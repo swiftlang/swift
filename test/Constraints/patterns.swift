@@ -443,7 +443,7 @@ func rdar_60048356() {
   }
 
   enum Failure {
-    case closed(Info)
+    case closed(Info) // expected-note {{'closed' declared here}}
   }
 
   enum Reason {
@@ -452,6 +452,29 @@ func rdar_60048356() {
 
   func test(_ reason: Reason) {
     if case .close(.closed((code: .normalClosure, _))) = reason { // Ok
+    }
+  }
+
+  // rdar://problem/60061646
+  func test(e: Failure) {
+    if case .closed(code: .normalClosure, _) = e { // Ok
+    // expected-warning@-1 {{enum case 'closed' has one associated value that is a tuple of 2 elements}}
+    }
+  }
+
+  enum E {
+    case foo((x: Int, y: Int)) // expected-note {{declared here}}
+    case bar(x: Int, y: Int)   // expected-note {{declared here}}
+  }
+
+  func test_destructing(e: E) {
+    if case .foo(let x, let y) = e { // Ok (destructring)
+    // expected-warning@-1 {{enum case 'foo' has one associated value that is a tuple of 2 elements}}
+      _ = x == y
+    }
+    if case .bar(let tuple) = e { // Ok (matching via tuple)
+    // expected-warning@-1 {{enum case 'bar' has 2 associated values; matching them as a tuple is deprecated}}
+      _ = tuple.0 == tuple.1
     }
   }
 }

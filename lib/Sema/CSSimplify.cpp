@@ -1683,10 +1683,33 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         }
       } else if (last->getKind() == ConstraintLocator::PatternMatch &&
           isa<EnumElementPattern>(
-            last->castTo<LocatorPathElt::PatternMatch>().getPattern()) &&
-          isSingleTupleParam(ctx, func1Params) &&
-          canImplodeParams(func2Params)) {
-        implodeParams(func2Params);
+            last->castTo<LocatorPathElt::PatternMatch>().getPattern())) {
+        // Consider following example:
+        //
+        // enum E {
+        //   case foo((x: Int, y: Int))
+        //   case bar(x: Int, y: Int)
+        // }
+        //
+        // func test(e: E) {
+        //   if case .foo(let x, let y) = e {}
+        //   if case .bar(let tuple) = e {}
+        // }
+        //
+        // Both of `if case` expressions have to be supported:
+        //
+        // 1. `case .foo(let x, let y) = e` allows a single tuple
+        //    parameter to be "destructured" into multiple arguments.
+        //
+        // 2. `case .bar(let tuple) = e` allows to match multiple
+        //    parameters with a single tuple argument.
+        if (isSingleTupleParam(ctx, func1Params) &&
+            canImplodeParams(func2Params)) {
+          implodeParams(func2Params);
+        } else if (isSingleTupleParam(ctx, func2Params) &&
+                   canImplodeParams(func1Params)) {
+          implodeParams(func1Params);
+        }
       }
     }
 
