@@ -101,8 +101,6 @@ protected:
 
   FulfillmentMap Fulfillments;
 
-  bool ConsiderParameterSources;
-
   GenericSignature::ConformsToArray getConformsTo(Type t) {
     return Generics->getConformsTo(t);
   }
@@ -183,8 +181,7 @@ private:
 PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
                                              CanSILFunctionType fnType,
                                              bool considerParameterSources = true)
-  : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType),
-    ConsiderParameterSources(considerParameterSources) {
+  : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType){
   initGenerics();
 
   auto rep = fnType->getRepresentation();
@@ -222,7 +219,7 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
       considerParameter(params[selfIndex], selfIndex, true);
     }
 
-      if (ConsiderParameterSources) {
+      if (considerParameterSources) {
         // Now consider the rest of the parameters.
         for (auto index : indices(params)) {
           if (index != selfIndex)
@@ -391,10 +388,6 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
-      // Don't consider ClassPointer source and Metadata source for partial_apply forwarder with non fixed layout.
-      // If not, we may end up with missing TypeMetadata for a type dependent generic parameter
-      // while generating code for destructor of HeapLayout.
-      if (!ConsiderParameterSources) return;
       // Classes are sources of metadata.
       if (type->getClassOrBoundGenericClass()) {
         considerNewTypeSource(MetadataSource::Kind::ClassPointer,
