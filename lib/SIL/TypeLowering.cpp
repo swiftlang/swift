@@ -1891,6 +1891,11 @@ TypeConverter::getTypeLowering(SILType type,
                                TypeExpansionContext forExpansion,
                                CanGenericSignature sig) {
   // The type lowering for a type parameter relies on its context.
+  if (!(sig || !type.getASTType()->hasTypeParameter())) {
+    llvm::errs() << "TypeConverter::getTypeLowering\n";
+    type.dump();
+    type.getASTType()->dump();
+  }
   assert(sig || !type.getASTType()->hasTypeParameter());
   auto loweredType = type.getASTType();
   auto origHadOpaqueTypeArchetype =

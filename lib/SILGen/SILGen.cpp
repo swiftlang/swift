@@ -829,6 +829,10 @@ void SILGenModule::emitDifferentiabilityWitness(
   assert(isa<DifferentiableAttr>(attr) || isa<DerivativeAttr>(attr));
   auto *origFnType = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
   auto origSilFnType = originalFunction->getLoweredFunctionType();
+  auto areSame = origSilFnType == origSilFnType->getUnsubstitutedType(originalFunction->getModule());
+  llvm::errs() << "ORIG FN TYPE: " << areSame << "\n";
+  origSilFnType->dump();
+  origSilFnType->getUnsubstitutedType(originalFunction->getModule())->dump();
   auto *silParamIndices =
       autodiff::getLoweredParameterIndices(config.parameterIndices, origFnType);
   // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
@@ -847,6 +851,9 @@ void SILGenModule::emitDifferentiabilityWitness(
   AutoDiffConfig silConfig(silParamIndices, config.resultIndices,
                            config.derivativeGenericSignature);
   SILDifferentiabilityWitnessKey key{originalFunction->getName(), silConfig};
+#if 0
+  return; // DEBUG
+#endif
   auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
   if (!diffWitness) {
     // Strip external from linkage of original function.

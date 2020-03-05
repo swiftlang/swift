@@ -1038,10 +1038,31 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   for (auto& arg : args.drop_front(1))
     origFnArgVals.push_back(arg.getValue());
 
+  auto origFnType = origFnVal->getType().castTo<SILFunctionType>();
+  auto origFnUnsubstType = origFnType->getUnsubstitutedType(SGF.getModule());
+  if (origFnType != origFnUnsubstType) {
+    llvm::errs() << "WOW ORIG MISMATCH!\n";
+    origFnVal->getType().dump();
+    origFnVal = SGF.B.createConvertFunction(loc, origFnVal, SILType::getPrimitiveObjectType(origFnUnsubstType), /*withoutActuallyEscaping*/ false);
+    origFnVal->getType().dump();
+  }
+
   // Get the derivative function.
   SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
       loc, kind, origFnVal);
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
+  auto derivativeFnUnsubstType = derivativeFnType->getUnsubstitutedType(SGF.getModule());
+  llvm::errs() << "emitBuiltinAutoDiffApplyDerivativeFunction\n";
+  derivativeFn->getType().dump();
+  derivativeFnUnsubstType->dump();
+  if (derivativeFnType != derivativeFnUnsubstType) {
+    llvm::errs() << "WOW MISMATCH!\n";
+    derivativeFn->getType().dump();
+    derivativeFn = SGF.B.createConvertFunction(loc, derivativeFn, SILType::getPrimitiveObjectType(derivativeFnUnsubstType), /*withoutActuallyEscaping*/ false);
+    derivativeFn->getType().dump();
+  }
+  llvm::errs() << "emitBuiltinAutoDiffApplyDerivativeFunction: SUBSTITUTIONS\n";
+  substitutions.dump();
 
   // We don't need to destroy the original function or retain the
   // `derivativeFn`, because they are trivial (because they are @noescape).
@@ -1058,8 +1079,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     numParameters += currentLevel->getNumParameters();
     if (currentLevel->getNumResults() != 1)
       break;
-    currentLevel =
-        currentLevel->getSingleResult().getInterfaceType()->getAs<SILFunctionType>();
+    currentLevel = currentLevel->getSingleResult().getInterfaceType()->getAs<SILFunctionType>();
   }
   assert(numParameters == origFnArgVals.size());
 
@@ -1079,6 +1099,8 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   for (auto *curryLevel : curryLevelsWithoutLast) {
     auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
         currentParameter, curryLevel->getNumParameters());
+    llvm::errs() << "emitBuiltinAutoDiffApplyDerivativeFunction: SUBSTITUTIONS\n";
+    substitutions.dump();
     auto applyResult = SGF.B.createApply(
         loc, derivativeFn, SubstitutionMap(), curryLevelArgVals,
         /*isNonThrowing*/ false);
@@ -1115,8 +1137,15 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     SGF.B.createStore(loc, differential,
                       SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
                       StoreOwnershipQualifier::Init);
-    return SGF.manageBufferForExprResult(
-        indResBuffer, SGF.getTypeLowering(indResBuffer->getType()), C);
+#if 0
+    return SGF.manageBufferForExprResult(indResBuffer, SGF.getTypeLowering(indResBuffer->getType()), C);
+#endif
+    AbstractionPattern pattern(SGF.F.getLoweredFunctionType()->getSubstGenericSignature(), indResBuffer->getType().getASTType());
+    // auto &asdf = SGF.getTypeLowering(indResBuffer->getType());
+    auto &tl = SGF.getTypeLowering(pattern, indResBuffer->getType().getASTType());
+    llvm::errs() << "HELLO WHAT IS THIS TYPE: " << tl.getLoweredType() << "\n";
+    SGF.F.dump();
+    return SGF.manageBufferForExprResult(indResBuffer, tl, C);
   }
 
   // Apply the last curry level, in the case where it only has direct results.
@@ -1160,8 +1189,9 @@ static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
       loc, transposeFn, SubstitutionMap(), applyArgs);
   if (transposeFnType->hasIndirectFormalResults()) {
     auto resBuffer = applyArgs.front();
-    return SGF.manageBufferForExprResult(
-        resBuffer, SGF.getTypeLowering(resBuffer->getType()), C);
+    AbstractionPattern pattern(SGF.F.getLoweredFunctionType()->getSubstGenericSignature(), resBuffer->getType().getASTType());
+    auto &asdf = SGF.getTypeLowering(pattern, resBuffer->getType().getASTType());
+    return SGF.manageBufferForExprResult(resBuffer, asdf, C);
   } else {
     return SGF.emitManagedRValueWithCleanup(apply);
   }

@@ -3472,13 +3472,27 @@ SILFunctionType::SILFunctionType(
            "non-witness_method SIL function with a conformance");
 
   // Make sure the type follows invariants.
+  if (!(!substitutions || genericSig)) {
+    llvm::errs() << "ERROR! '!substitutions || genericSig'\n";
+    dump();
+  }
   assert((!substitutions || genericSig)
          && "can only have substitutions with a generic signature");
+  if (!(!genericSigIsImplied || substitutions)) {
+    llvm::errs() << "ERROR! '!genericSigIsImplied || substitutions'\n";
+    dump();
+  }
   assert((!genericSigIsImplied || substitutions)
          && "genericSigIsImplied should only be set for a type with generic "
             "types and substitutions");
         
   if (substitutions) {
+    if (substitutions.getGenericSignature().getCanonicalSignature() !=
+        genericSig.getCanonicalSignature()) {
+      llvm::errs() << "GENERIC SIGNATURE MISMATCH!\n";
+      substitutions.getGenericSignature().getCanonicalSignature()->dump();
+      genericSig.getCanonicalSignature()->dump();
+    }
     assert(substitutions.getGenericSignature().getCanonicalSignature() ==
                genericSig.getCanonicalSignature() &&
            "substitutions must match generic signature");

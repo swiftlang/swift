@@ -334,15 +334,40 @@ void VJPEmitter::visitReturnInst(ReturnInst *ri) {
   auto vjpSubstMap = vjpGenericEnv
                          ? vjpGenericEnv->getForwardingSubstitutionMap()
                          : vjp->getForwardingSubstitutionMap();
+  // vjpSubstMap = vjp->getLoweredFunctionType()->getSubstitutions();
   auto *pullbackRef = builder.createFunctionRef(loc, pullback);
   auto *pullbackPartialApply =
       builder.createPartialApply(loc, pullbackRef, vjpSubstMap, {pbStructVal},
                                  ParameterConvention::Direct_Guaranteed);
+  llvm::errs() << "PULLBACK TYPES\n";
+  pullbackPartialApply->getType().dump();
+  // auto pullbackType = getLoweredType(vjp->getLoweredFunctionType()->getResults().back().getInterfaceType());
+  auto pullbackType = vjp->getLoweredFunctionType()->getResults().back().getSILStorageInterfaceType();
+  pullbackType.dump();
+  llvm::errs() << "BEFORE REPLACEMENT TYPES\n";
+  for (auto type : vjpSubstMap.getReplacementTypes())
+    type->dump();
+  llvm::errs() << "AFTER REPLACEMENT TYPES\n";
+  for (auto type : vjp->getLoweredFunctionType()->getSubstitutions().getReplacementTypes())
+    type->dump();
+  llvm::errs() << "FINAL REPLACEMENT TYPES\n";
+  for (auto type : pullbackType.castTo<SILFunctionType>()->getSubstitutions().getReplacementTypes())
+    type->dump();
+  // pullbackType = SILType::getPrimitiveObjectType(pullbackType.castTo<SILFunctionType>()->withSubstitutions(vjpSubstMap));
+  pullbackType = pullbackType.substGenericArgs(getModule(), vjpSubstMap, TypeExpansionContext::minimal());
+  llvm::errs() << "FINAL2 REPLACEMENT TYPES\n";
+  for (auto type : pullbackType.castTo<SILFunctionType>()->getSubstitutions().getReplacementTypes())
+    type->dump();
+  pullbackType = pullbackType.subst(getModule(), vjpSubstMap);
+  llvm::errs() << "FINAL3 REPLACEMENT TYPES\n";
+  for (auto type : pullbackType.castTo<SILFunctionType>()->getSubstitutions().getReplacementTypes())
+    type->dump();
+  auto *pullbackValue = builder.createConvertFunction(loc, pullbackPartialApply, pullbackType, /*withoutActuallyEscaping*/ false);
 
   // Return a tuple of the original result and pullback.
   SmallVector<SILValue, 8> directResults;
   directResults.append(origResults.begin(), origResults.end());
-  directResults.push_back(pullbackPartialApply);
+  directResults.push_back(pullbackValue);
   builder.createReturn(ri->getLoc(), joinElements(directResults, builder, loc));
 }
 

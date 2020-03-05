@@ -263,6 +263,7 @@ extension Tracked where T : Differentiable & FloatingPoint, T == T.TangentVector
 
 // Differential operators for `Tracked<T>`.
 
+/*
 public func gradient<T, R: FloatingPoint>(
   at x: T, in f: @differentiable (T) -> Tracked<R>
 ) -> T.TangentVector where R.TangentVector == R {
@@ -301,3 +302,4 @@ public func valueWithDerivative<T: FloatingPoint, R>(
   let (y, differential) = valueWithDifferential(at: x, in: f)
   return (y, differential(1))
 }
+*/

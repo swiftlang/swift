@@ -707,9 +707,8 @@ getExtracteeType(
     return SILType::getPrimitiveObjectType(originalFnTy);
   }
   auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        fnTy->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
-        *kindOpt, module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
+      fnTy->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
+      *kindOpt, module.Types, LookUpConformanceInModule(module.getSwiftModule()));
   return SILType::getPrimitiveObjectType(resultFnTy);
 }
 

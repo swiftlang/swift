@@ -3962,6 +3962,60 @@ public:
                functionResultType.dump();
                llvm::dbgs() << "return inst type: ";
                instResultType.dump(););
+    if (functionResultType != instResultType) {
+      llvm::errs() << "MISMATCH: " << functionResultType.getASTType().getPointer() << " " << instResultType.getASTType().getPointer() << "\n";
+      functionResultType.getASTType()->dump();
+      instResultType.getASTType()->dump();
+      auto expected = functionResultType.castTo<SILFunctionType>();
+      auto actual = instResultType.castTo<SILFunctionType>();
+
+#if 0
+      llvm::errs() << "EXPECTED PARAMS:\n";
+      for (auto param : expected->getParameters())
+        llvm::errs() << param.getInterfaceType().getPointer() << "\n";
+      llvm::errs() << "ACTUAL PARAMS:\n";
+      for (auto param : actual->getParameters())
+        llvm::errs() << param.getInterfaceType().getPointer() << "\n";
+
+      llvm::errs() << "EXPECTED RESULTS:\n";
+      for (auto param : expected->getResults())
+        llvm::errs() << param.getInterfaceType().getPointer() << "\n";
+      llvm::errs() << "ACTUAL RESULTS:\n";
+      for (auto param : actual->getResults())
+        llvm::errs() << param.getInterfaceType().getPointer() << "\n";
+
+      llvm::errs() << "EXPECTED REPLACEMENTS:\n";
+      for (auto param : expected->getSubstitutions().getReplacementTypes()) {
+        llvm::errs() << param.getPointer() << "\n";
+        param->dump();
+      }
+      llvm::errs() << "ACTUAL REPLACEMENTS:\n";
+      for (auto param : actual->getSubstitutions().getReplacementTypes()) {
+        llvm::errs() << param.getPointer() << "\n";
+        param->dump();
+      }
+#endif
+
+#if 0
+      // llvm::errs() << "PARAM: " << expected->getParameters().front().getInterfaceType().getPointer() << " " <<  actual->getParameters().front().getInterfaceType().getPointer() << "\n";
+      llvm::errs() << "GEN SIGS: " << expected->getSubstGenericSignature().getPointer() << " " << actual->getSubstGenericSignature().getPointer() << "\n";
+      llvm::errs() << "GEN SIGS: " << expected->getInvocationGenericSignature().getPointer() << " " << actual->getInvocationGenericSignature().getPointer() << "\n";
+      llvm::errs() << "IMPLIED: " << expected->isGenericSignatureImplied() << " " << actual->isGenericSignatureImplied() << "\n";
+      llvm::errs() << "GEN SIGS: " << expected->getSubstitutions().getGenericSignature().getPointer() << " " << actual->getSubstitutions().getGenericSignature().getPointer() << "\n";
+      expected->getSubstitutions().dump();
+      actual->getSubstitutions().dump();
+      {
+        llvm::FoldingSetNodeID hello;
+        expected->getSubstitutions().profile(hello);
+        llvm::errs() << "EXPECTED HASH: " << hello.ComputeHash() << "\n";
+      }
+      {
+        llvm::FoldingSetNodeID hello;
+        actual->getSubstitutions().profile(hello);
+        llvm::errs() << "ACTUAL HASH: " << hello.ComputeHash() << "\n";
+      }
+#endif
+    }
     requireSameType(functionResultType, instResultType,
                     "return value type does not match return type of function");
   }
