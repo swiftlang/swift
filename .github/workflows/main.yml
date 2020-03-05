@@ -67,83 +67,29 @@ jobs:
         with:
           name: macos-test-results
           path: ./swift-test-results.tar.gz
-  package:
-    name: Build SwiftWasm packages
-    needs:
-      - linux_build
-      - macos_build
-    runs-on: ubuntu-18.04
+  macos_smoke_test:
+    name: Compile hello.swift on macOS
+    runs-on: macos-latest
+    needs: macos_build
     steps:
-      - name: Download installable Linux archive
-        uses: actions/download-artifact@v1
-        with:
-          name: linux-installable
       - name: Download installable macOS archive
         uses: actions/download-artifact@v1
         with:
           name: macos-installable
-      - name: Download packaging scripts
-        uses: actions/download-artifact@v1
-        with:
-          name: packaging-scripts
-      - name: Build the packages
-        shell: bash
-        run: |
-          cd packaging-scripts
-          find . -name '*.sh' -exec chmod +x {} \;
-          chmod +x sdkroot/swiftwasm
-          ./download-prebuilts.sh
-
-          cp ../linux-installable/swiftwasm-linux.tar.gz \
-            ../macos-installable/swiftwasm-macos.tar.gz \
-            prebuilt
-          ./build-packages.sh
-
-          cd output
-          tar xf swiftwasm-sdk-linux.tar.xz && echo "Successfully unpacked Linux SDK"
-
-          cd swiftwasm-sdk
-          ./swiftwasm example/hello.swift hello.wasm && echo "Successfully linked hello.wasm"
-
-      - name: Upload macOS package
-        uses: actions/upload-artifact@v1
-        with:
-          name: macos-package
-          path: packaging-scripts/output/swiftwasm-sdk-macos.tar.xz
-
-      - name: Upload Linux package
-        uses: actions/upload-artifact@v1
-        with:
-          name: linux-package
-          path: packaging-scripts/output/swiftwasm-sdk-linux.tar.xz
-
-      - name: Upload hello.wasm compiled with Linux package
-        uses: actions/upload-artifact@v1
-        with:
-          name: linux-hello.wasm
-          path: packaging-scripts/output/swiftwasm-sdk/hello.wasm
-
-  macos_smoke_test:
-    name: Compile hello.swift on macOS
-    runs-on: macos-latest
-    needs: package
-    steps:
-      - name: Download SwiftWasm macOS package
-        uses: actions/download-artifact@v1
-        with:
-          name: macos-package
-
       - name: Build hello.wasm
         shell: bash
         run: |
-          cd macos-package
-          tar xf swiftwasm-sdk-macos.tar.xz && echo "Successfully unpacked macOS SDK"
-
-          cd swiftwasm-sdk
-          ./swiftwasm example/hello.swift hello.wasm && echo "Successfully linked hello.wasm"
+          set -x
+          tar xf $(find -name "swift-wasm-*.tar.gz" -type f)
+          TOOLCHAIN_PATH=$(find -name "swift-wasm-*" -type d)
+          echo 'print("Hello, world!")' > hello.swift
+          $TOOLCHAIN_PATH/usr/bin/swiftc \
+                -target wasm32-unknown-wasi \
+                hello.swift -o hello.wasm && \
+                echo "Successfully linked hello.wasm"
 
       - name: Upload hello.wasm compiled with macOS package
         uses: actions/upload-artifact@v1
         with:
           name: macos-hello.wasm
-          path: macos-package/swiftwasm-sdk/hello.wasm
+          path: hello.wasm
