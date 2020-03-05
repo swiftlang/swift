@@ -94,6 +94,10 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
     llvm::Mangler::getNameWithPrefix(name, unmangledName,
                                      IRModule.getDataLayout());
 
+    // Ignore module hash symbols.
+    if (name.endswith("Tw"))
+      continue;
+
     auto value = nameValue.getValue();
     if (auto GV = dyn_cast<llvm::GlobalValue>(value)) {
       // Is this a symbol that should be listed?

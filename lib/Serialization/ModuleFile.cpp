@@ -1880,6 +1880,67 @@ ModuleFile::ModuleFile(
       break;
     }
 
+    case HASH_BLOCK_ID: {
+      if (llvm::Error Err = cursor.EnterSubBlock(HASH_BLOCK_ID)) {
+        // FIXME this drops the error on the floor.
+        consumeError(std::move(Err));
+        info.status = error(Status::Malformed);
+        return;
+      }
+
+      Expected<llvm::BitstreamEntry> maybeNext =
+          cursor.advanceSkippingSubblocks();
+      if (!maybeNext) {
+        // FIXME this drops the error on the floor.
+        consumeError(maybeNext.takeError());
+        info.status = error(Status::Malformed);
+        return;
+      }
+      llvm::BitstreamEntry next = maybeNext.get();
+      while (next.Kind == llvm::BitstreamEntry::Record) {
+        scratch.clear();
+        StringRef blobData;
+        Expected<unsigned> maybeKind =
+            cursor.readRecord(next.ID, scratch, &blobData);
+        if (!maybeKind) {
+          // FIXME this drops the error on the floor.
+          consumeError(maybeKind.takeError());
+          info.status = error(Status::Malformed);
+          return;
+        }
+        unsigned kind = maybeKind.get();
+
+        switch (kind) {
+        case hash_block::HASH_DATA: {
+          assert(scratch.empty());
+          if (blobData.size() != 16) {
+            info.status = error(Status::Malformed);
+            return;
+          }
+          moduleHash = blobData;
+          break;
+        }
+        default:
+          break;
+        }
+
+        maybeNext = cursor.advanceSkippingSubblocks();
+        if (!maybeNext) {
+          // FIXME this drops the error on the floor.
+          consumeError(maybeNext.takeError());
+          info.status = error(Status::Malformed);
+          return;
+        }
+        next = maybeNext.get();
+      }
+
+      if (next.Kind != llvm::BitstreamEntry::EndBlock) {
+        info.status = error(Status::Malformed);
+        return;
+      }
+      break;
+    }
+
     default:
       // Unknown top-level block, possibly for use by a future version of the
       // module format.

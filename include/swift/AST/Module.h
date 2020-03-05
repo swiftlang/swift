@@ -190,6 +190,54 @@ public:
     }
   };
 
+  /// A hash of the written swiftmodule file.
+  ///
+  /// Used to implement version checking.
+  class Hash {
+    llvm::MD5::MD5Result hash;
+    bool valid = false;
+  public:
+    Hash() { hash.Bytes.fill(0); }
+  
+    Hash &operator=(StringRef s) {
+      assert(s.size() == 16);
+      std::copy(s.begin(), s.end(), hash.Bytes.begin());
+      valid = true;
+      return *this;
+    }
+  
+    void finalize(llvm::MD5 &md5) {
+      md5.final(hash);
+      valid = true;
+    }
+  
+    Hash &operator=(const Hash &rhs) {
+      hash = rhs.hash;
+      valid = rhs.valid;
+      return *this;
+    }
+
+    /// Return true if the hash is computed.
+    ///
+    /// This is only done for modules which are not compiled with library
+    /// evolution.
+    bool isValid() const { return valid; }
+    
+    const llvm::MD5::MD5Result &md5() const { return hash; }
+
+    StringRef rawDataAsStr() const {
+      return StringRef((const char *)hash.Bytes.data(), hash.Bytes.size());
+    }
+    
+    SmallString<32> readableStr() { return hash.digest(); }
+  };
+
+  /// The hash of the written swiftmodule file.
+  ///
+  /// Set during serialization and used in IRGen to emit symbols for version
+  /// checking.
+  Hash hash;
+
   /// Produces the components of a given module's full name in reverse order.
   ///
   /// For a Swift module, this will only ever have one component, but an

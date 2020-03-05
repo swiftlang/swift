@@ -189,6 +189,11 @@ def verify_incremental_dependencies :
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enable the dependency verifier for each frontend job">;
 
+def disable_module_version_checking :
+  Flag<["-"], "disable-module-version-checking">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Disable module version checking">;
+
 def driver_emit_fine_grained_dependency_dot_file_after_every_import :
 Flag<["-"], "driver-emit-fine-grained-dependency-dot-file-after-every-import">,
 InternalDebugOpt,

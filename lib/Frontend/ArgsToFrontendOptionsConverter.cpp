@@ -178,6 +178,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
 
+  Opts.DisableModuleVersionChecking |=
+    Args.hasArg(OPT_disable_module_version_checking);
+
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames();
   computeLLVMArgs();

@@ -283,6 +283,8 @@ private:
   /// if the module can be loaded.
   void writeHeader(const SerializationOptions &options = {});
 
+  void writeHash(ModuleDecl *M);
+
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
   void writeInputBlock(const SerializationOptions &options);

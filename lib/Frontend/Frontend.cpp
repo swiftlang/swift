@@ -173,6 +173,12 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.SerializeOptionsForDebugging =
       opts.SerializeOptionsForDebugging.getValueOr(!moduleIsPublic);
 
+  serializationOpts.writeModuleHash =
+      !opts.DisableModuleVersionChecking &&
+      !opts.EnableLibraryEvolution &&
+      opts.InputsAndOutputs.isWholeModule() &&
+      opts.RequestedAction != FrontendOptions::ActionType::MergeModules;
+
   return serializationOpts;
 }
 

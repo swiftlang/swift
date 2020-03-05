@@ -266,6 +266,9 @@ public:
   /// Should we enable the dependency verifier for all primary files known to this frontend?
   bool EnableIncrementalDependencyVerifier = false;
 
+  /// Disable version checking for swiftmodule files.
+  bool DisableModuleVersionChecking = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.

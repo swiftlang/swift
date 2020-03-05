@@ -637,6 +637,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
                        &extendedInfo);
   if (loadInfo.status == serialization::Status::Valid) {
     M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
+    M.hash = loadedModuleFile->getModuleHash();
 
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,

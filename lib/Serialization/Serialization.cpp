@@ -853,6 +853,9 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_PROPERTY_OFFSETS);
 
+  BLOCK(HASH_BLOCK);
+  BLOCK_RECORD(hash_block, HASH_DATA);
+
 #undef BLOCK
 #undef BLOCK_RECORD
 }
@@ -5072,6 +5075,17 @@ SerializerBase::SerializerBase(ArrayRef<unsigned char> signature,
   this->SF = DC.dyn_cast<SourceFile *>();
 }
 
+void Serializer::writeHash(ModuleDecl *M) {
+  llvm::MD5 md5;
+  md5.update(ArrayRef<uint8_t>((uint8_t *)Buffer.data(), Buffer.size_in_bytes()));
+  M->hash.finalize(md5);
+  {
+    BCBlockRAII hashBlock(Out, HASH_BLOCK_ID, 3);
+    hash_block::HashLayout hashRecord(Out);
+    hashRecord.emit(ScratchRecord, M->hash.rawDataAsStr());
+  }
+}
+
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                const SILModule *SILMod,
                                const SerializationOptions &options) {
@@ -5086,6 +5100,10 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
+    if (options.writeModuleHash) {
+      if (auto *M = DC.dyn_cast<ModuleDecl *>())
+        S.writeHash(M);
+    }
   }
 
   S.writeToStream(os);

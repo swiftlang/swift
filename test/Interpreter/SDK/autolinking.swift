@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: echo "int global() { return 42; }" | %clang -dynamiclib -o %t/libLinkMe.dylib -x c -
-// RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t -module-name LinkMe -module-link-name LinkMe %S/../../Inputs/empty.swift
+// RUN: %target-swift-frontend -emit-module -parse-stdlib -disable-module-version-checking -o %t -module-name LinkMe -module-link-name LinkMe %S/../../Inputs/empty.swift
 
 // RUN: %target-jit-run -DIMPORT %s -I %t -L %t 2>&1
 // RUN: %target-jit-run -lLinkMe %s -L %t 2>&1

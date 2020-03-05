@@ -999,6 +999,56 @@ static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
   return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
 }
 
+/// Create a global variable which contains an array of hash symbols of imported
+/// modules.
+///
+/// If a symbol is not defined in the library, the linker will issue an
+/// undefined symbol error. This makes sure that the version of module files
+/// is in sync with the actual created binary of a module.
+static void emitVersionCheckingSymbols(IRGenModule *PrimaryIGM) {
+  ModuleDecl *M = PrimaryIGM->getSwiftModule();
+
+  SmallVector<llvm::Constant *, 8> hashRefs;
+
+  // Collect all imported modules which have a hash stored in the modulefile.
+  ModuleDecl::ImportFilter ImportFilter;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+  ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  llvm::SetVector<ModuleDecl *> importsToHandle;
+  SmallVector<ModuleDecl::ImportedModule, 8> importedModules;
+  M->getImportedModules(importedModules, ImportFilter);
+  for (ModuleDecl::ImportedModule import : importedModules) {
+    ModuleDecl *MDecl = import.second;
+    if (MDecl->hash.isValid())
+      importsToHandle.insert(MDecl);
+  }
+
+  if (!M->hash.isValid() && importsToHandle.empty())
+    return;
+
+  // Create an array which contains references to the hash symbols.
+  for (ModuleDecl *import : importsToHandle) {
+    IRGenMangler mangler;
+    std::string symname = mangler.mangleModuleHash(import);
+    auto *extHashSym = new llvm::GlobalVariable(PrimaryIGM->Module, PrimaryIGM->Int8Ty,
+      true, llvm::GlobalValue::ExternalLinkage, nullptr, symname);
+    hashRefs.push_back(extHashSym);
+  }
+
+  // Create the global variable which holds the symbols.
+  // This variable is used as the hash symbol for the current module at the same
+  // time.
+  auto *arrTy = llvm::ArrayType::get(PrimaryIGM->Int8PtrTy, hashRefs.size());
+  auto *init = llvm::ConstantArray::get(arrTy, hashRefs);
+
+  IRGenMangler mangler;
+  std::string symname = mangler.mangleModuleHash(M);
+
+  new llvm::GlobalVariable(PrimaryIGM->Module, arrTy, true,
+    llvm::GlobalValue::ExternalLinkage, init, symname);
+}
+
 void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
@@ -1024,6 +1074,14 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
       createLinkerDirectiveVariable(*PrimaryIGM, entry.getKey());
     }
   }
+
+  if (PrimaryIGM->getSILModule().isWholeModule()) {
+    emitVersionCheckingSymbols(PrimaryIGM);
+  } else {
+    assert(!PrimaryIGM->getSwiftModule()->hash.isValid() &&
+           "shouldn't have computed a hash for a non-wmo compilation");
+  }
+
   for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {
     Decl *decl = v.getDecl();
     CurrentIGMPtr IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);

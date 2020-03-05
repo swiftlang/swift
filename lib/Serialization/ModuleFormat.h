@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 545; // SILFunctionType pattern sigs/subs
+const uint16_t SWIFTMODULE_VERSION_MINOR = 546; // Module hashes
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -704,6 +704,12 @@ enum BlockID {
   ///
   /// \sa decl_locs_block
   DECL_LOCS_BLOCK_ID,
+  
+  /// The hash block, which contains a MD5 hash of the whole module file.
+  ///
+  /// This block is optional and only written if the module is not compiled
+  /// with library evolution.
+  HASH_BLOCK_ID
 };
 
 /// The record types within the control block.
@@ -2026,6 +2032,15 @@ namespace decl_member_tables_block {
     BCBlob  // maps from DeclIDs to DeclID vectors
   >;
 }
+
+namespace hash_block {
+  enum RecordKind {
+    HASH_DATA = 1,
+  };
+
+  using HashLayout = BCRecordLayout<HASH_DATA, BCBlob>;
+}
+
 
 } // end namespace serialization
 } // end namespace swift

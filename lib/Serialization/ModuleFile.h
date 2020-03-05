@@ -95,6 +95,9 @@ class ModuleFile
   /// A callback to be invoked every time a type was deserialized.
   std::function<void(Type)> DeserializedTypeCallback;
 
+  /// A hash of the written swiftmodule file.
+  ModuleDecl::Hash moduleHash;
+
   /// Is this module file actually a .sib file? .sib files are serialized SIL at
   /// arbitrary granularity and arbitrary stage; unlike serialized Swift
   /// modules, which are assumed to contain canonical SIL for an entire module.
@@ -513,6 +516,8 @@ public:
     assert(FileContext && "no associated context yet");
     return FileContext;
   }
+
+  const ModuleDecl::Hash &getModuleHash() const { return moduleHash; }
 
 private:
   /// Read an on-disk decl hash table stored in index_block::DeclListLayout

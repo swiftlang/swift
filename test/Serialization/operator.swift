@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_operator.swift
+// RUN: %target-swift-frontend -emit-module -disable-module-version-checking -o %t %S/Inputs/def_operator.swift
 // RUN: llvm-bcanalyzer %t/def_operator.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -typecheck -I%t %s
 // RUN: %target-swift-frontend -interpret -I %t -DINTERP %s | %FileCheck --check-prefix=OUTPUT %s
