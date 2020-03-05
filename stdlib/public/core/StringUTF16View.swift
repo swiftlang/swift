@@ -531,6 +531,8 @@ extension String.UTF16View {
     let idx = _utf16AlignNativeIndex(idx)
 
     guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
+      // TODO: Generic _distance is still very slow. We should be able to
+      // skip over ASCII substrings quickly
       return _distance(from: startIndex, to: idx)
     }
 
