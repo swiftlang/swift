@@ -175,20 +175,7 @@ public:
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
-                                int *extraInhabitantIndex) const {
-    if (getNumExtraInhabitants() == 0) {
-      *extraInhabitantIndex = -1;
-      return true;
-    }
-    // If it has extra inhabitants, it must be a pointer.  (The only non-pointer
-    // data with extra inhabitants is a non-payload enum, which doesn't get here.)
-    // But there are two different conventions, one for function pointers:
-    if (self == TypeConverter::getThinFunctionTypeInfo()) {
-      return reader.readFunctionPointerExtraInhabitantIndex(address, extraInhabitantIndex);
-    } else {
-      return reader.readHeapObjectExtraInhabitantIndex(address, extraInhabitantIndex);
-    }
-  }
+                                int *extraInhabitantIndex) const;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Builtin;
