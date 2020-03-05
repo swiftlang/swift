@@ -103,8 +103,10 @@ bool TempRValueOptPass::collectLoads(
     SILValue srcAddr, SmallPtrSetImpl<SILInstruction *> &loadInsts) {
   // All normal uses (loads) must be in the initialization block.
   // (The destroy and dealloc are commonly in a different block though.)
-  if (user->getParent() != address->getParent())
+  if (user->getParent() != address->getParent()) {
+    LLVM_DEBUG(llvm::dbgs()<<"FAIL: Use outside basic block");
     return false;
+  }
 
   // Only allow uses that cannot destroy their operand. We need to be sure
   // that replacing all this temporary's uses with the copy source doesn't
@@ -382,6 +384,8 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   auto *tempObj = dyn_cast<AllocStackInst>(copyInst->getDest());
   if (!tempObj)
     return false;
+
+  LLVM_DEBUG(copyInst->dump());
 
   // The copy's source address must not be a scoped instruction, like
   // begin_borrow. When the temporary object is eliminated, it's uses are

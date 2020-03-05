@@ -345,6 +345,9 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // SILCombine can expose further opportunities for SimplifyCFG.
   P.addSimplifyCFG();
 
+  // SimpliCFG can expose further opportunities for TempRVO
+  P.addTempRValueOpt();
+
   P.addCSE();
   if (OpLevel == OptimizationLevelKind::HighLevel) {
     // Early RLE does not touch loads from Arrays. This is important because
