@@ -2292,9 +2292,6 @@ Constraint *ConstraintSystem::selectDisjunction() {
 }
 
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
-  if (isUnavailable())
-    cs.increaseScore(SK_Unavailable);
-
   cs.simplifyDisjunctionChoice(Choice);
 
   if (ExplicitConversion)
