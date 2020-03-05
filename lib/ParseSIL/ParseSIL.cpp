@@ -25,8 +25,6 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/Parser.h"
-#include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "swift/Syntax/SyntaxArena.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -106,59 +104,6 @@ SILParserState::SILParserState(SILModule *M)
     : Impl(M ? std::make_unique<SILParserTUState>(*M) : nullptr) {}
 
 SILParserState::~SILParserState() = default;
-
-void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
-  out << "With parser at source location: ";
-  P.Tok.getLoc().print(out, P.Context.SourceMgr);
-  out << '\n';
-}
-
-/// A thunk that deletes an allocated PersistentParserState. This is needed for
-/// us to be able to forward declare a unique_ptr to the state in the AST.
-static void deletePersistentParserState(PersistentParserState *state) {
-  delete state;
-}
-
-void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID) {
-  auto &ctx = SF.getASTContext();
-  std::shared_ptr<SyntaxTreeCreator> STreeCreator;
-  if (SF.shouldBuildSyntaxTree()) {
-    STreeCreator = std::make_shared<SyntaxTreeCreator>(
-        SF.getASTContext().SourceMgr, BufferID,
-        SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
-  }
-
-  // If we've been asked to silence warnings, do so now. This is needed for
-  // secondary files, which can be parsed multiple times.
-  auto &diags = ctx.Diags;
-  auto didSuppressWarnings = diags.getSuppressWarnings();
-  auto shouldSuppress = SF.getParsingOptions().contains(
-      SourceFile::ParsingFlags::SuppressWarnings);
-  diags.setSuppressWarnings(didSuppressWarnings || shouldSuppress);
-  SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
-
-  // If this buffer is for code completion, hook up the state needed by its
-  // second pass.
-  PersistentParserState *state = nullptr;
-  if (ctx.SourceMgr.getCodeCompletionBufferID() == BufferID) {
-    state = new PersistentParserState();
-    SF.setDelayedParserState({state, &deletePersistentParserState});
-  }
-
-  FrontendStatsTracer tracer(SF.getASTContext().Stats,
-                             "Parsing");
-  Parser P(BufferID, SF, /*SIL*/ nullptr, state, STreeCreator);
-  PrettyStackTraceParser StackTrace(P);
-
-  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(P.CurrentTokenHash,
-                                                 SF.getInterfaceHashPtr());
-  P.parseTopLevel();
-
-  if (STreeCreator) {
-    auto rawNode = P.finalizeSyntaxTree();
-    STreeCreator->acceptSyntaxRoot(rawNode, SF);
-  }
-}
 
 void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
   auto bufferID = SF.getBufferID();

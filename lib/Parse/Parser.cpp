@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
@@ -1232,7 +1233,13 @@ ParserUnit::~ParserUnit() {
 
 OpaqueSyntaxNode ParserUnit::parse() {
   auto &P = getParser();
-  P.parseTopLevel();
+  auto &ctx = P.Context;
+
+  SmallVector<Decl *, 128> decls;
+  P.parseTopLevel(decls);
+
+  ctx.evaluator.cacheOutput(ParseSourceFileRequest{&P.SF},
+                            ctx.AllocateCopy(decls));
   return P.finalizeSyntaxTree();
 }
 
@@ -1418,4 +1425,10 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
 
 DeclName swift::parseDeclName(ASTContext &ctx, StringRef name) {
   return parseDeclName(name).formDeclName(ctx);
+}
+
+void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
+  out << "With parser at source location: ";
+  P.Tok.getLoc().print(out, P.Context.SourceMgr);
+  out << '\n';
 }

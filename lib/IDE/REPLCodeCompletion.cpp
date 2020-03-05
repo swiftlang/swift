@@ -232,7 +232,6 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
     newSF.addImports(importsWithOptions);
   }
 
-  parseIntoSourceFile(newSF, *BufferID);
   performTypeChecking(newSF);
 
   performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);

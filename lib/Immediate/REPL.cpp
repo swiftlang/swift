@@ -185,7 +185,6 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
     REPLInputFile.addImports(ImportsWithOptions);
   }
 
-  parseIntoSourceFile(REPLInputFile, BufferID);
   performTypeChecking(REPLInputFile);
   return REPLModule;
 }
