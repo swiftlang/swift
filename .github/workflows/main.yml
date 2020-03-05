@@ -80,8 +80,8 @@ jobs:
         shell: bash
         run: |
           set -x
-          tar xf $(find -name "swift-wasm-*.tar.gz" -type f)
-          TOOLCHAIN_PATH=$(find -name "swift-wasm-*" -type d)
+          tar xf $(find . -name "swift-wasm-*.tar.gz" -type f)
+          TOOLCHAIN_PATH=$(find . -name "swift-wasm-*" -type d)
           echo 'print("Hello, world!")' > hello.swift
           $TOOLCHAIN_PATH/usr/bin/swiftc \
                 -target wasm32-unknown-wasi \
