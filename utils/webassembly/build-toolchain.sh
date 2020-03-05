@@ -24,12 +24,12 @@ esac
 YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
-TOOLCHAIN_VERSION="5.2.${YEAR}${MONTH}${DAY}"
-TOOLCHAIN_NAME="swift-wasm-5.2-DEVELOPMENT-SNAPSHOT-${YEAR}-${MONTH}-${DAY}-a"
+TOOLCHAIN_VERSION="${YEAR}${MONTH}${DAY}"
+TOOLCHAIN_NAME="swift-wasm-DEVELOPMENT-SNAPSHOT-${YEAR}-${MONTH}-${DAY}-a"
 ARCHIVE="${TOOLCHAIN_NAME}-${OS_SUFFIX}.tar.gz"
 INSTALLABLE_PACKAGE=$SOURCE_PATH/$ARCHIVE
 
-PACKAGE_ARTIFACT="$SOURCE_PATH/swift-wasm-5.2-DEVELOPMENT-SNAPSHOT-${OS_SUFFIX}.tar.gz"
+PACKAGE_ARTIFACT="$SOURCE_PATH/swift-wasm-DEVELOPMENT-SNAPSHOT-${OS_SUFFIX}.tar.gz"
 
 BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
 DISPLAY_NAME_SHORT="Swift for WebAssembly Development Snapshot"
@@ -45,6 +45,7 @@ $BUILD_SCRIPT \
   --darwin-toolchain-display-name-short="${DISPLAY_NAME_SHORT}" \
   --darwin-toolchain-name="${TOOLCHAIN_NAME}" \
   --darwin-toolchain-version="${TOOLCHAIN_VERSION}" \
+  --darwin-toolchain-alias="swift" \
   "$@"
 
 TMP_DIR=$(mktemp -d)
