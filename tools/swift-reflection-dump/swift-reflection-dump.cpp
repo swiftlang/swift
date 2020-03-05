@@ -466,7 +466,7 @@ public:
       return true;
     }
     case DLQ_GetLeastValidPointerValue: {
-      auto result = static_cast<uint8_t *>(outBuffer);
+      auto result = static_cast<uint64_t *>(outBuffer);
       if (applePlatform && wordSize == 8) {
         // Swift reserves the first 4GiB on 64-bit Apple platforms
         *result = 0x100000000;
