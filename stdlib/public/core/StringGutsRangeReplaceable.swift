@@ -79,13 +79,16 @@ extension _StringGuts {
     _internalInvariant(
       self.uniqueNativeCapacity == nil || self.uniqueNativeCapacity! < n)
 
+    // TODO: Dont' do this! Growth should only happen for append...
     let growthTarget = Swift.max(n, (self.uniqueNativeCapacity ?? 0) * 2)
 
     if _fastPath(isFastUTF8) {
       let isASCII = self.isASCII
       let storage = self.withFastUTF8 {
         __StringStorage.create(
-          initializingFrom: $0, capacity: growthTarget, isASCII: isASCII)
+          initializingFrom: $0,
+          codeUnitCapacity: growthTarget,
+          isASCII: isASCII)
       }
 
       self = _StringGuts(storage)

@@ -120,8 +120,10 @@ extension _StringGuts {
 
   internal var hasSharedStorage: Bool { return _object.hasSharedStorage }
 
+  // Whether this string has breadcrumbs
   internal var hasBreadcrumbs: Bool {
-    return hasNativeStorage || hasSharedStorage
+    return hasSharedStorage
+      || (hasNativeStorage && _object.nativeStorage.hasBreadcrumbs)
   }
 }
 
