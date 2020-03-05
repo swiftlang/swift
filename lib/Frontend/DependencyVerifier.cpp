@@ -18,9 +18,10 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/Demangling/Demangler.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Parse/Lexer.h"
 
@@ -261,7 +262,6 @@ public:
 class DependencyVerifier {
   SourceManager &SM;
   const DependencyTracker &DT;
-  std::vector<llvm::SMDiagnostic> Errors = {};
 
 public:
   explicit DependencyVerifier(SourceManager &SM, const DependencyTracker &DT)
@@ -286,7 +286,7 @@ private:
                          ObligationMap &Obs,
                          NegativeExpectationMap &NegativeExpectations);
 
-  bool verifyNegativeExpectations(ObligationMap &Obs,
+  bool verifyNegativeExpectations(const SourceFile *SF, ObligationMap &Obs,
                                   NegativeExpectationMap &Negs);
 
   bool diagnoseUnfulfilledObligations(const SourceFile *SF, ObligationMap &OM);
@@ -328,29 +328,13 @@ private:
   }
 
 private:
-  template <typename... Ts>
-  inline auto addFormattedDiagnostic(const Expectation &dep, const char *Fmt,
-                                     Ts &&... Vals) {
-    return addFormattedDiagnostic(dep.MessageRange.begin(), Fmt,
-                                  std::forward<Ts>(Vals)...);
+  template <typename... ArgTypes>
+  InFlightDiagnostic
+  diagnose(DiagnosticEngine &Diags, const char *LocPtr, Diag<ArgTypes...> ID,
+           typename detail::PassArgument<ArgTypes>::type... Args) const {
+    auto Loc = SourceLoc(llvm::SMLoc::getFromPointer(LocPtr));
+    return Diags.diagnose(Loc, ID, std::move(Args)...);
   }
-
-  template <typename... Ts>
-  inline auto addFormattedDiagnostic(const char *Loc, const char *Fmt,
-                                     Ts &&... Vals) {
-    auto loc = SourceLoc(llvm::SMLoc::getFromPointer(Loc));
-    auto diag =
-        SM.GetMessage(loc, llvm::SourceMgr::DK_Error,
-                      llvm::formatv(Fmt, std::forward<Ts>(Vals)...), {}, {});
-    Errors.push_back(diag);
-  }
-
-  void addError(const char *Loc, const Twine &Msg,
-                ArrayRef<llvm::SMFixIt> FixIts = {}) {
-    auto loc = SourceLoc(llvm::SMLoc::getFromPointer(Loc));
-    auto diag = SM.GetMessage(loc, llvm::SourceMgr::DK_Error, Msg, {}, FixIts);
-    Errors.push_back(diag);
-  };
 };
 } // end anonymous namespace
 
@@ -391,17 +375,19 @@ bool DependencyVerifier::parseExpectations(
 
     // Skip any whitespace before the {{.
     MatchStart = MatchStart.substr(MatchStart.find_first_not_of(" \t"));
+    auto &diags = SF->getASTContext().Diags;
 
     const size_t TextStartIdx = MatchStart.find("{{");
     if (TextStartIdx == StringRef::npos) {
-      addError(MatchStart.data(), "expected {{ in expectation");
+      diagnose(diags, MatchStart.data(),
+               diag::expectation_missing_opening_braces);
       continue;
     }
 
     const size_t End = MatchStart.find("}}");
     if (End == StringRef::npos) {
-      addError(MatchStart.data(),
-               "didn't find '}}' to match '{{' in expectation");
+      diagnose(diags, MatchStart.data(),
+               diag::expectation_missing_closing_braces);
       continue;
     }
 
@@ -483,7 +469,7 @@ bool DependencyVerifier::verifyObligations(
     ObligationMap &OM, llvm::StringMap<Expectation> &NegativeExpectations) {
   auto *tracker = SF->getReferencedNameTracker();
   assert(tracker && "Constructed source file without referenced name tracker!");
-
+  auto &diags = SF->getASTContext().Diags;
   for (auto &expectation : ExpectedDependencies) {
     const bool wantsCascade = expectation.isCascading();
     switch (expectation.Info.Kind) {
@@ -497,20 +483,18 @@ bool DependencyVerifier::verifyObligations(
           [&](Obligation &p) {
             const auto haveCascade = p.getCascades();
             if (haveCascade != wantsCascade) {
-              addFormattedDiagnostic(
-                  expectation,
-                  "expected {0} dependency; found {1} dependency instead",
-                  wantsCascade ? "cascading" : "non-cascading",
-                  haveCascade ? "cascading" : "non-cascading");
+              diagnose(diags, expectation.MessageRange.begin(),
+                       diag::dependency_cascading_mismatch, wantsCascade,
+                       haveCascade);
               return p.fail();
             }
 
             return p.fullfill();
           },
-          [this](const Expectation &e) {
-            addFormattedDiagnostic(
-                e, "expected member dependency does not exist: {0}",
-                e.MessageRange);
+          [&](const Expectation &e) {
+            diagnose(
+                diags, e.MessageRange.begin(), diag::missing_member_dependency,
+                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
           });
       break;
     case Expectation::Kind::PotentialMember:
@@ -520,39 +504,36 @@ bool DependencyVerifier::verifyObligations(
             assert(p.getName().empty());
             const auto haveCascade = p.getCascades();
             if (haveCascade != wantsCascade) {
-              addFormattedDiagnostic(
-                  expectation,
-                  "expected {0} potential member dependency; found {1} "
-                  "potential member dependency instead",
-                  wantsCascade ? "cascading" : "non-cascading",
-                  haveCascade ? "cascading" : "non-cascading");
+              diagnose(diags, expectation.MessageRange.begin(),
+                       diag::potential_dependency_cascading_mismatch,
+                       wantsCascade, haveCascade);
               return p.fail();
             }
 
             return p.fullfill();
           },
-          [this](const Expectation &e) {
-            addFormattedDiagnostic(
-                e, "expected potential member dependency does not exist: {0}",
-                e.MessageRange);
+          [&](const Expectation &e) {
+            diagnose(
+                diags, e.MessageRange.begin(), diag::missing_member_dependency,
+                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
           });
       break;
     case Expectation::Kind::Provides:
       matchExpectationOrFail(
           OM, expectation, [](Obligation &O) { return O.fullfill(); },
-          [this](const Expectation &e) {
-            addFormattedDiagnostic(
-                e, "expected provided dependency does not exist: {0}",
-                e.MessageRange);
+          [&](const Expectation &e) {
+            diagnose(
+                diags, e.MessageRange.begin(), diag::missing_member_dependency,
+                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
           });
       break;
     case Expectation::Kind::DynamicMember:
       matchExpectationOrFail(
           OM, expectation, [](Obligation &O) { return O.fullfill(); },
-          [this](const Expectation &e) {
-            addFormattedDiagnostic(
-                e, "expected dynamic member dependency does not exist: {0}",
-                e.MessageRange);
+          [&](const Expectation &e) {
+            diagnose(
+                diags, e.MessageRange.begin(), diag::missing_member_dependency,
+                static_cast<uint8_t>(expectation.Info.Kind), e.MessageRange);
           });
       break;
     }
@@ -562,7 +543,8 @@ bool DependencyVerifier::verifyObligations(
 }
 
 bool DependencyVerifier::verifyNegativeExpectations(
-    ObligationMap &Obligations, NegativeExpectationMap &NegativeExpectations) {
+    const SourceFile *SF, ObligationMap &Obligations,
+    NegativeExpectationMap &NegativeExpectations) {
   forEachOwedObligation(Obligations, [&](StringRef key, Obligation &p) {
     auto entry = NegativeExpectations.find(key);
     if (entry == NegativeExpectations.end()) {
@@ -570,8 +552,8 @@ bool DependencyVerifier::verifyNegativeExpectations(
     }
 
     auto &expectation = entry->second;
-    addFormattedDiagnostic(expectation, "unexpected dependency exists: {0}",
-                           expectation.MessageRange);
+    diagnose(SF->getASTContext().Diags, expectation.MessageRange.begin(),
+             diag::negative_expectation_violated, expectation.MessageRange);
     p.fail();
   });
   return false;
@@ -581,31 +563,23 @@ bool DependencyVerifier::diagnoseUnfulfilledObligations(
     const SourceFile *SF, ObligationMap &Obligations) {
   CharSourceRange EntireRange = SM.getRangeForBuffer(*SF->getBufferID());
   StringRef InputFile = SM.extractText(EntireRange);
+  auto &diags = SF->getASTContext().Diags;
   forEachOwedObligation(Obligations, [&](StringRef key, Obligation &p) {
     // HACK: Diagnosing the end of the buffer will print a carat pointing
     // at the file path, but not print any of the buffer's contents, which
     // might be misleading.
-    const char *Loc = InputFile.end();
+    auto Loc = SourceLoc(llvm::SMLoc::getFromPointer(InputFile.end()));
     switch (p.getKind()) {
     case Expectation::Kind::Negative:
       llvm_unreachable("Obligations may not be negative; only Expectations!");
     case Expectation::Kind::Member:
-      addFormattedDiagnostic(Loc, "unexpected {0} dependency: {1}",
-                             p.describeCascade(), key);
-      break;
     case Expectation::Kind::DynamicMember:
-      addFormattedDiagnostic(Loc,
-                             "unexpected {0} dynamic member dependency: {1}",
-                             p.describeCascade(), p.getName());
-      break;
     case Expectation::Kind::PotentialMember:
-      addFormattedDiagnostic(Loc,
-                             "unexpected {0} potential member dependency: {1}",
-                             p.describeCascade(), key);
+      diags.diagnose(Loc, diag::unexpected_dependency, p.describeCascade(),
+                     static_cast<uint8_t>(p.getKind()), key);
       break;
     case Expectation::Kind::Provides:
-      addFormattedDiagnostic(Loc, "unexpected provided entity: {0}",
-                             p.getName());
+      diags.diagnose(Loc, diag::unexpected_provided_entity, p.getName());
       break;
     }
   });
@@ -629,7 +603,7 @@ bool DependencyVerifier::verifyFile(const SourceFile *SF) {
     return true;
   }
 
-  if (verifyNegativeExpectations(Obligations, Negatives)) {
+  if (verifyNegativeExpectations(SF, Obligations, Negatives)) {
     return true;
   }
 
@@ -637,17 +611,7 @@ bool DependencyVerifier::verifyFile(const SourceFile *SF) {
     return true;
   }
 
-  // Sort the diagnostics by location so we get a stable ordering.
-  std::sort(Errors.begin(), Errors.end(),
-            [&](const llvm::SMDiagnostic &lhs,
-                const llvm::SMDiagnostic &rhs) -> bool {
-              return lhs.getLoc().getPointer() < rhs.getLoc().getPointer();
-            });
-
-  for (auto Err : Errors)
-    SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), Err);
-
-  return !Errors.empty();
+  return SF->getASTContext().Diags.hadAnyError();
 }
 
 //===----------------------------------------------------------------------===//
