@@ -51,6 +51,20 @@ let 👍👍👍 = {
   return y
 }
 
+// Multi-line fix-its
+foo(b: 1,
+    a: 2)
+
+foo(b:
+    1,
+    a:
+    2)
+
+foo(b:
+    1,
+    a: 2)
+
+
 // Test fallback for non-ASCII characters.
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:11
 // CHECK: [[#LINE-1]] |
@@ -142,6 +156,41 @@ let 👍👍👍 = {
 // CHECK: [[#LINE]]   | let 👍👍👍 = {
 // CHECK:    | --> error: unable to infer complex closure return type; add explicit type to disambiguate [insert ' () -> <#Result#> in ']
 // CHECK: [[#LINE+1]] |   let y = 1
+
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:5
+// CHECK: [[#LINE-2]] | // Multi-line fix-its
+// CHECK: [[#LINE-1]] | foo(a: 2, b: 1,
+// CHECK:             |     ++++++~~~~-
+// CHECK: [[#LINE]]   |     a: 2)
+// CHECK:             |     ----
+// CHECK:             |     ^ error: argument 'a' must precede argument 'b' [remove ',\n    a: 2' and insert 'a: 2, ']
+// CHECK: [[#LINE+1]] |
+
+
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:5
+// CHECK: [[#LINE-3]] |
+// CHECK: [[#LINE-2]] | foo(b:
+// CHECK:             |     ~~
+// CHECK: [[#LINE-1]] |     1,
+// CHECK:             |     ~-
+// CHECK: [[#LINE]]   |     a:
+// CHECK:             |     --
+// CHECK:             |     ^ error: argument 'a' must precede argument 'b' [remove ',\n    a:\n    2' and insert 'a:\n    2, ']
+// CHECK: [[#LINE+1]] |     2)
+// CHECK:             |     -
+// CHECK: [[#LINE+2]] |
+
+
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:5
+// CHECK: [[#LINE-3]] |
+// CHECK: [[#LINE-2]] | foo(a: 2, b:
+// CHECK:             |     ++++++~~
+// CHECK: [[#LINE-1]] |     1,
+// CHECK:             |     ~-
+// CHECK: [[#LINE]]   |     a: 2)
+// CHECK:             |     ----
+// CHECK:             |     ^ error: argument 'a' must precede argument 'b' [remove ',\n    a: 2' and insert 'a: 2, ']
+// CHECK: [[#LINE+1]] |
 
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:5
 // CHECK: [[#LINE-1]] | func foo(a: Int, b: Int) {
