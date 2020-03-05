@@ -39,8 +39,8 @@ protected:
   bool OptimizeProtocolNames = true;
 
   /// If enabled, use Objective-C runtime names when mangling @objc Swift
-  /// protocols.
-  bool UseObjCProtocolNames = false;
+  /// protocols and classes.
+  bool UseObjCRuntimeNames = false;
 
   /// If enabled, non-canonical types are allowed and type alias types get a
   /// special mangling.
