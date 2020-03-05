@@ -146,8 +146,7 @@ extension String.UTF16View: BidirectionalCollection {
     // For a BMP scalar (1-3 UTF-8 code units), advance past it. For a non-BMP
     // scalar, use a transcoded offset first.
 
-    // TODO: do the ugly if non-transcoded make sure to scalar align thing...
-    // Also, can we just jump ahead 4 is transcoded is 1?
+    // TODO: If transcoded is 1, can we just skip ahead 4?
 
     let idx = _utf16AlignNativeIndex(idx)
     let len = _guts.fastUTF8ScalarLength(startingAt: idx._encodedOffset)
