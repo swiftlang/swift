@@ -427,3 +427,19 @@ struct TestConstraintGenerationErrors {
     }
   }
 }
+
+// Check @unknown
+func testUnknownInSwitchSwitch(e: E) {
+    tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    @unknown case .a: // expected-error{{'@unknown' is only supported for catch-all cases ("case _")}}
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+    default:
+      "nothing"
+    }
+  }
+}
