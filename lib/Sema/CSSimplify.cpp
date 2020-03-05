@@ -227,12 +227,12 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
-  unsigned paramIdx, numParams = params.size();
+  unsigned numParams = params.size();
   parameterBindings.clear();
   parameterBindings.resize(numParams);
 
   // Keep track of which arguments we have claimed from the argument tuple.
-  unsigned nextArgIdx = 0, numArgs = args.size();
+  unsigned numArgs = args.size();
   SmallVector<bool, 4> claimedArgs(numArgs, false);
   SmallVector<Identifier, 4> actualArgNames;
   unsigned numClaimedArgs = 0;
@@ -258,7 +258,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       actualArgNames.resize(numArgs);
 
       // Figure out previous argument names from the parameter bindings.
-      for (unsigned i = 0; i != numParams; ++i) {
+      for (auto i : indices(params)) {
         const auto &param = params[i];
         bool firstArg = true;
 
@@ -278,18 +278,18 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   };
 
   // Local function that skips over any claimed arguments.
-  auto skipClaimedArgs = [&]() {
+  auto skipClaimedArgs = [&](unsigned &nextArgIdx) {
     while (nextArgIdx != numArgs && claimedArgs[nextArgIdx])
       ++nextArgIdx;
   };
 
   // Local function that retrieves the next unclaimed argument with the given
   // name (which may be empty). This routine claims the argument.
-  auto claimNextNamed
-    = [&](Identifier paramLabel, bool ignoreNameMismatch,
-          bool forVariadic = false) -> Optional<unsigned> {
+  auto claimNextNamed = [&](unsigned &nextArgIdx, Identifier paramLabel,
+                            bool ignoreNameMismatch,
+                            bool forVariadic = false) -> Optional<unsigned> {
     // Skip over any claimed arguments.
-    skipClaimedArgs();
+    skipClaimedArgs(nextArgIdx);
 
     // If we've claimed all of the arguments, there's nothing more to do.
     if (numClaimedArgs == numArgs)
@@ -380,13 +380,15 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   // Local function that attempts to bind the given parameter to arguments in
   // the list.
   bool haveUnfulfilledParams = false;
-  auto bindNextParameter = [&](bool ignoreNameMismatch) {
+  auto bindNextParameter = [&](unsigned paramIdx, unsigned &nextArgIdx,
+                               bool ignoreNameMismatch) {
     const auto &param = params[paramIdx];
 
     // Handle variadic parameters.
     if (param.isVariadic()) {
       // Claim the next argument with the name of this parameter.
-      auto claimed = claimNextNamed(param.getLabel(), ignoreNameMismatch);
+      auto claimed =
+          claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch);
 
       // If there was no such argument, leave the parameter unfulfilled.
       if (!claimed) {
@@ -400,7 +402,6 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       // If the argument is itself variadic, we're forwarding varargs
       // with a VarargExpansionExpr; don't collect any more arguments.
       if (args[*claimed].isVariadic()) {
-        skipClaimedArgs();
         return;
       }
 
@@ -408,20 +409,20 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       {
         nextArgIdx = *claimed;
         // Claim any additional unnamed arguments.
-        while ((claimed = claimNextNamed(Identifier(), false, true))) {
+        while (
+            (claimed = claimNextNamed(nextArgIdx, Identifier(), false, true))) {
           parameterBindings[paramIdx].push_back(*claimed);
         }
       }
 
       nextArgIdx = currentNextArgIdx;
-      skipClaimedArgs();
       return;
     }
 
     // Try to claim an argument for this parameter.
-    if (auto claimed = claimNextNamed(param.getLabel(), ignoreNameMismatch)) {
+    if (auto claimed =
+            claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch)) {
       parameterBindings[paramIdx].push_back(*claimed);
-      skipClaimedArgs();
       return;
     }
 
@@ -476,34 +477,37 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     }
 
     // Claim the parameter/argument pair.
-    claimedArgs[numArgs-1] = true;
-    ++numClaimedArgs;
+    claim(params[lastParamIdx].getLabel(), numArgs - 1,
+          /*ignoreNameClash=*/true);
     // Let's claim the trailing closure unless it's an extra argument.
     if (!isExtraClosure)
       parameterBindings[lastParamIdx].push_back(numArgs - 1);
   }
 
-  // Mark through the parameters, binding them to their arguments.
-  for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
-    if (parameterBindings[paramIdx].empty())
-      bindNextParameter(false);
+  {
+    unsigned nextArgIdx = 0;
+    // Mark through the parameters, binding them to their arguments.
+    for (auto paramIdx : indices(params)) {
+      if (parameterBindings[paramIdx].empty())
+        bindNextParameter(paramIdx, nextArgIdx, false);
+    }
   }
 
   // If we have any unclaimed arguments, complain about those.
   if (numClaimedArgs != numArgs) {
     // Find all of the named, unclaimed arguments.
     llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
-    for (nextArgIdx = 0; skipClaimedArgs(), nextArgIdx != numArgs;
-         ++nextArgIdx) {
-      if (!args[nextArgIdx].getLabel().empty())
-        unclaimedNamedArgs.push_back(nextArgIdx);
+    for (auto argIdx : indices(args)) {
+      if (claimedArgs[argIdx]) continue;
+      if (!args[argIdx].getLabel().empty())
+        unclaimedNamedArgs.push_back(argIdx);
     }
 
     if (!unclaimedNamedArgs.empty()) {
       // Find all of the named, unfulfilled parameters.
       llvm::SmallVector<unsigned, 4> unfulfilledNamedParams;
       bool hasUnfulfilledUnnamedParams = false;
-      for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+      for (auto paramIdx : indices(params)) {
         if (parameterBindings[paramIdx].empty()) {
           if (params[paramIdx].getLabel().empty())
             hasUnfulfilledUnnamedParams = true;
@@ -522,7 +526,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
           // Find the closest matching unfulfilled named parameter.
           unsigned bestScore = 0;
           unsigned best = 0;
-          for (unsigned i = 0, n = unfulfilledNamedParams.size(); i != n; ++i) {
+          for (auto i : indices(unfulfilledNamedParams)) {
             unsigned param = unfulfilledNamedParams[i];
             auto paramName = params[param].getLabel();
 
@@ -539,12 +543,10 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
           // If we found a parameter to fulfill, do it.
           if (bestScore > 0) {
             // Bind this parameter to the argument.
-            nextArgIdx = argIdx;
-            paramIdx = unfulfilledNamedParams[best];
+            auto paramIdx = unfulfilledNamedParams[best];
             auto paramLabel = params[paramIdx].getLabel();
 
             parameterBindings[paramIdx].push_back(claim(paramLabel, argIdx));
-            skipClaimedArgs();
 
             // Erase this parameter from the list of unfulfilled named
             // parameters, so we don't try to fulfill it again.
@@ -565,15 +567,14 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     // semi-positionally.
     if (numClaimedArgs != numArgs) {
       // Restart at the first argument/parameter.
-      nextArgIdx = 0;
-      skipClaimedArgs();
+      unsigned nextArgIdx = 0;
       haveUnfulfilledParams = false;
-      for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+      for (auto paramIdx : indices(params)) {
         // Skip fulfilled parameters.
         if (!parameterBindings[paramIdx].empty())
           continue;
 
-        bindNextParameter(true);
+        bindNextParameter(paramIdx, nextArgIdx, true);
       }
     }
 
@@ -582,7 +583,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     // labels don't line up, if so let's try to claim arguments
     // with incorrect labels, and let OoO/re-labeling logic diagnose that.
     if (numArgs == numParams && numClaimedArgs != numArgs) {
-      for (unsigned i = 0; i < numArgs; ++i) {
+      for (auto i : indices(args)) {
         if (claimedArgs[i] || !parameterBindings[i].empty())
           continue;
 
@@ -619,7 +620,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
   // If we have any unfulfilled parameters, check them now.
   if (haveUnfulfilledParams) {
-    for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+    for (auto paramIdx : indices(params)) {
       // If we have a binding for this parameter, we're done.
       if (!parameterBindings[paramIdx].empty())
         continue;

@@ -1089,8 +1089,40 @@ public:
   }
   
   void visitNestedAccess(BeginAccessInst *access) {
-    // Look through nested accesses.
-    return next(access->getOperand());
+    // First see if we have read/modify. If we do not, just look through the
+    // nested access.
+    switch (access->getAccessKind()) {
+    case SILAccessKind::Init:
+    case SILAccessKind::Deinit:
+      return next(access->getOperand());
+    case SILAccessKind::Read:
+    case SILAccessKind::Modify:
+      break;
+    }
+
+    // Next check if our live range is completely in the begin/end access
+    // scope. If so, we may be able to use a load_borrow here!
+    SmallVector<Operand *, 8> endScopeUses;
+    transform(access->getEndAccesses(), std::back_inserter(endScopeUses),
+              [](EndAccessInst *eai) {
+                return &eai->getAllOperands()[0];
+              });
+    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
+    LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
+    if (!checker.validateLifetime(access, endScopeUses,
+                                  liveRange.getDestroyingUses())) {
+      // If we fail the linear lifetime check, then just recur:
+      return next(access->getOperand());
+    }
+
+    // Otherwise, if we have read, then we are done!
+    if (access->getAccessKind() == SILAccessKind::Read) {
+      return answer(false);
+    }
+
+    // If we have a modify, check if our value is /ever/ written to. If it is
+    // never actually written to, then we convert to a load_borrow.
+    return answer(ARCOpt.isAddressWrittenToDefUseAnalysis(access));
   }
   
   void visitArgumentAccess(SILFunctionArgument *arg) {
