@@ -1141,20 +1141,51 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     if (tuple1->getNumElements() != tuple2->getNumElements())
       return getTypeMatchFailure(locator);
 
+    // Determine whether this conversion is performed as part
+    // of a larger pattern matching operation.
+    bool inPatternMatchingContext = false;
+    {
+      SmallVector<LocatorPathElt, 4> path;
+      (void)locator.getLocatorParts(path);
+
+      if (!path.empty()) {
+        // Direct pattern matching between tuple pattern and tuple type.
+        if (path.back().is<LocatorPathElt::PatternMatch>()) {
+          inPatternMatchingContext = true;
+        } else if (path.size() > 1) {
+          // sub-pattern matching as part of the enum element matching
+          // where sub-element is a tuple pattern e.g.
+          // `case .foo((a: 42, _)) = question`
+          auto lastIdx = path.size() - 1;
+          if (path[lastIdx - 1].is<LocatorPathElt::PatternMatch>() &&
+              path[lastIdx].is<LocatorPathElt::FunctionArgument>())
+            inPatternMatchingContext = true;
+        }
+      }
+    }
+
     for (unsigned i = 0, n = tuple1->getNumElements(); i != n; ++i) {
       const auto &elt1 = tuple1->getElement(i);
       const auto &elt2 = tuple2->getElement(i);
 
-      // If the names don't match, we may have a conflict.
-      if (elt1.getName() != elt2.getName()) {
-        // Same-type requirements require exact name matches.
-        if (kind <= ConstraintKind::Equal)
+      // If the tuple pattern had a label for the tuple element,
+      // it must match the label for the tuple type being matched.
+      if (inPatternMatchingContext) {
+        if (elt1.hasName() && elt1.getName() != elt2.getName()) {
           return getTypeMatchFailure(locator);
+        }
+      } else {
+        // If the names don't match, we may have a conflict.
+        if (elt1.getName() != elt2.getName()) {
+          // Same-type requirements require exact name matches.
+          if (kind <= ConstraintKind::Equal)
+            return getTypeMatchFailure(locator);
 
-        // For subtyping constraints, just make sure that this name isn't
-        // used at some other position.
-        if (elt2.hasName() && tuple1->getNamedElementId(elt2.getName()) != -1)
-          return getTypeMatchFailure(locator);
+          // For subtyping constraints, just make sure that this name isn't
+          // used at some other position.
+          if (elt2.hasName() && tuple1->getNamedElementId(elt2.getName()) != -1)
+            return getTypeMatchFailure(locator);
+        }
       }
 
       // Variadic bit must match.
@@ -1794,14 +1825,21 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // FIXME: We should check value ownership too, but it's not completely
     // trivial because of inout-to-pointer conversions.
 
+    // For equality contravariance doesn't matter, but let's make sure
+    // that types are matched in original order because that is important
+    // when function types are equated as part of pattern matching.
+    auto paramType1 = kind == ConstraintKind::Equal ? func1Param.getOldType()
+                                                    : func2Param.getOldType();
+
+    auto paramType2 = kind == ConstraintKind::Equal ? func2Param.getOldType()
+                                                    : func1Param.getOldType();
+
     // Compare the parameter types.
-    auto result = matchTypes(func2Param.getOldType(),
-                             func1Param.getOldType(),
-                             subKind, subflags,
+    auto result = matchTypes(paramType1, paramType2, subKind, subflags,
                              (func1Params.size() == 1
-                              ? argumentLocator
-                              : argumentLocator.withPathElement(
-                                LocatorPathElt::TupleElement(i))));
+                                  ? argumentLocator
+                                  : argumentLocator.withPathElement(
+                                        LocatorPathElt::TupleElement(i))));
     if (result.isFailure())
       return result;
   }
