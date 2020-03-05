@@ -114,13 +114,16 @@ public:
   DiagnosticEngine &Diags;
   SourceFile &SF;
   Lexer *L;
-  SILParserTUStateBase *SIL; // Non-null when parsing a .sil file.
+  SILParserTUStateBase *SIL; // Non-null when parsing SIL decls.
   PersistentParserState *State;
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
+
+  /// Tracks parsed decls that LLDB requires to be inserted at the top-level.
+  std::vector<Decl *> ContextSwitchedTopLevelDecls;
 
   NullablePtr<llvm::MD5> CurrentTokenHash;
   void recordTokenHash(const Token Tok) {
@@ -881,8 +884,8 @@ public:
   /// Returns true if the parser is at the start of a SIL decl.
   bool isStartOfSILDecl();
 
-  /// Parse the top-level Swift decls into the source file.
-  void parseTopLevel();
+  /// Parse the top-level Swift decls into the provided vector.
+  void parseTopLevel(SmallVectorImpl<Decl *> &decls);
 
   /// Parse the top-level SIL decls into the SIL module.
   void parseTopLevelSIL();
@@ -1726,6 +1729,15 @@ struct ParsedDeclName {
 
   /// Form a declaration name from this parsed declaration name.
   DeclNameRef formDeclNameRef(ASTContext &ctx) const;
+};
+
+/// To assist debugging parser crashes, tell us the location of the
+/// current token.
+class PrettyStackTraceParser : public llvm::PrettyStackTraceEntry {
+  Parser &P;
+public:
+  explicit PrettyStackTraceParser(Parser &P) : P(P) {}
+  void print(llvm::raw_ostream &out) const override;
 };
 
 /// Parse a stringified Swift declaration name,
