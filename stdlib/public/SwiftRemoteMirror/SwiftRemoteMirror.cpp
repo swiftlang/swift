@@ -81,7 +81,7 @@ static int minimalDataLayoutQueryFunction(void *ReaderContext,
   }
   if (type == DLQ_GetObjCReservedLowBits) {
     auto result = static_cast<uint8_t *>(outBuffer);
-    if (applePlatform && !iosDerivedPlatform && wordSize == 8) {
+    if (applePlatform && !iosDerivedPlatform && WordSize == 8) {
       // Obj-C reserves low bit on 64-bit macOS only.
       // Other Apple platforms don't reserve this bit (even when
       // running on x86_64-based simulators).
@@ -93,7 +93,7 @@ static int minimalDataLayoutQueryFunction(void *ReaderContext,
   }
   if (type == DLQ_GetLeastValidPointerValue) {
     auto result = static_cast<uint64_t *>(outBuffer);
-    if (applePlatform && wordSize == 8) {
+    if (applePlatform && WordSize == 8) {
       // Swift reserves the first 4GiB on all 64-bit Apple platforms
       *result = 0x100000000;
     } else {
