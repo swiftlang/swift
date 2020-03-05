@@ -48,6 +48,11 @@ $BUILD_SCRIPT \
   --darwin-toolchain-alias="swift" \
   "$@"
 
+
+if [ ! -e $SOURCE_PATH/swift-nightly-toolchain ]; then
+  $UTILS_PATH/install-nightly-toolchain.sh
+fi
+
 TMP_DIR=$(mktemp -d)
 cd $TMP_DIR
 tar xfz $INSTALLABLE_PACKAGE $TOOLCHAIN_NAME
@@ -57,6 +62,8 @@ cd $TMP_DIR/$TOOLCHAIN_NAME
 cp -r $WASI_SDK_PATH/lib/clang usr/lib
 cp $WASI_SDK_PATH/bin/* usr/bin
 cp -r $WASI_SDK_PATH/share/wasi-sysroot usr/share
+
+$UTILS_PATH/build-swiftpm.sh $TMP_DIR/$TOOLCHAIN_NAME
 
 cd $TMP_DIR
 tar cfz $PACKAGE_ARTIFACT $TOOLCHAIN_NAME

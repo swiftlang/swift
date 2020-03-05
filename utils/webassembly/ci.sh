@@ -19,7 +19,7 @@ export SCCACHE_CACHE_SIZE="50G"
 export SCCACHE_DIR="$SOURCE_PATH/build-cache"
 
 CACHE_FLAGS="--cmake-c-launcher $(which sccache) --cmake-cxx-launcher $(which sccache)"
-FLAGS="--release --debug-swift-stdlib $CACHE_FLAGS --verbose"
+FLAGS="--release $CACHE_FLAGS --verbose"
 
 $BUILD_SCRIPT $FLAGS
 
