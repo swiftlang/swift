@@ -354,6 +354,9 @@ public:
     if (ExtraProtocols.empty())
       return;
 
+    if (!printOptions.shouldPrint(nominal))
+      return;
+
     SmallPtrSet<ProtocolDecl *, 16> handledProtocols;
 
     // First record all protocols that have already been handled.

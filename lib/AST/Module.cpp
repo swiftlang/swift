@@ -1820,20 +1820,73 @@ void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
 }
 
 bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
-  if (!targetDecl->getAttrs().hasAttribute<SPIAccessControlAttr>())
-    return false;
-
   auto targetModule = targetDecl->getModuleContext();
-  SmallVector<Identifier, 4> importedSpis;
-  lookupImportedSPIGroups(targetModule, importedSpis);
+  SmallVector<Identifier, 4> importedSPIGroups;
+  lookupImportedSPIGroups(targetModule, importedSPIGroups);
+  if (importedSPIGroups.empty()) return false;
 
-  for (auto attr : targetDecl->getAttrs().getAttributes<SPIAccessControlAttr>())
-    for (auto declSPI : attr->getSPIGroups())
-      for (auto importedSPI : importedSpis)
-        if (importedSPI == declSPI)
-          return true;
+  auto declSPIGroups = targetDecl->getSPIGroups();
+
+  // Note: If we reach a point where there are many SPI imports or SPI groups
+  // on decls we could optimize this further by using a set.
+  for (auto importedSPI : importedSPIGroups)
+    for (auto declSPI : declSPIGroups)
+      if (importedSPI == declSPI)
+        return true;
 
   return false;
+}
+
+bool Decl::isSPI() const {
+  return !getSPIGroups().empty();
+}
+
+ArrayRef<Identifier> Decl::getSPIGroups() const {
+  if (auto vd = dyn_cast<ValueDecl>(this)) {
+    if (vd->getFormalAccess() < AccessLevel::Public)
+      return ArrayRef<Identifier>();
+  } else if (!isa<ExtensionDecl>(this))
+    return ArrayRef<Identifier>();
+
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SPIGroupsRequest{ this },
+                           ArrayRef<Identifier>());
+}
+
+llvm::Expected<llvm::ArrayRef<Identifier>>
+SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
+  // Applies only to public ValueDecls and ExtensionDecls.
+  if (auto vd = dyn_cast<ValueDecl>(decl))
+    assert(vd->getFormalAccess() >= AccessLevel::Public);
+  else
+    assert(isa<ExtensionDecl>(decl));
+
+  // First, look for local attributes.
+  llvm::SetVector<Identifier> spiGroups;
+  for (auto attr : decl->getAttrs().getAttributes<SPIAccessControlAttr>())
+    for (auto spi : attr->getSPIGroups())
+      spiGroups.insert(spi);
+
+  auto &ctx = decl->getASTContext();
+  if (spiGroups.empty()) {
+
+    // Then in the extended nominal type.
+    if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
+      auto extended = extension->getExtendedNominal();
+      auto extSPIs = extended->getSPIGroups();
+      if (!extSPIs.empty()) return extSPIs;
+    }
+
+    // And finally in the parent context.
+    auto parent = decl->getDeclContext();
+    if (auto parentD = parent->getAsDecl()) {
+      if (!isa<ModuleDecl>(parentD)) {
+        return parentD->getSPIGroups();
+      }
+    }
+  }
+
+  return ctx.AllocateCopy(spiGroups.getArrayRef());
 }
 
 bool SourceFile::shouldCrossImport() const {
