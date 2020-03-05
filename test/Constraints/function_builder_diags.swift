@@ -443,3 +443,26 @@ func testUnknownInSwitchSwitch(e: E) {
     }
   }
 }
+
+// Check for mutability mismatches when there are multiple case items
+// referring to same-named variables.
+enum E3 {
+  case a(Int, String)
+  case b(String, Int)
+  case c(String, Int)
+}
+
+func testCaseMutabilityMismatches(e: E3) {
+    tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    case .a(let x, var y),
+         .b(let y, // expected-error{{'let' pattern binding must match previous 'var' pattern binding}}
+            var x), // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
+         .c(let y, // expected-error{{'let' pattern binding must match previous 'var' pattern binding}}
+            var x): // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
+      x
+      y += "a"
+    }
+  }
+}

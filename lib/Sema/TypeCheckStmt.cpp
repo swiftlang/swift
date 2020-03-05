@@ -2071,7 +2071,7 @@ void swift::checkUnknownAttrRestrictions(
 }
 
 void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
-  llvm::SmallDenseMap<Identifier, VarDecl *, 4> latestVars;
+  llvm::SmallDenseMap<Identifier, std::pair<VarDecl *, bool>, 4> latestVars;
   auto recordVar = [&](VarDecl *var) {
     if (!var->hasName())
       return;
@@ -2079,14 +2079,37 @@ void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
     // If there is an existing variable with this name, set it as the
     // parent of this new variable.
     auto &entry = latestVars[var->getName()];
-    if (entry) {
+    if (entry.first) {
       assert(!var->getParentVarDecl() ||
-             var->getParentVarDecl() == entry);
-      var->setParentVarDecl(entry);
+             var->getParentVarDecl() == entry.first);
+      var->setParentVarDecl(entry.first);
+
+      // Check for a mutability mismatch.
+      if (entry.second != var->isLet()) {
+        // Find the original declaration.
+        auto initialCaseVarDecl = entry.first;
+        while (auto parentVar = initialCaseVarDecl->getParentVarDecl())
+          initialCaseVarDecl = parentVar;
+
+        auto diag = var->diagnose(diag::mutability_mismatch_multiple_pattern_list,
+                                  var->isLet(), initialCaseVarDecl->isLet());
+
+        VarPattern *foundVP = nullptr;
+        var->getParentPattern()->forEachNode([&](Pattern *P) {
+          if (auto *VP = dyn_cast<VarPattern>(P))
+            if (VP->getSingleVar() == var)
+              foundVP = VP;
+        });
+        if (foundVP)
+          diag.fixItReplace(foundVP->getLoc(),
+                            initialCaseVarDecl->isLet() ? "let" : "var");
+      }
+    } else {
+      entry.second = var->isLet();
     }
 
     // Record this variable as the latest with this name.
-    entry = var;
+    entry.first = var;
   };
 
   // Wire up the parent var decls for each variable that occurs within
