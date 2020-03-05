@@ -867,11 +867,10 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     auto declAccess = VD->getFormalAccess();
     if (declAccess < AccessLevel::Public) {
-      diagnose(attr->getLocation(),
-               diag::spi_attribute_on_non_public,
-               declAccess,
-               D->getDescriptiveKind())
-        .fixItRemove(attr->getRange());
+      diagnoseAndRemoveAttr(attr,
+                            diag::spi_attribute_on_non_public,
+                            declAccess,
+                            D->getDescriptiveKind());
     }
   }
 }
