@@ -433,3 +433,25 @@ switch sr7799_1 {
 
 if case .baz = sr7799_1 {} // Ok
 if case .bar? = sr7799_1 {} // Ok
+
+// rdar://problem/60048356 - `if case` fails when `_` pattern doesn't have a label
+func rdar_60048356() {
+  typealias Info = (code: ErrorCode, reason: String)
+
+  enum ErrorCode {
+    case normalClosure
+  }
+
+  enum Failure {
+    case closed(Info)
+  }
+
+  enum Reason {
+    case close(Failure)
+  }
+
+  func test(_ reason: Reason) {
+    if case .close(.closed((code: .normalClosure, _))) = reason { // Ok
+    }
+  }
+}
