@@ -1,6 +1,6 @@
 #/bin/bash
 
-set -x
+set -ex
 SOURCE_PATH="$(cd "$(dirname $0)/../../.." && pwd)"
 UTILS_PATH="$(cd "$(dirname $0)" && pwd)"
 
@@ -31,7 +31,7 @@ INSTALLABLE_PACKAGE=$SOURCE_PATH/$ARCHIVE
 
 PACKAGE_ARTIFACT="$SOURCE_PATH/swift-wasm-DEVELOPMENT-SNAPSHOT-${OS_SUFFIX}.tar.gz"
 
-BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
+BUNDLE_IDENTIFIER="swiftwasm.${YEAR}${MONTH}${DAY}"
 DISPLAY_NAME_SHORT="Swift for WebAssembly Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 
