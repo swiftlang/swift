@@ -117,6 +117,7 @@ set(SWIFTLIB_ESSENTIAL
   REPL.swift
   Result.swift
   Reverse.swift
+  RingBuffer.swift
   Runtime.swift
   RuntimeFunctionCounters.swift
   SipHash.swift

@@ -902,33 +902,11 @@ extension Sequence {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
     guard maxLength != 0 else { return [] }
 
-    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
-    // Put incoming elements into a ring buffer to save space. Once all
-    // elements are consumed, reorder the ring buffer into a copy and return it.
-    // This saves memory for sequences particularly longer than `maxLength`.
-    var ringBuffer = ContiguousArray<Element>()
-    ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedCount))
+    let capacity = Swift.min(maxLength, underestimatedCount)
+    var ringBuffer = RingBuffer<Element>(capacity: capacity)
+    ringBuffer.pushBack(contentsOf: self)
 
-    var i = 0
-
-    for element in self {
-      if ringBuffer.count < maxLength {
-        ringBuffer.append(element)
-      } else {
-        ringBuffer[i] = element
-        i = (i + 1) % maxLength
-      }
-    }
-
-    if i != ringBuffer.startIndex {
-      var rotated = ContiguousArray<Element>()
-      rotated.reserveCapacity(ringBuffer.count)
-      rotated += ringBuffer[i..<ringBuffer.endIndex]
-      rotated += ringBuffer[0..<i]
-      return Array(rotated)
-    } else {
-      return Array(ringBuffer)
-    }
+    return Array(ringBuffer)
   }
 
   /// Returns a sequence containing all but the given number of initial
@@ -979,25 +957,17 @@ extension Sequence {
     _precondition(k >= 0, "Can't drop a negative number of elements from a sequence")
     guard k != 0 else { return Array(self) }
 
-    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
-    // Put incoming elements from this sequence in a holding tank, a ring buffer
-    // of size <= k. If more elements keep coming in, pull them out of the
-    // holding tank into the result, an `Array`. This saves
-    // `k` * sizeof(Element) of memory, because slices keep the entire
-    // memory of an `Array` alive.
     var result = ContiguousArray<Element>()
-    var ringBuffer = ContiguousArray<Element>()
-    var i = ringBuffer.startIndex
+    var ringBuffer = RingBuffer<Element>(capacity: k)
 
     for element in self {
-      if ringBuffer.count < k {
-        ringBuffer.append(element)
-      } else {
-        result.append(ringBuffer[i])
-        ringBuffer[i] = element
-        i = (i + 1) % k
+      if ringBuffer.isFull {
+        let frontElement = ringBuffer.popFront()
+        result.append(frontElement)
       }
+      ringBuffer.pushBack(element)
     }
+
     return Array(result)
   }
 
