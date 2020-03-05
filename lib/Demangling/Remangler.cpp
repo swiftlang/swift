@@ -2477,6 +2477,14 @@ void Remangler::mangleOpaqueType(Node *node) {
 
   addSubstitution(entry);
 }
+
+void Remangler::mangleModuleHash(Node *node) {
+  mangle(node->getChild(0));
+  if (node->getNumChildren() > 1)
+    mangle(node->getChild(1));
+  Buffer << "Tw";
+}
+
 void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");
 }

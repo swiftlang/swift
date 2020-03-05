@@ -550,6 +550,9 @@ public:
 
   std::string mangleSymbolNameForGenericEnvironment(
                                                 CanGenericSignature genericSig);
+                                                
+  std::string mangleModuleHash(ModuleDecl *module);
+                                                
 protected:
   SymbolicMangling
   withSymbolicReferences(IRGenModule &IGM,

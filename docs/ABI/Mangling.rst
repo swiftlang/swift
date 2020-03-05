@@ -171,6 +171,9 @@ Globals
   global ::= entity 'Wvd'                // field offset
   global ::= entity 'WC'                 // resilient enum tag index
 
+  global ::= module identifier 'Tw'      // module hash for version checking
+  global ::= module 'Tw'                 // module version table
+
 A direct symbol resolves directly to the address of an object.  An
 indirect symbol resolves to the address of a pointer to the object.
 They are distinct manglings to make a certain class of bugs

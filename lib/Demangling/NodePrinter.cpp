@@ -533,6 +533,7 @@ private:
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
     case Node::Kind::OpaqueReturnType:
     case Node::Kind::OpaqueReturnTypeOf:
+    case Node::Kind::ModuleHash:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2370,6 +2371,18 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::AccessorFunctionReference:
     Printer << "accessor function at " << Node->getIndex();
+    return nullptr;
+  case Node::Kind::ModuleHash:
+    if (Node->getNumChildren() == 2) {
+      Printer << "matching version ";
+      print(Node->getChild(1));
+      Printer << " of module ";
+      print(Node->getChild(0));
+    } else {
+      Printer << "module ";
+      print(Node->getChild(0));
+      Printer << " version table";
+    }
     return nullptr;
   }
   printer_unreachable("bad node kind!");

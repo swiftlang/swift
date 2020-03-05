@@ -2369,6 +2369,14 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
         return nullptr;
       return createNode(Node::Kind::OutlinedBridgedMethod, Params);
     }
+    case 'w': {
+      NodePointer hash = popNode(Node::Kind::Identifier);
+      NodePointer module = popNode(Node::Kind::Identifier);
+      if (module)
+        return createWithChildren(Node::Kind::ModuleHash, module, hash);
+      module = hash;
+      return createWithChild(Node::Kind::ModuleHash, module);
+    }
     default:
       return nullptr;
   }

@@ -327,3 +327,16 @@ std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
   appendGenericSignature(genericSig);
   return finalize();
 }
+
+std::string IRGenMangler::mangleModuleHash(ModuleDecl *module) {
+  beginMangling();
+  appendIdentifier(module->getName().str());
+  if (module->hash.isValid()) {
+    SmallString<32> hashStr("V");
+    hashStr += module->hash.readableStr();
+    appendIdentifier(hashStr.str());
+  }
+  appendOperator("Tw");
+  return finalize();
+}
+                                                

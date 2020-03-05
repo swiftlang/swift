@@ -280,5 +280,8 @@ NODE(OpaqueTypeDescriptorAccessorVar)
 NODE(OpaqueReturnType)
 CONTEXT_NODE(OpaqueReturnTypeOf)
 
+// Added in Swift 5.1
+NODE(ModuleHash)
+
 #undef CONTEXT_NODE
 #undef NODE
