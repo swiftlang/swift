@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/USRGeneration.h"
 #include "DeclarationFragmentPrinter.h"
 #include "SymbolGraphASTWalker.h"
 
@@ -54,6 +55,8 @@ void DeclarationFragmentPrinter::closeFragment() {
   if (Kind == FragmentKind::None) {
     return;
   }
+
+  ++NumFragments;
 
   if (!Spelling.empty()) {
     OS.object([&](){
@@ -128,7 +131,8 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
     PrintNameContext NameContext) {
   openFragment(FragmentKind::TypeIdentifier);
   printText(Name.str());
-  USR = Graph.getUSR(RefTo);
+  llvm::raw_svector_ostream OS(USR);
+  ide::printDeclUSR(RefTo, OS);
   closeFragment();
 }
 
