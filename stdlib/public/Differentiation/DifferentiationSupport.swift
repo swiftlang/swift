@@ -403,17 +403,16 @@ public extension Differentiable {
 // Free-function-style differential operators
 //===----------------------------------------------------------------------===//
 
-/*
 // Transpose
 
-@inlinable
-public func transpose<T, R>(
-  of body: @escaping @differentiable(linear) (T) -> R
-) -> @differentiable(linear) (R) -> T {
-  let original = body as (T) -> R
-  let transpose = { x in Builtin.applyTranspose_arity1(body, x) }
-  return Builtin.linearFunction_arity1(transpose, original)
-}
+// @inlinable
+// public func transpose<T, R>(
+//   of body: @escaping @differentiable(linear) (T) -> R
+// ) -> @differentiable(linear) (R) -> T {
+//   let original = body as (T) -> R
+//   let transpose = { x in Builtin.applyTranspose_arity1(body, x) }
+//   return Builtin.linearFunction_arity1(transpose, original)
+// }
 
 // Value with differential
 
@@ -745,7 +744,6 @@ public func valueWithGradient<T, U, V, R>(
   where R : FloatingPoint, R.TangentVector == R {
   return { x, y, z in valueWithGradient(at: x, y, z, in: f) }
 }
-*/
 
 //===----------------------------------------------------------------------===//
 // Type-erased `AnyDerivative`
