@@ -47,16 +47,16 @@ namespace {
 
 class LiveRange {
   /// A list of destroy_values of the live range.
-  SmallVector<SILInstruction *, 2> destroys;
+  SmallVector<Operand *, 2> destroyingUses;
 
   /// A list of forwarding instructions that forward our destroys ownership, but
   /// that are also able to forward guaranteed ownership.
-  SmallVector<SILInstruction *, 2> generalForwardingInsts;
+  SmallVector<Operand *, 2> generalForwardingUses;
 
   /// Consuming users that we were not able to understand as a forwarding
   /// instruction or a destroy_value. These must be passed a strongly control
   /// equivalent +1 value.
-  SmallVector<SILInstruction *, 2> unknownConsumingUsers;
+  SmallVector<Operand *, 2> unknownConsumingUses;
 
 public:
   LiveRange(SILValue value);
@@ -68,18 +68,40 @@ public:
   ///
   /// Semantically this implies that a value is never passed off as +1 to memory
   /// or another function implying it can be used everywhere at +0.
-  bool hasConsumingUse() const { return unknownConsumingUsers.size(); }
+  bool hasConsumingUse() const { return unknownConsumingUses.size(); }
 
-  ArrayRef<SILInstruction *> getDestroys() const { return destroys; }
-  ArrayRef<SILInstruction *> getNonConsumingForwardingInsts() const {
-    return generalForwardingInsts;
+  ArrayRef<Operand *> getDestroyingUses() const { return destroyingUses; }
+
+private:
+  struct OperandToUser;
+
+public:
+  using DestroyingInstsRange =
+      TransformRange<ArrayRef<Operand *>, OperandToUser>;
+  DestroyingInstsRange getDestroyingInsts() const;
+
+  ArrayRef<Operand *> getNonConsumingForwardingUses() const {
+    return generalForwardingUses;
   }
 };
 
 } // end anonymous namespace
 
+struct LiveRange::OperandToUser {
+  OperandToUser() {}
+
+  SILInstruction *operator()(const Operand *use) const {
+    auto *nonConstUse = const_cast<Operand *>(use);
+    return nonConstUse->getUser();
+  }
+};
+
+LiveRange::DestroyingInstsRange LiveRange::getDestroyingInsts() const {
+  return DestroyingInstsRange(getDestroyingUses(), OperandToUser());
+}
+
 LiveRange::LiveRange(SILValue value)
-    : destroys(), generalForwardingInsts(), unknownConsumingUsers() {
+    : destroyingUses(), generalForwardingUses(), unknownConsumingUses() {
   assert(value.getOwnershipKind() == ValueOwnershipKind::Owned);
 
   // We know that our silvalue produces an @owned value. Look through all of our
@@ -109,8 +131,8 @@ LiveRange::LiveRange(SILValue value)
 
     // Ok, we know now that we have a consuming use. See if we have a destroy
     // value, quickly up front. If we do have one, stash it and continue.
-    if (auto *dvi = dyn_cast<DestroyValueInst>(user)) {
-      destroys.push_back(dvi);
+    if (isa<DestroyValueInst>(user)) {
+      destroyingUses.push_back(op);
       continue;
     }
 
@@ -134,13 +156,13 @@ LiveRange::LiveRange(SILValue value)
                         return v.getOwnershipKind() ==
                                ValueOwnershipKind::Owned;
                       })) {
-      unknownConsumingUsers.push_back(user);
+      unknownConsumingUses.push_back(op);
       continue;
     }
 
     // Ok, this is a forwarding instruction whose ownership we can flip from
     // owned -> guaranteed.
-    generalForwardingInsts.push_back(user);
+    generalForwardingUses.push_back(op);
 
     // If we have a non-terminator, just visit its users recursively to see if
     // the the users force the live range to be alive.
@@ -303,14 +325,16 @@ bool IsAddressWrittenToDefUseAnalysis::isWrittenToHelper(SILValue initialValue) 
 //             Convert Forwarding Insts from Owned -> Guaranteed
 //===----------------------------------------------------------------------===//
 
-static void convertForwardingInstsFromOwnedToGuaranteed(
-    ArrayRef<SILInstruction *> guaranteedForwardingInsts) {
+static void convertForwardingUsesFromOwnedToGuaranteed(
+    ArrayRef<Operand *> guaranteedForwardingUses) {
   // Then change all of our guaranteed forwarding insts to have guaranteed
   // ownership kind instead of what ever they previously had (ignoring trivial
   // results);
-  while (!guaranteedForwardingInsts.empty()) {
-    auto *i = guaranteedForwardingInsts.back();
-    guaranteedForwardingInsts = guaranteedForwardingInsts.drop_back();
+  while (!guaranteedForwardingUses.empty()) {
+    auto *use = guaranteedForwardingUses.back();
+    guaranteedForwardingUses = guaranteedForwardingUses.drop_back();
+
+    auto *i = use->getUser();
 
     // If this is a term inst, just convert all of its incoming values that are
     // owned to be guaranteed.
@@ -745,7 +769,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
         return borrowScope.isLocalScope();
       });
 
-  auto destroys = lr.getDestroys();
+  auto destroys = lr.getDestroyingUses();
   if (destroys.empty() && haveAnyLocalScopes) {
     return false;
   }
@@ -766,23 +790,17 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   //    non-local scopes.
   {
     bool foundNonDeadEnd = false;
-    for (auto *dvi : destroys) {
-      foundNonDeadEnd |= !getDeadEndBlocks().isDeadEnd(dvi->getParent());
+    for (auto *d : destroys) {
+      foundNonDeadEnd |= !getDeadEndBlocks().isDeadEnd(d->getParentBlock());
     }
     if (!foundNonDeadEnd && haveAnyLocalScopes)
       return false;
-    // TODO: In a future commit, when LiveRange converts to work with
-    // operands, this will not be needed. This is just to simplify
-    // patches.
-    SmallVector<Operand *, 8> destroyOperands;
-    transform(destroys, std::back_inserter(destroyOperands),
-              [](SILInstruction *i) { return &i->getAllOperands()[0]; });
     SmallVector<Operand *, 8> scratchSpace;
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     if (llvm::any_of(borrowScopeIntroducers,
                      [&](BorrowScopeIntroducingValue borrowScope) {
                        return !borrowScope.areUsesWithinScope(
-                           destroyOperands, scratchSpace, visitedBlocks,
+                           destroys, scratchSpace, visitedBlocks,
                            getDeadEndBlocks());
                      })) {
       return false;
@@ -792,15 +810,15 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // Otherwise, we know that our copy_value/destroy_values are all completely
   // within the guaranteed value scope. First delete the destroys/copies.
   while (!destroys.empty()) {
-    auto *dvi = destroys.back();
+    auto *d = destroys.back();
     destroys = destroys.drop_back();
-    eraseInstruction(dvi);
+    eraseInstruction(d->getUser());
     ++NumEliminatedInsts;
   }
 
   eraseAndRAUWSingleValueInstruction(cvi, cvi->getOperand());
-  convertForwardingInstsFromOwnedToGuaranteed(
-      lr.getNonConsumingForwardingInsts());
+  convertForwardingUsesFromOwnedToGuaranteed(
+      lr.getNonConsumingForwardingUses());
 
   ++NumEliminatedInsts;
   return true;
@@ -1153,17 +1171,10 @@ public:
 
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
+
     // Returns true on success. So we invert.
-    auto destroys = liveRange.getDestroys();
-    // TODO: Once LiveRange uses operands, eliminate this!
-    SmallVector<Operand *, 16> destroyOperands;
-    transform(destroys, std::back_inserter(destroyOperands),
-              [](SILInstruction *i) {
-                assert(isa<DestroyValueInst>(i));
-                return &cast<DestroyValueInst>(i)->getAllOperands()[0];
-              });
-    bool foundError =
-        !checker.validateLifetime(baseObject, endScopeInsts, destroyOperands);
+    bool foundError = !checker.validateLifetime(baseObject, endScopeInsts,
+                                                liveRange.getDestroyingUses());
     return answer(foundError);
   }
   
@@ -1196,17 +1207,12 @@ public:
 
     // Then make sure that all of our load [copy] uses are within the
     // destroy_addr.
-    SmallVector<Operand *, 16> destroyOperands;
-    transform(liveRange.getDestroys(), std::back_inserter(destroyOperands),
-              [](SILInstruction *i) {
-                return &cast<DestroyValueInst>(i)->getAllOperands()[0];
-              });
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     // Returns true on success. So we invert.
     bool foundError = !checker.validateLifetime(
         stack, destroyAddrOperands /*consuming users*/,
-        destroyOperands /*non consuming users*/);
+        liveRange.getDestroyingUses() /*non consuming users*/);
     return answer(foundError);
   }
 
@@ -1258,8 +1264,7 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // to find the post-dominating block set of these destroy value to ensure that
   // we do not insert multiple end_borrow.
   assert(lifetimeFrontier.empty());
-  auto destroyValues = lr.getDestroys();
-  ValueLifetimeAnalysis analysis(li, destroyValues);
+  ValueLifetimeAnalysis analysis(li, lr.getDestroyingInsts());
   bool foundCriticalEdges = !analysis.computeFrontier(
       lifetimeFrontier, ValueLifetimeAnalysis::DontModifyCFG,
       &getDeadEndBlocks());
@@ -1273,10 +1278,11 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   }
 
   // Then delete all of our destroy_value.
+  auto destroyValues = lr.getDestroyingUses();
   while (!destroyValues.empty()) {
     auto *dvi = destroyValues.back();
     destroyValues = destroyValues.drop_back();
-    eraseInstruction(dvi);
+    eraseInstruction(dvi->getUser());
     ++NumEliminatedInsts;
   }
 
@@ -1285,8 +1291,8 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
 
   // And then change the ownership all of our owned forwarding users to be
   // guaranteed.
-  convertForwardingInstsFromOwnedToGuaranteed(
-      lr.getNonConsumingForwardingInsts());
+  convertForwardingUsesFromOwnedToGuaranteed(
+      lr.getNonConsumingForwardingUses());
 
   ++NumEliminatedInsts;
   ++NumLoadCopyConvertedToLoadBorrow;
