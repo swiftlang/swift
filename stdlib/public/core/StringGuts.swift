@@ -323,13 +323,10 @@ extension _StringGuts {
 public // SPI(corelibs-foundation)
 func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let s = p else { return nil }
-  let count = Int(_swift_stdlib_strlen(s))
-  let result = [CChar](unsafeUninitializedCapacity: count + 1) { buf, initializedCount in
-    for i in 0..<count {
-      buf[i] = s[i]
-    }
-    buf[count] = 0
-    initializedCount = count + 1
+  let bytesToCopy = UTF8._nullCodeUnitOffset(in: s) + 1 // +1 for the terminating NUL
+  let result = [CChar](unsafeUninitializedCapacity: bytesToCopy) { buf, initedCount in
+    buf.baseAddress!.assign(from: cString, count: bytesToCopy)
+    initedCount = bytesToCopy
   }
   return result
 }
