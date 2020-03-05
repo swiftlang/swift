@@ -252,14 +252,17 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
 
   case RecordKind::Tuple:
   case RecordKind::Struct: {
+    if (Fields.size() == 0) {
+      return false;
+    }
     // Tuples and Structs inherit XIs from their most capacious member
-    FieldInfo *mostCapaciousField = nullptr;
-    for (auto Field : Fields) {
-      if (mostCapaciousField == nullptr
-          || (Field.TI.getNumExtraInhabitants()
-              > mostCapaciousField->TI.getNumExtraInhabitants())) {
-        mostCapaciousField = &Field;
-      }
+    auto mostCapaciousField = std::max_element(
+      Fields.begin(), Fields.end(),
+      [](const FieldInfo &lhs, const FieldInfo &rhs) {
+        return lhs.TI.getNumExtraInhabitants() < rhs.TI.getNumExtraInhabitants();
+      });
+    if (mostCapaciousField->TI.getNumExtraInhabitants() == 0) {
+      return false; // No child XIs?  Something is broken.
     }
     auto fieldAddress = remote::RemoteAddress(address.getAddressData()
                                               + mostCapaciousField->Offset);
