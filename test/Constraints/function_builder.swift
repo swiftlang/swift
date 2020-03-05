@@ -593,7 +593,8 @@ testSwitch(getE(1))
 // CHECK-SAME: second("just 42")
 testSwitch(getE(2))
 
-func testSwitchCombined(_ e: E) {
+func testSwitchCombined(_ eIn: E) {
+  var e = eIn
   tuplify(true) { c in
     "testSwitchCombined"
     switch e {
