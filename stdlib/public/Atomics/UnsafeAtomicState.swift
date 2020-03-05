@@ -16,36 +16,19 @@ import Swift
 /// (such as a simple Int-backed enum type) that is stored at a stable memory
 /// location.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-@frozen
-public struct UnsafeAtomicState<Value: RawRepresentable>
-where Value.RawValue == Int {
+extension UnsafeAtomic where Value: RawRepresentable, Value.RawValue == Int {
+  @_transparent
   @usableFromInline
-  internal let _ptr: UnsafeMutableRawPointer
-
-  @_transparent // Debug performance
-  public init(at address: UnsafeMutablePointer<Int>) {
-    precondition(_isPOD(Value.self))
-    self._ptr = UnsafeMutableRawPointer(address)
+  internal var _rawValue: UnsafeAtomic<Int> {
+    UnsafeAtomic<Int>(_raw: _ptr)
   }
-}
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicState {
-  @inlinable
-  public var address: UnsafeMutablePointer<Int> {
-    _ptr.assumingMemoryBound(to: Int.self)
-  }
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomicState {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
   @_semantics("atomics.constant_ordering")
   @_transparent @_alwaysEmitIntoClient
   public func load(ordering: AtomicLoadOrdering) -> Value {
-    let v = Int(bitPattern: _ptr._atomicLoadWord(ordering: ordering))
-    return Value(rawValue: v)!
+    Value(rawValue: _rawValue.load(ordering: ordering))!
   }
 
   /// Atomically sets the current value to `desired`,
@@ -56,8 +39,7 @@ extension UnsafeAtomicState {
     _ desired: Value,
     ordering: AtomicStoreOrdering
   ) {
-    let desiredWord = UInt(bitPattern: desired.rawValue)
-    _ptr._atomicStoreWord(desiredWord, ordering: ordering)
+    _rawValue.store(desired.rawValue, ordering: ordering)
   }
 
   /// Atomically sets the current value to `desired` and returns the previous
@@ -70,9 +52,7 @@ extension UnsafeAtomicState {
     _ desired: Value,
     ordering: AtomicUpdateOrdering
   ) -> Value {
-    let desiredWord = UInt(bitPattern: desired.rawValue)
-    let resultWord = _ptr._atomicExchangeWord(desiredWord, ordering: ordering)
-    return Value(rawValue: Int(bitPattern: resultWord))!
+    Value(rawValue: _rawValue.exchange(desired.rawValue, ordering: ordering))!
   }
 
   /// Perform an atomic compare and exchange operation with
@@ -97,11 +77,11 @@ extension UnsafeAtomicState {
     desired: Value,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Value) {
-    let (success, originalWord) = _ptr._atomicCompareExchangeWord(
-      expected: UInt(bitPattern: expected.rawValue),
-      desired: UInt(bitPattern: desired.rawValue),
+    let (success, original) = _rawValue.compareExchange(
+      expected: expected.rawValue,
+      desired: desired.rawValue,
       ordering: ordering)
-    return (success, Value(rawValue: Int(bitPattern: originalWord))!)
+    return (success, Value(rawValue: original)!)
   }
 
   /// Perform an atomic compare and exchange operation with the specified
@@ -145,11 +125,11 @@ extension UnsafeAtomicState {
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Value) {
-    let (success, originalWord) = _ptr._atomicCompareExchangeWord(
-      expected: UInt(bitPattern: expected.rawValue),
-      desired: UInt(bitPattern: desired.rawValue),
+    let (success, original) = _rawValue.compareExchange(
+      expected: expected.rawValue,
+      desired: desired.rawValue,
       ordering: ordering,
       failureOrdering: failureOrdering)
-    return (success, Value(rawValue: Int(bitPattern: originalWord))!)
+    return (success, Value(rawValue: original)!)
   }
 }

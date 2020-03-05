@@ -18,6 +18,12 @@ public struct UnsafeAtomic<Value> {
   @usableFromInline
   internal let _ptr: UnsafeMutableRawPointer
 
+  @_transparent
+  @usableFromInline
+  internal init(_raw: UnsafeMutableRawPointer) {
+    self._ptr = _raw
+  }
+
   @_transparent // Debug performance
   public init(at address: UnsafeMutablePointer<Value>) {
     self._ptr = UnsafeMutableRawPointer(address)
