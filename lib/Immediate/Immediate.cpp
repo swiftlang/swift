@@ -315,7 +315,8 @@ int swift::RunImmediately(CompilerInstance &CI,
               .setRelocationModel(llvm::Reloc::PIC_)
               .setOptions(std::move(TargetOpt))
               .setCPU(std::move(CPU))
-              .addFeatures(Features))
+              .addFeatures(Features)
+              .setCodeGenOptLevel(llvm::CodeGenOpt::Default))
         .create();
 
     if (!JITOrErr) {
