@@ -1104,6 +1104,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
       [&](CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
+    llvm::errs() << "RESULT TAN TYPE: " << tanType << "\n";
+    tanType->dump();
     AbstractionPattern pattern(derivativeFnGenSig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -1132,6 +1134,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // Given a type, returns its formal SIL result info.
   auto getTangentResultInfoForOriginalParameter =
       [&](CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
+    llvm::errs() << "PARAM TAN TYPE: " << tanType << "\n";
     AbstractionPattern pattern(derivativeFnGenSig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
