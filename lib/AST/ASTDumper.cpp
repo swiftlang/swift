@@ -3204,8 +3204,11 @@ static void dumpSubstitutionMapRec(
     out << "substitution ";
     genericParams[i]->print(out);
     out << " -> ";
-    if (replacementTypes[i])
-      replacementTypes[i]->print(out);
+    if (replacementTypes[i]) {
+      PrintOptions opts;
+      opts.PrintForSIL = true;
+      replacementTypes[i]->print(out, opts);
+    }
     else
       out << "<<unresolved concrete type>>";
     printParen(')');
