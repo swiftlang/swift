@@ -1114,6 +1114,7 @@ public:
     }
 
     // Translate all of the cases.
+    bool limitExhaustivityChecks = false;
     assert(target.kind == FunctionBuilderTarget::TemporaryVar);
     auto temporaryVar = target.captured.first;
     unsigned caseIndex = 0;
@@ -1124,10 +1125,18 @@ public:
               temporaryVar, {target.captured.second[caseIndex]})))
         return nullptr;
 
+      // Check restrictions on '@unknown'.
+      if (caseStmt->hasUnknownAttr()) {
+        checkUnknownAttrRestrictions(
+            cs.getASTContext(), caseStmt, /*fallthroughDest=*/nullptr,
+            limitExhaustivityChecks);
+      }
+
       ++caseIndex;
     }
 
-    TypeChecker::checkSwitchExhaustiveness(switchStmt, dc, /*limited=*/false);
+    TypeChecker::checkSwitchExhaustiveness(
+        switchStmt, dc, limitExhaustivityChecks);
 
     return switchStmt;
   }

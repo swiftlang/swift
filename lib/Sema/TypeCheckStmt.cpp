@@ -1035,40 +1035,6 @@ public:
     std::swap(*prevCaseDecls, *nextCaseDecls);
   }
 
-  void checkUnknownAttrRestrictions(CaseStmt *caseBlock,
-                                    bool &limitExhaustivityChecks) {
-    if (caseBlock->getCaseLabelItems().size() != 1) {
-      assert(!caseBlock->getCaseLabelItems().empty() &&
-             "parser should not produce case blocks with no items");
-      getASTContext().Diags.diagnose(caseBlock->getLoc(),
-                                     diag::unknown_case_multiple_patterns)
-          .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
-      limitExhaustivityChecks = true;
-    }
-
-    if (FallthroughDest != nullptr) {
-      if (!caseBlock->isDefault())
-        getASTContext().Diags.diagnose(caseBlock->getLoc(),
-                                       diag::unknown_case_must_be_last);
-      limitExhaustivityChecks = true;
-    }
-
-    const auto &labelItem = caseBlock->getCaseLabelItems().front();
-    if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
-      getASTContext().Diags.diagnose(labelItem.getStartLoc(),
-                                     diag::unknown_case_where_clause)
-          .highlight(labelItem.getGuardExpr()->getSourceRange());
-    }
-
-    const Pattern *pattern =
-        labelItem.getPattern()->getSemanticsProvidingPattern();
-    if (!isa<AnyPattern>(pattern)) {
-      getASTContext().Diags.diagnose(labelItem.getStartLoc(),
-                                     diag::unknown_case_must_be_catchall)
-          .highlight(pattern->getSourceRange());
-    }
-  }
-
   void checkFallthroughPatternBindingsAndTypes(CaseStmt *caseBlock,
                                                CaseStmt *previousBlock) {
     auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
@@ -1236,7 +1202,9 @@ public:
 
       // Check restrictions on '@unknown'.
       if (caseBlock->hasUnknownAttr()) {
-        checkUnknownAttrRestrictions(caseBlock, limitExhaustivityChecks);
+        checkUnknownAttrRestrictions(
+            getASTContext(), caseBlock, FallthroughDest,
+            limitExhaustivityChecks);
       }
 
       // If the previous case fellthrough, similarly check that that case's
@@ -2065,6 +2033,41 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   TLCD->setBody(Body);
   checkTopLevelErrorHandling(TLCD);
   performTopLevelDeclDiagnostics(TLCD);
+}
+
+void swift::checkUnknownAttrRestrictions(
+    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
+    bool &limitExhaustivityChecks) {
+  if (caseBlock->getCaseLabelItems().size() != 1) {
+    assert(!caseBlock->getCaseLabelItems().empty() &&
+           "parser should not produce case blocks with no items");
+    ctx.Diags.diagnose(caseBlock->getLoc(),
+                       diag::unknown_case_multiple_patterns)
+        .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
+    limitExhaustivityChecks = true;
+  }
+
+  if (fallthroughDest != nullptr) {
+    if (!caseBlock->isDefault())
+      ctx.Diags.diagnose(caseBlock->getLoc(),
+                         diag::unknown_case_must_be_last);
+    limitExhaustivityChecks = true;
+  }
+
+  const auto &labelItem = caseBlock->getCaseLabelItems().front();
+  if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
+    ctx.Diags.diagnose(labelItem.getStartLoc(),
+                                   diag::unknown_case_where_clause)
+        .highlight(labelItem.getGuardExpr()->getSourceRange());
+  }
+
+  const Pattern *pattern =
+      labelItem.getPattern()->getSemanticsProvidingPattern();
+  if (!isa<AnyPattern>(pattern)) {
+    ctx.Diags.diagnose(labelItem.getStartLoc(),
+                       diag::unknown_case_must_be_catchall)
+        .highlight(pattern->getSourceRange());
+  }
 }
 
 void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
