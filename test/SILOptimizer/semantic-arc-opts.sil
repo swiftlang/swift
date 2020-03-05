@@ -1657,3 +1657,127 @@ bb3(%0c : @guaranteed $FakeOptional<ClassLet>):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_read_access : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_read_access'
+sil [ossa] @loadcopy_to_loadborrow_from_read_access : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [read] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  end_access %2 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_mut_access_without_writes : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_mut_access_without_writes'
+sil [ossa] @loadcopy_to_loadborrow_from_mut_access_without_writes : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [modify] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  end_access %2 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We can with time handle this case by proving that the destroy_addr is after
+// the destroy_value.
+//
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: load [copy]
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_mut_access_with_writes'
+sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [modify] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  destroy_addr %2 : $*Klass
+  end_access %2 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We will never be able to handle this unless we can hoist the copy before the
+// destroy_addr. Once we have begin_borrows around all interior_pointers, we can
+// handle this version.
+//
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_2 : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: load [copy]
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_mut_access_with_writes_2'
+sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_2 : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [modify] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_addr %2 : $*Klass
+  destroy_value %3 : $Klass
+  end_access %2 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We will never be able to handle this since we can't hoist the destroy_value
+// before the guaranteed_klass_user.
+//
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_3 : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: load [copy]
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_mut_access_with_writes_3'
+sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_3 : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [modify] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  destroy_addr %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  end_access %2 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We will never be able to handle this since the end_access is before the use
+// of %3, so we can not form a long enough load_borrow.
+//
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_4 : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: load [copy]
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_mut_access_with_writes_4'
+sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_4 : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [modify] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  end_access %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
