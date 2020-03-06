@@ -138,6 +138,17 @@ void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
 static int PipeMemoryReader_queryDataLayout(void *Context,
                                              DataLayoutQueryType type,
                                              void *inBuffer, void *outBuffer) {
+#if defined(__APPLE__) && __APPLE__
+  int applePlatform = 1;
+#else
+  int applePlatform = 0;
+#endif
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+  int iosDerivedPlatform = 1;
+#else
+  int iosDerivedPlatform = 0;
+#endif
+
   switch (type) {
     case DLQ_GetPointerSize: {
       uint8_t *result = (uint8_t *)outBuffer;
@@ -151,25 +162,24 @@ static int PipeMemoryReader_queryDataLayout(void *Context,
     }
     case DLQ_GetObjCReservedLowBits: {
       uint8_t *result = (uint8_t *)outBuffer;
-#if __APPLE__ && __x86_64__ && !defined(TARGET_OS_IOS) && !defined(TARGET_OS_WATCH) && !defined(TARGET_OS_TV)
-      // Only for 64-bit macOS (not iOS, not even when simulated on x86_64)
-      *result = 1;
-#else
-      *result = 0;
-#endif
+      if (applePlatform && !iosDerivedPlatform && (sizeof(void *) == 8)) {
+        // Only for 64-bit macOS (not iOS, not even when simulated on x86_64)
+        *result = 1;
+      } else {
+        *result = 0;
+      }
       return 1;
     }
     case DLQ_GetLeastValidPointerValue: {
       uint64_t *result = (uint64_t *)outBuffer;
-#if __APPLE__
-      if (sizeof(void *) == 8) {
+      if (applePlatform && (sizeof(void *) == 8)) {
         // Swift reserves the first 4GiB on Apple 64-bit platforms
         *result = 0x100000000;
         return 1;
+      } else {
+        // Swift reserves the first 4KiB everywhere else
+        *result = 0x1000;
       }
-#endif
-      // Swift reserves the first 4KiB everywhere else
-      *result = 0x1000;
       return 1;
     }
   }

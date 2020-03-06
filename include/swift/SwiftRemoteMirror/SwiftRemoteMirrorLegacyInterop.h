@@ -567,16 +567,17 @@ swift_reflection_interop_minimalDataLayoutQueryFunction8(
   void *inBuffer, void *outBuffer) {
   // Caveat: This assumes the process being examined is
   // running in the same kind of environment as this host code.
-#if __APPLE__
+#if defined(__APPLE__) && __APPLE__
     auto applePlatform = true;
 #else
     auto applePlatform = false;
 #endif
-#if __APPLE__ && (defined(TARGET_OS_IOS) || defined(TARGET_OS_WATCH) || defined(TARGET_OS_TV))
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
     auto iosDerivedPlatform = true;
 #else
     auto iosDerivedPlatform = false;
 #endif
+
   switch (type) {
   case DLQ_GetPointerSize:
   case DLQ_GetSizeSize: {

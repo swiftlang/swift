@@ -33,6 +33,17 @@ namespace remote {
 class InProcessMemoryReader final : public MemoryReader {
   bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                        void *outBuffer) override {
+#if defined(__APPLE__) && __APPLE__
+    auto applePlatform = true;
+#else
+    auto applePlatform = false;
+#endif
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+    auto iosDerivedPlatform = true;
+#else
+    auto iosDerivedPlatform = false;
+#endif
+
     switch (type) {
     case DLQ_GetPointerSize: {
       auto result = static_cast<uint8_t *>(outBuffer);
@@ -46,27 +57,26 @@ class InProcessMemoryReader final : public MemoryReader {
     }
     case DLQ_GetObjCReservedLowBits: {
       auto result = static_cast<uint8_t *>(outBuffer);
-#if __APPLE__ && __x86_64__ && !defined(TARGET_OS_IOS) && !defined(TARGET_OS_WATCH) && !defined(TARGET_OS_TV)
-      // ObjC on 64-bit macOS reserves the bottom bit of all pointers.
-      *result = 1;
-#endif
-      // Non-Apple platforms obviously do not reserve the bottom bit.
-      // Other Apple platforms (notably including the 64-bit iOS simulator
-      // running on x86_64) do not reserve the bottom bit.
-      *result = 0;
+      if (applePlatform && !iosDerivedPlatform && (sizeof(void *) == 8)) {
+        // Obj-C reserves low bit on 64-bit macOS only.
+        // Other Apple platforms don't reserve this bit (even when
+        // running on x86_64-based simulators).
+        *result = 1;
+      } else {
+        *result = 0;
+      }
       return true;
     }
     case DLQ_GetLeastValidPointerValue: {
       auto result = static_cast<uint64_t *>(outBuffer);
-#if __APPLE__
-      if (sizeof(void *) == 8) {
-        // Swift reserves the first 4GiB on 64-bit Apple platforms
+      if (applePlatform && (sizeof(void *) == 8)) {
+        // Swift reserves the first 4GiB on Apple 64-bit platforms
         *result = 0x100000000;
-        return true;
+        return 1;
+      } else {
+        // Swift reserves the first 4KiB everywhere else
+        *result = 0x1000;
       }
-#endif
-      // Swift reserves the first 4KiB everywhere else
-      *result = 0x1000;
       return true;
     }
     }

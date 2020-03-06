@@ -432,16 +432,17 @@ public:
     auto wordSize = Images.front().TheImage.getBytesInAddress();
     // TODO: The following should be set based on inspecting the image.
     // This code sets it to match the platform this code was compiled for.
-#if __APPLE__
+#if defined(__APPLE__) && __APPLE__
     auto applePlatform = true;
 #else
     auto applePlatform = false;
 #endif
-#if __APPLE__ && (defined(TARGET_OS_IOS) || defined(TARGET_OS_WATCH) || defined(TARGET_OS_TV))
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
     auto iosDerivedPlatform = true;
 #else
     auto iosDerivedPlatform = false;
 #endif
+
     switch (type) {
     case DLQ_GetPointerSize: {
       auto result = static_cast<uint8_t *>(outBuffer);
