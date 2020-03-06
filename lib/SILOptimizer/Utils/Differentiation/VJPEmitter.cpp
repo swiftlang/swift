@@ -696,6 +696,8 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
 
   // Checkpoint the pullback.
   auto *pullbackDecl = pullbackInfo.lookUpLinearMapDecl(ai);
+  llvm::dbgs() << "pullbackDecl\n";
+  pullbackDecl->dump();
 
   // If actual pullback type does not match lowered pullback type, reabstract
   // the pullback using a thunk.
@@ -707,15 +709,9 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
   if (!loweredPullbackType->isEqual(actualPullbackType)) {
     // Set non-reabstracted original pullback type in nested apply info.
     nestedApplyInfo.originalPullbackType = actualPullbackType;
+
     SILOptFunctionBuilder fb(context.getTransform());
-    auto *thunk =
-        getOrCreateReabstractionThunk(fb, getModule(), loc, /*caller*/ vjp,
-                                      actualPullbackType, loweredPullbackType);
-    auto *thunkRef = getBuilder().createFunctionRef(loc, thunk);
-    pullback = getBuilder().createPartialApply(
-        ai->getLoc(), thunkRef,
-        getOpSubstitutionMap(thunk->getForwardingSubstitutionMap()), {pullback},
-        actualPullbackType->getCalleeConvention());
+    pullback = reabstractFunction(getBuilder(), fb, ai->getLoc(), pullback, loweredPullbackType);
   }
   pullbackValues[ai->getParent()].push_back(pullback);
 

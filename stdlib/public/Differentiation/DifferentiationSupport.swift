@@ -209,7 +209,6 @@ public func withoutDerivative<T, R>(at x: T, in body: (T) -> R) -> R {
 // Functional utilities
 //===----------------------------------------------------------------------===//
 
-/*
 /// Create a differentiable function from a vector-Jacobian products function.
 @inlinable
 public func differentiableFunction<T : Differentiable, R : Differentiable>(
@@ -294,13 +293,11 @@ public extension Differentiable {
     )
   }
 }
-*/
 
 //===----------------------------------------------------------------------===//
 // Method-style differential operators
 //===----------------------------------------------------------------------===//
 
-/*
 public extension Differentiable {
   @available(*, deprecated, message: """
     Method-style differential operators are deprecated and will be removed; \
@@ -397,7 +394,6 @@ public extension Differentiable {
     return (y, pb(R(1)))
   }
 }
-*/
 
 //===----------------------------------------------------------------------===//
 // Free-function-style differential operators
@@ -1281,7 +1277,6 @@ extension Array where Element: Differentiable {
 // Differentiable higher order functions for collections
 //===----------------------------------------------------------------------===//
 
-/*
 public extension Array where Element: Differentiable {
   @differentiable(wrt: (self, initialResult))
   func differentiableReduce<Result: Differentiable>(
@@ -1352,7 +1347,6 @@ public extension Array where Element: Differentiable {
     return (value: values, pullback: pullback)
   }
 }
-*/
 
 //===----------------------------------------------------------------------===//
 // JVP diagnostics

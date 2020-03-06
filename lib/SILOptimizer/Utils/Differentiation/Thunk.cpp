@@ -254,16 +254,14 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
 SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
                                            SILModule &module, SILLocation loc,
                                            SILFunction *caller,
-                                           CanSILFunctionType substFromType,
-                                           CanSILFunctionType substToType) {
+                                           CanSILFunctionType fromType,
+                                           CanSILFunctionType toType) {
+
+  assert(!fromType->getSubstitutions());
+  assert(!toType->getSubstitutions());
+
   SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
-  auto fromType = substFromType->getUnsubstitutedType(module);
-  auto toType = substToType->getUnsubstitutedType(module);
-  llvm::errs() << "FROM TYPE\n";
-  fromType->dump();
-  llvm::errs() << "TO TYPE\n";
-  toType->dump();
   auto thunkType =
       buildThunkType(caller, fromType, toType, genericEnv, interfaceSubs,
                      /*withoutActuallyEscaping*/ false,
@@ -435,6 +433,9 @@ getOrCreateSubsetParametersThunkForLinearMap(
     CanSILFunctionType linearMapType, CanSILFunctionType targetType,
     AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
     SILAutoDiffIndices actualIndices) {
+  assert(!linearMapType->getSubstitutions());
+  assert(!targetType->getSubstitutions());
+
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for " << linearMapType
              << " from " << actualIndices << " to " << desiredIndices << '\n');
@@ -798,22 +799,31 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   auto linearMap = directResults.back();
 
   auto linearMapType = linearMap->getType().castTo<SILFunctionType>();
+  llvm::dbgs() << "linear map is " << *linearMap << "\n";
+  llvm::dbgs() << "linear map type is " << linearMap->getType() << "\n";
   auto linearMapTargetType = targetType->getResults()
                                  .back()
                                  .getSILStorageInterfaceType()
                                  .castTo<SILFunctionType>();
+  auto unsubstLinearMapType = linearMapType->getUnsubstitutedType(module);
+  auto unsubstLinearMapTargetType = linearMapTargetType->getUnsubstitutedType(module);
 
   SILFunction *linearMapThunk;
   SubstitutionMap linearMapSubs;
   std::tie(linearMapThunk, linearMapSubs) =
       getOrCreateSubsetParametersThunkForLinearMap(
-          fb, thunk, linearMapType, linearMapTargetType, kind, desiredIndices,
+          fb, thunk, unsubstLinearMapType, unsubstLinearMapTargetType, kind, desiredIndices,
           actualIndices);
 
   auto *linearMapThunkFRI = builder.createFunctionRef(loc, linearMapThunk);
-  auto *thunkedLinearMap = builder.createPartialApply(
-      loc, linearMapThunkFRI, linearMapSubs, {linearMap},
+  SILValue thunkedLinearMap = linearMap;
+  if (linearMapType != unsubstLinearMapType)
+    thunkedLinearMap = builder.createConvertFunction(loc, thunkedLinearMap, SILType::getPrimitiveObjectType(unsubstLinearMapType), false); // todo: correct boolean value?
+  thunkedLinearMap = builder.createPartialApply(
+      loc, linearMapThunkFRI, linearMapSubs, {thunkedLinearMap},
       ParameterConvention::Direct_Guaranteed);
+  if (linearMapTargetType != unsubstLinearMapTargetType)
+    thunkedLinearMap = builder.createConvertFunction(loc, thunkedLinearMap, SILType::getPrimitiveObjectType(unsubstLinearMapTargetType), false); // todo: correct boolean value?
 
   assert(origFnType->getResults().size() == 1);
   if (origFnType->getResults().front().isFormalDirect()) {
@@ -824,8 +834,43 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
     builder.createReturn(loc, thunkedLinearMap);
   }
 
+  llvm::dbgs() << "the subset parameter thunk\n";
+  thunk->dump();
+
   return {thunk, interfaceSubs};
 }
+
+SILValue reabstractFunction(SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
+                            SILValue fn,
+                                           CanSILFunctionType toType) {
+  // TODO: I removed some calls to getOpType and getOpSubstitutionMap because we
+  // don't have a cloner here. Maybe I should have a cloner so that I can call
+  // them? Also remapSubstitutionMap from other callers.
+
+    auto &module = *fn->getModule();
+    auto fromType = fn->getType().getAs<SILFunctionType>();
+    auto unsubstFromType = fromType->getUnsubstitutedType(module);
+    auto unsubstToType = toType->getUnsubstitutedType(module);
+
+    auto *thunk =
+        getOrCreateReabstractionThunk(fb, module, loc, /*caller*/ fn->getFunction(),
+                                      unsubstFromType, unsubstToType);
+    auto *thunkRef = builder.createFunctionRef(loc, thunk);
+
+    if (fromType != unsubstFromType)
+      fn = builder.createConvertFunction(loc, fn, SILType::getPrimitiveObjectType(unsubstFromType), false); // todo: what's the right val for the bool?
+
+    fn = builder.createPartialApply(
+        loc, thunkRef,
+        thunk->getForwardingSubstitutionMap(), {fn},
+        fromType->getCalleeConvention());
+
+    if (toType != unsubstToType)
+      fn = builder.createConvertFunction(loc, fn, SILType::getPrimitiveObjectType(toType), false);// todo: what's the right val for the bool?
+
+    return fn;
+}
+
 
 } // end namespace autodiff
 } // end namespace swift

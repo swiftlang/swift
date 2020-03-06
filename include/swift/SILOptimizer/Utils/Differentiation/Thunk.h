@@ -19,6 +19,7 @@
 
 #include "swift/AST/AutoDiff.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILBuilder.h"
 
 namespace swift {
 
@@ -112,6 +113,10 @@ getOrCreateSubsetParametersThunkForLinearMap(
     CanSILFunctionType linearMapType, CanSILFunctionType targetType,
     AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
     SILAutoDiffIndices actualIndices);
+
+SILValue reabstractFunction(SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
+                            SILValue fn,
+                                           CanSILFunctionType toType);
 
 } // end namespace autodiff
 
