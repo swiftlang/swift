@@ -1202,6 +1202,11 @@ public:
       auto A = dyn_cast<ArchetypeType>(t);
       if (!A)
         return;
+      if (!isArchetypeValidInFunction(A, F)) {
+        llvm::dbgs() << "archetype " << A << "\n";
+        llvm::dbgs() << "I " << *I << "\n";
+        llvm::dbgs() << "F " << *F << "\n";
+      }
       require(isArchetypeValidInFunction(A, F),
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");

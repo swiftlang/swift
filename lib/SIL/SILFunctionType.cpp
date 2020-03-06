@@ -1225,6 +1225,7 @@ static CanSILFunctionType getPullbackType(
   };
 
   SmallVector<SILParameterInfo, 1> pullbackParams;
+  llvm::dbgs() << "processing results\n";
   if (inoutParam) {
     auto paramTan = inoutParam->getInterfaceType()->getAutoDiffTangentSpace(
         lookupConformance);
@@ -1266,6 +1267,7 @@ static CanSILFunctionType getPullbackType(
     }
   }
   SmallVector<SILResultInfo, 8> pullbackResults;
+  llvm::dbgs() << "processing params\n";
   for (auto &param : getDiffParams(originalFnTy, parameterIndices)) {
     if (param.isIndirectInOut())
       continue;
@@ -1292,6 +1294,7 @@ static CanSILFunctionType getPullbackType(
       ParameterConvention::Direct_Guaranteed, pullbackParams, {},
       pullbackResults, {}, SubstitutionMap(), /*isGenericSignatureImplied*/ false, ctx);
 #endif
+  llvm::dbgs() << "finishing up\n";
   GenericSignature genericSig;
   SubstitutionMap substitutions;
   bool impliedSignature = false;
@@ -1304,6 +1307,7 @@ static CanSILFunctionType getPullbackType(
                                  llvm::makeArrayRef(substConformances));
     impliedSignature = true;
   }
+  llvm::dbgs() << "returning the pullback type\n";
   return SILFunctionType::get(
       genericSig, SILFunctionType::ExtInfo(), SILCoroutineKind::None,
       ParameterConvention::Direct_Guaranteed, pullbackParams, {},
@@ -1358,15 +1362,15 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // Compute closure type.
   CanSILFunctionType closureType;
   switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP: {
+  case AutoDiffDerivativeFunctionKind::JVP:
     closureType = getDifferentialType(this, parameterIndices, resultIndex, substGenericSignature, lookupConformance);
     break;
-  }
-  case AutoDiffDerivativeFunctionKind::VJP: {
+  case AutoDiffDerivativeFunctionKind::VJP:
     closureType = getPullbackType(this, parameterIndices, resultIndex, substGenericSignature, lookupConformance, TC);
     break;
   }
-  }
+
+  llvm::dbgs() << "has closure type\n";
 
   // Compute the derivative function parameters. There are a few differences
   // between the original function parameters and the derivative function
@@ -1375,6 +1379,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   newParameters.reserve(getNumParameters());
   // Difference 1. The derivative generic constraints may make the derivative
   // function parameters more concrete.
+  llvm::dbgs() << "transforming params\n";
   for (auto &param : getParameters()) {
     newParameters.push_back(param.getWithInterfaceType(
         param.getInterfaceType()->getCanonicalType(substGenericSignature)));
@@ -1382,6 +1387,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // Difference 2. Reabstraction thunks have a function-typed parameter (the
   // function to reabstract) as their last parameter. Reabstraction thunk
   // JVPs/VJPs have a `@differentiable` function-typed last parameter instead.
+  llvm::dbgs() << "adding reabstraction param\n";
   if (isReabstractionThunk) {
     assert(!parameterIndices->contains(getNumParameters() - 1) &&
            "Function-typed parameter should not be wrt");
@@ -1400,14 +1406,16 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   newResults.reserve(getNumResults() + 1);
   // Difference 1. The derivative generic constraints may make the derivative
   // function results more concrete.
+  llvm::dbgs() << "transforming results\n";
   for (auto &result : getResults()) {
     newResults.push_back(result.getWithInterfaceType(
         result.getInterfaceType()->getCanonicalType(substGenericSignature)));
   }
   // Difference 2. The derivative function has a linear map result.
-  newResults.push_back({closureType->getCanonicalType(substGenericSignature),
-                        ResultConvention::Owned});
+  llvm::dbgs() << "adding closure type " << closureType << "\n";
+  newResults.push_back({closureType, ResultConvention::Owned});
 
+  llvm::dbgs() << "computing extinfo\n";
   // Compute the derivative function ExtInfo.
   // If original function is `@convention(c)`, the derivative function should
   // have `@convention(thin)`. IRGen does not support `@convention(c)` functions

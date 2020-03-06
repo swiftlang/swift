@@ -1245,7 +1245,8 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   // If callee pullback was reabstracted in VJP, reabstract callee pullback.
   if (applyInfo.originalPullbackType) {
     SILOptFunctionBuilder fb(getContext().getTransform());
-    pullback = reabstractFunction(builder, fb, loc, pullback, *applyInfo.originalPullbackType);
+    pullback = reabstractFunction(builder, fb, loc, pullback, *applyInfo.originalPullbackType,
+                                  [this](SubstitutionMap subs) -> SubstitutionMap { return this->remapSubstitutionMap(subs); });
   }
   args.push_back(seed);
 

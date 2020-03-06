@@ -807,7 +807,8 @@ void JVPEmitter::emitTangentForApplyInst(
   // differential.
   if (!differentialType->isEqual(originalDifferentialType)) {
     SILOptFunctionBuilder fb(context.getTransform());
-    differential = reabstractFunction(diffBuilder, fb, loc, differential, originalDifferentialType);
+    differential = reabstractFunction(diffBuilder, fb, loc, differential, originalDifferentialType,
+                                      [this](SubstitutionMap subs) -> SubstitutionMap { return this->getOpSubstitutionMap(subs); });
   }
 
   // Call the differential.
@@ -1401,7 +1402,8 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   // reabstract the differential using a thunk.
   if (!loweredDifferentialType->isEqual(originalDifferentialType)) {
     SILOptFunctionBuilder fb(context.getTransform());
-    differential = reabstractFunction(builder, fb, loc, differential, loweredDifferentialType);
+    differential = reabstractFunction(builder, fb, loc, differential, loweredDifferentialType,
+                                      [this](SubstitutionMap subs) -> SubstitutionMap { return this->getOpSubstitutionMap(subs); });
   }
   differentialValues[ai->getParent()].push_back(differential);
 

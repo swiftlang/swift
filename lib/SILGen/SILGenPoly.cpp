@@ -4011,7 +4011,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   if (linearMap.getType().castTo<SILFunctionType>() != targetLinearMapFnType) {
   // if (linearMapFnType->hasArchetype()) {
     auto linearMapFnType = linearMap.getType().castTo<SILFunctionType>();
-    assert(linearMapFnType->hasArchetype());
+    //assert(linearMapFnType->hasArchetype());
     llvm::errs() << "WOW MEANINGFUL!\n";
     linearMapFnType->dump();
     linearMapFnType->getUnsubstitutedType(thunkSGF.getModule())->dump();

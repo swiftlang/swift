@@ -715,7 +715,8 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     llvm::dbgs() << "in struct\n";
     pullbackInfo.getLinearMapStruct(ai->getParent())->dump();
     SILOptFunctionBuilder fb(context.getTransform());
-    pullback = reabstractFunction(getBuilder(), fb, ai->getLoc(), pullback, loweredPullbackType);
+    pullback = reabstractFunction(getBuilder(), fb, ai->getLoc(), pullback, loweredPullbackType,
+                                  [this](SubstitutionMap subs) -> SubstitutionMap { return this->getOpSubstitutionMap(subs); });
   }
   pullbackValues[ai->getParent()].push_back(pullback);
 

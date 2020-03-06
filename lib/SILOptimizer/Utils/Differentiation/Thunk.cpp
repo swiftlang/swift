@@ -825,7 +825,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
       loc, linearMapThunkFRI, linearMapSubs, {thunkedLinearMap},
       ParameterConvention::Direct_Guaranteed);
   if (linearMapTargetType != unsubstLinearMapTargetType)
-    thunkedLinearMap = builder.createConvertFunction(loc, thunkedLinearMap, SILType::getPrimitiveObjectType(unsubstLinearMapTargetType), false); // todo: correct boolean value?
+    thunkedLinearMap = builder.createConvertFunction(loc, thunkedLinearMap, SILType::getPrimitiveObjectType(linearMapTargetType), false); // todo: correct boolean value?
 
   assert(origFnType->getResults().size() == 1);
   if (origFnType->getResults().front().isFormalDirect()) {
@@ -844,7 +844,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 
 SILValue reabstractFunction(SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
                             SILValue fn,
-                                           CanSILFunctionType toType) {
+                                           CanSILFunctionType toType, std::function<SubstitutionMap(SubstitutionMap)> remapSubstMap) {
   // TODO: I removed some calls to getOpType and getOpSubstitutionMap because we
   // don't have a cloner here. Maybe I should have a cloner so that I can call
   // them? Also remapSubstitutionMap from other callers.
@@ -864,7 +864,7 @@ SILValue reabstractFunction(SILBuilder &builder, SILOptFunctionBuilder &fb, SILL
 
     fn = builder.createPartialApply(
         loc, thunkRef,
-        thunk->getForwardingSubstitutionMap(), {fn},
+        remapSubstMap(thunk->getForwardingSubstitutionMap()), {fn},
         fromType->getCalleeConvention());
 
     if (toType != unsubstToType)
