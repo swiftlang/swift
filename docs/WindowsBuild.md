@@ -45,13 +45,13 @@ git clone https://github.com/compnerd/windows-swift windows-swift
 
 ## Acquire ICU, SQLite3, curl, libxml2 and zlib
 
-Go to [compnerd's windows-swift azure page](https://dev.azure.com/compnerd/windows-swift/_build) and open [Pipelines](https://dev.azure.com/compnerd/windows-swift/_build) where you'll see bots (hopefully green) for:
+Go to [compnerd's windows-swift azure page](https://dev.azure.com/compnerd/swift-build/_build) and open [Pipelines](https://dev.azure.com/compnerd/swift-build/_build) where you'll see bots (hopefully green) for:
 
-- [ICU](https://dev.azure.com/compnerd/windows-swift/_build?definitionId=9)
-- [SQLite](https://dev.azure.com/compnerd/windows-swift/_build?definitionId=12&_a=summary)
-- [curl](https://dev.azure.com/compnerd/windows-swift/_build?definitionId=11&_a=summary)
-- [libxml2](https://dev.azure.com/compnerd/windows-swift/_build?definitionId=10&_a=summary)
-- [zlib](https://dev.azure.com/compnerd/windows-swift/_build?definitionId=16&_a=summary)
+- [ICU](https://dev.azure.com/compnerd/swift-build/_build?definitionId=9)
+- [SQLite](https://dev.azure.com/compnerd/swift-build/_build?definitionId=12&_a=summary)
+- [curl](https://dev.azure.com/compnerd/swift-build/_build?definitionId=11&_a=summary)
+- [libxml2](https://dev.azure.com/compnerd/swift-build/_build?definitionId=10&_a=summary)
+- [zlib](https://dev.azure.com/compnerd/swift-build/_build?definitionId=16&_a=summary)
 
 Download each of the zip files and copy their contents into S:/Library. The directory structure should resemble:
 

@@ -1927,15 +1927,6 @@ static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
   }
 }
 
-/// Return a substituted callee function type.
-static CanSILFunctionType
-getCalleeSubstFunctionType(SILValue Callee, SubstitutionMap Subs,
-                           TypeExpansionContext context) {
-  // Create a substituted callee type.
-  auto CanFnTy = Callee->getType().castTo<SILFunctionType>();
-  return CanFnTy->substGenericArgs(*Callee->getModule(), Subs, context);
-}
-
 /// Create a new apply based on an old one, but with a different
 /// function being applied.
 static ApplySite replaceWithSpecializedCallee(ApplySite AI,
@@ -1949,13 +1940,16 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
   prepareCallArguments(AI, Builder, ReInfo, Arguments, StoreResultTo);
 
   // Create a substituted callee type.
+  auto CanFnTy = Callee->getType().castTo<SILFunctionType>();
   SubstitutionMap Subs;
   if (ReInfo.getSpecializedType()->isPolymorphic()) {
     Subs = ReInfo.getCallerParamSubstitutionMap();
+    Subs = SubstitutionMap::get(CanFnTy->getSubstGenericSignature(), Subs);
   }
 
   auto CalleeSubstFnTy =
-      getCalleeSubstFunctionType(Callee, Subs, ReInfo.getResilienceExpansion());
+      CanFnTy->substGenericArgs(*Callee->getModule(), Subs,
+                                ReInfo.getResilienceExpansion());
   auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
   SILFunctionConventions substConv(CalleeSubstFnTy, Builder.getModule());
 
@@ -2453,6 +2447,8 @@ void swift::trySpecializeApplyOfGeneric(
       Arguments.push_back(Op.get());
     }
     auto Subs = ReInfo.getCallerParamSubstitutionMap();
+    auto FnTy = Thunk->getLoweredFunctionType();
+    Subs = SubstitutionMap::get(FnTy->getSubstGenericSignature(), Subs);
     auto *NewPAI = Builder.createPartialApply(
         PAI->getLoc(), FRI, Subs, Arguments,
         PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),

@@ -77,6 +77,8 @@ typedef unsigned int __swift_thread_key_t;
 #  endif
 # elif defined(__FreeBSD__)
 typedef int __swift_thread_key_t;
+# elif defined(__OpenBSD__)
+typedef int __swift_thread_key_t;
 # elif defined(_WIN32)
 typedef unsigned long __swift_thread_key_t;
 # elif defined(__HAIKU__)

@@ -776,8 +776,8 @@ static bool doCodeCompletionImpl(
       Offset, /*EnableASTCaching=*/false, Error,
       CodeCompletionDiagnostics ? &PrintDiags : nullptr,
       [&](CompilerInstance &CI) {
-        performCodeCompletionSecondPass(CI.getPersistentParserState(),
-                                        *callbacksFactory);
+        auto SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
       });
   return isSuccess ? 0 : 1;
 }
@@ -1123,8 +1123,6 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
     registerParseRequestFunctions(Parser.getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(Parser.getParser().Context.evaluator);
 
-    // Collecting syntactic information shouldn't evaluate # conditions.
-    Parser.getParser().State->PerformConditionEvaluation = false;
     Parser.getDiagnosticEngine().addConsumer(PrintDiags);
 
     (void)Parser.parse();
@@ -1359,9 +1357,6 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   registerParseRequestFunctions(Parser.getParser().Context.evaluator);
   registerTypeCheckerRequestFunctions(
       Parser.getParser().Context.evaluator);
-
-  // Collecting syntactic information shouldn't evaluate # conditions.
-  Parser.getParser().State->PerformConditionEvaluation = false;
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;

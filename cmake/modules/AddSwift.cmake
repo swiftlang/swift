@@ -905,22 +905,6 @@ function(_add_swift_host_executable_single name)
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
 
-  handle_swift_sources(
-      dependency_target
-      unused_module_dependency_target
-      unused_sib_dependency_target
-      unused_sibopt_dependency_target
-      unused_sibgen_dependency_target
-      SWIFTEXE_SINGLE_SOURCES SWIFTEXE_SINGLE_EXTERNAL_SOURCES ${name}
-      DEPENDS
-        ${SWIFTEXE_SINGLE_DEPENDS}
-      MODULE_NAME ${name}
-      SDK ${SWIFTEXE_SINGLE_SDK}
-      ARCHITECTURE ${SWIFTEXE_SINGLE_ARCHITECTURE}
-      COMPILE_FLAGS ${SWIFTEXE_SINGLE_COMPILE_FLAGS}
-      IS_MAIN)
-  add_swift_source_group("${SWIFTEXE_SINGLE_EXTERNAL_SOURCES}")
-
   add_executable(${name}
       ${SWIFTEXE_SINGLE_SOURCES}
       ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
@@ -928,7 +912,6 @@ function(_add_swift_host_executable_single name)
   add_dependencies_multiple_targets(
       TARGETS "${name}"
       DEPENDS
-        ${dependency_target}
         ${LLVM_COMMON_DEPENDS}
         ${SWIFTEXE_SINGLE_DEPENDS})
   llvm_update_compile_flags("${name}")
@@ -969,17 +952,6 @@ function(_add_swift_host_executable_single name)
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_LINK_COMPONENTS})
-
-  # NOTE(compnerd) use the C linker language to invoke `clang` rather than
-  # `clang++` as we explicitly link against the C++ runtime.  We were previously
-  # actually passing `-nostdlib++` to avoid the C++ runtime linkage.
-  if(${SWIFTEXE_SINGLE_SDK} STREQUAL ANDROID)
-    set_property(TARGET "${name}" PROPERTY
-      LINKER_LANGUAGE "C")
-  else()
-    set_property(TARGET "${name}" PROPERTY
-      LINKER_LANGUAGE "CXX")
-  endif()
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
 endfunction()

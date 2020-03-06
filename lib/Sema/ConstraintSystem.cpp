@@ -1885,6 +1885,10 @@ isInvalidPartialApplication(ConstraintSystem &cs,
 std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
     const OverloadChoice &choice, ConstraintLocator *locator,
     Type boundType, Type refType) {
+  // If the declaration is unavailable, note that in the score.
+  if (isDeclUnavailable(choice.getDecl(), locator))
+    increaseScore(SK_Unavailable);
+
   bool bindConstraintCreated = false;
   const auto kind = choice.getKind();
   if (kind != OverloadChoiceKind::DeclViaDynamic &&
@@ -2454,8 +2458,17 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
         auto *proto = assocType->getProtocol();
         auto conformance = DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
-        if (!conformance)
+        if (!conformance) {
+          // If the base type doesn't conform to the associatedtype's protocol,
+          // there will be a missing conformance fix applied in diagnostic mode,
+          // so the concrete dependent member type is considered a "hole" in
+          // order to continue solving.
+          if (shouldAttemptFixes() &&
+              getPhase() == ConstraintSystemPhase::Solving)
+            return getASTContext().TheUnresolvedType;
+
           return DependentMemberType::get(lookupBaseType, assocType);
+        }
 
         auto subs = SubstitutionMap::getProtocolSubstitutions(
             proto, lookupBaseType, conformance);
@@ -2895,10 +2908,9 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
 static bool
 diagnoseAmbiguityWithEphemeralPointers(ConstraintSystem &cs,
                                        ArrayRef<Solution> solutions) {
-  bool allSolutionsHaveFixes = true;
+  unsigned numSolutionsWithFixes = 0;
   for (const auto &solution : solutions) {
     if (solution.Fixes.empty()) {
-      allSolutionsHaveFixes = false;
       continue;
     }
 
@@ -2906,11 +2918,14 @@ diagnoseAmbiguityWithEphemeralPointers(ConstraintSystem &cs,
           return fix->getKind() == FixKind::TreatEphemeralAsNonEphemeral;
         }))
       return false;
+
+    numSolutionsWithFixes += 1;
   }
 
-  // If all solutions have fixes for ephemeral pointers, let's
+  // If all or no solutions have fixes for ephemeral pointers, let's
   // let `diagnoseAmbiguityWithFixes` diagnose the problem.
-  if (allSolutionsHaveFixes)
+  if (numSolutionsWithFixes == 0 ||
+      numSolutionsWithFixes == solutions.size())
     return false;
 
   // If only some of the solutions have ephemeral pointer fixes

@@ -4218,10 +4218,66 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
         return true;
 
-      setStmtConditionTarget(&condElement, target);
+      setSolutionApplicationTarget(&condElement, target);
       continue;
     }
     }
+  }
+
+  return false;
+}
+
+bool ConstraintSystem::generateConstraints(
+    CaseStmt *caseStmt, DeclContext *dc, Type subjectType,
+    ConstraintLocator *locator) {
+  // Pre-bind all of the pattern variables within the case.
+  bindSwitchCasePatternVars(caseStmt);
+
+  for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
+    // Resolve the pattern.
+    auto *pattern = TypeChecker::resolvePattern(
+        caseLabelItem.getPattern(), dc, /*isStmtCondition=*/false);
+    if (!pattern)
+      return true;
+
+    // Generate constraints for the pattern, including one-way bindings for
+    // any variables that show up in this pattern, because those variables
+    // can be referenced in the guard expressions and the body.
+    Type patternType = generateConstraints(
+        pattern, locator, /* bindPatternVarsOneWay=*/true);
+
+    // Convert the subject type to the pattern, which establishes the
+    // bindings.
+    addConstraint(
+        ConstraintKind::Conversion, subjectType, patternType, locator);
+
+    // Generate constraints for the guard expression, if there is one.
+    Expr *guardExpr = caseLabelItem.getGuardExpr();
+    if (guardExpr) {
+      guardExpr = generateConstraints(guardExpr, dc);
+      if (!guardExpr)
+        return true;
+    }
+
+    // Save this info.
+    setCaseLabelItemInfo(&caseLabelItem, {pattern, guardExpr});
+
+    // For any pattern variable that has a parent variable (i.e., another
+    // pattern variable with the same name in the same case), require that
+    // the types be equivalent.
+    pattern->forEachVariable([&](VarDecl *var) {
+      if (auto parentVar = var->getParentVarDecl()) {
+        addConstraint(
+            ConstraintKind::Equal, getType(parentVar), getType(var), locator);
+      }
+    });
+  }
+
+  // Bind the types of the case body variables.
+  for (auto caseBodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    auto parentVar = caseBodyVar->getParentVarDecl();
+    assert(parentVar && "Case body variables always have parents");
+    setType(caseBodyVar, getType(parentVar));
   }
 
   return false;

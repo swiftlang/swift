@@ -563,3 +563,57 @@ tuplify(true) { c in
 // CHECK: testIfLetAsMatching
 // CHECK-SAME: "subMethod"
 // CHECK-SAME: "Superclass instance"
+
+
+// switch statements
+func testSwitch(_ e: E) {
+  tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    case .a:
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+    case .b(let i, nil):
+      "just \(i)"
+    }
+  }
+}
+
+// CHECK: testSwitch
+// CHECK-SAME: first(main.Either<Swift.String, (Swift.Int, Swift.String)>.first("a"))
+testSwitch(getE(0))
+
+// CHECK: testSwitch
+// CHECK-SAME: first(main.Either<Swift.String, (Swift.Int, Swift.String)>.second(34, "hello!"))
+testSwitch(getE(1))
+
+// CHECK: testSwitch
+// CHECK-SAME: second("just 42")
+testSwitch(getE(2))
+
+func testSwitchCombined(_ eIn: E) {
+  var e = eIn
+  tuplify(true) { c in
+    "testSwitchCombined"
+    switch e {
+    case .a:
+      "a"
+    case .b(let i, _?), .b(let i, nil):
+      "just \(i)"
+    }
+  }
+}
+
+// CHECK: testSwitchCombined
+// CHECK-SAME: main.Either<Swift.String, Swift.String>.first("a")
+testSwitchCombined(getE(0))
+
+// CHECK: testSwitchCombined
+// CHECK-SAME: second("just 17")
+testSwitchCombined(getE(1))
+
+// CHECK: testSwitchCombined
+// CHECK-SAME: second("just 42")
+testSwitchCombined(getE(2))

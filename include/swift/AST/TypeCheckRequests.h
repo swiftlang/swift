@@ -2025,6 +2025,26 @@ public:
   }
 };
 
+/// List SPI group ids declared on a decl.
+class SPIGroupsRequest :
+    public SimpleRequest<SPIGroupsRequest,
+                         llvm::ArrayRef<Identifier>(const Decl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<llvm::ArrayRef<Identifier>>
+  evaluate(Evaluator &evaluator, const Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+
 /// Type-checks a `@differentiable` attribute and returns the resolved parameter
 /// indices on success. On failure, emits diagnostics and returns `nullptr`.
 ///

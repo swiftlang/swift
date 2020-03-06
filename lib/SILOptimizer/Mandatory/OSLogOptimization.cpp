@@ -871,13 +871,7 @@ static Optional<BorrowScopeIntroducingValue>
 getUniqueBorrowScopeIntroducingValue(SILValue value) {
   assert(value.getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
          "parameter must be a guarenteed value");
-  SmallVector<BorrowScopeIntroducingValue, 4> borrowIntroducers;
-  getUnderlyingBorrowIntroducingValues(value, borrowIntroducers);
-  assert(borrowIntroducers.size() > 0 &&
-         "folding guaranteed value with no borrow introducer");
-  if (borrowIntroducers.size() > 1)
-    return None;
-  return borrowIntroducers[0];
+  return getSingleBorrowIntroducingValue(value);
 }
 
 /// Replace all uses of \c originalVal by \c foldedVal and adjust lifetimes of

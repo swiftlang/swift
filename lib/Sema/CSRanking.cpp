@@ -94,9 +94,6 @@ bool ConstraintSystem::worseThanBestSolution() const {
   if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
-  if (retainAllSolutions())
-    return false;
-
   if (!solverState || !solverState->BestScore ||
       CurrentScore <= *solverState->BestScore)
     return false;

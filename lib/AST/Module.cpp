@@ -32,6 +32,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -674,7 +675,8 @@ void ModuleDecl::getTopLevelDeclsWhereAttributesMatch(
 }
 
 void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
-  Results.append(Decls.begin(), Decls.end());
+  auto decls = getTopLevelDecls();
+  Results.append(decls.begin(), decls.end());
 }
 
 void ModuleDecl::getPrecedenceGroups(
@@ -1190,7 +1192,14 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 void
 SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modules,
                                ModuleDecl::ImportFilter filter) const {
-  assert(ASTStage >= Parsed || Kind == SourceFileKind::SIL);
+  // FIXME: Ideally we should assert that the file has been name bound before
+  // calling this function. However unfortunately that can cause issues for
+  // overlays which can depend on a Clang submodule for the underlying framework
+  // they are overlaying, which causes us to attempt to load the overlay again.
+  // We need to find a way to ensure that an overlay dependency with the same
+  // name as the overlay always loads the underlying Clang module. We currently
+  // handle this for a direct import from the overlay, but not when it happens
+  // through other imports.
   assert(filter && "no imports requested?");
   for (auto desc : Imports) {
     ModuleDecl::ImportFilter requiredFilter;
@@ -1688,7 +1697,7 @@ void SourceFile::print(raw_ostream &OS, const PrintOptions &PO) {
 void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   std::set<DeclKind> MajorDeclKinds = {DeclKind::Class, DeclKind::Enum,
     DeclKind::Extension, DeclKind::Protocol, DeclKind::Struct};
-  for (auto decl : Decls) {
+  for (auto decl : getTopLevelDecls()) {
     if (!decl->shouldPrintInContext(PO))
       continue;
     // For a major decl, we print an empty line before it.
@@ -1820,20 +1829,73 @@ void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
 }
 
 bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
-  if (!targetDecl->getAttrs().hasAttribute<SPIAccessControlAttr>())
-    return false;
-
   auto targetModule = targetDecl->getModuleContext();
-  SmallVector<Identifier, 4> importedSpis;
-  lookupImportedSPIGroups(targetModule, importedSpis);
+  SmallVector<Identifier, 4> importedSPIGroups;
+  lookupImportedSPIGroups(targetModule, importedSPIGroups);
+  if (importedSPIGroups.empty()) return false;
 
-  for (auto attr : targetDecl->getAttrs().getAttributes<SPIAccessControlAttr>())
-    for (auto declSPI : attr->getSPIGroups())
-      for (auto importedSPI : importedSpis)
-        if (importedSPI == declSPI)
-          return true;
+  auto declSPIGroups = targetDecl->getSPIGroups();
+
+  // Note: If we reach a point where there are many SPI imports or SPI groups
+  // on decls we could optimize this further by using a set.
+  for (auto importedSPI : importedSPIGroups)
+    for (auto declSPI : declSPIGroups)
+      if (importedSPI == declSPI)
+        return true;
 
   return false;
+}
+
+bool Decl::isSPI() const {
+  return !getSPIGroups().empty();
+}
+
+ArrayRef<Identifier> Decl::getSPIGroups() const {
+  if (auto vd = dyn_cast<ValueDecl>(this)) {
+    if (vd->getFormalAccess() < AccessLevel::Public)
+      return ArrayRef<Identifier>();
+  } else if (!isa<ExtensionDecl>(this))
+    return ArrayRef<Identifier>();
+
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SPIGroupsRequest{ this },
+                           ArrayRef<Identifier>());
+}
+
+llvm::Expected<llvm::ArrayRef<Identifier>>
+SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
+  // Applies only to public ValueDecls and ExtensionDecls.
+  if (auto vd = dyn_cast<ValueDecl>(decl))
+    assert(vd->getFormalAccess() >= AccessLevel::Public);
+  else
+    assert(isa<ExtensionDecl>(decl));
+
+  // First, look for local attributes.
+  llvm::SetVector<Identifier> spiGroups;
+  for (auto attr : decl->getAttrs().getAttributes<SPIAccessControlAttr>())
+    for (auto spi : attr->getSPIGroups())
+      spiGroups.insert(spi);
+
+  auto &ctx = decl->getASTContext();
+  if (spiGroups.empty()) {
+
+    // Then in the extended nominal type.
+    if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
+      auto extended = extension->getExtendedNominal();
+      auto extSPIs = extended->getSPIGroups();
+      if (!extSPIs.empty()) return extSPIs;
+    }
+
+    // And finally in the parent context.
+    auto parent = decl->getDeclContext();
+    if (auto parentD = parent->getAsDecl()) {
+      if (!isa<ModuleDecl>(parentD)) {
+        return parentD->getSPIGroups();
+      }
+    }
+  }
+
+  return ctx.AllocateCopy(spiGroups.getArrayRef());
 }
 
 bool SourceFile::shouldCrossImport() const {
@@ -1896,10 +1958,11 @@ static void performAutoImport(
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
                        ImplicitModuleImportKind ModImpKind,
-                       bool KeepParsedTokens, bool BuildSyntaxTree)
-  : FileUnit(FileUnitKind::Source, M),
-    BufferID(bufferID ? *bufferID : -1),
-    Kind(K), SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
+                       bool KeepParsedTokens, bool BuildSyntaxTree,
+                       ParsingOptions parsingOpts)
+    : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
+      ParsingOpts(parsingOpts), Kind(K),
+      SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
   M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 
@@ -1953,6 +2016,30 @@ bool SourceFile::canBeParsedInFull() const {
   llvm_unreachable("unhandled kind");
 }
 
+bool SourceFile::hasDelayedBodyParsing() const {
+  if (ParsingOpts.contains(ParsingFlags::DisableDelayedBodies))
+    return false;
+
+  // Not supported right now.
+  if (Kind == SourceFileKind::REPL || Kind == SourceFileKind::SIL)
+    return false;
+  if (hasInterfaceHash())
+    return false;
+  if (shouldCollectToken())
+    return false;
+  if (shouldBuildSyntaxTree())
+    return false;
+
+  return true;
+}
+
+ArrayRef<Decl *> SourceFile::getTopLevelDecls() const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  return evaluateOrDefault(ctx.evaluator, ParseSourceFileRequest{mutableThis},
+                           {});
+}
+
 bool FileUnit::walk(ASTWalker &walker) {
   SmallVector<Decl *, 64> Decls;
   getTopLevelDecls(Decls);
@@ -1986,7 +2073,7 @@ bool FileUnit::walk(ASTWalker &walker) {
 bool SourceFile::walk(ASTWalker &walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
-  for (Decl *D : Decls) {
+  for (Decl *D : getTopLevelDecls()) {
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into decl", D);
 #endif

@@ -18,6 +18,8 @@
 
 namespace swift {
 
+class PersistentParserState;
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -25,6 +27,8 @@ namespace swift {
 /// before being used for anything; a full type-check is also necessary for
 /// IR generation.
 class SourceFile final : public FileUnit {
+  friend class ParseSourceFileRequest;
+
 public:
   class Impl;
   struct SourceFileSyntaxInfo;
@@ -88,6 +92,36 @@ public:
     }
   };
 
+  /// Flags that direct how the source file is parsed.
+  enum class ParsingFlags : uint8_t {
+    /// Whether to disable delayed parsing for nominal type, extension, and
+    /// function bodies.
+    ///
+    /// If set, type and function bodies will be parsed eagerly. Otherwise they
+    /// will be lazily parsed when their contents is queried. This lets us avoid
+    /// building AST nodes when they're not needed.
+    ///
+    /// This is set for primary files, since we want to type check all
+    /// declarations and function bodies anyway, so there's no benefit in lazy
+    /// parsing.
+    DisableDelayedBodies = 1 << 0,
+
+    /// Whether to disable evaluating the conditions of #if decls.
+    ///
+    /// If set, #if decls are parsed as-is. Otherwise, the bodies of any active
+    /// clauses are hoisted such that they become sibling nodes with the #if
+    /// decl.
+    ///
+    /// FIXME: When condition evaluation moves to a later phase, remove this
+    /// and adjust the client call 'performParseOnly'.
+    DisablePoundIfEvaluation = 1 << 1,
+
+    /// Whether to suppress warnings when parsing. This is set for secondary
+    /// files, as they get parsed multiple times.
+    SuppressWarnings = 1 << 2
+  };
+  using ParsingOptions = OptionSet<ParsingFlags>;
+
 private:
   std::unique_ptr<SourceLookupCache> Cache;
   SourceLookupCache &getCache() const;
@@ -130,6 +164,9 @@ private:
   /// If not, we can fast-path module checks.
   bool HasImplementationOnlyImports = false;
 
+  /// The parsing options for the file.
+  ParsingOptions ParsingOpts;
+
   /// The scope map that describes this source file.
   std::unique_ptr<ASTScope> Scope;
 
@@ -140,8 +177,11 @@ private:
   /// been validated.
   llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
 
-  /// The list of top-level declarations in the source file.
-  std::vector<Decl *> Decls;
+  /// The list of top-level declarations in the source file. This is \c None if
+  /// they have not yet been parsed.
+  /// FIXME: Once addTopLevelDecl/prependTopLevelDecl/truncateTopLevelDecls
+  /// have been removed, this can become an optional ArrayRef.
+  Optional<std::vector<Decl *>> Decls;
 
   using SeparatelyImportedOverlayMap =
     llvm::SmallDenseMap<ModuleDecl *, llvm::SmallPtrSet<ModuleDecl *, 1>>;
@@ -154,13 +194,26 @@ private:
   /// mechanism which is not SourceFile-dependent.)
   SeparatelyImportedOverlayMap separatelyImportedOverlays;
 
+  /// A pointer to PersistentParserState with a function reference to its
+  /// deleter to handle the fact that it's forward declared.
+  using ParserStatePtr =
+      std::unique_ptr<PersistentParserState, void (*)(PersistentParserState *)>;
+
+  /// Stores delayed parser state that code completion needs to be able to
+  /// resume parsing at the code completion token in the file.
+  ParserStatePtr DelayedParserState =
+      ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
+
   friend ASTContext;
   friend Impl;
 
 public:
-  /// Appends the given declaration to the end of the top-level decls list.
+  /// Appends the given declaration to the end of the top-level decls list. Do
+  /// not add any additional uses of this function.
   void addTopLevelDecl(Decl *d) {
-    Decls.push_back(d);
+    // Force decl parsing if we haven't already.
+    (void)getTopLevelDecls();
+    Decls->push_back(d);
   }
 
   /// Prepends a declaration to the top-level decls list.
@@ -170,19 +223,33 @@ public:
   ///
   /// See rdar://58355191
   void prependTopLevelDecl(Decl *d) {
-    Decls.insert(Decls.begin(), d);
+    // Force decl parsing if we haven't already.
+    (void)getTopLevelDecls();
+    Decls->insert(Decls->begin(), d);
   }
 
   /// Retrieves an immutable view of the list of top-level decls in this file.
-  ArrayRef<Decl *> getTopLevelDecls() const {
-    return Decls;
+  ArrayRef<Decl *> getTopLevelDecls() const;
+
+  /// Retrieves an immutable view of the top-level decls if they have already
+  /// been parsed, or \c None if they haven't. Should only be used for dumping.
+  Optional<ArrayRef<Decl *>> getCachedTopLevelDecls() const {
+    if (!Decls)
+      return None;
+    return llvm::makeArrayRef(*Decls);
   }
 
-  /// Truncates the list of top-level decls so it contains \c count elements.
+  /// Truncates the list of top-level decls so it contains \c count elements. Do
+  /// not add any additional uses of this function.
   void truncateTopLevelDecls(unsigned count) {
-    assert(count <= Decls.size() && "Can only truncate top-level decls!");
-    Decls.resize(count);
+    // Force decl parsing if we haven't already.
+    (void)getTopLevelDecls();
+    assert(count <= Decls->size() && "Can only truncate top-level decls!");
+    Decls->resize(count);
   }
+
+  /// Retrieve the parsing options for the file.
+  ParsingOptions getParsingOptions() const { return ParsingOpts; }
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.
@@ -239,10 +306,8 @@ public:
   const SourceFileKind Kind;
 
   enum ASTStage_t {
-    /// Parsing is underway.
-    Parsing,
-    /// Parsing has completed.
-    Parsed,
+    /// The source file is not name bound or type checked.
+    Unprocessed,
     /// Name binding has completed.
     NameBound,
     /// Type checking has completed.
@@ -254,11 +319,11 @@ public:
   ///
   /// Only files that have been fully processed (i.e. type-checked) will be
   /// forwarded on to IRGen.
-  ASTStage_t ASTStage = Parsing;
+  ASTStage_t ASTStage = Unprocessed;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
-             bool KeepSyntaxTree = false);
+             bool KeepSyntaxTree = false, ParsingOptions parsingOpts = {});
 
   ~SourceFile();
 
@@ -405,6 +470,27 @@ public:
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
 
+  /// Retrieves the previously set delayed parser state, asserting that it
+  /// exists.
+  PersistentParserState *getDelayedParserState() {
+    // Force parsing of the top-level decls, which will set DelayedParserState
+    // if necessary.
+    // FIXME: Ideally the parser state should be an output of
+    // ParseSourceFileRequest, but the evaluator doesn't currently support
+    // move-only outputs for cached requests.
+    (void)getTopLevelDecls();
+
+    auto *state = DelayedParserState.get();
+    assert(state && "Didn't set any delayed parser state!");
+    return state;
+  }
+
+  /// Record delayed parser state for the source file. This is needed for code
+  /// completion's second pass.
+  void setDelayedParserState(ParserStatePtr &&state) {
+    DelayedParserState = std::move(state);
+  }
+
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;
 
@@ -507,6 +593,10 @@ public:
 
   bool isSuitableForASTScopes() const { return canBeParsedInFull(); }
 
+  /// Whether the bodies of types and functions within this file can be lazily
+  /// parsed.
+  bool hasDelayedBodyParsing() const;
+
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
@@ -529,6 +619,11 @@ private:
 
   std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
 };
+
+inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
+                                            SourceFile::ParsingFlags rhs) {
+  return SourceFile::ParsingOptions(lhs) | rhs;
+}
 
 inline SourceFile &
 ModuleDecl::getMainSourceFile(SourceFileKind expectedKind) const {

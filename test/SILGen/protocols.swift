@@ -429,6 +429,22 @@ public func test(_ p: Proto) {
 // CHECK: end_apply [[TOKEN]]
 // CHECK: return
 
+// SR-11748
+
+protocol SelfReturningSubscript {
+  subscript(b: Int) -> Self { get }
+}
+
+public func testSelfReturningSubscript() {
+  // CHECK-LABEL: sil private [ossa] @$s9protocols26testSelfReturningSubscriptyyFAA0cdE0_pAaC_pXEfU_
+  // CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access
+  // CHECK: [[OPEN_ADDR:%.*]] = alloc_stack $@opened("{{.*}}") SelfReturningSubscript
+  // CHECK: copy_addr [[OPEN]] to [initialization] [[OPEN_ADDR]] : $*@opened("{{.*}}") SelfReturningSubscript
+  // CHECK: [[WIT_M:%.*]] = witness_method $@opened("{{.*}}") SelfReturningSubscript, #SelfReturningSubscript.subscript!getter.1
+  // CHECK: apply [[WIT_M]]<@opened("{{.*}}") SelfReturningSubscript>({{%.*}}, {{%.*}}, [[OPEN_ADDR]])
+  _ = [String: SelfReturningSubscript]().mapValues { $0[2] }
+}
+
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @$s9protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSivgTW
 // CHECK-NEXT: }

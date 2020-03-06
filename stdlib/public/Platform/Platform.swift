@@ -332,6 +332,11 @@ public var SIG_DFL: sig_t? { return nil }
 public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
 public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
 public var SIG_HOLD: sig_t { return unsafeBitCast(5, to: sig_t.self) }
+#elseif os(OpenBSD)
+public var SIG_DFL: sig_t? { return nil }
+public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
+public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
+public var SIG_HOLD: sig_t { return unsafeBitCast(3, to: sig_t.self) }
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Haiku)
 public typealias sighandler_t = __sighandler_t
 
@@ -382,7 +387,7 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
   return UnsafeMutablePointer<sem_t>(bitPattern: -1)
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
   // The value is ABI.  Value verified to be correct on Glibc.
   return UnsafeMutablePointer<sem_t>(bitPattern: 0)
 #else
@@ -412,7 +417,7 @@ public func sem_open(
 //===----------------------------------------------------------------------===//
 
 // Some platforms don't have `extern char** environ` imported from C.
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(PS4)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(OpenBSD) || os(PS4)
 public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
   return _swift_stdlib_getEnviron()
 }

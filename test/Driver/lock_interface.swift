@@ -1,3 +1,4 @@
+// REQUIRES: rdar59977439
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/module-cache-lock)
 // RUN: %empty-directory(%t/module-cache-no-lock)

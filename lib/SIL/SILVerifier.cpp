@@ -1308,6 +1308,17 @@ public:
       });
     }
 
+    if (subs.getGenericSignature()->getCanonicalSignature() !=
+          fnTy->getSubstGenericSignature()->getCanonicalSignature()) {
+      llvm::dbgs() << "substitution map's generic signature: ";
+      subs.getGenericSignature()->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      llvm::dbgs() << "callee's generic signature: ";
+      fnTy->getSubstGenericSignature()->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      require(false,
+              "Substitution map does not match callee in apply instruction");
+    }
     // Apply the substitutions.
     return fnTy->substGenericArgs(F.getModule(), subs, F.getTypeExpansionContext());
   }
@@ -4303,37 +4314,46 @@ public:
             "branch argument types do not match arguments for dest bb");
   }
 
-  void checkCondBranchInst(CondBranchInst *CBI) {
+  void checkCondBranchInst(CondBranchInst *cbi) {
     // It is important that cond_br keeps an i1 type. ARC Sequence Opts assumes
     // that cond_br does not use reference counted values or decrement reference
     // counted values under the assumption that the instruction that computes
     // the i1 is the use/decrement that ARC cares about and that after that
     // instruction is evaluated, the scalar i1 has a different identity and the
     // object can be deallocated.
-    requireSameType(CBI->getCondition()->getType(),
+    requireSameType(cbi->getCondition()->getType(),
                     SILType::getBuiltinIntegerType(
-                        1, CBI->getCondition()->getType().getASTContext()),
+                        1, cbi->getCondition()->getType().getASTContext()),
                     "condition of conditional branch must have Int1 type");
 
-    require(CBI->getTrueArgs().size() == CBI->getTrueBB()->args_size(),
+    require(cbi->getTrueArgs().size() == cbi->getTrueBB()->args_size(),
             "true branch has wrong number of arguments for dest bb");
-    require(CBI->getTrueBB() != CBI->getFalseBB(),
-            "identical destinations");
-    require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
-                       CBI->getTrueBB()->args_begin(),
+    require(cbi->getTrueBB() != cbi->getFalseBB(), "identical destinations");
+    require(std::equal(cbi->getTrueArgs().begin(), cbi->getTrueArgs().end(),
+                       cbi->getTrueBB()->args_begin(),
                        [&](SILValue branchArg, SILArgument *bbArg) {
                          return verifyBranchArgs(branchArg, bbArg);
                        }),
             "true branch argument types do not match arguments for dest bb");
 
-    require(CBI->getFalseArgs().size() == CBI->getFalseBB()->args_size(),
+    require(cbi->getFalseArgs().size() == cbi->getFalseBB()->args_size(),
             "false branch has wrong number of arguments for dest bb");
-    require(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
-                       CBI->getFalseBB()->args_begin(),
+    require(std::equal(cbi->getFalseArgs().begin(), cbi->getFalseArgs().end(),
+                       cbi->getFalseBB()->args_begin(),
                        [&](SILValue branchArg, SILArgument *bbArg) {
                          return verifyBranchArgs(branchArg, bbArg);
                        }),
             "false branch argument types do not match arguments for dest bb");
+    // When we are in ossa, cond_br can not have any arguments that are
+    // non-trivial.
+    if (!F.hasOwnership())
+      return;
+
+    require(llvm::all_of(cbi->getOperandValues(),
+                         [&](SILValue v) -> bool {
+                           return v->getType().isTrivial(*cbi->getFunction());
+                         }),
+            "cond_br must not have a non-trivial value in ossa.");
   }
 
   void checkDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
@@ -4905,38 +4925,13 @@ public:
       CurInstruction = TI;
 
       // Check for non-cond_br critical edges.
-      auto *CBI = dyn_cast<CondBranchInst>(TI);
-      if (!CBI) {
-        for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
-          require(!isCriticalEdgePred(TI, Idx),
-                  "non cond_br critical edges not allowed");
-        }
+      if (isa<CondBranchInst>(TI)) {
         continue;
       }
-      // In ownership qualified SIL, ban critical edges from CondBranchInst that
-      // have non-trivial arguments.
-      //
-      // FIXME: it would be far simpler to ban all critical edges in general.
-      if (!F->hasOwnership())
-        continue;
 
-      if (isCriticalEdgePred(CBI, CondBranchInst::TrueIdx)) {
-        require(
-            llvm::all_of(CBI->getTrueArgs(),
-                         [](SILValue V) -> bool {
-                           return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::None;
-                         }),
-            "cond_br with critical edges must not have a non-trivial value");
-      }
-      if (isCriticalEdgePred(CBI, CondBranchInst::FalseIdx)) {
-        require(
-            llvm::all_of(CBI->getFalseArgs(),
-                         [](SILValue V) -> bool {
-                           return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::None;
-                         }),
-            "cond_br with critical edges must not have a non-trivial value");
+      for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
+        require(!isCriticalEdgePred(TI, Idx),
+                "non cond_br critical edges not allowed");
       }
     }
   }

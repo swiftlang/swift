@@ -70,13 +70,11 @@ Solution ConstraintSystem::finalize() {
 
   // Update the best score we've seen so far.
   auto &ctx = getASTContext();
-  if (!retainAllSolutions()) {
-    assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
-           !solverState->BestScore || CurrentScore <= *solverState->BestScore);
+  assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
+         !solverState->BestScore || CurrentScore <= *solverState->BestScore);
 
-    if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
-      solverState->BestScore = CurrentScore;
-    }
+  if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
+    solverState->BestScore = CurrentScore;
   }
 
   for (auto tv : getTypeVariables()) {
@@ -172,7 +170,8 @@ Solution ConstraintSystem::finalize() {
   solution.contextualTypes.assign(
       contextualTypes.begin(), contextualTypes.end());
 
-  solution.stmtConditionTargets = stmtConditionTargets;
+  solution.solutionApplicationTargets = solutionApplicationTargets;
+  solution.caseLabelItems = caseLabelItems;
 
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
@@ -246,9 +245,15 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register the statement condition targets.
-  for (const auto &stmtConditionTarget : solution.stmtConditionTargets) {
-    if (!getStmtConditionTarget(stmtConditionTarget.first))
-      setStmtConditionTarget(stmtConditionTarget.first, stmtConditionTarget.second);
+  for (const auto &target : solution.solutionApplicationTargets) {
+    if (!getSolutionApplicationTarget(target.first))
+      setSolutionApplicationTarget(target.first, target.second);
+  }
+
+  // Register the statement condition targets.
+  for (const auto &info : solution.caseLabelItems) {
+    if (!getCaseLabelItemInfo(info.first))
+      setCaseLabelItemInfo(info.first, info.second);
   }
 
   // Register the conformances checked along the way to arrive to solution.
@@ -351,6 +356,13 @@ void truncate(llvm::SmallSetVector<T, N> &vec, unsigned newSize) {
 
 template <typename K, typename V>
 void truncate(llvm::MapVector<K, V> &map, unsigned newSize) {
+  assert(newSize <= map.size() && "Not a truncation!");
+  for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
+    map.pop_back();
+}
+
+template <typename K, typename V, unsigned N>
+void truncate(llvm::SmallMapVector<K, V, N> &map, unsigned newSize) {
   assert(newSize <= map.size() && "Not a truncation!");
   for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
     map.pop_back();
@@ -463,7 +475,8 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
   numContextualTypes = cs.contextualTypes.size();
-  numStmtConditionTargets = cs.stmtConditionTargets.size();
+  numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
+  numCaseLabelItems = cs.caseLabelItems.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -541,8 +554,11 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any contextual types.
   truncate(cs.contextualTypes, numContextualTypes);
 
-  // Remove any statement condition types.
-  truncate(cs.stmtConditionTargets, numStmtConditionTargets);
+  // Remove any solution application targets.
+  truncate(cs.solutionApplicationTargets, numSolutionApplicationTargets);
+
+  // Remove any case label item infos.
+  truncate(cs.caseLabelItems, numCaseLabelItems);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -1311,8 +1327,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Filter deduced solutions, try to figure out if there is
   // a single best solution to use, if not explicitly disabled
   // by constraint system options.
-  if (!retainAllSolutions())
-    filterSolutions(solutions);
+  filterSolutions(solutions);
 
   // We fail if there is no solution or the expression was too complex.
   return solutions.empty() || getExpressionTooComplex(solutions);
@@ -2277,9 +2292,6 @@ Constraint *ConstraintSystem::selectDisjunction() {
 }
 
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
-  if (isUnavailable())
-    cs.increaseScore(SK_Unavailable);
-
   cs.simplifyDisjunctionChoice(Choice);
 
   if (ExplicitConversion)

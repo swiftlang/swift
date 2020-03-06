@@ -29,6 +29,7 @@ sil @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
 class Klass {}
 sil @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
 sil @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+sil @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
 
 struct MyInt {
   var value: Builtin.Int32
@@ -1299,6 +1300,484 @@ bb0(%0 : @owned $Builtin.NativeObject):
 bb1(%2 : @guaranteed $Builtin.NativeObject):
   end_borrow %2 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_simple_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_simple_liveranges_in_same_block_1'
+sil [ossa] @join_simple_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_simple_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_simple_liveranges_in_same_block_2'
+sil [ossa] @join_simple_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @join_simple_liveranges_in_same_block_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_simple_liveranges_in_same_block_3'
+sil [ossa] @join_simple_liveranges_in_same_block_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @join_simple_liveranges_in_same_block_4 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_simple_liveranges_in_same_block_4'
+sil [ossa] @join_simple_liveranges_in_same_block_4 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  %f = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %f2 = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f2(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @donot_join_simple_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_join_simple_liveranges_in_same_block_1'
+sil [ossa] @donot_join_simple_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Forwarding case. We need LiveRanges for this.
+//
+// CHECK-LABEL: sil [ossa] @donot_join_simple_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_join_simple_liveranges_in_same_block_2'
+sil [ossa] @donot_join_simple_liveranges_in_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $Builtin.NativeObject
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%2) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Forwarding case. We need LiveRanges for this.
+//
+// CHECK-LABEL: sil [ossa] @donot_join_simple_liveranges_in_same_block_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_join_simple_liveranges_in_same_block_3'
+sil [ossa] @donot_join_simple_liveranges_in_same_block_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  %2 = unchecked_ref_cast %0 : $Builtin.NativeObject to $Builtin.NativeObject
+  destroy_value %2 : $Builtin.NativeObject
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Now test cases where we find our consumer is in the return block or is a
+// return itself.
+//
+// CHECK-LABEL: sil [ossa] @join_simple_liveranges_not_same_block_with_consuming_return : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_simple_liveranges_not_same_block_with_consuming_return'
+sil [ossa] @join_simple_liveranges_not_same_block_with_consuming_return : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  return %1 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @join_simple_liveranges_not_same_block_consumed_in_return_block : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_simple_liveranges_not_same_block_consumed_in_return_block'
+sil [ossa] @join_simple_liveranges_not_same_block_consumed_in_return_block : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @donot_join_simple_liveranges_not_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_join_simple_liveranges_not_same_block_1'
+sil [ossa] @donot_join_simple_liveranges_not_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @donot_join_simple_liveranges_not_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'donot_join_simple_liveranges_not_same_block_2'
+sil [ossa] @donot_join_simple_liveranges_not_same_block_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  %f = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  destroy_value %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_functionarg : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'convert_load_copy_to_load_borrow_despite_switch_enum_functionarg'
+sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_functionarg : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<ClassLet>):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+  switch_enum %0 : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%1 : @guaranteed $ClassLet):
+  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_beginborrow : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'convert_load_copy_to_load_borrow_despite_switch_enum_beginborrow'
+sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_beginborrow : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+bb0(%0 : @owned $FakeOptional<ClassLet>):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+  %0a = begin_borrow %0 : $FakeOptional<ClassLet>
+  switch_enum %0a : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%1 : @guaranteed $ClassLet):
+  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  end_borrow %0a : $FakeOptional<ClassLet>
+  destroy_value %0 : $FakeOptional<ClassLet>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_loadborrow : $@convention(thin) (@in_guaranteed FakeOptional<ClassLet>) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'convert_load_copy_to_load_borrow_despite_switch_enum_loadborrow'
+sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_loadborrow : $@convention(thin) (@in_guaranteed FakeOptional<ClassLet>) -> () {
+bb0(%0 : $*FakeOptional<ClassLet>):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+  %0a = load_borrow %0 : $*FakeOptional<ClassLet>
+  switch_enum %0a : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%1 : @guaranteed $ClassLet):
+  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  end_borrow %0a : $FakeOptional<ClassLet>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// TODO: We can support this in a little bit once the rest of SemanticARCOpts is
+// guaranteed to be safe with guaranteed phis.
+//
+// CHECK-LABEL: sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_1 : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_1'
+sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_1 : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+bb0(%0 : @owned $FakeOptional<ClassLet>):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+  cond_br undef, bb0a, bb0b
+
+bb0a:
+  %0a = begin_borrow %0 : $FakeOptional<ClassLet>
+  br bb0c(%0a : $FakeOptional<ClassLet>)
+
+bb0b:
+  %0b = begin_borrow %0 : $FakeOptional<ClassLet>
+  br bb0c(%0b : $FakeOptional<ClassLet>)
+
+bb0c(%0c : @guaranteed $FakeOptional<ClassLet>):
+  switch_enum %0c : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%1 : @guaranteed $ClassLet):
+  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  end_borrow %0c : $FakeOptional<ClassLet>
+  destroy_value %0 : $FakeOptional<ClassLet>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that if begin_borrow has a consuming end scope use, we can still
+// eliminate load [copy].
+//
+// CHECK-LABEL: sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_2 : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_2'
+sil [ossa] @convert_load_copy_to_load_borrow_despite_switch_enum_guaranteedphi_2 : $@convention(thin) (@owned FakeOptional<ClassLet>) -> () {
+bb0(%0 : @owned $FakeOptional<ClassLet>):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %0a = begin_borrow %0 : $FakeOptional<ClassLet>
+  br bb3(%0a : $FakeOptional<ClassLet>)
+
+bb2:
+  %0b = begin_borrow %0 : $FakeOptional<ClassLet>
+  %0b2 = unchecked_enum_data %0b : $FakeOptional<ClassLet>, #FakeOptional.some!enumelt.1
+  %2 = ref_element_addr %0b2 : $ClassLet, #ClassLet.aLet
+  %3 = load [copy] %2 : $*Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  br bb3(%0b : $FakeOptional<ClassLet>)
+
+bb3(%0c : @guaranteed $FakeOptional<ClassLet>):
+  %f2 = function_ref @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
+  apply %f2(%0c) : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
+  end_borrow %0c : $FakeOptional<ClassLet>
+  destroy_value %0 : $FakeOptional<ClassLet>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_read_access : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_read_access'
+sil [ossa] @loadcopy_to_loadborrow_from_read_access : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [read] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  end_access %2 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_mut_access_without_writes : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: load_borrow
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_mut_access_without_writes'
+sil [ossa] @loadcopy_to_loadborrow_from_mut_access_without_writes : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [modify] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  end_access %2 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We can with time handle this case by proving that the destroy_addr is after
+// the destroy_value.
+//
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: load [copy]
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_mut_access_with_writes'
+sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [modify] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  destroy_addr %2 : $*Klass
+  end_access %2 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We will never be able to handle this unless we can hoist the copy before the
+// destroy_addr. Once we have begin_borrows around all interior_pointers, we can
+// handle this version.
+//
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_2 : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: load [copy]
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_mut_access_with_writes_2'
+sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_2 : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [modify] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_addr %2 : $*Klass
+  destroy_value %3 : $Klass
+  end_access %2 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We will never be able to handle this since we can't hoist the destroy_value
+// before the guaranteed_klass_user.
+//
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_3 : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: load [copy]
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_mut_access_with_writes_3'
+sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_3 : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [modify] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  destroy_addr %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  end_access %2 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We will never be able to handle this since the end_access is before the use
+// of %3, so we can not form a long enough load_borrow.
+//
+// CHECK-LABEL: sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_4 : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK-NOT: load_borrow
+// CHECK: load [copy]
+// CHECK-NOT: load_borrow
+// CHECK: } // end sil function 'loadcopy_to_loadborrow_from_mut_access_with_writes_4'
+sil [ossa] @loadcopy_to_loadborrow_from_mut_access_with_writes_4 : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aVar
+  %2 = begin_access [modify] [dynamic] %1 : $*Klass
+  %3 = load [copy] %2 : $*Klass
+  end_access %2 : $*Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
   %9999 = tuple()
   return %9999 : $()
 }
