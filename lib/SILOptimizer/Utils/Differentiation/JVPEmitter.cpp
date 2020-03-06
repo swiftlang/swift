@@ -1431,10 +1431,15 @@ void JVPEmitter::visitReturnInst(ReturnInst *ri) {
       loc, differentialRef, jvpSubstMap, {diffStructVal},
       ParameterConvention::Direct_Guaranteed);
 
+  auto differentialType = jvp->getLoweredFunctionType()->getResults().back().getSILStorageInterfaceType();
+  differentialType = differentialType.substGenericArgs(getModule(), jvpSubstMap, TypeExpansionContext::minimal());
+  differentialType = differentialType.subst(getModule(), jvpSubstMap);
+  auto *differentialValue = builder.createConvertFunction(loc, differentialPartialApply, differentialType, /*withoutActuallyEscaping*/ false);
+
   // Return a tuple of the original result and pullback.
   SmallVector<SILValue, 8> directResults;
   directResults.append(origResults.begin(), origResults.end());
-  directResults.push_back(differentialPartialApply);
+  directResults.push_back(differentialValue);
   builder.createReturn(ri->getLoc(), joinElements(directResults, builder, loc));
 }
 
