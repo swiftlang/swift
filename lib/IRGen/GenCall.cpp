@@ -2767,6 +2767,10 @@ llvm::CallInst *CallEmission::emitCallSite() {
     IGF.Builder.SetInsertPoint(call->getParent());
   }
 
+  if (IsMustTail) {
+    call->setTailCallKind(llvm::CallInst::TailCallKind::TCK_MustTail);
+  }
+
   Args.clear();
 
   // Destroy any temporaries we needed.
