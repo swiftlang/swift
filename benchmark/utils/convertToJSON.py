@@ -74,9 +74,9 @@ VALGROUP = 4
 
 if __name__ == "__main__":
     data = {}
-    data['Tests'] = []
-    data['Machine'] = {}
-    data['Run'] = {}
+    data["Tests"] = []
+    data["Machine"] = {}
+    data["Run"] = {}
     for line in sys.stdin:
         m = SCORERE.match(line)
         if not m:
@@ -84,8 +84,8 @@ if __name__ == "__main__":
             if not m:
                 continue
         test = {}
-        test['Data'] = [int(m.group(VALGROUP))]
-        test['Info'] = {}
-        test['Name'] = [m.group(KEYGROUP)]
-        data['Tests'].append(test)
+        test["Data"] = [int(m.group(VALGROUP))]
+        test["Info"] = {}
+        test["Name"] = [m.group(KEYGROUP)]
+        data["Tests"].append(test)
     print(json.dumps(data, sort_keys=True, indent=4))

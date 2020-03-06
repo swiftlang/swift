@@ -20,8 +20,8 @@ struct Indirect<T: AnyObject> {
 sil @make_indirect : $<T: SomeClass> () -> (@out Indirect<T>)
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %T19yield_once_indirect8IndirectV* } @test_simple
-// CHECK-32-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:16]]), %swift.type* %C)
-// CHECK-64-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:32]]), %swift.type* %C)
+// CHECK-32-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:16]]) %0, %swift.type* %C)
+// CHECK-64-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:32]]) %0, %swift.type* %C)
 sil @test_simple : $@yield_once <C: SomeClass> () -> (@yields @in Indirect<C>) {
 entry:
   //   Allocate space for the return value of make_indirect.
@@ -30,8 +30,8 @@ entry:
   // CHECK-64-SAME: , align 8
 
   //   Coroutine setup.
-  // CHECK-32-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], i8* %0, i8* bitcast (void (i8*, i1)* @"$s19yield_once_indirect9SomeClassCRbzlIet_TC" to i8*), i8* bitcast (i8* (i32)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
-  // CHECK-64-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], i8* %0, i8* bitcast (void (i8*, i1)* @"$s19yield_once_indirect9SomeClassCRbzlIet_TC" to i8*), i8* bitcast (i8* (i64)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
+  // CHECK-32-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], i8* %0, i8* bitcast (void (i8*, i1)* @"$s19yield_once_indirect8IndirectVyxGAA9SomeClassCRbzlIetAYi_TC" to i8*), i8* bitcast (i8* (i32)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
+  // CHECK-64-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], i8* %0, i8* bitcast (void (i8*, i1)* @"$s19yield_once_indirect8IndirectVyxGAA9SomeClassCRbzlIetAYi_TC" to i8*), i8* bitcast (i8* (i64)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
   // CHECK-NEXT:    [[BEGIN:%.*]] = call i8* @llvm.coro.begin(token [[ID]], i8* null)
   // CHECK-NEXT:    store %swift.type*
   // CHECK-NEXT:    call swiftcc void @marker(i32 1000)
@@ -83,10 +83,10 @@ unwind:
   // CHECK-NEXT:    unreachable
 }
 
-// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc void @"$s19yield_once_indirect9SomeClassCRbzlIet_TC"
+// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc void @"$s19yield_once_indirect8IndirectVyxGAA9SomeClassCRbzlIetAYi_TC"
 // CHECK-SAME:      (i8* noalias dereferenceable([[BUFFER_SIZE]]), i1)
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_simple_call(i1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_simple_call(i1 %0)
 sil @test_simple_call : $(Builtin.Int1) -> () {
 entry(%flag : $Builtin.Int1):
   //   Allocate the buffer.

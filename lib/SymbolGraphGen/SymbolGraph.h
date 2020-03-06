@@ -17,8 +17,11 @@
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/VersionTuple.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Markup/Markup.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "Edge.h"
 #include "JSON.h"
+#include "Symbol.h"
 
 namespace swift {
 namespace symbolgraphgen {
@@ -26,14 +29,29 @@ namespace symbolgraphgen {
 /// A graph of symbols and the relationships between them.
 struct SymbolGraph {
   /**
+   The options to use while building the graph.
+   */
+  const SymbolGraphOptions &Options;
+
+  /**
    The module this symbol graph represents.
   */
   ModuleDecl &M;
 
   /**
+   The module whose types were extended in `M`.
+   */
+  Optional<ModuleDecl *> ExtendedModule;
+  
+  /**
    The module's target triple.
   */
   llvm::Triple Target;
+
+  /**
+   A context for allocations.
+   */
+  markup::MarkupContext &Ctx;
 
   /**
    The semantic version of the module that this symbol graph describes,
@@ -44,18 +62,133 @@ struct SymbolGraph {
   /**
    The symbols in a module: the nodes in the graph.
    */
-  llvm::SmallPtrSet<const ValueDecl *, 32> Nodes;
+  llvm::DenseSet<Symbol> Nodes;
 
   /**
    The relationships between symbols: the edges in the graph.
    */
   llvm::DenseSet<Edge> Edges;
 
-  SymbolGraph(ModuleDecl &M, llvm::Triple Target,
+  SymbolGraph(const SymbolGraphOptions &Options,
+              ModuleDecl &M,
+              Optional<ModuleDecl *> ExtendedModule,
+              llvm::Triple Target,
+              markup::MarkupContext &Ctx,
               Optional<llvm::VersionTuple> ModuleVersion = None);
 
-  void serialize(SymbolGraphASTWalker &Walker,
-                 llvm::json::OStream &OS) const;
+  // MARK: - Utilities
+
+  /// Get the base print options for declaration fragments.
+  PrintOptions getDeclarationFragmentsPrintOptions() const;
+
+  // MARK: - Symbols (Nodes)
+
+  /**
+   Record a symbol as a node in the graph.
+   */
+  void recordNode(Symbol S);
+
+  // MARK: - Relationships (Edges)
+
+  /**
+   Record a relationship between two declarations as an edge in the graph.
+
+   \param Source The declaration serving as the source of the edge in the
+   directed graph.
+   \param Target The declaration serving as the target of the edge in the
+   directed graph.
+   \param Kind The kind of relationship the edge represents.
+   */
+  void recordEdge(Symbol Source, Symbol Target, RelationshipKind Kind);
+
+  /**
+   Record a MemberOf relationship, if the given declaration is nested
+   in another.
+   */
+  void recordMemberRelationship(Symbol S);
+
+  /**
+   If a declaration has members by conforming to a protocol, such as default
+   implementations, with a "synthesized" USR to disambiguate from the protocol's
+   real implementation.
+
+   The reason these "virtual" members are recorded is to show documentation
+   under a conforming type for members with the concrete types substituted.
+
+   For example, if `Array` takes on a function from a collection protocol,
+   `subscript(index: Self.Index) -> Element`, the documentation for Array may
+   wish to show this function as `subscript(index: Int) -> Element` instead,
+   and show unique documentation for it.
+   */
+  void recordSynthesizedMemberRelationship(Symbol S);
+
+  /**
+   Record InheritsFrom relationships for every class from which the
+   declaration inherits.
+   */
+  void recordInheritanceRelationships(Symbol S);
+
+  /**
+   If the declaration is a default implementation in a protocol extension,
+   record a DefaultImplementationOf relationship between the declaration and
+   the requirement.
+   */
+  void recordDefaultImplementationRelationships(Symbol S);
+
+  /**
+   Record a RequirementOf relationship if the declaration is a requirement
+   of a protocol.
+   */
+  void recordRequirementRelationships(Symbol S);
+
+  /**
+   If the declaration is an Objective-C-based optional protocol requirement,
+   record an OptionalRequirementOf relationship between the declaration
+   and its containing protocol.
+   */
+  void recordOptionalRequirementRelationships(Symbol S);
+
+  /**
+   Record ConformsTo relationships for each protocol conformance of
+   the declaration.
+   */
+  void recordConformanceRelationships(Symbol S);
+
+  /**
+   Records an Overrides relationship if the given declaration
+   overrides another.
+   */
+  void recordOverrideRelationship(Symbol S);
+
+  // MARK: - Serialization
+
+  /// Serialize this symbol graph's JSON to an output stream.
+  void serialize(llvm::json::OStream &OS);
+
+  /// Serialize the overall declaration fragments for a `ValueDecl`.
+  void
+  serializeDeclarationFragments(StringRef Key, const Symbol &S,
+                                llvm::json::OStream &OS);
+
+  /// Get the overall declaration fragments for a `ValueDecl` when it is viewed
+  /// as a subheading and/or part of a larger group of symbol listings.
+  void
+  serializeSubheadingDeclarationFragments(StringRef Key, const Symbol &S,
+                                          llvm::json::OStream &OS);
+
+  /// Get the overall declaration for a type declaration.
+  void
+  serializeDeclarationFragments(StringRef Key, Type T,
+                                llvm::json::OStream &OS);
+
+  /// Returns `true` if the declaration has a name that makes it
+  /// implicitly internal/private, such as underscore prefixes,
+  /// and checking every named parent context as well.
+  bool isImplicitlyPrivate(const ValueDecl *VD) const;
+
+  /// Returns `true` if the declaration should be included as a node
+  /// in the graph.
+  bool canIncludeDeclAsNode(const Decl *D) const;
 };
 
 } // end namespace symbolgraphgen

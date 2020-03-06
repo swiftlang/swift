@@ -1961,7 +1961,7 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' sil-type (',' debug-var-attr)*
+  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
   // %1 has type $*T
@@ -1979,6 +1979,10 @@ deallocated prior to returning from a function. If a block has multiple
 predecessors, the stack height and order of allocations must be consistent
 coming from all predecessor blocks. ``alloc_stack`` allocations must be
 deallocated in last-in, first-out stack order.
+
+The ``dynamic_lifetime`` attribute specifies that the initialization and
+destruction of the stored value cannot be verified at compile time.
+This is the case, e.g. for conditionally initialized objects.
 
 The memory is not retainable. To allocate a retainable box for a value
 type, use ``alloc_box``.
@@ -5665,6 +5669,42 @@ destination (if it returns with ``throw``).
 ``%0`` must have a function type with an error result.
 
 The rules on generic substitutions are identical to those of ``apply``.
+
+Differentiable Programming
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+differentiability_witness_function
+``````````````````````````````````
+::
+
+  sil-instruction ::=
+      'differentiability_witness_function'
+      '[' sil-differentiability-witness-function-kind ']'
+      '[' 'parameters' sil-differentiability-witness-function-index-list ']'
+      '[' 'results' sil-differentiability-witness-function-index-list ']'
+      generic-parameter-clause?
+      sil-function-name ':' sil-type
+
+  sil-differentiability-witness-function-kind ::= 'jvp' | 'vjp' | 'transpose'
+  sil-differentiability-witness-function-index-list ::= [0-9]+ (' ' [0-9]+)*
+
+  differentiability_witness_function [jvp] [parameters 0] [results 0] \
+    <T where T: Differentiable> @foo : $(T) -> T
+
+Looks up a differentiability witness function (JVP, VJP, or transpose) for
+a referenced function via SIL differentiability witnesses.
+
+The differentiability witness function kind identifies the witness function to
+look up: ``[jvp]``, ``[vjp]``, or ``[transpose]``.
+
+The remaining components identify the SIL differentiability witness:
+
+- Original function name.
+- Parameter indices.
+- Result indices.
+- Witness generic parameter clause (optional). When parsing SIL, the parsed
+  witness generic parameter clause is combined with the original function's
+  generic signature to form the full witness generic signature.
 
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~

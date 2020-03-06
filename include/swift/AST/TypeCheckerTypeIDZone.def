@@ -46,6 +46,9 @@ SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
 SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
               IndexSubset *(DifferentiableAttr *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeEraserHasViableInitRequest,
+              bool(TypeEraserAttr *, ProtocolDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
               ValueDecl *(ValueDecl *),
               Cached, NoLocationInfo)
@@ -204,6 +207,9 @@ SWIFT_REQUEST(TypeChecker, PreCheckFunctionBuilderRequest,
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               bool(NominalTypeDecl *, ImplicitMemberAction), Uncached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
+              llvm::ArrayRef<Identifier>(Decl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeMemberwiseInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
@@ -222,3 +228,5 @@ SWIFT_REQUEST(TypeChecker, ValueWitnessRequest,
 SWIFT_REQUEST(TypeChecker, PatternTypeRequest,
               Type(ContextualPattern),
               Cached, HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, ScopedImportLookupRequest,
+              ArrayRef<ValueDecl *>(ImportDecl *), Cached, NoLocationInfo)

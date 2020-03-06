@@ -20,6 +20,7 @@
 
 #include "IRGen.h"
 #include "SwiftTargetInfo.h"
+#include "TypeLayout.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -48,6 +49,7 @@
 
 namespace llvm {
   class Constant;
+  class ConstantInt;
   class DataLayout;
   class Function;
   class FunctionType;
@@ -95,6 +97,7 @@ namespace swift {
   class RootProtocolConformance;
   struct SILDeclRef;
   class SILDefaultWitnessTable;
+  class SILDifferentiabilityWitness;
   class SILGlobalVariable;
   class SILModule;
   class SILProperty;
@@ -541,7 +544,6 @@ public:
   SILModuleConventions silConv;
   ModuleDecl *ObjCModule = nullptr;
   ModuleDecl *ClangImporterModule = nullptr;
-  SourceFile *CurSourceFile = nullptr;
 
   llvm::StringMap<ModuleDecl*> OriginalModules;
   llvm::SmallString<128> OutputFilename;
@@ -555,6 +557,8 @@ public:
   /// A global variable which stores the hash of the module. Used for
   /// incremental compilation.
   llvm::GlobalVariable *ModuleHash;
+
+  TypeLayoutCache typeLayoutCache;
 
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
@@ -671,6 +675,8 @@ public:
   llvm::PointerType
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
+
+  llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
@@ -851,6 +857,8 @@ public:
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param,
                                            CanSILFunctionType funcTy);
+
+  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
 
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
@@ -1216,6 +1224,8 @@ private:                            \
   llvm::Constant *Id##Fn = nullptr;
 #include "swift/Runtime/RuntimeFunctions.def"
   
+  Optional<llvm::Constant *> FixedClassInitializationFn;
+  
   llvm::Constant *FixLifetimeFn = nullptr;
 
   mutable Optional<SpareBitVector> HeapPointerSpareBits;
@@ -1223,6 +1233,8 @@ private:                            \
 //--- Generic ---------------------------------------------------------------
 public:
   llvm::Constant *getFixLifetimeFn();
+  
+  llvm::Constant *getFixedClassInitializationFn();
 
   /// The constructor used when generating code.
   ///
@@ -1272,6 +1284,7 @@ public:
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILProperty(SILProperty *prop);
+  void emitSILDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
@@ -1286,7 +1299,7 @@ public:
                                       ForeignFunctionInfo *foreignInfo=nullptr);
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
 
-  llvm::Constant *getInt32(uint32_t value);
+  llvm::ConstantInt *getInt32(uint32_t value);
   llvm::Constant *getSize(Size size);
   llvm::Constant *getAlignment(Alignment align);
   llvm::Constant *getBool(bool condition);
@@ -1463,6 +1476,10 @@ public:
   llvm::Function *getAddrOfDefaultAssociatedConformanceAccessor(
                                            AssociatedConformance requirement);
 
+  llvm::Constant *
+  getAddrOfDifferentiabilityWitness(const SILDifferentiabilityWitness *witness,
+                                    ConstantInit definition = ConstantInit());
+
   Address getAddrOfObjCISAMask();
 
   /// Retrieve the generic signature for the current generic context, or null if no
@@ -1475,8 +1492,7 @@ public:
   GenericEnvironment *getGenericEnvironment();
 
   ConstantReference
-  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
-       ConstantReference::Directness forceIndirect = ConstantReference::Direct);
+  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity);
 
   llvm::Constant *
   emitRelativeReference(ConstantReference target,

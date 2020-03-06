@@ -45,6 +45,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "iOS",
   "Linux",
   "FreeBSD",
+  "OpenBSD",
   "Windows",
   "Android",
   "PS4",
@@ -258,6 +259,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::FreeBSD:
     addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
     break;
+  case llvm::Triple::OpenBSD:
+    addPlatformConditionValue(PlatformConditionKind::OS, "OpenBSD");
+    break;
   case llvm::Triple::Win32:
     if (Target.getEnvironment() == llvm::Triple::Cygnus)
       addPlatformConditionValue(PlatformConditionKind::OS, "Cygwin");
@@ -355,34 +359,4 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // in the common case.
 
   return { false, false };
-}
-
-bool LangOptions::doesTargetSupportObjCMetadataUpdateCallback() const {
-  if (Target.isMacOSX())
-    return !Target.isMacOSXVersionLT(10, 14, 4);
-  if (Target.isiOS()) // also returns true on tvOS
-    return !Target.isOSVersionLT(12, 2);
-  if (Target.isWatchOS())
-    return !Target.isOSVersionLT(5, 2);
-
-  // Don't assert if we're running on a non-Apple platform; we still
-  // want to allow running tests that -enable-objc-interop.
-  return false;
-}
-
-bool LangOptions::doesTargetSupportObjCGetClassHook() const {
-  return doesTargetSupportObjCMetadataUpdateCallback();
-}
-
-bool LangOptions::doesTargetSupportObjCClassStubs() const {
-  if (Target.isMacOSX())
-    return !Target.isMacOSXVersionLT(10, 15);
-  if (Target.isiOS()) // also returns true on tvOS
-    return !Target.isOSVersionLT(13);
-  if (Target.isWatchOS())
-    return !Target.isOSVersionLT(6);
-
-  // Don't assert if we're running on a non-Apple platform; we still
-  // want to allow running tests that -enable-objc-interop.
-  return false;
 }

@@ -3,10 +3,10 @@
 // RUN: %{python} %utils/chex.py < %s > %t/enum_resilience.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -emit-ir -enable-library-evolution -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %t/enum_resilience.swift --check-prefix=ENUM_RES
-// RUN: %target-swift-frontend -emit-ir -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %t/enum_resilience.swift --check-prefix=ENUM_NOT_RES
+// RUN: %target-swift-frontend -disable-type-layout -emit-ir -enable-library-evolution -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %t/enum_resilience.swift --check-prefix=ENUM_RES
+// RUN: %target-swift-frontend -disable-type-layout -emit-ir -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %t/enum_resilience.swift --check-prefix=ENUM_NOT_RES
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
-// RUN: %target-swift-frontend -module-name enum_resilience -I %t -emit-ir -enable-library-evolution %s | %FileCheck %t/enum_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -disable-type-layout -module-name enum_resilience -I %t -emit-ir -enable-library-evolution %s | %FileCheck %t/enum_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 // RUN: %target-swift-frontend -module-name enum_resilience -I %t -emit-ir -enable-library-evolution -O %s
 
 import resilient_enum
@@ -88,7 +88,7 @@ enum InternalEither {
   case Right(ReferenceFast)
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience25functionWithResilientEnumy010resilient_A06MediumOAEF"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience25functionWithResilientEnumy010resilient_A06MediumOAEF"(%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1)
 public func functionWithResilientEnum(_ m: Medium) -> Medium {
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s14resilient_enum6MediumOMa"([[INT]] 0)
@@ -106,7 +106,7 @@ public func functionWithResilientEnum(_ m: Medium) -> Medium {
   return m
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience33functionWithIndirectResilientEnumy010resilient_A00E8ApproachOAEF"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience33functionWithIndirectResilientEnumy010resilient_A00E8ApproachOAEF"(%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1)
 public func functionWithIndirectResilientEnum(_ ia: IndirectApproach) -> IndirectApproach {
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s14resilient_enum16IndirectApproachOMa"([[INT]] 0)
@@ -190,7 +190,7 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
   return Medium.Postcard(s)
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i32|i64}} @"$s15enum_resilience19resilientSwitchTestySi0c1_A06MediumOF"(%swift.opaque* noalias nocapture)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i32|i64}} @"$s15enum_resilience19resilientSwitchTestySi0c1_A06MediumOF"(%swift.opaque* noalias nocapture %0)
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s14resilient_enum6MediumOMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
@@ -263,7 +263,7 @@ public func resilientSwitchTest(_ m: Medium) -> Int {
 
 public func reabstraction<T>(_ f: (Medium) -> T) {}
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience25resilientEnumPartialApplyyySi0c1_A06MediumOXEF"(i8*, %swift.opaque*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience25resilientEnumPartialApplyyySi0c1_A06MediumOXEF"(i8* %0, %swift.opaque* %1)
 public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 
 // CHECK:     [[STACKALLOC:%.*]] = alloca i8
@@ -274,7 +274,7 @@ public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 // CHECK:     ret void
 }
 
-// CHECK-LABEL: define internal swiftcc void @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA"(%TSi* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.refcounted* swiftself)
+// CHECK-LABEL: define internal swiftcc void @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA"(%TSi* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1, %swift.refcounted* swiftself %2)
 
 
 // Enums with resilient payloads from a different resilience domain
@@ -320,7 +320,7 @@ public func getResilientEnumType() -> Any.Type {
 // from metadata -- make sure we can do that
 extension ResilientMultiPayloadGenericEnum {
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$s14resilient_enum32ResilientMultiPayloadGenericEnumO0B11_resilienceE16getTypeParameterxmyF"(%swift.type* %"ResilientMultiPayloadGenericEnum<T>", %swift.opaque* noalias nocapture swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$s14resilient_enum32ResilientMultiPayloadGenericEnumO0B11_resilienceE16getTypeParameterxmyF"(%swift.type* %"ResilientMultiPayloadGenericEnum<T>", %swift.opaque* noalias nocapture swiftself %0)
 // CHECK: [[METADATA:%.*]] = bitcast %swift.type* %"ResilientMultiPayloadGenericEnum<T>" to %swift.type**
 // CHECK-NEXT: [[T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[METADATA]], [[INT]] 2
 // CHECK-NEXT: [[T:%.*]] = load %swift.type*, %swift.type** [[T_ADDR]]
@@ -329,7 +329,7 @@ extension ResilientMultiPayloadGenericEnum {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience39constructExhaustiveWithResilientMembers010resilient_A011SimpleShapeOyF"(%T14resilient_enum11SimpleShapeO* noalias nocapture sret)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience39constructExhaustiveWithResilientMembers010resilient_A011SimpleShapeOyF"(%T14resilient_enum11SimpleShapeO* noalias nocapture sret %0)
 // CHECK: [[BUFFER:%.*]] = bitcast %T14resilient_enum11SimpleShapeO* %0 to %swift.opaque*
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
@@ -348,7 +348,7 @@ public func constructFullyFixed() -> FullyFixedLayout {
   return .noPayload
 }
 
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s15enum_resilience24EnumWithResilientPayloadOMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s15enum_resilience24EnumWithResilientPayloadOMr"(%swift.type* %0, i8* %1, i8** %2)
 // CHECK:        [[TUPLE_LAYOUT:%.*]] = alloca %swift.full_type_layout
 // CHECK:        [[SIZE_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 319)
 // CHECK-NEXT:   [[SIZE_METADATA:%.*]] = extractvalue %swift.metadata_response [[SIZE_RESPONSE]], 0

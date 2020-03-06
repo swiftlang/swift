@@ -24,6 +24,7 @@ class ValueDecl;
 class AnyFunctionType;
 
 namespace ide {
+enum class SemanticContextKind;
 
 /// Type check parent contexts of the given decl context, and the body of the
 /// given context until \c Loc if the context is a function body.
@@ -37,7 +38,17 @@ Expr *findParsedExpr(const DeclContext *DC, SourceRange TargetRange);
 /// \p DC should be an \c AbstractFunctionDecl or an \c AbstractClosureExpr.
 Type getReturnTypeFromContext(const DeclContext *DC);
 
-using FunctionTypeAndDecl = std::pair<AnyFunctionType *, ValueDecl *>;
+struct FunctionTypeAndDecl {
+  AnyFunctionType *Type;
+  ValueDecl *Decl;
+  Optional<SemanticContextKind> SemanticContext;
+
+  FunctionTypeAndDecl(AnyFunctionType *Type, ValueDecl *Decl)
+      : Type(Type), Decl(Decl) {}
+  FunctionTypeAndDecl(AnyFunctionType *Type, ValueDecl *Decl,
+                      SemanticContextKind SemanticContext)
+      : Type(Type), Decl(Decl), SemanticContext(SemanticContext) {}
+};
 
 /// Given an expression and its decl context, the analyzer tries to figure out
 /// the expected type of the expression by analyzing its context.

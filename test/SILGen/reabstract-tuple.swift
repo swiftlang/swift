@@ -20,17 +20,19 @@ class Box<T> {
 // CHECK:   ([[ELTA_0:%.*]], [[ELTA_1:%.*]]) = destructure_tuple [[TUPLEA]] : $(Int, @callee_guaranteed () -> ())
 // CHECK:   [[THUNK1:%.*]] = function_ref @$sIeg_ytIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out ()
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK1]]([[ELTA_1]]) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out ()
-// CHECK:   [[TUPLEB:%.*]] = tuple ([[ELTA_0]] : $Int, [[PA]] : $@callee_guaranteed () -> @out ())
+// CHECK:   [[PA_CONV:%.*]] = convert_function [[PA]]
+// CHECK:   [[TUPLEB:%.*]] = tuple ([[ELTA_0]] : $Int, [[PA_CONV]] : $@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <()>)
 // CHECK:   ([[TUPLEB_0:%.*]], [[TUPLEB_1:%.*]]) = destructure_tuple [[TUPLEB]]
 // CHECK:   // function_ref Box.__allocating_init(_:)
 // CHECK:   [[INIT_F:%.*]] = function_ref @$s4main3BoxCyACyxGxcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0>
 // CHECK:   [[CALL:%.*]] = apply [[INIT_F]]<(Int, () -> ())>(%{{.*}}, %{{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0>
 // CHECK:   [[BORROW_CALL:%.*]] = begin_borrow [[CALL]] : $Box<(Int, () -> ())> 
 // CHECK:   [[REF:%.*]] = ref_element_addr [[BORROW_CALL]] : $Box<(Int, () -> ())>, #Box.value
-// CHECK:   [[TUPLEC:%.*]] = load [copy] [[REF]] : $*(Int, @callee_guaranteed () -> @out ())
+// CHECK:   [[TUPLEC:%.*]] = load [copy] [[REF]] : $*(Int, @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <()>)
 // CHECK:   ([[TUPLEC_0:%.*]], [[TUPLEC_1:%.*]]) = destructure_tuple [[TUPLEC]]
+// CHECK:   [[TUPLEC_1_CONV:%.*]] = convert_function [[TUPLEC_1]]
 // CHECK:   [[THUNK2:%.*]] = function_ref @$sytIegr_Ieg_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> ()
-// CHECK:   [[PA2:%.*]] = partial_apply [callee_guaranteed] [[THUNK2]]([[TUPLEC_1]]) : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> ()
+// CHECK:   [[PA2:%.*]] = partial_apply [callee_guaranteed] [[THUNK2]]([[TUPLEC_1_CONV]]) :
 // CHECK:   destroy_value [[PA2]] : $@callee_guaranteed () -> ()    
 // CHECK:   end_borrow [[BORROW_CALL]] : $Box<(Int, () -> ())>
 // CHECK-LABEL: } // end sil function '$s4main7testBoxyyF'

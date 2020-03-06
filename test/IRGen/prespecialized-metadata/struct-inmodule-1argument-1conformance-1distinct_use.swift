@@ -1,4 +1,4 @@
-// RUN: %swift -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
+// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
@@ -7,7 +7,7 @@
 
 // CHECK: @"$sytN" = external{{( dllimport)?}} global %swift.full_type
 
-// CHECK: @"$s4main5ValueVySiGMf" = internal constant <{
+// CHECK: @"$s4main5ValueVySiGMf" = linkonce_odr hidden constant <{
 // CHECK-SAME:    i8**,
 // CHECK-SAME:    [[INT]],
 // CHECK-SAME:    %swift.type_descriptor*,
@@ -47,7 +47,7 @@ func doit() {
 doit()
 
 // CHECK: ; Function Attrs: noinline nounwind readnone
-// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueVMa"([[INT]], %swift.type*, i8**) #{{[0-9]+}} {
+// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueVMa"([[INT]] %0, %swift.type* %1, i8** %2) #{{[0-9]+}} {
 // CHECK: entry:
 // CHECK:   [[ERASED_TYPE:%[0-9]+]] = bitcast %swift.type* %1 to i8*
 // CHECK:   [[ERASED_TABLE:%[0-9]+]] = bitcast i8** %2 to i8*

@@ -25,7 +25,7 @@ import _SwiftFoundationOverlayShims
 public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
     public typealias ReferenceType = NSTimeZone
     
-    fileprivate var _wrapped : NSTimeZone
+    private var _wrapped : NSTimeZone
     private var _autoupdating : Bool
     
     /// The time zone currently used by the system.
@@ -92,7 +92,7 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
         }
     }
     
-    fileprivate init(reference: NSTimeZone) {
+    private init(reference: NSTimeZone) {
         if __NSTimeZoneIsAutoupdating(reference) {
             // we can't copy this or we lose its auto-ness (27048257)
             // fortunately it's immutable

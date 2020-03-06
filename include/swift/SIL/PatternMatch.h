@@ -310,7 +310,7 @@ namespace detail {
 struct GetOperandsFunctor {
   template <size_t... Idx>
   std::array<SILValue, sizeof...(Idx)>
-  operator()(SILInstruction *i, llvm::index_sequence<Idx...> seq) const {
+  operator()(SILInstruction *i, std::index_sequence<Idx...> seq) const {
     return {i->getOperand(Idx)...};
   }
 };
@@ -327,15 +327,15 @@ template <typename... MatcherTys> struct MatcherFunctor {
   template <size_t... Idx>
   std::array<bool, sizeof...(MatcherTys)>
   matchHelper(const std::array<SILValue, sizeof...(MatcherTys)> &operands,
-              llvm::index_sequence<Idx...> seq) {
+              std::index_sequence<Idx...> seq) {
     return {individual(std::get<Idx>(matchers), std::get<Idx>(operands))...};
   }
 
   bool match(SILInstruction *i) {
     std::array<SILValue, sizeof...(MatcherTys)> operands =
-        GetOperandsFunctor{}(i, llvm::index_sequence_for<MatcherTys...>{});
+        GetOperandsFunctor{}(i, std::index_sequence_for<MatcherTys...>{});
     auto tmpResult =
-        matchHelper(operands, llvm::index_sequence_for<MatcherTys...>{});
+        matchHelper(operands, std::index_sequence_for<MatcherTys...>{});
     for (unsigned i : indices(tmpResult)) {
       if (!tmpResult[i])
         return false;

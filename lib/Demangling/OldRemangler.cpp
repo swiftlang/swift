@@ -1227,6 +1227,10 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
     Buffer << "CO";
   } else if (text == "@convention(witness_method)") {
     Buffer << "Cw";
+  } else if (text == "@yield_once") {
+    Buffer << "A";
+  } else if (text == "@yield_many") {
+    Buffer << "G";
   } else {
     unreachable("bad impl-function-attribute");
   }
@@ -1245,6 +1249,12 @@ void Remangler::mangleImplErrorResult(Node *node) {
 
 void Remangler::mangleImplResult(Node *node) {
   assert(node->getNumChildren() == 2);
+  mangleChildNodes(node); // impl convention, type
+}
+
+void Remangler::mangleImplYield(Node *node) {
+  assert(node->getNumChildren() == 2);
+  Buffer << 'Y';
   mangleChildNodes(node); // impl convention, type
 }
 

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// posix_spawn is not available on Android or Windows (MSVC).
-#if !defined(__ANDROID__) && !defined(__HAIKU__) && (!defined(_WIN32) || defined(__CYGWIN__))
+// posix_spawn is not available on Android, HAIKU, WASI or Windows (MSVC).
+#if !defined(__ANDROID__) && !defined(__HAIKU__) && (!defined(_WIN32) || defined(__CYGWIN__)) && !defined(__wasi__)
 
 #include "swift/Runtime/Config.h"
 
@@ -54,5 +54,5 @@ int _stdlib_posix_spawn(pid_t *__restrict pid, const char * __restrict path,
   return posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 
-#endif // !defined(__ANDROID__) && !defined(__HAIKU__) && (!defined(_WIN32) || defined(__CGYWIN__))
+#endif // !defined(__ANDROID__) && !defined(__HAIKU__) && (!defined(_WIN32) || defined(__CGYWIN__)) && !defined(__wasi__)
 

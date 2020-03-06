@@ -370,8 +370,7 @@ private:
   void writeSIL(const SILModule *M, bool serializeAllSIL);
 
   /// Top-level entry point for serializing a module.
-  void writeAST(ModuleOrSourceFile DC,
-                bool enableNestedTypeLookupTable);
+  void writeAST(ModuleOrSourceFile DC);
 
   using SerializerBase::SerializerBase;
   using SerializerBase::writeToStream;

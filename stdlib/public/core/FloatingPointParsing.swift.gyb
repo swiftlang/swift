@@ -124,38 +124,56 @@ extension ${Self}: LosslessStringConvertible {
   /// - Parameter text: The input string to convert to a `${Self}` instance. If
   ///   `text` has invalid characters or is in an invalid format, the result
   ///   is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init?<S: StringProtocol>(_ text: S) {
-    let result: ${Self}? = text.withCString { chars in
-      // TODO: We should change the ABI for
-      // _swift_stdlib_strtoX_clocale so that it returns
-      // a boolean `false` for leading whitespace, empty
-      // string, or invalid character.  Then we could avoid
-      // inlining these checks into every single client.
-      switch chars[0] {
-      case 9, 10, 11, 12, 13, 32:
-        // Reject any input with leading whitespace.
-        return nil
-      case 0:
-        // Reject the empty string
-        return nil
-      default:
-        break
-      }
-      var result: ${Self} = 0
-      let endPtr = withUnsafeMutablePointer(to: &result) {
-        _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, $0)
-      }
-			// Verify that all the characters were consumed.
-      if endPtr == nil || endPtr![0] != 0 {
-        return nil
-      }
-      return result
-    }
-
-    if let result = result {
-      self = result
+    if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+      self.init(Substring(text))
     } else {
+      self = 0.0
+      let success = withUnsafeMutablePointer(to: &self) { p -> Bool in
+        text.withCString { chars -> Bool in
+          switch chars[0] {
+          case 9, 10, 11, 12, 13, 32:
+            return false // Reject leading whitespace
+          case 0:
+            return false // Reject empty string
+          default:
+            break
+          }
+          let endPtr = _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
+          // Succeed only if endPtr points to end of C string
+          return endPtr != nil && endPtr![0] == 0
+        }
+      }
+      if !success {
+        return nil
+      }
+    }
+  }
+
+  // Caveat:  This implementation used to be inlineable.
+  // In particular, we still have to export
+  // _swift_stdlib_strtoXYZ_clocale()
+  // as ABI to support old compiled code that still requires it.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public init?(_ text: Substring) {
+    self = 0.0
+    let success = withUnsafeMutablePointer(to: &self) { p -> Bool in
+      text.withCString { chars -> Bool in
+        switch chars[0] {
+        case 9, 10, 11, 12, 13, 32:
+          return false // Reject leading whitespace
+        case 0:
+          return false // Reject empty string
+        default:
+          break
+        }
+        let endPtr = _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
+        // Succeed only if endPtr points to end of C string
+        return endPtr != nil && endPtr![0] == 0
+      }
+    }
+    if !success {
       return nil
     }
   }

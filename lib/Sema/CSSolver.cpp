@@ -70,13 +70,11 @@ Solution ConstraintSystem::finalize() {
 
   // Update the best score we've seen so far.
   auto &ctx = getASTContext();
-  if (!retainAllSolutions()) {
-    assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
-           !solverState->BestScore || CurrentScore <= *solverState->BestScore);
+  assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
+         !solverState->BestScore || CurrentScore <= *solverState->BestScore);
 
-    if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
-      solverState->BestScore = CurrentScore;
-    }
+  if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
+    solverState->BestScore = CurrentScore;
   }
 
   for (auto tv : getTypeVariables()) {
@@ -164,13 +162,16 @@ Solution ConstraintSystem::finalize() {
   solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
                                        DefaultedConstraints.end());
 
-  for (auto &nodeType : addedNodeTypes) {
-    solution.addedNodeTypes.insert(nodeType);
+  for (auto &nodeType : NodeTypes) {
+    solution.nodeTypes.insert(nodeType);
   }
 
   // Remember contextual types.
   solution.contextualTypes.assign(
       contextualTypes.begin(), contextualTypes.end());
+
+  solution.solutionApplicationTargets = solutionApplicationTargets;
+  solution.caseLabelItems = caseLabelItems;
 
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
@@ -231,9 +232,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
                               solution.DefaultedConstraints.end());
 
   // Add the node types back.
-  for (auto &nodeType : solution.addedNodeTypes) {
-    if (!hasType(nodeType.first))
-      setType(nodeType.first, nodeType.second);
+  for (auto &nodeType : solution.nodeTypes) {
+    setType(nodeType.first, nodeType.second);
   }
 
   // Add the contextual types.
@@ -242,6 +242,18 @@ void ConstraintSystem::applySolution(const Solution &solution) {
       setContextualType(contextualType.first, contextualType.second.typeLoc,
                         contextualType.second.purpose);
     }
+  }
+
+  // Register the statement condition targets.
+  for (const auto &target : solution.solutionApplicationTargets) {
+    if (!getSolutionApplicationTarget(target.first))
+      setSolutionApplicationTarget(target.first, target.second);
+  }
+
+  // Register the statement condition targets.
+  for (const auto &info : solution.caseLabelItems) {
+    if (!getCaseLabelItemInfo(info.first))
+      setCaseLabelItemInfo(info.first, info.second);
   }
 
   // Register the conformances checked along the way to arrive to solution.
@@ -349,6 +361,13 @@ void truncate(llvm::MapVector<K, V> &map, unsigned newSize) {
     map.pop_back();
 }
 
+template <typename K, typename V, unsigned N>
+void truncate(llvm::SmallMapVector<K, V, N> &map, unsigned newSize) {
+  assert(newSize <= map.size() && "Not a truncation!");
+  for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
+    map.pop_back();
+}
+
 } // end anonymous namespace
 
 ConstraintSystem::SolverState::SolverState(
@@ -421,6 +440,7 @@ ConstraintSystem::SolverState::~SolverState() {
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
   #include "ConstraintSolverStats.def"
 
+#if LLVM_ENABLE_STATS
   // Update the "largest" statistics if this system is larger than the
   // previous one.  
   // FIXME: This is not at all thread-safe.
@@ -432,6 +452,7 @@ ConstraintSystem::SolverState::~SolverState() {
       ++JOIN2(Largest,Name);
     #include "ConstraintSolverStats.def"
   }
+#endif
 }
 
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
@@ -454,6 +475,8 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
   numContextualTypes = cs.contextualTypes.size();
+  numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
+  numCaseLabelItems = cs.caseLabelItems.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -509,8 +532,13 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.DefaultedConstraints, numDefaultedConstraints);
 
   // Remove any node types we registered.
-  for (unsigned i : range(numAddedNodeTypes, cs.addedNodeTypes.size())) {
-    cs.eraseType(cs.addedNodeTypes[i].first);
+  for (unsigned i :
+           reverse(range(numAddedNodeTypes, cs.addedNodeTypes.size()))) {
+    TypedNode node = cs.addedNodeTypes[i].first;
+    if (Type oldType = cs.addedNodeTypes[i].second)
+      cs.NodeTypes[node] = oldType;
+    else
+      cs.NodeTypes.erase(node);
   }
   truncate(cs.addedNodeTypes, numAddedNodeTypes);
 
@@ -525,6 +553,12 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any contextual types.
   truncate(cs.contextualTypes, numContextualTypes);
+
+  // Remove any solution application targets.
+  truncate(cs.solutionApplicationTargets, numSolutionApplicationTargets);
+
+  // Remove any case label item infos.
+  truncate(cs.caseLabelItems, numCaseLabelItems);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -1110,8 +1144,7 @@ static bool debugConstraintSolverForTarget(
 /// diagnostic.
 static void maybeProduceFallbackDiagnostic(
     ConstraintSystem &cs, SolutionApplicationTarget target) {
-  if (cs.Options.contains(ConstraintSystemFlags::SubExpressionDiagnostics) ||
-      cs.Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
+  if (cs.Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
     return;
 
   // Before producing fatal error here, let's check if there are any "error"
@@ -1239,56 +1272,17 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
   assert(!solverState && "cannot be used directly");
 
   // Set up the expression type checker timer.
-  Expr *expr = target.getAsExpr();
-  Timer.emplace(expr, *this);
+  if (Expr *expr = target.getAsExpr())
+    Timer.emplace(expr, *this);
 
-  // Try to shrink the system by reducing disjunction domains. This
-  // goes through every sub-expression and generate its own sub-system, to
-  // try to reduce the domains of those subexpressions.
-  shrink(expr);
-
-  // Generate constraints for the main system.
-  if (auto generatedExpr = generateConstraints(expr, DC))
-    expr = generatedExpr;
-  else {
-    return SolutionResult::forError();
-  }
-
-  // If there is a type that we're expected to convert to, add the conversion
-  // constraint.
-  if (Type convertType = target.getExprConversionType()) {
-    // Determine whether we know more about the contextual type.
-    ContextualTypePurpose ctp = target.getExprContextualTypePurpose();
-    bool isOpaqueReturnType = target.infersOpaqueReturnType();
-
-    // Substitute type variables in for unresolved types.
-    if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
-      bool isForSingleExprFunction = (ctp == CTP_ReturnSingleExpr);
-      auto *convertTypeLocator = getConstraintLocator(
-          expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
-
-      convertType = convertType.transform([&](Type type) -> Type {
-        if (type->is<UnresolvedType>())
-          return createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
-        return type;
-      });
-    }
-
-    addContextualConversionConstraint(expr, convertType, ctp,
-                                      isOpaqueReturnType);
-  }
+  if (generateConstraints(target, allowFreeTypeVariables))
+    return SolutionResult::forError();;
 
   // Notify the listener that we've built the constraint system.
-  if (listener && listener->builtConstraints(*this, expr)) {
-    return SolutionResult::forError();
-  }
-
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    print(log, expr);
-    log << "\n";
-    print(log);
+  if (Expr *expr = target.getAsExpr()) {
+    if (listener && listener->builtConstraints(*this, expr)) {
+      return SolutionResult::forError();
+    }
   }
 
   // Try to solve the constraint system using computed suggestions.
@@ -1297,8 +1291,6 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
 
   if (getExpressionTooComplex(solutions))
     return SolutionResult::forTooComplex();
-
-  target.setExpr(expr);
 
   switch (solutions.size()) {
   case 0:
@@ -1335,8 +1327,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Filter deduced solutions, try to figure out if there is
   // a single best solution to use, if not explicitly disabled
   // by constraint system options.
-  if (!retainAllSolutions())
-    filterSolutions(solutions);
+  filterSolutions(solutions);
 
   // We fail if there is no solution or the expression was too complex.
   return solutions.empty() || getExpressionTooComplex(solutions);
@@ -1362,7 +1353,7 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
 
   SmallVector<std::unique_ptr<SolverStep>, 16> workList;
   // First step is always wraps whole constraint system.
-  workList.push_back(llvm::make_unique<SplitterStep>(*this, solutions));
+  workList.push_back(std::make_unique<SplitterStep>(*this, solutions));
 
   // Indicate whether previous step in the stack has failed
   // (returned StepResult::Kind = Error), this is useful to
@@ -2209,7 +2200,7 @@ void ConstraintSystem::partitionDisjunction(
       if (!funcDecl)
         return false;
 
-      if (!funcDecl->getAttrs().isUnavailable(getASTContext()))
+      if (!isDeclUnavailable(funcDecl, constraint->getLocator()))
         return false;
 
       unavailable.push_back(index);

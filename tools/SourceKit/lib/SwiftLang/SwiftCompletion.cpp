@@ -137,8 +137,9 @@ static bool swiftCodeCompleteImpl(
 
         SwiftConsumer.setContext(&CI.getASTContext(), &CI.getInvocation(),
                                  &CompletionContext);
-        performCodeCompletionSecondPass(CI.getPersistentParserState(),
-                                        *callbacksFactory);
+
+        auto SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
         SwiftConsumer.clearContext();
       });
 }
@@ -1291,9 +1292,9 @@ SwiftCompletionCache::~SwiftCompletionCache() {}
 
 void SwiftLangSupport::codeCompleteCacheOnDisk(StringRef path) {
   ThreadSafeRefCntPtr<SwiftCompletionCache> newCache(new SwiftCompletionCache);
-  newCache->onDisk = llvm::make_unique<ide::OnDiskCodeCompletionCache>(path);
+  newCache->onDisk = std::make_unique<ide::OnDiskCodeCompletionCache>(path);
   newCache->inMemory =
-      llvm::make_unique<ide::CodeCompletionCache>(newCache->onDisk.get());
+      std::make_unique<ide::CodeCompletionCache>(newCache->onDisk.get());
 
   CCCache = newCache; // replace the old cache.
 }

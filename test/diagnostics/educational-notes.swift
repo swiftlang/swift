@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -enable-descriptive-diagnostics -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -enable-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s
 
 // A diagnostic with no educational notes
 let x = 1 +

@@ -528,7 +528,7 @@ public struct URLResourceValues {
 */
 public struct URL : ReferenceConvertible, Equatable {
     public typealias ReferenceType = NSURL
-    fileprivate var _url : NSURL
+    private var _url: NSURL
     
     public typealias BookmarkResolutionOptions = NSURL.BookmarkResolutionOptions
     public typealias BookmarkCreationOptions = NSURL.BookmarkCreationOptions
@@ -1135,11 +1135,11 @@ public struct URL : ReferenceConvertible, Equatable {
         }
     }
     
-    fileprivate init(reference: __shared NSURL) {
+    private init(reference: __shared NSURL) {
         _url = URL._converted(from: reference).copy() as! NSURL
     }
     
-    private var reference : NSURL {
+    private var reference: NSURL {
         return _url
     }
 

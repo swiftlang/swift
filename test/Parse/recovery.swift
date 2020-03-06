@@ -818,9 +818,12 @@ func test23719432() {
 }
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator
-infix operator · {  // expected-error {{'·' is considered to be an identifier, not an operator}}
+infix operator · {  // expected-error {{'·' is considered an identifier and must not appear within an operator name}}
   associativity none precedence 150
 }
+
+infix operator -@-class Recover1 {} // expected-error {{'@' is not allowed in operator names}}
+prefix operator -фф--class Recover2 {} // expected-error {{'фф' is considered an identifier and must not appear within an operator name}}
 
 // <rdar://problem/21712891> Swift Compiler bug: String subscripts with range should require closing bracket.
 func r21712891(s : String) -> String {

@@ -23,37 +23,37 @@ namespace symbolgraphgen {
 
 struct AvailabilityDomain;
 struct SymbolGraphASTWalker;
+struct SymbolGraph;
 
 /// A symbol from a module: a node in a graph.
-struct Symbol {
+class Symbol {
+  /// The symbol graph in which this symbol resides.
+  SymbolGraph *Graph;
   const ValueDecl *VD;
+  const NominalTypeDecl *SynthesizedBaseTypeDecl;
 
   void serializeKind(StringRef Identifier, StringRef DisplayName,
                      llvm::json::OStream &OS) const;
 
   void serializeKind(llvm::json::OStream &OS) const;
 
-  void serializeIdentifier(SymbolGraphASTWalker &Walker,
-                           llvm::json::OStream &OS) const;
+  void serializeIdentifier(llvm::json::OStream &OS) const;
 
-  void serializePathComponents(SymbolGraphASTWalker &Walker,
-                               llvm::json::OStream &OS) const;
+  void serializePathComponents(llvm::json::OStream &OS) const;
 
-  void serializeNames(SymbolGraphASTWalker &Walker,
-                      llvm::json::OStream &OS) const;
+  void serializeNames(llvm::json::OStream &OS) const;
 
-  void serializePosition(StringRef Key, unsigned Line, unsigned ByteOffset,
+  void serializePosition(StringRef Key, SourceLoc Loc,
+                         SourceManager &SourceMgr,
                          llvm::json::OStream &OS) const;
 
   void serializeRange(size_t InitialIdentation,
                       SourceRange Range, SourceManager &SourceMgr,
                       llvm::json::OStream &OS) const;
 
-  void serializeDocComment(SymbolGraphASTWalker &Walker,
-                           llvm::json::OStream &OS) const;
+  void serializeDocComment(llvm::json::OStream &OS) const;
 
-  void serializeFunctionSignature(SymbolGraphASTWalker &Walker,
-                                  llvm::json::OStream &OS) const;
+  void serializeFunctionSignature(llvm::json::OStream &OS) const;
 
   void serializeGenericParam(const swift::GenericTypeParamType &Param,
                              llvm::json::OStream &OS) const;
@@ -63,13 +63,13 @@ struct Symbol {
 
   void serializeSwiftGenericMixin(llvm::json::OStream &OS) const;
 
-  void serializeSwiftExtensionMixin(SymbolGraphASTWalker &Walker,
-                                    llvm::json::OStream &OS) const;
+  void serializeSwiftExtensionMixin(llvm::json::OStream &OS) const;
 
-  void serializeDeclarationFragmentMixin(SymbolGraphASTWalker &Walker,
-                                         llvm::json::OStream &OS) const;
+  void serializeDeclarationFragmentMixin(llvm::json::OStream &OS) const;
 
   void serializeAccessLevelMixin(llvm::json::OStream &OS) const;
+
+  void serializeLocationMixin(llvm::json::OStream &OS) const;
 
   llvm::Optional<StringRef>
   getDomain(PlatformAgnosticAvailabilityKind AgnosticKind,
@@ -77,15 +77,77 @@ struct Symbol {
 
   void serializeAvailabilityMixin(llvm::json::OStream &OS) const;
 
-  void serialize(SymbolGraphASTWalker &Walker,
-                 llvm::json::OStream &OS) const;
-  
-  bool operator==(const Symbol &Other) const {
-    return VD == Other.VD;
+public:
+  Symbol(SymbolGraph *Graph, const ValueDecl *VD,
+         const NominalTypeDecl *SynthesizedBaseTypeDecl);
+
+  void serialize(llvm::json::OStream &OS) const;
+
+  const SymbolGraph *getGraph() const {
+    return Graph;
   }
+
+  const ValueDecl *getSymbolDecl() const {
+    return VD;
+  }
+
+  Type getSynthesizedBaseType() const {
+    if (SynthesizedBaseTypeDecl) {
+      return SynthesizedBaseTypeDecl->getDeclaredInterfaceType();
+    } else {
+      return Type();
+    }
+  }
+
+  const NominalTypeDecl *getSynthesizedBaseTypeDecl() const {
+    return SynthesizedBaseTypeDecl;
+  }
+
+  void getPathComponents(SmallVectorImpl<SmallString<32>> &Components) const;
+
+  /// Print the symbol path to an output stream.
+  void printPath(llvm::raw_ostream &OS) const;
+
+  void getUSR(SmallVectorImpl<char> &USR) const;
 };
 
 } // end namespace symbolgraphgen
-} // end namespace swift 
+} // end namespace swift
+
+namespace llvm {
+using Symbol = swift::symbolgraphgen::Symbol;
+using SymbolGraph = swift::symbolgraphgen::SymbolGraph;
+
+template <> struct DenseMapInfo<Symbol> {
+  static inline Symbol getEmptyKey() {
+    return Symbol {
+      DenseMapInfo<SymbolGraph *>::getEmptyKey(),
+      DenseMapInfo<const swift::ValueDecl *>::getEmptyKey(),
+      DenseMapInfo<const swift::NominalTypeDecl *>::getTombstoneKey(),
+    };
+  }
+  static inline Symbol getTombstoneKey() {
+    return Symbol {
+      DenseMapInfo<SymbolGraph *>::getTombstoneKey(),
+      DenseMapInfo<const swift::ValueDecl *>::getTombstoneKey(),
+      DenseMapInfo<const swift::NominalTypeDecl *>::getTombstoneKey(),
+    };
+  }
+  static unsigned getHashValue(const Symbol S) {
+    unsigned H = 0;
+    H ^= DenseMapInfo<SymbolGraph *>::getHashValue(S.getGraph());
+    H ^= DenseMapInfo<const swift::ValueDecl *>::getHashValue(S.getSymbolDecl());
+    H ^= DenseMapInfo<const swift::NominalTypeDecl *>::getHashValue(S.getSynthesizedBaseTypeDecl());
+    return H;
+  }
+  static bool isEqual(const Symbol LHS, const Symbol RHS) {
+    return LHS.getGraph() == RHS.getGraph() &&
+        LHS.getSymbolDecl() == RHS.getSymbolDecl() &&
+        LHS.getSynthesizedBaseTypeDecl() ==
+            RHS.getSynthesizedBaseTypeDecl();
+  }
+};
+} // end namespace llvm
+
 
 #endif // SWIFT_SYMBOLGRAPHGEN_SYMBOL_H

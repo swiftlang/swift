@@ -813,13 +813,14 @@ APInt BuiltinIntegerWidth::parse(StringRef text, unsigned radix, bool negate,
 static APFloat getFloatLiteralValue(bool IsNegative, StringRef Text,
                                     const llvm::fltSemantics &Semantics) {
   APFloat Val(Semantics);
-  APFloat::opStatus Res =
-    Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven);
-  assert(Res != APFloat::opInvalidOp && "Sema didn't reject invalid number");
-  (void)Res;
+  llvm::Expected<APFloat::opStatus> MaybeRes =
+      Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven);
+  assert(MaybeRes && *MaybeRes != APFloat::opInvalidOp &&
+         "Sema didn't reject invalid number");
+  (void)MaybeRes;
   if (IsNegative) {
     auto NegVal = APFloat::getZero(Semantics, /*negative*/ true);
-    Res = NegVal.subtract(Val, llvm::APFloat::rmNearestTiesToEven);
+    auto Res = NegVal.subtract(Val, llvm::APFloat::rmNearestTiesToEven);
     assert(Res != APFloat::opInvalidOp && "Sema didn't reject invalid number");
     (void)Res;
     return NegVal;
@@ -1840,6 +1841,46 @@ void AutoClosureExpr::setBody(Expr *E) {
 
 Expr *AutoClosureExpr::getSingleExpressionBody() const {
   return cast<ReturnStmt>(Body->getFirstElement().get<Stmt *>())->getResult();
+}
+
+Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
+  switch (getThunkKind()) {
+  case AutoClosureExpr::Kind::None:
+    break;
+
+  case AutoClosureExpr::Kind::SingleCurryThunk: {
+    auto *body = getSingleExpressionBody();
+    body = body->getSemanticsProvidingExpr();
+    if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
+      return outerCall->getFn();
+    }
+
+    assert(false && "Malformed curry thunk?");
+    break;
+  }
+
+  case AutoClosureExpr::Kind::DoubleCurryThunk: {
+    auto *body = getSingleExpressionBody();
+    if (auto *innerClosure = dyn_cast<AutoClosureExpr>(body)) {
+      assert(innerClosure->getThunkKind() ==
+               AutoClosureExpr::Kind::SingleCurryThunk);
+      auto *innerBody = innerClosure->getSingleExpressionBody();
+      innerBody = innerBody->getSemanticsProvidingExpr();
+      if (auto *outerCall = dyn_cast<ApplyExpr>(innerBody)) {
+        if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
+          if (auto *declRef = dyn_cast<DeclRefExpr>(innerCall->getFn())) {
+            return declRef;
+          }
+        }
+      }
+    }
+
+    assert(false && "Malformed curry thunk?");
+    break;
+  }
+  }
+
+  return nullptr;
 }
 
 FORWARD_SOURCE_LOCS_TO(UnresolvedPatternExpr, subPattern)

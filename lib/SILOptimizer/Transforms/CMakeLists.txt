@@ -25,6 +25,7 @@ silopt_register_sources(
   RedundantLoadElimination.cpp
   RedundantOverflowCheckRemoval.cpp
   ReleaseDevirtualizer.cpp
+  SemanticARCOpts.cpp
   SILCodeMotion.cpp
   SILLowerAggregateInstrs.cpp
   SILMem2Reg.cpp
@@ -33,5 +34,6 @@ silopt_register_sources(
   Sink.cpp
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
+  TempRValueElimination.cpp
   UnsafeGuaranteedPeephole.cpp
 )

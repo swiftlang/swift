@@ -1,0 +1,4 @@
+---
+version: 42    # intentionally far in the future
+modules:
+- name: _AlwaysImportedOverlay

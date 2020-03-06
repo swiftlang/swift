@@ -10,6 +10,7 @@ else()
 endif()
 
 add_swift_host_library(swiftAST STATIC
+  AbstractSourceFileDepGraphFactory.cpp
   AccessRequests.cpp
   ASTContext.cpp
   ASTDemangler.cpp
@@ -44,7 +45,7 @@ add_swift_host_library(swiftAST STATIC
   Evaluator.cpp
   Expr.cpp
   FineGrainedDependencies.cpp
-  FineGrainedDependenciesSourceFileDepGraphConstructor.cpp
+  FrontendSourceFileDepGraphFactory.cpp
   GenericEnvironment.cpp
   GenericSignature.cpp
   GenericSignatureBuilder.cpp
@@ -65,6 +66,7 @@ add_swift_host_library(swiftAST STATIC
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   RawComment.cpp
+  ReferencedNameTracker.cpp
   RequirementEnvironment.cpp
   SyntaxASTMap.cpp
   SILLayout.cpp

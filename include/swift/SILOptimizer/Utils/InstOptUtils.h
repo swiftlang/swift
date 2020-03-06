@@ -145,6 +145,15 @@ public:
       SILInstruction *inst,
       llvm::function_ref<void(SILInstruction *)> callback =
                                     [](SILInstruction *) {});
+
+  /// Recursively visit users of \c inst  (including \c inst)and force delete
+  /// them. Also, destroy the consumed operands of the deleted instructions
+  /// whenever necessary. Invoke the \c callback on instructions that are
+  /// deleted.
+  void recursivelyForceDeleteUsersAndFixLifetimes(
+      SILInstruction *inst,
+      llvm::function_ref<void(SILInstruction *)> callback =
+          [](SILInstruction *) {});
 };
 
 /// If \c inst is dead, delete it and recursively eliminate all code that
@@ -283,28 +292,69 @@ struct InstModCallbacks {
       [](SILValue oldValue, SILValue newValue) {
         oldValue->replaceAllUsesWith(newValue);
       };
+  std::function<void(SingleValueInstruction *, SILValue)>
+      eraseAndRAUWSingleValueInst =
+          [](SingleValueInstruction *i, SILValue newValue) {
+            i->replaceAllUsesWith(newValue);
+            i->eraseFromParent();
+          };
 
   InstModCallbacks(decltype(deleteInst) deleteInst,
                    decltype(createdNewInst) createdNewInst,
                    decltype(replaceValueUsesWith) replaceValueUsesWith)
       : deleteInst(deleteInst), createdNewInst(createdNewInst),
-        replaceValueUsesWith(replaceValueUsesWith) {}
+        replaceValueUsesWith(replaceValueUsesWith),
+        eraseAndRAUWSingleValueInst(
+            [](SingleValueInstruction *i, SILValue newValue) {
+              i->replaceAllUsesWith(newValue);
+              i->eraseFromParent();
+            }) {}
+
+  InstModCallbacks(
+      decltype(deleteInst) deleteInst, decltype(createdNewInst) createdNewInst,
+      decltype(replaceValueUsesWith) replaceValueUsesWith,
+      decltype(eraseAndRAUWSingleValueInst) eraseAndRAUWSingleValueInst)
+      : deleteInst(deleteInst), createdNewInst(createdNewInst),
+        replaceValueUsesWith(replaceValueUsesWith),
+        eraseAndRAUWSingleValueInst(eraseAndRAUWSingleValueInst) {}
+
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
   InstModCallbacks(const InstModCallbacks &) = default;
   InstModCallbacks(InstModCallbacks &&) = default;
 };
 
+/// Get all consumed arguments of a partial_apply.
+///
+/// These are basically all arguments, except inout arguments and arguments
+/// of trivial type.
+/// If \p includeTrivialAddrArgs is true, also trivial address-type arguments
+/// are included.
+void getConsumedPartialApplyArgs(PartialApplyInst *pai,
+                                 SmallVectorImpl<Operand *> &argOperands,
+                                 bool includeTrivialAddrArgs);
+
+/// Collect all (transitive) users of \p inst which just copy or destroy \p
+/// inst.
+///
+/// In other words: all users which do not prevent \p inst from being considered
+/// as "dead".
+/// Returns true, if there are no other users beside those collected in \p
+/// destroys, i.e. if \p inst can be considered as "dead".
+bool collectDestroys(SingleValueInstruction *inst,
+                     SmallVectorImpl<SILInstruction *> &destroys);
 /// If Closure is a partial_apply or thin_to_thick_function with only local
 /// ref count users and a set of post-dominating releases:
 ///
 /// 1. Remove all ref count operations and the closure.
-/// 2. Add each one of the last release locations insert releases for the
-///    captured args if we have a partial_apply.
+/// 2. At each one of the last release locations insert releases for the
+///    captured args if we have a partial_apply (except \p needKeepArgsAlive is
+///    false).
 ///
 /// In the future this should be extended to be less conservative with users.
 bool tryDeleteDeadClosure(SingleValueInstruction *closure,
-                          InstModCallbacks callbacks = InstModCallbacks());
+                          InstModCallbacks callbacks = InstModCallbacks(),
+                          bool needKeepArgsAlive = true);
 
 /// Given a SILValue argument to a partial apply \p Arg and the associated
 /// parameter info for that argument, perform the necessary cleanups to Arg when
@@ -513,9 +563,9 @@ findLocalApplySites(FunctionRefBaseInst *fri);
 /// Gets the base implementation of a method.
 AbstractFunctionDecl *getBaseMethod(AbstractFunctionDecl *FD);
 
-SILInstruction *
-tryOptimizeApplyOfPartialApply(PartialApplyInst *pai, SILBuilder &builder,
-                               InstModCallbacks callbacks = InstModCallbacks());
+bool tryOptimizeApplyOfPartialApply(
+    PartialApplyInst *pai, SILBuilderContext &builderCtxt,
+    InstModCallbacks callbacks = InstModCallbacks());
 
 } // end namespace swift
 

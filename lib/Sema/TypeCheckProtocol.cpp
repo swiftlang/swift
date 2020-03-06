@@ -725,7 +725,7 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
                             requirement);
   };
 
-  if (auto memberTy = type->getAs<DependentMemberType>())
+  if (type->is<DependentMemberType>())
     return missingRequirementMatch(type);
 
   type = type->mapTypeOutOfContext();
@@ -4087,8 +4087,8 @@ void ConformanceChecker::resolveValueWitnesses() {
 void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   assert(!Conformance->isComplete() && "Conformance is already complete");
 
-  FrontendStatsTracer statsTracer(getASTContext().Stats, "check-conformance",
-                                  Conformance);
+  FrontendStatsTracer statsTracer(getASTContext().Stats,
+                                  "check-conformance", Conformance);
 
   llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
   SuppressDiagnostics = false;
@@ -4896,7 +4896,10 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   // If the class does not have a custom @objc name and the deployment target
   // supports the objc_getClass() hook, the workaround is unnecessary.
   ASTContext &ctx = classDecl->getASTContext();
-  if (ctx.LangOpts.doesTargetSupportObjCGetClassHook() &&
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(ctx);
+  if (deploymentAvailability.isContainedIn(
+        ctx.getObjCGetClassHookAvailability()) &&
       !hasExplicitObjCName(classDecl))
     return;
 

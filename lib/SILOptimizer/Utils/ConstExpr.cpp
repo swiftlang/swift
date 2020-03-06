@@ -480,6 +480,20 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return SymbolicValue::getAddress(memObject, accessPath,
                                      evaluator.getAllocator());
   }
+  
+  // `convert_function` instructions that only change substitutions can be
+  // looked through to the original function.
+  //
+  // TODO: Certain covariant or otherwise ABI-compatible conversions should
+  // be handled as well.
+  if (auto cf = dyn_cast<ConvertFunctionInst>(value)) {
+    if (cf->onlyConvertsSubstitutions()) {
+      return getConstantValue(cf->getOperand());
+    }
+  }
+
+  if (auto *convertEscapeInst = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
+    return getConstantValue(convertEscapeInst->getOperand());
 
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 

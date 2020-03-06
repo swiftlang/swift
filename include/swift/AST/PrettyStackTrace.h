@@ -202,6 +202,24 @@ public:
   void print(llvm::raw_ostream &OS) const override;
 };
 
+/// PrettyStackTraceDifferentiabilityWitness - Observe that we are processing a
+/// specific differentiability witness.
+class PrettyStackTraceDifferentiabilityWitness
+    : public llvm::PrettyStackTraceEntry {
+  const SILDifferentiabilityWitnessKey Key;
+  const char *Action;
+
+public:
+  PrettyStackTraceDifferentiabilityWitness(
+      const char *action, const SILDifferentiabilityWitnessKey key)
+      : Key(key), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
+void printDifferentiabilityWitnessDescription(
+    llvm::raw_ostream &out, const SILDifferentiabilityWitnessKey key,
+    bool addNewline = true);
+
 } // end namespace swift
 
 #endif

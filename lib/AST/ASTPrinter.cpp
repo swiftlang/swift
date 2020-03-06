@@ -100,7 +100,8 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
 }
 
 PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
-                                                   bool printFullConvention) {
+                                                   bool printFullConvention,
+                                                   bool printSPIs) {
   PrintOptions result;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
@@ -120,6 +121,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
+  result.PrintSPIs = printSPIs;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -143,6 +145,10 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
       if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
         return false;
 
+      // Skip SPI decls if `PrintSPIs`.
+      if (!options.PrintSPIs && D->isSPI())
+        return false;
+
       // Skip anything that isn't 'public' or '@usableFromInline'.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         if (!isPublicOrUsableFromInline(VD)) {
@@ -151,6 +157,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
           if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD))
             if (contributesToParentTypeStorage(ASD))
               return true;
+
           return false;
         }
       }
@@ -980,6 +987,17 @@ void PrintAST::printAttributes(const Decl *D) {
              !hasLessAccessibleSetter(vd)))
           Options.ExcludeAttrList.push_back(DAK_HasStorage);
       }
+    }
+
+    // SPI groups
+    if (Options.PrintSPIs) {
+      interleave(D->getSPIGroups(),
+             [&](Identifier spiName) {
+               Printer.printAttrName("_spi", true);
+               Printer << "(" << spiName << ") ";
+             },
+             [&] { Printer << ""; });
+      Options.ExcludeAttrList.push_back(DAK_SPIAccessControl);
     }
 
     // Don't print any contextual decl modifiers.
@@ -4535,6 +4553,14 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
     Printer << ")";
     break;
   }
+}
+  
+void LayoutConstraint::dump() const {
+  if (!*this) {
+    llvm::errs() << "(null)\n";
+    return;
+  }
+  getPointer()->print(llvm::errs());
 }
 
 void GenericSignatureImpl::print(raw_ostream &OS, PrintOptions PO) const {

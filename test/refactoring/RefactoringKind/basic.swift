@@ -392,10 +392,10 @@ struct S {
 // RUN: %refactor -source-filename %s -pos=272:3 -end-pos=275:13 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-IFLET-EXPRESSION
 
 // RUN: %refactor -source-filename %s -pos=288:3 -end-pos=288:16 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-COMPUTED-PROPERTY
-// RUN: %refactor -source-filename %s -pos=289:3 -end-pos=289:22 | %FileCheck %s -check-prefix=CHECK-NONE
-// RUN: %refactor -source-filename %s -pos=290:3 -end-pos=290:32 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-COMPUTED-PROPERTY2
-// RUN: %refactor -source-filename %s -pos=291:3 -end-pos=291:18 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-COMPUTED-PROPERTY2
-// RUN: %refactor -source-filename %s -pos=292:3 -end-pos=296:4 | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %refactor -source-filename %s -pos=289:3 -end-pos=289:22 | %FileCheck %s -check-prefix=CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY
+// RUN: %refactor -source-filename %s -pos=290:3 -end-pos=290:32 | %FileCheck %s -check-prefix=CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY
+// RUN: %refactor -source-filename %s -pos=291:3 -end-pos=291:18 | %FileCheck %s -check-prefix=CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY
+// RUN: %refactor -source-filename %s -pos=292:3 -end-pos=296:4 | %FileCheck %s -check-prefix=CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY
 
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
@@ -450,6 +450,7 @@ struct S {
 
 // CHECK-CONVERT-TO-COMPUTED-PROPERTY: Convert To Computed Property
 
-// CHECK-CONVERT-TO-COMPUTED-PROPERTY2: Action begins
-// CHECK-CONVERT-TO-COMPUTED-PROPERTY2-NEXT: Move To Extension
-// CHECK-CONVERT-TO-COMPUTED-PROPERTY2-NEXT: Action ends
+// CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY: Action begins
+// CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY-NOT: Convert To Computed Property
+// CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY: Action ends
+

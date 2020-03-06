@@ -65,7 +65,8 @@ struct Struct<T> {
 // CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue07assign_a1_B13_reabstractedyyAA6StructVyS2icGz_S2ictF
 // CHECK:         [[REABSTRACT:%.*]] = function_ref @$sS2iIegyd_S2iIegnr_TR
 // CHECK:         [[REABSTRACTED:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT]]
-// CHECK:         assign [[REABSTRACTED]] to {{%.*}} : $*@callee_guaranteed (@in_guaranteed Int) -> @out Int
+// CHECK:         [[REABSTRACTED_CONV:%.*]] = convert_function [[REABSTRACTED]]
+// CHECK:         assign [[REABSTRACTED_CONV]] to {{%.*}} :
 func assign_optional_lvalue_reabstracted(_ x: inout Struct<(Int) -> Int>,
                                          _ y: @escaping (Int) -> Int) {
   x.value! = y

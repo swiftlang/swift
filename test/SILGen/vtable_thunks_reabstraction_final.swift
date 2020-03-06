@@ -23,7 +23,7 @@ class NongenericSub: GenericSuper<Int>, Fooable {
 }
 
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s33vtable_thunks_reabstraction_final13NongenericSubCAA7FooableA2aDP3foo{{[_0-9a-zA-Z]*}}FTW
-// CHECK:         class_method {{%.*}} : $NongenericSub, #NongenericSub.foo!1 {{.*}}, $@convention(method) (@in_guaranteed Int, @guaranteed NongenericSub) -> @out Optional<Int>
+// CHECK:         class_method {{%.*}} : $NongenericSub, #NongenericSub.foo!1 {{.*}}
 
 class GenericSub<U: AnyObject>: GenericSuper<U>, Barrable {
   override func foo(_ x: U) -> U? {
@@ -38,7 +38,7 @@ class C {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s33vtable_thunks_reabstraction_final4testyyF
 func test() {
-  // CHECK: class_method {{%.*}} : $NongenericSub, #NongenericSub.foo!1 {{.*}}, $@convention(method) (@in_guaranteed Int, @guaranteed NongenericSub) -> @out Optional<Int>
+  // CHECK: class_method {{%.*}} : $NongenericSub, #NongenericSub.foo!1 {{.*}}
   NongenericSub().foo(0)
 
   // FIXME: rdar://problem/21167978

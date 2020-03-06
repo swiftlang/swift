@@ -4613,7 +4613,7 @@ namespace {
 
       // Create the extension declaration and record it.
       objcClass->addExtension(result);
-      Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+      Impl.ImportedDecls[{decl, getVersion()}] = result;
       SmallVector<TypeLoc, 4> inheritedTypes;
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
@@ -7380,8 +7380,10 @@ void SwiftDeclConverter::importInheritedConstructors(
 
 Decl *ClangImporter::Implementation::importDeclCached(
     const clang::NamedDecl *ClangDecl,
-    ImportNameVersion version) {
-  auto Known = ImportedDecls.find({ClangDecl->getCanonicalDecl(), version});
+    ImportNameVersion version,
+    bool UseCanonical) {
+  auto Known = ImportedDecls.find(
+    { UseCanonical? ClangDecl->getCanonicalDecl(): ClangDecl, version });
   if (Known != ImportedDecls.end())
     return Known->second;
 
@@ -7857,8 +7859,8 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 void ClangImporter::Implementation::startedImportingEntity() {
   ++NumTotalImportedEntities;
   // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (SwiftContext.Stats)
-    SwiftContext.Stats->getFrontendCounters().NumTotalClangImportedEntities++;
+  if (auto *Stats = SwiftContext.Stats)
+    Stats->getFrontendCounters().NumTotalClangImportedEntities++;
 }
 
 /// Look up associated type requirements in the conforming type.
@@ -7970,7 +7972,8 @@ void ClangImporter::Implementation::finishNormalConformance(
 Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
     const clang::NamedDecl *ClangDecl,
     ImportNameVersion version,
-    bool SuperfluousTypedefsAreTransparent) {
+    bool SuperfluousTypedefsAreTransparent,
+    bool UseCanonicalDecl) {
   if (!ClangDecl)
     return nullptr;
 
@@ -7979,9 +7982,9 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
                                     Instance->getSourceManager(), "importing");
 
-  auto Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
+  auto Canon = cast<clang::NamedDecl>(UseCanonicalDecl? ClangDecl->getCanonicalDecl(): ClangDecl);
 
-  if (auto Known = importDeclCached(Canon, version)) {
+  if (auto Known = importDeclCached(Canon, version, UseCanonicalDecl)) {
     if (!SuperfluousTypedefsAreTransparent &&
         SuperfluousTypedefs.count(Canon))
       return nullptr;
@@ -8082,8 +8085,11 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   auto decl = dyn_cast<clang::NamedDecl>(dc);
   if (!decl)
     return nullptr;
-
-  auto swiftDecl = importDecl(decl, CurrentVersion);
+  // Category decls with same name can be merged and using canonical decl always
+  // leads to the first category of the given name. We'd like to keep these
+  // categories separated.
+  auto useCanonical = !isa<clang::ObjCCategoryDecl>(decl);
+  auto swiftDecl = importDecl(decl, CurrentVersion, useCanonical);
   if (!swiftDecl)
     return nullptr;
 
@@ -8557,7 +8563,8 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
-  FrontendStatsTracer tracer(D->getASTContext().Stats, "load-all-members", D);
+  FrontendStatsTracer tracer(D->getASTContext().Stats,
+                             "load-all-members", D);
   assert(D);
 
   // Check whether we're importing an Objective-C container of some sort.

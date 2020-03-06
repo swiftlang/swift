@@ -76,7 +76,7 @@ internal struct _SmallString {
 extension _SmallString {
   @inlinable @inline(__always)
   internal static var capacity: Int {
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(wasm32)
     return 10
 #else
     return 15
@@ -264,7 +264,7 @@ extension _SmallString {
 
     self.init(leading: leading, trailing: trailing, count: count)
   }
-  
+
   @inline(__always)
   internal init(
     initializingUTF8With initializer: (

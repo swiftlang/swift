@@ -30,7 +30,12 @@
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Mutex.h"
+#if defined(__wasi__)
+# define SWIFT_CASTING_SUPPORTS_MUTEX 0
+#else
+# define SWIFT_CASTING_SUPPORTS_MUTEX 1
+# include "swift/Runtime/Mutex.h"
+#endif
 #include "swift/Runtime/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -125,7 +130,9 @@ TypeNamePair
 swift::swift_getTypeName(const Metadata *type, bool qualified) {
   using Key = llvm::PointerIntPair<const Metadata *, 1, bool>;
 
+  #if SWIFT_CASTING_SUPPORTS_MUTEX
   static StaticReadWriteLock TypeNameCacheLock;
+  #endif
   static Lazy<llvm::DenseMap<Key, std::pair<const char *, size_t>>>
     TypeNameCache;
   
@@ -134,7 +141,9 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
 
   // Attempt read-only lookup of cache entry.
   {
+    #if SWIFT_CASTING_SUPPORTS_MUTEX
     StaticScopedReadLock guard(TypeNameCacheLock);
+    #endif
 
     auto found = cache.find(key);
     if (found != cache.end()) {
@@ -145,7 +154,9 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
 
   // Read-only lookup failed to find item, we may need to create it.
   {
+    #if SWIFT_CASTING_SUPPORTS_MUTEX
     StaticScopedWriteLock guard(TypeNameCacheLock);
+    #endif
 
     // Do lookup again just to make sure it wasn't created by another
     // thread before we acquired the write lock.
@@ -1046,6 +1057,10 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
                               const Metadata *targetType) {
   auto origSourceType = sourceType;
 
+  // Identical types always succeed
+  if (sourceType == targetType)
+    return origSourceType;
+
   switch (targetType->getKind()) {
   case MetadataKind::ObjCClassWrapper:
     // Get the actual class object.
@@ -1111,17 +1126,13 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
 
   case MetadataKind::Existential: {
     auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
-    if (!_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
-      return nullptr;
-    return origSourceType;
+    if (_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
+      return origSourceType;
+    return nullptr;
   }
 
   default:
-    // The cast succeeds only if the metadata pointers are statically
-    // equivalent.
-    if (sourceType != targetType)
-      return nullptr;
-    return origSourceType;
+    return nullptr;
   }
 
   swift_runtime_unreachable("Unhandled MetadataKind in switch.");
@@ -1132,6 +1143,10 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
                                            const Metadata *targetType,
                                            const char *file, unsigned line, unsigned column) {
   auto origSourceType = sourceType;
+
+  // Identical types always succeed
+  if (sourceType == targetType)
+    return origSourceType;
 
   switch (targetType->getKind()) {
   case MetadataKind::ObjCClassWrapper:
@@ -1199,12 +1214,16 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
       swift_dynamicCastFailure(sourceType, targetType);
     }
     break;
+
+  case MetadataKind::Existential: {
+    auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
+    if (_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
+      return origSourceType;
+    swift_dynamicCastFailure(sourceType, targetType);
+  }
+
   default:
-    // The cast succeeds only if the metadata pointers are statically
-    // equivalent.
-    if (sourceType != targetType)
-      swift_dynamicCastFailure(sourceType, targetType);
-    return origSourceType;
+    swift_dynamicCastFailure(sourceType, targetType);
   }
 }
 

@@ -543,6 +543,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableConcisePoundFile =
       Args.hasArg(OPT_enable_experimental_concise_pound_file);
 
+  Opts.EnableCrossImportOverlays =
+      Args.hasFlag(OPT_enable_cross_import_overlays,
+                   OPT_disable_cross_import_overlays,
+                   Opts.EnableCrossImportOverlays);
+
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   if (const Arg *A = Args.getLastArg(OPT_target)) {
@@ -814,8 +819,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
-  Opts.EnableDescriptiveDiagnostics |=
-      Args.hasArg(OPT_enable_descriptive_diagnostics);
+  Opts.EnableEducationalNotes |= Args.hasArg(OPT_enable_educational_notes);
+  Opts.EnableExperimentalFormatting |=
+      Args.hasArg(OPT_enable_experimental_diagnostic_formatting);
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
     Opts.DiagnosticDocumentationPath = A->getValue();
   }
@@ -994,6 +1000,20 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
 
+  if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_EQ)) {
+    llvm::Expected<llvm::remarks::Format> formatOrErr =
+        llvm::remarks::parseFormat(A->getValue());
+    if (llvm::Error err = formatOrErr.takeError()) {
+      Diags.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
+                     toString(std::move(err)));
+      return true;
+    }
+    Opts.OptRecordFormat = *formatOrErr;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_passes))
+    Opts.OptRecordPasses = A->getValue();
+
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
 
@@ -1104,6 +1124,9 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   }
   if (const Arg *A = Args.getLastArg(OPT_previous_module_installname_map_file)) {
     Opts.ModuleInstallNameMapPath = A->getValue();
+  }
+  for (auto A : Args.getAllArgValues(OPT_embed_tbd_for_module)) {
+    Opts.embedSymbolsFromModules.push_back(StringRef(A).str());
   }
   return false;
 }
@@ -1256,6 +1279,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.EnableDynamicReplacementChaining |=
       Args.hasArg(OPT_enable_dynamic_replacement_chaining);
 
+  if (auto A = Args.getLastArg(OPT_enable_type_layouts,
+                               OPT_disable_type_layouts)) {
+    Opts.UseTypeLayoutValueHandling
+      = A->getOption().matches(OPT_enable_type_layouts);
+  }
+
   Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
 
   // This is set to true by default.
@@ -1338,8 +1367,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.DisableLegacyTypeInfo = true;
   }
 
-  if (Args.hasArg(OPT_disable_generic_metadata_prespecialization)) {
-    Opts.PrespecializeGenericMetadata = false;
+  if (Args.hasArg(OPT_prespecialize_generic_metadata) && 
+      !Args.hasArg(OPT_disable_generic_metadata_prespecialization)) {
+    Opts.PrespecializeGenericMetadata = true;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {

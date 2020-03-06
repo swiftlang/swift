@@ -72,6 +72,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
+#include "llvm/Transforms/Instrumentation/SanitizerCoverage.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
 
@@ -146,7 +147,7 @@ static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
                                      legacy::PassManagerBase &PM) {
   const PassManagerBuilderWrapper &BuilderWrapper =
       static_cast<const PassManagerBuilderWrapper &>(Builder);
-  PM.add(createSanitizerCoverageModulePass(
+  PM.add(createModuleSanitizerCoverageLegacyPassPass(
       BuilderWrapper.IRGOpts.SanitizeCoverage));
 }
 
@@ -165,6 +166,12 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   TargetOpts.FunctionSections = Opts.FunctionSections;
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+
+  // WebAssembly doesn't support atomics yet, see https://bugs.swift.org/browse/SR-12097
+  // for more details.
+  if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
+    TargetOpts.ThreadModel = llvm::ThreadModel::Single;
+
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
   return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
 }
@@ -313,7 +320,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
 #endif
     for (auto I = Module->begin(), E = Module->end(); I != E; ++I) {
       if (!I->isDeclaration()) {
-        I->setAlignment(pageSize);
+        I->setAlignment(llvm::MaybeAlign(pageSize));
         break;
       }
     }
@@ -391,8 +398,13 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
 
   // Search for the section which holds the hash.
   for (auto &Section : ObjectFile->sections()) {
-    StringRef SectionName;
-    Section.getName(SectionName);
+    llvm::Expected<StringRef> SectionNameOrErr = Section.getName();
+    if (!SectionNameOrErr) {
+      llvm::consumeError(SectionNameOrErr.takeError());
+      continue;
+    }
+
+    StringRef SectionName = *SectionNameOrErr;
     if (SectionName == HashSectionName) {
       llvm::Expected<llvm::StringRef> SectionData = Section.getContents();
       if (!SectionData) {
@@ -442,15 +454,13 @@ static void countStatsPostIRGen(UnifiedStatsReporter &Stats,
 
 template<typename ...ArgTypes>
 void
-diagnoseSync(DiagnosticEngine *Diags, llvm::sys::Mutex *DiagMutex,
+diagnoseSync(DiagnosticEngine &Diags, llvm::sys::Mutex *DiagMutex,
              SourceLoc Loc, Diag<ArgTypes...> ID,
              typename swift::detail::PassArgument<ArgTypes>::type... Args) {
-  if (!Diags)
-    return;
   if (DiagMutex)
     DiagMutex->lock();
 
-  Diags->diagnose(Loc, ID, std::move(Args)...);
+  Diags.diagnose(Loc, ID, std::move(Args)...);
 
   if (DiagMutex)
     DiagMutex->unlock();
@@ -458,7 +468,8 @@ diagnoseSync(DiagnosticEngine *Diags, llvm::sys::Mutex *DiagMutex,
 
 /// Run the LLVM passes. In multi-threaded compilation this will be done for
 /// multiple LLVM modules in parallel.
-bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine *Diags,
+bool swift::performLLVM(const IRGenOptions &Opts,
+                        DiagnosticEngine &Diags,
                         llvm::sys::Mutex *DiagMutex,
                         llvm::GlobalVariable *HashGlobal,
                         llvm::Module *Module,
@@ -572,10 +583,10 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine *Diags,
     break;
   case IRGenOutputKind::NativeAssembly:
   case IRGenOutputKind::ObjectFile: {
-    llvm::TargetMachine::CodeGenFileType FileType;
+    CodeGenFileType FileType;
     FileType = (Opts.OutputKind == IRGenOutputKind::NativeAssembly
-                  ? llvm::TargetMachine::CGFT_AssemblyFile
-                  : llvm::TargetMachine::CGFT_ObjectFile);
+                  ? CGFT_AssemblyFile
+                  : CGFT_ObjectFile);
 
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         TargetMachine->getTargetIRAnalysis()));
@@ -842,20 +853,9 @@ void swift::irgen::deleteIRGenModule(
 /// IRGenModule.
 static void runIRGenPreparePasses(SILModule &Module,
                                   irgen::IRGenModule &IRModule) {
-  SILPassManager PM(&Module, &IRModule, "irgen", /*isMandatoryPipeline=*/ true);
-  bool largeLoadable = Module.getOptions().EnableLargeLoadableTypes;
-#define PASS(ID, Tag, Name)
-#define IRGEN_PASS(ID, Tag, Name)                                              \
-  if (swift::PassKind::ID == swift::PassKind::LoadableByAddress) {             \
-    if (largeLoadable) {                                                       \
-      PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());          \
-    }                                                                          \
-  } else {                                                                     \
-    PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());            \
-  }
-#include "swift/SILOptimizer/PassManager/Passes.def"
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getIRGenPreparePassPipeline(Module.getOptions()));
+  auto &opts = Module.getOptions();
+  auto plan = SILPassPipelinePlan::getIRGenPreparePassPipeline(opts);
+  executePassPipelinePlan(&Module, plan, /*isMandatory*/ true, &IRModule);
 }
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output file.
@@ -963,7 +963,7 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
     FrontendStatsTracer tracer(Ctx.Stats, "LLVM pipeline");
 
     // Since no out module hash was set, we need to performLLVM.
-    if (performLLVM(Opts, &IGM.Context.Diags, nullptr, IGM.ModuleHash,
+    if (performLLVM(Opts, IGM.Context.Diags, nullptr, IGM.ModuleHash,
                     IGM.getModule(), IGM.TargetMachine.get(),
                     IGM.Context.LangOpts.EffectiveLanguageVersion,
                     IGM.OutputFilename, IGM.Context.Stats))
@@ -998,7 +998,7 @@ struct LLVMCodeGenThreads {
                           << IGM->OutputFilename << "\n";
                    diagMutex->unlock(););
         embedBitcode(IGM->getModule(), parent.irgen->Opts);
-        performLLVM(parent.irgen->Opts, &IGM->Context.Diags, diagMutex,
+        performLLVM(parent.irgen->Opts, IGM->Context.Diags, diagMutex,
                     IGM->ModuleHash, IGM->getModule(), IGM->TargetMachine.get(),
                     IGM->Context.LangOpts.EffectiveLanguageVersion,
                     IGM->OutputFilename, IGM->Context.Stats);
@@ -1350,16 +1350,15 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
     break;
   }
   ASTSym->setSection(Section);
-  ASTSym->setAlignment(serialization::SWIFTMODULE_ALIGNMENT);
-  ::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, IGM.getModule(),
+  ASTSym->setAlignment(llvm::MaybeAlign(serialization::SWIFTMODULE_ALIGNMENT));
+  ::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, IGM.getModule(),
                 IGM.TargetMachine.get(),
                 Ctx.LangOpts.EffectiveLanguageVersion,
-                OutputPath);
+                OutputPath, Ctx.Stats);
 }
 
 bool swift::performLLVM(const IRGenOptions &Opts, ASTContext &Ctx,
-                        llvm::Module *Module, StringRef OutputFilename,
-                        UnifiedStatsReporter *Stats) {
+                        llvm::Module *Module, StringRef OutputFilename) {
   // Build TargetMachine.
   auto TargetMachine = createTargetMachine(Opts, Ctx);
   if (!TargetMachine)
@@ -1370,10 +1369,10 @@ bool swift::performLLVM(const IRGenOptions &Opts, ASTContext &Ctx,
   Module->setDataLayout(Clang->getTargetInfo().getDataLayout());
 
   embedBitcode(Module, Opts);
-  if (::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, Module,
+  if (::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, Module,
                     TargetMachine.get(),
                     Ctx.LangOpts.EffectiveLanguageVersion,
-                    OutputFilename, Stats))
+                    OutputFilename, Ctx.Stats))
     return true;
   return false;
 }

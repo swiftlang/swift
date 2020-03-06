@@ -67,6 +67,7 @@ class SILUndef;
 class SourceFile;
 class SerializedSILLoader;
 class SILFunctionBuilder;
+class SILRemarkStreamer;
 
 namespace Lowering {
 class SILGenModule;
@@ -232,13 +233,11 @@ private:
   // The list of SILProperties in the module.
   PropertyListType properties;
 
-  /// This is the underlying raw stream of OptRecordStream.
-  ///
-  /// It is also owned by SILModule in order to keep their lifetime in sync.
-  std::unique_ptr<llvm::raw_ostream> OptRecordRawStream;
+  /// The remark output stream used to record SIL remarks to a file.
+  std::unique_ptr<llvm::raw_fd_ostream> silRemarkStream;
 
-  /// If non-null, the YAML file where remarks should be recorded.
-  std::unique_ptr<llvm::yaml::Output> OptRecordStream;
+  /// The remark streamer used to serialize SIL remarks to a file.
+  std::unique_ptr<swift::SILRemarkStreamer> silRemarkStreamer;
 
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
@@ -475,7 +474,8 @@ public:
   using differentiability_witness_iterator = DifferentiabilityWitnessListType::iterator;
   using differentiability_witness_const_iterator = DifferentiabilityWitnessListType::const_iterator;
   DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() { return differentiabilityWitnesses; }
-  const DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() const { return differentiabilityWitnesses; }  differentiability_witness_iterator differentiability_witness_begin() { return differentiabilityWitnesses.begin(); }
+  const DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() const { return differentiabilityWitnesses; }
+  differentiability_witness_iterator differentiability_witness_begin() { return differentiabilityWitnesses.begin(); }
   differentiability_witness_iterator differentiability_witness_end() { return differentiabilityWitnesses.end(); }
   differentiability_witness_const_iterator differentiability_witness_begin() const { return differentiabilityWitnesses.begin(); }
   differentiability_witness_const_iterator differentiability_witness_end() const { return differentiabilityWitnesses.end(); }
@@ -523,9 +523,12 @@ public:
     return coverageMaps;
   }
 
-  llvm::yaml::Output *getOptRecordStream() { return OptRecordStream.get(); }
-  void setOptRecordStream(std::unique_ptr<llvm::yaml::Output> &&Stream,
-                          std::unique_ptr<llvm::raw_ostream> &&RawStream);
+  swift::SILRemarkStreamer *getSILRemarkStreamer() {
+    return silRemarkStreamer.get();
+  }
+  void setSILRemarkStreamer(
+      std::unique_ptr<llvm::raw_fd_ostream> &&remarkStream,
+      std::unique_ptr<swift::SILRemarkStreamer> &&remarkStreamer);
 
   // This is currently limited to VarDecl because the visibility of global
   // variables and class properties is straightforward, while the visibility of
@@ -674,6 +677,10 @@ public:
   /// the given module?
   bool isTypeMetadataAccessible(CanType type);
 
+  /// Can type metadata necessary for value operations for the given sil type be
+  /// fetched in the given module?
+  bool isTypeMetadataForLayoutAccessible(SILType type);
+
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify() const;
@@ -769,6 +776,13 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
   M.print(OS);
   return OS;
 }
+
+/// Print a simple description of a SILModule for the request evaluator.
+void simple_display(llvm::raw_ostream &out, const SILModule *M);
+
+/// Retrieve a SourceLoc for a SILModule that the request evaluator can use for
+/// diagnostics.
+SourceLoc extractNearestSourceLoc(const SILModule *SM);
 
 namespace Lowering {
 /// Determine whether the given class will be allocated/deallocated using the

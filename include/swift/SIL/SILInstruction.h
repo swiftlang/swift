@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_INSTRUCTION_H
 #define SWIFT_SIL_INSTRUCTION_H
 
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
@@ -61,6 +62,7 @@ class SILBasicBlock;
 class SILBuilder;
 class SILDebugLocation;
 class SILDebugScope;
+class SILDifferentiabilityWitness;
 class SILFunction;
 class SILGlobalVariable;
 class SILInstructionResultArray;
@@ -999,7 +1001,7 @@ class MultipleValueInstructionTrailingObjects<Derived, DerivedResult,
                                       MultipleValueInstruction *,
                                       DerivedResult,
                                       FinalOtherTrailingTypes...> {
-  static_assert(LLVM_IS_FINAL(DerivedResult),
+  static_assert(std::is_final<DerivedResult>(),
                 "Expected DerivedResult to be final");
   static_assert(
       std::is_base_of<MultipleValueInstructionResult, DerivedResult>::value,
@@ -1442,7 +1444,18 @@ public:
     }
   }
 
+  /// Set to true that this alloc_stack contains a value whose lifetime can not
+  /// be ascertained from uses.
+  ///
+  /// As an example if an alloc_stack is known to be only conditionally
+  /// initialized.
   void setDynamicLifetime() { dynamicLifetime = true; }
+
+  /// Returns true if the alloc_stack's initialization can not be ascertained
+  /// from uses directly (so should be treated conservatively).
+  ///
+  /// An example of an alloc_stack with dynamic lifetime is an alloc_stack that
+  /// is conditionally initialized.
   bool hasDynamicLifetime() const { return dynamicLifetime; }
 
   /// Return the debug variable information attached to this instruction.
@@ -1873,6 +1886,7 @@ public:
   /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return NumStaticOperands; }
 
+  Operand *getCalleeOperand() { return &getAllOperands()[Callee]; }
   const Operand *getCalleeOperand() const { return &getAllOperands()[Callee]; }
   SILValue getCallee() const { return getCalleeOperand()->get(); }
 
@@ -1931,6 +1945,11 @@ public:
   SILType getSubstCalleeSILType() const {
     return SubstCalleeType;
   }
+  
+  void setSubstCalleeType(CanSILFunctionType t) {
+    SubstCalleeType = SILType::getPrimitiveObjectType(t);
+  }
+  
   SILFunctionConventions getSubstCalleeConv() const {
     return SILFunctionConventions(getSubstCalleeType(), this->getModule());
   }
@@ -4312,6 +4331,11 @@ public:
   bool withoutActuallyEscaping() const {
     return SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping;
   }
+            
+  /// Returns `true` if the function conversion is between types with the same
+  /// argument and return types, as well as all other attributes, after substitution,
+  /// such as converting `$<A, B> in (A) -> B for <Int, String>` to `(Int) -> String`.
+  bool onlyConvertsSubstitutions() const;
 };
 
 /// ConvertEscapeToNoEscapeInst - Change the type of a escaping function value
@@ -7929,6 +7953,40 @@ class TryApplyInst final
          SILBasicBlock *normalBB, SILBasicBlock *errorBB, SILFunction &F,
          SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
+};
+
+class DifferentiabilityWitnessFunctionInst
+    : public InstructionBase<
+          SILInstructionKind::DifferentiabilityWitnessFunctionInst,
+          SingleValueInstruction> {
+private:
+  friend SILBuilder;
+  /// The differentiability witness function kind.
+  DifferentiabilityWitnessFunctionKind witnessKind;
+  /// The referenced SIL differentiability witness.
+  SILDifferentiabilityWitness *witness;
+  /// Whether the instruction has an explicit function type.
+  bool hasExplicitFunctionType;
+
+  static SILType getDifferentiabilityWitnessType(
+      SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,
+      SILDifferentiabilityWitness *witness);
+
+public:
+  /// Note: explicit function type may be specified only in lowered SIL.
+  DifferentiabilityWitnessFunctionInst(
+      SILModule &module, SILDebugLocation loc,
+      DifferentiabilityWitnessFunctionKind witnessKind,
+      SILDifferentiabilityWitness *witness, Optional<SILType> FunctionType);
+
+  DifferentiabilityWitnessFunctionKind getWitnessKind() const {
+    return witnessKind;
+  }
+  SILDifferentiabilityWitness *getWitness() const { return witness; }
+  bool getHasExplicitFunctionType() const { return hasExplicitFunctionType; }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
 // This is defined out of line to work around the fact that this depends on

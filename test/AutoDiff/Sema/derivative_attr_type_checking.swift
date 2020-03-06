@@ -3,6 +3,14 @@
 
 import _Differentiation
 
+// Dummy `Differentiable`-conforming type.
+struct DummyTangentVector: Differentiable & AdditiveArithmetic {
+  static var zero: Self { Self() }
+  static func + (_: Self, _: Self) -> Self { Self() }
+  static func - (_: Self, _: Self) -> Self { Self() }
+  typealias TangentVector = Self
+}
+
 // Test top-level functions.
 
 func id(_ x: Float) -> Float {
@@ -61,6 +69,22 @@ func vjpSubtractWrt1(x: Float, y: Float) -> (value: Float, pullback: (Float) -> 
   return (x - y, { $0 })
 }
 
+// Test invalid original function.
+
+// expected-error @+1 {{use of unresolved identifier 'nonexistentFunction'}}
+@derivative(of: nonexistentFunction)
+func vjpOriginalFunctionNotFound(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+// Test `@derivative` attribute where `value:` result does not conform to `Differentiable`.
+// Invalid original function should be diagnosed first.
+// expected-error @+1 {{use of unresolved identifier 'nonexistentFunction'}}
+@derivative(of: nonexistentFunction)
+func vjpOriginalFunctionNotFound2(_ x: Float) -> (value: Int, pullback: (Float) -> Float) {
+  fatalError()
+}
+
 // Test incorrect `@derivative` declaration type.
 
 // expected-note @+1 {{'incorrectDerivativeType' defined here}}
@@ -68,22 +92,22 @@ func incorrectDerivativeType(_ x: Float) -> Float {
   return x
 }
 
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple of type '(value: T..., pullback: (U.TangentVector) -> T.TangentVector...)' or '(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'}}
+// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple; first element must have label 'value:' and second element must have label 'pullback:' or 'differential:'}}
 @derivative(of: incorrectDerivativeType)
 func jvpResultIncorrect(x: Float) -> Float {
   return x
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple (first element must have label 'value:'}}
+// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple; first element must have label 'value:'}}
 @derivative(of: incorrectDerivativeType)
 func vjpResultIncorrectFirstLabel(x: Float) -> (Float, (Float) -> Float) {
   return (x, { $0 })
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')}}
+// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple; second element must have label 'pullback:' or 'differential:'}}
 @derivative(of: incorrectDerivativeType)
 func vjpResultIncorrectSecondLabel(x: Float) -> (value: Float, (Float) -> Float) {
   return (x, { $0 })
 }
-// expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple (first element type 'Int' must conform to 'Differentiable')}}
+// expected-error @+1 {{could not find function 'incorrectDerivativeType' with expected type '(Int) -> Int'}}
 @derivative(of: incorrectDerivativeType)
 func vjpResultNotDifferentiable(x: Int) -> (
   value: Int, pullback: (Int) -> Int
@@ -91,7 +115,7 @@ func vjpResultNotDifferentiable(x: Int) -> (
   return (x, { $0 })
 }
 // expected-error @+2 {{function result's 'pullback' type does not match 'incorrectDerivativeType'}}
-// expected-note @+3 {{'pullback' does not have expected type '(Float.TangentVector) -> (Float.TangentVector)' (aka '(Float) -> Float')}}
+// expected-note @+3 {{'pullback' does not have expected type '(Float.TangentVector) -> Float.TangentVector' (aka '(Float) -> Float')}}
 @derivative(of: incorrectDerivativeType)
 func vjpResultIncorrectPullbackType(x: Float) -> (
   value: Float, pullback: (Double) -> Double
@@ -165,17 +189,6 @@ func vjpFunctionParameter(_ fn: (Float) -> Float) -> (
   value: Float, pullback: (Float) -> Float
 ) {
   return (functionParameter(fn), { $0 })
-}
-
-func inoutParameter(_ x: inout Float) -> Float {
-  return x
-}
-// expected-error @+1 {{cannot differentiate with respect to 'inout' parameter ('inout Float'}}
-@derivative(of: inoutParameter)
-func vjpInoutParameter(x: inout Float) -> (
-  value: Float, pullback: (Float) -> Float
-) {
-  return (inoutParameter(&x), { $0 })
 }
 
 // Test static methods.
@@ -563,6 +576,174 @@ extension ProtocolRequirementDerivative {
   }
 }
 
+// Test `inout` parameters.
+
+func multipleSemanticResults(_ x: inout Float) -> Float {
+  return x
+}
+// expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
+@derivative(of: multipleSemanticResults)
+func vjpMultipleSemanticResults(x: inout Float) -> (
+  value: Float, pullback: (Float) -> Float
+) {
+  return (multipleSemanticResults(&x), { $0 })
+}
+
+struct InoutParameters: Differentiable {
+  typealias TangentVector = DummyTangentVector
+  mutating func move(along _: TangentVector) {}
+}
+
+extension InoutParameters {
+  // expected-note @+1 4 {{'staticMethod(_:rhs:)' defined here}}
+  static func staticMethod(_ lhs: inout Self, rhs: Self) {}
+
+  // Test wrt `inout` parameter.
+
+  @derivative(of: staticMethod)
+  static func vjpWrtInout(_ lhs: inout Self, _ rhs: Self) -> (
+    value: Void, pullback: (inout TangentVector) -> TangentVector
+  ) { fatalError() }
+
+  // expected-error @+1 {{function result's 'pullback' type does not match 'staticMethod(_:rhs:)'}}
+  @derivative(of: staticMethod)
+  static func vjpWrtInoutMismatch(_ lhs: inout Self, _ rhs: Self) -> (
+    // expected-note @+1 {{'pullback' does not have expected type '(inout InoutParameters.TangentVector) -> InoutParameters.TangentVector' (aka '(inout DummyTangentVector) -> DummyTangentVector')}}
+    value: Void, pullback: (TangentVector) -> TangentVector
+  ) { fatalError() }
+
+  @derivative(of: staticMethod)
+  static func jvpWrtInout(_ lhs: inout Self, _ rhs: Self) -> (
+    value: Void, differential: (inout TangentVector, TangentVector) -> Void
+  ) { fatalError() }
+
+  // expected-error @+1 {{function result's 'differential' type does not match 'staticMethod(_:rhs:)'}}
+  @derivative(of: staticMethod)
+  static func jvpWrtInoutMismatch(_ lhs: inout Self, _ rhs: Self) -> (
+    // expected-note @+1 {{'differential' does not have expected type '(inout InoutParameters.TangentVector, InoutParameters.TangentVector) -> ()' (aka '(inout DummyTangentVector, DummyTangentVector) -> ()')}}
+    value: Void, differential: (TangentVector, TangentVector) -> Void
+  ) { fatalError() }
+
+  // Test non-wrt `inout` parameter.
+
+  @derivative(of: staticMethod, wrt: rhs)
+  static func vjpNotWrtInout(_ lhs: inout Self, _ rhs: Self) -> (
+    value: Void, pullback: (TangentVector) -> TangentVector
+  ) { fatalError() }
+
+  // expected-error @+1 {{function result's 'pullback' type does not match 'staticMethod(_:rhs:)'}}
+  @derivative(of: staticMethod, wrt: rhs)
+  static func vjpNotWrtInoutMismatch(_ lhs: inout Self, _ rhs: Self) -> (
+    // expected-note @+1 {{'pullback' does not have expected type '(InoutParameters.TangentVector) -> InoutParameters.TangentVector' (aka '(DummyTangentVector) -> DummyTangentVector')}}
+    value: Void, pullback: (inout TangentVector) -> TangentVector
+  ) { fatalError() }
+
+  @derivative(of: staticMethod, wrt: rhs)
+  static func jvpNotWrtInout(_ lhs: inout Self, _ rhs: Self) -> (
+    value: Void, differential: (TangentVector) -> TangentVector
+  ) { fatalError() }
+
+  // expected-error @+1 {{function result's 'differential' type does not match 'staticMethod(_:rhs:)'}}
+  @derivative(of: staticMethod, wrt: rhs)
+  static func jvpNotWrtInout(_ lhs: inout Self, _ rhs: Self) -> (
+    // expected-note @+1 {{'differential' does not have expected type '(InoutParameters.TangentVector) -> InoutParameters.TangentVector' (aka '(DummyTangentVector) -> DummyTangentVector')}}
+    value: Void, differential: (inout TangentVector) -> TangentVector
+  ) { fatalError() }
+}
+
+extension InoutParameters {
+  // expected-note @+1 4 {{'mutatingMethod' defined here}}
+  mutating func mutatingMethod(_ other: Self) {}
+
+  // Test wrt `inout` `self` parameter.
+
+  @derivative(of: mutatingMethod)
+  mutating func vjpWrtInout(_ other: Self) -> (
+    value: Void, pullback: (inout TangentVector) -> TangentVector
+  ) { fatalError() }
+
+  // expected-error @+1 {{function result's 'pullback' type does not match 'mutatingMethod'}}
+  @derivative(of: mutatingMethod)
+  mutating func vjpWrtInoutMismatch(_ other: Self) -> (
+    // expected-note @+1 {{'pullback' does not have expected type '(inout InoutParameters.TangentVector) -> InoutParameters.TangentVector' (aka '(inout DummyTangentVector) -> DummyTangentVector')}}
+    value: Void, pullback: (TangentVector) -> TangentVector
+  ) { fatalError() }
+
+  @derivative(of: mutatingMethod)
+  mutating func jvpWrtInout(_ other: Self) -> (
+    value: Void, differential: (inout TangentVector, TangentVector) -> Void
+  ) { fatalError() }
+
+  // expected-error @+1 {{function result's 'differential' type does not match 'mutatingMethod'}}
+  @derivative(of: mutatingMethod)
+  mutating func jvpWrtInoutMismatch(_ other: Self) -> (
+    // expected-note @+1 {{'differential' does not have expected type '(inout InoutParameters.TangentVector, InoutParameters.TangentVector) -> ()' (aka '(inout DummyTangentVector, DummyTangentVector) -> ()')}}
+    value: Void, differential: (TangentVector, TangentVector) -> Void
+  ) { fatalError() }
+
+  // Test non-wrt `inout` `self` parameter.
+
+  @derivative(of: mutatingMethod, wrt: other)
+  mutating func vjpNotWrtInout(_ other: Self) -> (
+    value: Void, pullback: (TangentVector) -> TangentVector
+  ) { fatalError() }
+
+  // expected-error @+1 {{function result's 'pullback' type does not match 'mutatingMethod'}}
+  @derivative(of: mutatingMethod, wrt: other)
+  mutating func vjpNotWrtInoutMismatch(_ other: Self) -> (
+    // expected-note @+1 {{'pullback' does not have expected type '(InoutParameters.TangentVector) -> InoutParameters.TangentVector' (aka '(DummyTangentVector) -> DummyTangentVector')}}
+    value: Void, pullback: (inout TangentVector) -> TangentVector
+  ) { fatalError() }
+
+  @derivative(of: mutatingMethod, wrt: other)
+  mutating func jvpNotWrtInout(_ other: Self) -> (
+    value: Void, differential: (TangentVector) -> TangentVector
+  ) { fatalError() }
+
+  // expected-error @+1 {{function result's 'differential' type does not match 'mutatingMethod'}}
+  @derivative(of: mutatingMethod, wrt: other)
+  mutating func jvpNotWrtInoutMismatch(_ other: Self) -> (
+    // expected-note @+1 {{'differential' does not have expected type '(InoutParameters.TangentVector) -> InoutParameters.TangentVector' (aka '(DummyTangentVector) -> DummyTangentVector')}}
+    value: Void, differential: (TangentVector, TangentVector) -> Void
+  ) { fatalError() }
+}
+
+// Test multiple semantic results.
+
+extension InoutParameters {
+  func multipleSemanticResults(_ x: inout Float) -> Float { x }
+  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
+  @derivative(of: multipleSemanticResults)
+  func vjpMultipleSemanticResults(_ x: inout Float) -> (
+    value: Float, pullback: (inout Float) -> Void
+  ) { fatalError() }
+
+  func inoutVoid(_ x: Float, _ void: inout Void) -> Float {}
+  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
+  @derivative(of: inoutVoid)
+  func vjpInoutVoidParameter(_ x: Float, _ void: inout Void) -> (
+    value: Float, pullback: (inout Float) -> Void
+  ) { fatalError() }
+}
+
+// Test original/derivative function `inout` parameter mismatches.
+
+extension InoutParameters {
+  func inoutParameterMismatch(_ x: Float) {}
+  // expected-error @+1 {{could not find function 'inoutParameterMismatch' with expected type '(InoutParameters) -> (inout Float) -> Void'}}
+  @derivative(of: inoutParameterMismatch)
+  func vjpInoutParameterMismatch(_ x: inout Float) -> (value: Void, pullback: (inout Float) -> Void) {
+    fatalError()
+  }
+
+  func mutatingMismatch(_ x: Float) {}
+  // expected-error @+1 {{could not find function 'mutatingMismatch' with expected type '(inout InoutParameters) -> (Float) -> Void'}}
+  @derivative(of: mutatingMismatch)
+  mutating func vjpMutatingMismatch(_ x: Float) -> (value: Void, pullback: (inout Float) -> Void) {
+    fatalError()
+  }
+}
+
 // Test cross-file derivative registration. Currently unsupported.
 // TODO(TF-1021): Lift this restriction.
 
@@ -596,5 +777,31 @@ where Self: Differentiable, Self == Self.TangentVector {
     value: Self, pullback: (Self) -> (Self, Self)
   ) {
     return (x + y, { v in (v, v) })
+  }
+}
+
+// Test derivatives of default implementations.
+protocol HasADefaultImplementation {
+  func req(_ x: Float) -> Float
+}
+extension HasADefaultImplementation {
+  func req(_ x: Float) -> Float { x }
+  // ok
+  @derivative(of: req)
+  func req(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    (x, { 10 * $0 })
+  }
+}
+
+// Test default derivatives of requirements.
+protocol HasADefaultDerivative {
+  func req(_ x: Float) -> Float
+}
+extension HasADefaultDerivative {
+  // TODO(TF-982): Make this ok.
+  // expected-error @+1 {{could not find function 'req'}}
+  @derivative(of: req)
+  func req(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    (x, { 10 * $0 })
   }
 }

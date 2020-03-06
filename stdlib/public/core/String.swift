@@ -445,7 +445,7 @@ extension String {
   /// sequences and the second with an ill-formed sequence at the end.
   ///
   ///     let validUTF8: [UInt8] = [67, 97, 102, -61, -87, 0]
-  ///     let s = String(uninitializedCapacity: validUTF8.count,
+  ///     let s = String(unsafeUninitializedCapacity: validUTF8.count,
   ///                    initializingUTF8With: { ptr in
   ///         ptr.initializeFrom(validUTF8)
   ///         return validUTF8.count
@@ -453,14 +453,14 @@ extension String {
   ///     // Prints "Café"
   ///
   ///     let invalidUTF8: [UInt8] = [67, 97, 102, -61, 0]
-  ///     let s = String(uninitializedCapacity: invalidUTF8.count,
+  ///     let s = String(unsafeUninitializedCapacity: invalidUTF8.count,
   ///                    initializingUTF8With: { ptr in
   ///         ptr.initializeFrom(invalidUTF8)
   ///         return invalidUTF8.count
   ///     })
   ///     // Prints "Caf�"
   ///
-  ///     let s = String(uninitializedCapacity: invalidUTF8.count,
+  ///     let s = String(unsafeUninitializedCapacity: invalidUTF8.count,
   ///                    initializingUTF8With: { ptr in
   ///         ptr.initializeFrom(invalidUTF8)
   ///         return 0
@@ -475,6 +475,20 @@ extension String {
   ///     - Parameters:
   ///       - buffer: A buffer covering uninitialized memory with room for the
   ///           specified number of UTF-8 code units.
+  @inline(__always)
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public init(
+    unsafeUninitializedCapacity capacity: Int,
+    initializingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>
+    ) throws -> Int
+  ) rethrows {
+    self = try String(
+      uninitializedCapacity: capacity,
+      initializingUTF8With: initializer
+    )
+  }
+  
   @inline(__always)
   internal init(
     uninitializedCapacity capacity: Int,

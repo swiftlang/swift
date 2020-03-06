@@ -18,7 +18,7 @@ import Darwin
 import Glibc
 
 @inlinable // This is @inlinable as trivially computable.
-fileprivate func malloc_good_size(_ size: Int) -> Int {
+private func malloc_good_size(_ size: Int) -> Int {
     return size
 }
 

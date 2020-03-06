@@ -241,6 +241,267 @@ func outOfOrder(_ a : Int, b: Int) {
 }
 
 // -------------------------------------------
+// Positions around defaults and variadics 
+// -------------------------------------------
+
+struct PositionsAroundDefaultsAndVariadics {
+  // unlabeled defaulted around labeled parameter
+  func f1(_ a: Bool = false, _ b: Int = 0, c: String = "", _ d: [Int] = []) {}
+
+  func test_f1() {
+    f1(true, 2, c: "3", [4])
+
+    f1(true, c: "3", 2, [4]) // expected-error {{unnamed argument #4 must precede argument 'c'}}
+
+    f1(true, c: "3", [4], 2) // expected-error {{unnamed argument #4 must precede argument 'c'}}
+
+    f1(true, c: "3", 2) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+
+    f1(true, c: "3", [4])
+
+    f1(c: "3", 2, [4]) // expected-error {{unnamed argument #3 must precede argument 'c'}}
+
+    f1(c: "3", [4], 2) // expected-error {{unnamed argument #3 must precede argument 'c'}}
+    
+    f1(c: "3", 2) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+
+    f1(c: "3", [4])
+
+    f1(b: "2", [3]) // expected-error {{unnamed argument #2 must precede argument 'b'}}
+    
+    f1(b: "2", 1) // expected-error {{unnamed argument #2 must precede argument 'b'}}
+
+    f1(b: "2", [3], 1) // expected-error {{unnamed argument #2 must precede argument 'b'}}
+
+    f1(b: "2", 1, [3]) // expected-error {{unnamed argument #2 must precede argument 'b'}}
+  }
+
+  // unlabeled variadics before labeled parameter
+  func f2(_ a: Bool = false, _ b: Int..., c: String = "", _ d: [Int] = []) {}
+
+  func test_f2() {
+    f2(true, 21, 22, 23, c: "3", [4])
+
+    f2(true, "21", 22, 23, c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f2(true, 21, "22", 23, c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f2(true, 21, 22, "23", c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f2(true, 21, 22, c: "3", [4])
+    f2(true, 21, c: "3", [4])
+    f2(true, c: "3", [4])
+
+    f2(true, c: "3", 21) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+
+    f2(true, c: "3", 21, [4]) // expected-error {{unnamed argument #4 must precede argument 'c'}}
+    // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-2 {{remove brackets to pass array elements directly}}
+
+    f2(true, c: "3", [4], 21) // expected-error {{unnamed argument #4 must precede argument 'c'}}
+
+    f2(true, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-1 {{remove brackets to pass array elements directly}}
+
+    f2(true, 21, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-1 {{remove brackets to pass array elements directly}}
+    
+    f2(true, 21, 22, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-1 {{remove brackets to pass array elements directly}}
+
+    f2(21, 22, 23, c: "3", [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f2(21, 22, c: "3", [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f2(21, c: "3", [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f2(c: "3", [4])
+    f2(c: "3")
+    f2()
+
+    f2(c: "3", 21) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+    
+    f2(c: "3", 21, [4]) // expected-error {{incorrect argument labels in call (have 'c:_:_:', expected '_:_:c:_:')}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+    // expected-error@-2 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
+
+    f2(c: "3", [4], 21) // expected-error {{incorrect argument labels in call (have 'c:_:_:', expected '_:_:c:_:')}}
+    // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f2([4]) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
+
+    f2(21, [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-2 {{remove brackets to pass array elements directly}}
+
+    f2(21, 22, [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-2 {{remove brackets to pass array elements directly}}
+  }
+
+  // labeled variadics before labeled parameter
+  func f3(_ a: Bool = false, b: Int..., c: String = "", _ d: [Int] = []) {}
+
+  func test_f3() {
+    f3(true, b: 21, 22, 23, c: "3", [4])
+
+    f3(true, b: "21", 22, 23, c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+    
+    f3(true, b: 21, "22", 23, c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+    
+    f3(true, b: 21, 22, "23", c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f3(true, b: 21, 22, c: "3", [4])
+    f3(true, b: 21, c: "3", [4])
+    f3(true, c: "3", [4])
+
+    f3(true, c: "3", b: 21) // expected-error {{argument 'b' must precede argument 'c'}}
+
+    f3(true, c: "3", b: 21, [4]) // expected-error {{argument 'b' must precede argument 'c'}}
+    // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-2 {{remove brackets to pass array elements directly}}
+
+    f3(true, c: "3", [4], b: 21) // expected-error {{argument 'b' must precede argument 'c'}}
+
+    f3(true, b: 21, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-1 {{remove brackets to pass array elements directly}}
+
+    f3(b: 21, 22, 23, c: "3", [4])
+    f3(b: 21, 22, c: "3", [4])
+    f3(b: 21, c: "3", [4])
+    f3(c: "3", [4])
+
+    f3([4]) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
+    
+    f3()
+
+    f3(c: "3", b: 21) // expected-error {{incorrect argument labels in call (have 'c:b:', expected '_:b:c:_:')}}
+
+    f3(c: "3", b: 21, [4]) // expected-error {{incorrect argument labels in call (have 'c:b:_:', expected '_:b:c:_:')}}
+    // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-2 {{remove brackets to pass array elements directly}}
+
+    f3(c: "3", [4], b: 21) // expected-error {{incorrect argument labels in call (have 'c:_:b:', expected '_:b:c:_:')}}
+  }
+
+  // unlabeled variadics after labeled parameter
+  func f4(_ a: Bool = false, b: String = "", _ c: Int..., d: [Int] = []) {}
+
+  func test_f4() {
+    f4(true, b: "2", 31, 32, 33, d: [4])
+    
+    f4(true, b: "2", "31", 32, 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f4(true, b: "2", 31, "32", 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+    
+    f4(true, b: "2", 31, 32, "33", d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+    
+    f4(true, b: "2", 31, 32, d: [4])
+    f4(true, b: "2", 31, d: [4])
+    f4(true, b: "2", d: [4])
+
+    f4(true, 31, b: "2", d: [4]) // expected-error {{argument 'b' must precede unnamed argument #2}}
+
+    f4(true, b: "2", d: [4], 31) // expected-error {{unnamed argument #4 must precede argument 'd'}}
+
+    f4(true, b: "2", 31)
+    f4(true, b: "2")
+
+    f4(true)
+    f4(true, 31)
+    f4(true, 31, d: [4])
+    f4(true, 31, 32)
+    f4(true, 31, 32, d: [4])
+
+    f4(b: "2", 31, 32, 33, d: [4])
+
+    f4(b: "2", "31", 32, 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f4(b: "2", 31, "32", 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f4(b: "2", 31, 32, "33", d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f4(b: "2", 31, 32, d: [4])
+    f4(b: "2", 31, d: [4])
+    f4(b: "2", d: [4])
+
+    f4(31, b: "2", d: [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f4(b: "2", d: [4], 31) // expected-error {{unnamed argument #3 must precede argument 'b'}}
+
+    f4(b: "2", 31)
+    f4(b: "2", 31, 32)
+    f4(b: "2")
+
+    f4()
+    
+    f4(31) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f4(31, d: [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f4(31, 32) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f4(31, 32, d: [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  }
+
+  // labeled variadics after labeled parameter
+  func f5(_ a: Bool = false, b: String = "", c: Int..., d: [Int] = []) {}
+
+  func test_f5() {
+    f5(true, b: "2", c: 31, 32, 33, d: [4])
+    
+    f5(true, b: "2", c: "31", 32, 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f5(true, b: "2", c: 31, "32", 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f5(true, b: "2", c: 31, 32, "33", d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+    
+    f5(true, b: "2", c: 31, 32, d: [4])
+    f5(true, b: "2", c: 31, d: [4])
+    f5(true, b: "2", d: [4])
+
+    f5(true, c: 31, b: "2", d: [4]) // expected-error {{argument 'b' must precede argument 'c'}}
+
+    f5(true, b: "2", d: [4], 31) // expected-error {{incorrect argument labels in call (have '_:b:d:_:', expected '_:b:c:d:')}}
+
+    f5(true, b: "2", c: 31)
+    f5(true, b: "2")
+
+    f5(true)
+    f5(true, c: 31)
+    f5(true, c: 31, d: [4])
+    f5(true, c: 31, 32)
+    f5(true, c: 31, 32, d: [4])
+
+    f5(b: "2", c: 31, 32, 33, d: [4])
+    
+    f5(b: "2", c: "31", 32, 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f5(b: "2", c: 31, "32", 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f5(b: "2", c: 31, 32, "33", d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f5(b: "2", c: 31, 32, d: [4])
+    f5(b: "2", c: 31, d: [4])
+    f5(b: "2", d: [4])
+
+    f5(c: 31, b: "2", d: [4]) // expected-error {{incorrect argument labels in call (have 'c:b:d:', expected '_:b:c:d:')}}
+
+    f5(b: "2", d: [4], c: 31) // expected-error {{incorrect argument labels in call (have 'b:d:c:', expected '_:b:c:d:')}}
+
+    f5(b: "2", c: 31)
+    f5(b: "2", c: 31, 32)
+    f5(b: "2")
+
+    f5()
+    f5(c: 31)
+    f5(c: 31, d: [4])
+    f5(c: 31, 32)
+    f5(c: 31, 32, d: [4])
+  }
+}
+
+// -------------------------------------------
 // Missing arguments
 // -------------------------------------------
 // FIXME: Diagnostics could be improved with all missing names, or

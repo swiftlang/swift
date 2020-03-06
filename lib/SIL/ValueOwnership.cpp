@@ -148,6 +148,7 @@ CONSTANT_OWNERSHIP_INST(None, WitnessMethod)
 CONSTANT_OWNERSHIP_INST(None, StoreBorrow)
 CONSTANT_OWNERSHIP_INST(None, ConvertEscapeToNoEscape)
 CONSTANT_OWNERSHIP_INST(Unowned, InitBlockStorageHeader)
+CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
 // TODO: It would be great to get rid of these.
 CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
@@ -318,7 +319,7 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
   // Otherwise, map our results to their ownership kinds and then merge them!
   auto resultOwnershipKinds =
       makeTransformRange(results, [&](const SILResultInfo &info) {
-        return info.getOwnershipKind(*f);
+        return info.getOwnershipKind(*f, ai->getSubstCalleeType());
       });
   auto mergedOwnershipKind = ValueOwnershipKind::merge(resultOwnershipKinds);
   if (!mergedOwnershipKind) {
@@ -547,7 +548,6 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
       BuiltinInst *BI, StringRef Attr) { \
     llvm_unreachable("builtin should have been lowered in SILGen"); \
   }
-
 #include "swift/AST/Builtins.def"
 
 ValueOwnershipKind

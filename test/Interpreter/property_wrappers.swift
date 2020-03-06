@@ -18,8 +18,8 @@ struct Observable<Value: Equatable> {
   private var stored: Value
 
   
-  init(initialValue: Value) {
-    self.stored = initialValue
+  init(wrappedValue: Value) {
+    self.stored = wrappedValue
   }
 
   var wrappedValue: Value {

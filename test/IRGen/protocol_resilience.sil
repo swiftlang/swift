@@ -135,7 +135,7 @@ protocol InternalProtocol {
 
 // CHECK-SAME: }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
@@ -146,7 +146,7 @@ bb0(%0 : $*Self):
   return %result : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultD(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultD(%swift.opaque* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @defaultD : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
@@ -187,7 +187,7 @@ bb0(%0 : $*Self):
 }
 
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultE(%swift.type* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultE(%swift.type* swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @defaultE : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
@@ -228,7 +228,7 @@ bb0(%0 : $@thick Self.Type):
 }
 
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultF(%swift.type* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultF(%swift.type* swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @defaultF : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
@@ -267,7 +267,7 @@ struct ConformingStruct : ResilientProtocol {
   static func defaultF()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @noDefaultA(%T19protocol_resilience16ConformingStructV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @noDefaultA(%T19protocol_resilience16ConformingStructV* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @noDefaultA : $@convention(witness_method: ResilientProtocol) (@in_guaranteed ConformingStruct) -> () {
@@ -277,7 +277,7 @@ bb0(%0 : $*ConformingStruct):
   // concrete Self type.
 
   // CHECK-NEXT: [[SELF:%.*]] = bitcast %T19protocol_resilience16ConformingStructV* %0 to %swift.opaque*
-  // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself [[SELF]], %swift.type* bitcast ({{i32|i64}}* {{.*}}) to %swift.type*), i8** %SelfWitnessTable)
+  // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself [[SELF]], %swift.type* %Self, i8** %SelfWitnessTable)
   %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
   %ignore1 = apply %fn1<ConformingStruct>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
@@ -287,7 +287,7 @@ bb0(%0 : $*ConformingStruct):
 }
 
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @noDefaultB(%T19protocol_resilience16ConformingStructV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @noDefaultB(%T19protocol_resilience16ConformingStructV* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @noDefaultB : $@convention(witness_method: ResilientProtocol) (@in_guaranteed ConformingStruct) -> () {
@@ -325,14 +325,14 @@ sil_witness_table ConformingStruct : ResilientProtocol module protocol_resilienc
 // Make sure resilient conformances are accessed with an accessor function
 //
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doSomething(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.OtherResilientProtocol)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doSomething(%swift.opaque* noalias nocapture %0, %swift.type* %T, i8** %T.OtherResilientProtocol)
 sil @doSomething : $@convention(thin) <T : OtherResilientProtocol> (@in T) -> () {
 bb0(%0 : $*T):
   %result = tuple ()
   return %result : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingType(%T19protocol_resilience23ResilientConformingTypeV* noalias nocapture)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingType(%T19protocol_resilience23ResilientConformingTypeV* noalias nocapture %0)
 sil @passConformingType : $@convention(thin) (@in ResilientConformingType) -> () {
 bb0(%0 : $*ResilientConformingType):
 
@@ -383,14 +383,14 @@ sil_witness_table AnotherConformingStruct : RefinesOtherResilientProtocol module
 sil_witness_table hidden AnotherConformingStruct: OtherResilientProtocol module protocol_resilience {
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doSomethingRefined(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.RefinesOtherResilientProtocol)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doSomethingRefined(%swift.opaque* noalias nocapture %0, %swift.type* %T, i8** %T.RefinesOtherResilientProtocol)
 sil @doSomethingRefined : $@convention(thin) <T : RefinesOtherResilientProtocol> (@in T) -> () {
 bb0(%0 : $*T):
   %result = tuple ()
   return %result : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingTypeRefined(%T19protocol_resilience23AnotherConformingStructV* noalias nocapture)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingTypeRefined(%T19protocol_resilience23AnotherConformingStructV* noalias nocapture %0)
 sil @passConformingTypeRefined : $@convention(thin) (@in AnotherConformingStruct) -> () {
 bb0(%0 : $*AnotherConformingStruct):
 
@@ -427,14 +427,14 @@ sil_witness_table ConformsWithResilientAssoc : HasResilientAssoc module protocol
   associated_type T: ResilientConformingType
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doSomethingAssoc(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.HasResilientAssoc)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doSomethingAssoc(%swift.opaque* noalias nocapture %0, %swift.type* %T, i8** %T.HasResilientAssoc)
 sil @doSomethingAssoc : $@convention(thin) <T : HasResilientAssoc> (@in T) -> () {
 bb0(%0 : $*T):
   %result = tuple ()
   return %result : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingTypeAssoc(%T19protocol_resilience26ConformsWithResilientAssocV* noalias nocapture)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingTypeAssoc(%T19protocol_resilience26ConformsWithResilientAssocV* noalias nocapture %0)
 sil @passConformingTypeAssoc : $@convention(thin) (@in ConformsWithResilientAssoc) -> () {
 bb0(%0 : $*ConformsWithResilientAssoc):
 
