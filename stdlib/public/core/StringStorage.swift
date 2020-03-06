@@ -256,7 +256,6 @@ final internal class __StringStorage
 
   @inline(__always)
   fileprivate var _capacityAndFlags: _CapacityAndFlags {
-    // TODO: ...
     _CapacityAndFlags(realCapacity: _realCapacity, flags: _capacityFlags)
   }
 #else
@@ -289,7 +288,6 @@ final internal class __StringStorage
 
 // Creation
 extension __StringStorage {
-  // TODO: Test effect of asking for exactly 62, 63, 64, 65 code units...
   @_effects(releasenone)
   private static func create(
     codeUnitCapacity capacity: Int, countAndFlags: _CountAndFlags
@@ -330,17 +328,6 @@ extension __StringStorage {
     // initialized so we can't verify e.g. ASCII-ness
     storage._invariantCheck(initialized: false)
     return storage
-  }
-
-  // DO NOT PUSH: For stats gathering only...
-  internal static func create(
-    count: Int, codeUnitCapacity capacity: Int
-  ) -> __StringStorage {
-    __StringStorage.create(
-      codeUnitCapacity: capacity,
-      countAndFlags: _CountAndFlags(mortalCount: count, isASCII: false))
-    // NOTE: content is garbage and not necessarily validy endcoded. Please
-    // delete this entry point...
   }
 
   // The caller is expected to check UTF8 validity and ASCII-ness and update
@@ -447,7 +434,6 @@ extension __StringStorage {
 
   // @opaque
   fileprivate var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
-    // TODO: better message
     precondition(
       hasBreadcrumbs, "Internal error: string breadcrumbs not present")
     return UnsafeMutablePointer(_realCapacityEnd)
