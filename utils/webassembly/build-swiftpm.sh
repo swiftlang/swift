@@ -42,12 +42,11 @@ install_swiftpm() {
 
   if [[ "$(uname)" == "Linux" ]]; then
     install_runtime_file "${bin_path}/libPackageDescription.so"
-    install_runtime_file "${bin_path}/PackageDescription.swiftmodule"
-    install_runtime_file "${bin_path}/PackageDescription.swiftdoc"
   else
     install_runtime_file "${bin_path}/libPackageDescription.dylib"
-    install_runtime_file "${bin_path}/PackageDescription.swiftinterface"
   fi
+  install_runtime_file "${bin_path}/PackageDescription.swiftmodule"
+  install_runtime_file "${bin_path}/PackageDescription.swiftdoc"
 }
 
 build_swiftpm

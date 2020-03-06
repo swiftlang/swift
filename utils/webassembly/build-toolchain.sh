@@ -49,7 +49,8 @@ $BUILD_SCRIPT \
   "$@"
 
 
-if [ ! -e $SOURCE_PATH/swift-nightly-toolchain ]; then
+NIGHTLY_TOOLCHAIN=$SOURCE_PATH/swift-nightly-toolchain
+if [ ! -e $NIGHTLY_TOOLCHAIN ]; then
   $UTILS_PATH/install-nightly-toolchain.sh
 fi
 
@@ -63,7 +64,12 @@ cp -r $WASI_SDK_PATH/lib/clang usr/lib
 cp $WASI_SDK_PATH/bin/* usr/bin
 cp -r $WASI_SDK_PATH/share/wasi-sysroot usr/share
 
+# Build SwiftPM and install it into toolchain
 $UTILS_PATH/build-swiftpm.sh $TMP_DIR/$TOOLCHAIN_NAME
+
+# Copy nightly-toolchain's host environment stdlib into toolchain
+
+cp -r $NIGHTLY_TOOLCHAIN/usr/lib/swift/macosx $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift
 
 cd $TMP_DIR
 tar cfz $PACKAGE_ARTIFACT $TOOLCHAIN_NAME
