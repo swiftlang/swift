@@ -57,6 +57,15 @@ private:
   /// RemainingArgsForCallee, at least between calls.
   bool EmittedCall;
 
+  /// Indicates that the emitted call should have a 
+  /// "must tail" attribute. 
+  ///
+  /// NOTE: Calls with this attribute must be in the same block as a
+  /// function exit with no side-effect-having instructions 
+  /// between the call and the return instruction. Calls that violate
+  /// this will hit an llvm assertion.
+  bool IsMustTail = false;
+
   void setFromCallee();
   void emitToUnmappedMemory(Address addr);
   void emitToUnmappedExplosion(Explosion &out);
@@ -88,6 +97,8 @@ public:
   void emitToMemory(Address addr, const LoadableTypeInfo &substResultTI,
                     bool isOutlined);
   void emitToExplosion(Explosion &out, bool isOutlined);
+
+  void setMustTail() { IsMustTail = true; }
 
   TemporarySet claimTemporaries() {
     // Move the actual temporary set out.
