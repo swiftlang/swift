@@ -191,9 +191,7 @@ reflect(enum: Optional<TwoCaseNoPayloadEnum>.some(.other))
 
 // CHECK-64: Enum value:
 // CHECK-64: (enum_value name=some index=0
-// CHECK-64:   (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1
-// CHECK-64:     (case name=preferred index=0)
-// CHECK-64:     (case name=other index=1))
+// CHECK-64:   (enum reflect_Enum_TwoCaseNoPayload.TwoCaseNoPayloadEnum)
 // CHECK-64: )
 
 // CHECK-32: Reflecting an enum.
@@ -212,9 +210,7 @@ reflect(enum: Optional<TwoCaseNoPayloadEnum>.some(.other))
 
 // CHECK-32: Enum value:
 // CHECK-32: (enum_value name=some index=0
-// CHECK-32:   (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1
-// CHECK-32:     (case name=preferred index=0)
-// CHECK-32:     (case name=other index=1))
+// CHECK-32:   (enum reflect_Enum_TwoCaseNoPayload.TwoCaseNoPayloadEnum)
 // CHECK-32: )
 
 reflect(enum: Optional<TwoCaseNoPayloadEnum>.none)

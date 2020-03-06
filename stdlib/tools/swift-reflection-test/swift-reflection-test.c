@@ -564,7 +564,7 @@ int reflectEnum(SwiftReflectionContextRef RC,
 
   int CaseIndex;
   if (!swift_reflection_projectEnumValue(RC, EnumInstance, EnumTypeRef, &CaseIndex)) {
-    printf("swift_reflection_projectEnumValue failed.\n");
+    printf("swift_reflection_projectEnumValue failed.\n\n");
     PipeMemoryReader_sendDoneMessage(&Pipe);
     return 1; // <<< Test cases also verify failures, so this must "succeed"
   }
@@ -584,7 +584,7 @@ int reflectEnum(SwiftReflectionContextRef RC,
   } else {
     printf("(enum_value name=%s index=%llu\n",
            CaseName, (unsigned long long)CaseIndex);
-    swift_reflection_dumpInfoForTypeRef(RC, PayloadTypeRef);
+    swift_reflection_dumpTypeRef(PayloadTypeRef);
     printf(")\n");
   }
   printf("\n");
@@ -637,7 +637,7 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
 
     int CaseIndex;
     if (!swift_reflection_projectEnumValue(RC, EnumInstance, EnumTypeRef, &CaseIndex)) {
-      printf("swift_reflection_projectEnumValue failed.\n");
+      printf("swift_reflection_projectEnumValue failed.\n\n");
       PipeMemoryReader_sendDoneMessage(&Pipe);
       return 1; // <<< Test cases rely on detecting this, so must "succeed"
     }

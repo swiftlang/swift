@@ -1507,18 +1507,9 @@ reflect(enum: ManyCasesOneIntPayload.payload(77))
 // CHECK32-NEXT:   (case name=otherC index=3))
 
 // CHECKALL: Enum value:
-// CHECK64-NEXT: (enum_value name=payload index=0
-// CHECK64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK64-NEXT:       (field name=_value offset=0
-// CHECK64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))
-// CHECK64-NEXT: )
-
-// CHECK32-NEXT: (enum_value name=payload index=0
-// CHECK32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK32-NEXT:       (field name=_value offset=0
-// CHECK32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))
-// CHECK32-NEXT: )
-
+// CHECKALL-NEXT: (enum_value name=payload index=0
+// CHECKALL-NEXT: (struct Swift.Int)
+// CHECKALL-NEXT: )
 
 reflect(enum: ManyCasesOneStringPayload.payload("hello, world"))
 
@@ -1584,17 +1575,7 @@ reflect(enum: ManyCasesOneStringPayload.payload("hello, world"))
 
 // CHECKALL: Enum value:
 // CHECK64-NEXT: (enum_value name=payload index=0
-// CHECK64-NEXT: (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK64-NEXT:   (field name=_guts offset=0
-// CHECK64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK64-NEXT:       (field name=_object offset=0
-// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK64-NEXT:           (field name=_countAndFlagsBits offset=0
-// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK64-NEXT:               (field name=_value offset=0
-// CHECK64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK64-NEXT:           (field name=_object offset=8
-// CHECK64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))))
+// CHECK64-NEXT: (struct Swift.String)
 // CHECK64-NEXT: )
 
 // XXX Note: 32-bit String contains a multi_payload_enum which projectEnumValue cannot yet handle.

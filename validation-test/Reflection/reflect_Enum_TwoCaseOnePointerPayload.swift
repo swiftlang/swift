@@ -141,66 +141,66 @@ reflect(object: ClassWithTwoCaseOnePointerPayloadEnum())
 reflect(enum: TwoCaseOnePointerPayloadEnum.valid(Marker()))
 
 // CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_Enum_TwoCaseOnePointerPayload.TwoCaseOnePointerPayloadEnum)
+// CHECK-64-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK-64-NEXT: Type reference:
+// CHECK-64-NEXT: (enum reflect_Enum_TwoCaseOnePointerPayload.TwoCaseOnePointerPayloadEnum)
 
 // CHECK-64: Type info:
-// CHECK-64: (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
-// CHECK-64:   (case name=valid index=0 offset=0
-// CHECK-64:     (reference kind=strong refcounting=native))
-// CHECK-64:   (case name=invalid index=1))
+// CHECK-64-NEXT: (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
+// CHECK-64-NEXT:   (case name=valid index=0 offset=0
+// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
+// CHECK-64-NEXT:   (case name=invalid index=1))
 
 // CHECK-64: Enum value:
-// CHECK-64: (enum_value name=valid index=0
-// CHECK-64:   (reference kind=strong refcounting=native)
-// CHECK-64: )
+// CHECK-64-NEXT: (enum_value name=valid index=0
+// CHECK-64-NEXT:   (class reflect_Enum_TwoCaseOnePointerPayload.Marker)
+// CHECK-64-NEXT: )
 
 // CHECK-32: Reflecting an enum.
-// CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-32: Type reference:
-// CHECK-32: (enum reflect_Enum_TwoCaseOnePointerPayload.TwoCaseOnePointerPayloadEnum)
+// CHECK-32-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK-32-NEXT: Type reference:
+// CHECK-32-NEXT: (enum reflect_Enum_TwoCaseOnePointerPayload.TwoCaseOnePointerPayloadEnum)
 
 // CHECK-32: Type info:
-// CHECK-32: (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
-// CHECK-32:   (case name=valid index=0 offset=0
-// CHECK-32:     (reference kind=strong refcounting=native))
-// CHECK-32:   (case name=invalid index=1))
+// CHECK-32-NEXT: (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32-NEXT:   (case name=valid index=0 offset=0
+// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
+// CHECK-32-NEXT:   (case name=invalid index=1))
 
 // CHECK-32: Enum value:
-// CHECK-32: (enum_value name=valid index=0
-// CHECK-32:   (reference kind=strong refcounting=native)
-// CHECK-32: )
+// CHECK-32-NEXT: (enum_value name=valid index=0
+// CHECK-32-NEXT:   (class reflect_Enum_TwoCaseOnePointerPayload.Marker)
+// CHECK-32-NEXT: )
 
 reflect(enum: TwoCaseOnePointerPayloadEnum.invalid)
 
 // CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_Enum_TwoCaseOnePointerPayload.TwoCaseOnePointerPayloadEnum)
+// CHECK-64-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK-64-NEXT: Type reference:
+// CHECK-64-NEXT: (enum reflect_Enum_TwoCaseOnePointerPayload.TwoCaseOnePointerPayloadEnum)
 
 // CHECK-64: Type info:
-// CHECK-64: (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
-// CHECK-64:   (case name=valid index=0 offset=0
-// CHECK-64:     (reference kind=strong refcounting=native))
-// CHECK-64:   (case name=invalid index=1))
+// CHECK-64-NEXT: (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
+// CHECK-64-NEXT:   (case name=valid index=0 offset=0
+// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
+// CHECK-64-NEXT:   (case name=invalid index=1))
 
 // CHECK-64: Enum value:
-// CHECK-64: (enum_value name=invalid index=1)
+// CHECK-64-NEXT: (enum_value name=invalid index=1)
 
 // CHECK-32: Reflecting an enum.
-// CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-32: Type reference:
-// CHECK-32: (enum reflect_Enum_TwoCaseOnePointerPayload.TwoCaseOnePointerPayloadEnum)
+// CHECK-32-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK-32-NEXT: Type reference:
+// CHECK-32-NEXT: (enum reflect_Enum_TwoCaseOnePointerPayload.TwoCaseOnePointerPayloadEnum)
 
 // CHECK-32: Type info:
-// CHECK-32: (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
-// CHECK-32:   (case name=valid index=0 offset=0
-// CHECK-32:     (reference kind=strong refcounting=native))
-// CHECK-32:   (case name=invalid index=1))
+// CHECK-32-NEXT: (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32-NEXT:   (case name=valid index=0 offset=0
+// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
+// CHECK-32-NEXT:   (case name=invalid index=1))
 
 // CHECK-32: Enum value:
-// CHECK-32: (enum_value name=invalid index=1)
+// CHECK-32-NEXT: (enum_value name=invalid index=1)
 
 doneReflecting()
 

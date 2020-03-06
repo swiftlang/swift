@@ -20,12 +20,12 @@ reflect(enum: OneCaseNoPayload.only)
 // CHECK-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-NEXT: Type reference:
 // CHECK-NEXT: (enum reflect_Enum_value.OneCaseNoPayload)
-// CHECK-EMPTY:
-// CHECK-NEXT: Type info:
+
+// CHECK: Type info:
 // CHECK-NEXT: (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-NEXT:   (case name=only index=0))
-// CHECK-EMPTY:
-// CHECK-NEXT: Enum value:
+
+// CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=only index=0)
 
 reflect(enumValue: Optional<OneCaseNoPayload>.some(.only))
@@ -131,8 +131,8 @@ reflect(enum: OneSwiftClassPayload.otherC)
 // CHECK-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-NEXT: Type reference:
 // CHECK-NEXT: (enum reflect_Enum_value.OneSwiftClassPayload)
-// CHECK-EMPTY:
-// CHECK-NEXT: Type info:
+
+// CHECK: Type info:
 // X64-NEXT: (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483642 bitwise_takable=1
 // X32-NEXT: (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4091 bitwise_takable=1
 // CHECK-NEXT:   (case name=payloadA index=0 offset=0
@@ -142,8 +142,8 @@ reflect(enum: OneSwiftClassPayload.otherC)
 // CHECK-NEXT:   (case name=otherC index=3)
 // CHECK-NEXT:   (case name=otherD index=4)
 // CHECK-NEXT:   (case name=otherE index=5))
-// CHECK-EMPTY:
-// CHECK-NEXT: Enum value:
+
+// CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=otherC index=3)
 
 reflect(enumValue: Optional<OneSwiftClassPayload>.none)
