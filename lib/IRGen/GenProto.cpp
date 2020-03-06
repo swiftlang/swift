@@ -213,19 +213,19 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
     unsigned selfIndex = ~0U;
     auto params = fnType->getParameters();
 
-    // Consider 'self' first.
-    if (fnType->hasSelfParam()) {
-      selfIndex = params.size() - 1;
-      considerParameter(params[selfIndex], selfIndex, true);
-    }
-
-      if (considerParameterSources) {
-        // Now consider the rest of the parameters.
-        for (auto index : indices(params)) {
-          if (index != selfIndex)
-            considerParameter(params[index], index, false);
-        }
+    if (considerParameterSources) {
+      // Consider 'self' first.
+      if (fnType->hasSelfParam()) {
+        selfIndex = params.size() - 1;
+        considerParameter(params[selfIndex], selfIndex, true);
       }
+
+      // Now consider the rest of the parameters.
+      for (auto index : indices(params)) {
+        if (index != selfIndex)
+          considerParameter(params[index], index, false);
+      }
+    }
   }
 }
 
