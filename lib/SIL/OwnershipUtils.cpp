@@ -13,6 +13,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -395,6 +396,51 @@ bool BorrowScopeIntroducingValue::visitLocalScopeTransitiveEndingUses(
   }
 
   return foundError;
+}
+
+bool BorrowScopeIntroducingValue::visitInteriorPointerOperands(
+    function_ref<void(const InteriorPointerOperand &)> func) const {
+  SmallVector<Operand *, 32> worklist(value->getUses());
+  while (!worklist.empty()) {
+    auto *op = worklist.pop_back_val();
+
+    if (auto interiorPointer = InteriorPointerOperand::get(op)) {
+      func(*interiorPointer);
+      continue;
+    }
+
+    auto *user = op->getUser();
+    if (isa<BeginBorrowInst>(user) || isa<DebugValueInst>(user) ||
+        isa<SuperMethodInst>(user) || isa<ClassMethodInst>(user) ||
+        isa<CopyValueInst>(user) || isa<EndBorrowInst>(user) ||
+        isa<ApplyInst>(user) || isa<StoreBorrowInst>(user) ||
+        isa<StoreInst>(user) || isa<PartialApplyInst>(user) ||
+        isa<UnmanagedRetainValueInst>(user) ||
+        isa<UnmanagedReleaseValueInst>(user) ||
+        isa<UnmanagedAutoreleaseValueInst>(user)) {
+      continue;
+    }
+
+    // These are interior pointers that have not had support yet added for them.
+    if (isa<OpenExistentialBoxInst>(user) ||
+        isa<ProjectExistentialBoxInst>(user)) {
+      continue;
+    }
+
+    // Look through object.
+    if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
+      if (Projection::isObjectProjection(svi)) {
+        for (SILValue result : user->getResults()) {
+          llvm::copy(result->getUses(), std::back_inserter(worklist));
+        }
+        continue;
+      }
+    }
+
+    return false;
+  }
+
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
