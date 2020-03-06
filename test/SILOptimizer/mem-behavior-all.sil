@@ -19,9 +19,9 @@ class Parent {
 // CHECK-LABEL: @testLetSideEffects
 //
 // The store does not affect the let-load (ref_element_addr).
-// CHECK: PAIR #35.
-// CHECK-NEXT:    %7 = begin_access [modify] [static] %1 : $*Builtin.Int32
-// CHECK-NEXT:    %11 = ref_element_addr %10 : $C, #C.prop
+// CHECK: PAIR #25.
+// CHECK-NEXT:    %6 = begin_access [modify] [static] %1 : $*Builtin.Int32
+// CHECK-NEXT:    %10 = ref_element_addr %9 : $C, #C.prop
 // CHECK-NEXT:  r=0,w=0,se=0
 //
 // Any unknown instructions with side effects does affect the let-load.
@@ -38,7 +38,6 @@ bb0(%0 : @owned $Parent, %1 : $*Builtin.Int32):
   %borrow1 = begin_borrow %0 : $Parent
   %childAdr = ref_element_addr %borrow1 : $Parent, #Parent.child
   %child = load_borrow %childAdr : $*C
-  end_borrow %borrow1 : $Parent
 
   %three = integer_literal $Builtin.Int32, 3
   %access = begin_access [modify] [static] %1 : $*Builtin.Int32
@@ -50,6 +49,7 @@ bb0(%0 : @owned $Parent, %1 : $*Builtin.Int32):
   %val = load [trivial] %propAdr : $*Builtin.Int32
   end_borrow %borrow2 : $C
   end_borrow %child : $C
+  end_borrow %borrow1 : $Parent
   destroy_value %0 : $Parent
   return %val : $Builtin.Int32
 }

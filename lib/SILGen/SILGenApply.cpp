@@ -4892,14 +4892,11 @@ StringRef SILGenFunction::getMagicFilePathString(SourceLoc loc) {
 std::string SILGenFunction::getMagicFileString(SourceLoc loc) {
   auto path = getMagicFilePathString(loc);
 
-  if (!getASTContext().LangOpts.EnableConcisePoundFile)
-    return path.str();
+  auto result = SGM.MagicFileStringsByFilePath.find(path);
+  if (result != SGM.MagicFileStringsByFilePath.end())
+    return std::get<0>(result->second);
 
-  auto value = llvm::sys::path::filename(path).str();
-  value += " (";
-  value += getModule().getSwiftModule()->getNameStr();
-  value += ")";
-  return value;
+  return path.str();
 }
 
 /// Emit an application of the given allocating initializer.

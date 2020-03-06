@@ -485,8 +485,8 @@ extension __StringStorage {
 
     // Check that capacity end matches our notion of unused storage, and also
     // checks that breadcrumbs were dutifully aligned.
-    _internalInvariant(UnsafeMutablePointer<UInt8>(_realCapacityEnd)
-      == unusedStorage.baseAddress! + (unusedStorage.count + 1))
+    // _internalInvariant(UnsafeMutablePointer<UInt8>(_realCapacityEnd)
+    //   == unusedStorage.baseAddress! + (unusedStorage.count + 1))
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
