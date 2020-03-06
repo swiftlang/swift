@@ -5175,11 +5175,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       // collection type couldn't be determined without unification to
       // `Any` and `+` failing for all numeric overloads is just a consequence.
       if (typeVar && type->isAny()) {
-        auto *GP = typeVar->getImpl().getGenericParameter();
-        if (auto *GPD = GP->getDecl()) {
-          auto *DC = GPD->getDeclContext();
-          if (DC->isTypeContext() && DC->getSelfInterfaceType()->isEqual(GP))
-            return SolutionKind::Error;
+        if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+          if (auto *GPD = GP->getDecl()) {
+            auto *DC = GPD->getDeclContext();
+            if (DC->isTypeContext() && DC->getSelfInterfaceType()->isEqual(GP))
+              return SolutionKind::Error;
+          }
         }
       }
 
