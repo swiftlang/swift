@@ -383,6 +383,20 @@ static SILValue reapplyFunctionConversion(
     auto silTy = SILType::getPrimitiveObjectType(thickTy);
     return builder.createThinToThickFunction(loc, innerNewFunc, silTy);
   }
+  // convert_function
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(oldConvertedFunc)) {
+    auto innerNewFunc = reapplyFunctionConversion(
+        context, newFunc, oldFunc, cfi->getOperand(), builder, loc,
+        newBuffersToDealloc, parameterIndices, newFuncGenSig);
+#if 0 // todo: we prolly need this, need to add all argument for computing derivative type
+    auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
+    auto thickTy = operandFnTy->getWithRepresentation(
+        SILFunctionTypeRepresentation::Thick);
+    auto silTy = SILType::getPrimitiveObjectType(thickTy);
+    return builder.createThinToThickFunction(loc, innerNewFunc, silTy);
+#endif
+    return innerNewFunc;
+  }
   // partial_apply
   if (auto *pai = dyn_cast<PartialApplyInst>(oldConvertedFunc)) {
     SmallVector<SILValue, 8> newArgs;

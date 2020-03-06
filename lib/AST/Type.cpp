@@ -5055,6 +5055,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
   auto *derivativeFunctionType =
       makeFunctionType(curryLevels.back()->getParams(), retTy,
                        curryLevels.size() == 1 ? derivativeGenSig : nullptr,
+                       // nullptr,
                        curryLevels.back()->getExtInfo());
 
   // Wrap the derivative function type in additional curry levels.
@@ -5066,6 +5067,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
     derivativeFunctionType = makeFunctionType(
         curryLevel->getParams(), derivativeFunctionType,
         i == curryLevelsWithoutLast.size() - 1 ? derivativeGenSig : nullptr,
+        // nullptr,
         curryLevel->getExtInfo());
   }
 

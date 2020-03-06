@@ -1151,8 +1151,8 @@ static CanSILFunctionType getPullbackType(
   SmallVector<SILResultInfo, 2> originalResults = getSemanticResults(originalFnTy, parameterIndices, inoutParam, isWrtInoutParameter);
 
   // Given a type, returns its formal SIL parameter info.
-  auto getTangentParameterInfoForOriginalResult =
-      [&](CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
+  auto getTangentParameterConventionForOriginalResult =
+      [&](CanType tanType, ResultConvention origResConv) -> ParameterConvention {
     llvm::errs() << "RESULT TAN TYPE: " << tanType << "\n";
     tanType->dump();
     llvm::dbgs() << "about to make a pattern\n";
@@ -1180,12 +1180,12 @@ static CanSILFunctionType getPullbackType(
       conv = ParameterConvention::Indirect_In_Guaranteed;
       break;
     }
-    return {tanType, conv};
+    return conv;
   };
 
   // Given a type, returns its formal SIL result info.
-  auto getTangentResultInfoForOriginalParameter =
-      [&](CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
+  auto getTangentResultConventionForOriginalParameter =
+      [&](CanType tanType, ParameterConvention origParamConv) -> ResultConvention {
     llvm::errs() << "PARAM TAN TYPE: " << tanType << "\n";
     AbstractionPattern pattern(derivativeFnGenSig, tanType);
     auto &tl =
@@ -1210,10 +1210,8 @@ static CanSILFunctionType getPullbackType(
       conv = ResultConvention::Indirect;
       break;
     }
-    return {tanType, conv};
+    return conv;
   };
-
-
 
   SmallVector<SILParameterInfo, 1> pullbackParams;
   if (inoutParam) {
@@ -1244,16 +1242,16 @@ static CanSILFunctionType getPullbackType(
         lookupConformance);
     assert(resultTan && "Result type does not have a tangent space?");
     auto resultTanType = resultTan->getCanonicalType();
+    auto paramTanConvention = getTangentParameterConventionForOriginalResult(resultTanType, origRes.getConvention());
     if (!resultTanType->hasArchetype() && !resultTanType->hasTypeParameter()) {
-    auto resultTanType = resultTan->getCanonicalType();
-      pullbackParams.push_back(getTangentParameterInfoForOriginalResult(
-          resultTanType, origRes.getConvention()));
+      auto resultTanType = resultTan->getCanonicalType();
+      pullbackParams.push_back({resultTanType, paramTanConvention});
     } else {
       auto gpIndex = substGenericParams.size();
       auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
       substGenericParams.push_back(gpType);
       substReplacements.push_back(resultTanType);
-      pullbackParams.push_back({gpType, ParameterConvention::Indirect_In_Guaranteed});
+      pullbackParams.push_back({gpType, paramTanConvention});
     }
   }
   SmallVector<SILResultInfo, 8> pullbackResults;
@@ -1265,16 +1263,16 @@ static CanSILFunctionType getPullbackType(
             lookupConformance);
     assert(paramTan && "Parameter type does not have a tangent space?");
     auto paramTanType = paramTan->getCanonicalType();
+    auto resultTanConvention = getTangentResultConventionForOriginalParameter(paramTanType, param.getConvention());
     if (!paramTanType->hasArchetype() && !paramTanType->hasTypeParameter()) {
-      pullbackResults.push_back(getTangentResultInfoForOriginalParameter(
-          paramTanType, param.getConvention()));
+      pullbackResults.push_back({paramTanType, resultTanConvention});
     } else {
       // paramTan->getCanonicalType()->substituteBindingsTo(<#Type ty#>, <#llvm::function_ref<CanType (ArchetypeType *, CanType, ArchetypeType *, ArrayRef<ProtocolConformanceRef>)> substFn#>)
       auto gpIndex = substGenericParams.size();
       auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
       substGenericParams.push_back(gpType);
       substReplacements.push_back(paramTanType);
-      pullbackResults.push_back({gpType, ResultConvention::Indirect});
+      pullbackResults.push_back({gpType, resultTanConvention});
     }
   }
 #if 0

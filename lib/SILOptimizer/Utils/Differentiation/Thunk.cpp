@@ -254,10 +254,16 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
 SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
                                            SILModule &module, SILLocation loc,
                                            SILFunction *caller,
-                                           CanSILFunctionType fromType,
-                                           CanSILFunctionType toType) {
+                                           CanSILFunctionType substFromType,
+                                           CanSILFunctionType substToType) {
   SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
+  auto fromType = substFromType->getUnsubstitutedType(module);
+  auto toType = substToType->getUnsubstitutedType(module);
+  llvm::errs() << "FROM TYPE\n";
+  fromType->dump();
+  llvm::errs() << "TO TYPE\n";
+  toType->dump();
   auto thunkType =
       buildThunkType(caller, fromType, toType, genericEnv, interfaceSubs,
                      /*withoutActuallyEscaping*/ false,

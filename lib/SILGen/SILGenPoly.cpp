@@ -3280,7 +3280,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                                 const TypeLowering &expectedTL) {
   auto substSourceType = fn.getType().castTo<SILFunctionType>();
   auto substExpectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
-  
+
   // Apply substitutions in the source and destination types, since the thunk
   // doesn't change because of different function representations.
   CanSILFunctionType sourceType;
@@ -3350,6 +3350,10 @@ static ManagedValue createThunk(SILGenFunction &SGF,
       ->getWithExtInfo(substExpectedType->getExtInfo().withNoEscape(false));
     thunkedFn = SGF.B.createConvertFunction(loc, thunkedFn,
                     SILType::getPrimitiveObjectType(substEscapingExpectedType));
+    llvm::errs() << "CALLER 2\n";
+    thunkedFn.dump();
+    SILType::getPrimitiveObjectType(expectedType).dump();
+    SILType::getPrimitiveObjectType(substExpectedType).dump();
   }
   
   if (!substExpectedType->isNoEscape()) {
@@ -3371,6 +3375,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
                                         CanAnyFunctionType inputSubstType,
                                         AbstractionPattern outputOrigType,
                                         CanAnyFunctionType outputSubstType) {
+  llvm::errs() << "HELLO createAutoDiffThunk " << SGF.F.getName() << "\n";
   // Applies a thunk to all the components by extracting them, applying thunks
   // to all of them, and then putting them back together.
   auto sourceType = fn.getType().castTo<SILFunctionType>();
@@ -3447,6 +3452,18 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
         derivativeFnOutputOrigType, derivativeFnOutputSubstType);
     SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
         loc, kind, borrowedFnValue.getValue());
+    auto origNonDiffFnType = sourceType->getWithExtInfo(sourceType->getExtInfo().withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable));
+    auto expectedType =  origNonDiffFnType->getAutoDiffDerivativeFunctionType(parameterIndices, /*resultIndex*/ 0, kind, SGF.SGM.M.Types, LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+    llvm::errs() << "ACTUAL VS EXPECTED TYPE: " << (derivativeFn->getType().castTo<SILFunctionType>() == expectedType) << "\n";
+    derivativeFn->getType().dump();
+    SILType::getPrimitiveObjectType(expectedType).dump();
+    llvm::errs() << "INPUT VS OUTPUT SUBST TYPE\n";
+    derivativeFnInputOrigType.dump();
+    derivativeFnOutputOrigType.dump();
+    // outputOrigTypeNotDiff.dump();
+    derivativeFnOutputSubstType->dump();
+    llvm::errs() << "EXPECTED TYPE LOWERING\n";
+    derivativeFnExpectedTL.getLoweredType().dump();
     derivativeFn = SGF.B.emitCopyValueOperation(loc, derivativeFn);
     auto managedDerivativeFn = SGF.emitManagedRValueWithCleanup(derivativeFn);
     return createThunk(SGF, loc, managedDerivativeFn, derivativeFnInputOrigType,

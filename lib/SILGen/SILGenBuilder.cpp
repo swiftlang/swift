@@ -18,6 +18,7 @@
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "llvm/Support/Signals.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -69,7 +70,11 @@ SILGenBuilder::createConvertFunction(SILLocation loc, ManagedValue fn,
   CleanupCloner cloner(*this, fn);
   SILValue result = createConvertFunction(loc, fn.forward(getSILGenFunction()),
                                           resultTy, withoutActuallyEscaping);
-  return cloner.clone(result);
+  auto hello = cloner.clone(result);
+  llvm::errs() << "SILGenBuilder::createConvertFunction\n";
+  hello.dump();
+  llvm::sys::PrintStackTrace(llvm::errs());
+  return hello;
 }
 
 ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
