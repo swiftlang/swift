@@ -1693,8 +1693,6 @@ private:
     DeclContext *DC;
     llvm::BumpPtrAllocator &Allocator;
 
-    ConstraintSystem &BaseCS;
-
     // Contextual Information.
     Type CT;
     ContextualTypePurpose CTP;
@@ -1702,8 +1700,7 @@ private:
   public:
     Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), DC(cs.DC), Allocator(cs.Allocator), BaseCS(cs),
-          CT(ct), CTP(ctp) {}
+        : E(expr), DC(cs.DC), Allocator(cs.Allocator), CT(ct), CTP(ctp) {}
 
     /// Return underlying expression.
     Expr *getExpr() const { return E; }
