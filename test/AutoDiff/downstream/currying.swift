@@ -18,7 +18,7 @@ CurryingAutodiffTests.testWithLeakChecking("StructMember") {
   // This value is then converted to a `@differentiable` function-typed value.
   let g: @differentiable (Tracked<Float>) -> Tracked<Float> = a.instanceMethod
 
-  expectEqual(6.0, gradient(at: 3, in: g))
+  expectEqual(Tracked<Float>(6.0), gradient(at: 3, in: g))
 }
 
 runAllTests()
