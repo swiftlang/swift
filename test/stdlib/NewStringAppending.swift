@@ -8,6 +8,10 @@
 //
 // Memory allocator specifics also vary across platforms.
 // REQUIRES: CPU=x86_64, OS=macosx
+// UNSUPPORTED: use_os_stdlib
+
+// TODO: Adapt capacity checks into a non-FileCheck more exhuastive test that
+// can run on older OSes and match their behavior...
 
 import Foundation
 import Swift
