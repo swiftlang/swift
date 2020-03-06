@@ -113,6 +113,8 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
                                   SubstitutionMap &interfaceSubs,
                                   bool withoutActuallyEscaping,
                                   DifferentiationThunkKind thunkKind) {
+  llvm::dbgs() << "buildThunkType from\n\t" << SILType::getPrimitiveObjectType(sourceType) << "\nto\n\t" << SILType::getPrimitiveObjectType(expectedType) << "\n";
+
   assert(!expectedType->isPolymorphic());
   assert(!sourceType->isPolymorphic());
 

@@ -709,6 +709,7 @@ getExtracteeType(
   auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
       fnTy->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
       *kindOpt, module.Types, LookUpConformanceInModule(module.getSwiftModule()));
+  llvm::dbgs() << "getExtracteeType for " << function << ":\n" << SILType::getPrimitiveObjectType(resultFnTy) << "\n";
   return SILType::getPrimitiveObjectType(resultFnTy);
 }
 

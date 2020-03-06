@@ -364,7 +364,8 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   auto derivativeFnType =
       remappedOrigFnSubstTy->getAutoDiffDerivativeFunctionType(
           parameters, source, derivativeFnKind, context.getTypeConverter(),
-          LookUpConformanceInModule(derivative->getModule().getSwiftModule()));
+          LookUpConformanceInModule(derivative->getModule().getSwiftModule()))
+      ->getUnsubstitutedType(original->getModule());
   llvm::dbgs() << "derivativeFnTy " << derivativeFnType << "\n";
 
   auto derivativeFnResultTypes = derivativeFnType->getAllResultsInterfaceType();

@@ -709,7 +709,11 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
   if (!loweredPullbackType->isEqual(actualPullbackType)) {
     // Set non-reabstracted original pullback type in nested apply info.
     nestedApplyInfo.originalPullbackType = actualPullbackType;
-
+    llvm::dbgs() << "reabstracting " << *ai << " to " << loweredPullbackType << "\n";
+    llvm::dbgs() << "decl is\n";
+    pullbackDecl->dump();
+    llvm::dbgs() << "in struct\n";
+    pullbackInfo.getLinearMapStruct(ai->getParent())->dump();
     SILOptFunctionBuilder fb(context.getTransform());
     pullback = reabstractFunction(getBuilder(), fb, ai->getLoc(), pullback, loweredPullbackType);
   }

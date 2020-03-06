@@ -271,11 +271,11 @@ namespace {
       auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::JVP, TC,
-          LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
+          LookUpConformanceInModule(&M), CanGenericSignature());
       auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::VJP, TC,
-          LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
+          LookUpConformanceInModule(&M), CanGenericSignature());
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
       props.addSubobject(classifyType(origType, jvpTy, TC, Expansion));
@@ -325,7 +325,8 @@ namespace {
 
     RetTy visitAbstractTypeParamType(CanType type,
                                      AbstractionPattern origType) {
-      if (origType.isTypeParameterOrOpaqueArchetype()) {
+      // SWIFT_ENABLE_TENSORFLOW
+      if (origType.isTypeParameterOrOpaqueArchetype() || origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
         if (origType.requiresClass()) {
           return asImpl().handleReference(type);
         } else {

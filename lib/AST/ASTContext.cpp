@@ -3424,6 +3424,12 @@ SILFunctionType::SILFunctionType(
       WitnessMethodConformance(witnessMethodConformance),
       Substitutions(substitutions) {
 
+  llvm::dbgs() << "constructing SILFunctionType\n" << genericSig << "\n";
+  for (auto param : params)
+    param.dump();
+  for (auto result : normalResults)
+    result.dump();
+
   Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
   Bits.SILFunctionType.ExtInfoBits = ext.Bits;
   Bits.SILFunctionType.HasUncommonInfo = false;
@@ -3510,6 +3516,8 @@ SILFunctionType::SILFunctionType(
 
     for (auto param : getParameters()) {
       (void)param;
+      param.dump();
+      llvm::dbgs() << param.getInterfaceType() << "\n";
       assert(!param.getInterfaceType()->hasError()
              && "interface type of parameter should not contain error types");
       assert(!param.getInterfaceType()->hasArchetype()
