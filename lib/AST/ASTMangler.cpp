@@ -699,7 +699,7 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
         break;
     }
   } else if (auto objCName =
-               getOverriddenSwiftProtocolObjCName(decl, UseObjCProtocolNames)) {
+               getOverriddenSwiftProtocolObjCName(decl, UseObjCRuntimeNames)) {
     // @objc Swift protocols should be mangled as Objective-C protocols,
     // so append the Objective-C runtime name.
     appendIdentifier(*objCName);
@@ -1298,7 +1298,7 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
     genericArgs = boundType->getGenericArgs();
     if (Type parent = boundType->getParent()) {
       GenericTypeDecl *decl = boundType->getAnyGeneric();
-      if (!getSpecialManglingContext(decl, UseObjCProtocolNames))
+      if (!getSpecialManglingContext(decl, UseObjCRuntimeNames))
         appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
     }
   }
@@ -1610,7 +1610,7 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
 /// This is the top-level entrypoint for mangling <context>.
 void ASTMangler::appendContextOf(const ValueDecl *decl) {
   // Check for a special mangling context.
-  if (auto context = getSpecialManglingContext(decl, UseObjCProtocolNames)) {
+  if (auto context = getSpecialManglingContext(decl, UseObjCRuntimeNames)) {
     switch (*context) {
     case ClangImporterContext:
       return appendOperator("SC");
@@ -1857,7 +1857,10 @@ void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
 
   appendContextOf(protocol);
   auto *clangDecl = protocol->getClangDecl();
-  if (auto *clangProto = cast_or_null<clang::ObjCProtocolDecl>(clangDecl))
+  auto clangProto = cast_or_null<clang::ObjCProtocolDecl>(clangDecl);
+  if (clangProto && UseObjCRuntimeNames)
+    appendIdentifier(clangProto->getObjCRuntimeNameAsString());
+  else if (clangProto)
     appendIdentifier(clangProto->getName());
   else
     appendDeclName(protocol);
@@ -1928,15 +1931,25 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     if (!namedDecl)
       return false;
 
-    appendIdentifier(namedDecl->getName());
+    // Mangle ObjC classes using their runtime names.
+    auto interface = dyn_cast<clang::ObjCInterfaceDecl>(namedDecl);
+    auto protocol = dyn_cast<clang::ObjCProtocolDecl>(namedDecl);
+    
+    if (UseObjCRuntimeNames && interface) {
+      appendIdentifier(interface->getObjCRuntimeNameAsString());
+    } else if (UseObjCRuntimeNames && protocol) {
+      appendIdentifier(protocol->getObjCRuntimeNameAsString());
+    } else {
+      appendIdentifier(namedDecl->getName());
+    }
 
     // The important distinctions to maintain here are Objective-C's various
     // namespaces: protocols, tags (struct/enum/union), and unqualified names.
     // We continue to mangle "class" the standard Swift way because it feels
     // weird to call that an alias, but they're really in the same namespace.
-    if (isa<clang::ObjCInterfaceDecl>(namedDecl)) {
+    if (interface) {
       appendOperator("C");
-    } else if (isa<clang::ObjCProtocolDecl>(namedDecl)) {
+    } else if (protocol) {
       appendOperator("P");
     } else if (isa<clang::TagDecl>(namedDecl)) {
       // Note: This includes enums, but that's okay. A Clang enum is not always
