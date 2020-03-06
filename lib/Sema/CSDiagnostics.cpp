@@ -1878,6 +1878,18 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseCoercionToUnrelatedType())
       return true;
 
+    if (isa<OptionalTryExpr>(anchor)) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_convert_initializer_value,
+                     getFromType(), getToType());
+      return true;
+    }
+
+    if (isa<AssignExpr>(anchor)) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_convert_assign,
+                     getFromType(), getToType());
+      return true;
+    }
+
     return false;
   }
 

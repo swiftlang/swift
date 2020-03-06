@@ -15,7 +15,6 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
@@ -29,169 +28,6 @@ class SILInstruction;
 class SILModule;
 class SILValue;
 class DeadEndBlocks;
-class BranchPropagatedUser;
-
-namespace ownership {
-
-struct ErrorBehaviorKind {
-  enum inner_t {
-    Invalid = 0,
-    ReturnFalse = 1,
-    PrintMessage = 2,
-    Assert = 4,
-    ReturnFalseOnLeak = 8,
-    PrintMessageAndReturnFalse = PrintMessage | ReturnFalse,
-    PrintMessageAndAssert = PrintMessage | Assert,
-    ReturnFalseOnLeakAssertOtherwise = ReturnFalseOnLeak | Assert,
-  } Value;
-
-  ErrorBehaviorKind() : Value(Invalid) {}
-  ErrorBehaviorKind(inner_t Inner) : Value(Inner) { assert(Value != Invalid); }
-
-  bool shouldAssert() const {
-    assert(Value != Invalid);
-    return Value & Assert;
-  }
-
-  bool shouldReturnFalseOnLeak() const {
-    assert(Value != Invalid);
-    return Value & ReturnFalseOnLeak;
-  }
-
-  bool shouldPrintMessage() const {
-    assert(Value != Invalid);
-    return Value & PrintMessage;
-  }
-
-  bool shouldReturnFalse() const {
-    assert(Value != Invalid);
-    return Value & ReturnFalse;
-  }
-};
-
-} // end namespace ownership
-
-class LinearLifetimeError {
-  ownership::ErrorBehaviorKind errorBehavior;
-  bool foundUseAfterFree = false;
-  bool foundLeak = false;
-  bool foundOverConsume = false;
-
-public:
-  LinearLifetimeError(ownership::ErrorBehaviorKind errorBehavior)
-      : errorBehavior(errorBehavior) {}
-
-  bool getFoundError() const {
-    return foundUseAfterFree || foundLeak || foundOverConsume;
-  }
-
-  bool getFoundLeak() const { return foundLeak; }
-
-  bool getFoundUseAfterFree() const { return foundUseAfterFree; }
-
-  bool getFoundOverConsume() const { return foundOverConsume; }
-
-  void handleLeak(llvm::function_ref<void()> &&messagePrinterFunc) {
-    foundLeak = true;
-
-    if (errorBehavior.shouldPrintMessage())
-      messagePrinterFunc();
-
-    if (errorBehavior.shouldReturnFalseOnLeak())
-      return;
-
-    // We already printed out our error if we needed to, so don't pass it along.
-    handleError([]() {});
-  }
-
-  void handleOverConsume(llvm::function_ref<void()> &&messagePrinterFunc) {
-    foundOverConsume = true;
-    handleError(std::move(messagePrinterFunc));
-  }
-
-  void handleUseAfterFree(llvm::function_ref<void()> &&messagePrinterFunc) {
-    foundUseAfterFree = true;
-    handleError(std::move(messagePrinterFunc));
-  }
-
-private:
-  void handleError(llvm::function_ref<void()> &&messagePrinterFunc) {
-    if (errorBehavior.shouldPrintMessage())
-      messagePrinterFunc();
-
-    if (errorBehavior.shouldReturnFalse()) {
-      return;
-    }
-
-    assert(errorBehavior.shouldAssert() && "At this point, we should assert");
-    llvm_unreachable("triggering standard assertion failure routine");
-  }
-};
-
-/// A class used to validate linear lifetime with respect to an SSA-like
-/// definition.
-///
-/// This class is able to both validate that a linear lifetime has been properly
-/// constructed (for verification and safety purposes) as well as return to the
-/// caller upon failure, what the failure was. In certain cases (for instance if
-/// there exists a path without a non-consuming use), the class will report back
-/// the specific insertion points needed to insert these compensating releases.
-///
-/// DISCUSSION: A linear lifetime consists of a starting block or instruction
-/// and a list of non-consuming uses and a set of consuming uses. The consuming
-/// uses must not be reachable from each other and jointly post-dominate all
-/// consuming uses as well as the defining block/instruction.
-class LinearLifetimeChecker {
-  SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
-  DeadEndBlocks &deadEndBlocks;
-
-public:
-  LinearLifetimeChecker(SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-                        DeadEndBlocks &deadEndBlocks)
-      : visitedBlocks(visitedBlocks), deadEndBlocks(deadEndBlocks) {}
-
-  /// Returns true if:
-  ///
-  /// 1. No consuming uses are reachable from any other consuming use, from any
-  /// non-consuming uses, or from the producer instruction.
-  /// 2. The consuming use set jointly post dominates producers and all non
-  /// consuming uses.
-  ///
-  /// Returns false otherwise.
-  ///
-  /// \p value The value whose lifetime we are checking.
-  /// \p consumingUses the array of users that destroy or consume a value.
-  /// \p nonConsumingUses regular uses
-  /// \p errorBehavior If we detect an error, should we return false or hard
-  /// error.
-  /// \p leakingBlocks If non-null a list of blocks where the value was detected
-  /// to leak. Can be used to insert missing destroys.
-  LinearLifetimeError
-  checkValue(SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
-             ArrayRef<BranchPropagatedUser> nonConsumingUses,
-             ownership::ErrorBehaviorKind errorBehavior,
-             SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
-
-  /// Returns true that \p value forms a linear lifetime with consuming uses \p
-  /// consumingUses, non consuming uses \p nonConsumingUses. Returns false
-  /// otherwise.
-  bool validateLifetime(SILValue value,
-                        ArrayRef<BranchPropagatedUser> consumingUses,
-                        ArrayRef<BranchPropagatedUser> nonConsumingUses) {
-    return !checkValue(value, consumingUses, nonConsumingUses,
-                       ownership::ErrorBehaviorKind::ReturnFalse,
-                       nullptr /*leakingBlocks*/)
-                .getFoundError();
-  }
-
-  bool validateLifetime(SILValue value,
-                        ArrayRef<SILInstruction *> consumingUses,
-                        ArrayRef<SILInstruction *> nonConsumingUses) {
-    return validateLifetime(
-        value, BranchPropagatedUser::convertFromInstArray(consumingUses),
-        BranchPropagatedUser::convertFromInstArray(nonConsumingUses));
-  }
-};
 
 /// Returns true if v is an address or trivial.
 bool isValueAddressOrTrivial(SILValue v);
@@ -217,6 +53,10 @@ bool isGuaranteedForwardingValue(SILValue value);
 /// Is this a node kind that can forward owned ownership, but may not be able to
 /// forward guaranteed ownership.
 bool isOwnedForwardingValueKind(SILNodeKind kind);
+
+/// Does this SILInstruction 'forward' owned ownership, but may not be able to
+/// forward guaranteed ownership.
+bool isOwnedForwardingInstruction(SILInstruction *inst);
 
 struct BorrowScopeOperandKind {
   enum Kind {
@@ -360,8 +200,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const BorrowScopeOperand &operand);
 
 struct BorrowScopeIntroducingValueKind {
-  using UnderlyingKindTy = std::underlying_type<ValueKind>::type;
-
   /// Enum we use for exhaustive pattern matching over borrow scope introducers.
   enum Kind {
     LoadBorrow,
@@ -370,8 +208,10 @@ struct BorrowScopeIntroducingValueKind {
     Phi,
   };
 
-  static Optional<BorrowScopeIntroducingValueKind> get(ValueKind kind) {
-    switch (kind) {
+  static Optional<BorrowScopeIntroducingValueKind> get(SILValue value) {
+    if (value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+      return None;
+    switch (value->getKind()) {
     default:
       return None;
     case ValueKind::LoadBorrowInst:
@@ -380,8 +220,15 @@ struct BorrowScopeIntroducingValueKind {
       return BorrowScopeIntroducingValueKind(BeginBorrow);
     case ValueKind::SILFunctionArgument:
       return BorrowScopeIntroducingValueKind(SILFunctionArgument);
-    case ValueKind::SILPhiArgument:
+    case ValueKind::SILPhiArgument: {
+      if (llvm::any_of(value->getParentBlock()->getPredecessorBlocks(),
+                       [](SILBasicBlock *block) {
+                         return !isa<BranchInst>(block->getTerminator());
+                       })) {
+        return None;
+      }
       return BorrowScopeIntroducingValueKind(Phi);
+    }
     }
   }
 
@@ -437,53 +284,14 @@ struct BorrowScopeIntroducingValue {
   BorrowScopeIntroducingValueKind kind;
   SILValue value;
 
-  BorrowScopeIntroducingValue(LoadBorrowInst *lbi)
-      : kind(BorrowScopeIntroducingValueKind::LoadBorrow), value(lbi) {}
-  BorrowScopeIntroducingValue(BeginBorrowInst *bbi)
-      : kind(BorrowScopeIntroducingValueKind::BeginBorrow), value(bbi) {}
-  BorrowScopeIntroducingValue(SILFunctionArgument *arg)
-      : kind(BorrowScopeIntroducingValueKind::SILFunctionArgument), value(arg) {
-    assert(arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed);
-  }
-  BorrowScopeIntroducingValue(SILPhiArgument *arg)
-      : kind(BorrowScopeIntroducingValueKind::Phi), value(arg) {
-    assert(llvm::all_of(arg->getParent()->getPredecessorBlocks(),
-                        [](SILBasicBlock *block) {
-                          return isa<BranchInst>(block->getTerminator());
-                        }) &&
-           "Phi argument incoming values must come from branch insts!");
-    assert(arg->isPhiArgument() && "Can only accept a true phi argument!");
-    assert(arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed);
-  }
-
-  BorrowScopeIntroducingValue(SILValue v)
-      : kind(*BorrowScopeIntroducingValueKind::get(v->getKind())), value(v) {
-    // Validate that if we have a phi argument that all our predecessors have
-    // branches as terminators.
-    assert(!isa<SILPhiArgument>(v) ||
-           (llvm::all_of(v->getParentBlock()->getPredecessorBlocks(),
-                         [](SILBasicBlock *block) {
-                           return isa<BranchInst>(block->getTerminator());
-                         }) &&
-            "Phi argument incoming values must come from branch insts!"));
-
-    assert(v.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
-  }
-
   /// If value is a borrow introducer return it after doing some checks.
+  ///
+  /// This is the only way to construct a BorrowScopeIntroducingValue. We make
+  /// the primary constructor private for this reason.
   static Optional<BorrowScopeIntroducingValue> get(SILValue value) {
-    auto kind = BorrowScopeIntroducingValueKind::get(value->getKind());
-    if (!kind || value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+    auto kind = BorrowScopeIntroducingValueKind::get(value);
+    if (!kind)
       return None;
-    // If kind is phi and we were not passed something with all branch
-    // predecessors, return None.
-    if ((*kind) == BorrowScopeIntroducingValueKind::Phi &&
-        llvm::any_of(value->getParentBlock()->getPredecessorBlocks(),
-                     [](SILBasicBlock *block) {
-                       return !isa<BranchInst>(block->getTerminator());
-                     }))
-      return None;
-    // Otherwise, create our value directly.
     return BorrowScopeIntroducingValue(*kind, value);
   }
 
@@ -511,16 +319,15 @@ struct BorrowScopeIntroducingValue {
 
   bool isLocalScope() const { return kind.isLocalScope(); }
 
-  /// Returns true if the passed in set of instructions is completely within the
-  /// lifetime of this borrow introducer.
+  /// Returns true if the passed in set of uses is completely within
+  /// the lifetime of this borrow introducer.
   ///
   /// NOTE: Scratch space is used internally to this method to store the end
   /// borrow scopes if needed.
-  bool
-  areInstructionsWithinScope(ArrayRef<SILInstruction *> instructions,
-                             SmallVectorImpl<SILInstruction *> &scratchSpace,
-                             SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-                             DeadEndBlocks &deadEndBlocks) const;
+  bool areUsesWithinScope(ArrayRef<Operand *> instructions,
+                          SmallVectorImpl<Operand *> &scratchSpace,
+                          SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+                          DeadEndBlocks &deadEndBlocks) const;
 
   /// Given a local borrow scope introducer, visit all non-forwarding consuming
   /// users. This means that this looks through guaranteed block arguments.
@@ -541,13 +348,32 @@ private:
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const BorrowScopeIntroducingValue &value);
 
-/// Look up through the def-use chain of \p inputValue, recording any "borrow"
-/// introducing values that we find into \p out. If at any point, we find a
-/// point in the chain we do not understand, we bail and return false. If we are
-/// able to understand all of the def-use graph, we know that we have found all
-/// of the borrow introducing values, we return true.
-bool getUnderlyingBorrowIntroducingValues(
-    SILValue inputValue, SmallVectorImpl<BorrowScopeIntroducingValue> &out);
+/// Look up the def-use graph starting at use \p inputOperand, recording any
+/// "borrow" introducing values that we find into \p out. If at any point, we
+/// find a point in the chain we do not understand, we bail and return false. If
+/// we are able to understand all of the def-use graph, we know that we have
+/// found all of the borrow introducing values, we return true.
+///
+/// NOTE: This may return multiple borrow introducing values in cases where
+/// there are phi-like nodes in the IR like any true phi block arguments or
+/// aggregate literal instructions (struct, tuple, enum, etc.).
+bool getAllBorrowIntroducingValues(
+    SILValue value, SmallVectorImpl<BorrowScopeIntroducingValue> &out);
+
+/// Look up the def-use graph starting at \p inputOperand and see if
+/// we can find a single BorrowScopeIntroducingValue for \p
+/// inputOperand. Returns None if there are multiple such introducers
+/// or if while processing we find a user we do not understand.
+Optional<BorrowScopeIntroducingValue>
+getSingleBorrowIntroducingValue(SILValue value);
+
+/// Look up through the def-use chain of \p inputValue, looking for an initial
+/// "borrow" introducing value. If at any point, we find two introducers or we
+/// find a point in the chain we do not understand, we bail and return false. If
+/// we are able to understand all of the def-use graph and only find a single
+/// introducer, then we return a .some(BorrowScopeIntroducingValue).
+Optional<BorrowScopeIntroducingValue>
+getSingleBorrowIntroducingValue(SILValue inputValue);
 
 } // namespace swift
 

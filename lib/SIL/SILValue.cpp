@@ -322,3 +322,17 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   }
   return os;
 }
+
+//===----------------------------------------------------------------------===//
+//                                  Operand
+//===----------------------------------------------------------------------===//
+
+SILBasicBlock *Operand::getParentBlock() const {
+  auto *self = const_cast<Operand *>(this);
+  return self->getUser()->getParent();
+}
+
+SILFunction *Operand::getParentFunction() const {
+  auto *self = const_cast<Operand *>(this);
+  return self->getUser()->getFunction();
+}

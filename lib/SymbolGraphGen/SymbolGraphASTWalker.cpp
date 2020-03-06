@@ -25,67 +25,7 @@ SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
                                            const SymbolGraphOptions &Options)
   : Options(Options),
     M(M),
-    Graph(M, None, Options.Target, Ctx) {}
-
-/// Returns `true` if the symbol should be included as a node in the graph.
-bool SymbolGraphASTWalker::shouldIncludeNode(const Decl *D) const {
-  // If this decl isn't in this module, don't record it,
-  // as it will appear elsewhere in its module's symbol graph.
-  if (D->getModuleContext()->getName() != M.getName()) {
-    return false;
-  }
-
-  // Implicit declarations are probably not going to have documentation,
-  // so don't record it in the symbol graph.
-  if (D->isImplicit()) {
-    return false;
-  }
-  
-  // At this point, the declaration must be a ValueDecl.
-  auto VD = cast<ValueDecl>(D);
-
-  // Don't record unconditionally private declarations
-  if (VD->isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic=*/false)) {
-    return false;
-  }
-
-  // Don't record effectively internal declarations if specified
-  if (Options.MinimumAccessLevel > AccessLevel::Internal &&
-      VD->hasUnderscoredNaming()) {
-    return false;
-  }
-
-  // Symbols must meet the minimum access level to be included in the graph.
-  if (VD->getFormalAccess() < Options.MinimumAccessLevel) {
-    return false;
-  }
-
-  // Special cases
-
-  auto BaseName = VD->getBaseName().userFacingName();
-
-  // ${MODULE}Version{Number,String} in ${Module}.h
-  SmallString<32> VersionNameIdentPrefix { M.getName().str() };
-  VersionNameIdentPrefix.append("Version");
-
-  if (BaseName.startswith(VersionNameIdentPrefix.str())) {
-    return false;
-  }
-
-  // Automatically mapped SIMD types 
-  bool ShouldInclude = llvm::StringSwitch<bool>(BaseName)
-#define MAP_SIMD_TYPE(C_TYPE, _, __) \
-    .Case("swift_" #C_TYPE "2", false) \
-    .Case("swift_" #C_TYPE "3", false) \
-    .Case("swift_" #C_TYPE "4", false)
-#include "swift/ClangImporter/SIMDMappedTypes.def"
-    .Case("SWIFT_TYPEDEFS", false)
-    .Case("char16_t", false)
-    .Case("char32_t", false)
-    .Default(true);
-
-  return ShouldInclude;
-}
+    Graph(Options, M, None, Options.Target, Ctx) {}
 
 /// Get a "sub" symbol graph for the parent module of a type that the main module `M` is extending.
 SymbolGraph &SymbolGraphASTWalker::getExtendedModuleSymbolGraph(ModuleDecl *M) {
@@ -94,7 +34,8 @@ SymbolGraph &SymbolGraphASTWalker::getExtendedModuleSymbolGraph(ModuleDecl *M) {
     return *Found->getSecond();
   }
   auto *Memory = Ctx.allocate(sizeof(SymbolGraph), alignof(SymbolGraph));  
-  auto *SG = new (Memory) SymbolGraph(Graph.M,
+  auto *SG = new (Memory) SymbolGraph(Options,
+                                      Graph.M,
                                       Optional<ModuleDecl *>(M),
                                       Options.Target,
                                       Ctx);
@@ -114,15 +55,20 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     case swift::DeclKind::Constructor:
     case swift::DeclKind::Func:
     case swift::DeclKind::Var:
+    case swift::DeclKind::Subscript:
     case swift::DeclKind::TypeAlias:
+    case swift::DeclKind::AssociatedType:
       break;
+    case swift::DeclKind::Extension:
+      // We don't want to descend into extensions on underscored types.
+      return !cast<ExtensionDecl>(D)->getExtendedNominal()->hasUnderscoredNaming();
       
     // We'll descend into everything else.
     default:
       return true;
   }
 
-  if (!shouldIncludeNode(D)) {
+  if (!Graph.canIncludeDeclAsNode(D)) {
     return false;
   }
 
@@ -136,14 +82,14 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
       auto ExtendedModule = ExtendedNominal->getModuleContext();
       if (ExtendedModule != &M) {
         auto &SG = getExtendedModuleSymbolGraph(ExtendedModule);
-        SG.recordNode(VD);
+        SG.recordNode(Symbol(&Graph, VD, nullptr));
         return true;
       }
     }
   }
 
   // Otherwise, record this in the main module `M`'s symbol graph.
-  Graph.recordNode(VD);
+  Graph.recordNode(Symbol(&Graph, VD, nullptr));
 
   return true;
 }

@@ -25,8 +25,6 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/Parser.h"
-#include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "swift/Syntax/SyntaxArena.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -107,48 +105,6 @@ SILParserState::SILParserState(SILModule *M)
 
 SILParserState::~SILParserState() = default;
 
-void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
-  out << "With parser at source location: ";
-  P.Tok.getLoc().print(out, P.Context.SourceMgr);
-  out << '\n';
-}
-
-void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
-                                PersistentParserState *PersistentState,
-                                bool DelayBodyParsing) {
-  std::shared_ptr<SyntaxTreeCreator> STreeCreator;
-  if (SF.shouldBuildSyntaxTree()) {
-    STreeCreator = std::make_shared<SyntaxTreeCreator>(
-        SF.getASTContext().SourceMgr, BufferID,
-        SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
-  }
-
-  // Not supported right now.
-  if (SF.Kind == SourceFileKind::REPL)
-    DelayBodyParsing = false;
-  if (SF.hasInterfaceHash())
-    DelayBodyParsing = false;
-  if (SF.shouldCollectToken())
-    DelayBodyParsing = false;
-  if (SF.shouldBuildSyntaxTree())
-    DelayBodyParsing = false;
-
-  FrontendStatsTracer tracer(SF.getASTContext().Stats,
-                             "Parsing");
-  Parser P(BufferID, SF, /*SIL*/ nullptr, PersistentState, STreeCreator,
-           DelayBodyParsing);
-  PrettyStackTraceParser StackTrace(P);
-
-  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(P.CurrentTokenHash,
-                                                 SF.getInterfaceHashPtr());
-  P.parseTopLevel();
-
-  if (STreeCreator) {
-    auto rawNode = P.finalizeSyntaxTree();
-    STreeCreator->acceptSyntaxRoot(rawNode, SF);
-  }
-}
-
 void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
   auto bufferID = SF.getBufferID();
   assert(bufferID);
@@ -157,7 +113,7 @@ void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
                              "Parsing SIL");
   Parser parser(*bufferID, SF, sil->Impl.get(),
                 /*persistentParserState*/ nullptr,
-                /*syntaxTreeCreator*/ nullptr, /*delayBodyParsing*/ false);
+                /*syntaxTreeCreator*/ nullptr);
   PrettyStackTraceParser StackTrace(parser);
   parser.parseTopLevelSIL();
 }

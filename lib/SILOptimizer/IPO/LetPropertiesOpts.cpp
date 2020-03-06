@@ -21,6 +21,7 @@
 #define DEBUG_TYPE "let-properties-opt"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLinkage.h"
@@ -394,9 +395,9 @@ LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
   if (auto SI = dyn_cast<StructInst>(I)) {
     value = SI->getFieldValue(Property);
   } else if (auto SI = dyn_cast<StoreInst>(I)) {
-    auto Dest = stripAddressAccess(SI->getDest());
+    auto Dest = stripAccessMarkers(SI->getDest());
 
-    assert(isProjectionOfProperty(stripAddressAccess(SI->getDest()), Property)
+    assert(isProjectionOfProperty(stripAccessMarkers(SI->getDest()), Property)
            && "Store instruction should store into a proper let property");
     (void) Dest;
     value = SI->getSrc();
@@ -590,7 +591,7 @@ void LetPropertiesOpt::run(SILModuleTransform *T) {
         // a struct instruction.
         if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
           if (auto *REAI =
-                  dyn_cast<RefElementAddrInst>(stripAddressAccess(BAI))) {
+                  dyn_cast<RefElementAddrInst>(stripAccessMarkers(BAI))) {
             collectPropertyAccess(BAI, REAI->getField(), NonRemovable);
           }
         } else if (auto *REAI = dyn_cast<RefElementAddrInst>(&I)) {

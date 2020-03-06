@@ -12,11 +12,13 @@
 
 #define DEBUG_TYPE "sil-membehavior"
 
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SIL/SILVisitor.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -37,6 +39,11 @@ using MemBehavior = SILInstruction::MemoryBehavior;
 /// Visitor that determines the memory behavior of an instruction relative to a
 /// specific SILValue (i.e. can the instruction cause the value to be read,
 /// etc.).
+///
+/// TODO: Clarify what it means to return a MayHaveSideEffects result. Does this
+/// mean that the instruction may release objects referenced by value 'V'?
+/// Deallocate the an address contained in 'V'? Are any other code motion
+/// barriers relevant here?
 class MemoryBehaviorVisitor
     : public SILInstructionVisitor<MemoryBehaviorVisitor, MemBehavior> {
 
@@ -48,6 +55,8 @@ class MemoryBehaviorVisitor
 
   /// The value we are attempting to discover memory behavior relative to.
   SILValue V;
+
+  Optional<bool> cachedIsLetValue;
 
   /// The SILType of the value.
   Optional<SILType> TypedAccessTy;
@@ -68,6 +77,28 @@ public:
     return *TypedAccessTy;
   }
 
+  /// Return true if 'V's accessed address is that of a let variables.
+  bool isLetValue() {
+    if (!cachedIsLetValue) {
+      cachedIsLetValue =
+          V->getType().isAddress() && isLetAddress(getAccessedAddress(V));
+    }
+    return cachedIsLetValue.getValue();
+  }
+
+  // Return true is the given address (or pointer) may alias with 'V'.
+  bool mayAlias(SILValue opAddress) {
+    if (AA->isNoAlias(opAddress, V, computeTBAAType(opAddress),
+                      getValueTBAAType())) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "No alias: access " << opAddress << " value " << V);
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs()
+               << "May alias: access " << opAddress << " value " << V);
+    return true;
+  }
+
   MemBehavior visitValueBase(ValueBase *V) {
     llvm_unreachable("unimplemented");
   }
@@ -76,21 +107,53 @@ public:
     // If we do not have any more information, just use the general memory
     // behavior implementation.
     auto Behavior = Inst->getMemoryBehavior();
-    bool ReadOnlyAccess = isLetPointer(V);
 
     // If this is a regular read-write access then return the computed memory
     // behavior.
-    if (!ReadOnlyAccess)
+    if (!isLetValue())
       return Behavior;
 
-    // If this is a read-only access to 'let variable' then we can strip away
-    // the write access.
+    // If this is a read-only access to 'let variable'. Other side effects, such
+    // as releases of the object containing a 'let' property are still relevant.
     switch (Behavior) {
-    case MemBehavior::MayHaveSideEffects: return MemBehavior::MayRead;
     case MemBehavior::MayReadWrite:       return MemBehavior::MayRead;
     case MemBehavior::MayWrite:           return MemBehavior::None;
     default: return Behavior;
     }
+  }
+
+  MemBehavior visitBeginAccessInst(BeginAccessInst *beginAccess) {
+    switch (beginAccess->getAccessKind()) {
+    case SILAccessKind::Init:
+    case SILAccessKind::Deinit:
+      // No address aliasing is expected for variable initialization or
+      // deinitialization.
+      if (stripAccessMarkers(beginAccess) != getAccessedAddress(V))
+        return MemBehavior::None;
+
+      return MemBehavior::MayWrite;
+
+    case SILAccessKind::Read:
+      if (!mayAlias(beginAccess->getSource()))
+        return MemBehavior::None;
+
+      return MemBehavior::MayRead;
+
+    case SILAccessKind::Modify:
+      if (isLetValue()) {
+        assert(stripAccessMarkers(beginAccess) != getAccessedAddress(V)
+               && "let modification not allowed");
+        return MemBehavior::None;
+      }
+      if (!mayAlias(beginAccess->getSource()))
+        return MemBehavior::None;
+
+      return MemBehavior::MayWrite;
+    }
+  }
+
+  MemBehavior visitEndAccessInst(EndAccessInst *endAccess) {
+    return visitBeginAccessInst(endAccess->getBeginAccess());
   }
 
   MemBehavior visitLoadInst(LoadInst *LI);
@@ -108,19 +171,13 @@ public:
   // Instructions which are none if our SILValue does not alias one of its
   // arguments. If we cannot prove such a thing, return the relevant memory
   // behavior.
-#define OPERANDALIAS_MEMBEHAVIOR_INST(Name)                             \
-  MemBehavior visit##Name(Name *I) {                                    \
-    for (Operand &Op : I->getAllOperands()) {                           \
-      if (!AA->isNoAlias(Op.get(), V)) {                                \
-        LLVM_DEBUG(llvm::dbgs() << "  " #Name                           \
-                   " does alias inst. Returning Normal behavior.\n");   \
-        return I->getMemoryBehavior();                                  \
-      }                                                                 \
-    }                                                                   \
-                                                                        \
-    LLVM_DEBUG(llvm::dbgs() << "  " #Name " does not alias inst. "      \
-               "Returning None.\n");                                    \
-    return MemBehavior::None;                                           \
+#define OPERANDALIAS_MEMBEHAVIOR_INST(Name)                                    \
+  MemBehavior visit##Name(Name *I) {                                           \
+    for (Operand & Op : I->getAllOperands()) {                                 \
+      if (mayAlias(Op.get()))                                                  \
+        return I->getMemoryBehavior();                                         \
+    }                                                                          \
+    return MemBehavior::None;                                                  \
   }
 
   OPERANDALIAS_MEMBEHAVIOR_INST(InjectEnumAddrInst)
@@ -168,12 +225,8 @@ public:
 } // end anonymous namespace
 
 MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
-  if (AA->isNoAlias(LI->getOperand(), V, computeTBAAType(LI->getOperand()),
-                   getValueTBAAType())) {
-    LLVM_DEBUG(llvm::dbgs() << "  Load Operand does not alias inst. Returning "
-                               "None.\n");
+  if (!mayAlias(LI->getOperand()))
     return MemBehavior::None;
-  }
 
   LLVM_DEBUG(llvm::dbgs() << "  Could not prove that load inst does not alias "
                              "pointer. Returning may read.");
@@ -183,17 +236,14 @@ MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
 MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
   // No store besides the initialization of a "let"-variable
   // can have any effect on the value of this "let" variable.
-  if (isLetPointer(V) && SI->getDest() != V)
-    return MemBehavior::None;
-
-  // If the store dest cannot alias the pointer in question, then the
-  // specified value cannot be modified by the store.
-  if (AA->isNoAlias(SI->getDest(), V, computeTBAAType(SI->getDest()),
-                   getValueTBAAType())) {
-    LLVM_DEBUG(llvm::dbgs() << "  Store Dst does not alias inst. Returning "
-                               "None.\n");
+  if (isLetValue()
+      && (getAccessedAddress(SI->getDest()) != getAccessedAddress(V))) {
     return MemBehavior::None;
   }
+  // If the store dest cannot alias the pointer in question, then the
+  // specified value cannot be modified by the store.
+  if (!mayAlias(SI->getDest()))
+    return MemBehavior::None;
 
   // Otherwise, a store just writes.
   LLVM_DEBUG(llvm::dbgs() << "  Could not prove store does not alias inst. "
@@ -285,16 +335,14 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
       if (NewBehavior != Behavior) {
         SILValue Arg = AI->getArgument(Idx);
         // We only consider the argument effects if the argument aliases V.
-        if (!Arg->getType().isAddress() ||
-            !AA->isNoAlias(Arg, V, computeTBAAType(Arg), getValueTBAAType())) {
+        if (!Arg->getType().isAddress() || mayAlias(Arg))
           Behavior = NewBehavior;
-        }
       }
     }
   }
 
   if (Behavior > MemBehavior::None) {
-    if (Behavior > MemBehavior::MayRead && isLetPointer(V))
+    if (Behavior > MemBehavior::MayRead && isLetValue())
       Behavior = MemBehavior::MayRead;
 
     // Ask escape analysis.

@@ -1413,6 +1413,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
     switch (auto kind = Child->getKind()) {
     case Node::Kind::ImplParameter:
     case Node::Kind::ImplResult:
+    case Node::Kind::ImplYield:
     case Node::Kind::ImplErrorResult:
       mangleChildNode(Child, 1);
       break;
@@ -1473,11 +1474,16 @@ void Remangler::mangleImplFunctionType(Node *node) {
                         .Case("@convention(objc_method)", 'O')
                         .Case("@convention(closure)", 'K')
                         .Case("@convention(witness_method)", 'W')
+                        .Case("@yield_once", 'A')
+                        .Case("@yield_many", 'G')
                         .Default(0);
         assert(FuncAttr && "invalid impl function attribute");
         Buffer << FuncAttr;
         break;
       }
+      case Node::Kind::ImplYield:
+        Buffer << 'Y';
+        LLVM_FALLTHROUGH;
       case Node::Kind::ImplParameter: {
         char ConvCh =
             llvm::StringSwitch<char>(Child->getFirstChild()->getText())
@@ -1529,6 +1535,10 @@ void Remangler::mangleImplParameter(Node *node) {
 }
 
 void Remangler::mangleImplResult(Node *node) {
+  unreachable("handled inline");
+}
+
+void Remangler::mangleImplYield(Node *node) {
   unreachable("handled inline");
 }
 

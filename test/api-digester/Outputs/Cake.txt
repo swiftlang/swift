@@ -46,6 +46,7 @@ cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake: Func S1.foo3() is now static
 cake: Var C1.CIIns1 changes from weak to strong
 cake: Var C1.CIIns2 changes from strong to weak
+cake: EnumElement FrozenKind.AddedCase has been added as a new enum case
 
 /* Conformance changes */
 cake: Func ObjCProtocol.removeOptional() is no longer an optional requirement

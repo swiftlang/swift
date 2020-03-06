@@ -2738,8 +2738,10 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
   for (unsigned i = 0, e = params->size(); i != e; ++i) {
     auto *param = params->get(i);
-    if (!isTupleDestructuring(param))
+    if (!isTupleDestructuring(param)) {
+      param->setDestructured(false);
       continue;
+    }
 
     auto argName = "arg" + std::to_string(i);
 

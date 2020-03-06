@@ -159,6 +159,9 @@ WARNING(warn_ignore_embed_bitcode_marker, none,
 WARNING(verify_debug_info_requires_debug_option,none,
         "ignoring '-verify-debug-info'; no debug info is being generated", ())
 
+ERROR(verify_incremental_dependencies_needs_incremental,none,
+      "'-verify-incremental-dependencies' requires '-incremental'", ())
+
 ERROR(error_profile_missing,none,
       "no profdata file exists at '%0'", (StringRef))
 

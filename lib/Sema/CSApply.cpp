@@ -1408,13 +1408,12 @@ namespace {
       // Compute the concrete reference to the subscript.
       auto subscriptRef = resolveConcreteDeclRef(subscript, memberLoc);
 
-      // Figure out the index and result types.
-      auto subscriptTy = simplifyType(selected.openedType);
-      auto *subscriptFnTy = subscriptTy->castTo<FunctionType>();
-      auto resultTy = subscriptFnTy->getResult();
-
       // Coerce the index argument.
-      index = coerceCallArguments(index, subscriptFnTy, subscriptRef, nullptr,
+      auto openedFullFnType = simplifyType(selected.openedFullType)
+                                  ->castTo<FunctionType>();
+      auto fullSubscriptTy = openedFullFnType->getResult()
+                                  ->castTo<FunctionType>();
+      index = coerceCallArguments(index, fullSubscriptTy, subscriptRef, nullptr,
                                   argLabels, hasTrailingClosure,
                                   locator.withPathElement(
                                     ConstraintLocator::ApplyArgument));
@@ -1436,6 +1435,11 @@ namespace {
         // TODO: diagnose if semantics != AccessSemantics::Ordinary?
         auto subscriptExpr = DynamicSubscriptExpr::create(
             ctx, base, index, subscriptRef, isImplicit, getType);
+        auto resultTy = simplifyType(selected.openedType)
+                            ->castTo<FunctionType>()
+                            ->getResult();
+        assert(!selected.openedFullType->hasOpenedExistential()
+               && "open existential archetype in AnyObject subscript type?");
         cs.setType(subscriptExpr, resultTy);
         Expr *result = subscriptExpr;
         closeExistential(result, locator);
@@ -1443,7 +1447,6 @@ namespace {
       }
 
       // Convert the base.
-      auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
       auto openedBaseType =
           getBaseType(openedFullFnType, /*wantsRValue*/ false);
       auto containerTy = solution.simplifyType(openedBaseType);
@@ -1469,7 +1472,7 @@ namespace {
       // Form the subscript expression.
       auto subscriptExpr = SubscriptExpr::create(
           ctx, base, index, subscriptRef, isImplicit, semantics, getType);
-      cs.setType(subscriptExpr, resultTy);
+      cs.setType(subscriptExpr, fullSubscriptTy->getResult());
       subscriptExpr->setIsSuper(isSuper);
 
       Expr *result = subscriptExpr;
@@ -7461,7 +7464,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
       case StmtConditionElement::CK_PatternBinding: {
         ConstraintSystem &cs = solution.getConstraintSystem();
-        auto target = *cs.getStmtConditionTarget(&condElement);
+        auto target = *cs.getSolutionApplicationTarget(&condElement);
         auto resolvedTarget = rewriteTarget(target);
         if (!resolvedTarget)
           return None;
@@ -7472,6 +7475,45 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
         continue;
       }
       }
+    }
+
+    return target;
+  } else if (auto caseLabelItem = target.getAsCaseLabelItem()) {
+    ConstraintSystem &cs = solution.getConstraintSystem();
+    auto info = *cs.getCaseLabelItemInfo(*caseLabelItem);
+
+    // Figure out the pattern type.
+    Type patternType = solution.simplifyType(solution.getType(info.pattern));
+    patternType = patternType->reconstituteSugar(/*recursive=*/false);
+
+    // Coerce the pattern to its appropriate type.
+    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+    patternOptions |= TypeResolutionFlags::OverrideType;
+    auto contextualPattern =
+        ContextualPattern::forRawPattern(info.pattern,
+                                         target.getDeclContext());
+    if (auto coercedPattern = TypeChecker::coercePatternToType(
+            contextualPattern, patternType, patternOptions)) {
+      (*caseLabelItem)->setPattern(coercedPattern);
+    } else {
+      return None;
+    }
+
+    // If there is a guard expression, coerce that.
+    if (auto guardExpr = info.guardExpr) {
+      guardExpr = guardExpr->walk(*this);
+      if (!guardExpr)
+        return None;
+
+      // FIXME: Feels like we could leverage existing code more.
+      Type boolType = cs.getASTContext().getBoolDecl()->getDeclaredType();
+      guardExpr = solution.coerceToType(
+          guardExpr, boolType, cs.getConstraintLocator(info.guardExpr));
+      if (!guardExpr)
+        return None;
+
+      (*caseLabelItem)->setGuardExpr(guardExpr);
+      solution.setExprTypes(guardExpr);
     }
 
     return target;
@@ -7747,6 +7789,18 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
     for (auto &condElement : stmtCondition.stmtCondition) {
       condElement = *condElement.walk(walker);
     }
+    return *this;
+
+  case Kind::caseLabelItem:
+    if (auto newPattern =
+            caseLabelItem.caseLabelItem->getPattern()->walk(walker)) {
+      caseLabelItem.caseLabelItem->setPattern(newPattern);
+    }
+    if (auto guardExpr = caseLabelItem.caseLabelItem->getGuardExpr()) {
+      if (auto newGuardExpr = guardExpr->walk(walker))
+        caseLabelItem.caseLabelItem->setGuardExpr(newGuardExpr);
+    }
+
     return *this;
   }
 }

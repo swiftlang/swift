@@ -3,6 +3,7 @@ add_swift_host_library(swiftFrontend STATIC
   ArgsToFrontendOptionsConverter.cpp
   ArgsToFrontendOutputsConverter.cpp
   CompilerInvocation.cpp
+  DependencyVerifier.cpp
   DiagnosticVerifier.cpp
   Frontend.cpp
   FrontendInputsAndOutputs.cpp
@@ -21,6 +22,7 @@ target_link_libraries(swiftFrontend PRIVATE
   swiftParseSIL
   swiftSILGen
   swiftSILOptimizer
+  swiftIRGen
   swiftSema
   swiftSerialization
   swiftTBDGen)

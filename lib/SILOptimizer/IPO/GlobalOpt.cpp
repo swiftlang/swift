@@ -730,6 +730,7 @@ bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
 static bool isPotentialStore(SILInstruction *inst) {
   switch (inst->getKind()) {
     case SILInstructionKind::LoadInst:
+    case SILInstructionKind::EndAccessInst:
       return false;
     case SILInstructionKind::StructElementAddrInst:
     case SILInstructionKind::TupleElementAddrInst:

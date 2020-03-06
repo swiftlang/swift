@@ -292,12 +292,32 @@ struct InstModCallbacks {
       [](SILValue oldValue, SILValue newValue) {
         oldValue->replaceAllUsesWith(newValue);
       };
+  std::function<void(SingleValueInstruction *, SILValue)>
+      eraseAndRAUWSingleValueInst =
+          [](SingleValueInstruction *i, SILValue newValue) {
+            i->replaceAllUsesWith(newValue);
+            i->eraseFromParent();
+          };
 
   InstModCallbacks(decltype(deleteInst) deleteInst,
                    decltype(createdNewInst) createdNewInst,
                    decltype(replaceValueUsesWith) replaceValueUsesWith)
       : deleteInst(deleteInst), createdNewInst(createdNewInst),
-        replaceValueUsesWith(replaceValueUsesWith) {}
+        replaceValueUsesWith(replaceValueUsesWith),
+        eraseAndRAUWSingleValueInst(
+            [](SingleValueInstruction *i, SILValue newValue) {
+              i->replaceAllUsesWith(newValue);
+              i->eraseFromParent();
+            }) {}
+
+  InstModCallbacks(
+      decltype(deleteInst) deleteInst, decltype(createdNewInst) createdNewInst,
+      decltype(replaceValueUsesWith) replaceValueUsesWith,
+      decltype(eraseAndRAUWSingleValueInst) eraseAndRAUWSingleValueInst)
+      : deleteInst(deleteInst), createdNewInst(createdNewInst),
+        replaceValueUsesWith(replaceValueUsesWith),
+        eraseAndRAUWSingleValueInst(eraseAndRAUWSingleValueInst) {}
+
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
   InstModCallbacks(const InstModCallbacks &) = default;

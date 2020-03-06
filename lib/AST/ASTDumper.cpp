@@ -781,13 +781,15 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, ASTNodeColor) << "source_file ";
       PrintWithColorRAII(OS, LocationColor) << '\"' << SF.getFilename() << '\"';
-      
-      for (Decl *D : SF.getTopLevelDecls()) {
-        if (D->isImplicit())
-          continue;
 
-        OS << '\n';
-        printRec(D);
+      if (auto decls = SF.getCachedTopLevelDecls()) {
+        for (Decl *D : *decls) {
+          if (D->isImplicit())
+            continue;
+
+          OS << '\n';
+          printRec(D);
+        }
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -3204,8 +3206,11 @@ static void dumpSubstitutionMapRec(
     out << "substitution ";
     genericParams[i]->print(out);
     out << " -> ";
-    if (replacementTypes[i])
-      replacementTypes[i]->print(out);
+    if (replacementTypes[i]) {
+      PrintOptions opts;
+      opts.PrintForSIL = true;
+      replacementTypes[i]->print(out, opts);
+    }
     else
       out << "<<unresolved concrete type>>";
     printParen(')');

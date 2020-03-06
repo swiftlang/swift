@@ -1,4 +1,3 @@
-// REQUIRES: rdar59812778
 // REQUIRES: OS=macosx
 // REQUIRES: swift_stdlib_no_asserts
 // RUN: %empty-directory(%t.tmp)

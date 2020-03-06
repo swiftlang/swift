@@ -22,9 +22,9 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/Projection.h"
@@ -181,9 +181,9 @@ bool SILValueOwnershipChecker::check() {
   if (!result.getValue())
     return false;
 
-  SmallVector<BranchPropagatedUser, 32> allLifetimeEndingUsers;
+  SmallVector<Operand *, 32> allLifetimeEndingUsers;
   llvm::copy(lifetimeEndingUsers, std::back_inserter(allLifetimeEndingUsers));
-  SmallVector<BranchPropagatedUser, 32> allRegularUsers;
+  SmallVector<Operand *, 32> allRegularUsers;
   llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
   llvm::copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
 
