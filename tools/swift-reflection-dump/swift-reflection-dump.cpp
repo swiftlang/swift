@@ -35,6 +35,10 @@
 #include <unistd.h>
 #endif
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#endif
+
 #include <algorithm>
 #include <csignal>
 
@@ -426,6 +430,19 @@ public:
   bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                        void *outBuffer) override {
     auto wordSize = Images.front().TheImage.getBytesInAddress();
+    // TODO: The following should be set based on inspecting the image.
+    // This code sets it to match the platform this code was compiled for.
+#if defined(__APPLE__) && __APPLE__
+    auto applePlatform = true;
+#else
+    auto applePlatform = false;
+#endif
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+    auto iosDerivedPlatform = true;
+#else
+    auto iosDerivedPlatform = false;
+#endif
+
     switch (type) {
     case DLQ_GetPointerSize: {
       auto result = static_cast<uint8_t *>(outBuffer);
@@ -435,6 +452,29 @@ public:
     case DLQ_GetSizeSize: {
       auto result = static_cast<uint8_t *>(outBuffer);
       *result = wordSize;
+      return true;
+    }
+    case DLQ_GetObjCReservedLowBits: {
+      auto result = static_cast<uint8_t *>(outBuffer);
+      if (applePlatform && !iosDerivedPlatform && wordSize == 8) {
+        // Obj-C reserves low bit on 64-bit macOS only.
+        // Other Apple platforms don't reserve this bit (even when
+        // running on x86_64-based simulators).
+        *result = 1;
+      } else {
+        *result = 0;
+      }
+      return true;
+    }
+    case DLQ_GetLeastValidPointerValue: {
+      auto result = static_cast<uint64_t *>(outBuffer);
+      if (applePlatform && wordSize == 8) {
+        // Swift reserves the first 4GiB on 64-bit Apple platforms
+        *result = 0x100000000;
+      } else {
+        // Swift reserves the first 4KiB everywhere else
+        *result = 0x1000;
+      }
       return true;
     }
     }

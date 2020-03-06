@@ -85,6 +85,19 @@ typedef enum {
   /// should be populated with the size of size_t in the remote process, in
   /// bytes.
   DLQ_GetSizeSize,
+
+  /// The query should ignore inBuffer, and treat outBuffer as uint8_t* which
+  /// should be populated with the number of low-order bits in each pointer
+  /// reserved by Obj-C in the remote process.  This is generally zero except
+  /// for 64-bit macOS, which has to reserve the bottom bit for Obj-C
+  /// interoperability.
+  DLQ_GetObjCReservedLowBits,
+
+  /// The query should ignore inBuffer, and treat outBuffer as uint64_t* which
+  /// should be populated with the lowest valid pointer value in the remote
+  /// process.  This is currently 0x1000 (4096) except on 64-bit Apple platforms
+  /// where it is 0x100000000.
+  DLQ_GetLeastValidPointerValue,
 } DataLayoutQueryType;
 
 /// Data layout query function, which returns answers based on query types (from
