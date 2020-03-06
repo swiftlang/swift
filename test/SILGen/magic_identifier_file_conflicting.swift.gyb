@@ -4,6 +4,11 @@
 // We want to check both the diagnostics and the SIL output.
 // RUN: %target-swift-emit-silgen -verify -emit-sorted-sil -enable-experimental-concise-pound-file -module-name Foo %t/magic_identifier_file_conflicting.swift %S/Inputs/magic_identifier_file_conflicting_other.swift | %FileCheck %s
 
+// FIXME: Make this test work on Windows. There's no fundamental reason it
+//        can't; we just need someone with a Windows machine to do it so we
+//        don't have a 30-minute debug cycle.
+// UNSUPPORTED: OS=windows-msvc
+
 %{
 TEMPDIR_ESC = TEMPDIR.replace('\\', '\\\\')
 def fixit_loc(start_col, orig_suffix):
