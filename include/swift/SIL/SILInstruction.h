@@ -7420,15 +7420,35 @@ public:
            OpIndex <= Operands.back().getOperandNumber();
   }
 
+  /// Returns the operand on the cond_br terminator associated with the value
+  /// that will be passed to DestBB in A.
+  Operand *getOperandForDestBB(const SILBasicBlock *DestBB,
+                               const SILArgument *A) const;
+
+  /// Returns the operand on the cond_br terminator associated with the value
+  /// that will be passed as the \p Index argument to DestBB.
+  Operand *getOperandForDestBB(const SILBasicBlock *DestBB,
+                               unsigned ArgIndex) const;
+
   /// Returns the argument on the cond_br terminator that will be passed to
   /// DestBB in A.
   SILValue getArgForDestBB(const SILBasicBlock *DestBB,
-                           const SILArgument *A) const;
+                           const SILArgument *A) const {
+    if (auto *op = getOperandForDestBB(DestBB, A)) {
+      return op->get();
+    }
+    return SILValue();
+  }
 
   /// Returns the argument on the cond_br terminator that will be passed as the
   /// \p Index argument to DestBB.
   SILValue getArgForDestBB(const SILBasicBlock *DestBB,
-                           unsigned ArgIndex) const;
+                           unsigned ArgIndex) const {
+    if (auto *op = getOperandForDestBB(DestBB, ArgIndex)) {
+      return op->get();
+    }
+    return SILValue();
+  }
 
   /// Return the SILPhiArgument from either the true or false destination for
   /// the given operand.
