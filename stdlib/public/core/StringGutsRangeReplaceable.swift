@@ -58,7 +58,7 @@ extension _StringGuts {
   internal init(_initialCapacity capacity: Int) {
     self.init()
     if _slowPath(capacity > _SmallString.capacity) {
-      self.grow(capacity) // TODO: no factor should be applied
+      self.grow(capacity)
     }
   }
 
@@ -68,7 +68,7 @@ extension _StringGuts {
     if let currentCap = self.uniqueNativeCapacity, currentCap >= n { return }
 
     // Grow
-    self.grow(n) // TODO: no factor should be applied
+    self.grow(n)
   }
 
   // Grow to accomodate at least `n` code units
@@ -79,15 +79,12 @@ extension _StringGuts {
     _internalInvariant(
       self.uniqueNativeCapacity == nil || self.uniqueNativeCapacity! < n)
 
-    // TODO: Dont' do this! Growth should only happen for append...
-    let growthTarget = Swift.max(n, (self.uniqueNativeCapacity ?? 0) * 2)
-
     if _fastPath(isFastUTF8) {
       let isASCII = self.isASCII
       let storage = self.withFastUTF8 {
         __StringStorage.create(
           initializingFrom: $0,
-          codeUnitCapacity: growthTarget,
+          codeUnitCapacity: n,
           isASCII: isASCII)
       }
 
@@ -95,7 +92,7 @@ extension _StringGuts {
       return
     }
 
-    _foreignGrow(growthTarget)
+    _foreignGrow(n)
   }
 
   @inline(never) // slow-path
@@ -146,9 +143,9 @@ extension _StringGuts {
       growthTarget = totalCount
     } else {
       growthTarget = Swift.max(
-        totalCount, _growArrayCapacity(nativeCapacity ?? 0))
+        totalCount, Int(Float(nativeCapacity ?? 0) * 1.6))
     }
-    self.grow(growthTarget) // NOTE: this already has exponential growth...
+    self.grow(growthTarget)
   }
 
   internal mutating func append(_ other: _StringGuts) {
