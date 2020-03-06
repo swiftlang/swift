@@ -1516,9 +1516,6 @@ public:
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
 
-  /// The original CS if this CS was created as a simplification of another CS
-  ConstraintSystem *baseCS = nullptr;
-
   /// The total number of disjunctions created.
   unsigned CountDisjunctions = 0;
 

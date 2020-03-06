@@ -41,15 +41,6 @@ ExpressionTimer::ExpressionTimer(Expr *E, ConstraintSystem &CS)
       StartTime(llvm::TimeRecord::getCurrentTime()),
       PrintDebugTiming(CS.getASTContext().TypeCheckerOpts.DebugTimeExpressions),
       PrintWarning(true) {
-  if (auto *baseCS = CS.baseCS) {
-    // If we already have a timer in the base constraint
-    // system, let's seed its start time to the child.
-    if (baseCS->Timer) {
-      StartTime = baseCS->Timer->startedAt();
-      PrintWarning = false;
-      PrintDebugTiming = false;
-    }
-  }
 }
 
 ExpressionTimer::~ExpressionTimer() {
@@ -598,12 +589,6 @@ static void extendDepthMap(
 
 Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
     Expr *expr) {
-  // Check whether the parent has this information.
-  if (baseCS && baseCS != this) {
-    if (auto known = baseCS->getExprDepthAndParent(expr))
-      return *known;
-  }
-
   // Bring the set of expression weights up to date.
   while (NumInputExprsInWeights < InputExprs.size()) {
     extendDepthMap(InputExprs[NumInputExprsInWeights], ExprWeights);
