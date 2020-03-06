@@ -249,6 +249,20 @@ internal final class _ContiguousArrayStorage<
 @frozen
 internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
 
+  // Obsolete, only here for ABI compat. Call the version that takes
+  // `growForAppend` instead
+  @usableFromInline
+  internal init(
+    _uninitializedCount uninitializedCount: Int,
+    minimumCapacity: Int
+  ) {
+    self.init(
+      _uninitializedCount: uninitializedCount,
+      minimumCapacity: minimumCapacity,
+      growForAppend: false
+    )
+  }
+  
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the `count` elements at the
   /// result's `.firstElementAddress` or set the result's `.count`
@@ -256,20 +270,31 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @inlinable
   internal init(
     _uninitializedCount uninitializedCount: Int,
-    minimumCapacity: Int
+    minimumCapacity: Int,
+    growForAppend: Bool
   ) {
     let realMinimumCapacity = Swift.max(uninitializedCount, minimumCapacity)
     if realMinimumCapacity == 0 {
       self = _ContiguousArrayBuffer<Element>()
     }
     else {
-      _storage = Builtin.allocWithTailElems_1(
-         _ContiguousArrayStorage<Element>.self,
-         realMinimumCapacity._builtinWordValue, Element.self)
-
-      let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
-      let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
-      let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
+      #if arch(i386) || arch(arm) || arch(wasm32)
+      let headerSize = 16
+      #else
+      let headerSize = 32
+      #endif
+      let (storage, realCapacity) = _allocate(
+        numHeaderBytes: headerSize,
+        numTailBytes: MemoryLayout<Element>.stride * realMinimumCapacity,
+        growthFactor: growForAppend ? 1.6 : nil
+      ) { tailBytes in
+        Builtin.allocWithTailElems_1(
+           _ContiguousArrayStorage<Element>.self,
+           tailBytes._builtinWordValue,
+           Element.self
+        )
+      }
+      _storage = storage
 
       _initStorageHeader(
         count: uninitializedCount, capacity: realCapacity)
@@ -614,7 +639,9 @@ internal func += <Element, C: Collection>(
   else {
     var newLHS = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: newCount,
-      minimumCapacity: _growArrayCapacity(lhs.capacity))
+      minimumCapacity: lhs.capacity,
+      growForAppend: true
+    )
 
     newLHS.firstElementAddress.moveInitialize(
       from: lhs.firstElementAddress, count: oldCount)
@@ -719,7 +746,9 @@ internal func _copyCollectionToContiguousArray<
 
   let result = _ContiguousArrayBuffer<C.Element>(
     _uninitializedCount: count,
-    minimumCapacity: 0)
+    minimumCapacity: 0,
+    growForAppend: false
+  )
 
   let p = UnsafeMutableBufferPointer(start: result.firstElementAddress, count: count)
   var (itr, end) = source._copyContents(initializing: p)
@@ -760,7 +789,9 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     } else {
       result = _ContiguousArrayBuffer(
         _uninitializedCount: initialCapacity,
-        minimumCapacity: 0)
+        minimumCapacity: 0,
+        growForAppend: false
+      )
     }
 
     p = result.firstElementAddress
@@ -773,9 +804,11 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   internal mutating func add(_ element: Element) {
     if remainingCapacity == 0 {
       // Reallocate.
-      let newCapacity = max(_growArrayCapacity(result.capacity), 1)
       var newResult = _ContiguousArrayBuffer<Element>(
-        _uninitializedCount: newCapacity, minimumCapacity: 0)
+        _uninitializedCount: result.capacity + 1,
+        minimumCapacity: 0,
+        growForAppend: true
+      )
       p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
       if !result.isEmpty {

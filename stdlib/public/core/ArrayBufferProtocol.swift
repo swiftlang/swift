@@ -132,7 +132,10 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
              // fast and does not end up in an unspecialized entry point.
   internal init(copying buffer: Self) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
+      _uninitializedCount: buffer.count,
+      minimumCapacity: buffer.count,
+      growForAppend: false
+    )
     buffer._copyContents(
       subRange: buffer.indices,
       initializing: newBuffer.firstElementAddress)

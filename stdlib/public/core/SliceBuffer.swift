@@ -418,7 +418,9 @@ extension _SliceBuffer {
 
     let result = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: count,
-      minimumCapacity: 0)
+      minimumCapacity: 0,
+      growForAppend: false
+    )
     result.firstElementAddress.initialize(
       from: firstElementAddress, count: count)
     return ContiguousArray(_buffer: result)

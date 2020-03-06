@@ -173,7 +173,9 @@ fileprivate struct _CapacityAndFlags {
 
 // TODO: Migrate this to somewhere it can be shared with Array
 import SwiftShims
-fileprivate func _allocate<T: AnyObject>(
+
+@_alwaysEmitIntoClient
+internal func _allocate<T: AnyObject>(
   numHeaderBytes: Int,        // The size of the class header
   numTailBytes: Int,          // The desired number of tail bytes
   growthFactor: Float? = nil, // Exponential growth factor for large allocs

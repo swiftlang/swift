@@ -881,7 +881,10 @@ extension Array: RangeReplaceableCollection {
     minimumCapacity: Int
   ) -> _Buffer {
     let newBuffer = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: 0, minimumCapacity: minimumCapacity)
+      _uninitializedCount: 0,
+      minimumCapacity: minimumCapacity,
+      growForAppend: false
+    )
     return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
@@ -928,7 +931,8 @@ extension Array: RangeReplaceableCollection {
 
     let innerBuffer = _ContiguousArrayBuffer<Element>(
       count: count,
-      storage: storage)
+      storage: storage
+    )
 
     return (
       Array(
@@ -1053,14 +1057,12 @@ extension Array: RangeReplaceableCollection {
   internal mutating func _createNewBuffer(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) {
-    let newCapacity = _growArrayCapacity(oldCapacity: _getCapacity(),
-                                         minimumCapacity: minimumCapacity,
-                                         growForAppend: growForAppend)
     let count = _getCount()
-    _internalInvariant(newCapacity >= count)
-    
     let newBuffer = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: count, minimumCapacity: newCapacity)
+      _uninitializedCount: count,
+      minimumCapacity: minimumCapacity,
+      growForAppend: growForAppend
+    )
 
     if bufferIsUnique {
       _internalInvariant(_buffer.isUniquelyReferenced())

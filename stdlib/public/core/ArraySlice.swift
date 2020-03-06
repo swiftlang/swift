@@ -702,7 +702,10 @@ extension ArraySlice: RangeReplaceableCollection {
     minimumCapacity: Int
   ) -> _Buffer {
     let newBuffer = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: 0, minimumCapacity: minimumCapacity)
+      _uninitializedCount: 0,
+      minimumCapacity: minimumCapacity,
+      growForAppend: false
+    )
     return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
@@ -811,7 +814,10 @@ extension ArraySlice: RangeReplaceableCollection {
       minimumCapacity: minimumCapacity) == nil {
 
       let newBuffer = _ContiguousArrayBuffer<Element>(
-        _uninitializedCount: count, minimumCapacity: minimumCapacity)
+        _uninitializedCount: count,
+        minimumCapacity: minimumCapacity,
+        growForAppend: false
+      )
 
       _buffer._copyContents(
         subRange: _buffer.indices,
@@ -974,10 +980,23 @@ extension ArraySlice: RangeReplaceableCollection {
 
     // Ensure uniqueness, mutability, and sufficient storage.  Note that
     // for consistency, we need unique self even if newElements is empty.
-    self.reserveCapacity(
-      newCount > oldCapacity ?
-      Swift.max(newCount, _growArrayCapacity(oldCapacity))
-      : newCount)
+    
+    if _buffer.requestUniqueMutableBackingBuffer(
+      minimumCapacity: newCount) == nil {
+
+      let newBuffer = _ContiguousArrayBuffer<Element>(
+        _uninitializedCount: newCount,
+        minimumCapacity: oldCapacity,
+        growForAppend: true
+      )
+
+      _buffer._copyContents(
+        subRange: _buffer.indices,
+        initializing: newBuffer.firstElementAddress)
+      _buffer = _Buffer(
+        _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
+    }
+    _internalInvariant(capacity >= newCount)
   }
 
   @inlinable

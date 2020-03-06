@@ -207,11 +207,13 @@ extension _ArrayBufferProtocol {
     _internalInvariant(minNewCapacity >= countForBuffer)
 
     let minimumCapacity = Swift.max(requiredCapacity,
-      minNewCapacity > capacity
-         ? _growArrayCapacity(capacity) : capacity)
+                                    Swift.max(minNewCapacity, capacity))
 
     return _ContiguousArrayBuffer(
-      _uninitializedCount: countForBuffer, minimumCapacity: minimumCapacity)
+      _uninitializedCount: countForBuffer,
+      minimumCapacity: minimumCapacity,
+      growForAppend: true
+    )
   }
 }
 
