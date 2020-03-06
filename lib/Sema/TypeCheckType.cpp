@@ -629,9 +629,9 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   return BGT->getGenericArgs().front()->isVoid();
 }
 
-static Type checkConstrainedExtensionRequirements(Type type,
-                                                  SourceLoc loc,
-                                                  DeclContext *dc) {
+static Type checkContextualRequirements(Type type,
+                                        SourceLoc loc,
+                                        DeclContext *dc) {
   // Even if the type is not generic, it might be inside of a generic
   // context, so we need to check requirements.
   GenericTypeDecl *decl;
@@ -646,25 +646,34 @@ static Type checkConstrainedExtensionRequirements(Type type,
     return type;
   }
 
-  // FIXME: Some day the type might also have its own 'where' clause, even
-  // if its not generic.
-
-  auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext());
-  if (!ext || !ext->isConstrainedExtension())
-    return type;
-
-  if (parentTy->hasUnboundGenericType() ||
+  if (!parentTy || parentTy->hasUnboundGenericType() ||
       parentTy->hasTypeVariable()) {
     return type;
   }
 
-  auto subMap = parentTy->getContextSubstitutions(ext);
+  // We are interested in either a contextual where clause or
+  // a constrained extension context.
+  TypeSubstitutionMap subMap;
+  GenericSignature genericSig;
+  SourceLoc noteLoc;
+  if (decl->getTrailingWhereClause()) {
+    subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
+    genericSig = decl->getGenericSignature();
+    noteLoc = decl->getLoc();
+  } else {
+    const auto ext = dyn_cast<ExtensionDecl>(decl->getDeclContext());
+    if (ext && ext->isConstrainedExtension()) {
+      subMap = parentTy->getContextSubstitutions(ext);
+      genericSig = ext->getGenericSignature();
+      noteLoc = ext->getLoc();
+    } else {
+      return type;
+    }
+  }
 
-  SourceLoc noteLoc = ext->getLoc();
   if (noteLoc.isInvalid())
     noteLoc = loc;
 
-  auto genericSig = ext->getGenericSignature();
   auto result =
     TypeChecker::checkGenericArguments(
         dc, loc, noteLoc, type,
@@ -722,7 +731,7 @@ static Type applyGenericArguments(Type type,
     if (resolution.getStage() == TypeResolutionStage::Structural)
       return type;
 
-    return checkConstrainedExtensionRequirements(type, loc, dc);
+    return checkContextualRequirements(type, loc, dc);
   }
 
   if (type->hasError()) {

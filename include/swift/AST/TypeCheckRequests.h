@@ -1108,7 +1108,7 @@ class InferredGenericSignatureRequest :
     public SimpleRequest<InferredGenericSignatureRequest,
                          GenericSignature (ModuleDecl *,
                                             GenericSignatureImpl *,
-                                            GenericParamList *,
+                                            GenericParamSource,
                                             SmallVector<Requirement, 2>,
                                             SmallVector<TypeLoc, 2>,
                                             bool),
@@ -1124,7 +1124,7 @@ private:
   evaluate(Evaluator &evaluator,
            ModuleDecl *module,
            GenericSignatureImpl *baseSignature,
-           GenericParamList *gpl,
+           GenericParamSource paramSource,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,
            bool allowConcreteGenericParams) const;

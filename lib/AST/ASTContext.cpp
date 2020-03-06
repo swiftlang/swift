@@ -4470,19 +4470,22 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   assert(isa<AbstractFunctionDecl>(base) || isa<SubscriptDecl>(base));
   assert(isa<AbstractFunctionDecl>(derived) || isa<SubscriptDecl>(derived));
 
-  auto baseClass = base->getDeclContext()->getSelfClassDecl();
-  auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
+  const auto baseClass = base->getDeclContext()->getSelfClassDecl();
+  const auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
 
   assert(baseClass != nullptr);
   assert(derivedClass != nullptr);
 
-  auto baseGenericSig = base->getAsGenericContext()->getGenericSignature();
-  auto derivedGenericSig = derived->getAsGenericContext()->getGenericSignature();
+  const auto baseGenericSig =
+      base->getAsGenericContext()->getGenericSignature();
+  const auto derivedGenericSig =
+      derived->getAsGenericContext()->getGenericSignature();
 
   if (base == derived)
     return derivedGenericSig;
 
-  if (derivedClass->getSuperclass().isNull())
+  const auto derivedSuperclass = derivedClass->getSuperclass();
+  if (derivedSuperclass.isNull())
     return nullptr;
 
   if (derivedGenericSig.isNull())
@@ -4490,12 +4493,6 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
 
   if (baseGenericSig.isNull())
     return derivedGenericSig;
-
-  auto baseClassSig = baseClass->getGenericSignature();
-  auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
-      derivedClass->getModuleContext(), baseClass);
-
-  unsigned derivedDepth = 0;
 
   auto key = OverrideSignatureKey(baseGenericSig,
                                   derivedGenericSig,
@@ -4506,22 +4503,25 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     return getImpl().overrideSigCache.lookup(key);
   }
 
-  if (auto derivedSig = derivedClass->getGenericSignature())
-    derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
+  const auto derivedClassSig = derivedClass->getGenericSignature();
+
+  unsigned derivedDepth = 0;
+  unsigned baseDepth = 0;
+  if (derivedClassSig)
+    derivedDepth = derivedClassSig->getGenericParams().back()->getDepth() + 1;
+  if (const auto baseClassSig = baseClass->getGenericSignature())
+    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
 
   SmallVector<GenericTypeParamType *, 2> addedGenericParams;
-  if (auto *gpList = derived->getAsGenericContext()->getGenericParams()) {
+  if (const auto *gpList = derived->getAsGenericContext()->getGenericParams()) {
     for (auto gp : *gpList) {
       addedGenericParams.push_back(
           gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
     }
   }
 
-  unsigned baseDepth = 0;
-
-  if (baseClassSig) {
-    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
-  }
+  const auto subMap = derivedSuperclass->getContextSubstitutionMap(
+      derivedClass->getModuleContext(), baseClass);
 
   auto substFn = [&](SubstitutableType *type) -> Type {
     auto *gp = cast<GenericTypeParamType>(type);
@@ -4553,7 +4553,7 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   auto genericSig = evaluateOrDefault(
       evaluator,
       AbstractGenericSignatureRequest{
-        derivedClass->getGenericSignature().getPointer(),
+        derivedClassSig.getPointer(),
         std::move(addedGenericParams),
         std::move(addedRequirements)},
       GenericSignature());

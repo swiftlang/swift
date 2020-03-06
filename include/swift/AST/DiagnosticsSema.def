@@ -2751,6 +2751,10 @@ ERROR(dynamic_self_stored_property_init,none,
 ERROR(dynamic_self_default_arg,none,
       "covariant 'Self' type cannot be referenced from a default argument expression", ())
 
+ERROR(where_nongeneric_ctx,none,
+      "'where' clause on non-generic member declaration requires a "
+      "generic context", ())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
 //------------------------------------------------------------------------------
