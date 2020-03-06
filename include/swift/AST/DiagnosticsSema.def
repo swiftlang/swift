@@ -2759,10 +2759,10 @@ ERROR(broken_tensor_array_protocol_requirement,none,
 ERROR(broken_tensor_group_requirement,none,
       "TensorGroup protocol is broken: unexpected requirement", ())
 WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
-      "stored property %0 has no derivative because it does not conform to "
+      "stored property %0 has no derivative because %1 does not conform to "
       "'Differentiable'; add an explicit '@noDerivative' attribute"
-      "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
-      (Identifier, Identifier, bool))
+      "%select{|, or conform %2 to 'AdditiveArithmetic'}3",
+      (Identifier, Type, Identifier, bool))
 WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %1 "
       "requires all stored properties to be mutable; use 'var' instead, or add "
