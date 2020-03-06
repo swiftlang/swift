@@ -55,6 +55,7 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* RawRepresentable Changes */";
   case LocalDiagID::generic_sig_change:
     return "/* Generic Signature Changes */";
+  case LocalDiagID::enum_case_added:
   case LocalDiagID::decl_added:
   case LocalDiagID::decl_reorder:
   case LocalDiagID::var_has_fixed_order_change:
