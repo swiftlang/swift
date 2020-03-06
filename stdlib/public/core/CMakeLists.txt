@@ -236,23 +236,27 @@ set(SWIFTLIB_GYB_SOURCES
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 set(swift_core_framework_depends)
-set(swift_core_private_link_libraries)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 
-if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL CYGWIN)
-  # TODO(compnerd) cache this variable to permit re-configuration
-  execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}" OUTPUT_VARIABLE ENV_SYSTEMROOT)
-  list(APPEND swift_core_private_link_libraries "${ENV_SYSTEMROOT}/system32/psapi.dll")
-elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL FREEBSD)
-  find_library(EXECINFO_LIBRARY execinfo)
-  list(APPEND swift_core_private_link_libraries ${EXECINFO_LIBRARY})
-elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL LINUX)
-  if(SWIFT_BUILD_STATIC_STDLIB)
-    list(APPEND swift_core_private_link_libraries)
+function(swift_core_private_libraries sdk arch libraries_var_name)
+  set(private_link_libraries)
+  if(${sdk} STREQUAL CYGWIN)
+    if(${sdk} STREQUAL ${SWIFT_HOST_VARIANT_SDK})
+      # TODO(compnerd) cache this variable to permit re-configuration
+      execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}" OUTPUT_VARIABLE ENV_SYSTEMROOT)
+      list(APPEND private_link_libraries "${ENV_SYSTEMROOT}/system32/psapi.dll")
+    else()
+      message(FATAL_ERROR "CYGWIN cross-compilation doesn't know where to find psapi.dll.")
+    endif()
+  elseif(${sdk} STREQUAL FREEBSD)
+    find_library(EXECINFO_LIBRARY execinfo)
+    list(APPEND private_link_libraries ${EXECINFO_LIBRARY})
+  elseif(${sdk} STREQUAL WINDOWS)
+    list(APPEND private_link_libraries shell32;DbgHelp)
   endif()
-elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL WINDOWS)
-  list(APPEND swift_core_private_link_libraries shell32;DbgHelp)
-endif()
+
+  set(${libraries_var_name} ${private_link_libraries} PARENT_SCOPE)
+endfunction()
 
 option(SWIFT_CHECK_ESSENTIAL_STDLIB
     "Check core standard library layering by linking its essential subset"
@@ -298,8 +302,6 @@ set(swiftCore_common_options
                     ${SWIFTLIB_GYB_SOURCES}
                   LINK_FLAGS
                     ${swift_core_link_flags}
-                  PRIVATE_LINK_LIBRARIES
-                    ${swift_core_private_link_libraries}
                   INCORPORATE_OBJECT_LIBRARIES
                     ${swift_core_incorporate_object_libraries}
                   FRAMEWORK_DEPENDS

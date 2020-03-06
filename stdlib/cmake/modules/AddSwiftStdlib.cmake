@@ -1931,6 +1931,12 @@ function(add_swift_target_library name)
       set(swiftlib_module_dependency_targets)
       set(swiftlib_private_link_libraries_targets)
 
+      if(name STREQUAL swiftCore)
+        # This initializes swiftlib_private_link_libraries_targets for swiftCore,
+        # so don't move it away from the variable declaration just above.
+        swift_core_private_libraries(${sdk} ${arch} swiftlib_private_link_libraries_targets)
+      endif()
+
       if(NOT BUILD_STANDALONE)
         foreach(mod ${swiftlib_module_depends_flattened})
           if(DEFINED maccatalyst_build_flavor)
