@@ -85,6 +85,7 @@ jobs:
           echo 'print("Hello, world!")' > hello.swift
           $TOOLCHAIN_PATH/usr/bin/swiftc \
                 -target wasm32-unknown-wasi \
+                -sdk $TOOLCHAIN_PATH/usr/share/wasi-sysroot \
                 hello.swift -o hello.wasm && \
                 echo "Successfully linked hello.wasm"
 
