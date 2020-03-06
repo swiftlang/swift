@@ -927,6 +927,16 @@ public:
   /// @_originalDefinedIn attribute, this function returns this module name.
   StringRef getAlternateModuleName() const;
 
+  // Is this Decl an SPI? It can be directly marked with @_spi or is defined in
+  // an @_spi context.
+  bool isSPI() const;
+
+  // List the SPI groups declared with @_spi or inherited by this decl.
+  //
+  // SPI groups are inherited from the parent contexts only if the local decl
+  // doesn't declare any @_spi.
+  ArrayRef<Identifier> getSPIGroups() const;
+
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(
@@ -1218,7 +1228,9 @@ public:
   void print(raw_ostream &OS) const;
   void print(ASTPrinter &Printer) const;
 };
-  
+
+using GenericParamSource = PointerUnion<GenericContext *, GenericParamList *>;
+
 /// GenericParamList - A list of generic parameters that is part of a generic
 /// function or type, along with extra requirements placed on those generic
 /// parameters and types derived from them.

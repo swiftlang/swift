@@ -427,3 +427,56 @@ struct TestConstraintGenerationErrors {
     }
   }
 }
+
+// Check @unknown
+func testUnknownInSwitchSwitch(e: E) {
+    tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    @unknown case .a: // expected-error{{'@unknown' is only supported for catch-all cases ("case _")}}
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+    default:
+      "nothing"
+    }
+  }
+}
+
+// Check for mutability mismatches when there are multiple case items
+// referring to same-named variables.
+enum E3 {
+  case a(Int, String)
+  case b(String, Int)
+  case c(String, Int)
+}
+
+func testCaseMutabilityMismatches(e: E3) {
+    tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    case .a(let x, var y),
+         .b(let y, // expected-error{{'let' pattern binding must match previous 'var' pattern binding}}
+            var x), // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
+         .c(let y, // expected-error{{'let' pattern binding must match previous 'var' pattern binding}}
+            var x): // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
+      x
+      y += "a"
+    }
+  }
+}
+
+// Check for type equivalence among different case variables with the same name.
+func testCaseVarTypes(e: E3) {
+    // FIXME: Terrible diagnostic
+    tuplify(true) { c in  // expected-error{{type of expression is ambiguous without more context}}
+    "testSwitch"
+    switch e {
+    case .a(let x, let y),
+         .c(let x, let y):
+      x
+      y + "a"
+    }
+  }
+}

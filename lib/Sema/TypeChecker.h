@@ -696,7 +696,9 @@ public:
 
   /// Construct a new generic environment for the given declaration context.
   ///
-  /// \param genericParams The generic parameters to validate.
+  /// \param paramSource The source of generic info: either a generic parameter
+  /// list or a generic context with a \c where clause dependent on outer
+  /// generic parameters.
   ///
   /// \param dc The declaration context in which to perform the validation.
   ///
@@ -714,7 +716,7 @@ public:
   ///
   /// \returns the resulting generic signature.
   static GenericSignature checkGenericSignature(
-                        GenericParamList *genericParams,
+                        GenericParamSource paramSource,
                         DeclContext *dc,
                         GenericSignature outerSignature,
                         bool allowConcreteGenericParams,
@@ -1653,6 +1655,12 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      GenericSignature sig,
                                      SubstitutionMap Substitutions,
                                      bool isExtension);
+
+/// Check for restrictions on the use of the @unknown attribute on a
+/// case statement.
+void checkUnknownAttrRestrictions(
+    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
+    bool &limitExhaustivityChecks);
 
 /// Bind all of the pattern variables that occur within a case statement and
 /// all of its case items to their "parent" pattern variables, forming chains

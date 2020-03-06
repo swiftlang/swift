@@ -46,17 +46,20 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
 namespace {
 
 class LiveRange {
+  /// The parent value that introduces the live range.
+  SILValue value;
+
   /// A list of destroy_values of the live range.
-  SmallVector<SILInstruction *, 2> destroys;
+  SmallVector<Operand *, 2> destroyingUses;
 
   /// A list of forwarding instructions that forward our destroys ownership, but
   /// that are also able to forward guaranteed ownership.
-  SmallVector<SILInstruction *, 2> generalForwardingInsts;
+  SmallVector<Operand *, 2> generalForwardingUses;
 
   /// Consuming users that we were not able to understand as a forwarding
   /// instruction or a destroy_value. These must be passed a strongly control
   /// equivalent +1 value.
-  SmallVector<SILInstruction *, 2> unknownConsumingUsers;
+  SmallVector<Operand *, 2> unknownConsumingUses;
 
 public:
   LiveRange(SILValue value);
@@ -68,18 +71,67 @@ public:
   ///
   /// Semantically this implies that a value is never passed off as +1 to memory
   /// or another function implying it can be used everywhere at +0.
-  bool hasConsumingUse() const { return unknownConsumingUsers.size(); }
+  bool hasConsumingUse() const { return unknownConsumingUses.size(); }
 
-  ArrayRef<SILInstruction *> getDestroys() const { return destroys; }
-  ArrayRef<SILInstruction *> getNonConsumingForwardingInsts() const {
-    return generalForwardingInsts;
+  ArrayRef<Operand *> getDestroyingUses() const { return destroyingUses; }
+
+private:
+  struct OperandToUser;
+
+public:
+  using DestroyingInstsRange =
+      TransformRange<ArrayRef<Operand *>, OperandToUser>;
+  DestroyingInstsRange getDestroyingInsts() const;
+
+  ArrayRef<Operand *> getNonConsumingForwardingUses() const {
+    return generalForwardingUses;
   }
+
+  /// A consuming operation that:
+  ///
+  /// 1. If \p insertEndBorrows is true inserts end borrows at all
+  ///    destroying insts locations.
+  ///
+  /// 2. Deletes all destroy_values.
+  ///
+  /// 3. RAUW value with newGuaranteedValue.
+  ///
+  /// 4. Convert all of the general forwarding instructions from
+  ///    @owned -> @guaranteed. "Like Dominoes".
+  ///
+  /// 5. Leaves all of the unknown consuming users alone. It is up to
+  ///    the caller to handle converting their ownership.
+  void convertToGuaranteedAndRAUW(SILValue newGuaranteedValue,
+                                  InstModCallbacks callbacks) &&;
+
+  /// Given a new guaranteed value, insert end_borrow for the newGuaranteedValue
+  /// at all of our destroy_values in prepration for converting from owned to
+  /// guaranteed.
+  ///
+  /// This is used when converting load [copy] -> load_borrow.
+  void insertEndBorrowsAtDestroys(SILValue newGuaranteedValue,
+                                  DeadEndBlocks &deadEndBlocks,
+                                  ValueLifetimeAnalysis::Frontier &scratch);
 };
 
 } // end anonymous namespace
 
+struct LiveRange::OperandToUser {
+  OperandToUser() {}
+
+  SILInstruction *operator()(const Operand *use) const {
+    auto *nonConstUse = const_cast<Operand *>(use);
+    return nonConstUse->getUser();
+  }
+};
+
+LiveRange::DestroyingInstsRange LiveRange::getDestroyingInsts() const {
+  return DestroyingInstsRange(getDestroyingUses(), OperandToUser());
+}
+
 LiveRange::LiveRange(SILValue value)
-    : destroys(), generalForwardingInsts(), unknownConsumingUsers() {
+    : value(value), destroyingUses(), generalForwardingUses(),
+      unknownConsumingUses() {
   assert(value.getOwnershipKind() == ValueOwnershipKind::Owned);
 
   // We know that our silvalue produces an @owned value. Look through all of our
@@ -109,8 +161,8 @@ LiveRange::LiveRange(SILValue value)
 
     // Ok, we know now that we have a consuming use. See if we have a destroy
     // value, quickly up front. If we do have one, stash it and continue.
-    if (auto *dvi = dyn_cast<DestroyValueInst>(user)) {
-      destroys.push_back(dvi);
+    if (isa<DestroyValueInst>(user)) {
+      destroyingUses.push_back(op);
       continue;
     }
 
@@ -134,13 +186,13 @@ LiveRange::LiveRange(SILValue value)
                         return v.getOwnershipKind() ==
                                ValueOwnershipKind::Owned;
                       })) {
-      unknownConsumingUsers.push_back(user);
+      unknownConsumingUses.push_back(op);
       continue;
     }
 
     // Ok, this is a forwarding instruction whose ownership we can flip from
     // owned -> guaranteed.
-    generalForwardingInsts.push_back(user);
+    generalForwardingUses.push_back(op);
 
     // If we have a non-terminator, just visit its users recursively to see if
     // the the users force the live range to be alive.
@@ -172,6 +224,108 @@ LiveRange::LiveRange(SILValue value)
         // recursively.
         llvm::copy(succArg->getUses(), std::back_inserter(worklist));
       }
+    }
+  }
+}
+
+void LiveRange::insertEndBorrowsAtDestroys(
+    SILValue newGuaranteedValue, DeadEndBlocks &deadEndBlocks,
+    ValueLifetimeAnalysis::Frontier &scratch) {
+  assert(scratch.empty() && "Expected scratch to be initially empty?!");
+
+  // Since we are looking through forwarding uses that can accept guaranteed
+  // parameters, we can have multiple destroy_value along the same path. We need
+  // to find the post-dominating block set of these destroy value to ensure that
+  // we do not insert multiple end_borrow.
+  //
+  // TODO: Hoist this out?
+  auto *inst = value->getDefiningInstruction();
+  assert(inst && "Should only call this with value's that are actually part of "
+                 "an instruction");
+
+  ValueLifetimeAnalysis analysis(inst, getDestroyingInsts());
+  bool foundCriticalEdges = !analysis.computeFrontier(
+      scratch, ValueLifetimeAnalysis::DontModifyCFG, &deadEndBlocks);
+  (void)foundCriticalEdges;
+  assert(!foundCriticalEdges);
+  auto loc = RegularLocation::getAutoGeneratedLocation();
+  while (!scratch.empty()) {
+    auto *insertPoint = scratch.pop_back_val();
+    SILBuilderWithScope builder(insertPoint);
+    builder.createEndBorrow(loc, newGuaranteedValue);
+  }
+}
+
+void LiveRange::convertToGuaranteedAndRAUW(SILValue newGuaranteedValue,
+                                           InstModCallbacks callbacks) && {
+  assert(isa<SingleValueInstruction>(value) &&
+         "Can only convert single value instruction live ranges to guaranteed");
+  while (!destroyingUses.empty()) {
+    auto *d = destroyingUses.pop_back_val();
+    callbacks.deleteInst(d->getUser());
+    ++NumEliminatedInsts;
+  }
+
+  callbacks.eraseAndRAUWSingleValueInst(cast<SingleValueInstruction>(value),
+                                        newGuaranteedValue);
+
+  // Then change all of our guaranteed forwarding insts to have guaranteed
+  // ownership kind instead of what ever they previously had (ignoring trivial
+  // results);
+  while (!generalForwardingUses.empty()) {
+    auto *i = generalForwardingUses.pop_back_val()->getUser();
+
+    // If this is a term inst, just convert all of its incoming values that are
+    // owned to be guaranteed.
+    if (auto *ti = dyn_cast<TermInst>(i)) {
+      for (auto &succ : ti->getSuccessors()) {
+        auto *succBlock = succ.getBB();
+
+        // If we do not have any arguments, then continue.
+        if (succBlock->args_empty())
+          continue;
+
+        for (auto *succArg : succBlock->getSILPhiArguments()) {
+          // If we have an any value, just continue.
+          if (succArg->getOwnershipKind() == ValueOwnershipKind::Owned) {
+            succArg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+          }
+        }
+      }
+      continue;
+    }
+
+    assert(i->hasResults());
+    for (SILValue result : i->getResults()) {
+      if (auto *svi = dyn_cast<OwnershipForwardingSingleValueInst>(result)) {
+        if (svi->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          svi->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(result)) {
+        if (ofci->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          ofci->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *sei = dyn_cast<OwnershipForwardingSelectEnumInstBase>(result)) {
+        if (sei->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          sei->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(result)) {
+        if (mvir->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          mvir->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      llvm_unreachable("unhandled forwarding instruction?!");
     }
   }
 }
@@ -300,74 +454,6 @@ bool IsAddressWrittenToDefUseAnalysis::isWrittenToHelper(SILValue initialValue) 
 }
 
 //===----------------------------------------------------------------------===//
-//             Convert Forwarding Insts from Owned -> Guaranteed
-//===----------------------------------------------------------------------===//
-
-static void convertForwardingInstsFromOwnedToGuaranteed(
-    ArrayRef<SILInstruction *> guaranteedForwardingInsts) {
-  // Then change all of our guaranteed forwarding insts to have guaranteed
-  // ownership kind instead of what ever they previously had (ignoring trivial
-  // results);
-  while (!guaranteedForwardingInsts.empty()) {
-    auto *i = guaranteedForwardingInsts.back();
-    guaranteedForwardingInsts = guaranteedForwardingInsts.drop_back();
-
-    // If this is a term inst, just convert all of its incoming values that are
-    // owned to be guaranteed.
-    if (auto *ti = dyn_cast<TermInst>(i)) {
-      for (auto &succ : ti->getSuccessors()) {
-        auto *succBlock = succ.getBB();
-
-        // If we do not have any arguments, then continue.
-        if (succBlock->args_empty())
-          continue;
-
-        for (auto *succArg : succBlock->getSILPhiArguments()) {
-          // If we have an any value, just continue.
-          if (succArg->getOwnershipKind() == ValueOwnershipKind::Owned) {
-            succArg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-          }
-        }
-      }
-      continue;
-    }
-
-    assert(i->hasResults());
-    for (SILValue result : i->getResults()) {
-      if (auto *svi = dyn_cast<OwnershipForwardingSingleValueInst>(result)) {
-        if (svi->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          svi->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(result)) {
-        if (ofci->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          ofci->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      if (auto *sei = dyn_cast<OwnershipForwardingSelectEnumInstBase>(result)) {
-        if (sei->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          sei->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(result)) {
-        if (mvir->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          mvir->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      llvm_unreachable("unhandled forwarding instruction?!");
-    }
-  }
-}
-
-//===----------------------------------------------------------------------===//
 //                               Implementation
 //===----------------------------------------------------------------------===//
 
@@ -447,6 +533,15 @@ struct SemanticARCOptVisitor
       worklist.insert(*opt);
     }
     visitedSinceLastMutation.clear();
+  }
+
+  InstModCallbacks getCallbacks() {
+    return InstModCallbacks(
+        [this](SILInstruction *inst) { eraseInstruction(inst); },
+        [](SILInstruction *) {}, [](SILValue, SILValue) {},
+        [this](SingleValueInstruction *i, SILValue value) {
+          eraseAndRAUWSingleValueInstruction(i, value);
+        });
   }
 
   /// The default visitor.
@@ -745,7 +840,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
         return borrowScope.isLocalScope();
       });
 
-  auto destroys = lr.getDestroys();
+  auto destroys = lr.getDestroyingUses();
   if (destroys.empty() && haveAnyLocalScopes) {
     return false;
   }
@@ -766,16 +861,16 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   //    non-local scopes.
   {
     bool foundNonDeadEnd = false;
-    for (auto *dvi : destroys) {
-      foundNonDeadEnd |= !getDeadEndBlocks().isDeadEnd(dvi->getParent());
+    for (auto *d : destroys) {
+      foundNonDeadEnd |= !getDeadEndBlocks().isDeadEnd(d->getParentBlock());
     }
     if (!foundNonDeadEnd && haveAnyLocalScopes)
       return false;
-    SmallVector<SILInstruction *, 8> scratchSpace;
+    SmallVector<Operand *, 8> scratchSpace;
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     if (llvm::any_of(borrowScopeIntroducers,
                      [&](BorrowScopeIntroducingValue borrowScope) {
-                       return !borrowScope.areInstructionsWithinScope(
+                       return !borrowScope.areUsesWithinScope(
                            destroys, scratchSpace, visitedBlocks,
                            getDeadEndBlocks());
                      })) {
@@ -784,18 +879,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   }
 
   // Otherwise, we know that our copy_value/destroy_values are all completely
-  // within the guaranteed value scope. First delete the destroys/copies.
-  while (!destroys.empty()) {
-    auto *dvi = destroys.back();
-    destroys = destroys.drop_back();
-    eraseInstruction(dvi);
-    ++NumEliminatedInsts;
-  }
-
-  eraseAndRAUWSingleValueInstruction(cvi, cvi->getOperand());
-  convertForwardingInstsFromOwnedToGuaranteed(
-      lr.getNonConsumingForwardingInsts());
-
+  // within the guaranteed value scope. So RAUW and convert to guaranteed!
+  std::move(lr).convertToGuaranteedAndRAUW(cvi->getOperand(), getCallbacks());
   ++NumEliminatedInsts;
   return true;
 }
@@ -1065,8 +1150,40 @@ public:
   }
   
   void visitNestedAccess(BeginAccessInst *access) {
-    // Look through nested accesses.
-    return next(access->getOperand());
+    // First see if we have read/modify. If we do not, just look through the
+    // nested access.
+    switch (access->getAccessKind()) {
+    case SILAccessKind::Init:
+    case SILAccessKind::Deinit:
+      return next(access->getOperand());
+    case SILAccessKind::Read:
+    case SILAccessKind::Modify:
+      break;
+    }
+
+    // Next check if our live range is completely in the begin/end access
+    // scope. If so, we may be able to use a load_borrow here!
+    SmallVector<Operand *, 8> endScopeUses;
+    transform(access->getEndAccesses(), std::back_inserter(endScopeUses),
+              [](EndAccessInst *eai) {
+                return &eai->getAllOperands()[0];
+              });
+    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
+    LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
+    if (!checker.validateLifetime(access, endScopeUses,
+                                  liveRange.getDestroyingUses())) {
+      // If we fail the linear lifetime check, then just recur:
+      return next(access->getOperand());
+    }
+
+    // Otherwise, if we have read, then we are done!
+    if (access->getAccessKind() == SILAccessKind::Read) {
+      return answer(false);
+    }
+
+    // If we have a modify, check if our value is /ever/ written to. If it is
+    // never actually written to, then we convert to a load_borrow.
+    return answer(ARCOpt.isAddressWrittenToDefUseAnalysis(access));
   }
   
   void visitArgumentAccess(SILFunctionArgument *arg) {
@@ -1141,14 +1258,16 @@ public:
     // borrow scope introducing value and then use the linear lifetime checker
     // to check whether the copied value is dominated by the lifetime of the
     // borrow it's based on.
-    SmallVector<SILInstruction *, 4> endScopeInsts;
-    value->getLocalScopeEndingInstructions(endScopeInsts);
+    SmallVector<Operand *, 4> endScopeInsts;
+    value->visitLocalScopeEndingUses(
+        [&](Operand *use) { endScopeInsts.push_back(use); });
 
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
+
     // Returns true on success. So we invert.
     bool foundError = !checker.validateLifetime(baseObject, endScopeInsts,
-                                                liveRange.getDestroys());
+                                                liveRange.getDestroyingUses());
     return answer(foundError);
   }
   
@@ -1174,8 +1293,8 @@ public:
   /// See if we have an alloc_stack that is only written to once by an
   /// initializing instruction.
   void visitStackAccess(AllocStackInst *stack) {
-    SmallVector<SILInstruction *, 8> destroyAddrs;
-    bool initialAnswer = isSingleInitAllocStack(stack, destroyAddrs);
+    SmallVector<Operand *, 8> destroyAddrOperands;
+    bool initialAnswer = isSingleInitAllocStack(stack, destroyAddrOperands);
     if (!initialAnswer)
       return answer(true);
 
@@ -1185,8 +1304,8 @@ public:
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     // Returns true on success. So we invert.
     bool foundError = !checker.validateLifetime(
-        stack, destroyAddrs /*consuming users*/,
-        liveRange.getDestroys() /*non consuming users*/);
+        stack, destroyAddrOperands /*consuming users*/,
+        liveRange.getDestroyingUses() /*non consuming users*/);
     return answer(foundError);
   }
 
@@ -1233,41 +1352,8 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   auto *lbi =
       SILBuilderWithScope(li).createLoadBorrow(li->getLoc(), li->getOperand());
 
-  // Since we are looking through forwarding uses that can accept guaranteed
-  // parameters, we can have multiple destroy_value along the same path. We need
-  // to find the post-dominating block set of these destroy value to ensure that
-  // we do not insert multiple end_borrow.
-  assert(lifetimeFrontier.empty());
-  auto destroyValues = lr.getDestroys();
-  ValueLifetimeAnalysis analysis(li, destroyValues);
-  bool foundCriticalEdges = !analysis.computeFrontier(
-      lifetimeFrontier, ValueLifetimeAnalysis::DontModifyCFG,
-      &getDeadEndBlocks());
-  (void)foundCriticalEdges;
-  assert(!foundCriticalEdges);
-  auto loc = RegularLocation::getAutoGeneratedLocation();
-  while (!lifetimeFrontier.empty()) {
-    auto *insertPoint = lifetimeFrontier.pop_back_val();
-    SILBuilderWithScope builder(insertPoint);
-    builder.createEndBorrow(loc, lbi);
-  }
-
-  // Then delete all of our destroy_value.
-  while (!destroyValues.empty()) {
-    auto *dvi = destroyValues.back();
-    destroyValues = destroyValues.drop_back();
-    eraseInstruction(dvi);
-    ++NumEliminatedInsts;
-  }
-
-  // RAUW our other uses from the load to the load_borrow.
-  eraseAndRAUWSingleValueInstruction(li, lbi);
-
-  // And then change the ownership all of our owned forwarding users to be
-  // guaranteed.
-  convertForwardingInstsFromOwnedToGuaranteed(
-      lr.getNonConsumingForwardingInsts());
-
+  lr.insertEndBorrowsAtDestroys(lbi, getDeadEndBlocks(), lifetimeFrontier);
+  std::move(lr).convertToGuaranteedAndRAUW(lbi, getCallbacks());
   ++NumEliminatedInsts;
   ++NumLoadCopyConvertedToLoadBorrow;
   return true;

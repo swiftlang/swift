@@ -1308,6 +1308,17 @@ public:
       });
     }
 
+    if (subs.getGenericSignature()->getCanonicalSignature() !=
+          fnTy->getSubstGenericSignature()->getCanonicalSignature()) {
+      llvm::dbgs() << "substitution map's generic signature: ";
+      subs.getGenericSignature()->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      llvm::dbgs() << "callee's generic signature: ";
+      fnTy->getSubstGenericSignature()->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      require(false,
+              "Substitution map does not match callee in apply instruction");
+    }
     // Apply the substitutions.
     return fnTy->substGenericArgs(F.getModule(), subs, F.getTypeExpansionContext());
   }

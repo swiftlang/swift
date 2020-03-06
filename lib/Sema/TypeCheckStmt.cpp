@@ -1035,40 +1035,6 @@ public:
     std::swap(*prevCaseDecls, *nextCaseDecls);
   }
 
-  void checkUnknownAttrRestrictions(CaseStmt *caseBlock,
-                                    bool &limitExhaustivityChecks) {
-    if (caseBlock->getCaseLabelItems().size() != 1) {
-      assert(!caseBlock->getCaseLabelItems().empty() &&
-             "parser should not produce case blocks with no items");
-      getASTContext().Diags.diagnose(caseBlock->getLoc(),
-                                     diag::unknown_case_multiple_patterns)
-          .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
-      limitExhaustivityChecks = true;
-    }
-
-    if (FallthroughDest != nullptr) {
-      if (!caseBlock->isDefault())
-        getASTContext().Diags.diagnose(caseBlock->getLoc(),
-                                       diag::unknown_case_must_be_last);
-      limitExhaustivityChecks = true;
-    }
-
-    const auto &labelItem = caseBlock->getCaseLabelItems().front();
-    if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
-      getASTContext().Diags.diagnose(labelItem.getStartLoc(),
-                                     diag::unknown_case_where_clause)
-          .highlight(labelItem.getGuardExpr()->getSourceRange());
-    }
-
-    const Pattern *pattern =
-        labelItem.getPattern()->getSemanticsProvidingPattern();
-    if (!isa<AnyPattern>(pattern)) {
-      getASTContext().Diags.diagnose(labelItem.getStartLoc(),
-                                     diag::unknown_case_must_be_catchall)
-          .highlight(pattern->getSourceRange());
-    }
-  }
-
   void checkFallthroughPatternBindingsAndTypes(CaseStmt *caseBlock,
                                                CaseStmt *previousBlock) {
     auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
@@ -1236,7 +1202,9 @@ public:
 
       // Check restrictions on '@unknown'.
       if (caseBlock->hasUnknownAttr()) {
-        checkUnknownAttrRestrictions(caseBlock, limitExhaustivityChecks);
+        checkUnknownAttrRestrictions(
+            getASTContext(), caseBlock, FallthroughDest,
+            limitExhaustivityChecks);
       }
 
       // If the previous case fellthrough, similarly check that that case's
@@ -2067,8 +2035,43 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   performTopLevelDeclDiagnostics(TLCD);
 }
 
+void swift::checkUnknownAttrRestrictions(
+    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
+    bool &limitExhaustivityChecks) {
+  if (caseBlock->getCaseLabelItems().size() != 1) {
+    assert(!caseBlock->getCaseLabelItems().empty() &&
+           "parser should not produce case blocks with no items");
+    ctx.Diags.diagnose(caseBlock->getLoc(),
+                       diag::unknown_case_multiple_patterns)
+        .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
+    limitExhaustivityChecks = true;
+  }
+
+  if (fallthroughDest != nullptr) {
+    if (!caseBlock->isDefault())
+      ctx.Diags.diagnose(caseBlock->getLoc(),
+                         diag::unknown_case_must_be_last);
+    limitExhaustivityChecks = true;
+  }
+
+  const auto &labelItem = caseBlock->getCaseLabelItems().front();
+  if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
+    ctx.Diags.diagnose(labelItem.getStartLoc(),
+                                   diag::unknown_case_where_clause)
+        .highlight(labelItem.getGuardExpr()->getSourceRange());
+  }
+
+  const Pattern *pattern =
+      labelItem.getPattern()->getSemanticsProvidingPattern();
+  if (!isa<AnyPattern>(pattern)) {
+    ctx.Diags.diagnose(labelItem.getStartLoc(),
+                       diag::unknown_case_must_be_catchall)
+        .highlight(pattern->getSourceRange());
+  }
+}
+
 void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
-  llvm::SmallDenseMap<Identifier, VarDecl *, 4> latestVars;
+  llvm::SmallDenseMap<Identifier, std::pair<VarDecl *, bool>, 4> latestVars;
   auto recordVar = [&](VarDecl *var) {
     if (!var->hasName())
       return;
@@ -2076,14 +2079,37 @@ void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
     // If there is an existing variable with this name, set it as the
     // parent of this new variable.
     auto &entry = latestVars[var->getName()];
-    if (entry) {
+    if (entry.first) {
       assert(!var->getParentVarDecl() ||
-             var->getParentVarDecl() == entry);
-      var->setParentVarDecl(entry);
+             var->getParentVarDecl() == entry.first);
+      var->setParentVarDecl(entry.first);
+
+      // Check for a mutability mismatch.
+      if (entry.second != var->isLet()) {
+        // Find the original declaration.
+        auto initialCaseVarDecl = entry.first;
+        while (auto parentVar = initialCaseVarDecl->getParentVarDecl())
+          initialCaseVarDecl = parentVar;
+
+        auto diag = var->diagnose(diag::mutability_mismatch_multiple_pattern_list,
+                                  var->isLet(), initialCaseVarDecl->isLet());
+
+        VarPattern *foundVP = nullptr;
+        var->getParentPattern()->forEachNode([&](Pattern *P) {
+          if (auto *VP = dyn_cast<VarPattern>(P))
+            if (VP->getSingleVar() == var)
+              foundVP = VP;
+        });
+        if (foundVP)
+          diag.fixItReplace(foundVP->getLoc(),
+                            initialCaseVarDecl->isLet() ? "let" : "var");
+      }
+    } else {
+      entry.second = var->isLet();
     }
 
     // Record this variable as the latest with this name.
-    entry = var;
+    entry.first = var;
   };
 
   // Wire up the parent var decls for each variable that occurs within

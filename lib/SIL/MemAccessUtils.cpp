@@ -22,37 +22,39 @@
 using namespace swift;
 
 SILValue swift::stripAccessMarkers(SILValue v) {
-  while (true) {
-    switch (v->getKind()) {
-    default:
-      return v;
-
-    case ValueKind::BeginBorrowInst:
-    case ValueKind::BeginAccessInst:
-      v = cast<SingleValueInstruction>(v)->getOperand(0);
-    }
+  while (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    v = bai->getOperand();
   }
+  return v;
+}
+
+// The resulting projection must have an address-type operand at index zero
+// representing the projected address.
+SingleValueInstruction *swift::isAccessProjection(SILValue v) {
+  switch (v->getKind()) {
+  default:
+    return nullptr;
+
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::TupleElementAddrInst:
+  case ValueKind::UncheckedTakeEnumDataAddrInst:
+  case ValueKind::TailAddrInst:
+  case ValueKind::IndexAddrInst:
+    return cast<SingleValueInstruction>(v);
+  };
 }
 
 // TODO: When the optimizer stops stripping begin_access markers, then we should
 // be able to assert that the result is a BeginAccessInst and the default case
 // is unreachable.
 SILValue swift::getAccessedAddress(SILValue v) {
-  assert(v->getType().isAddress());
   while (true) {
-    switch (v->getKind()) {
-    default:
+    assert(v->getType().isAddress());
+    auto *projection = isAccessProjection(v);
+    if (!projection)
       return v;
 
-    case ValueKind::BeginBorrowInst:
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::UncheckedTakeEnumDataAddrInst:
-    case ValueKind::TailAddrInst:
-    case ValueKind::IndexAddrInst:
-      v = cast<SingleValueInstruction>(v)->getOperand(0);
-      continue;
-    };
+    v = projection->getOperand(0);
   }
 }
 
@@ -712,8 +714,8 @@ SILBasicBlock::iterator swift::removeBeginAccess(BeginAccessInst *beginAccess) {
   return beginAccess->getParent()->erase(beginAccess);
 }
 
-bool swift::isSingleInitAllocStack(
-    AllocStackInst *asi, SmallVectorImpl<SILInstruction *> &destroyingUsers) {
+bool swift::isSingleInitAllocStack(AllocStackInst *asi,
+                                   SmallVectorImpl<Operand *> &destroyingUses) {
   // For now, we just look through projections and rely on memInstMustInitialize
   // to classify all other uses as init or not.
   SmallVector<Operand *, 32> worklist(asi->getUses());
@@ -745,7 +747,7 @@ bool swift::isSingleInitAllocStack(
     default:
       break;
     case SILInstructionKind::DestroyAddrInst:
-      destroyingUsers.push_back(user);
+      destroyingUses.push_back(use);
       continue;
     case SILInstructionKind::DeallocStackInst:
     case SILInstructionKind::LoadBorrowInst:

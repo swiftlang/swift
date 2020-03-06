@@ -53,6 +53,14 @@ namespace swift {
 /// (pointer-to-address is not stripped).
 SILValue stripAccessMarkers(SILValue v);
 
+/// Return a non-null address-type SingleValueInstruction if \p v is the result
+/// of an address projection that may be inside of a formal access, such as
+/// (begin_borrow, struct_element_addr, tuple_element_addr).
+///
+/// The resulting projection must have an address-type operand at index zero
+/// representing the projected address.
+SingleValueInstruction *isAccessProjection(SILValue v);
+
 /// Attempt to return the address corresponding to a variable's formal access
 /// by stripping indexing and address projections.
 ///
@@ -540,7 +548,7 @@ bool memInstMustInitialize(Operand *memOper);
 /// alloc_stack. If the alloc_stack is destroyed in pieces, we do not guarantee
 /// that the list of destroying users is a minimal jointly post-dominating set.
 bool isSingleInitAllocStack(AllocStackInst *asi,
-                            SmallVectorImpl<SILInstruction *> &destroyingUsers);
+                            SmallVectorImpl<Operand *> &destroyingUses);
 
 /// Return true if the given address producer may be the source of a formal
 /// access (a read or write of a potentially aliased, user visible variable).

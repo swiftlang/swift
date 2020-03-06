@@ -1516,9 +1516,6 @@ public:
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
 
-  /// The original CS if this CS was created as a simplification of another CS
-  ConstraintSystem *baseCS = nullptr;
-
   /// The total number of disjunctions created.
   unsigned CountDisjunctions = 0;
 
@@ -1696,8 +1693,6 @@ private:
     DeclContext *DC;
     llvm::BumpPtrAllocator &Allocator;
 
-    ConstraintSystem &BaseCS;
-
     // Contextual Information.
     Type CT;
     ContextualTypePurpose CTP;
@@ -1705,8 +1700,7 @@ private:
   public:
     Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), DC(cs.DC), Allocator(cs.Allocator), BaseCS(cs),
-          CT(ct), CTP(ctp) {}
+        : E(expr), DC(cs.DC), Allocator(cs.Allocator), CT(ct), CTP(ctp) {}
 
     /// Return underlying expression.
     Expr *getExpr() const { return E; }

@@ -63,6 +63,11 @@ SwiftVersion("swift-version", llvm::cl::desc("Interpret input according to a spe
 static llvm::cl::opt<bool>
 PrettyPrint("pretty-print", llvm::cl::desc("Pretty-print the resulting Symbol Graph JSON"), llvm::cl::cat(Category));
 
+static llvm::cl::opt<bool>
+SkipSynthesizedMembers("skip-synthesized-members",
+                       llvm::cl::desc("Skip members inherited through classes or default implementations"),
+                       llvm::cl::cat(Category));
+
 static llvm::cl::opt<std::string>
 MinimumAccessLevel("minimum-access-level", llvm::cl::desc("Include symbols with this access level or more"), llvm::cl::cat(Category));
 
@@ -171,6 +176,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
     llvm::Triple(options::Target),
     options::PrettyPrint,
     AccessLevel::Public,
+    !options::SkipSynthesizedMembers,
   };
 
   if (!options::MinimumAccessLevel.empty()) {

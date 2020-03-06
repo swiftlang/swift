@@ -30,6 +30,7 @@
 #include <mach-o/getsect.h>
 
 #include <CoreFoundation/CFDictionary.h>
+#include <TargetConditionals.h>
 
 /// The "public" interface follows. All of these functions are the same
 /// as the corresponding swift_reflection_* functions, except for taking
@@ -535,12 +536,28 @@ swift_reflection_interop_minimalDataLayoutQueryFunction4(
   void *ReaderContext,
   DataLayoutQueryType type,
   void *inBuffer, void *outBuffer) {
-  if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
+  switch (type) {
+  case DLQ_GetPointerSize:
+  case DLQ_GetSizeSize: {
     uint8_t *result = (uint8_t *)outBuffer;
     *result = 4;
     return 1;
   }
-  return 0;
+  case DLQ_GetObjCReservedLowBits: {
+    uint8_t *result = (uint8_t *)outBuffer;
+    // Swift assumes this for all 32-bit platforms, including Darwin
+    *result = 0;
+    return 1;
+  }
+  case DLQ_GetLeastValidPointerValue: {
+    uint64_t *result = (uint64_t *)outBuffer;
+    // Swift assumes this for all 32-bit platforms, including Darwin
+    *result = 0x1000;
+    return 1;
+  }
+  default:
+    return 0;
+  }
 }
 
 static inline int
@@ -548,12 +565,49 @@ swift_reflection_interop_minimalDataLayoutQueryFunction8(
   void *ReaderContext,
   DataLayoutQueryType type,
   void *inBuffer, void *outBuffer) {
-  if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
+  // Caveat: This assumes the process being examined is
+  // running in the same kind of environment as this host code.
+#if defined(__APPLE__) && __APPLE__
+    auto applePlatform = true;
+#else
+    auto applePlatform = false;
+#endif
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+    auto iosDerivedPlatform = true;
+#else
+    auto iosDerivedPlatform = false;
+#endif
+
+  switch (type) {
+  case DLQ_GetPointerSize:
+  case DLQ_GetSizeSize: {
     uint8_t *result = (uint8_t *)outBuffer;
     *result = 8;
     return 1;
   }
-  return 0;
+  case DLQ_GetObjCReservedLowBits: {
+    uint8_t *result = (uint8_t *)outBuffer;
+    if (applePlatform && !iosDerivedPlatform) {
+      *result = 1;
+    } else {
+      *result = 0;
+    }
+    return 1;
+  }
+  case DLQ_GetLeastValidPointerValue: {
+    uint64_t *result = (uint64_t *)outBuffer;
+    if (applePlatform) {
+      // On 64-bit Apple platforms, Swift reserves the first 4GiB
+      *result = 0x100000000;
+    } else {
+      // Swift reserves the first 4KiB everywhere else.
+      *result = 0x1000;
+    }
+    return 1;
+  }
+  default:
+    return 0;
+  }
 }
 
 static inline SwiftReflectionInteropContextRef

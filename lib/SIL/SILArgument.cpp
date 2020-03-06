@@ -86,6 +86,22 @@ bool SILPhiArgument::isPhiArgument() const {
   return isa<BranchInst>(termInst) || isa<CondBranchInst>(termInst);
 }
 
+static Operand *getIncomingPhiOperandForPred(const SILBasicBlock *parentBlock,
+                                             const SILBasicBlock *predBlock,
+                                             unsigned argIndex) {
+  auto *predBlockTermInst = predBlock->getTerminator();
+  if (auto *bi = dyn_cast<BranchInst>(predBlockTermInst)) {
+    return &const_cast<BranchInst *>(bi)->getAllOperands()[argIndex];
+  }
+
+  // FIXME: Disallowing critical edges in SIL would enormously simplify phi and
+  // branch handling and reduce expensive analysis invalidation. If that is
+  // done, then only BranchInst will participate in phi operands, eliminating
+  // the need to search for the appropriate CondBranchInst operand.
+  return cast<CondBranchInst>(predBlockTermInst)
+      ->getOperandForDestBB(parentBlock, argIndex);
+}
+
 static SILValue getIncomingPhiValueForPred(const SILBasicBlock *parentBlock,
                                            const SILBasicBlock *predBlock,
                                            unsigned argIndex) {
@@ -131,6 +147,24 @@ bool SILPhiArgument::getIncomingPhiValues(
         getIncomingPhiValueForPred(parentBlock, predBlock, argIndex);
     assert(incomingValue);
     returnedPhiValues.push_back(incomingValue);
+  }
+  return true;
+}
+
+bool SILPhiArgument::getIncomingPhiOperands(
+    SmallVectorImpl<Operand *> &returnedPhiOperands) const {
+  if (!isPhiArgument())
+    return false;
+
+  const auto *parentBlock = getParent();
+  assert(!parentBlock->pred_empty());
+
+  unsigned argIndex = getIndex();
+  for (auto *predBlock : getParent()->getPredecessorBlocks()) {
+    Operand *incomingOperand =
+        getIncomingPhiOperandForPred(parentBlock, predBlock, argIndex);
+    assert(incomingOperand);
+    returnedPhiOperands.push_back(incomingOperand);
   }
   return true;
 }

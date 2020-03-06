@@ -124,16 +124,31 @@ namespace {
     Out.resetColor();
   }
 
+  static void printStringAsSingleQuotedLine(StringRef str, raw_ostream &Out) {
+    Out << "'";
+    for (auto character : str) {
+      if (character == '\n')
+        Out << "\\n";
+      else
+        Out << character;
+    }
+    Out << "'";
+  }
+
   // Describe a fix-it out-of-line.
   static void describeFixIt(SourceManager &SM, DiagnosticInfo::FixIt fixIt,
                             raw_ostream &Out) {
     if (fixIt.getRange().getByteLength() == 0) {
-      Out << "insert '" << fixIt.getText() << "'";
+      Out << "insert ";
+      printStringAsSingleQuotedLine(fixIt.getText(), Out);
     } else if (fixIt.getText().empty()) {
-      Out << "remove '" << SM.extractText(fixIt.getRange()) << "'";
+      Out << "remove ";
+      printStringAsSingleQuotedLine(SM.extractText(fixIt.getRange()), Out);
     } else {
-      Out << "replace '" << SM.extractText(fixIt.getRange()) << "' with '"
-          << fixIt.getText() << "'";
+      Out << "replace ";
+      printStringAsSingleQuotedLine(SM.extractText(fixIt.getRange()), Out);
+      Out << " with ";
+      printStringAsSingleQuotedLine(fixIt.getText(), Out);
     }
   }
 
@@ -280,6 +295,11 @@ namespace {
       // line.
       unsigned *byteToColumnMap = new unsigned[LineText.size() + 1];
       unsigned extraColumns = 0;
+      // Track the location of the first character in the line that is not a
+      // whitespace character. This can be used to avoid underlining leading
+      // whitespace, which looks weird even though it is technically accurate.
+      unsigned firstNonWhitespaceColumn = 0;
+      bool seenNonWhitespaceCharacter = false;
       // We count one past the end of LineText here to handle trailing fix-it
       // insertions.
       for (unsigned i = 0; i < LineText.size() + 1; ++i) {
@@ -294,9 +314,17 @@ namespace {
             }
           }
         }
-        // Tabs are mapped to 2 spaces so they have a known column width.
-        if (i < LineText.size() && LineText[i] == '\t')
-          extraColumns += 1;
+
+        if (i < LineText.size()) {
+          // Tabs are mapped to 2 spaces so they have a known column width.
+          if (LineText[i] == '\t')
+            extraColumns += 1;
+
+          if (!seenNonWhitespaceCharacter && !isspace(LineText[i])) {
+            firstNonWhitespaceColumn = i + extraColumns;
+            seenNonWhitespaceCharacter = true;
+          }
+        }
 
         byteToColumnMap[i] = i + extraColumns;
       }
@@ -325,18 +353,28 @@ namespace {
       if (isASCII) {
         auto highlightLine = std::string(byteToColumnMap[LineText.size()], ' ');
         for (auto highlight : Highlights) {
-          for (unsigned i = highlight.StartByte; i < highlight.EndByte; ++i)
+          for (unsigned i =
+                   std::max(highlight.StartByte, firstNonWhitespaceColumn);
+               i < highlight.EndByte; ++i)
             highlightLine[byteToColumnMap[i]] = '~';
         }
 
         for (auto fixIt : FixIts) {
           // Mark deletions.
-          for (unsigned i = fixIt.StartByte; i < fixIt.EndByte; ++i)
+          for (unsigned i = std::max(fixIt.StartByte, firstNonWhitespaceColumn);
+               i < fixIt.EndByte; ++i)
             highlightLine[byteToColumnMap[i]] = '-';
-
-          // Mark insertions.
-          for (unsigned i = byteToColumnMap[fixIt.StartByte - 1] + 1;
-               i < byteToColumnMap[fixIt.StartByte]; ++i)
+          // Mark insertions. If the fix-it starts at the beginning of the line,
+          // highlight from column zero to the end column. Otherwise, find the
+          // column which immediately precedes the insertion. Then, highlight
+          // from the column after that to the end column. The end column in
+          // this case is obtained from the fix-it's starting byte, because
+          // insertions are printed before the deleted range.
+          unsigned startColumn = fixIt.StartByte == 0
+                                     ? 0
+                                     : byteToColumnMap[fixIt.StartByte - 1] + 1;
+          for (unsigned i = startColumn; i < byteToColumnMap[fixIt.StartByte];
+               ++i)
             highlightLine[i] = '+';
         }
 
@@ -640,7 +678,10 @@ static void annotateSnippetWithInfo(SourceManager &SM,
   // Don't print inline fix-its for notes.
   if (Info.Kind != DiagnosticKind::Note) {
     for (auto fixIt : Info.FixIts) {
-      Snippet.addFixIt(fixIt.getRange(), fixIt.getText());
+      // Don't print multi-line fix-its inline, only include them at the end of
+      // the message.
+      if (fixIt.getText().find("\n") == std::string::npos)
+        Snippet.addFixIt(fixIt.getRange(), fixIt.getText());
     }
   }
   // Add any explicitly grouped notes to the snippet.

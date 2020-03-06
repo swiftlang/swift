@@ -1961,7 +1961,7 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' sil-type (',' debug-var-attr)*
+  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
   // %1 has type $*T
@@ -1979,6 +1979,10 @@ deallocated prior to returning from a function. If a block has multiple
 predecessors, the stack height and order of allocations must be consistent
 coming from all predecessor blocks. ``alloc_stack`` allocations must be
 deallocated in last-in, first-out stack order.
+
+The ``dynamic_lifetime`` attribute specifies that the initialization and
+destruction of the stored value cannot be verified at compile time.
+This is the case, e.g. for conditionally initialized objects.
 
 The memory is not retainable. To allocate a retainable box for a value
 type, use ``alloc_box``.

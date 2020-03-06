@@ -2315,7 +2315,8 @@ namespace {
                cast<TypedPattern>(pattern)->getSubPattern(), locator,
                Type(), bindPatternVarsOneWay);
         CS.addConstraint(
-            ConstraintKind::Conversion, subPatternType, openedType, locator);
+            ConstraintKind::Conversion, subPatternType, openedType,
+          locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
         return setType(openedType);
       }
 
@@ -2352,7 +2353,7 @@ namespace {
 
           Type eltTy = getTypeForPattern(
               tupleElt.getPattern(),
-              locator.withPathElement(LocatorPathElt::TupleElement(i)),
+              locator,
               externalEltType,
               bindPatternVarsOneWay);
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
@@ -2368,7 +2369,8 @@ namespace {
               CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
           CS.addConstraint(
               ConstraintKind::OptionalObject, externalPatternType,
-              objVar, locator);
+              objVar,
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           externalPatternType = objVar;
         }
@@ -2386,7 +2388,9 @@ namespace {
 
         Type castType =
             resolveTypeReferenceInExpression(isPattern->getCastTypeLoc());
-        castType = CS.openUnboundGenericType(castType, locator);
+        castType = CS.openUnboundGenericType(
+            castType,
+            locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
         Type subPatternType =
             getTypeForPattern(isPattern->getSubPattern(), locator, castType,
@@ -2395,7 +2399,8 @@ namespace {
         // Make sure we can cast from the subpattern type to the type we're
         // checking; if it's impossible, fail.
         CS.addConstraint(
-            ConstraintKind::CheckedCast, subPatternType, castType, locator);
+            ConstraintKind::CheckedCast, subPatternType, castType,
+            locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
         return setType(subPatternType);
       }
@@ -2422,7 +2427,9 @@ namespace {
           // Resolve the parent type.
           Type parentType =
             resolveTypeReferenceInExpression(enumPattern->getParentType());
-          parentType = CS.openUnboundGenericType(parentType, locator);
+          parentType = CS.openUnboundGenericType(
+              parentType,
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
@@ -2433,8 +2440,9 @@ namespace {
 
           // Parent type needs to be convertible to the pattern type; this
           // accounts for cases where the pattern type is existential.
-          CS.addConstraint(ConstraintKind::Conversion, parentType, patternType,
-                           locator);
+          CS.addConstraint(
+              ConstraintKind::Conversion, parentType, patternType,
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           baseType = parentType;
         } else {
@@ -2470,8 +2478,9 @@ namespace {
               ConstraintKind::Equal, functionType, memberType,
               locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
-          CS.addConstraint(ConstraintKind::Conversion, outputType, baseType,
-                           locator);
+          CS.addConstraint(
+              ConstraintKind::Conversion, outputType, baseType,
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
         }
 
         return setType(patternType);
@@ -4265,10 +4274,18 @@ bool ConstraintSystem::generateConstraints(
     // For any pattern variable that has a parent variable (i.e., another
     // pattern variable with the same name in the same case), require that
     // the types be equivalent.
-    pattern->forEachVariable([&](VarDecl *var) {
+    pattern->forEachNode([&](Pattern *pattern) {
+      auto namedPattern = dyn_cast<NamedPattern>(pattern);
+      if (!namedPattern)
+        return;
+
+      auto var = namedPattern->getDecl();
       if (auto parentVar = var->getParentVarDecl()) {
         addConstraint(
-            ConstraintKind::Equal, getType(parentVar), getType(var), locator);
+            ConstraintKind::Equal, getType(parentVar), getType(var),
+            getConstraintLocator(
+              locator,
+              LocatorPathElt::PatternMatch(namedPattern)));
       }
     });
   }

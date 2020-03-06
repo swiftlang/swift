@@ -3137,6 +3137,9 @@ void ClangModuleUnit::lookupObjCMethods(
     auto owningClangModule = getClangTopLevelOwningModule(objcMethod, clangCtx);
     if (owningClangModule != clangModule) continue;
 
+    if (shouldSuppressDeclImport(objcMethod))
+      continue;
+
     // If we found a property accessor, import the property.
     if (objcMethod->isPropertyAccessor())
       (void)owner.importDecl(objcMethod->findPropertyDecl(true),
