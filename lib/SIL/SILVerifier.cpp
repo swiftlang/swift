@@ -4705,9 +4705,14 @@ public:
               "The transpose function must not be differentiable");
       auto expectedTransposeType = origTy->getAutoDiffTransposeFunctionType(
           lfi->getParameterIndices(), TC, LookUpConformanceInModule(M));
-      requireSameType(SILType::getPrimitiveObjectType(transposeType),
-                      SILType::getPrimitiveObjectType(expectedTransposeType),
-                      "Transpose type does not match expected transpose type");
+      // TODO: Consider tightening verification. This requires changes to
+      // `SILFunctionType::getAutoDiffTransposeFunctionType`.
+      requireSameType(
+          SILType::getPrimitiveObjectType(
+              transposeType->getUnsubstitutedType(F.getModule())),
+          SILType::getPrimitiveObjectType(
+              expectedTransposeType->getUnsubstitutedType(F.getModule())),
+          "Transpose type does not match expected transpose type");
     }
   }
 
