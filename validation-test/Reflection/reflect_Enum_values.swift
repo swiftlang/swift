@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_enum_wip
-// RUN: %target-codesign %t/reflect_enum_wip
+// RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_Enum_values
+// RUN: %target-codesign %t/reflect_Enum_values
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_enum_wip | tee /dev/stderr | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --dump-input=fail
+// RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_values | tee /dev/stderr | %FileCheck %s --check-prefix=CHECK%target-ptrsize --check-prefix=CHECKALL --dump-input=fail
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
@@ -18,20 +18,29 @@ class OneCaseNoPayloadC {
   var y = 42
 }
 reflect(object: OneCaseNoPayloadC())
-// CHECK-64: Reflecting an object.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (class reflect_enum_wip.OneCaseNoPayloadC)
+// CHECKALL: Reflecting an object.
+// CHECKALL-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (class reflect_Enum_values.OneCaseNoPayloadC)
 
-// CHECK-64: Type info:
-// CHECK-64: (class_instance size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:   (field name=x offset=16
-// CHECK-64:     (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:       (case name=only index=0)))
-// CHECK-64:   (field name=y offset=16
-// CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:       (field name=_value offset=0
-// CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))
+// CHECKALL: Type info:
+// CHECK64-NEXT: (class_instance size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:   (field name=x offset=16
+// CHECK64-NEXT:     (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:       (case name=only index=0)))
+// CHECK64-NEXT:   (field name=y offset=16
+// CHECK64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:       (field name=_value offset=0
+// CHECK64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))
+
+// CHECK32-NEXT: (class_instance size=12 alignment=4 stride=12 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:   (field name=x offset=8
+// CHECK32-NEXT:     (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:       (case name=only index=0)))
+// CHECK32-NEXT:   (field name=y offset=8
+// CHECK32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:       (field name=_value offset=0
+// CHECK32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
 
 enum ManyCasesNoPayload {
   case a, b, c, d
@@ -46,50 +55,86 @@ class ManyCasesNoPayloadC {
 }
 reflect(object: ManyCasesNoPayloadC())
 
-// CHECK-64: Reflecting an object.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (class reflect_enum_wip.ManyCasesNoPayloadC)
+// CHECKALL: Reflecting an object.
+// CHECKALL-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (class reflect_Enum_values.ManyCasesNoPayloadC)
 
-// CHECK-64: Type info:
-// CHECK-64: (class_instance size=40 alignment=8 stride=40 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:   (field name=a offset=16
-// CHECK-64:     (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
-// CHECK-64:       (case name=a index=0)
-// CHECK-64:       (case name=b index=1)
-// CHECK-64:       (case name=c index=2)
-// CHECK-64:       (case name=d index=3)))
-// CHECK-64:   (field name=b offset=17
-// CHECK-64:     (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
-// CHECK-64:       (case name=a index=0)
-// CHECK-64:       (case name=b index=1)
-// CHECK-64:       (case name=c index=2)
-// CHECK-64:       (case name=d index=3)))
-// CHECK-64:   (field name=c offset=18
-// CHECK-64:     (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
-// CHECK-64:       (case name=a index=0)
-// CHECK-64:       (case name=b index=1)
-// CHECK-64:       (case name=c index=2)
-// CHECK-64:       (case name=d index=3)))
-// CHECK-64:   (field name=d offset=19
-// CHECK-64:     (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
-// CHECK-64:       (case name=a index=0)
-// CHECK-64:       (case name=b index=1)
-// CHECK-64:       (case name=c index=2)
-// CHECK-64:       (case name=d index=3)))
-// CHECK-64:   (field name=s offset=24
-// CHECK-64:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:       (field name=_guts offset=0
-// CHECK-64:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_object offset=0
-// CHECK-64:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_countAndFlagsBits offset=0
-// CHECK-64:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:                   (field name=_value offset=0
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:               (field name=_object offset=8
-// CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))))))
-
+// CHECKALL: Type info:
+// CHECK64-NEXT: (class_instance size=40 alignment=8 stride=40 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:   (field name=a offset=16
+// CHECK32-NEXT: (class_instance size=24 alignment=4 stride=24 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:   (field name=a offset=8
+// CHECKALL-NEXT:     (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
+// CHECKALL-NEXT:       (case name=a index=0)
+// CHECKALL-NEXT:       (case name=b index=1)
+// CHECKALL-NEXT:       (case name=c index=2)
+// CHECKALL-NEXT:       (case name=d index=3)))
+// CHECK64-NEXT:   (field name=b offset=17
+// CHECK32-NEXT:   (field name=b offset=9
+// CHECKALL-NEXT:     (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
+// CHECKALL-NEXT:       (case name=a index=0)
+// CHECKALL-NEXT:       (case name=b index=1)
+// CHECKALL-NEXT:       (case name=c index=2)
+// CHECKALL-NEXT:       (case name=d index=3)))
+// CHECK64-NEXT:   (field name=c offset=18
+// CHECK32-NEXT:   (field name=c offset=10
+// CHECKALL-NEXT:     (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
+// CHECKALL-NEXT:       (case name=a index=0)
+// CHECKALL-NEXT:       (case name=b index=1)
+// CHECKALL-NEXT:       (case name=c index=2)
+// CHECKALL-NEXT:       (case name=d index=3)))
+// CHECK64-NEXT:   (field name=d offset=19
+// CHECK32-NEXT:   (field name=d offset=11
+// CHECKALL-NEXT:     (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
+// CHECKALL-NEXT:       (case name=a index=0)
+// CHECKALL-NEXT:       (case name=b index=1)
+// CHECKALL-NEXT:       (case name=c index=2)
+// CHECKALL-NEXT:       (case name=d index=3)))
+// CHECK64-NEXT:   (field name=s offset=24
+// CHECK64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:       (field name=_guts offset=0
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_object offset=0
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_countAndFlagsBits offset=0
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=_value offset=0
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:               (field name=_object offset=8
+// CHECK64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))))))
+// CHECK32-NEXT:   (field name=s offset=12
+// CHECK32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:       (field name=_guts offset=0
+// CHECK32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_object offset=0
+// CHECK32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_count offset=0
+// CHECK32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_value offset=0
+// CHECK32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:               (field name=_variant offset=4
+// CHECK32-NEXT:                 (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                   (case name=immortal index=0 offset=0
+// CHECK32-NEXT:                     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (case name=native index=1 offset=0
+// CHECK32-NEXT:                     (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=object offset=0
+// CHECK32-NEXT:                         (reference kind=strong refcounting=unknown))))
+// CHECK32-NEXT:                   (case name=bridged index=2 offset=0
+// CHECK32-NEXT:                     (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=object offset=0
+// CHECK32-NEXT:                         (reference kind=strong refcounting=unknown))))))
+// CHECK32-NEXT:               (field name=_discriminator offset=9
+// CHECK32-NEXT:                 (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_value offset=0
+// CHECK32-NEXT:                     (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:               (field name=_flags offset=10
+// CHECK32-NEXT:                 (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_value offset=0
+// CHECK32-NEXT:                     (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1)))))))))))
 
 enum VastNumberOfCasesNoPayload {
   case option0
@@ -369,81 +414,231 @@ class ManyCasesOnePayloadC {
 }
 reflect(object: ManyCasesOnePayloadC())
 
-// CHECK-64: Reflecting an object.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (class reflect_enum_wip.ManyCasesOnePayloadC)
+// CHECKALL: Reflecting an object.
+// CHECKALL-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (class reflect_Enum_values.ManyCasesOnePayloadC)
 
-// CHECK-64: Type info:
-// CHECK-64: (class_instance size=80 alignment=8 stride=80 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:   (field name=payload offset=16
-// CHECK-64:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
-// CHECK-64:       (case name=payload index=0 offset=0
-// CHECK-64:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_guts offset=0
-// CHECK-64:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_object offset=0
-// CHECK-64:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=_countAndFlagsBits offset=0
-// CHECK-64:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:                       (field name=_value offset=0
-// CHECK-64:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:                   (field name=_object offset=8
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=otherA index=1)
-// CHECK-64:       (case name=otherB index=2)
-// CHECK-64:       (case name=otherC index=3)))
-// CHECK-64:   (field name=a offset=32
-// CHECK-64:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
-// CHECK-64:       (case name=payload index=0 offset=0
-// CHECK-64:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_guts offset=0
-// CHECK-64:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_object offset=0
-// CHECK-64:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=_countAndFlagsBits offset=0
-// CHECK-64:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:                       (field name=_value offset=0
-// CHECK-64:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:                   (field name=_object offset=8
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=otherA index=1)
-// CHECK-64:       (case name=otherB index=2)
-// CHECK-64:       (case name=otherC index=3)))
-// CHECK-64:   (field name=b offset=48
-// CHECK-64:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
-// CHECK-64:       (case name=payload index=0 offset=0
-// CHECK-64:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_guts offset=0
-// CHECK-64:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_object offset=0
-// CHECK-64:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=_countAndFlagsBits offset=0
-// CHECK-64:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:                       (field name=_value offset=0
-// CHECK-64:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:                   (field name=_object offset=8
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=otherA index=1)
-// CHECK-64:       (case name=otherB index=2)
-// CHECK-64:       (case name=otherC index=3)))
-// CHECK-64:   (field name=c offset=64
-// CHECK-64:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
-// CHECK-64:       (case name=payload index=0 offset=0
-// CHECK-64:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_guts offset=0
-// CHECK-64:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_object offset=0
-// CHECK-64:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=_countAndFlagsBits offset=0
-// CHECK-64:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:                       (field name=_value offset=0
-// CHECK-64:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:                   (field name=_object offset=8
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))))
-// CHECK-64:       (case name=otherA index=1)
-// CHECK-64:       (case name=otherB index=2)
-// CHECK-64:       (case name=otherC index=3)))
+// CHECKALL: Type info:
+// CHECK64-NEXT: (class_instance size=80 alignment=8 stride=80 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:   (field name=payload offset=16
+// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT:       (case name=payload index=0 offset=0
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_guts offset=0
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_object offset=0
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
+// CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:                       (field name=_value offset=0
+// CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:                   (field name=_object offset=8
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=otherA index=1)
+// CHECK64-NEXT:       (case name=otherB index=2)
+// CHECK64-NEXT:       (case name=otherC index=3)))
+// CHECK64-NEXT:   (field name=a offset=32
+// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT:       (case name=payload index=0 offset=0
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_guts offset=0
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_object offset=0
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
+// CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:                       (field name=_value offset=0
+// CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:                   (field name=_object offset=8
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=otherA index=1)
+// CHECK64-NEXT:       (case name=otherB index=2)
+// CHECK64-NEXT:       (case name=otherC index=3)))
+// CHECK64-NEXT:   (field name=b offset=48
+// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT:       (case name=payload index=0 offset=0
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_guts offset=0
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_object offset=0
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
+// CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:                       (field name=_value offset=0
+// CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:                   (field name=_object offset=8
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=otherA index=1)
+// CHECK64-NEXT:       (case name=otherB index=2)
+// CHECK64-NEXT:       (case name=otherC index=3)))
+// CHECK64-NEXT:   (field name=c offset=64
+// CHECK64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT:       (case name=payload index=0 offset=0
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_guts offset=0
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_object offset=0
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
+// CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:                       (field name=_value offset=0
+// CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:                   (field name=_object offset=8
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))))
+// CHECK64-NEXT:       (case name=otherA index=1)
+// CHECK64-NEXT:       (case name=otherB index=2)
+// CHECK64-NEXT:       (case name=otherC index=3)))
+
+// CHECK32-NEXT: (class_instance size=56 alignment=4 stride=56 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:   (field name=payload offset=8
+// CHECK32-NEXT:     (single_payload_enum size=12 alignment=4 stride=12 num_extra_inhabitants=250 bitwise_takable=1
+// CHECK32-NEXT:       (case name=payload index=0 offset=0
+// CHECK32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_guts offset=0
+// CHECK32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_object offset=0
+// CHECK32-NEXT:                 (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_count offset=0
+// CHECK32-NEXT:                     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_variant offset=4
+// CHECK32-NEXT:                     (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                       (case name=immortal index=0 offset=0
+// CHECK32-NEXT:                         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=_value offset=0
+// CHECK32-NEXT:                             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                       (case name=native index=1 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))
+// CHECK32-NEXT:                       (case name=bridged index=2 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))))
+// CHECK32-NEXT:                   (field name=_discriminator offset=9
+// CHECK32-NEXT:                     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_flags offset=10
+// CHECK32-NEXT:                     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))))))))
+// CHECK32-NEXT:       (case name=otherA index=1)
+// CHECK32-NEXT:       (case name=otherB index=2)
+// CHECK32-NEXT:       (case name=otherC index=3)))
+// CHECK32-NEXT:   (field name=a offset=20
+// CHECK32-NEXT:     (single_payload_enum size=12 alignment=4 stride=12 num_extra_inhabitants=250 bitwise_takable=1
+// CHECK32-NEXT:       (case name=payload index=0 offset=0
+// CHECK32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_guts offset=0
+// CHECK32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_object offset=0
+// CHECK32-NEXT:                 (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_count offset=0
+// CHECK32-NEXT:                     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_variant offset=4
+// CHECK32-NEXT:                     (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                       (case name=immortal index=0 offset=0
+// CHECK32-NEXT:                         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=_value offset=0
+// CHECK32-NEXT:                             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                       (case name=native index=1 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))
+// CHECK32-NEXT:                       (case name=bridged index=2 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))))
+// CHECK32-NEXT:                   (field name=_discriminator offset=9
+// CHECK32-NEXT:                     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_flags offset=10
+// CHECK32-NEXT:                     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))))))))
+// CHECK32-NEXT:       (case name=otherA index=1)
+// CHECK32-NEXT:       (case name=otherB index=2)
+// CHECK32-NEXT:       (case name=otherC index=3)))
+// CHECK32-NEXT:   (field name=b offset=32
+// CHECK32-NEXT:     (single_payload_enum size=12 alignment=4 stride=12 num_extra_inhabitants=250 bitwise_takable=1
+// CHECK32-NEXT:       (case name=payload index=0 offset=0
+// CHECK32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_guts offset=0
+// CHECK32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_object offset=0
+// CHECK32-NEXT:                 (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_count offset=0
+// CHECK32-NEXT:                     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_variant offset=4
+// CHECK32-NEXT:                     (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                       (case name=immortal index=0 offset=0
+// CHECK32-NEXT:                         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=_value offset=0
+// CHECK32-NEXT:                             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                       (case name=native index=1 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))
+// CHECK32-NEXT:                       (case name=bridged index=2 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))))
+// CHECK32-NEXT:                   (field name=_discriminator offset=9
+// CHECK32-NEXT:                     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_flags offset=10
+// CHECK32-NEXT:                     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))))))))
+// CHECK32-NEXT:       (case name=otherA index=1)
+// CHECK32-NEXT:       (case name=otherB index=2)
+// CHECK32-NEXT:       (case name=otherC index=3)))
+// CHECK32-NEXT:   (field name=c offset=44
+// CHECK32-NEXT:     (single_payload_enum size=12 alignment=4 stride=12 num_extra_inhabitants=250 bitwise_takable=1
+// CHECK32-NEXT:       (case name=payload index=0 offset=0
+// CHECK32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_guts offset=0
+// CHECK32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_object offset=0
+// CHECK32-NEXT:                 (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_count offset=0
+// CHECK32-NEXT:                     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_variant offset=4
+// CHECK32-NEXT:                     (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                       (case name=immortal index=0 offset=0
+// CHECK32-NEXT:                         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=_value offset=0
+// CHECK32-NEXT:                             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                       (case name=native index=1 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))
+// CHECK32-NEXT:                       (case name=bridged index=2 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))))
+// CHECK32-NEXT:                   (field name=_discriminator offset=9
+// CHECK32-NEXT:                     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_flags offset=10
+// CHECK32-NEXT:                     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))))))))
+// CHECK32-NEXT:       (case name=otherA index=1)
+// CHECK32-NEXT:       (case name=otherB index=2)
+// CHECK32-NEXT:       (case name=otherC index=3))))
 
 enum ManyCasesManyPayloads {
   case a(String)
@@ -458,777 +653,1025 @@ class ManyCasesManyPayloadsC {
 }
 reflect(object: ManyCasesManyPayloadsC())
 
-// CHECK-64: Reflecting an object.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (class reflect_enum_wip.ManyCasesManyPayloadsC)
+// CHECKALL: Reflecting an object.
+// CHECKALL-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (class reflect_Enum_values.ManyCasesManyPayloadsC)
 
-// CHECK-64: Type info:
-// CHECK-64: (class_instance size=81 alignment=8 stride=88 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:   (field name=a offset=16
-// CHECK-64:     (multi_payload_enum size=17 alignment=8 stride=24 num_extra_inhabitants=252 bitwise_takable=1
-// CHECK-64:       (case name=a index=0 offset=0
-// CHECK-64:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_guts offset=0
-// CHECK-64:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_object offset=0
-// CHECK-64:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=_countAndFlagsBits offset=0
-// CHECK-64:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:                       (field name=_value offset=0
-// CHECK-64:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:                   (field name=_object offset=8
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=b index=1 offset=0
-// CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_buffer offset=0
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_storage offset=0
-// CHECK-64:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=rawValue offset=0
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=c index=2 offset=0
-// CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_variant offset=0
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=object offset=0
-// CHECK-64:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=rawValue offset=0
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=extra index=3)))
-// CHECK-64:   (field name=b offset=40
-// CHECK-64:     (multi_payload_enum size=17 alignment=8 stride=24 num_extra_inhabitants=252 bitwise_takable=1
-// CHECK-64:       (case name=a index=0 offset=0
-// CHECK-64:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_guts offset=0
-// CHECK-64:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_object offset=0
-// CHECK-64:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=_countAndFlagsBits offset=0
-// CHECK-64:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:                       (field name=_value offset=0
-// CHECK-64:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:                   (field name=_object offset=8
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=b index=1 offset=0
-// CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_buffer offset=0
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_storage offset=0
-// CHECK-64:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=rawValue offset=0
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=c index=2 offset=0
-// CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_variant offset=0
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=object offset=0
-// CHECK-64:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=rawValue offset=0
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=extra index=3)))
-// CHECK-64:   (field name=c offset=64
-// CHECK-64:     (multi_payload_enum size=17 alignment=8 stride=24 num_extra_inhabitants=252 bitwise_takable=1
-// CHECK-64:       (case name=a index=0 offset=0
-// CHECK-64:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_guts offset=0
-// CHECK-64:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_object offset=0
-// CHECK-64:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=_countAndFlagsBits offset=0
-// CHECK-64:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:                       (field name=_value offset=0
-// CHECK-64:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:                   (field name=_object offset=8
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=b index=1 offset=0
-// CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_buffer offset=0
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_storage offset=0
-// CHECK-64:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=rawValue offset=0
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=c index=2 offset=0
-// CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_variant offset=0
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=object offset=0
-// CHECK-64:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:                   (field name=rawValue offset=0
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:       (case name=extra index=3))))
+// CHECKALL: Type info:
+// CHECK64-NEXT: (class_instance size=81 alignment=8 stride=88 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:   (field name=a offset=16
+// CHECK64-NEXT:     (multi_payload_enum size=17 alignment=8 stride=24 num_extra_inhabitants=252 bitwise_takable=1
+// CHECK64-NEXT:       (case name=a index=0 offset=0
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_guts offset=0
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_object offset=0
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
+// CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:                       (field name=_value offset=0
+// CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:                   (field name=_object offset=8
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=b index=1 offset=0
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_buffer offset=0
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_storage offset=0
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=rawValue offset=0
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=c index=2 offset=0
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_variant offset=0
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=object offset=0
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=rawValue offset=0
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=extra index=3)))
+// CHECK64-NEXT:   (field name=b offset=40
+// CHECK64-NEXT:     (multi_payload_enum size=17 alignment=8 stride=24 num_extra_inhabitants=252 bitwise_takable=1
+// CHECK64-NEXT:       (case name=a index=0 offset=0
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_guts offset=0
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_object offset=0
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
+// CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:                       (field name=_value offset=0
+// CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:                   (field name=_object offset=8
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=b index=1 offset=0
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_buffer offset=0
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_storage offset=0
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=rawValue offset=0
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=c index=2 offset=0
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_variant offset=0
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=object offset=0
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=rawValue offset=0
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=extra index=3)))
+// CHECK64-NEXT:   (field name=c offset=64
+// CHECK64-NEXT:     (multi_payload_enum size=17 alignment=8 stride=24 num_extra_inhabitants=252 bitwise_takable=1
+// CHECK64-NEXT:       (case name=a index=0 offset=0
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_guts offset=0
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_object offset=0
+// CHECK64-NEXT:                 (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=_countAndFlagsBits offset=0
+// CHECK64-NEXT:                     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:                       (field name=_value offset=0
+// CHECK64-NEXT:                         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:                   (field name=_object offset=8
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=b index=1 offset=0
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_buffer offset=0
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_storage offset=0
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=rawValue offset=0
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=c index=2 offset=0
+// CHECK64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_variant offset=0
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=object offset=0
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=rawValue offset=0
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:       (case name=extra index=3))))
 
+// CHECK32-NEXT: (class_instance size=44 alignment=4 stride=44 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:   (field name=a offset=8
+// CHECK32-NEXT:     (multi_payload_enum size=12 alignment=4 stride=12 num_extra_inhabitants=60 bitwise_takable=1
+// CHECK32-NEXT:       (case name=a index=0 offset=0
+// CHECK32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_guts offset=0
+// CHECK32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_object offset=0
+// CHECK32-NEXT:                 (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_count offset=0
+// CHECK32-NEXT:                     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_variant offset=4
+// CHECK32-NEXT:                     (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                       (case name=immortal index=0 offset=0
+// CHECK32-NEXT:                         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=_value offset=0
+// CHECK32-NEXT:                             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                       (case name=native index=1 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))
+// CHECK32-NEXT:                       (case name=bridged index=2 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))))
+// CHECK32-NEXT:                   (field name=_discriminator offset=9
+// CHECK32-NEXT:                     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_flags offset=10
+// CHECK32-NEXT:                     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))))))))
+// CHECK32-NEXT:       (case name=b index=1 offset=0
+// CHECK32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_buffer offset=0
+// CHECK32-NEXT:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_storage offset=0
+// CHECK32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=rawValue offset=0
+// CHECK32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
+// CHECK32-NEXT:       (case name=c index=2 offset=0
+// CHECK32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_variant offset=0
+// CHECK32-NEXT:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:               (field name=object offset=0
+// CHECK32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=rawValue offset=0
+// CHECK32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
+// CHECK32-NEXT:       (case name=extra index=3)))
+// CHECK32-NEXT:   (field name=b offset=20
+// CHECK32-NEXT:     (multi_payload_enum size=12 alignment=4 stride=12 num_extra_inhabitants=60 bitwise_takable=1
+// CHECK32-NEXT:       (case name=a index=0 offset=0
+// CHECK32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_guts offset=0
+// CHECK32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_object offset=0
+// CHECK32-NEXT:                 (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_count offset=0
+// CHECK32-NEXT:                     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_variant offset=4
+// CHECK32-NEXT:                     (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                       (case name=immortal index=0 offset=0
+// CHECK32-NEXT:                         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=_value offset=0
+// CHECK32-NEXT:                             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                       (case name=native index=1 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))
+// CHECK32-NEXT:                       (case name=bridged index=2 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))))
+// CHECK32-NEXT:                   (field name=_discriminator offset=9
+// CHECK32-NEXT:                     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_flags offset=10
+// CHECK32-NEXT:                     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))))))))
+// CHECK32-NEXT:       (case name=b index=1 offset=0
+// CHECK32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_buffer offset=0
+// CHECK32-NEXT:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_storage offset=0
+// CHECK32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=rawValue offset=0
+// CHECK32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
+// CHECK32-NEXT:       (case name=c index=2 offset=0
+// CHECK32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_variant offset=0
+// CHECK32-NEXT:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:               (field name=object offset=0
+// CHECK32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=rawValue offset=0
+// CHECK32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
+// CHECK32-NEXT:       (case name=extra index=3)))
+// CHECK32-NEXT:   (field name=c offset=32
+// CHECK32-NEXT:     (multi_payload_enum size=12 alignment=4 stride=12 num_extra_inhabitants=60 bitwise_takable=1
+// CHECK32-NEXT:       (case name=a index=0 offset=0
+// CHECK32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_guts offset=0
+// CHECK32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_object offset=0
+// CHECK32-NEXT:                 (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_count offset=0
+// CHECK32-NEXT:                     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_variant offset=4
+// CHECK32-NEXT:                     (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                       (case name=immortal index=0 offset=0
+// CHECK32-NEXT:                         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=_value offset=0
+// CHECK32-NEXT:                             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                       (case name=native index=1 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))
+// CHECK32-NEXT:                       (case name=bridged index=2 offset=0
+// CHECK32-NEXT:                         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                           (field name=object offset=0
+// CHECK32-NEXT:                             (reference kind=strong refcounting=unknown))))))
+// CHECK32-NEXT:                   (field name=_discriminator offset=9
+// CHECK32-NEXT:                     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (field name=_flags offset=10
+// CHECK32-NEXT:                     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))))))))
+// CHECK32-NEXT:       (case name=b index=1 offset=0
+// CHECK32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_buffer offset=0
+// CHECK32-NEXT:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_storage offset=0
+// CHECK32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=rawValue offset=0
+// CHECK32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
+// CHECK32-NEXT:       (case name=c index=2 offset=0
+// CHECK32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_variant offset=0
+// CHECK32-NEXT:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:               (field name=object offset=0
+// CHECK32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=rawValue offset=0
+// CHECK32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
+// CHECK32-NEXT:       (case name=extra index=3))))
 
 reflect(enum: OneCaseNoPayload.only)
 
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_enum_wip.OneCaseNoPayload)
+// CHECKALL: Reflecting an enum.
+// CHECKALL-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values.OneCaseNoPayload)
 
-// CHECK-64: Type info:
-// CHECK-64: (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:   (case name=only index=0))
+// CHECKALL: Type info:
+// CHECKALL-NEXT: (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECKALL-NEXT:   (case name=only index=0))
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=only index=0)
+// CHECKALL: Enum value:
+// CHECKALL-NEXT: (enum_value name=only index=0)
 
 reflect(enum: ManyCasesNoPayload.b)
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_enum_wip.ManyCasesNoPayload)
+// CHECKALL: Reflecting an enum.
+// CHECKALL-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values.ManyCasesNoPayload)
 
-// CHECK-64: Type info:
-// CHECK-64: (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
-// CHECK-64:   (case name=a index=0)
-// CHECK-64:   (case name=b index=1)
-// CHECK-64:   (case name=c index=2)
-// CHECK-64:   (case name=d index=3))
+// CHECKALL: Type info:
+// CHECKALL-NEXT: (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
+// CHECKALL-NEXT:   (case name=a index=0)
+// CHECKALL-NEXT:   (case name=b index=1)
+// CHECKALL-NEXT:   (case name=c index=2)
+// CHECKALL-NEXT:   (case name=d index=3))
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=b index=1)
+// CHECKALL: Enum value:
+// CHECKALL-NEXT: (enum_value name=b index=1)
 
 reflect(enum: VastNumberOfCasesNoPayload.option12)
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_enum_wip.VastNumberOfCasesNoPayload)
+// CHECKALL: Reflecting an enum.
+// CHECKALL-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values.VastNumberOfCasesNoPayload)
 
-// CHECK-64: Type info:
-// CHECK-64: (no_payload_enum size=2 alignment=2 stride=2 num_extra_inhabitants=65278 bitwise_takable=1
-// CHECK-64:   (case name=option0 index=0)
-// CHECK-64:   (case name=option1 index=1)
-// CHECK-64:   (case name=option2 index=2)
-// CHECK-64:   (case name=option3 index=3)
-// CHECK-64:   (case name=option4 index=4)
-// CHECK-64:   (case name=option5 index=5)
-// CHECK-64:   (case name=option6 index=6)
-// CHECK-64:   (case name=option7 index=7)
-// CHECK-64:   (case name=option8 index=8)
-// CHECK-64:   (case name=option9 index=9)
-// CHECK-64:   (case name=option10 index=10)
-// CHECK-64:   (case name=option11 index=11)
-// CHECK-64:   (case name=option12 index=12)
-// CHECK-64:   (case name=option13 index=13)
-// CHECK-64:   (case name=option14 index=14)
-// CHECK-64:   (case name=option15 index=15)
-// CHECK-64:   (case name=option16 index=16)
-// CHECK-64:   (case name=option17 index=17)
-// CHECK-64:   (case name=option18 index=18)
-// CHECK-64:   (case name=option19 index=19)
-// CHECK-64:   (case name=option20 index=20)
-// CHECK-64:   (case name=option21 index=21)
-// CHECK-64:   (case name=option22 index=22)
-// CHECK-64:   (case name=option23 index=23)
-// CHECK-64:   (case name=option24 index=24)
-// CHECK-64:   (case name=option25 index=25)
-// CHECK-64:   (case name=option26 index=26)
-// CHECK-64:   (case name=option27 index=27)
-// CHECK-64:   (case name=option28 index=28)
-// CHECK-64:   (case name=option29 index=29)
-// CHECK-64:   (case name=option30 index=30)
-// CHECK-64:   (case name=option31 index=31)
-// CHECK-64:   (case name=option32 index=32)
-// CHECK-64:   (case name=option33 index=33)
-// CHECK-64:   (case name=option34 index=34)
-// CHECK-64:   (case name=option35 index=35)
-// CHECK-64:   (case name=option36 index=36)
-// CHECK-64:   (case name=option37 index=37)
-// CHECK-64:   (case name=option38 index=38)
-// CHECK-64:   (case name=option39 index=39)
-// CHECK-64:   (case name=option40 index=40)
-// CHECK-64:   (case name=option41 index=41)
-// CHECK-64:   (case name=option42 index=42)
-// CHECK-64:   (case name=option43 index=43)
-// CHECK-64:   (case name=option44 index=44)
-// CHECK-64:   (case name=option45 index=45)
-// CHECK-64:   (case name=option46 index=46)
-// CHECK-64:   (case name=option47 index=47)
-// CHECK-64:   (case name=option48 index=48)
-// CHECK-64:   (case name=option49 index=49)
-// CHECK-64:   (case name=option50 index=50)
-// CHECK-64:   (case name=option51 index=51)
-// CHECK-64:   (case name=option52 index=52)
-// CHECK-64:   (case name=option53 index=53)
-// CHECK-64:   (case name=option54 index=54)
-// CHECK-64:   (case name=option55 index=55)
-// CHECK-64:   (case name=option56 index=56)
-// CHECK-64:   (case name=option57 index=57)
-// CHECK-64:   (case name=option58 index=58)
-// CHECK-64:   (case name=option59 index=59)
-// CHECK-64:   (case name=option60 index=60)
-// CHECK-64:   (case name=option61 index=61)
-// CHECK-64:   (case name=option62 index=62)
-// CHECK-64:   (case name=option63 index=63)
-// CHECK-64:   (case name=option64 index=64)
-// CHECK-64:   (case name=option65 index=65)
-// CHECK-64:   (case name=option66 index=66)
-// CHECK-64:   (case name=option67 index=67)
-// CHECK-64:   (case name=option68 index=68)
-// CHECK-64:   (case name=option69 index=69)
-// CHECK-64:   (case name=option70 index=70)
-// CHECK-64:   (case name=option71 index=71)
-// CHECK-64:   (case name=option72 index=72)
-// CHECK-64:   (case name=option73 index=73)
-// CHECK-64:   (case name=option74 index=74)
-// CHECK-64:   (case name=option75 index=75)
-// CHECK-64:   (case name=option76 index=76)
-// CHECK-64:   (case name=option77 index=77)
-// CHECK-64:   (case name=option78 index=78)
-// CHECK-64:   (case name=option79 index=79)
-// CHECK-64:   (case name=option80 index=80)
-// CHECK-64:   (case name=option81 index=81)
-// CHECK-64:   (case name=option82 index=82)
-// CHECK-64:   (case name=option83 index=83)
-// CHECK-64:   (case name=option84 index=84)
-// CHECK-64:   (case name=option85 index=85)
-// CHECK-64:   (case name=option86 index=86)
-// CHECK-64:   (case name=option87 index=87)
-// CHECK-64:   (case name=option88 index=88)
-// CHECK-64:   (case name=option89 index=89)
-// CHECK-64:   (case name=option90 index=90)
-// CHECK-64:   (case name=option91 index=91)
-// CHECK-64:   (case name=option92 index=92)
-// CHECK-64:   (case name=option93 index=93)
-// CHECK-64:   (case name=option94 index=94)
-// CHECK-64:   (case name=option95 index=95)
-// CHECK-64:   (case name=option96 index=96)
-// CHECK-64:   (case name=option97 index=97)
-// CHECK-64:   (case name=option98 index=98)
-// CHECK-64:   (case name=option99 index=99)
-// CHECK-64:   (case name=option100 index=100)
-// CHECK-64:   (case name=option101 index=101)
-// CHECK-64:   (case name=option102 index=102)
-// CHECK-64:   (case name=option103 index=103)
-// CHECK-64:   (case name=option104 index=104)
-// CHECK-64:   (case name=option105 index=105)
-// CHECK-64:   (case name=option106 index=106)
-// CHECK-64:   (case name=option107 index=107)
-// CHECK-64:   (case name=option108 index=108)
-// CHECK-64:   (case name=option109 index=109)
-// CHECK-64:   (case name=option110 index=110)
-// CHECK-64:   (case name=option111 index=111)
-// CHECK-64:   (case name=option112 index=112)
-// CHECK-64:   (case name=option113 index=113)
-// CHECK-64:   (case name=option114 index=114)
-// CHECK-64:   (case name=option115 index=115)
-// CHECK-64:   (case name=option116 index=116)
-// CHECK-64:   (case name=option117 index=117)
-// CHECK-64:   (case name=option118 index=118)
-// CHECK-64:   (case name=option119 index=119)
-// CHECK-64:   (case name=option120 index=120)
-// CHECK-64:   (case name=option121 index=121)
-// CHECK-64:   (case name=option122 index=122)
-// CHECK-64:   (case name=option123 index=123)
-// CHECK-64:   (case name=option124 index=124)
-// CHECK-64:   (case name=option125 index=125)
-// CHECK-64:   (case name=option126 index=126)
-// CHECK-64:   (case name=option127 index=127)
-// CHECK-64:   (case name=option128 index=128)
-// CHECK-64:   (case name=option129 index=129)
-// CHECK-64:   (case name=option130 index=130)
-// CHECK-64:   (case name=option131 index=131)
-// CHECK-64:   (case name=option132 index=132)
-// CHECK-64:   (case name=option133 index=133)
-// CHECK-64:   (case name=option134 index=134)
-// CHECK-64:   (case name=option135 index=135)
-// CHECK-64:   (case name=option136 index=136)
-// CHECK-64:   (case name=option137 index=137)
-// CHECK-64:   (case name=option138 index=138)
-// CHECK-64:   (case name=option139 index=139)
-// CHECK-64:   (case name=option140 index=140)
-// CHECK-64:   (case name=option141 index=141)
-// CHECK-64:   (case name=option142 index=142)
-// CHECK-64:   (case name=option143 index=143)
-// CHECK-64:   (case name=option144 index=144)
-// CHECK-64:   (case name=option145 index=145)
-// CHECK-64:   (case name=option146 index=146)
-// CHECK-64:   (case name=option147 index=147)
-// CHECK-64:   (case name=option148 index=148)
-// CHECK-64:   (case name=option149 index=149)
-// CHECK-64:   (case name=option150 index=150)
-// CHECK-64:   (case name=option151 index=151)
-// CHECK-64:   (case name=option152 index=152)
-// CHECK-64:   (case name=option153 index=153)
-// CHECK-64:   (case name=option154 index=154)
-// CHECK-64:   (case name=option155 index=155)
-// CHECK-64:   (case name=option156 index=156)
-// CHECK-64:   (case name=option157 index=157)
-// CHECK-64:   (case name=option158 index=158)
-// CHECK-64:   (case name=option159 index=159)
-// CHECK-64:   (case name=option160 index=160)
-// CHECK-64:   (case name=option161 index=161)
-// CHECK-64:   (case name=option162 index=162)
-// CHECK-64:   (case name=option163 index=163)
-// CHECK-64:   (case name=option164 index=164)
-// CHECK-64:   (case name=option165 index=165)
-// CHECK-64:   (case name=option166 index=166)
-// CHECK-64:   (case name=option167 index=167)
-// CHECK-64:   (case name=option168 index=168)
-// CHECK-64:   (case name=option169 index=169)
-// CHECK-64:   (case name=option170 index=170)
-// CHECK-64:   (case name=option171 index=171)
-// CHECK-64:   (case name=option172 index=172)
-// CHECK-64:   (case name=option173 index=173)
-// CHECK-64:   (case name=option174 index=174)
-// CHECK-64:   (case name=option175 index=175)
-// CHECK-64:   (case name=option176 index=176)
-// CHECK-64:   (case name=option177 index=177)
-// CHECK-64:   (case name=option178 index=178)
-// CHECK-64:   (case name=option179 index=179)
-// CHECK-64:   (case name=option180 index=180)
-// CHECK-64:   (case name=option181 index=181)
-// CHECK-64:   (case name=option182 index=182)
-// CHECK-64:   (case name=option183 index=183)
-// CHECK-64:   (case name=option184 index=184)
-// CHECK-64:   (case name=option185 index=185)
-// CHECK-64:   (case name=option186 index=186)
-// CHECK-64:   (case name=option187 index=187)
-// CHECK-64:   (case name=option188 index=188)
-// CHECK-64:   (case name=option189 index=189)
-// CHECK-64:   (case name=option190 index=190)
-// CHECK-64:   (case name=option191 index=191)
-// CHECK-64:   (case name=option192 index=192)
-// CHECK-64:   (case name=option193 index=193)
-// CHECK-64:   (case name=option194 index=194)
-// CHECK-64:   (case name=option195 index=195)
-// CHECK-64:   (case name=option196 index=196)
-// CHECK-64:   (case name=option197 index=197)
-// CHECK-64:   (case name=option198 index=198)
-// CHECK-64:   (case name=option199 index=199)
-// CHECK-64:   (case name=option200 index=200)
-// CHECK-64:   (case name=option201 index=201)
-// CHECK-64:   (case name=option202 index=202)
-// CHECK-64:   (case name=option203 index=203)
-// CHECK-64:   (case name=option204 index=204)
-// CHECK-64:   (case name=option205 index=205)
-// CHECK-64:   (case name=option206 index=206)
-// CHECK-64:   (case name=option207 index=207)
-// CHECK-64:   (case name=option208 index=208)
-// CHECK-64:   (case name=option209 index=209)
-// CHECK-64:   (case name=option210 index=210)
-// CHECK-64:   (case name=option211 index=211)
-// CHECK-64:   (case name=option212 index=212)
-// CHECK-64:   (case name=option213 index=213)
-// CHECK-64:   (case name=option214 index=214)
-// CHECK-64:   (case name=option215 index=215)
-// CHECK-64:   (case name=option216 index=216)
-// CHECK-64:   (case name=option217 index=217)
-// CHECK-64:   (case name=option218 index=218)
-// CHECK-64:   (case name=option219 index=219)
-// CHECK-64:   (case name=option220 index=220)
-// CHECK-64:   (case name=option221 index=221)
-// CHECK-64:   (case name=option222 index=222)
-// CHECK-64:   (case name=option223 index=223)
-// CHECK-64:   (case name=option224 index=224)
-// CHECK-64:   (case name=option225 index=225)
-// CHECK-64:   (case name=option226 index=226)
-// CHECK-64:   (case name=option227 index=227)
-// CHECK-64:   (case name=option228 index=228)
-// CHECK-64:   (case name=option229 index=229)
-// CHECK-64:   (case name=option230 index=230)
-// CHECK-64:   (case name=option231 index=231)
-// CHECK-64:   (case name=option232 index=232)
-// CHECK-64:   (case name=option233 index=233)
-// CHECK-64:   (case name=option234 index=234)
-// CHECK-64:   (case name=option235 index=235)
-// CHECK-64:   (case name=option236 index=236)
-// CHECK-64:   (case name=option237 index=237)
-// CHECK-64:   (case name=option238 index=238)
-// CHECK-64:   (case name=option239 index=239)
-// CHECK-64:   (case name=option240 index=240)
-// CHECK-64:   (case name=option241 index=241)
-// CHECK-64:   (case name=option242 index=242)
-// CHECK-64:   (case name=option243 index=243)
-// CHECK-64:   (case name=option244 index=244)
-// CHECK-64:   (case name=option245 index=245)
-// CHECK-64:   (case name=option246 index=246)
-// CHECK-64:   (case name=option247 index=247)
-// CHECK-64:   (case name=option248 index=248)
-// CHECK-64:   (case name=option249 index=249)
-// CHECK-64:   (case name=option250 index=250)
-// CHECK-64:   (case name=option251 index=251)
-// CHECK-64:   (case name=option252 index=252)
-// CHECK-64:   (case name=option253 index=253)
-// CHECK-64:   (case name=option254 index=254)
-// CHECK-64:   (case name=option255 index=255)
-// CHECK-64:   (case name=option256 index=256)
-// CHECK-64:   (case name=option257 index=257))
+// CHECKALL: Type info:
+// CHECKALL-NEXT: (no_payload_enum size=2 alignment=2 stride=2 num_extra_inhabitants=65278 bitwise_takable=1
+// CHECKALL-NEXT:   (case name=option0 index=0)
+// CHECKALL-NEXT:   (case name=option1 index=1)
+// CHECKALL-NEXT:   (case name=option2 index=2)
+// CHECKALL-NEXT:   (case name=option3 index=3)
+// CHECKALL-NEXT:   (case name=option4 index=4)
+// CHECKALL-NEXT:   (case name=option5 index=5)
+// CHECKALL-NEXT:   (case name=option6 index=6)
+// CHECKALL-NEXT:   (case name=option7 index=7)
+// CHECKALL-NEXT:   (case name=option8 index=8)
+// CHECKALL-NEXT:   (case name=option9 index=9)
+// CHECKALL-NEXT:   (case name=option10 index=10)
+// CHECKALL-NEXT:   (case name=option11 index=11)
+// CHECKALL-NEXT:   (case name=option12 index=12)
+// CHECKALL-NEXT:   (case name=option13 index=13)
+// CHECKALL-NEXT:   (case name=option14 index=14)
+// CHECKALL-NEXT:   (case name=option15 index=15)
+// CHECKALL-NEXT:   (case name=option16 index=16)
+// CHECKALL-NEXT:   (case name=option17 index=17)
+// CHECKALL-NEXT:   (case name=option18 index=18)
+// CHECKALL-NEXT:   (case name=option19 index=19)
+// CHECKALL-NEXT:   (case name=option20 index=20)
+// CHECKALL-NEXT:   (case name=option21 index=21)
+// CHECKALL-NEXT:   (case name=option22 index=22)
+// CHECKALL-NEXT:   (case name=option23 index=23)
+// CHECKALL-NEXT:   (case name=option24 index=24)
+// CHECKALL-NEXT:   (case name=option25 index=25)
+// CHECKALL-NEXT:   (case name=option26 index=26)
+// CHECKALL-NEXT:   (case name=option27 index=27)
+// CHECKALL-NEXT:   (case name=option28 index=28)
+// CHECKALL-NEXT:   (case name=option29 index=29)
+// CHECKALL-NEXT:   (case name=option30 index=30)
+// CHECKALL-NEXT:   (case name=option31 index=31)
+// CHECKALL-NEXT:   (case name=option32 index=32)
+// CHECKALL-NEXT:   (case name=option33 index=33)
+// CHECKALL-NEXT:   (case name=option34 index=34)
+// CHECKALL-NEXT:   (case name=option35 index=35)
+// CHECKALL-NEXT:   (case name=option36 index=36)
+// CHECKALL-NEXT:   (case name=option37 index=37)
+// CHECKALL-NEXT:   (case name=option38 index=38)
+// CHECKALL-NEXT:   (case name=option39 index=39)
+// CHECKALL-NEXT:   (case name=option40 index=40)
+// CHECKALL-NEXT:   (case name=option41 index=41)
+// CHECKALL-NEXT:   (case name=option42 index=42)
+// CHECKALL-NEXT:   (case name=option43 index=43)
+// CHECKALL-NEXT:   (case name=option44 index=44)
+// CHECKALL-NEXT:   (case name=option45 index=45)
+// CHECKALL-NEXT:   (case name=option46 index=46)
+// CHECKALL-NEXT:   (case name=option47 index=47)
+// CHECKALL-NEXT:   (case name=option48 index=48)
+// CHECKALL-NEXT:   (case name=option49 index=49)
+// CHECKALL-NEXT:   (case name=option50 index=50)
+// CHECKALL-NEXT:   (case name=option51 index=51)
+// CHECKALL-NEXT:   (case name=option52 index=52)
+// CHECKALL-NEXT:   (case name=option53 index=53)
+// CHECKALL-NEXT:   (case name=option54 index=54)
+// CHECKALL-NEXT:   (case name=option55 index=55)
+// CHECKALL-NEXT:   (case name=option56 index=56)
+// CHECKALL-NEXT:   (case name=option57 index=57)
+// CHECKALL-NEXT:   (case name=option58 index=58)
+// CHECKALL-NEXT:   (case name=option59 index=59)
+// CHECKALL-NEXT:   (case name=option60 index=60)
+// CHECKALL-NEXT:   (case name=option61 index=61)
+// CHECKALL-NEXT:   (case name=option62 index=62)
+// CHECKALL-NEXT:   (case name=option63 index=63)
+// CHECKALL-NEXT:   (case name=option64 index=64)
+// CHECKALL-NEXT:   (case name=option65 index=65)
+// CHECKALL-NEXT:   (case name=option66 index=66)
+// CHECKALL-NEXT:   (case name=option67 index=67)
+// CHECKALL-NEXT:   (case name=option68 index=68)
+// CHECKALL-NEXT:   (case name=option69 index=69)
+// CHECKALL-NEXT:   (case name=option70 index=70)
+// CHECKALL-NEXT:   (case name=option71 index=71)
+// CHECKALL-NEXT:   (case name=option72 index=72)
+// CHECKALL-NEXT:   (case name=option73 index=73)
+// CHECKALL-NEXT:   (case name=option74 index=74)
+// CHECKALL-NEXT:   (case name=option75 index=75)
+// CHECKALL-NEXT:   (case name=option76 index=76)
+// CHECKALL-NEXT:   (case name=option77 index=77)
+// CHECKALL-NEXT:   (case name=option78 index=78)
+// CHECKALL-NEXT:   (case name=option79 index=79)
+// CHECKALL-NEXT:   (case name=option80 index=80)
+// CHECKALL-NEXT:   (case name=option81 index=81)
+// CHECKALL-NEXT:   (case name=option82 index=82)
+// CHECKALL-NEXT:   (case name=option83 index=83)
+// CHECKALL-NEXT:   (case name=option84 index=84)
+// CHECKALL-NEXT:   (case name=option85 index=85)
+// CHECKALL-NEXT:   (case name=option86 index=86)
+// CHECKALL-NEXT:   (case name=option87 index=87)
+// CHECKALL-NEXT:   (case name=option88 index=88)
+// CHECKALL-NEXT:   (case name=option89 index=89)
+// CHECKALL-NEXT:   (case name=option90 index=90)
+// CHECKALL-NEXT:   (case name=option91 index=91)
+// CHECKALL-NEXT:   (case name=option92 index=92)
+// CHECKALL-NEXT:   (case name=option93 index=93)
+// CHECKALL-NEXT:   (case name=option94 index=94)
+// CHECKALL-NEXT:   (case name=option95 index=95)
+// CHECKALL-NEXT:   (case name=option96 index=96)
+// CHECKALL-NEXT:   (case name=option97 index=97)
+// CHECKALL-NEXT:   (case name=option98 index=98)
+// CHECKALL-NEXT:   (case name=option99 index=99)
+// CHECKALL-NEXT:   (case name=option100 index=100)
+// CHECKALL-NEXT:   (case name=option101 index=101)
+// CHECKALL-NEXT:   (case name=option102 index=102)
+// CHECKALL-NEXT:   (case name=option103 index=103)
+// CHECKALL-NEXT:   (case name=option104 index=104)
+// CHECKALL-NEXT:   (case name=option105 index=105)
+// CHECKALL-NEXT:   (case name=option106 index=106)
+// CHECKALL-NEXT:   (case name=option107 index=107)
+// CHECKALL-NEXT:   (case name=option108 index=108)
+// CHECKALL-NEXT:   (case name=option109 index=109)
+// CHECKALL-NEXT:   (case name=option110 index=110)
+// CHECKALL-NEXT:   (case name=option111 index=111)
+// CHECKALL-NEXT:   (case name=option112 index=112)
+// CHECKALL-NEXT:   (case name=option113 index=113)
+// CHECKALL-NEXT:   (case name=option114 index=114)
+// CHECKALL-NEXT:   (case name=option115 index=115)
+// CHECKALL-NEXT:   (case name=option116 index=116)
+// CHECKALL-NEXT:   (case name=option117 index=117)
+// CHECKALL-NEXT:   (case name=option118 index=118)
+// CHECKALL-NEXT:   (case name=option119 index=119)
+// CHECKALL-NEXT:   (case name=option120 index=120)
+// CHECKALL-NEXT:   (case name=option121 index=121)
+// CHECKALL-NEXT:   (case name=option122 index=122)
+// CHECKALL-NEXT:   (case name=option123 index=123)
+// CHECKALL-NEXT:   (case name=option124 index=124)
+// CHECKALL-NEXT:   (case name=option125 index=125)
+// CHECKALL-NEXT:   (case name=option126 index=126)
+// CHECKALL-NEXT:   (case name=option127 index=127)
+// CHECKALL-NEXT:   (case name=option128 index=128)
+// CHECKALL-NEXT:   (case name=option129 index=129)
+// CHECKALL-NEXT:   (case name=option130 index=130)
+// CHECKALL-NEXT:   (case name=option131 index=131)
+// CHECKALL-NEXT:   (case name=option132 index=132)
+// CHECKALL-NEXT:   (case name=option133 index=133)
+// CHECKALL-NEXT:   (case name=option134 index=134)
+// CHECKALL-NEXT:   (case name=option135 index=135)
+// CHECKALL-NEXT:   (case name=option136 index=136)
+// CHECKALL-NEXT:   (case name=option137 index=137)
+// CHECKALL-NEXT:   (case name=option138 index=138)
+// CHECKALL-NEXT:   (case name=option139 index=139)
+// CHECKALL-NEXT:   (case name=option140 index=140)
+// CHECKALL-NEXT:   (case name=option141 index=141)
+// CHECKALL-NEXT:   (case name=option142 index=142)
+// CHECKALL-NEXT:   (case name=option143 index=143)
+// CHECKALL-NEXT:   (case name=option144 index=144)
+// CHECKALL-NEXT:   (case name=option145 index=145)
+// CHECKALL-NEXT:   (case name=option146 index=146)
+// CHECKALL-NEXT:   (case name=option147 index=147)
+// CHECKALL-NEXT:   (case name=option148 index=148)
+// CHECKALL-NEXT:   (case name=option149 index=149)
+// CHECKALL-NEXT:   (case name=option150 index=150)
+// CHECKALL-NEXT:   (case name=option151 index=151)
+// CHECKALL-NEXT:   (case name=option152 index=152)
+// CHECKALL-NEXT:   (case name=option153 index=153)
+// CHECKALL-NEXT:   (case name=option154 index=154)
+// CHECKALL-NEXT:   (case name=option155 index=155)
+// CHECKALL-NEXT:   (case name=option156 index=156)
+// CHECKALL-NEXT:   (case name=option157 index=157)
+// CHECKALL-NEXT:   (case name=option158 index=158)
+// CHECKALL-NEXT:   (case name=option159 index=159)
+// CHECKALL-NEXT:   (case name=option160 index=160)
+// CHECKALL-NEXT:   (case name=option161 index=161)
+// CHECKALL-NEXT:   (case name=option162 index=162)
+// CHECKALL-NEXT:   (case name=option163 index=163)
+// CHECKALL-NEXT:   (case name=option164 index=164)
+// CHECKALL-NEXT:   (case name=option165 index=165)
+// CHECKALL-NEXT:   (case name=option166 index=166)
+// CHECKALL-NEXT:   (case name=option167 index=167)
+// CHECKALL-NEXT:   (case name=option168 index=168)
+// CHECKALL-NEXT:   (case name=option169 index=169)
+// CHECKALL-NEXT:   (case name=option170 index=170)
+// CHECKALL-NEXT:   (case name=option171 index=171)
+// CHECKALL-NEXT:   (case name=option172 index=172)
+// CHECKALL-NEXT:   (case name=option173 index=173)
+// CHECKALL-NEXT:   (case name=option174 index=174)
+// CHECKALL-NEXT:   (case name=option175 index=175)
+// CHECKALL-NEXT:   (case name=option176 index=176)
+// CHECKALL-NEXT:   (case name=option177 index=177)
+// CHECKALL-NEXT:   (case name=option178 index=178)
+// CHECKALL-NEXT:   (case name=option179 index=179)
+// CHECKALL-NEXT:   (case name=option180 index=180)
+// CHECKALL-NEXT:   (case name=option181 index=181)
+// CHECKALL-NEXT:   (case name=option182 index=182)
+// CHECKALL-NEXT:   (case name=option183 index=183)
+// CHECKALL-NEXT:   (case name=option184 index=184)
+// CHECKALL-NEXT:   (case name=option185 index=185)
+// CHECKALL-NEXT:   (case name=option186 index=186)
+// CHECKALL-NEXT:   (case name=option187 index=187)
+// CHECKALL-NEXT:   (case name=option188 index=188)
+// CHECKALL-NEXT:   (case name=option189 index=189)
+// CHECKALL-NEXT:   (case name=option190 index=190)
+// CHECKALL-NEXT:   (case name=option191 index=191)
+// CHECKALL-NEXT:   (case name=option192 index=192)
+// CHECKALL-NEXT:   (case name=option193 index=193)
+// CHECKALL-NEXT:   (case name=option194 index=194)
+// CHECKALL-NEXT:   (case name=option195 index=195)
+// CHECKALL-NEXT:   (case name=option196 index=196)
+// CHECKALL-NEXT:   (case name=option197 index=197)
+// CHECKALL-NEXT:   (case name=option198 index=198)
+// CHECKALL-NEXT:   (case name=option199 index=199)
+// CHECKALL-NEXT:   (case name=option200 index=200)
+// CHECKALL-NEXT:   (case name=option201 index=201)
+// CHECKALL-NEXT:   (case name=option202 index=202)
+// CHECKALL-NEXT:   (case name=option203 index=203)
+// CHECKALL-NEXT:   (case name=option204 index=204)
+// CHECKALL-NEXT:   (case name=option205 index=205)
+// CHECKALL-NEXT:   (case name=option206 index=206)
+// CHECKALL-NEXT:   (case name=option207 index=207)
+// CHECKALL-NEXT:   (case name=option208 index=208)
+// CHECKALL-NEXT:   (case name=option209 index=209)
+// CHECKALL-NEXT:   (case name=option210 index=210)
+// CHECKALL-NEXT:   (case name=option211 index=211)
+// CHECKALL-NEXT:   (case name=option212 index=212)
+// CHECKALL-NEXT:   (case name=option213 index=213)
+// CHECKALL-NEXT:   (case name=option214 index=214)
+// CHECKALL-NEXT:   (case name=option215 index=215)
+// CHECKALL-NEXT:   (case name=option216 index=216)
+// CHECKALL-NEXT:   (case name=option217 index=217)
+// CHECKALL-NEXT:   (case name=option218 index=218)
+// CHECKALL-NEXT:   (case name=option219 index=219)
+// CHECKALL-NEXT:   (case name=option220 index=220)
+// CHECKALL-NEXT:   (case name=option221 index=221)
+// CHECKALL-NEXT:   (case name=option222 index=222)
+// CHECKALL-NEXT:   (case name=option223 index=223)
+// CHECKALL-NEXT:   (case name=option224 index=224)
+// CHECKALL-NEXT:   (case name=option225 index=225)
+// CHECKALL-NEXT:   (case name=option226 index=226)
+// CHECKALL-NEXT:   (case name=option227 index=227)
+// CHECKALL-NEXT:   (case name=option228 index=228)
+// CHECKALL-NEXT:   (case name=option229 index=229)
+// CHECKALL-NEXT:   (case name=option230 index=230)
+// CHECKALL-NEXT:   (case name=option231 index=231)
+// CHECKALL-NEXT:   (case name=option232 index=232)
+// CHECKALL-NEXT:   (case name=option233 index=233)
+// CHECKALL-NEXT:   (case name=option234 index=234)
+// CHECKALL-NEXT:   (case name=option235 index=235)
+// CHECKALL-NEXT:   (case name=option236 index=236)
+// CHECKALL-NEXT:   (case name=option237 index=237)
+// CHECKALL-NEXT:   (case name=option238 index=238)
+// CHECKALL-NEXT:   (case name=option239 index=239)
+// CHECKALL-NEXT:   (case name=option240 index=240)
+// CHECKALL-NEXT:   (case name=option241 index=241)
+// CHECKALL-NEXT:   (case name=option242 index=242)
+// CHECKALL-NEXT:   (case name=option243 index=243)
+// CHECKALL-NEXT:   (case name=option244 index=244)
+// CHECKALL-NEXT:   (case name=option245 index=245)
+// CHECKALL-NEXT:   (case name=option246 index=246)
+// CHECKALL-NEXT:   (case name=option247 index=247)
+// CHECKALL-NEXT:   (case name=option248 index=248)
+// CHECKALL-NEXT:   (case name=option249 index=249)
+// CHECKALL-NEXT:   (case name=option250 index=250)
+// CHECKALL-NEXT:   (case name=option251 index=251)
+// CHECKALL-NEXT:   (case name=option252 index=252)
+// CHECKALL-NEXT:   (case name=option253 index=253)
+// CHECKALL-NEXT:   (case name=option254 index=254)
+// CHECKALL-NEXT:   (case name=option255 index=255)
+// CHECKALL-NEXT:   (case name=option256 index=256)
+// CHECKALL-NEXT:   (case name=option257 index=257))
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=option12 index=12)
+// CHECKALL: Enum value:
+// CHECKALL-NEXT: (enum_value name=option12 index=12)
 
 reflect(enum: VastNumberOfCasesNoPayload.option256)
 
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_enum_wip.VastNumberOfCasesNoPayload)
+// CHECKALL: Reflecting an enum.
+// CHECKALL-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values.VastNumberOfCasesNoPayload)
 
-// CHECK-64: Type info:
-// CHECK-64: (no_payload_enum size=2 alignment=2 stride=2 num_extra_inhabitants=65278 bitwise_takable=1
-// CHECK-64:   (case name=option0 index=0)
-// CHECK-64:   (case name=option1 index=1)
-// CHECK-64:   (case name=option2 index=2)
-// CHECK-64:   (case name=option3 index=3)
-// CHECK-64:   (case name=option4 index=4)
-// CHECK-64:   (case name=option5 index=5)
-// CHECK-64:   (case name=option6 index=6)
-// CHECK-64:   (case name=option7 index=7)
-// CHECK-64:   (case name=option8 index=8)
-// CHECK-64:   (case name=option9 index=9)
-// CHECK-64:   (case name=option10 index=10)
-// CHECK-64:   (case name=option11 index=11)
-// CHECK-64:   (case name=option12 index=12)
-// CHECK-64:   (case name=option13 index=13)
-// CHECK-64:   (case name=option14 index=14)
-// CHECK-64:   (case name=option15 index=15)
-// CHECK-64:   (case name=option16 index=16)
-// CHECK-64:   (case name=option17 index=17)
-// CHECK-64:   (case name=option18 index=18)
-// CHECK-64:   (case name=option19 index=19)
-// CHECK-64:   (case name=option20 index=20)
-// CHECK-64:   (case name=option21 index=21)
-// CHECK-64:   (case name=option22 index=22)
-// CHECK-64:   (case name=option23 index=23)
-// CHECK-64:   (case name=option24 index=24)
-// CHECK-64:   (case name=option25 index=25)
-// CHECK-64:   (case name=option26 index=26)
-// CHECK-64:   (case name=option27 index=27)
-// CHECK-64:   (case name=option28 index=28)
-// CHECK-64:   (case name=option29 index=29)
-// CHECK-64:   (case name=option30 index=30)
-// CHECK-64:   (case name=option31 index=31)
-// CHECK-64:   (case name=option32 index=32)
-// CHECK-64:   (case name=option33 index=33)
-// CHECK-64:   (case name=option34 index=34)
-// CHECK-64:   (case name=option35 index=35)
-// CHECK-64:   (case name=option36 index=36)
-// CHECK-64:   (case name=option37 index=37)
-// CHECK-64:   (case name=option38 index=38)
-// CHECK-64:   (case name=option39 index=39)
-// CHECK-64:   (case name=option40 index=40)
-// CHECK-64:   (case name=option41 index=41)
-// CHECK-64:   (case name=option42 index=42)
-// CHECK-64:   (case name=option43 index=43)
-// CHECK-64:   (case name=option44 index=44)
-// CHECK-64:   (case name=option45 index=45)
-// CHECK-64:   (case name=option46 index=46)
-// CHECK-64:   (case name=option47 index=47)
-// CHECK-64:   (case name=option48 index=48)
-// CHECK-64:   (case name=option49 index=49)
-// CHECK-64:   (case name=option50 index=50)
-// CHECK-64:   (case name=option51 index=51)
-// CHECK-64:   (case name=option52 index=52)
-// CHECK-64:   (case name=option53 index=53)
-// CHECK-64:   (case name=option54 index=54)
-// CHECK-64:   (case name=option55 index=55)
-// CHECK-64:   (case name=option56 index=56)
-// CHECK-64:   (case name=option57 index=57)
-// CHECK-64:   (case name=option58 index=58)
-// CHECK-64:   (case name=option59 index=59)
-// CHECK-64:   (case name=option60 index=60)
-// CHECK-64:   (case name=option61 index=61)
-// CHECK-64:   (case name=option62 index=62)
-// CHECK-64:   (case name=option63 index=63)
-// CHECK-64:   (case name=option64 index=64)
-// CHECK-64:   (case name=option65 index=65)
-// CHECK-64:   (case name=option66 index=66)
-// CHECK-64:   (case name=option67 index=67)
-// CHECK-64:   (case name=option68 index=68)
-// CHECK-64:   (case name=option69 index=69)
-// CHECK-64:   (case name=option70 index=70)
-// CHECK-64:   (case name=option71 index=71)
-// CHECK-64:   (case name=option72 index=72)
-// CHECK-64:   (case name=option73 index=73)
-// CHECK-64:   (case name=option74 index=74)
-// CHECK-64:   (case name=option75 index=75)
-// CHECK-64:   (case name=option76 index=76)
-// CHECK-64:   (case name=option77 index=77)
-// CHECK-64:   (case name=option78 index=78)
-// CHECK-64:   (case name=option79 index=79)
-// CHECK-64:   (case name=option80 index=80)
-// CHECK-64:   (case name=option81 index=81)
-// CHECK-64:   (case name=option82 index=82)
-// CHECK-64:   (case name=option83 index=83)
-// CHECK-64:   (case name=option84 index=84)
-// CHECK-64:   (case name=option85 index=85)
-// CHECK-64:   (case name=option86 index=86)
-// CHECK-64:   (case name=option87 index=87)
-// CHECK-64:   (case name=option88 index=88)
-// CHECK-64:   (case name=option89 index=89)
-// CHECK-64:   (case name=option90 index=90)
-// CHECK-64:   (case name=option91 index=91)
-// CHECK-64:   (case name=option92 index=92)
-// CHECK-64:   (case name=option93 index=93)
-// CHECK-64:   (case name=option94 index=94)
-// CHECK-64:   (case name=option95 index=95)
-// CHECK-64:   (case name=option96 index=96)
-// CHECK-64:   (case name=option97 index=97)
-// CHECK-64:   (case name=option98 index=98)
-// CHECK-64:   (case name=option99 index=99)
-// CHECK-64:   (case name=option100 index=100)
-// CHECK-64:   (case name=option101 index=101)
-// CHECK-64:   (case name=option102 index=102)
-// CHECK-64:   (case name=option103 index=103)
-// CHECK-64:   (case name=option104 index=104)
-// CHECK-64:   (case name=option105 index=105)
-// CHECK-64:   (case name=option106 index=106)
-// CHECK-64:   (case name=option107 index=107)
-// CHECK-64:   (case name=option108 index=108)
-// CHECK-64:   (case name=option109 index=109)
-// CHECK-64:   (case name=option110 index=110)
-// CHECK-64:   (case name=option111 index=111)
-// CHECK-64:   (case name=option112 index=112)
-// CHECK-64:   (case name=option113 index=113)
-// CHECK-64:   (case name=option114 index=114)
-// CHECK-64:   (case name=option115 index=115)
-// CHECK-64:   (case name=option116 index=116)
-// CHECK-64:   (case name=option117 index=117)
-// CHECK-64:   (case name=option118 index=118)
-// CHECK-64:   (case name=option119 index=119)
-// CHECK-64:   (case name=option120 index=120)
-// CHECK-64:   (case name=option121 index=121)
-// CHECK-64:   (case name=option122 index=122)
-// CHECK-64:   (case name=option123 index=123)
-// CHECK-64:   (case name=option124 index=124)
-// CHECK-64:   (case name=option125 index=125)
-// CHECK-64:   (case name=option126 index=126)
-// CHECK-64:   (case name=option127 index=127)
-// CHECK-64:   (case name=option128 index=128)
-// CHECK-64:   (case name=option129 index=129)
-// CHECK-64:   (case name=option130 index=130)
-// CHECK-64:   (case name=option131 index=131)
-// CHECK-64:   (case name=option132 index=132)
-// CHECK-64:   (case name=option133 index=133)
-// CHECK-64:   (case name=option134 index=134)
-// CHECK-64:   (case name=option135 index=135)
-// CHECK-64:   (case name=option136 index=136)
-// CHECK-64:   (case name=option137 index=137)
-// CHECK-64:   (case name=option138 index=138)
-// CHECK-64:   (case name=option139 index=139)
-// CHECK-64:   (case name=option140 index=140)
-// CHECK-64:   (case name=option141 index=141)
-// CHECK-64:   (case name=option142 index=142)
-// CHECK-64:   (case name=option143 index=143)
-// CHECK-64:   (case name=option144 index=144)
-// CHECK-64:   (case name=option145 index=145)
-// CHECK-64:   (case name=option146 index=146)
-// CHECK-64:   (case name=option147 index=147)
-// CHECK-64:   (case name=option148 index=148)
-// CHECK-64:   (case name=option149 index=149)
-// CHECK-64:   (case name=option150 index=150)
-// CHECK-64:   (case name=option151 index=151)
-// CHECK-64:   (case name=option152 index=152)
-// CHECK-64:   (case name=option153 index=153)
-// CHECK-64:   (case name=option154 index=154)
-// CHECK-64:   (case name=option155 index=155)
-// CHECK-64:   (case name=option156 index=156)
-// CHECK-64:   (case name=option157 index=157)
-// CHECK-64:   (case name=option158 index=158)
-// CHECK-64:   (case name=option159 index=159)
-// CHECK-64:   (case name=option160 index=160)
-// CHECK-64:   (case name=option161 index=161)
-// CHECK-64:   (case name=option162 index=162)
-// CHECK-64:   (case name=option163 index=163)
-// CHECK-64:   (case name=option164 index=164)
-// CHECK-64:   (case name=option165 index=165)
-// CHECK-64:   (case name=option166 index=166)
-// CHECK-64:   (case name=option167 index=167)
-// CHECK-64:   (case name=option168 index=168)
-// CHECK-64:   (case name=option169 index=169)
-// CHECK-64:   (case name=option170 index=170)
-// CHECK-64:   (case name=option171 index=171)
-// CHECK-64:   (case name=option172 index=172)
-// CHECK-64:   (case name=option173 index=173)
-// CHECK-64:   (case name=option174 index=174)
-// CHECK-64:   (case name=option175 index=175)
-// CHECK-64:   (case name=option176 index=176)
-// CHECK-64:   (case name=option177 index=177)
-// CHECK-64:   (case name=option178 index=178)
-// CHECK-64:   (case name=option179 index=179)
-// CHECK-64:   (case name=option180 index=180)
-// CHECK-64:   (case name=option181 index=181)
-// CHECK-64:   (case name=option182 index=182)
-// CHECK-64:   (case name=option183 index=183)
-// CHECK-64:   (case name=option184 index=184)
-// CHECK-64:   (case name=option185 index=185)
-// CHECK-64:   (case name=option186 index=186)
-// CHECK-64:   (case name=option187 index=187)
-// CHECK-64:   (case name=option188 index=188)
-// CHECK-64:   (case name=option189 index=189)
-// CHECK-64:   (case name=option190 index=190)
-// CHECK-64:   (case name=option191 index=191)
-// CHECK-64:   (case name=option192 index=192)
-// CHECK-64:   (case name=option193 index=193)
-// CHECK-64:   (case name=option194 index=194)
-// CHECK-64:   (case name=option195 index=195)
-// CHECK-64:   (case name=option196 index=196)
-// CHECK-64:   (case name=option197 index=197)
-// CHECK-64:   (case name=option198 index=198)
-// CHECK-64:   (case name=option199 index=199)
-// CHECK-64:   (case name=option200 index=200)
-// CHECK-64:   (case name=option201 index=201)
-// CHECK-64:   (case name=option202 index=202)
-// CHECK-64:   (case name=option203 index=203)
-// CHECK-64:   (case name=option204 index=204)
-// CHECK-64:   (case name=option205 index=205)
-// CHECK-64:   (case name=option206 index=206)
-// CHECK-64:   (case name=option207 index=207)
-// CHECK-64:   (case name=option208 index=208)
-// CHECK-64:   (case name=option209 index=209)
-// CHECK-64:   (case name=option210 index=210)
-// CHECK-64:   (case name=option211 index=211)
-// CHECK-64:   (case name=option212 index=212)
-// CHECK-64:   (case name=option213 index=213)
-// CHECK-64:   (case name=option214 index=214)
-// CHECK-64:   (case name=option215 index=215)
-// CHECK-64:   (case name=option216 index=216)
-// CHECK-64:   (case name=option217 index=217)
-// CHECK-64:   (case name=option218 index=218)
-// CHECK-64:   (case name=option219 index=219)
-// CHECK-64:   (case name=option220 index=220)
-// CHECK-64:   (case name=option221 index=221)
-// CHECK-64:   (case name=option222 index=222)
-// CHECK-64:   (case name=option223 index=223)
-// CHECK-64:   (case name=option224 index=224)
-// CHECK-64:   (case name=option225 index=225)
-// CHECK-64:   (case name=option226 index=226)
-// CHECK-64:   (case name=option227 index=227)
-// CHECK-64:   (case name=option228 index=228)
-// CHECK-64:   (case name=option229 index=229)
-// CHECK-64:   (case name=option230 index=230)
-// CHECK-64:   (case name=option231 index=231)
-// CHECK-64:   (case name=option232 index=232)
-// CHECK-64:   (case name=option233 index=233)
-// CHECK-64:   (case name=option234 index=234)
-// CHECK-64:   (case name=option235 index=235)
-// CHECK-64:   (case name=option236 index=236)
-// CHECK-64:   (case name=option237 index=237)
-// CHECK-64:   (case name=option238 index=238)
-// CHECK-64:   (case name=option239 index=239)
-// CHECK-64:   (case name=option240 index=240)
-// CHECK-64:   (case name=option241 index=241)
-// CHECK-64:   (case name=option242 index=242)
-// CHECK-64:   (case name=option243 index=243)
-// CHECK-64:   (case name=option244 index=244)
-// CHECK-64:   (case name=option245 index=245)
-// CHECK-64:   (case name=option246 index=246)
-// CHECK-64:   (case name=option247 index=247)
-// CHECK-64:   (case name=option248 index=248)
-// CHECK-64:   (case name=option249 index=249)
-// CHECK-64:   (case name=option250 index=250)
-// CHECK-64:   (case name=option251 index=251)
-// CHECK-64:   (case name=option252 index=252)
-// CHECK-64:   (case name=option253 index=253)
-// CHECK-64:   (case name=option254 index=254)
-// CHECK-64:   (case name=option255 index=255)
-// CHECK-64:   (case name=option256 index=256)
-// CHECK-64:   (case name=option257 index=257))
+// CHECKALL: Type info:
+// CHECKALL-NEXT: (no_payload_enum size=2 alignment=2 stride=2 num_extra_inhabitants=65278 bitwise_takable=1
+// CHECKALL-NEXT:   (case name=option0 index=0)
+// CHECKALL-NEXT:   (case name=option1 index=1)
+// CHECKALL-NEXT:   (case name=option2 index=2)
+// CHECKALL-NEXT:   (case name=option3 index=3)
+// CHECKALL-NEXT:   (case name=option4 index=4)
+// CHECKALL-NEXT:   (case name=option5 index=5)
+// CHECKALL-NEXT:   (case name=option6 index=6)
+// CHECKALL-NEXT:   (case name=option7 index=7)
+// CHECKALL-NEXT:   (case name=option8 index=8)
+// CHECKALL-NEXT:   (case name=option9 index=9)
+// CHECKALL-NEXT:   (case name=option10 index=10)
+// CHECKALL-NEXT:   (case name=option11 index=11)
+// CHECKALL-NEXT:   (case name=option12 index=12)
+// CHECKALL-NEXT:   (case name=option13 index=13)
+// CHECKALL-NEXT:   (case name=option14 index=14)
+// CHECKALL-NEXT:   (case name=option15 index=15)
+// CHECKALL-NEXT:   (case name=option16 index=16)
+// CHECKALL-NEXT:   (case name=option17 index=17)
+// CHECKALL-NEXT:   (case name=option18 index=18)
+// CHECKALL-NEXT:   (case name=option19 index=19)
+// CHECKALL-NEXT:   (case name=option20 index=20)
+// CHECKALL-NEXT:   (case name=option21 index=21)
+// CHECKALL-NEXT:   (case name=option22 index=22)
+// CHECKALL-NEXT:   (case name=option23 index=23)
+// CHECKALL-NEXT:   (case name=option24 index=24)
+// CHECKALL-NEXT:   (case name=option25 index=25)
+// CHECKALL-NEXT:   (case name=option26 index=26)
+// CHECKALL-NEXT:   (case name=option27 index=27)
+// CHECKALL-NEXT:   (case name=option28 index=28)
+// CHECKALL-NEXT:   (case name=option29 index=29)
+// CHECKALL-NEXT:   (case name=option30 index=30)
+// CHECKALL-NEXT:   (case name=option31 index=31)
+// CHECKALL-NEXT:   (case name=option32 index=32)
+// CHECKALL-NEXT:   (case name=option33 index=33)
+// CHECKALL-NEXT:   (case name=option34 index=34)
+// CHECKALL-NEXT:   (case name=option35 index=35)
+// CHECKALL-NEXT:   (case name=option36 index=36)
+// CHECKALL-NEXT:   (case name=option37 index=37)
+// CHECKALL-NEXT:   (case name=option38 index=38)
+// CHECKALL-NEXT:   (case name=option39 index=39)
+// CHECKALL-NEXT:   (case name=option40 index=40)
+// CHECKALL-NEXT:   (case name=option41 index=41)
+// CHECKALL-NEXT:   (case name=option42 index=42)
+// CHECKALL-NEXT:   (case name=option43 index=43)
+// CHECKALL-NEXT:   (case name=option44 index=44)
+// CHECKALL-NEXT:   (case name=option45 index=45)
+// CHECKALL-NEXT:   (case name=option46 index=46)
+// CHECKALL-NEXT:   (case name=option47 index=47)
+// CHECKALL-NEXT:   (case name=option48 index=48)
+// CHECKALL-NEXT:   (case name=option49 index=49)
+// CHECKALL-NEXT:   (case name=option50 index=50)
+// CHECKALL-NEXT:   (case name=option51 index=51)
+// CHECKALL-NEXT:   (case name=option52 index=52)
+// CHECKALL-NEXT:   (case name=option53 index=53)
+// CHECKALL-NEXT:   (case name=option54 index=54)
+// CHECKALL-NEXT:   (case name=option55 index=55)
+// CHECKALL-NEXT:   (case name=option56 index=56)
+// CHECKALL-NEXT:   (case name=option57 index=57)
+// CHECKALL-NEXT:   (case name=option58 index=58)
+// CHECKALL-NEXT:   (case name=option59 index=59)
+// CHECKALL-NEXT:   (case name=option60 index=60)
+// CHECKALL-NEXT:   (case name=option61 index=61)
+// CHECKALL-NEXT:   (case name=option62 index=62)
+// CHECKALL-NEXT:   (case name=option63 index=63)
+// CHECKALL-NEXT:   (case name=option64 index=64)
+// CHECKALL-NEXT:   (case name=option65 index=65)
+// CHECKALL-NEXT:   (case name=option66 index=66)
+// CHECKALL-NEXT:   (case name=option67 index=67)
+// CHECKALL-NEXT:   (case name=option68 index=68)
+// CHECKALL-NEXT:   (case name=option69 index=69)
+// CHECKALL-NEXT:   (case name=option70 index=70)
+// CHECKALL-NEXT:   (case name=option71 index=71)
+// CHECKALL-NEXT:   (case name=option72 index=72)
+// CHECKALL-NEXT:   (case name=option73 index=73)
+// CHECKALL-NEXT:   (case name=option74 index=74)
+// CHECKALL-NEXT:   (case name=option75 index=75)
+// CHECKALL-NEXT:   (case name=option76 index=76)
+// CHECKALL-NEXT:   (case name=option77 index=77)
+// CHECKALL-NEXT:   (case name=option78 index=78)
+// CHECKALL-NEXT:   (case name=option79 index=79)
+// CHECKALL-NEXT:   (case name=option80 index=80)
+// CHECKALL-NEXT:   (case name=option81 index=81)
+// CHECKALL-NEXT:   (case name=option82 index=82)
+// CHECKALL-NEXT:   (case name=option83 index=83)
+// CHECKALL-NEXT:   (case name=option84 index=84)
+// CHECKALL-NEXT:   (case name=option85 index=85)
+// CHECKALL-NEXT:   (case name=option86 index=86)
+// CHECKALL-NEXT:   (case name=option87 index=87)
+// CHECKALL-NEXT:   (case name=option88 index=88)
+// CHECKALL-NEXT:   (case name=option89 index=89)
+// CHECKALL-NEXT:   (case name=option90 index=90)
+// CHECKALL-NEXT:   (case name=option91 index=91)
+// CHECKALL-NEXT:   (case name=option92 index=92)
+// CHECKALL-NEXT:   (case name=option93 index=93)
+// CHECKALL-NEXT:   (case name=option94 index=94)
+// CHECKALL-NEXT:   (case name=option95 index=95)
+// CHECKALL-NEXT:   (case name=option96 index=96)
+// CHECKALL-NEXT:   (case name=option97 index=97)
+// CHECKALL-NEXT:   (case name=option98 index=98)
+// CHECKALL-NEXT:   (case name=option99 index=99)
+// CHECKALL-NEXT:   (case name=option100 index=100)
+// CHECKALL-NEXT:   (case name=option101 index=101)
+// CHECKALL-NEXT:   (case name=option102 index=102)
+// CHECKALL-NEXT:   (case name=option103 index=103)
+// CHECKALL-NEXT:   (case name=option104 index=104)
+// CHECKALL-NEXT:   (case name=option105 index=105)
+// CHECKALL-NEXT:   (case name=option106 index=106)
+// CHECKALL-NEXT:   (case name=option107 index=107)
+// CHECKALL-NEXT:   (case name=option108 index=108)
+// CHECKALL-NEXT:   (case name=option109 index=109)
+// CHECKALL-NEXT:   (case name=option110 index=110)
+// CHECKALL-NEXT:   (case name=option111 index=111)
+// CHECKALL-NEXT:   (case name=option112 index=112)
+// CHECKALL-NEXT:   (case name=option113 index=113)
+// CHECKALL-NEXT:   (case name=option114 index=114)
+// CHECKALL-NEXT:   (case name=option115 index=115)
+// CHECKALL-NEXT:   (case name=option116 index=116)
+// CHECKALL-NEXT:   (case name=option117 index=117)
+// CHECKALL-NEXT:   (case name=option118 index=118)
+// CHECKALL-NEXT:   (case name=option119 index=119)
+// CHECKALL-NEXT:   (case name=option120 index=120)
+// CHECKALL-NEXT:   (case name=option121 index=121)
+// CHECKALL-NEXT:   (case name=option122 index=122)
+// CHECKALL-NEXT:   (case name=option123 index=123)
+// CHECKALL-NEXT:   (case name=option124 index=124)
+// CHECKALL-NEXT:   (case name=option125 index=125)
+// CHECKALL-NEXT:   (case name=option126 index=126)
+// CHECKALL-NEXT:   (case name=option127 index=127)
+// CHECKALL-NEXT:   (case name=option128 index=128)
+// CHECKALL-NEXT:   (case name=option129 index=129)
+// CHECKALL-NEXT:   (case name=option130 index=130)
+// CHECKALL-NEXT:   (case name=option131 index=131)
+// CHECKALL-NEXT:   (case name=option132 index=132)
+// CHECKALL-NEXT:   (case name=option133 index=133)
+// CHECKALL-NEXT:   (case name=option134 index=134)
+// CHECKALL-NEXT:   (case name=option135 index=135)
+// CHECKALL-NEXT:   (case name=option136 index=136)
+// CHECKALL-NEXT:   (case name=option137 index=137)
+// CHECKALL-NEXT:   (case name=option138 index=138)
+// CHECKALL-NEXT:   (case name=option139 index=139)
+// CHECKALL-NEXT:   (case name=option140 index=140)
+// CHECKALL-NEXT:   (case name=option141 index=141)
+// CHECKALL-NEXT:   (case name=option142 index=142)
+// CHECKALL-NEXT:   (case name=option143 index=143)
+// CHECKALL-NEXT:   (case name=option144 index=144)
+// CHECKALL-NEXT:   (case name=option145 index=145)
+// CHECKALL-NEXT:   (case name=option146 index=146)
+// CHECKALL-NEXT:   (case name=option147 index=147)
+// CHECKALL-NEXT:   (case name=option148 index=148)
+// CHECKALL-NEXT:   (case name=option149 index=149)
+// CHECKALL-NEXT:   (case name=option150 index=150)
+// CHECKALL-NEXT:   (case name=option151 index=151)
+// CHECKALL-NEXT:   (case name=option152 index=152)
+// CHECKALL-NEXT:   (case name=option153 index=153)
+// CHECKALL-NEXT:   (case name=option154 index=154)
+// CHECKALL-NEXT:   (case name=option155 index=155)
+// CHECKALL-NEXT:   (case name=option156 index=156)
+// CHECKALL-NEXT:   (case name=option157 index=157)
+// CHECKALL-NEXT:   (case name=option158 index=158)
+// CHECKALL-NEXT:   (case name=option159 index=159)
+// CHECKALL-NEXT:   (case name=option160 index=160)
+// CHECKALL-NEXT:   (case name=option161 index=161)
+// CHECKALL-NEXT:   (case name=option162 index=162)
+// CHECKALL-NEXT:   (case name=option163 index=163)
+// CHECKALL-NEXT:   (case name=option164 index=164)
+// CHECKALL-NEXT:   (case name=option165 index=165)
+// CHECKALL-NEXT:   (case name=option166 index=166)
+// CHECKALL-NEXT:   (case name=option167 index=167)
+// CHECKALL-NEXT:   (case name=option168 index=168)
+// CHECKALL-NEXT:   (case name=option169 index=169)
+// CHECKALL-NEXT:   (case name=option170 index=170)
+// CHECKALL-NEXT:   (case name=option171 index=171)
+// CHECKALL-NEXT:   (case name=option172 index=172)
+// CHECKALL-NEXT:   (case name=option173 index=173)
+// CHECKALL-NEXT:   (case name=option174 index=174)
+// CHECKALL-NEXT:   (case name=option175 index=175)
+// CHECKALL-NEXT:   (case name=option176 index=176)
+// CHECKALL-NEXT:   (case name=option177 index=177)
+// CHECKALL-NEXT:   (case name=option178 index=178)
+// CHECKALL-NEXT:   (case name=option179 index=179)
+// CHECKALL-NEXT:   (case name=option180 index=180)
+// CHECKALL-NEXT:   (case name=option181 index=181)
+// CHECKALL-NEXT:   (case name=option182 index=182)
+// CHECKALL-NEXT:   (case name=option183 index=183)
+// CHECKALL-NEXT:   (case name=option184 index=184)
+// CHECKALL-NEXT:   (case name=option185 index=185)
+// CHECKALL-NEXT:   (case name=option186 index=186)
+// CHECKALL-NEXT:   (case name=option187 index=187)
+// CHECKALL-NEXT:   (case name=option188 index=188)
+// CHECKALL-NEXT:   (case name=option189 index=189)
+// CHECKALL-NEXT:   (case name=option190 index=190)
+// CHECKALL-NEXT:   (case name=option191 index=191)
+// CHECKALL-NEXT:   (case name=option192 index=192)
+// CHECKALL-NEXT:   (case name=option193 index=193)
+// CHECKALL-NEXT:   (case name=option194 index=194)
+// CHECKALL-NEXT:   (case name=option195 index=195)
+// CHECKALL-NEXT:   (case name=option196 index=196)
+// CHECKALL-NEXT:   (case name=option197 index=197)
+// CHECKALL-NEXT:   (case name=option198 index=198)
+// CHECKALL-NEXT:   (case name=option199 index=199)
+// CHECKALL-NEXT:   (case name=option200 index=200)
+// CHECKALL-NEXT:   (case name=option201 index=201)
+// CHECKALL-NEXT:   (case name=option202 index=202)
+// CHECKALL-NEXT:   (case name=option203 index=203)
+// CHECKALL-NEXT:   (case name=option204 index=204)
+// CHECKALL-NEXT:   (case name=option205 index=205)
+// CHECKALL-NEXT:   (case name=option206 index=206)
+// CHECKALL-NEXT:   (case name=option207 index=207)
+// CHECKALL-NEXT:   (case name=option208 index=208)
+// CHECKALL-NEXT:   (case name=option209 index=209)
+// CHECKALL-NEXT:   (case name=option210 index=210)
+// CHECKALL-NEXT:   (case name=option211 index=211)
+// CHECKALL-NEXT:   (case name=option212 index=212)
+// CHECKALL-NEXT:   (case name=option213 index=213)
+// CHECKALL-NEXT:   (case name=option214 index=214)
+// CHECKALL-NEXT:   (case name=option215 index=215)
+// CHECKALL-NEXT:   (case name=option216 index=216)
+// CHECKALL-NEXT:   (case name=option217 index=217)
+// CHECKALL-NEXT:   (case name=option218 index=218)
+// CHECKALL-NEXT:   (case name=option219 index=219)
+// CHECKALL-NEXT:   (case name=option220 index=220)
+// CHECKALL-NEXT:   (case name=option221 index=221)
+// CHECKALL-NEXT:   (case name=option222 index=222)
+// CHECKALL-NEXT:   (case name=option223 index=223)
+// CHECKALL-NEXT:   (case name=option224 index=224)
+// CHECKALL-NEXT:   (case name=option225 index=225)
+// CHECKALL-NEXT:   (case name=option226 index=226)
+// CHECKALL-NEXT:   (case name=option227 index=227)
+// CHECKALL-NEXT:   (case name=option228 index=228)
+// CHECKALL-NEXT:   (case name=option229 index=229)
+// CHECKALL-NEXT:   (case name=option230 index=230)
+// CHECKALL-NEXT:   (case name=option231 index=231)
+// CHECKALL-NEXT:   (case name=option232 index=232)
+// CHECKALL-NEXT:   (case name=option233 index=233)
+// CHECKALL-NEXT:   (case name=option234 index=234)
+// CHECKALL-NEXT:   (case name=option235 index=235)
+// CHECKALL-NEXT:   (case name=option236 index=236)
+// CHECKALL-NEXT:   (case name=option237 index=237)
+// CHECKALL-NEXT:   (case name=option238 index=238)
+// CHECKALL-NEXT:   (case name=option239 index=239)
+// CHECKALL-NEXT:   (case name=option240 index=240)
+// CHECKALL-NEXT:   (case name=option241 index=241)
+// CHECKALL-NEXT:   (case name=option242 index=242)
+// CHECKALL-NEXT:   (case name=option243 index=243)
+// CHECKALL-NEXT:   (case name=option244 index=244)
+// CHECKALL-NEXT:   (case name=option245 index=245)
+// CHECKALL-NEXT:   (case name=option246 index=246)
+// CHECKALL-NEXT:   (case name=option247 index=247)
+// CHECKALL-NEXT:   (case name=option248 index=248)
+// CHECKALL-NEXT:   (case name=option249 index=249)
+// CHECKALL-NEXT:   (case name=option250 index=250)
+// CHECKALL-NEXT:   (case name=option251 index=251)
+// CHECKALL-NEXT:   (case name=option252 index=252)
+// CHECKALL-NEXT:   (case name=option253 index=253)
+// CHECKALL-NEXT:   (case name=option254 index=254)
+// CHECKALL-NEXT:   (case name=option255 index=255)
+// CHECKALL-NEXT:   (case name=option256 index=256)
+// CHECKALL-NEXT:   (case name=option257 index=257))
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=option256 index=256)
+// CHECKALL: Enum value:
+// CHECKALL-NEXT: (enum_value name=option256 index=256)
 
 reflect(enum: ManyCasesOneIntPayload.payload(77))
 
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_enum_wip.ManyCasesOneIntPayload)
+// CHECKALL: Reflecting an enum.
+// CHECKALL-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values.ManyCasesOneIntPayload)
 
-// CHECK-64: Type info:
-// CHECK-64: (single_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:   (case name=payload index=0 offset=0
-// CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:       (field name=_value offset=0
-// CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:   (case name=otherA index=1)
-// CHECK-64:   (case name=otherB index=2)
-// CHECK-64:   (case name=otherC index=3))
+// CHECKALL: Type info:
+// CHECK64-NEXT: (single_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:   (case name=payload index=0 offset=0
+// CHECK64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:       (field name=_value offset=0
+// CHECK64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:   (case name=otherA index=1)
+// CHECK64-NEXT:   (case name=otherB index=2)
+// CHECK64-NEXT:   (case name=otherC index=3))
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=payload index=0
-// CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:       (field name=_value offset=0
-// CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))
-// CHECK-64: )
+// CHECK32-NEXT: (single_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:   (case name=payload index=0 offset=0
+// CHECK32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:       (field name=_value offset=0
+// CHECK32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:   (case name=otherA index=1)
+// CHECK32-NEXT:   (case name=otherB index=2)
+// CHECK32-NEXT:   (case name=otherC index=3))
+
+// CHECKALL: Enum value:
+// CHECK64-NEXT: (enum_value name=payload index=0
+// CHECK64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:       (field name=_value offset=0
+// CHECK64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK64-NEXT: )
+
+// CHECK32-NEXT: (enum_value name=payload index=0
+// CHECK32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:       (field name=_value offset=0
+// CHECK32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK32-NEXT: )
 
 
 reflect(enum: ManyCasesOneStringPayload.payload("hello, world"))
 
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_enum_wip.ManyCasesOneStringPayload)
+// CHECKALL: Reflecting an enum.
+// CHECKALL-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values.ManyCasesOneStringPayload)
 
-// CHECK-64: Type info:
-// CHECK-64: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
-// CHECK-64:   (case name=payload index=0 offset=0
-// CHECK-64:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:       (field name=_guts offset=0
-// CHECK-64:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_object offset=0
-// CHECK-64:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_countAndFlagsBits offset=0
-// CHECK-64:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:                   (field name=_value offset=0
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:               (field name=_object offset=8
-// CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:   (case name=otherA index=1)
-// CHECK-64:   (case name=otherB index=2)
-// CHECK-64:   (case name=otherC index=3))
+// CHECKALL: Type info:
+// CHECK64-NEXT: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT:   (case name=payload index=0 offset=0
+// CHECK64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:       (field name=_guts offset=0
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_object offset=0
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_countAndFlagsBits offset=0
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=_value offset=0
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:               (field name=_object offset=8
+// CHECK64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:   (case name=otherA index=1)
+// CHECK64-NEXT:   (case name=otherB index=2)
+// CHECK64-NEXT:   (case name=otherC index=3))
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=payload index=0
-// CHECK-64: (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:   (field name=_guts offset=0
-// CHECK-64:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:       (field name=_object offset=0
-// CHECK-64:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_countAndFlagsBits offset=0
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:               (field name=_value offset=0
-// CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:           (field name=_object offset=8
-// CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))))
-// CHECK-64: )
+// CHECK32-NEXT: (single_payload_enum size=12 alignment=4 stride=12 num_extra_inhabitants=250 bitwise_takable=1
+// CHECK32-NEXT:   (case name=payload index=0 offset=0
+// CHECK32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:       (field name=_guts offset=0
+// CHECK32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_object offset=0
+// CHECK32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_count offset=0
+// CHECK32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_value offset=0
+// CHECK32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:               (field name=_variant offset=4
+// CHECK32-NEXT:                 (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                   (case name=immortal index=0 offset=0
+// CHECK32-NEXT:                     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (case name=native index=1 offset=0
+// CHECK32-NEXT:                     (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=object offset=0
+// CHECK32-NEXT:                         (reference kind=strong refcounting=unknown))))
+// CHECK32-NEXT:                   (case name=bridged index=2 offset=0
+// CHECK32-NEXT:                     (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=object offset=0
+// CHECK32-NEXT:                         (reference kind=strong refcounting=unknown))))))
+// CHECK32-NEXT:               (field name=_discriminator offset=9
+// CHECK32-NEXT:                 (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_value offset=0
+// CHECK32-NEXT:                     (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:               (field name=_flags offset=10
+// CHECK32-NEXT:                 (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_value offset=0
+// CHECK32-NEXT:                     (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))))))))
+// CHECK32-NEXT:   (case name=otherA index=1)
+// CHECK32-NEXT:   (case name=otherB index=2)
+// CHECK32-NEXT:   (case name=otherC index=3))
+
+// CHECKALL: Enum value:
+// CHECK64-NEXT: (enum_value name=payload index=0
+// CHECK64-NEXT: (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:   (field name=_guts offset=0
+// CHECK64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:       (field name=_object offset=0
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_countAndFlagsBits offset=0
+// CHECK64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_value offset=0
+// CHECK64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:           (field name=_object offset=8
+// CHECK64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))))
+// CHECK64-NEXT: )
+
+// XXX Note: 32-bit String contains a multi_payload_enum which projectEnumValue cannot yet handle.
+// CHECK32-NEXT: swift_reflection_projectEnumValue failed.
 
 reflect(enum: ManyCasesOneStringPayload.otherB)
 
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_enum_wip.ManyCasesOneStringPayload)
+// CHECKALL: Reflecting an enum.
+// CHECKALL-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECKALL-NEXT: Type reference:
+// CHECKALL-NEXT: (enum reflect_Enum_values.ManyCasesOneStringPayload)
 
-// CHECK-64: Type info:
-// CHECK-64: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
-// CHECK-64:   (case name=payload index=0 offset=0
-// CHECK-64:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:       (field name=_guts offset=0
-// CHECK-64:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:           (field name=_object offset=0
-// CHECK-64:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64:               (field name=_countAndFlagsBits offset=0
-// CHECK-64:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:                   (field name=_value offset=0
-// CHECK-64:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-64:               (field name=_object offset=8
-// CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:   (case name=otherA index=1)
-// CHECK-64:   (case name=otherB index=2)
-// CHECK-64:   (case name=otherC index=3))
+// CHECKALL: Type info:
+// CHECK64-NEXT: (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483644 bitwise_takable=1
+// CHECK64-NEXT:   (case name=payload index=0 offset=0
+// CHECK64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:       (field name=_guts offset=0
+// CHECK64-NEXT:         (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:           (field name=_object offset=0
+// CHECK64-NEXT:             (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK64-NEXT:               (field name=_countAndFlagsBits offset=0
+// CHECK64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK64-NEXT:                   (field name=_value offset=0
+// CHECK64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK64-NEXT:               (field name=_object offset=8
+// CHECK64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK64-NEXT:   (case name=otherA index=1)
+// CHECK64-NEXT:   (case name=otherB index=2)
+// CHECK64-NEXT:   (case name=otherC index=3))
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=otherB index=2)
+// CHECK32-NEXT: (single_payload_enum size=12 alignment=4 stride=12 num_extra_inhabitants=250 bitwise_takable=1
+// CHECK32-NEXT:   (case name=payload index=0 offset=0
+// CHECK32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:       (field name=_guts offset=0
+// CHECK32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:           (field name=_object offset=0
+// CHECK32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:               (field name=_count offset=0
+// CHECK32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_value offset=0
+// CHECK32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:               (field name=_variant offset=4
+// CHECK32-NEXT:                 (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK32-NEXT:                   (case name=immortal index=0 offset=0
+// CHECK32-NEXT:                     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=_value offset=0
+// CHECK32-NEXT:                         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:                   (case name=native index=1 offset=0
+// CHECK32-NEXT:                     (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=object offset=0
+// CHECK32-NEXT:                         (reference kind=strong refcounting=unknown))))
+// CHECK32-NEXT:                   (case name=bridged index=2 offset=0
+// CHECK32-NEXT:                     (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK32-NEXT:                       (field name=object offset=0
+// CHECK32-NEXT:                         (reference kind=strong refcounting=unknown))))))
+// CHECK32-NEXT:               (field name=_discriminator offset=9
+// CHECK32-NEXT:                 (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_value offset=0
+// CHECK32-NEXT:                     (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK32-NEXT:               (field name=_flags offset=10
+// CHECK32-NEXT:                 (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK32-NEXT:                   (field name=_value offset=0
+// CHECK32-NEXT:                     (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))))))))
+// CHECK32-NEXT:   (case name=otherA index=1)
+// CHECK32-NEXT:   (case name=otherB index=2)
+// CHECK32-NEXT:   (case name=otherC index=3))
 
+
+// CHECKALL: Enum value:
+// CHECK64-NEXT: (enum_value name=otherB index=2)
+
+// XXX Note: 32-bit String contains a multi_payload_enum which projectEnumValue cannot yet handle.
+// CHECK32-NEXT: swift_reflection_projectEnumValue failed.
 
 //reflect(enum: ManyCasesManyPayloads.a("hi, world"))
 
 doneReflecting()
 
-// CHECK-64: Done.
+// CHECKALL: Done.
 
-// CHECK-32: Done.
