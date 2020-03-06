@@ -828,6 +828,14 @@ ERROR(sil_function_subst_expected_l_angle,none,
       "expected '<' to begin SIL function type substitution list after 'for'", ())
 ERROR(sil_function_subst_expected_r_angle,none,
       "expected '>' to end SIL function type substitution list after 'for <...'", ())
+ERROR(sil_function_subst_expected_generics,none,
+      "expected '<' to begin substituted parameter list after '@substituted'", ())
+ERROR(sil_function_subst_expected_function,none,
+      "expected function type after '@substituted'", ())
+ERROR(sil_function_subst_expected_subs,none,
+      "expected 'for' to begin substitutions after '@substituted' function type", ())
+ERROR(sil_function_subs_without_generics,none,
+      "unexpected 'for' to begin substitutions after non-generic function type", ())
 
 // Opaque types
 ERROR(opaque_mid_composition,none,

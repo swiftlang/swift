@@ -30,8 +30,8 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
   var x = f?()
 }
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddrOnlyCallResult{{.*}} :
-// CHECK:    bb0([[T0:%.*]] : @guaranteed $Optional<@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <T>>):
-// CHECK: [[F:%.*]] = alloc_box $<τ_0_0> { var Optional<@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <τ_0_0>> } <T>, var, name "f"
+// CHECK:    bb0([[T0:%.*]] : @guaranteed $Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>>):
+// CHECK: [[F:%.*]] = alloc_box $<τ_0_0> { var Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>> } <T>, var, name "f"
 // CHECK-NEXT: [[PBF:%.*]] = project_box [[F]]
 // CHECK: [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK: store [[T0_COPY]] to [init] [[PBF]]

@@ -97,9 +97,12 @@ SILType SILBuilder::getPartialApplyResultType(
     needsSubstFunctionType |= yield.getInterfaceType()->hasTypeParameter();
   }
 
-  auto appliedFnType = SILFunctionType::get(needsSubstFunctionType
-                                              ? FTI->getSubstGenericSignature()
-                                              : nullptr,
+  SubstitutionMap appliedSubs;
+  if (needsSubstFunctionType) {
+    appliedSubs = FTI->getCombinedSubstitutions();
+  }
+
+  auto appliedFnType = SILFunctionType::get(nullptr,
                                             extInfo,
                                             FTI->getCoroutineKind(),
                                             calleeConvention,
@@ -107,12 +110,8 @@ SILType SILBuilder::getPartialApplyResultType(
                                             FTI->getYields(),
                                             results,
                                             FTI->getOptionalErrorResult(),
-                                            needsSubstFunctionType
-                                              ? FTI->getSubstitutions()
-                                              : SubstitutionMap(),
-                                            needsSubstFunctionType
-                                              ? FTI->isGenericSignatureImplied()
-                                              : false,
+                                            appliedSubs,
+                                            SubstitutionMap(),
                                             M.getASTContext());
 
   return SILType::getPrimitiveObjectType(appliedFnType);

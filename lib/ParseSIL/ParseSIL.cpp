@@ -1222,6 +1222,10 @@ bool SILParser::parseSILType(SILType &Result,
           auto env = handleSILGenericParams(generics, SF);
           fnType->setGenericEnvironment(env);
         }
+        if (auto generics = fnType->getPatternGenericParams()) {
+          auto env = handleSILGenericParams(generics, SF);
+          fnType->setPatternGenericEnvironment(env);
+        }
       }
       if (auto boxType = dyn_cast<SILBoxTypeRepr>(T)) {
         if (auto generics = boxType->getGenericParams()) {
@@ -1237,9 +1241,8 @@ bool SILParser::parseSILType(SILType &Result,
 
   // Save the top-level function generic environment if there was one.
   if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get()))
-    if (!fnType->areGenericParamsImplied())
-      if (auto env = fnType->getGenericEnvironment())
-        ParsedGenericEnv = env;
+    if (auto env = fnType->getGenericEnvironment())
+      ParsedGenericEnv = env;
   
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc);
@@ -2070,6 +2073,12 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
 
         genericEnv = handleSILGenericParams(generics, &P.SF);
         fnType->setGenericEnvironment(genericEnv);
+      }
+      if (auto generics = fnType->getPatternGenericParams()) {
+        assert(!Ty.wasValidated() && Ty.getType().isNull());
+
+        genericEnv = handleSILGenericParams(generics, &P.SF);
+        fnType->setPatternGenericEnvironment(genericEnv);
       }
     }
 

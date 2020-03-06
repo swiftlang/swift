@@ -577,7 +577,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
       genericSig, extInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, params, 
       /*yields*/ {}, blockInterfaceTy->getResults(),
-      blockInterfaceTy->getOptionalErrorResult(), SubstitutionMap(), false,
+      blockInterfaceTy->getOptionalErrorResult(),
+      SubstitutionMap(), SubstitutionMap(),
       getASTContext());
 
   // Create the invoke function. Borrow the mangling scheme from reabstraction
