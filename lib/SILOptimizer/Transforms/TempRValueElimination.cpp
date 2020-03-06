@@ -156,7 +156,7 @@ bool TempRValueOptPass::collectLoads(
       return true;
     }
     for (auto *mdiUseOper : mdi->getUses()) {
-      if (!collectLoads(mdiUseOper, mdiUseOper->getUser(), mdi, srcObject,
+      if (!collectLoads(mdiUseOper, mdiUseOper->getUser(), mdi, srcAddr,
                         loadInsts))
         return false;
     }
