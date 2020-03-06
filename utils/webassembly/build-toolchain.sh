@@ -69,7 +69,11 @@ $UTILS_PATH/build-swiftpm.sh $TMP_DIR/$TOOLCHAIN_NAME
 
 # Copy nightly-toolchain's host environment stdlib into toolchain
 
-cp -r $NIGHTLY_TOOLCHAIN/usr/lib/swift/macosx $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift
+if [[ "$(uname)" == "Linux" ]]; then
+  cp -r $NIGHTLY_TOOLCHAIN/usr/lib/swift/linux $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift
+else
+  cp -r $NIGHTLY_TOOLCHAIN/usr/lib/swift/macosx $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift
+fi
 
 cd $TMP_DIR
 tar cfz $PACKAGE_ARTIFACT $TOOLCHAIN_NAME
