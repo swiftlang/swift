@@ -10,7 +10,9 @@ extension String {
   }
 }
 
-// CHECK-NOT: Reallocations exceeded 15
+// TODO: Write more involved tests following expected growth patterns
+
+// CHECK-NOT: Reallocations exceeded 16
 func testReallocation() {
   let x = "The quick brown fox jumped over the lazy dog\n"._split(separator: " ")
 
@@ -36,8 +38,8 @@ func testReallocation() {
             String(story.bufferID, radix: 16)), intro \(intro)
           """)
 
-        if reallocations >= 15 {
-          print("Reallocations exceeded 15")
+        if reallocations >= 16 {
+          print("Reallocations exceeded 16")
           //return
         }
       }
