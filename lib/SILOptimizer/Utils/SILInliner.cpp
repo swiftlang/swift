@@ -63,7 +63,10 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
 }
 
 bool SILInliner::canInlineApplySite(FullApplySite apply) {
-  if (!apply.canOptimize())
+  if (!apply.canOptimize() ||
+      (apply.getReferencedFunctionOrNull() &&
+       apply.getFunction()->hasOwnership() !=
+           apply.getReferencedFunctionOrNull()->hasOwnership()))
     return false;
 
   if (auto BA = dyn_cast<BeginApplyInst>(apply))
