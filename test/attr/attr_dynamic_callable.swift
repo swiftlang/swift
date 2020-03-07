@@ -487,3 +487,14 @@ struct B {
 
 B()("hello") // ok
 B()("\(1)") // ok
+
+// SR-12019
+@dynamicCallable 
+struct SR12019 {
+  func dynamicallyCall<T: StringProtocol>(withArguments: [T]) { // expected-note {{where 'T' = 'Int'}}
+    print("hi")	
+  }
+}
+
+let sr12019 = SR12019()
+sr12019(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
