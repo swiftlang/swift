@@ -200,12 +200,12 @@ func writebackNesting(x: inout Int,
   // -- get 'b'
   // CHECK: function_ref @$sSi19keypath_applicationE1bSivg
   // -- apply keypath y
-  // CHECK: [[PROJECT_FN:%.*]] = function_ref @swift_modifyAtWritableKeyPath :
+  // CHECK: [[PROJECT_FN:%.*]] = function_ref @swift_modifyAtWritableKeyPath : $@yield_once @convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @guaranteed WritableKeyPath<τ_0_0, τ_0_1>) -> @yields @inout τ_0_1
   // CHECK: ([[Y_ADDR:%.*]], [[Y_TOKEN:%.*]]) = begin_apply [[PROJECT_FN]]<Int, Int>
   // -- get 'u'
   // CHECK: function_ref @$sSi19keypath_applicationE1uSivg
   // -- apply keypath z
-  // CHECK: [[PROJECT_FN:%.*]] = function_ref @swift_modifyAtWritableKeyPath :
+  // CHECK: [[PROJECT_FN:%.*]] = function_ref @swift_modifyAtWritableKeyPath : $@yield_once @convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @guaranteed WritableKeyPath<τ_0_0, τ_0_1>) -> @yields @inout τ_0_1
   // CHECK: ([[Z_ADDR:%.*]], [[Z_TOKEN:%.*]]) = begin_apply [[PROJECT_FN]]<Int, Int>
 
   // -- set 'tt'

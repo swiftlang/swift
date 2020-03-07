@@ -2957,7 +2957,7 @@ public:
                                      methodTy->getYields(),
                                      dynResults,
                                      methodTy->getOptionalErrorResult(),
-                                     SubstitutionMap(), false,
+                                     SubstitutionMap(), SubstitutionMap(),
                                      F.getASTContext());
     return SILType::getPrimitiveObjectType(fnTy);
   }

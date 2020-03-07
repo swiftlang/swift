@@ -7,7 +7,7 @@ import Swift
 var zero = 0
 
 // <rdar://problem/15921334>
-// CHECK-LABEL: sil hidden [ossa] @$s8closures46return_local_generic_function_without_captures{{[_0-9a-zA-Z]*}}F : $@convention(thin) <A, R> () -> @owned @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <A, R> {
+// CHECK-LABEL: sil hidden [ossa] @$s8closures46return_local_generic_function_without_captures{{[_0-9a-zA-Z]*}}F : $@convention(thin) <A, R> () -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <A, R> {
 
 func return_local_generic_function_without_captures<A, R>() -> (A) -> R {
   func f(_: A) -> R {

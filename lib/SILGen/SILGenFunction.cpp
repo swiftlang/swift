@@ -588,7 +588,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   SILResultInfo(OptNSStringTy,
                                 ResultConvention::Autoreleased),
                   /*error result*/ None,
-                  SubstitutionMap(), false,
+                  SubstitutionMap(), SubstitutionMap(),
                   ctx);
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
@@ -675,7 +675,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   SILResultInfo(argc->getType().getASTType(),
                                 ResultConvention::Unowned),
                   /*error result*/ None,
-                  SubstitutionMap(), false,
+                  SubstitutionMap(), SubstitutionMap(),
                   getASTContext());
 
     SILGenFunctionBuilder builder(SGM);

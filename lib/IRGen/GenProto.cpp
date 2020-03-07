@@ -3060,7 +3060,8 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
                                 /*params*/ {}, /*yields*/ {},
                                 /*results*/ {}, /*error*/ None,
-                                /*subs*/ SubstitutionMap(), /*implied*/ false,
+                                /*pattern subs*/ SubstitutionMap(),
+                                /*invocation subs*/ SubstitutionMap(),
                                 IGM.Context);
 
   // Figure out what we're actually still required to pass 

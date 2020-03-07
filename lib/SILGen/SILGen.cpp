@@ -434,7 +434,8 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                          yields,
                                          /*results*/ {},
                                          /*error result*/ {},
-                                         SubstitutionMap(), false,
+                                         SubstitutionMap(),
+                                         SubstitutionMap(),
                                          getASTContext());
 
   auto env = sig->getGenericEnvironment();
@@ -495,7 +496,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
                                    None,
-                                   SubstitutionMap(), false,
+                                   SubstitutionMap(), SubstitutionMap(),
                                    C);
 
   SILGenFunctionBuilder builder(*this);

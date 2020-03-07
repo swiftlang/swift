@@ -2683,6 +2683,16 @@ Type TypeResolver::resolveASTFunctionType(
   auto extInfo = incompleteExtInfo.withRepresentation(representation)
                                   .withClangFunctionType(clangFnType);
 
+  // Diagnose a couple of things that we can parse in SIL mode but we don't
+  // allow in formal types.
+  if (auto patternParams = repr->getPatternGenericParams()) {
+    diagnose(patternParams->getLAngleLoc(),
+             diag::ast_subst_function_type);
+  } else if (!repr->getInvocationSubstitutions().empty()) {
+    diagnose(repr->getInvocationSubstitutions()[0]->getStartLoc(),
+             diag::ast_subst_function_type);
+  }
+
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericEnv = repr->getGenericEnvironment()) {
     outputTy = outputTy->mapTypeOutOfContext();
@@ -2794,14 +2804,22 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   SmallVector<SILYieldInfo, 4> yields;
   SmallVector<SILResultInfo, 4> results;
   Optional<SILResultInfo> errorResult;
+
+  // Resolve generic params in the pattern environment, if present, or
+  // else the function's generic environment, if it has one.
+  GenericEnvironment *genericEnv = repr->getGenericEnvironment();
+  GenericEnvironment *componentTypeEnv =
+    repr->getPatternGenericEnvironment()
+      ? repr->getPatternGenericEnvironment()
+      : genericEnv;
+
   {
     Optional<TypeResolution> resolveSILFunctionGenericParams;
     Optional<llvm::SaveAndRestore<TypeResolution>> useSILFunctionGenericEnv;
-    
-    // Resolve generic params using the function's generic environment, if it
-    // has one.
-    if (auto env = repr->getGenericEnvironment()) {
-      resolveSILFunctionGenericParams = TypeResolution::forContextual(DC, env);
+
+    if (componentTypeEnv) {
+      resolveSILFunctionGenericParams =
+        TypeResolution::forContextual(DC, componentTypeEnv);
       useSILFunctionGenericEnv.emplace(resolution,
                                        *resolveSILFunctionGenericParams);
     }
@@ -2843,37 +2861,60 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       }
     }
   } // restore generic type resolution
-  
-  // Resolve substitutions if we have them.
-  SubstitutionMap subs;
-  if (!repr->getSubstitutions().empty()) {
-    auto sig = repr->getGenericEnvironment()
-                   ->getGenericSignature()
-                   .getCanonicalSignature();
+
+  auto resolveSubstitutions = [&](GenericEnvironment *env,
+                                  ArrayRef<TypeRepr*> args) {
+    auto sig = env->getGenericSignature().getCanonicalSignature();
     TypeSubstitutionMap subsMap;
     auto params = sig->getGenericParams();
-    for (unsigned i : indices(repr->getSubstitutions())) {
-      auto resolved = resolveType(repr->getSubstitutions()[i], options);
+    for (unsigned i : indices(args)) {
+      auto resolved = resolveType(args[i], options);
       subsMap.insert({params[i], resolved->getCanonicalType()});
     }
-    subs = SubstitutionMap::get(sig, QueryTypeSubstitutionMap{subsMap},
+    return SubstitutionMap::get(sig, QueryTypeSubstitutionMap{subsMap},
                                 TypeChecker::LookUpConformance(DC))
       .getCanonical();
+  };
+
+  // Resolve pattern substitutions in the invocation environment, if
+  // applicable.
+  SubstitutionMap patternSubs;
+  if (!repr->getPatternSubstitutions().empty()) {
+    Optional<TypeResolution> resolveSILFunctionGenericParams;
+    Optional<llvm::SaveAndRestore<TypeResolution>> useSILFunctionGenericEnv;
+    if (genericEnv) {
+      resolveSILFunctionGenericParams =
+        TypeResolution::forContextual(DC, genericEnv);
+      useSILFunctionGenericEnv.emplace(resolution,
+                                       *resolveSILFunctionGenericParams);
+    }
+
+    patternSubs = resolveSubstitutions(repr->getPatternGenericEnvironment(),
+                                       repr->getPatternSubstitutions());
+  }
+
+  // Resolve invocation substitutions if we have them.
+  SubstitutionMap invocationSubs;
+  if (!repr->getInvocationSubstitutions().empty()) {
+    invocationSubs = resolveSubstitutions(repr->getGenericEnvironment(),
+                                          repr->getInvocationSubstitutions());
   }
 
   if (hasError) {
     return ErrorType::get(Context);
   }
 
+  CanGenericSignature genericSig =
+    genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
+               : CanGenericSignature();
+
+
   // FIXME: Remap the parsed context types to interface types.
-  CanGenericSignature genericSig;
   SmallVector<SILParameterInfo, 4> interfaceParams;
   SmallVector<SILYieldInfo, 4> interfaceYields;
   SmallVector<SILResultInfo, 4> interfaceResults;
   Optional<SILResultInfo> interfaceErrorResult;
-  if (auto *genericEnv = repr->getGenericEnvironment()) {
-    genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
-
+  if (componentTypeEnv) {
     for (auto &param : params) {
       auto transParamType = param.getInterfaceType()->mapTypeOutOfContext()
           ->getCanonicalType();
@@ -2903,6 +2944,13 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     interfaceResults = results;
     interfaceErrorResult = errorResult;
   }
+
+  SubstitutionMap interfacePatternSubs = patternSubs;
+  if (interfacePatternSubs && repr->getGenericEnvironment()) {
+    interfacePatternSubs =
+      interfacePatternSubs.mapReplacementTypesOutOfContext();
+  }
+
   ProtocolConformanceRef witnessMethodConformance;
   if (witnessMethodProtocol) {
     auto resolved = resolveType(witnessMethodProtocol, options);
@@ -2914,8 +2962,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       return ErrorType::get(Context);
 
     Type selfType = params.back().getInterfaceType();
-    if (subs) {
-      selfType = selfType.subst(subs);
+    if (invocationSubs) {
+      selfType = selfType.subst(invocationSubs);
     }
     
     // The Self type can be nested in a few layers of metatypes (etc.).
@@ -2936,8 +2984,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                               callee,
                               interfaceParams, interfaceYields,
                               interfaceResults, interfaceErrorResult,
-                              subs,
-                              repr->areGenericParamsImplied(),
+                              interfacePatternSubs, invocationSubs,
                               Context, witnessMethodConformance);
 }
 

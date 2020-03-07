@@ -357,8 +357,8 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
                                             Type SelfType,
                                             ModuleDecl *Module) {
   Mod = Module;
-  assert(ThunkType->getSubstitutions().empty() && "not implemented");
-  GenericSignature GenSig = ThunkType->getSubstGenericSignature();
+  assert(ThunkType->getPatternSubstitutions().empty() && "not implemented");
+  GenericSignature GenSig = ThunkType->getInvocationGenericSignature();
   if (GenSig)
     CurGenericSignature = GenSig.getCanonicalSignature();
 
@@ -1456,11 +1456,11 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 
   llvm::SmallVector<char, 32> OpArgs;
 
-  if (fn->getSubstitutions()) {
+  if (fn->getPatternSubstitutions()) {
     OpArgs.push_back('s');
-    if (!fn->isGenericSignatureImplied()) {
-      OpArgs.push_back('i');
-    }
+  }
+  if (fn->getInvocationSubstitutions()) {
+    OpArgs.push_back('I');
   }
   
   if (fn->isPolymorphic() && fn->isPseudogeneric())
@@ -1538,10 +1538,15 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back(getResultConvention(error.getConvention()));
     appendType(error.getInterfaceType());
   }
-  if (auto sig = fn->getSubstGenericSignature()) {
+  if (auto sig = fn->getInvocationGenericSignature()) {
     appendGenericSignature(sig);
   }
-  if (auto subs = fn->getSubstitutions()) {
+  if (auto subs = fn->getInvocationSubstitutions()) {
+    appendFlatGenericArgs(subs);
+    appendRetroactiveConformances(subs, Mod);
+  }
+  if (auto subs = fn->getPatternSubstitutions()) {
+    appendGenericSignature(subs.getGenericSignature());
     appendFlatGenericArgs(subs);
     appendRetroactiveConformances(subs, Mod);
   }

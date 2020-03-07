@@ -4019,6 +4019,8 @@ ERROR(sil_non_coro_yields,PointsToFirstBadToken,
 ERROR(sil_function_repeat_convention,PointsToFirstBadToken,
       "repeated %select{parameter|result|callee}0 convention attribute",
       (unsigned))
+ERROR(ast_subst_function_type,none,
+      "substitutions cannot be provided on a formal function type", ())
 ERROR(sil_function_multiple_error_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
 ERROR(unsupported_sil_convention,none,

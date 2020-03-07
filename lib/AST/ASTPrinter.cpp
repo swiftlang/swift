@@ -4166,6 +4166,13 @@ public:
     printFunctionExtInfo(T->getASTContext(), T->getExtInfo(),
                          T->getWitnessMethodConformanceOrInvalid());
     printCalleeConvention(T->getCalleeConvention());
+
+    if (auto sig = T->getInvocationGenericSignature()) {
+      printGenericSignature(sig,
+                            PrintAST::PrintParams |
+                            PrintAST::PrintRequirements);
+      Printer << " ";
+    }
   
     // If this is a substituted function type, then its generic signature is
     // independent of the enclosing context, and defines the parameters active
@@ -4178,25 +4185,21 @@ public:
     TypePrinter *sub = this;
     Optional<TypePrinter> subBuffer;
     PrintOptions subOptions = Options;
-    if (T->getSubstitutions()) {
+    if (auto substitutions = T->getPatternSubstitutions()) {
       subOptions.GenericEnv = nullptr;
       subBuffer.emplace(Printer, subOptions);
       sub = &*subBuffer;
+
+      sub->Printer << "@substituted ";
+      sub->printGenericSignature(substitutions.getGenericSignature(),
+                                 PrintAST::PrintParams |
+                                 PrintAST::PrintRequirements);
+      sub->Printer << " ";
     }
   
     // Capture list used here to ensure we don't print anything using `this`
     // printer, but only the sub-Printer.
-    [T, sub, &subOptions]{
-      if (auto sig = T->getSubstGenericSignature()) {
-        sub->printGenericSignature(sig,
-                              PrintAST::PrintParams |
-                              PrintAST::PrintRequirements);
-        sub->Printer << " ";
-        if (T->isGenericSignatureImplied()) {
-          sub->Printer << "in ";
-        }
-      }
-
+    [T, sub, &subOptions] {
       sub->Printer << "(";
       bool first = true;
       for (auto param : T->getParameters()) {
@@ -4235,9 +4238,15 @@ public:
       if (totalResults != 1)
         sub->Printer << ")";
     }();
-  
-    // The substitution types are always in terms of the outer environment.
-    if (auto substitutions = T->getSubstitutions()) {
+
+    // Both the pattern and invocation substitution types are always in
+    // terms of the outer environment.  But this wouldn't necessarily be
+    // true with higher-rank polymorphism.
+    if (auto substitutions = T->getPatternSubstitutions()) {
+      Printer << " for";
+      printSubstitutions(substitutions);
+    }
+    if (auto substitutions = T->getInvocationSubstitutions()) {
       Printer << " for";
       printSubstitutions(substitutions);
     }
