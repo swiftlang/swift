@@ -2776,61 +2776,45 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
 
   auto &DE = cs.getASTContext().Diags;
 
-  llvm::SmallDenseMap<TypeVariableType *,
-                      std::pair<GenericTypeParamType *, SourceLoc>, 4>
-      genericParams;
-  // Consider only representative type variables shared across
-  // all of the solutions.
-  for (auto *typeVar : cs.getTypeVariables()) {
-    if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-      auto *locator = typeVar->getImpl().getLocator();
-      auto *repr = cs.getRepresentative(typeVar);
-      // If representative is another generic parameter let's
-      // use its generic parameter type instead of originator's,
-      // but it's possible that generic parameter is equated to
-      // some other type e.g.
-      //
-      // func foo<T>(_: T) -> T {}
-      //
-      // In this case when reference to function `foo` is "opened"
-      // type variable representing `T` would be equated to
-      // type variable representing a result type of the reference.
-      if (auto *reprGP = repr->getImpl().getGenericParameter())
-        GP = reprGP;
+  llvm::SmallDenseMap<TypeVariableType *, SmallVector<Type, 4>> conflicts;
 
-      genericParams[repr] = {GP, locator->getAnchor()->getLoc()};
-    }
-  }
+  for (const auto &binding : solutions[0].typeBindings) {
+    auto *typeVar = binding.first;
 
-  llvm::SmallDenseMap<std::pair<GenericTypeParamType *, SourceLoc>,
-                      SmallVector<Type, 4>>
-      conflicts;
-
-  for (const auto &entry : genericParams) {
-    auto *typeVar = entry.first;
-    auto GP = entry.second;
+    if (!typeVar->getImpl().getGenericParameter())
+      continue;
 
     llvm::SmallSetVector<Type, 4> arguments;
-    for (const auto &solution : solutions) {
-      auto type = solution.typeBindings.lookup(typeVar);
-      // Contextual opaque result type is uniquely identified by
-      // declaration it's associated with, so we have to compare
-      // declarations instead of using pointer equality on such types.
-      if (auto *opaque = type->getAs<OpaqueTypeArchetypeType>()) {
-        auto *decl = opaque->getDecl();
-        arguments.remove_if([&](Type argType) -> bool {
-          if (auto *otherOpaque = argType->getAs<OpaqueTypeArchetypeType>()) {
-            return decl == otherOpaque->getDecl();
+    arguments.insert(binding.second);
+
+    if (!llvm::all_of(solutions.slice(1), [&](const Solution &solution) {
+          auto binding = solution.typeBindings.find(typeVar);
+          if (binding == solution.typeBindings.end())
+            return false;
+
+          // Contextual opaque result type is uniquely identified by
+          // declaration it's associated with, so we have to compare
+          // declarations instead of using pointer equality on such types.
+          if (auto *opaque =
+                  binding->second->getAs<OpaqueTypeArchetypeType>()) {
+            auto *decl = opaque->getDecl();
+            arguments.remove_if([&](Type argType) -> bool {
+              if (auto *otherOpaque =
+                      argType->getAs<OpaqueTypeArchetypeType>()) {
+                return decl == otherOpaque->getDecl();
+              }
+              return false;
+            });
           }
-          return false;
-        });
-      }
 
-      arguments.insert(type);
+          arguments.insert(binding->second);
+          return true;
+        }))
+      continue;
+
+    if (arguments.size() > 1) {
+      conflicts[typeVar].append(arguments.begin(), arguments.end());
     }
-
-    if (arguments.size() > 1)
-      conflicts[GP].append(arguments.begin(), arguments.end());
   }
 
   auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
@@ -2847,10 +2831,8 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
 
   bool diagnosed = false;
   for (auto &conflict : conflicts) {
-    SourceLoc loc;
-    GenericTypeParamType *GP;
-
-    std::tie(GP, loc) = conflict.first;
+    auto *typeVar = conflict.first;
+    auto *locator = typeVar->getImpl().getLocator();
     auto conflictingArguments = conflict.second;
 
     llvm::SmallString<64> arguments;
@@ -2875,8 +2857,10 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
         },
         [&OS] { OS << " vs. "; });
 
-    DE.diagnose(loc, diag::conflicting_arguments_for_generic_parameter, GP,
-                OS.str());
+    auto *anchor = locator->getAnchor();
+    DE.diagnose(anchor->getLoc(),
+                diag::conflicting_arguments_for_generic_parameter,
+                typeVar->getImpl().getGenericParameter(), OS.str());
     diagnosed = true;
   }
 
