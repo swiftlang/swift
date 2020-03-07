@@ -480,6 +480,7 @@ public:
       // mapping.
       auto result = static_cast<uintptr_t *>(outBuffer);
       *result = (uintptr_t)~0ull;
+      return true;
     }
     case DLQ_GetObjCReservedLowBits: {
       auto result = static_cast<uint8_t *>(outBuffer);

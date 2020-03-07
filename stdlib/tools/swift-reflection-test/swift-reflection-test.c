@@ -171,6 +171,7 @@ static int PipeMemoryReader_queryDataLayout(void *Context,
 #else
       *result = (uintptr_t)~0ull;
 #endif
+      return 1;
     }
     case DLQ_GetObjCReservedLowBits: {
       uint8_t *result = (uint8_t *)outBuffer;
