@@ -62,11 +62,9 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
   return true;
 }
 
-bool SILInliner::canInlineApplySite(FullApplySite apply) {
+bool SILInliner::canInlineApplySite(FullApplySite apply, SILFunction *callee) {
   if (!apply.canOptimize() ||
-      (apply.getReferencedFunctionOrNull() &&
-       apply.getFunction()->hasOwnership() !=
-           apply.getReferencedFunctionOrNull()->hasOwnership()))
+      apply.getFunction()->hasOwnership() != callee->hasOwnership())
     return false;
 
   if (auto BA = dyn_cast<BeginApplyInst>(apply))
@@ -338,8 +336,8 @@ SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
                            ArrayRef<SILValue> appliedArgs) {
   PrettyStackTraceSILFunction calleeTraceRAII("inlining", calleeFunction);
   PrettyStackTraceSILFunction callerTraceRAII("...into", apply.getFunction());
-  assert(canInlineApplySite(apply)
-         && "Asked to inline function that is unable to be inlined?!");
+  assert(canInlineApplySite(apply, calleeFunction) &&
+         "Asked to inline function that is unable to be inlined?!");
 
   SILInlineCloner cloner(calleeFunction, apply, FuncBuilder, IKind, ApplySubs,
                          OpenedArchetypesTracker, DeletionCallback);
