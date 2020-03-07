@@ -1463,12 +1463,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
                           this, parameterIndices, transposeFnGenSig,
                           lookupConformance, /*isLinear*/ true)
                           .getCanonicalSignature();
-  auto substMap = getSubstitutions();
-  if (transposeFnGenSig) {
-    // substMap = substMap.subst(derivativeFnGenSig->getIdentitySubstitutionMap());
-    // substMap = substMap.subst(derivativeFnGenSig->getGenericEnvironment()->getForwardingSubstitutionMap());
-    substMap = transposeFnGenSig->getGenericEnvironment()->getForwardingSubstitutionMap();
-  }
 
   // Given a type, returns its formal SIL parameter info.
   auto getParameterInfoForOriginalResult =
@@ -1491,8 +1485,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
       newConv = ParameterConvention::Indirect_In_Guaranteed;
       break;
     }
-    return {result.getInterfaceType()->getCanonicalType(transposeFnGenSig),
-            newConv};
+    return {result.getInterfaceType(), newConv};
   };
 
   // Given a type, returns its formal SIL result info.
@@ -1517,36 +1510,26 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
       newConv = ResultConvention::Indirect;
       break;
     }
-    return {param.getInterfaceType()->getCanonicalType(transposeFnGenSig),
-            newConv};
+    return {param.getInterfaceType(), newConv};
   };
-
-  SmallVector<GenericTypeParamType *, 4> substGenericParams;
-  SmallVector<Requirement, 4> substRequirements;
-  SmallVector<Type, 4> substReplacements;
-  SmallVector<ProtocolConformanceRef, 4> substConformances;
 
   SmallVector<SILParameterInfo, 4> newParameters;
   SmallVector<SILResultInfo, 4> newResults;
-  for (auto param : llvm::enumerate(getParameters())) {
-    if (parameterIndices->contains(param.index()))
-      newResults.push_back(getResultInfoForOriginalParameter(param.value()));
+  for (auto pair : llvm::enumerate(getParameters())) {
+    auto index = pair.index();
+    auto param = pair.value();
+    if (parameterIndices->contains(index))
+      newResults.push_back(getResultInfoForOriginalParameter(param));
     else
-      newParameters.push_back(param.value());
+      newParameters.push_back(param);
   }
   for (auto &res : getResults())
     newParameters.push_back(getParameterInfoForOriginalResult(res));
-  // Transpose function type has a generic signature only if the original
-  // function type does, and if `transposeFnGenSig` does not have all concrete
-  // generic parameters.
-  CanGenericSignature canGenSig;
-  if (getSubstGenericSignature() && transposeFnGenSig &&
-      !transposeFnGenSig->areAllParamsConcrete())
-    canGenSig = transposeFnGenSig;
-  return SILFunctionType::get(
-      canGenSig, getExtInfo(), getCoroutineKind(), getCalleeConvention(),
-      newParameters, getYields(), newResults, getOptionalErrorResult(),
-      substMap, isGenericSignatureImplied(), getASTContext());
+  return SILFunctionType::get(getSubstGenericSignature(), getExtInfo(),
+                              getCoroutineKind(), getCalleeConvention(),
+                              newParameters, getYields(), newResults,
+                              getOptionalErrorResult(), getSubstitutions(),
+                              isGenericSignatureImplied(), getASTContext());
 }
 
 static bool isPseudogeneric(SILDeclRef c) {

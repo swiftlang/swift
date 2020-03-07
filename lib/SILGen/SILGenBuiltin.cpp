@@ -1099,8 +1099,6 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   for (auto *curryLevel : curryLevelsWithoutLast) {
     auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
         currentParameter, curryLevel->getNumParameters());
-    llvm::errs() << "emitBuiltinAutoDiffApplyDerivativeFunction: SUBSTITUTIONS\n";
-    substitutions.dump();
     auto applyResult = SGF.B.createApply(
         loc, derivativeFn, SubstitutionMap(), curryLevelArgVals,
         /*isNonThrowing*/ false);
@@ -1176,6 +1174,15 @@ static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
   SILValue transposeFn = SGF.B.createLinearFunctionExtract(
       loc, LinearDifferentiableFunctionTypeComponent::Transpose, origFnVal);
   auto transposeFnType = transposeFn->getType().castTo<SILFunctionType>();
+  auto transposeFnUnsubstType =
+      transposeFnType->getUnsubstitutedType(SGF.getModule());
+  if (transposeFnType != transposeFnUnsubstType) {
+    transposeFn = SGF.B.createConvertFunction(
+        loc, transposeFn,
+        SILType::getPrimitiveObjectType(transposeFnUnsubstType),
+        /*withoutActuallyEscaping*/ false);
+    transposeFnType = transposeFn->getType().castTo<SILFunctionType>();
+  }
 
   SmallVector<SILValue, 2> applyArgs;
   if (transposeFnType->hasIndirectFormalResults())
@@ -1188,10 +1195,13 @@ static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
   auto *apply = SGF.B.createApply(
       loc, transposeFn, SubstitutionMap(), applyArgs);
   if (transposeFnType->hasIndirectFormalResults()) {
-    auto resBuffer = applyArgs.front();
-    AbstractionPattern pattern(SGF.F.getLoweredFunctionType()->getSubstGenericSignature(), resBuffer->getType().getASTType());
-    auto &asdf = SGF.getTypeLowering(pattern, resBuffer->getType().getASTType());
-    return SGF.manageBufferForExprResult(resBuffer, asdf, C);
+    auto resultAddress = applyArgs.front();
+    AbstractionPattern pattern(
+        SGF.F.getLoweredFunctionType()->getSubstGenericSignature(),
+        resultAddress->getType().getASTType());
+    auto &tl =
+        SGF.getTypeLowering(pattern, resultAddress->getType().getASTType());
+    return SGF.manageBufferForExprResult(resultAddress, tl, C);
   } else {
     return SGF.emitManagedRValueWithCleanup(apply);
   }
