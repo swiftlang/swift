@@ -1445,7 +1445,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // Put everything together to get the derivative function type. Then, store in
   // cache and return.
   cachedResult = SILFunctionType::get(
-      constrainedOriginalFnTy->getSubstGenericSignature(), constrainedOriginalFnTy->getExtInfo(), constrainedOriginalFnTy->getCoroutineKind(), constrainedOriginalFnTy->getCalleeConvention(),
+      constrainedOriginalFnTy->getSubstGenericSignature(), extInfo, constrainedOriginalFnTy->getCoroutineKind(), constrainedOriginalFnTy->getCalleeConvention(),
       newParameters, constrainedOriginalFnTy->getYields(), newResults, constrainedOriginalFnTy->getOptionalErrorResult(),
       constrainedOriginalFnTy->getSubstitutions(), constrainedOriginalFnTy->isGenericSignatureImplied(), constrainedOriginalFnTy->getASTContext(),
       constrainedOriginalFnTy->getWitnessMethodConformanceOrInvalid());
