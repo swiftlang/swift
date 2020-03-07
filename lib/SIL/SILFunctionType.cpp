@@ -1074,7 +1074,7 @@ static SmallVector<SILResultInfo, 2> getSemanticResults(SILFunctionType *origina
 static CanSILFunctionType getDifferentialType(
     SILFunctionType *originalFnTy,
     IndexSubset *parameterIndices, unsigned resultIndex,
-    CanGenericSignature derivativeFnGenSig, LookupConformanceFn lookupConformance) {
+    LookupConformanceFn lookupConformance) {
   auto &ctx = originalFnTy->getASTContext();
   SmallVector<GenericTypeParamType *, 4> substGenericParams;
   SmallVector<Requirement, 4> substRequirements;
@@ -1150,7 +1150,7 @@ static CanSILFunctionType getDifferentialType(
 static CanSILFunctionType getPullbackType(
     SILFunctionType *originalFnTy,
     IndexSubset *parameterIndices, unsigned resultIndex,
-    CanGenericSignature derivativeFnGenSig, LookupConformanceFn lookupConformance, TypeConverter &TC) {
+    LookupConformanceFn lookupConformance, TypeConverter &TC) {
   auto &ctx = originalFnTy->getASTContext();
   SmallVector<GenericTypeParamType *, 4> substGenericParams;
   SmallVector<Requirement, 4> substRequirements;
@@ -1167,7 +1167,7 @@ static CanSILFunctionType getPullbackType(
     llvm::errs() << "RESULT TAN TYPE: " << tanType << "\n";
     tanType->dump();
     llvm::dbgs() << "about to make a pattern\n";
-    AbstractionPattern pattern(derivativeFnGenSig, tanType);
+    AbstractionPattern pattern(originalFnTy->getSubstGenericSignature(), tanType);
     llvm::dbgs() << "about to lower\n";
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -1198,7 +1198,7 @@ static CanSILFunctionType getPullbackType(
   auto getTangentResultConventionForOriginalParameter =
       [&](CanType tanType, ParameterConvention origParamConv) -> ResultConvention {
     llvm::errs() << "PARAM TAN TYPE: " << tanType << "\n";
-    AbstractionPattern pattern(derivativeFnGenSig, tanType);
+    AbstractionPattern pattern(originalFnTy->getSubstGenericSignature(), tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
     ResultConvention conv;
@@ -1314,6 +1314,58 @@ static CanSILFunctionType getPullbackType(
       pullbackResults, {}, substitutions, impliedSignature, ctx);
 }
 
+/// Constrains the `original` function type according to differentiability
+/// requirements:
+/// - All wrt parameters are constrained to be differentiable.
+/// - The invocation generic signature is replaced by the passed-in
+///   `constrainedInvocationGenSig`.
+static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
+    SILFunctionType *original,
+    IndexSubset *parameterIndices,
+    LookupConformanceFn lookupConformance,
+    CanGenericSignature constrainedInvocationGenSig) {
+
+  llvm::dbgs() << "getConstrainedAutoDiffOriginalFunctionType\n";
+  llvm::dbgs() << "original " << Type((TypeBase*)original) << "\n";
+  llvm::dbgs() << "constrained generic signature " << constrainedInvocationGenSig << "\n";
+
+  auto originalInvocationGenSig = original->getInvocationGenericSignature();
+  if (!originalInvocationGenSig) {
+    assert(!constrainedInvocationGenSig || constrainedInvocationGenSig->areAllParamsConcrete() && "derivative function cannot have invocation generic signature when original function doesn't");
+    return original;
+  }
+
+  assert(!original->getSubstitutions() && "cannot constrain substituted function type");
+  if (!constrainedInvocationGenSig)
+    constrainedInvocationGenSig = originalInvocationGenSig;
+  if (!constrainedInvocationGenSig)
+    return original;
+  constrainedInvocationGenSig =
+        autodiff::getConstrainedDerivativeGenericSignature(
+            original, parameterIndices, constrainedInvocationGenSig, lookupConformance)
+            .getCanonicalSignature();
+
+  SmallVector<SILParameterInfo, 4> newParameters;
+  newParameters.reserve(original->getNumParameters());
+  for (auto &param : original->getParameters()) {
+    newParameters.push_back(param.getWithInterfaceType(
+        param.getInterfaceType()->getCanonicalType(constrainedInvocationGenSig)));
+  }
+
+  SmallVector<SILResultInfo, 4> newResults;
+  newResults.reserve(original->getNumResults());
+  for (auto &result : original->getResults()) {
+    newResults.push_back(result.getWithInterfaceType(
+        result.getInterfaceType()->getCanonicalType(constrainedInvocationGenSig)));
+  }
+
+  return SILFunctionType::get(
+      constrainedInvocationGenSig->areAllParamsConcrete() ? GenericSignature() : constrainedInvocationGenSig, original->getExtInfo(), original->getCoroutineKind(), original->getCalleeConvention(),
+      newParameters, original->getYields(), newResults, original->getOptionalErrorResult(),
+      original->getSubstitutions(), original->isGenericSignatureImplied(), original->getASTContext(),
+      original->getWitnessMethodConformanceOrInvalid())->getCanonicalType()->getAs<SILFunctionType>();
+}
+
 CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     IndexSubset *parameterIndices, unsigned resultIndex,
     AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
@@ -1336,57 +1388,29 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   llvm::dbgs() << "getAutoDiffDerivativeFunctionType\n";
   dump();
 
-  // Compute the substituted generic signature of the derivative function.
-  CanGenericSignature substGenericSignature;
-  if (getInvocationGenericSignature()) {
-    assert(!getSubstitutions() && "don't know how to deal with invocation gen sig and substitutions at the same time");
-    if (!derivativeFnInvocationGenSig)
-      derivativeFnInvocationGenSig = getInvocationGenericSignature();
-    derivativeFnInvocationGenSig =
-        autodiff::getConstrainedDerivativeGenericSignature(
-            this, parameterIndices, derivativeFnInvocationGenSig, lookupConformance)
-            .getCanonicalSignature();
-    // Derivative function type has a generic signature only if the original
-    // function type does, and if `derivativeFnGenSig` does not have all concrete
-    // generic parameters.
-    if (derivativeFnInvocationGenSig &&
-       !derivativeFnInvocationGenSig->areAllParamsConcrete())
-      substGenericSignature = derivativeFnInvocationGenSig;
-  } else {
-    llvm::dbgs() << "original has no invocation gen sig\n";
-    llvm::dbgs() << derivativeFnInvocationGenSig << "\n";
-    assert(!derivativeFnInvocationGenSig && "derivative function cannot have invocation generic signature when original function doesn't");
-    substGenericSignature = getSubstGenericSignature();
-  }
+  SILFunctionType *constrainedOriginalFnTy = getConstrainedAutoDiffOriginalFunctionType(
+      this, parameterIndices, lookupConformance, derivativeFnInvocationGenSig);
 
   // Compute closure type.
   CanSILFunctionType closureType;
   switch (kind) {
   case AutoDiffDerivativeFunctionKind::JVP:
-    closureType = getDifferentialType(this, parameterIndices, resultIndex, substGenericSignature, lookupConformance);
+    closureType = getDifferentialType(constrainedOriginalFnTy, parameterIndices, resultIndex, lookupConformance);
     break;
   case AutoDiffDerivativeFunctionKind::VJP:
-    closureType = getPullbackType(this, parameterIndices, resultIndex, substGenericSignature, lookupConformance, TC);
+    closureType = getPullbackType(constrainedOriginalFnTy, parameterIndices, resultIndex, lookupConformance, TC);
     break;
   }
 
-  llvm::dbgs() << "has closure type\n";
-
-  // Compute the derivative function parameters. There are a few differences
-  // between the original function parameters and the derivative function
-  // parameters, explained in comments below.
+  // Compute the derivative function parameters.
   SmallVector<SILParameterInfo, 4> newParameters;
-  newParameters.reserve(getNumParameters());
-  // Difference 1. The derivative generic constraints may make the derivative
-  // function parameters more concrete.
-  llvm::dbgs() << "transforming params\n";
-  for (auto &param : getParameters()) {
-    newParameters.push_back(param.getWithInterfaceType(
-        param.getInterfaceType()->getCanonicalType(substGenericSignature)));
+  newParameters.reserve(constrainedOriginalFnTy->getNumParameters());
+  for (auto &param : constrainedOriginalFnTy->getParameters()) {
+    newParameters.push_back(param);
   }
-  // Difference 2. Reabstraction thunks have a function-typed parameter (the
-  // function to reabstract) as their last parameter. Reabstraction thunk
-  // JVPs/VJPs have a `@differentiable` function-typed last parameter instead.
+  // Reabstraction thunks have a function-typed parameter (the function to
+  // reabstract) as their last parameter. Reabstraction thunk JVPs/VJPs have a
+  // `@differentiable` function-typed last parameter instead.
   llvm::dbgs() << "adding reabstraction param\n";
   if (isReabstractionThunk) {
     assert(!parameterIndices->contains(getNumParameters() - 1) &&
@@ -1399,19 +1423,13 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     newParameters.back() = fnParam.getWithInterfaceType(diffFnType);
   }
 
-  // Compute the derivative function results. There are a few differences
-  // between the original function results and the derivative function results,
-  // explained in comments below.
+  // Compute the derivative function results.
   SmallVector<SILResultInfo, 4> newResults;
   newResults.reserve(getNumResults() + 1);
-  // Difference 1. The derivative generic constraints may make the derivative
-  // function results more concrete.
   llvm::dbgs() << "transforming results\n";
-  for (auto &result : getResults()) {
-    newResults.push_back(result.getWithInterfaceType(
-        result.getInterfaceType()->getCanonicalType(substGenericSignature)));
+  for (auto &result : constrainedOriginalFnTy->getResults()) {
+    newResults.push_back(result);
   }
-  // Difference 2. The derivative function has a linear map result.
   llvm::dbgs() << "adding closure type " << closureType << "\n";
   newResults.push_back({closureType, ResultConvention::Owned});
 
@@ -1420,21 +1438,17 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // If original function is `@convention(c)`, the derivative function should
   // have `@convention(thin)`. IRGen does not support `@convention(c)` functions
   // with multiple results.
-  auto extInfo = getExtInfo();
+  auto extInfo = constrainedOriginalFnTy->getExtInfo();
   if (getRepresentation() == SILFunctionTypeRepresentation::CFunctionPointer)
     extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-
-  llvm::dbgs() << "generic signature and substs\n";
-  substGenericSignature->dump();
-  getSubstitutions().dump();
 
   // Put everything together to get the derivative function type. Then, store in
   // cache and return.
   cachedResult = SILFunctionType::get(
-      substGenericSignature, extInfo, getCoroutineKind(), getCalleeConvention(),
-      newParameters, getYields(), newResults, getOptionalErrorResult(),
-      getSubstitutions(), isGenericSignatureImplied(), ctx,
-      getWitnessMethodConformanceOrInvalid());
+      constrainedOriginalFnTy->getSubstGenericSignature(), constrainedOriginalFnTy->getExtInfo(), constrainedOriginalFnTy->getCoroutineKind(), constrainedOriginalFnTy->getCalleeConvention(),
+      newParameters, constrainedOriginalFnTy->getYields(), newResults, constrainedOriginalFnTy->getOptionalErrorResult(),
+      constrainedOriginalFnTy->getSubstitutions(), constrainedOriginalFnTy->isGenericSignatureImplied(), constrainedOriginalFnTy->getASTContext(),
+      constrainedOriginalFnTy->getWitnessMethodConformanceOrInvalid());
   return cachedResult;
 }
 

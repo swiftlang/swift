@@ -3826,6 +3826,10 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind) {
   auto indices = config.getSILAutoDiffIndices();
 
+  llvm::dbgs() << "getOrCreateCustomDerivativeThunk\n";
+  originalFn->dump();
+  customDerivativeFn->dump();
+
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
   auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature()
       ? customDerivativeFnTy->getSubstGenericSignature()->getGenericEnvironment()
@@ -3840,6 +3844,10 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       kind, Types, LookUpConformanceInModule(M.getSwiftModule()),
       derivativeCanGenSig);
   assert(!thunkFnTy->getExtInfo().hasContext());
+
+  llvm::dbgs() << "customDerivativeFnTy " << customDerivativeFnTy << "\n";
+  llvm::dbgs() << "origFnTy " << origFnTy << "\n";
+  llvm::dbgs() << "thunkFnTy " << thunkFnTy << "\n";
 
   // TODO(TF-685): Use principled thunk mangling.
   // Do not simply reuse reabstraction thunk mangling.
