@@ -362,7 +362,17 @@ void VJPEmitter::visitReturnInst(ReturnInst *ri) {
   llvm::errs() << "FINAL3 REPLACEMENT TYPES\n";
   for (auto type : pullbackType.castTo<SILFunctionType>()->getSubstitutions().getReplacementTypes())
     type->dump();
-  auto *pullbackValue = builder.createConvertFunction(loc, pullbackPartialApply, pullbackType, /*withoutActuallyEscaping*/ false);
+
+  SILValue pullbackValue;
+  if (pullbackPartialApply->getType().castTo<SILFunctionType>()->isABICompatibleWith(pullbackType.castTo<SILFunctionType>(), *pullbackPartialApply->getFunction()).isCompatible()) {
+    pullbackValue = builder.createConvertFunction(loc, pullbackPartialApply, pullbackType, /*withoutActuallyEscaping*/ false);
+  } else {
+    // When `diag::autodiff_loadable_value_addressonly_tangent_unsupported`
+    // applies, the return type may be ABI-incomaptible with the type of the
+    // partially applied pullback. In these cases, produce an undef and rely on
+    // other code to emit a diagnostic.
+    pullbackValue = SILUndef::get(pullbackType, *pullbackPartialApply->getFunction());
+  }
 
   // Return a tuple of the original result and pullback.
   SmallVector<SILValue, 8> directResults;
