@@ -1650,10 +1650,9 @@ ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
-ERROR(where_without_generic_params,none,
-      "'where' clause cannot be attached to "
-      "%select{a non-generic|a protocol|an associated type}0 "
-      "declaration", (unsigned))
+ERROR(where_toplevel_nongeneric,none,
+      "'where' clause cannot be attached to non-generic "
+      "top-level declaration", ())
 ERROR(where_inside_brackets,none,
         "'where' clause next to generic parameters is obsolete, "
         "must be written following the declaration's type", ())

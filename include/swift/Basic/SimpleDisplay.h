@@ -135,6 +135,15 @@ namespace swift {
     }
     out << "}";
   }
+
+  template<typename T, typename U>
+  void simple_display(llvm::raw_ostream &out,
+                      const llvm::PointerUnion<T, U> &ptrUnion) {
+    if (const auto t = ptrUnion.template dyn_cast<T>())
+      simple_display(out, t);
+    else
+      simple_display(out, ptrUnion.template get<U>());
+  }
 }
 
 #endif // SWIFT_BASIC_SIMPLE_DISPLAY_H
