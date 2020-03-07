@@ -662,7 +662,14 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
       toDelete.push_back(fli);
       break;
     }
-
+    case SILInstructionKind::MarkDependenceInst: {
+      SILBuilderWithScope builder(user);
+      auto mdi = cast<MarkDependenceInst>(user);
+      auto newInst = builder.createMarkDependence(user->getLoc(), mdi->getValue(), si->getSrc());
+      mdi->replaceAllUsesWith(newInst);
+      toDelete.push_back(user);
+      break;
+    }
     // ASSUMPTION: no operations that may be handled by this default clause can
     // destroy tempObj. This includes operations that load the value from memory
     // and release it.

@@ -1117,7 +1117,7 @@ public:
       if (VarInfo)
         if (unsigned ArgNo = VarInfo->ArgNo) {
           // It is a function argument.
-          if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty()) {
+          if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty() && !VarInfo->Name.empty()) {
             require(
                 DebugVars[ArgNo] == VarInfo->Name,
                 "Scope contains conflicting debug variables for one function "

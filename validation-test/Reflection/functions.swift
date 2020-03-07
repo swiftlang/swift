@@ -115,13 +115,25 @@ func generic<T : P, U, V : C>(x: T, y: U, z: V, i: Int) {
 // CHECK-32-NEXT:     (reference kind=strong refcounting=native)))
 
 // CHECK-64:      Type info:
-// CHECK-64-NEXT: (closure_context size=72 alignment=8 stride=72 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64-NEXT:   (field offset=48
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=56
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=64
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native)))
+// CHECK-64-NEXT:(closure_context size=80 alignment=8 stride=80 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:  (field offset=48
+// CHECK-64-NEXT:    (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:      (field name=_value offset=0
+// CHECK-64-NEXT:        (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:  (field offset=56
+// CHECK-64-NEXT:    (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:      (field name=_guts offset=0
+// CHECK-64-NEXT:        (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:          (field name=_object offset=0
+// CHECK-64-NEXT:            (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:              (field name=_countAndFlagsBits offset=0
+// CHECK-64-NEXT:                (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:                  (field name=_value offset=0
+// CHECK-64-NEXT:                    (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:              (field name=_object offset=8
+// CHECK-64-NEXT:                (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK-64-NEXT:  (field offset=72
+// CHECK-64-NEXT:    (reference kind=strong refcounting=native)))
 }
 
 generic(x: 10, y: "", z: C(), i: 101)
@@ -146,15 +158,25 @@ func genericWithSources<A, B, C>(a: A, b: B, c: C, gc: GC<A, B, C>) {
 // CHECK-32-NEXT:     (reference kind=strong refcounting=native)))
 
 // CHECK-64:      Type info:
-// CHECK-64-NEXT: (closure_context size=48 alignment=8 stride=48
-// CHECK-64-NEXT:   (field offset=16
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=24
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=32
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=40
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native)))
+// CHECK-64-NEXT:(closure_context size=48 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:  (field offset=40
+// CHECK-64-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-64-NEXT:  (field offset=40
+// CHECK-64-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:      (field offset=0
+// CHECK-64-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-64-NEXT:      (field offset=0
+// CHECK-64-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:  (field offset=40
+// CHECK-64-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:      (field offset=0
+// CHECK-64-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-64-NEXT:      (field offset=0
+// CHECK-64-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-64-NEXT:      (field offset=0
+// CHECK-64-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:  (field offset=40
+// CHECK-64-NEXT:    (reference kind=strong refcounting=native)))
 }
 
 genericWithSources(a: (), b: ((), ()), c: ((), (), ()), gc: GC<(), ((), ()), ((), (), ())>())
