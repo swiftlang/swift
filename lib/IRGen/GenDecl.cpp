@@ -2015,7 +2015,7 @@ swift::irgen::createLinkerDirectiveVariable(IRGenModule &IGM, StringRef name) {
   ApplyIRLinkage({Linkage,
                   llvm::GlobalValue::VisibilityTypes::DefaultVisibility,
         llvm::GlobalValue::DLLStorageClassTypes::DefaultStorageClass}).to(var);
-  var->setAlignment(Alignment);
+  var->setAlignment(llvm::MaybeAlign(Alignment));
   disableAddressSanitizer(IGM, var);
   IGM.addUsedGlobal(var);
   return var;

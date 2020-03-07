@@ -1316,7 +1316,7 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
                                     fields.finishAndCreateFuture()));
       var->setConstant(true);
       var->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-      var->setAlignment(4);
+      var->setAlignment(llvm::MaybeAlign(4));
 
       TheTrivialPropertyDescriptor = var;
     } else {
