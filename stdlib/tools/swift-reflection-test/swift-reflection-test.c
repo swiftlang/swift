@@ -38,6 +38,10 @@
 #include <TargetConditionals.h>
 #endif
 
+#if __has_feature(ptrauth_calls)
+#include <ptrauth.h>
+#endif
+
 #if defined(__clang__) || defined(__GNUC__)
 #define NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)
@@ -158,6 +162,15 @@ static int PipeMemoryReader_queryDataLayout(void *Context,
     case DLQ_GetSizeSize: {
       uint8_t *result = (uint8_t *)outBuffer;
       *result = sizeof(size_t);
+      return 1;
+    }
+    case DLQ_GetPtrAuthMask: {
+      uintptr_t *result = (uintptr_t *)outBuffer;
+#if __has_feature(ptrauth_calls)
+      *result = (uintptr_t)ptrauth_strip((void*)0x0007ffffffffffff, 0);
+#else
+      *result = (uintptr_t)~0ull;
+#endif
       return 1;
     }
     case DLQ_GetObjCReservedLowBits: {

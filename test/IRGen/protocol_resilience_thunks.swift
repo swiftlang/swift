@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 // RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution -O %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
@@ -42,6 +42,8 @@ public protocol MyResilientProtocol {
 // CHECK:      [[WITNESS_GEP:%.*]] = getelementptr inbounds i8*, i8** %3, i32 1
 // CHECK:      [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_GEP]]
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to void (i1, %swift.opaque*, %swift.type*, i8**)*
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_GEP]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call swiftcc void [[FN]](i1 %0, %swift.opaque* noalias nocapture swiftself %1, %swift.type* %2, i8** %3)
 // CHECK-NEXT: ret void
 
@@ -49,6 +51,8 @@ public protocol MyResilientProtocol {
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %2, i32 2
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to i1 (%swift.opaque*, %swift.type*, i8**)*
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: [[RESULT:%.*]] = call swiftcc i1 [[FN]](%swift.opaque* noalias nocapture swiftself %0, %swift.type* %1, i8** %2)
 // CHECK-NEXT: ret i1 [[RESULT]]
 
@@ -56,6 +60,8 @@ public protocol MyResilientProtocol {
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %3, i32 3
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to void (%Any*, %swift.opaque*, %swift.type*, i8**)*
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call swiftcc void [[FN]](%Any* noalias nocapture sret %0, %swift.opaque* noalias nocapture swiftself %1, %swift.type* %2, i8** %3)
 // CHECK-NEXT: ret void
 
@@ -63,6 +69,8 @@ public protocol MyResilientProtocol {
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %3, i32 4
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.error**, %swift.type*, i8**)*
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call swiftcc void [[FN]](%swift.opaque* noalias nocapture swiftself %0, %swift.error**{{( noalias nocapture( swifterror)? dereferenceable\(.\))?}} %1, %swift.type* %2, i8** %3)
 // CHECK-NEXT: ret void
 
@@ -70,6 +78,8 @@ public protocol MyResilientProtocol {
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %5, i32 5
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, %swift.opaque*, %swift.type*, i8**)*
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call swiftcc void [[FN]](%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1, %swift.type* %2, %swift.opaque* noalias nocapture swiftself %3, %swift.type* %4, i8** %5)
 // CHECK-NEXT: ret void
 
@@ -77,6 +87,8 @@ public protocol MyResilientProtocol {
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %2, i32 6
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to i1 (%swift.opaque*, %swift.type*, i8**)*
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: [[RESULT:%.*]] = call swiftcc i1 %5(%swift.opaque* noalias nocapture swiftself %0, %swift.type* %1, i8** %2)
 // CHECK-NEXT: ret i1 [[RESULT]]
 
@@ -84,6 +96,8 @@ public protocol MyResilientProtocol {
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %3, i32 7
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to void (i1, %swift.opaque*, %swift.type*, i8**)*
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call swiftcc void [[FN]](i1 %0, %swift.opaque* nocapture swiftself %1, %swift.type* %2, i8** %3)
 // CHECK-NEXT: ret void
 
@@ -91,5 +105,7 @@ public protocol MyResilientProtocol {
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %3, i32 8
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to { i8*, %TSb* } (i8*, %swift.opaque*, %swift.type*, i8**)*
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: [[RESULT:%.*]] = call swiftcc { i8*, %TSb* } [[FN]](i8* noalias dereferenceable({{16|32}}) %0, %swift.opaque* nocapture swiftself %1, %swift.type* %2, i8** %3)
 // CHECK-NEXT: ret { i8*, %TSb* } [[RESULT]]

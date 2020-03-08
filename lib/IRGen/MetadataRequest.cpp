@@ -16,12 +16,14 @@
 
 #include "MetadataRequest.h"
 
+#include "Callee.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenArchetype.h"
 #include "GenClass.h"
 #include "GenMeta.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "GenericArguments.h"
@@ -1881,8 +1883,17 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     GenericArguments &genericArgs) {
   auto &IGM = IGF.IGM;
   
-  llvm::Constant *descriptor =
+  llvm::Value *descriptor =
     IGM.getAddrOfTypeContextDescriptor(nominal, RequireMetadata);
+
+  // Sign the descriptor.
+  auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
+  if (schema) {
+    auto authInfo = PointerAuthInfo::emit(
+        IGF, schema, nullptr,
+        PointerAuthEntity::Special::TypeDescriptorAsArgument);
+    descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
+  }
 
   auto request = params.claimNext();
 

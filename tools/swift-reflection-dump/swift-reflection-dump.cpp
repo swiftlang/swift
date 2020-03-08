@@ -286,6 +286,17 @@ private:
     Segments.push_back({HeaderAddress, O->getData()});
   }
 
+  bool isMachOWithPtrAuth() const {
+    auto macho = dyn_cast<MachOObjectFile>(O);
+    if (!macho)
+      return false;
+
+    auto &header = macho->getHeader();
+
+    return header.cputype == llvm::MachO::CPU_TYPE_ARM64
+      && header.cpusubtype == llvm::MachO::CPU_SUBTYPE_ARM64E;
+  }
+
 public:
   explicit Image(const ObjectFile *O) : O(O) {
     // Unfortunately llvm doesn't provide a uniform interface for iterating
@@ -301,6 +312,8 @@ public:
       abort();
     }
   }
+
+  const ObjectFile *getObjectFile() const { return O; }
   
   unsigned getBytesInAddress() const {
     return O->getBytesInAddress();
@@ -338,7 +351,15 @@ public:
     auto found = DynamicRelocations.find(Addr);
     RemoteAbsolutePointer result;
     if (found == DynamicRelocations.end())
-      result = RemoteAbsolutePointer("", pointerValue);
+      // In Mach-O images with ptrauth, the pointer value has an offset from
+      // the base address in the low 32 bits, and ptrauth discriminator info
+      // in the top 32 bits.
+      if (isMachOWithPtrAuth()) {
+        result = RemoteAbsolutePointer("",
+                                HeaderAddress + (pointerValue & 0xffffffffull));
+      } else {
+        result = RemoteAbsolutePointer("", pointerValue);
+      }
     else
       result = RemoteAbsolutePointer(found->second.Symbol,
                                      found->second.Offset);
@@ -452,6 +473,13 @@ public:
     case DLQ_GetSizeSize: {
       auto result = static_cast<uint8_t *>(outBuffer);
       *result = wordSize;
+      return true;
+    }
+    case DLQ_GetPtrAuthMask: {
+      // We don't try to sign pointers at all in our view of the object
+      // mapping.
+      auto result = static_cast<uintptr_t *>(outBuffer);
+      *result = (uintptr_t)~0ull;
       return true;
     }
     case DLQ_GetObjCReservedLowBits: {
