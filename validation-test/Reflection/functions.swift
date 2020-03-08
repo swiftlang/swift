@@ -106,13 +106,45 @@ func generic<T : P, U, V : C>(x: T, y: U, z: V, i: Int) {
 // CHECK-NEXT:    (builtin Builtin.NativeObject)
 
 // CHECK-32:      Type info:
-// CHECK-32-NEXT: (closure_context size=36 alignment=4 stride=36 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-32-NEXT:   (field offset=24
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=28
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=32
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native)))
+// CHECK-32-NEXT:(closure_context size=44 alignment=4 stride=44 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:  (field offset=24
+// CHECK-32-NEXT:    (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:      (field name=_value offset=0
+// CHECK-32-NEXT:        (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:  (field offset=28
+// CHECK-32-NEXT:    (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:      (field name=_guts offset=0
+// CHECK-32-NEXT:        (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:          (field name=_object offset=0
+// CHECK-32-NEXT:            (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:              (field name=_count offset=0
+// CHECK-32-NEXT:                (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:                  (field name=_value offset=0
+// CHECK-32-NEXT:                    (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:              (field name=_variant offset=4
+// CHECK-32-NEXT:                (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:                  (case name=immortal index=0 offset=0
+// CHECK-32-NEXT:                    (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:                      (field name=_value offset=0
+// CHECK-32-NEXT:                        (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:                  (case name=native index=1 offset=0
+// CHECK-32-NEXT:                    (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT:                      (field name=object offset=0
+// CHECK-32-NEXT:                        (reference kind=strong refcounting=unknown))))
+// CHECK-32-NEXT:                  (case name=bridged index=2 offset=0
+// CHECK-32-NEXT:                    (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT:                      (field name=object offset=0
+// CHECK-32-NEXT:                        (reference kind=strong refcounting=unknown))))))
+// CHECK-32-NEXT:              (field name=_discriminator offset=9
+// CHECK-32-NEXT:                (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:                  (field name=_value offset=0
+// CHECK-32-NEXT:                    (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:              (field name=_flags offset=10
+// CHECK-32-NEXT:                (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:                  (field name=_value offset=0
+// CHECK-32-NEXT:                    (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))))))))
+// CHECK-32-NEXT:  (field offset=40
+// CHECK-32-NEXT:    (reference kind=strong refcounting=native)))
 
 // CHECK-64:      Type info:
 // CHECK-64-NEXT:(closure_context size=80 alignment=8 stride=80 num_extra_inhabitants=0 bitwise_takable=1
@@ -147,15 +179,25 @@ func genericWithSources<A, B, C>(a: A, b: B, c: C, gc: GC<A, B, C>) {
 // CHECK-NEXT:    (builtin Builtin.NativeObject)
 
 // CHECK-32:      Type info:
-// CHECK-32-NEXT: (closure_context size=24 alignment=4 stride=24
-// CHECK-32-NEXT:   (field offset=8
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=12
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=16
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=20
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native)))
+// CHECK-32-NEXT:(closure_context size=24 alignment=4 stride=24 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:  (field offset=20
+// CHECK-32-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-32-NEXT:  (field offset=20
+// CHECK-32-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:      (field offset=0
+// CHECK-32-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-32-NEXT:      (field offset=0
+// CHECK-32-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:  (field offset=20
+// CHECK-32-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:      (field offset=0
+// CHECK-32-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-32-NEXT:      (field offset=0
+// CHECK-32-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-32-NEXT:      (field offset=0
+// CHECK-32-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:  (field offset=20
+// CHECK-32-NEXT:    (reference kind=strong refcounting=native)))
 
 // CHECK-64:      Type info:
 // CHECK-64-NEXT:(closure_context size=48 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
