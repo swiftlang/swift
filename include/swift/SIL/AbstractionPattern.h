@@ -323,8 +323,10 @@ class AbstractionPattern {
     TheKind = unsigned(kind);
     OrigType = origType;
     GenericSig = CanGenericSignature();
-    if (OrigType->hasTypeParameter())
+    if (OrigType->hasTypeParameter()) {
+      assert(OrigType == signature->getCanonicalTypeInContext(origType));
       GenericSig = signature;
+    }
   }
 
   void initClangType(CanGenericSignature signature,
