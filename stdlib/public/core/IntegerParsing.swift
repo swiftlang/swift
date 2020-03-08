@@ -375,8 +375,8 @@ where Iterator.Element == UInt8, Result: UnsignedInteger {
       let letterOffset = (cu & ~0x20) &- UInt8(ascii: "A")
       // Convert to a value, widening to ensure we don't roll any back over.
       let letterValue = UInt(letterOffset) &+ 10
-      // Make a all-bits mask based on whether digit >= 10.
-      let isLetter = UInt(bitPattern: Int(bitPattern: 10 &- digit) &>> 8)
+      // Make an all-bits mask based on whether digit > 9.
+      let isLetter = UInt(bitPattern: Int(bitPattern: 9 &- digit) &>> 8)
       // Overwrite digit value if we have a letter (a ^ a == 0; 0 ^ a == a).
       digit ^= (digit ^ letterValue) & isLetter
     }
