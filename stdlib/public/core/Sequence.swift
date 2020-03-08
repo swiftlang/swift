@@ -901,12 +901,14 @@ extension Sequence {
   public __consuming func suffix(_ maxLength: Int) -> [Element] {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
     guard maxLength != 0 else { return [] }
+    
+    var circularArray = CircularArray<Element>(capacity: maxLength)
 
-    let capacity = Swift.min(maxLength, underestimatedCount)
-    var ringBuffer = RingBuffer<Element>(capacity: capacity)
-    ringBuffer.pushBack(contentsOf: self)
+    for item in self {
+      circularArray.pushBack(item)
+    }
 
-    return Array(ringBuffer)
+    return Array(circularArray)
   }
 
   /// Returns a sequence containing all but the given number of initial
@@ -958,14 +960,14 @@ extension Sequence {
     guard k != 0 else { return Array(self) }
 
     var result = ContiguousArray<Element>()
-    var ringBuffer = RingBuffer<Element>(capacity: k)
+    var circularArray = CircularArray<Element>(capacity: k)
 
     for element in self {
-      if ringBuffer.isFull {
-        let frontElement = ringBuffer.popFront()
+      if circularArray.isFull {
+        let frontElement = circularArray.popFront()
         result.append(frontElement)
       }
-      ringBuffer.pushBack(element)
+      circularArray.pushBack(element)
     }
 
     return Array(result)

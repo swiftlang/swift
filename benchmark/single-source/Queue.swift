@@ -26,6 +26,13 @@ public let QueueConcrete = BenchmarkInfo(
   setUpFunction: { buildWorkload() },
   legacyFactor: 10)
 
+public let QueueCircularArray = BenchmarkInfo(
+  name: "QueueCircularArray",
+  runFunction: run_QueueCircularArray,
+  tags: [.validation, .api],
+  setUpFunction: { buildWorkload() },
+  legacyFactor: 10)
+
 // TODO: remove when there is a native equivalent in the std lib
 extension RangeReplaceableCollection where Self: BidirectionalCollection {
   public mutating func popLast() -> Element? {
@@ -126,5 +133,48 @@ func testConcreteQueue(elements: [String]) {
 func run_QueueConcrete(_ scale: Int) {
   for _ in 0..<scale {
     testConcreteQueue(elements: workload)
+  }
+}
+
+struct CircularArrayQueue<Element> {
+
+    var capacity: Int
+
+    private var circularArray: CircularArray<Element>
+
+    init() {
+        circularArray = CircularArray<Element>(capacity: 20)
+        self.capacity = 20
+    }
+
+    mutating func enqueue(_ newElement: Element) {
+        if circularArray.isFull {
+            let newCapacity = (capacity * 2)+1
+            circularArray.resize(newCapacity: newCapacity)
+            self.capacity = newCapacity
+        }
+        circularArray.pushBack(newElement)
+    }
+
+    mutating func dequeue() -> Element? {
+        return circularArray.popFirst()
+    }
+}
+
+func testCircularArrayQueue<Elements: Collection>(elements: Elements)
+where Elements.Element: Equatable {
+  var q = CircularArrayQueue<Elements.Element>()
+  for x in elements { q.enqueue(x) }
+  let results = sequence(state: q) { $0.dequeue() }
+  let i = results.reduce(0, { i,_ in i &+ 1 })
+  for x in elements { q.enqueue(x) }
+  let j = results.reduce(i, { i,_ in i &+ 1 })
+  CheckResults(j == elements.count*2)
+}
+
+@inline(never)
+func run_QueueCircularArray(_ scale: Int) {
+  for _ in 0..<scale {
+    testCircularArrayQueue(elements: workload)
   }
 }

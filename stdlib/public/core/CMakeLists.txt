@@ -39,6 +39,7 @@ set(SWIFTLIB_ESSENTIAL
   Builtin.swift
   BuiltinMath.swift
   Character.swift
+  CircularArray.swift
   CocoaArray.swift
   Codable.swift
   Collection.swift
@@ -117,7 +118,6 @@ set(SWIFTLIB_ESSENTIAL
   REPL.swift
   Result.swift
   Reverse.swift
-  RingBuffer.swift
   Runtime.swift
   RuntimeFunctionCounters.swift
   SipHash.swift

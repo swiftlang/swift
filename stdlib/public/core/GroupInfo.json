@@ -84,7 +84,7 @@
     "KeyValuePairs.swift",
     "Diffing.swift",
     "CollectionDifference.swift",
-    "RingBuffer.swift",
+    "CircularArray.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"

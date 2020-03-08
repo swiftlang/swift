@@ -8,32 +8,32 @@
 import StdlibUnittest
 import PrintTestTypes
 
-let PrintTests = TestSuite("PrintRingBuffer")
+let PrintTests = TestSuite("PrintCircularArray")
 
 PrintTests.test("Printable") {
-  expectPrinted("[]", RingBuffer<Int>())
-  expectPrinted("[1]", [ 1 ] as RingBuffer)
-  expectPrinted("[1, 2]", [ 1, 2 ] as RingBuffer)
-  expectPrinted("[1, 2, 3]", [ 1, 2, 3 ] as RingBuffer)
+  expectPrinted("[]", CircularArray<Int>())
+  expectPrinted("[1]", [ 1 ] as CircularArray)
+  expectPrinted("[1, 2]", [ 1, 2 ] as CircularArray)
+  expectPrinted("[1, 2, 3]", [ 1, 2, 3 ] as CircularArray)
   expectPrinted("[\"foo\", \"bar\", \"bas\"]", 
-    ["foo", "bar", "bas"] as RingBuffer)
+    ["foo", "bar", "bas"] as CircularArray)
   expectDebugPrinted("[\"foo\", \"bar\", \"bas\"]", 
-    ["foo", "bar", "bas"] as RingBuffer)
+    ["foo", "bar", "bas"] as CircularArray)
 
   expectPrinted("[►1◀︎, ►2◀︎, ►3◀︎]",[StructPrintable(1),
-    StructPrintable(2), StructPrintable(3)] as RingBuffer)
+    StructPrintable(2), StructPrintable(3)] as CircularArray)
 
   expectPrinted("[<10 20 30 40>, <50 60 70 80>]",
     [LargeStructPrintable(10, 20, 30, 40),
-     LargeStructPrintable(50, 60, 70, 80)] as RingBuffer)
+     LargeStructPrintable(50, 60, 70, 80)] as CircularArray)
 
-  expectPrinted("[►1◀︎]", [StructDebugPrintable(1)] as RingBuffer)
-
-  expectPrinted("[►1◀︎, ►2◀︎, ►3◀︎]", [ClassPrintable(1),
-    ClassPrintable(2), ClassPrintable(3)] as RingBuffer)
+  expectPrinted("[►1◀︎]", [StructDebugPrintable(1)] as CircularArray)
 
   expectPrinted("[►1◀︎, ►2◀︎, ►3◀︎]", [ClassPrintable(1),
-    ClassPrintable(2), ClassPrintable(3)] as RingBuffer<AnyObject>)
+    ClassPrintable(2), ClassPrintable(3)] as CircularArray)
+
+  expectPrinted("[►1◀︎, ►2◀︎, ►3◀︎]", [ClassPrintable(1),
+    ClassPrintable(2), ClassPrintable(3)] as CircularArray<AnyObject>)
 }
 
 runAllTests()
