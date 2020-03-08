@@ -1256,7 +1256,7 @@ void ToolChain::getResourceDirPath(SmallVectorImpl<char> &resourceDirPath,
     StringRef value = A->getValue();
     resourceDirPath.append(value.begin(), value.end());
   } else if (!getTriple().isOSDarwin() && !getTriple().isOSWASI() && args.hasArg(options::OPT_sdk)) {
-    // for WASI, sdk option points wasi-sysroot which doesn't have Swift toolchain
+    // for WASI, sdk option points to wasi-sysroot which doesn't have Swift toolchain
     StringRef value = args.getLastArg(options::OPT_sdk)->getValue();
     resourceDirPath.append(value.begin(), value.end());
     llvm::sys::path::append(resourceDirPath, "usr", "lib",
