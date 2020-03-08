@@ -836,6 +836,10 @@ public:
   /// Return true if the specified type or a super-class/super-protocol has the
   /// @dynamicMemberLookup attribute on it.
   bool hasDynamicMemberLookupAttribute();
+  
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicCallable attribute on it.
+  bool hasDynamicCallableAttribute();
 
   /// Retrieve the superclass of this type.
   ///

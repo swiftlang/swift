@@ -1499,6 +1499,13 @@ bool TypeBase::hasDynamicMemberLookupAttribute() {
       ctx.evaluator, HasDynamicMemberLookupAttributeRequest{canTy}, false);
 }
 
+bool TypeBase::hasDynamicCallableAttribute() {
+  auto canTy = getCanonicalType();
+  auto &ctx = canTy->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, HasDynamicCallableAttributeRequest{canTy}, false);
+}
+
 Type TypeBase::getSuperclass(bool useArchetypes) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);

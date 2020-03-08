@@ -515,8 +515,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     }
 
     // Handling an apply for a nominal type that supports @dynamicCallable.
-    auto nominal = fnTy->getAnyNominal();
-    if (nominal && nominal->getAttrs().hasAttribute<DynamicCallableAttr>()) {
+    if (fnTy->hasDynamicCallableAttribute()) {
       return getConstraintLocator(anchor, LocatorPathElt::ApplyFunction());
     }
 
