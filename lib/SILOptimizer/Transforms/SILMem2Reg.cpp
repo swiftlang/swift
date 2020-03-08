@@ -358,7 +358,9 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   SILBuilder builder(LI);
   for (auto iter = projections.rbegin(); iter != projections.rend(); ++iter) {
     const Projection &projection = *iter;
-    val = projection.createObjectProjection(builder, LI->getLoc(), val).get();
+    auto borrowedVal = builder.createBeginBorrow(LI->getLoc(), val);
+    val = projection.createObjectProjection(builder, LI->getLoc(), borrowedVal).get();
+    builder.createEndBorrow(LI->getLoc(), borrowedVal);
   }
   op = LI->getOperand();
   LI->replaceAllUsesWith(val);
@@ -955,10 +957,6 @@ class SILMem2Reg : public SILFunctionTransform {
 
   void run() override {
     SILFunction *F = getFunction();
-
-    // FIXME: We should be able to support ownership.
-    if (F->hasOwnership())
-      return;
 
     LLVM_DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F->getName()
                             << " **\n");
