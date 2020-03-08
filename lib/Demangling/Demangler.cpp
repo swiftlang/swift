@@ -113,7 +113,6 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::DirectMethodReferenceAttribute:
     case Node::Kind::VTableAttribute:
     case Node::Kind::PartialApplyForwarder:
-    case Node::Kind::ThinToThickForwarder:
     case Node::Kind::PartialApplyObjCForwarder:
     case Node::Kind::OutlinedVariable:
     case Node::Kind::OutlinedBridgedMethod:
@@ -550,8 +549,7 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
   while (NodePointer FuncAttr = popNode(isFunctionAttr)) {
     Parent->addChild(FuncAttr, *this);
     if (FuncAttr->getKind() == Node::Kind::PartialApplyForwarder ||
-        FuncAttr->getKind() == Node::Kind::PartialApplyObjCForwarder ||
-        FuncAttr->getKind() == Node::Kind::ThinToThickForwarder)
+        FuncAttr->getKind() == Node::Kind::PartialApplyObjCForwarder)
       Parent = FuncAttr;
   }
   for (Node *Nd : NodeStack) {
@@ -2180,7 +2178,6 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'd': return createNode(Node::Kind::DirectMethodReferenceAttribute);
     case 'a': return createNode(Node::Kind::PartialApplyObjCForwarder);
     case 'A': return createNode(Node::Kind::PartialApplyForwarder);
-    case 'u': return createNode(Node::Kind::ThinToThickForwarder);
     case 'm': return createNode(Node::Kind::MergedFunction);
     case 'X': return createNode(Node::Kind::DynamicallyReplaceableFunctionVar);
     case 'x': return createNode(Node::Kind::DynamicallyReplaceableFunctionKey);

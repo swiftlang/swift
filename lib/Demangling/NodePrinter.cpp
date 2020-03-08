@@ -467,7 +467,6 @@ private:
     case Node::Kind::Subscript:
     case Node::Kind::Suffix:
     case Node::Kind::ThinFunctionType:
-    case Node::Kind::ThinToThickForwarder:
     case Node::Kind::TupleElement:
     case Node::Kind::TypeMangling:
     case Node::Kind::TypeMetadata:
@@ -1233,14 +1232,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::ThinFunctionType:
     Printer << "@convention(thin) ";
     printFunctionType(nullptr, Node);
-    return nullptr;
-  case Node::Kind::ThinToThickForwarder:
-    Printer << "thin-to-thick forwarder";
-
-    if (Node->hasChildren()) {
-      Printer << " for ";
-      printChildren(Node);
-    }
     return nullptr;
   case Node::Kind::FunctionType:
   case Node::Kind::UncurriedFunctionType:
