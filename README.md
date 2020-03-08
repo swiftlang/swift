@@ -46,7 +46,7 @@ brew install cmake ninja
 brew cask install java # required for Bazel
 ```
 
-Additionally, [Bazel](https://www.bazel.build) between v0.24.1 and v0.25.2 (inclusive) is required to build with TensorFlow support. Instructions to download Bazel directly can be found [below](#bazel). You can find instructions for installing CMake, and Ninja directly [below](#build-dependencies) as well.
+Additionally, [Bazel](https://www.bazel.build) is required to build with TensorFlow support. Instructions to download Bazel directly can be found [below](#bazel). You can find instructions for installing CMake, and Ninja directly [below](#build-dependencies) as well.
 
 #### Linux
 
