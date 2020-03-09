@@ -13,7 +13,7 @@ The following must take place in the **developer command prompt** (provided by V
 2. Microsoft.VisualStudio.Component.Windows10SDK.17763
 3. Microsoft.VisualStudio.Component.VC.Tools.x86.x64
 
-The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019)) helps in finding the component name given its ID for Visual Studio 2019.
+The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019) helps in finding the component name given its ID for Visual Studio 2019.
 
 ## Clone the repositories
 
