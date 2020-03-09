@@ -6192,7 +6192,7 @@ public:
 class InitExistentialRefInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::InitExistentialRefInst, InitExistentialRefInst,
-          SingleValueInstruction> {
+          OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   CanType ConcreteType;
@@ -6203,7 +6203,8 @@ class InitExistentialRefInst final
                          ArrayRef<SILValue> TypeDependentOperands,
                          ArrayRef<ProtocolConformanceRef> Conformances)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Instance, TypeDependentOperands, ExistentialType),
+          DebugLoc, Instance, TypeDependentOperands, ExistentialType,
+          Instance.getOwnershipKind()),
         ConcreteType(FormalConcreteType), Conformances(Conformances) {}
 
   static InitExistentialRefInst *

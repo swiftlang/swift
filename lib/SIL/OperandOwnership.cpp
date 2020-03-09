@@ -173,7 +173,6 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AbortApply)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, BeginAccess)
@@ -348,6 +347,7 @@ FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
+FORWARD_ANY_OWNERSHIP_INST(InitExistentialRef)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
