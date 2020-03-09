@@ -272,7 +272,11 @@ bool TempRValueOptPass::collectLoads(
       return false;
     loadInsts.insert(user);
     return true;
-
+  case SILInstructionKind::FixLifetimeInst:
+    // If we have a fixed lifetime on our alloc_stack, we can just treat it like
+    // a load and re-write it so that it is on the old memory or old src object.
+    loadInsts.insert(user);
+    return true;
   case SILInstructionKind::CopyAddrInst: {
     // copy_addr which read from the temporary are like loads.
     auto *copyFromTmp = cast<CopyAddrInst>(user);
@@ -637,6 +641,13 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
       }
       li->replaceAllUsesWith(srcObject);
       toDelete.push_back(li);
+      break;
+    }
+    case SILInstructionKind::FixLifetimeInst: {
+      auto *fli = cast<FixLifetimeInst>(user);
+      SILBuilderWithScope builder(fli);
+      builder.createFixLifetime(fli->getLoc(), si->getSrc());
+      toDelete.push_back(fli);
       break;
     }
 
