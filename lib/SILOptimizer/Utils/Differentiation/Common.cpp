@@ -271,7 +271,6 @@ SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
 void extractAllElements(SILValue value, SILBuilder &builder,
                         SmallVectorImpl<SILValue> &results) {
   auto tupleType = value->getType().getAs<TupleType>();
-  llvm::dbgs() << "TUPLE TYPE " << value->getType() << "\n";
   if (!tupleType) {
     results.push_back(value);
     return;

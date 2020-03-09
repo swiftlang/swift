@@ -808,25 +808,33 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
                                  .getSILStorageInterfaceType()
                                  .castTo<SILFunctionType>();
   auto unsubstLinearMapType = linearMapType->getUnsubstitutedType(module);
-  auto unsubstLinearMapTargetType = linearMapTargetType->getUnsubstitutedType(module);
+  auto unsubstLinearMapTargetType =
+      linearMapTargetType->getUnsubstitutedType(module);
 
   SILFunction *linearMapThunk;
   SubstitutionMap linearMapSubs;
   std::tie(linearMapThunk, linearMapSubs) =
       getOrCreateSubsetParametersThunkForLinearMap(
-          fb, thunk, unsubstLinearMapType, unsubstLinearMapTargetType, kind, desiredIndices,
-          actualIndices);
+          fb, thunk, unsubstLinearMapType, unsubstLinearMapTargetType, kind,
+          desiredIndices, actualIndices);
 
   auto *linearMapThunkFRI = builder.createFunctionRef(loc, linearMapThunk);
   SILValue thunkedLinearMap = linearMap;
-  if (linearMapType != unsubstLinearMapType)
-    thunkedLinearMap = builder.createConvertFunction(loc, thunkedLinearMap, SILType::getPrimitiveObjectType(unsubstLinearMapType), false); // todo: correct boolean value?
+  if (linearMapType != unsubstLinearMapType) {
+    thunkedLinearMap = builder.createConvertFunction(
+        loc, thunkedLinearMap,
+        SILType::getPrimitiveObjectType(unsubstLinearMapType),
+        /*withoutActuallyEscaping*/ false); // todo: correct boolean value?
+  }
   thunkedLinearMap = builder.createPartialApply(
       loc, linearMapThunkFRI, linearMapSubs, {thunkedLinearMap},
       ParameterConvention::Direct_Guaranteed);
-  if (linearMapTargetType != unsubstLinearMapTargetType)
-    thunkedLinearMap = builder.createConvertFunction(loc, thunkedLinearMap, SILType::getPrimitiveObjectType(linearMapTargetType), false); // todo: correct boolean value?
-
+  if (linearMapTargetType != unsubstLinearMapTargetType) {
+    thunkedLinearMap = builder.createConvertFunction(
+        loc, thunkedLinearMap,
+        SILType::getPrimitiveObjectType(linearMapTargetType),
+        /*withoutActuallyEscaping*/ false); // todo: correct boolean value?
+  }
   assert(origFnType->getResults().size() == 1);
   if (origFnType->getResults().front().isFormalDirect()) {
     auto result =
@@ -842,37 +850,41 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   return {thunk, interfaceSubs};
 }
 
-SILValue reabstractFunction(SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
-                            SILValue fn,
-                                           CanSILFunctionType toType, std::function<SubstitutionMap(SubstitutionMap)> remapSubstMap) {
+SILValue reabstractFunction(
+    SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
+    SILValue fn, CanSILFunctionType toType,
+    std::function<SubstitutionMap(SubstitutionMap)> remapSubstMap) {
   // TODO: I removed some calls to getOpType and getOpSubstitutionMap because we
   // don't have a cloner here. Maybe I should have a cloner so that I can call
   // them? Also remapSubstitutionMap from other callers.
+  auto &module = *fn->getModule();
+  auto fromType = fn->getType().getAs<SILFunctionType>();
+  auto unsubstFromType = fromType->getUnsubstitutedType(module);
+  auto unsubstToType = toType->getUnsubstitutedType(module);
 
-    auto &module = *fn->getModule();
-    auto fromType = fn->getType().getAs<SILFunctionType>();
-    auto unsubstFromType = fromType->getUnsubstitutedType(module);
-    auto unsubstToType = toType->getUnsubstitutedType(module);
+  auto *thunk = getOrCreateReabstractionThunk(fb, module, loc,
+                                              /*caller*/ fn->getFunction(),
+                                              unsubstFromType, unsubstToType);
+  auto *thunkRef = builder.createFunctionRef(loc, thunk);
 
-    auto *thunk =
-        getOrCreateReabstractionThunk(fb, module, loc, /*caller*/ fn->getFunction(),
-                                      unsubstFromType, unsubstToType);
-    auto *thunkRef = builder.createFunctionRef(loc, thunk);
+  if (fromType != unsubstFromType)
+    fn = builder.createConvertFunction(
+        loc, fn, SILType::getPrimitiveObjectType(unsubstFromType),
+        /*withoutActuallyEscaping*/ false); // todo: what's the right val for
+                                            // the bool?
 
-    if (fromType != unsubstFromType)
-      fn = builder.createConvertFunction(loc, fn, SILType::getPrimitiveObjectType(unsubstFromType), false); // todo: what's the right val for the bool?
+  fn = builder.createPartialApply(
+      loc, thunkRef, remapSubstMap(thunk->getForwardingSubstitutionMap()), {fn},
+      fromType->getCalleeConvention());
 
-    fn = builder.createPartialApply(
-        loc, thunkRef,
-        remapSubstMap(thunk->getForwardingSubstitutionMap()), {fn},
-        fromType->getCalleeConvention());
+  if (toType != unsubstToType)
+    fn = builder.createConvertFunction(
+        loc, fn, SILType::getPrimitiveObjectType(toType),
+        /*withoutActuallyEscaping*/ false); // todo: what's the right val for
+                                            // the bool?
 
-    if (toType != unsubstToType)
-      fn = builder.createConvertFunction(loc, fn, SILType::getPrimitiveObjectType(toType), false);// todo: what's the right val for the bool?
-
-    return fn;
+  return fn;
 }
-
 
 } // end namespace autodiff
 } // end namespace swift
