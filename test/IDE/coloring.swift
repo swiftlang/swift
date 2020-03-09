@@ -494,3 +494,50 @@ func typeAttr3(a: @ escaping () -> Int) {}
 
 // CHECK: <kw>func</kw> typeAttr2(a: @ <comment-block>/*this is fine...*/</comment-block> escaping () -> <type>Int</type>, b: <attr-builtin>@ escaping</attr-builtin> () -> <type>Int</type>) {}
 func typeAttr2(a: @ /*this is fine...*/ escaping () -> Int, b: @ escaping () -> Int) {}
+
+// CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+// CHECK: <kw>var</kw> iHave = <int>10</int>, multipleVars = <int>20</int>
+@available(iOS 99, *)
+var iHave = 10, multipleVars = 20
+
+enum MultipleCaseElements {
+  // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+  // CHECK: <kw>case</kw> foo, bar
+  @available(iOS 99, *)
+  case foo, bar
+}
+
+protocol P {}
+enum E {
+  // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+  // CHECK: <kw>case</kw> a(<type>P</type>)
+  @available(iOS 99, *)
+  case a(P)
+}
+
+// Ideally this would be attr-builtin, but we don't actually have the attribute
+// in the AST at all.
+//
+// CHECK: <attr-id>@available</attr-id>(<kw>iOS</kw> <int>99</int>, *)
+// CHECK: <kw>var</kw> <kw>_</kw> = <int>10</int>
+@available(iOS 99, *)
+var _ = 10
+
+// CHECK: <type>Array</type><<type>T</type>> <kw>where</kw> <type>T</type>: <type>Equatable</type>
+typealias GenericAlias<T> = Array<T> where T: Equatable
+
+// Where clauses on contextually generic declarations
+//
+struct FreeWhere<T> {
+  // CHECK: <kw>func</kw> foo() <kw>where</kw> <type>T</type> == <type>Int</type>
+  func foo() where T == Int {}
+
+  // CHECK: <kw>subscript</kw>() -> <type>Int</type> <kw>where</kw> <type>T</type>: <type>Sequence</type>
+  subscript() -> Int where T: Sequence {}
+
+  // CHECK: <kw>enum</kw> Enum <kw>where</kw> <type>T</type> == <type>Int</type>
+  enum Enum where T == Int {}
+
+  // CHECK: <kw>typealias</kw> Alias = <type>Int</type> <kw>where</kw> <type>T</type> == <type>Int</type>
+  typealias Alias = Int where T == Int
+}

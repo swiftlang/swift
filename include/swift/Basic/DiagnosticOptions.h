@@ -55,9 +55,13 @@ public:
   // When printing diagnostics, include the diagnostic name at the end
   bool PrintDiagnosticNames = false;
 
-  /// If set to true, produce more descriptive diagnostic output if available.
-  /// Descriptive diagnostic output is not intended to be machine-readable.
-  bool EnableDescriptiveDiagnostics = false;
+  /// If set to true, display educational note content to the user if available.
+  /// Educational notes are documentation which supplement diagnostics.
+  bool EnableEducationalNotes = false;
+
+  // If set to true, use the more descriptive experimental formatting style for
+  // diagnostics.
+  bool EnableExperimentalFormatting = false;
 
   std::string DiagnosticDocumentationPath = "";
 

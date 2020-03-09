@@ -32,6 +32,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
@@ -68,6 +69,10 @@ class MandatoryCombiner final
 
   /// Whether any changes have been made.
   bool madeChange;
+
+  /// Set to true if some alloc/dealloc_stack instruction are inserted and at
+  /// the end of the run stack nesting needs to be corrected.
+  bool invalidatedStackNesting = false;
 
   /// The number of times that the worklist has been processed.
   unsigned iteration;
@@ -112,6 +117,10 @@ public:
     while (doOneIteration(function, iteration)) {
       changed = true;
       ++iteration;
+    }
+
+    if (invalidatedStackNesting) {
+      StackNesting().correctStackNesting(&function);
     }
 
     return changed;
@@ -269,7 +278,9 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
                                              /*instructionDescription=*/""
 #endif
   );
-  tryDeleteDeadClosure(partialApply, instModCallbacks);
+  if (tryDeleteDeadClosure(partialApply, instModCallbacks)) {
+    invalidatedStackNesting = true;
+  }
   return nullptr;
 }
 

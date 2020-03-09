@@ -289,6 +289,8 @@ public:
   /// Diagnose a failure associated with this fix.
   virtual bool diagnose(bool asNote = false) const = 0;
 
+  virtual bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const { return false; }
+
   void print(llvm::raw_ostream &Out) const;
 
   SWIFT_DEBUG_DUMP;
@@ -843,6 +845,8 @@ public:
 
   bool diagnose(bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override;
+
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
                                         DeclNameRef member, bool alreadyDiagnosed,
                                         ConstraintLocator *locator);
@@ -1109,6 +1113,10 @@ public:
 
   bool diagnose(bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
+    return diagnose();
+  }
+
   static AddMissingArguments *create(ConstraintSystem &cs,
                                      llvm::ArrayRef<Param> synthesizedArgs,
                                      ConstraintLocator *locator);
@@ -1148,6 +1156,10 @@ public:
   }
 
   bool diagnose(bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
+    return diagnose();
+  }
 
   /// FIXME(diagnostics): Once `resolveDeclRefExpr` is gone this
   /// logic would be obsolete.
@@ -1349,6 +1361,10 @@ public:
 
   bool diagnose(bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
+    return diagnose();
+  }
+
   static DefaultGenericArgument *create(ConstraintSystem &cs,
                                         GenericTypeParamType *param,
                                         ConstraintLocator *locator);
@@ -1420,6 +1436,10 @@ public:
 
   bool diagnose(bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
+    return diagnose();
+  }
+
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
                                       Type specifiedTy,
                                       ConstraintLocator *locator);
@@ -1479,11 +1499,17 @@ public:
     return "allow argument to parameter type conversion mismatch";
   }
 
+  unsigned getParamIdx() const;
+
   bool diagnose(bool asNote = false) const override;
 
   static AllowArgumentMismatch *create(ConstraintSystem &cs, Type argType,
                                        Type paramType,
                                        ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowArgumentTypeMismatch;
+  }
 };
 
 class ExpandArrayIntoVarargs final : public AllowArgumentMismatch {

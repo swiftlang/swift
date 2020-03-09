@@ -47,6 +47,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/FileSystem.h"
+#include <set>
 
 
 using namespace swift;
@@ -437,15 +438,15 @@ void SILType::dump() const {
 }
 
 /// Prints the name and type of the given SIL function with the given
-/// `PrintOptions`. Mutates `printOptions`, setting `GenericEnv` and
-/// `AlternativeTypeNames`.
-static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
-                                        const SILFunction *function,
-                                        PrintOptions &printOptions) {
+/// `PrintOptions`. Computes mapping for sugared type names and stores the
+/// result in `sugaredTypeNames`.
+static void printSILFunctionNameAndType(
+    llvm::raw_ostream &OS, const SILFunction *function,
+    llvm::DenseMap<CanType, Identifier> &sugaredTypeNames) {
   function->printName(OS);
   OS << " : $";
-  llvm::DenseMap<CanType, Identifier> aliases;
-  auto genSig = function->getLoweredFunctionType()->getSubstGenericSignature();
+  auto genSig =
+    function->getLoweredFunctionType()->getInvocationGenericSignature();
   auto *genEnv = function->getGenericEnvironment();
   // If `genSig` and `genEnv` are both defined, get sugared names of generic
   // parameter types for printing.
@@ -470,22 +471,24 @@ static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
         continue;
       // Otherwise, add sugared name mapping for the type (and its archetype, if
       // defined).
-      aliases[paramTy->getCanonicalType()] = name;
+      sugaredTypeNames[paramTy->getCanonicalType()] = name;
       if (auto *archetypeTy =
               genEnv->mapTypeIntoContext(paramTy)->getAs<ArchetypeType>())
-        aliases[archetypeTy->getCanonicalType()] = name;
+        sugaredTypeNames[archetypeTy->getCanonicalType()] = name;
     }
   }
+  auto printOptions = PrintOptions::printSIL();
   printOptions.GenericEnv = genEnv;
-  printOptions.AlternativeTypeNames = aliases.empty() ? nullptr : &aliases;
+  printOptions.AlternativeTypeNames =
+      sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames;
   function->getLoweredFunctionType()->print(OS, printOptions);
 }
 
 /// Prints the name and type of the given SIL function.
 static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
                                         const SILFunction *function) {
-  auto printOptions = PrintOptions::printSIL();
-  printSILFunctionNameAndType(OS, function, printOptions);
+  llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
+  printSILFunctionNameAndType(OS, function, sugaredTypeNames);
 }
 
 namespace {
@@ -2255,6 +2258,40 @@ public:
     }
     }
   }
+
+  void visitDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *dwfi) {
+    auto *witness = dwfi->getWitness();
+    *this << '[';
+    switch (dwfi->getWitnessKind()) {
+    case DifferentiabilityWitnessFunctionKind::JVP:
+      *this << "jvp";
+      break;
+    case DifferentiabilityWitnessFunctionKind::VJP:
+      *this << "vjp";
+      break;
+    case DifferentiabilityWitnessFunctionKind::Transpose:
+      *this << "transpose";
+      break;
+    }
+    *this << "] [parameters";
+    for (auto i : witness->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] [results";
+    for (auto i : witness->getResultIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    if (auto witnessGenSig = witness->getDerivativeGenericSignature()) {
+      auto subPrinter = PrintOptions::printSIL();
+      witnessGenSig->print(PrintState.OS, subPrinter);
+      *this << " ";
+    }
+    printSILFunctionNameAndType(PrintState.OS, witness->getOriginalFunction());
+    if (dwfi->getHasExplicitFunctionType()) {
+      *this << " as ";
+      *this << dwfi->getType();
+    }
+  }
 };
 } // end anonymous namespace
 
@@ -2479,8 +2516,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (!isExternalDeclaration() && hasOwnership())
     OS << "[ossa] ";
 
-  auto printOptions = PrintOptions::printSIL();
-  printSILFunctionNameAndType(OS, this, printOptions);
+  llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
+  printSILFunctionNameAndType(OS, this, sugaredTypeNames);
 
   if (!isExternalDeclaration()) {
     if (auto eCount = getEntryCount()) {
@@ -2488,7 +2525,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     }
     OS << " {\n";
 
-    SILPrinter(PrintCtx, printOptions.AlternativeTypeNames).print(this);
+    SILPrinter(PrintCtx, sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames)
+        .print(this);
     OS << "} // end sil function '" << getName() << '\'';
   }
 
@@ -2714,6 +2752,57 @@ printSILCoverageMaps(SILPrintContext &Ctx,
     M->print(Ctx);
 }
 
+using MagicFileStringMap =
+    llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>;
+
+static void
+printMagicFileStringMapEntry(SILPrintContext &Ctx,
+                             const MagicFileStringMap::MapEntryTy &entry) {
+  auto &OS = Ctx.OS();
+  OS << "//   '" << std::get<0>(entry.second)
+     << "' => '" << entry.first() << "'";
+
+  if (!std::get<1>(entry.second))
+    OS << " (alternate)";
+
+  OS << "\n";
+}
+
+static void printMagicFileStringMap(SILPrintContext &Ctx,
+                                    const MagicFileStringMap map) {
+  if (map.empty())
+    return;
+
+  Ctx.OS() << "\n\n// Mappings from '#file' to '#filePath':\n";
+
+  if (Ctx.sortSIL()) {
+    llvm::SmallVector<llvm::StringRef, 16> keys;
+    llvm::copy(map.keys(), std::back_inserter(keys));
+
+    llvm::sort(keys, [&](StringRef leftKey, StringRef rightKey) -> bool {
+      const auto &leftValue = map.find(leftKey)->second;
+      const auto &rightValue = map.find(rightKey)->second;
+
+      // Lexicographically earlier #file strings sort earlier.
+      if (std::get<0>(leftValue) != std::get<0>(rightValue))
+        return std::get<0>(leftValue) < std::get<0>(rightValue);
+
+      // Conflict winners sort before losers.
+      if (std::get<1>(leftValue) != std::get<1>(rightValue))
+        return std::get<1>(leftValue);
+
+      // Finally, lexicographically earlier #filePath strings sort earlier.
+      return leftKey < rightKey;
+    });
+
+    for (auto key : keys)
+      printMagicFileStringMapEntry(Ctx, *map.find(key));
+  } else {
+    for (const auto &entry : map)
+      printMagicFileStringMapEntry(Ctx, entry);
+  }
+}
+
 void SILProperty::print(SILPrintContext &Ctx) const {
   PrintOptions Options = PrintOptions::printSIL();
   
@@ -2827,6 +2916,10 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
   printExternallyVisibleDecls(PrintCtx, externallyVisible.getArrayRef());
+
+  if (M)
+    printMagicFileStringMap(
+        PrintCtx, M->computeMagicFileStringMap(/*shouldDiagnose=*/false));
 
   OS << "\n\n";
 }

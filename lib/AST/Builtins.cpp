@@ -892,6 +892,15 @@ static ValueDecl *getUnsafeGuaranteedEnd(ASTContext &C, Identifier Id) {
   return getBuiltinFunction(Id, { Int8Ty }, TupleType::getEmpty(C));
 }
 
+static ValueDecl *getTypePtrAuthDiscriminator(ASTContext &C, Identifier Id) {
+  // <T : AnyObject> (T.Type) -> Int64
+  BuiltinFunctionBuilder builder(C);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  Type Int64Ty = BuiltinIntegerType::get(64, C);
+  builder.setResult(makeConcrete(Int64Ty));
+  return builder.build(Id);
+}
+
 static ValueDecl *getOnFastPath(ASTContext &Context, Identifier Id) {
   return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
 }
@@ -1381,10 +1390,14 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::ExtendArgument:
   case IITDescriptor::TruncArgument:
   case IITDescriptor::HalfVecArgument:
+  case IITDescriptor::ScalableVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecElementArgument:
   case IITDescriptor::VecOfAnyPtrsToElt:
+  case IITDescriptor::VecOfBitcastsToInt:
+  case IITDescriptor::Subdivide2Argument:
+  case IITDescriptor::Subdivide4Argument:
     // These types cannot be expressed in swift yet.
     return Type();
 
@@ -2045,6 +2058,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
                               {},
                               TupleType::getEmpty(Context));
 
+  case BuiltinValueKind::TypePtrAuthDiscriminator:
+    return getTypePtrAuthDiscriminator(Context, Id);
+    
   case BuiltinValueKind::TypeJoin:
     return getTypeJoinOperation(Context, Id);
 

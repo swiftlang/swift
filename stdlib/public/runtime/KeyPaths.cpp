@@ -39,14 +39,21 @@ static intptr_t hashGenericArguments(const void *src, size_t bytes) {
   return 0;
 }
 
+struct KeyPathGenericWitnessTable {
+  void *destroy;
+  SWIFT_CC(swift) void (* __ptrauth_swift_runtime_function_entry_with_key(swift::SpecialPointerAuthDiscriminators::KeyPathCopy) copy)(const void *src, void *dest, size_t bytes);
+  SWIFT_CC(swift) bool (* __ptrauth_swift_runtime_function_entry_with_key(swift::SpecialPointerAuthDiscriminators::KeyPathEquals) equals)(const void *, const void *, size_t);
+  SWIFT_CC(swift) intptr_t (* __ptrauth_swift_runtime_function_entry_with_key(swift::SpecialPointerAuthDiscriminators::KeyPathHash) hash)(const void *src, size_t bytes);
+};
+
 /// A prefab witness table for computed key path components that only include
 /// captured generic arguments.
 SWIFT_RUNTIME_EXPORT
-void *(swift_keyPathGenericWitnessTable[]) = {
-  nullptr, // no destructor necessary
-  (void*)(uintptr_t)swift_copyKeyPathTrivialIndices,
-  (void*)(uintptr_t)equateGenericArguments,
-  (void*)(uintptr_t)hashGenericArguments,
+KeyPathGenericWitnessTable swift_keyPathGenericWitnessTable = {
+  nullptr,
+  swift_copyKeyPathTrivialIndices,
+  equateGenericArguments,
+  hashGenericArguments,
 };
 
 /****************************************************************************/
@@ -143,7 +150,9 @@ swift::swift_readAtKeyPath(YieldOnceBuffer *buffer,
 
   // Return a continuation that destroys the value in the buffer
   // and deallocates it.
-  return { &_destroy_temporary_continuation, result };
+  return { swift_ptrauth_sign_opaque_read_resume_function(
+             &_destroy_temporary_continuation, buffer),
+           result };
 }
 
 static SWIFT_CC(swift)
@@ -158,7 +167,9 @@ swift::swift_modifyAtWritableKeyPath(YieldOnceBuffer *buffer,
     _swift_modifyAtWritableKeyPath_impl(root, keyPath);
   buffer->Data[0] = addrAndOwner.Owner;
 
-  return { &_release_owner_continuation, addrAndOwner.Addr };
+  return { swift_ptrauth_sign_opaque_modify_resume_function(
+             &_release_owner_continuation, buffer),
+           addrAndOwner.Addr };
 }
 
 YieldOnceResult<OpaqueValue*>
@@ -169,5 +180,7 @@ swift::swift_modifyAtReferenceWritableKeyPath(YieldOnceBuffer *buffer,
     _swift_modifyAtReferenceWritableKeyPath_impl(root, keyPath);
   buffer->Data[0] = addrAndOwner.Owner;
 
-  return { &_release_owner_continuation, addrAndOwner.Addr };
+  return { swift_ptrauth_sign_opaque_modify_resume_function(
+             &_release_owner_continuation, buffer),
+           addrAndOwner.Addr };
 }

@@ -25,8 +25,8 @@ class SubDerived : Derived {}
 
 class MoreDerived : Concrete, SubProto {}
 
-// CHECK-objc-LABEL: define hidden swiftcc void @checkExistentialDowncast(%T24protocol_with_superclass8ConcreteC*, {{.*}} {
-// CHECK-native-LABEL: define hidden swiftcc void @checkExistentialDowncast(%T24protocol_with_superclass8ConcreteC*, %swift.refcounted*, i8**, %T24protocol_with_superclass8ConcreteC*, i8**, %T24protocol_with_superclass8ConcreteC*, i8**, %T24protocol_with_superclass8ConcreteC*, i8**) {{.*}} {
+// CHECK-objc-LABEL: define hidden swiftcc void @checkExistentialDowncast(%T24protocol_with_superclass8ConcreteC* %0, {{.*}} {
+// CHECK-native-LABEL: define hidden swiftcc void @checkExistentialDowncast(%T24protocol_with_superclass8ConcreteC* %0, %swift.refcounted* %1, i8** %2, %T24protocol_with_superclass8ConcreteC* %3, i8** %4, %T24protocol_with_superclass8ConcreteC* %5, i8** %6, %T24protocol_with_superclass8ConcreteC* %7, i8** %8) {{.*}} {
 sil hidden @checkExistentialDowncast : $@convention(thin) (@owned Concrete, @owned SuperProto, @owned SuperProto & Concrete, @owned ProtoRefinesClass, @owned SubProto) -> () {
 bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRefinesClass, %4 : $SubProto):
 

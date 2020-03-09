@@ -109,6 +109,9 @@ namespace swift {
     /// human-readable string.
     bool EnableConcisePoundFile = false;
 
+    /// Detect and automatically import modules' cross-import overlays.
+    bool EnableCrossImportOverlays = false;
+
     ///
     /// Support for alternate usage modes
     ///
@@ -189,7 +192,7 @@ namespace swift {
     bool BuildRequestDependencyGraph = false;
 
     /// Enable SIL type lowering
-    bool EnableSubstSILFunctionTypesForFunctionValues = false;
+    bool EnableSubstSILFunctionTypesForFunctionValues = true;
 
     /// Whether to diagnose an ephemeral to non-ephemeral conversion as an
     /// error.
@@ -387,33 +390,6 @@ namespace swift {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the class metadata update callback mechanism:
-    //
-    // - macOS 10.14.4
-    // - iOS 12.2
-    // - tvOS 12.2
-    // - watchOS 5.2
-    bool doesTargetSupportObjCMetadataUpdateCallback() const;
-
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the objc_getClass() hook:
-    //
-    // - macOS 10.14.4
-    // - iOS 12.2
-    // - tvOS 12.2
-    // - watchOS 5.2
-    bool doesTargetSupportObjCGetClassHook() const;
-
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the objc_loadClassref() entry point:
-    //
-    // - macOS 10.15
-    // - iOS 13
-    // - tvOS 13
-    // - watchOS 6
-    bool doesTargetSupportObjCClassStubs() const;
-
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
@@ -436,7 +412,7 @@ namespace swift {
     }
 
   private:
-    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 6>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };

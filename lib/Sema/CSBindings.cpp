@@ -311,6 +311,20 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     type = first;
     kind = AllowedBindingKind::Supertypes;
   } else {
+    // If the left-hand side of a relational constraint is a
+    // type variable representing a closure type, let's delay
+    // attempting any bindings related to any type variables
+    // on the other side since it could only be either a closure
+    // parameter or a result type, and we can't get a full set
+    // of bindings for them until closure's body is opened.
+    if (auto *typeVar = first->getAs<TypeVariableType>()) {
+      if (typeVar->getImpl().isClosureType()) {
+        result.InvolvesTypeVariables = true;
+        result.FullyBound = true;
+        return None;
+      }
+    }
+
     // Can't infer anything.
     if (result.InvolvesTypeVariables)
       return None;
@@ -904,7 +918,7 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
   }
 
   // If the type is a type variable itself, don't permit the binding.
-  if (auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>())
+  if (type->getRValueType()->is<TypeVariableType>())
     return None;
 
   // Don't bind to a dependent member type, even if it's currently
@@ -1026,6 +1040,25 @@ bool TypeVarBindingProducer::computeNext() {
       if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
         addNewBinding(binding.withType(*simplifiedSuper));
     }
+
+    auto srcLocator = binding.getLocator();
+    if (srcLocator &&
+        srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
+        !type->hasTypeVariable() && CS.isCollectionType(type)) {
+      // If the type binding comes from the argument conversion, let's
+      // instead of binding collection types directly, try to bind
+      // using temporary type variables substituted for element
+      // types, that's going to ensure that subtype relationship is
+      // always preserved.
+      auto *BGT = type->castTo<BoundGenericType>();
+      auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
+                                         BGT->getASTContext());
+
+      auto dstLocator = TypeVar->getImpl().getLocator();
+      auto newType = CS.openUnboundGenericType(UGT, dstLocator)
+                         ->reconstituteSugar(/*recursive=*/false);
+      addNewBinding(binding.withType(newType));
+    }
   }
 
   if (newBindings.empty())
@@ -1044,20 +1077,6 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   if (Binding.hasDefaultedLiteralProtocol()) {
     type = cs.openUnboundGenericType(type, dstLocator);
-    type = type->reconstituteSugar(/*recursive=*/false);
-  } else if (srcLocator &&
-             srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
-             !type->hasTypeVariable() && cs.isCollectionType(type)) {
-    // If the type binding comes from the argument conversion, let's
-    // instead of binding collection types directly, try to bind
-    // using temporary type variables substituted for element
-    // types, that's going to ensure that subtype relationship is
-    // always preserved.
-    auto *BGT = type->castTo<BoundGenericType>();
-    auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
-                                       BGT->getASTContext());
-
-    type = cs.openUnboundGenericType(UGT, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
@@ -1082,8 +1101,8 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
             cs, TypeVar->getImpl().getLocator());
         if (cs.recordFix(fix))
           return true;
-      } else if (auto *OLE = dyn_cast_or_null<ObjectLiteralExpr>(
-                     srcLocator->getAnchor())) {
+      } else if (srcLocator->getAnchor() &&
+                 isa<ObjectLiteralExpr>(srcLocator->getAnchor())) {
         auto *fix = SpecifyObjectLiteralTypeImport::create(
             cs, TypeVar->getImpl().getLocator());
         if (cs.recordFix(fix))

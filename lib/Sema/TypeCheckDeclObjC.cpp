@@ -1043,8 +1043,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
 
   // Infer @objc for @_dynamicReplacement(for:) when replaced decl is @objc.
   if (isa<AbstractFunctionDecl>(VD) || isa<AbstractStorageDecl>(VD))
-    if (auto *replacementAttr =
-            VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
+    if (VD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
       if (auto *replaced = VD->getDynamicallyReplacedDecl()) {
         if (replaced->isObjC())
           return ObjCReason(ObjCReason::ImplicitlyObjC);
@@ -2035,6 +2034,11 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
       if (overriddenCtor->hasStubImplementation())
         continue;
     }
+
+    // Require the declaration to actually come from a class. Selectors that
+    // come from protocol requirements are not actually overrides.
+    if (!overriddenMethod->getDeclContext()->getSelfClassDecl())
+      continue;
 
     // Diagnose the override.
     auto methodDiagInfo = getObjCMethodDiagInfo(method);

@@ -22,7 +22,7 @@
 // CHECK-DEFINITION-SAME: @"default associated conformance2T218resilient_protocol29ProtocolWithAssocTypeDefaultsP_AB014OtherResilientD0"
 
 // Associated type default + flags
-// CHECK-DEFINITION-SAME: [[INT]] add
+// CHECK-DEFINITION-SAME: getelementptr
 // CHECK-DEFINITION-SAME: @"default assoc type _____y2T1_____QzG 18resilient_protocol7WrapperV AA29ProtocolWithAssocTypeDefaultsP"
 // CHECK-DEFINITION-SAME: [[INT]] 1
 
@@ -98,7 +98,7 @@ public struct ConformsToDerived : ResilientDerivedProtocol {
 // Resilient protocol usage
 // ----------------------------------------------------------------------------
 
-// CHECK-USAGE: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$s31protocol_resilience_descriptors17assocTypeMetadatay1TQzmxm010resilient_A024ProtocolWithRequirementsRzlF"(%swift.type*, %swift.type* [[PWD:%.*]], i8** [[WTABLE:%.*]])
+// CHECK-USAGE: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$s31protocol_resilience_descriptors17assocTypeMetadatay1TQzmxm010resilient_A024ProtocolWithRequirementsRzlF"(%swift.type* %0, %swift.type* [[PWD:%.*]], i8** [[WTABLE:%.*]])
 public func assocTypeMetadata<PWR: ProtocolWithRequirements>(_: PWR.Type) -> PWR.T.Type {
   // CHECK-USAGE: call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness([[INT]] 0, i8** %PWR.ProtocolWithRequirements, %swift.type* %PWR, %swift.protocol_requirement* @"$s18resilient_protocol24ProtocolWithRequirementsTL", %swift.protocol_requirement* @"$s1T18resilient_protocol24ProtocolWithRequirementsPTl")
   return PWR.T.self

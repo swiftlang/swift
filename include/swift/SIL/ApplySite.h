@@ -135,6 +135,9 @@ public:
   SILValue getCallee() const { return getCalleeOperand()->get(); }
 
   /// Return the callee operand.
+  Operand *getCalleeOperand() { FOREACH_IMPL_RETURN(getCalleeOperand()); }
+
+  /// Return the callee operand.
   const Operand *getCalleeOperand() const {
     FOREACH_IMPL_RETURN(getCalleeOperand());
   }
@@ -195,6 +198,10 @@ public:
   SILType getSubstCalleeSILType() const {
     FOREACH_IMPL_RETURN(getSubstCalleeSILType());
   }
+  void setSubstCalleeType(CanSILFunctionType t) {
+    FOREACH_IMPL_RETURN(setSubstCalleeType(t));
+  }
+
   /// Get the conventions of the callee with the applied substitutions.
   SILFunctionConventions getSubstCalleeConv() const {
     return SILFunctionConventions(getSubstCalleeType(), getModule());

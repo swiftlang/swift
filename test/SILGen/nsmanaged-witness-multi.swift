@@ -18,7 +18,7 @@ extension Fish : FishProtocol {}
 // Make sure the modify accessor for Fish.name is emitted here even though it
 // its storage was declared in a different translation unit
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s4main4FishCAA0B8ProtocolA2aDP4nameSSvMTW : $@yield_once @convention(witness_method: FishProtocol) (@inout Fish) -> @yields @inout String
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s4main4FishCAA0B8ProtocolA2aDP4nameSSvMTW :
 // CHECK: function_ref @$s4main4FishC4nameSSvM
 // CHECK: return
 

@@ -288,21 +288,17 @@ class GC: GP {
 func wrap_gcp<T:GP>(_ a:T,_ b:GP) -> Int {
   return a.foo() + b.foo()
 }
+// For this case to be handled by ExistentialSpecializer, GenericSpecializer needs to run first to remove the generic argument.
+//
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform3gcpySixAA2GPRzlF : $@convention(thin) <T where T : GP> (@in_guaranteed T) -> Int {
 // CHECK: bb0(%0 : $*T):
-// CHECK: debug_value_addr 
-// CHECK: alloc_ref 
-// CHECK: debug_value
-// CHECK: debug_value 
-// CHECK: alloc_stack 
-// CHECK: init_existential_addr 
-// CHECK: store
-// CHECK: function_ref @$s21existential_transform8wrap_gcpySix_AA2GP_ptAaCRzlFTf4ne_n : $@convention(thin) <τ_0_0 where τ_0_0 : GP><τ_1_0 where τ_1_0 : GP> (@in_guaranteed τ_0_0, @in_guaranteed τ_1_0) -> Int 
-// CHECK: open_existential_addr 
-// CHECK: strong_retain 
-// CHECK: apply
+// CHECK: [[REF:%.*]] = alloc_ref
+// CHECK: [[E:%.*]] = alloc_stack
+// CHECK: [[EADR:%.*]] = init_existential_addr [[E]]
+// CHECK: store [[REF]] to [[EADR]]
+// CHECK: [[F:%.*]] = function_ref @$s21existential_transform8wrap_gcpySix_AA2GP_ptAaCRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : GP> (@in_guaranteed τ_0_0, @in_guaranteed GP) -> Int
+// CHECK: apply [[F]]<T>(%0, [[E]]) : $@convention(thin) <τ_0_0 where τ_0_0 : GP> (@in_guaranteed τ_0_0, @in_guaranteed GP) -> Int
 // CHECK: destroy_addr 
-// CHECK: strong_release 
 // CHECK: dealloc_stack
 // CHECK: return 
 // CHECK: } // end sil function '$s21existential_transform3gcpySixAA2GPRzlF'
@@ -314,22 +310,17 @@ func wrap_gcp<T:GP>(_ a:T,_ b:GP) -> Int {
 func wrap_gcp_arch<T:GP>(_ a:T,_ b:GP, _ c:inout Array<T>) -> Int {
   return a.foo() + b.foo() + c[0].foo()
 }
+// For this case to be handled by ExistentialSpecializer, GenericSpecializer needs to run first to remove the generic argument.
+//
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform8gcp_archySix_SayxGztAA2GPRzlF : $@convention(thin) <T where T : GP> (@in_guaranteed T, @inout Array<T>) -> Int {
 // CHECK: bb0(%0 : $*T, %1 : $*Array<T>):
-// CHECK: debug_value_addr
-// CHECK: debug_value_addr
-// CHECK: alloc_ref
-// CHECK: debug_value
-// CHECK: debug_value
-// CHECK: alloc_stack
-// CHECK: init_existential_addr
-// CHECK: store
-// CHECK: function_ref @$s21existential_transform13wrap_gcp_archySix_AA2GP_pSayxGztAaCRzlFTf4nen_n : $@convention(thin) <τ_0_0 where τ_0_0 : GP><τ_1_0 where τ_1_0 : GP> (@in_guaranteed τ_0_0, @in_guaranteed τ_1_0, @inout Array<τ_0_0>) -> Int
-// CHECK: open_existential_addr
-// CHECK: strong_retain
-// CHECK: apply
+// CHECK: [[REF:%.*]] = alloc_ref
+// CHECK: [[E:%.*]] = alloc_stack
+// CHECK: [[EADR:%.*]] = init_existential_addr [[E]]
+// CHECK: store [[REF]] to [[EADR]]
+// CHECK: [[F:%.*]] = function_ref @$s21existential_transform13wrap_gcp_archySix_AA2GP_pSayxGztAaCRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : GP> (@in_guaranteed τ_0_0, @in_guaranteed GP, @inout Array<τ_0_0>) -> Int
+// CHECK: apply [[F]]<T>(%0, [[E]], %1) : $@convention(thin) <τ_0_0 where τ_0_0 : GP> (@in_guaranteed τ_0_0, @in_guaranteed GP, @inout Array<τ_0_0>) -> Int
 // CHECK: destroy_addr
-// CHECK: strong_release
 // CHECK: dealloc_stack
 // CHECK: return
 // CHECK-LABEL: } // end sil function '$s21existential_transform8gcp_archySix_SayxGztAA2GPRzlF'

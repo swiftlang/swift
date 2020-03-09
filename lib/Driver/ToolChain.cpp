@@ -24,6 +24,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
@@ -145,7 +146,7 @@ std::unique_ptr<Job> ToolChain::constructJob(
   auto responseFileInfo =
       getResponseFileInfo(C, executablePath, invocationInfo, context);
 
-  return llvm::make_unique<Job>(
+  return std::make_unique<Job>(
       JA, std::move(inputs), std::move(output), executablePath,
       std::move(invocationInfo.Arguments),
       std::move(invocationInfo.ExtraEnvironment),
@@ -240,7 +241,7 @@ static std::unique_ptr<CommandOutput>
 makeBatchCommandOutput(ArrayRef<const Job *> jobs, Compilation &C,
                        file_types::ID outputType) {
   auto output =
-      llvm::make_unique<CommandOutput>(outputType, C.getDerivedOutputFileMap());
+      std::make_unique<CommandOutput>(outputType, C.getDerivedOutputFileMap());
   for (auto const *J : jobs) {
     output->addOutputs(J->getOutput());
   }
@@ -333,10 +334,32 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
   auto responseFileInfo =
       getResponseFileInfo(C, executablePath, invocationInfo, context);
 
-  return llvm::make_unique<BatchJob>(
+  return std::make_unique<BatchJob>(
       *batchCJA, inputJobs.takeVector(), std::move(output), executablePath,
       std::move(invocationInfo.Arguments),
       std::move(invocationInfo.ExtraEnvironment),
       std::move(invocationInfo.FilelistInfos), sortedJobs, NextQuasiPID,
       responseFileInfo);
+}
+
+llvm::Expected<file_types::ID>
+ToolChain::remarkFileTypeFromArgs(const llvm::opt::ArgList &Args) const {
+  const Arg *A = Args.getLastArg(options::OPT_save_optimization_record_EQ);
+  if (!A)
+    return file_types::TY_YAMLOptRecord;
+
+  llvm::Expected<llvm::remarks::Format> FormatOrErr =
+      llvm::remarks::parseFormat(A->getValue());
+  if (llvm::Error E = FormatOrErr.takeError())
+    return std::move(E);
+
+  switch (*FormatOrErr) {
+  case llvm::remarks::Format::YAML:
+    return file_types::TY_YAMLOptRecord;
+  case llvm::remarks::Format::Bitstream:
+    return file_types::TY_BitstreamOptRecord;
+  default:
+    return llvm::createStringError(std::errc::invalid_argument,
+                                   "Unknown remark format.");
+  }
 }

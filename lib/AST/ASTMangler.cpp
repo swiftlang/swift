@@ -357,8 +357,8 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
                                             Type SelfType,
                                             ModuleDecl *Module) {
   Mod = Module;
-  assert(ThunkType->getSubstitutions().empty() && "not implemented");
-  GenericSignature GenSig = ThunkType->getSubstGenericSignature();
+  assert(ThunkType->getPatternSubstitutions().empty() && "not implemented");
+  GenericSignature GenSig = ThunkType->getInvocationGenericSignature();
   if (GenSig)
     CurGenericSignature = GenSig.getCanonicalSignature();
 
@@ -699,7 +699,7 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
         break;
     }
   } else if (auto objCName =
-               getOverriddenSwiftProtocolObjCName(decl, UseObjCProtocolNames)) {
+               getOverriddenSwiftProtocolObjCName(decl, UseObjCRuntimeNames)) {
     // @objc Swift protocols should be mangled as Objective-C protocols,
     // so append the Objective-C runtime name.
     appendIdentifier(*objCName);
@@ -751,11 +751,6 @@ static const char *getMetatypeRepresentationOp(MetatypeRepresentation Rep) {
   }
 
   llvm_unreachable("Unhandled MetatypeRepresentation in switch.");
-}
-
-static bool isStdlibType(const TypeDecl *decl) {
-  DeclContext *dc = decl->getDeclContext();
-  return dc->isModuleScopeContext() && dc->getParentModule()->isStdlibModule();
 }
 
 /// Whether to mangle the given type as generic.
@@ -986,7 +981,7 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
         if (tryMangleTypeSubstitution(tybase))
           return;
 
-        if (isStdlibType(Decl) && Decl->getName().str() == "Optional") {
+        if (Decl->isStdlibDecl() && Decl->getName().str() == "Optional") {
           auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0], forDecl);
@@ -1303,7 +1298,7 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
     genericArgs = boundType->getGenericArgs();
     if (Type parent = boundType->getParent()) {
       GenericTypeDecl *decl = boundType->getAnyGeneric();
-      if (!getSpecialManglingContext(decl, UseObjCProtocolNames))
+      if (!getSpecialManglingContext(decl, UseObjCRuntimeNames))
         appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
     }
   }
@@ -1461,11 +1456,11 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 
   llvm::SmallVector<char, 32> OpArgs;
 
-  if (fn->getSubstitutions()) {
+  if (fn->getPatternSubstitutions()) {
     OpArgs.push_back('s');
-    if (!fn->isGenericSignatureImplied()) {
-      OpArgs.push_back('i');
-    }
+  }
+  if (fn->getInvocationSubstitutions()) {
+    OpArgs.push_back('I');
   }
   
   if (fn->isPolymorphic() && fn->isPseudogeneric())
@@ -1504,6 +1499,18 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
       OpArgs.push_back('W');
       break;
   }
+
+  // Coroutine kind.  This is mangled in all pointer auth modes.
+  switch (fn->getCoroutineKind()) {
+  case SILCoroutineKind::None:
+    break;
+  case SILCoroutineKind::YieldOnce:
+    OpArgs.push_back('A');
+    break;
+  case SILCoroutineKind::YieldMany:
+    OpArgs.push_back('G');
+    break;
+  }
   
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
@@ -1517,6 +1524,13 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     appendType(result.getInterfaceType());
   }
 
+  // Mangle the yields.
+  for (auto yield : fn->getYields()) {
+    OpArgs.push_back('Y');
+    OpArgs.push_back(getParamConvention(yield.getConvention()));
+    appendType(yield.getInterfaceType());
+  }
+
   // Mangle the error result if present.
   if (fn->hasErrorResult()) {
     auto error = fn->getErrorResult();
@@ -1524,10 +1538,15 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back(getResultConvention(error.getConvention()));
     appendType(error.getInterfaceType());
   }
-  if (auto sig = fn->getSubstGenericSignature()) {
+  if (auto sig = fn->getInvocationGenericSignature()) {
     appendGenericSignature(sig);
   }
-  if (auto subs = fn->getSubstitutions()) {
+  if (auto subs = fn->getInvocationSubstitutions()) {
+    appendFlatGenericArgs(subs);
+    appendRetroactiveConformances(subs, Mod);
+  }
+  if (auto subs = fn->getPatternSubstitutions()) {
+    appendGenericSignature(subs.getGenericSignature());
     appendFlatGenericArgs(subs);
     appendRetroactiveConformances(subs, Mod);
   }
@@ -1596,7 +1615,7 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
 /// This is the top-level entrypoint for mangling <context>.
 void ASTMangler::appendContextOf(const ValueDecl *decl) {
   // Check for a special mangling context.
-  if (auto context = getSpecialManglingContext(decl, UseObjCProtocolNames)) {
+  if (auto context = getSpecialManglingContext(decl, UseObjCRuntimeNames)) {
     switch (*context) {
     case ClangImporterContext:
       return appendOperator("SC");
@@ -1843,7 +1862,10 @@ void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
 
   appendContextOf(protocol);
   auto *clangDecl = protocol->getClangDecl();
-  if (auto *clangProto = cast_or_null<clang::ObjCProtocolDecl>(clangDecl))
+  auto clangProto = cast_or_null<clang::ObjCProtocolDecl>(clangDecl);
+  if (clangProto && UseObjCRuntimeNames)
+    appendIdentifier(clangProto->getObjCRuntimeNameAsString());
+  else if (clangProto)
     appendIdentifier(clangProto->getName());
   else
     appendDeclName(protocol);
@@ -1914,15 +1936,25 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     if (!namedDecl)
       return false;
 
-    appendIdentifier(namedDecl->getName());
+    // Mangle ObjC classes using their runtime names.
+    auto interface = dyn_cast<clang::ObjCInterfaceDecl>(namedDecl);
+    auto protocol = dyn_cast<clang::ObjCProtocolDecl>(namedDecl);
+    
+    if (UseObjCRuntimeNames && interface) {
+      appendIdentifier(interface->getObjCRuntimeNameAsString());
+    } else if (UseObjCRuntimeNames && protocol) {
+      appendIdentifier(protocol->getObjCRuntimeNameAsString());
+    } else {
+      appendIdentifier(namedDecl->getName());
+    }
 
     // The important distinctions to maintain here are Objective-C's various
     // namespaces: protocols, tags (struct/enum/union), and unqualified names.
     // We continue to mangle "class" the standard Swift way because it feels
     // weird to call that an alias, but they're really in the same namespace.
-    if (isa<clang::ObjCInterfaceDecl>(namedDecl)) {
+    if (interface) {
       appendOperator("C");
-    } else if (isa<clang::ObjCProtocolDecl>(namedDecl)) {
+    } else if (protocol) {
       appendOperator("P");
     } else if (isa<clang::TagDecl>(namedDecl)) {
       // Note: This includes enums, but that's okay. A Clang enum is not always
@@ -2483,7 +2515,7 @@ void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) 
 
 bool ASTMangler::tryAppendStandardSubstitution(const GenericTypeDecl *decl) {
   // Bail out if our parent isn't the swift standard library.
-  if (!isStdlibType(decl))
+  if (!decl->isStdlibDecl())
     return false;
 
   if (isa<NominalTypeDecl>(decl)) {

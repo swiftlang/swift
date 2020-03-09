@@ -92,13 +92,25 @@ namespace {
       CapturedDiagnostics.push_back(Diag);
     }
 
+    /// Result of verifying a file.
+    struct Result {
+      /// Were there any errors? All of the following are considered errors:
+      /// - Expected diagnostics that were not present
+      /// - Unexpected diagnostics that were present
+      /// - Errors in the definition of expected diagnostics
+      bool HadError;
+      bool HadUnexpectedDiag;
+    };
+
     /// verifyFile - After the file has been processed, check to see if we
     /// got all of the expected diagnostics and check to see if there were any
     /// unexpected ones.
-    bool verifyFile(unsigned BufferID, bool autoApplyFixes);
+    Result verifyFile(unsigned BufferID, bool autoApplyFixes);
 
     /// diagnostics for '<unknown>:0' should be considered as unexpected.
     bool verifyUnknown();
+
+    void printRemainingDiagnostics() const;
 
     /// If there are any -verify errors (e.g. differences between expectations
     /// and actual diagnostics produced), apply fixits to the original source
@@ -210,8 +222,8 @@ static std::string renderFixits(ArrayRef<llvm::SMFixIt> fixits,
 /// After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
-bool DiagnosticVerifier::verifyFile(unsigned BufferID,
-                                    bool shouldAutoApplyFixes) {
+DiagnosticVerifier::Result
+DiagnosticVerifier::verifyFile(unsigned BufferID, bool shouldAutoApplyFixes) {
   using llvm::SMLoc;
   
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
@@ -632,15 +644,20 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
   }
   
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
-  for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
-    if (CapturedDiagnostics[i].getFilename() != BufferName)
+  bool HadUnexpectedDiag = false;
+  for (unsigned i = CapturedDiagnostics.size(); i != 0; ) {
+    --i;
+    if (CapturedDiagnostics[i].getFilename() != BufferName) {
       continue;
+    }
 
+    HadUnexpectedDiag = true;
     std::string Message =
       "unexpected "+getDiagKindString(CapturedDiagnostics[i].getKind())+
       " produced: "+CapturedDiagnostics[i].getMessage().str();
     addError(CapturedDiagnostics[i].getLoc().getPointer(),
              Message);
+    CapturedDiagnostics.erase(CapturedDiagnostics.begin() + i);
   }
 
   // Sort the diagnostics by their address in the memory buffer as the primary
@@ -659,8 +676,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
   // If auto-apply fixits is on, rewrite the original source file.
   if (shouldAutoApplyFixes)
     autoApplyFixes(BufferID, Errors);
-  
-  return !Errors.empty();
+
+  return Result{!Errors.empty(), HadUnexpectedDiag};
 }
 
 bool DiagnosticVerifier::verifyUnknown() {
@@ -679,6 +696,15 @@ bool DiagnosticVerifier::verifyUnknown() {
     SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), diag);
   }
   return HadError;
+}
+
+void DiagnosticVerifier::printRemainingDiagnostics() const {
+  for (const auto &diag : CapturedDiagnostics) {
+    SM.getLLVMSourceMgr().PrintMessage(
+        llvm::errs(), diag.getLoc(), diag.getKind(),
+        "diagnostic produced by Clang: " + diag.getMessage(),
+        /*Ranges=*/ {}, diag.getFixIts());
+  }
 }
 
 /// If there are any -verify errors (e.g. differences between expectations
@@ -776,15 +802,26 @@ bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
   auto *Verifier = (DiagnosticVerifier*)SM.getLLVMSourceMgr().getDiagContext();
   SM.getLLVMSourceMgr().setDiagHandler(nullptr, nullptr);
   
-  bool HadError = false;
+  DiagnosticVerifier::Result Result = {false, false};
 
-  for (auto &BufferID : BufferIDs)
-    HadError |= Verifier->verifyFile(BufferID, autoApplyFixes);
-  if (!ignoreUnknown)
-    HadError |= Verifier->verifyUnknown();
+  for (auto &BufferID : BufferIDs) {
+    DiagnosticVerifier::Result FileResult =
+        Verifier->verifyFile(BufferID, autoApplyFixes);
+    Result.HadError |= FileResult.HadError;
+    Result.HadUnexpectedDiag |= FileResult.HadUnexpectedDiag;
+  }
+  if (!ignoreUnknown) {
+    bool HadError = Verifier->verifyUnknown();
+    Result.HadError |= HadError;
+    // For <unknown>, all errors are unexpected.
+    Result.HadUnexpectedDiag |= HadError;
+  }
+
+  if (Result.HadUnexpectedDiag)
+    Verifier->printRemainingDiagnostics();
 
   delete Verifier;
 
-  return HadError;
+  return Result.HadError;
 }
 

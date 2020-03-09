@@ -20,6 +20,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -689,11 +690,11 @@ void SILModule::serialize() {
   setSerialized();
 }
 
-void SILModule::setOptRecordStream(
-    std::unique_ptr<llvm::yaml::Output> &&Stream,
-    std::unique_ptr<llvm::raw_ostream> &&RawStream) {
-  OptRecordStream = std::move(Stream);
-  OptRecordRawStream = std::move(RawStream);
+void SILModule::setSILRemarkStreamer(
+    std::unique_ptr<llvm::raw_fd_ostream> &&remarkStream,
+    std::unique_ptr<swift::SILRemarkStreamer> &&remarkStreamer) {
+  silRemarkStream = std::move(remarkStream);
+  silRemarkStreamer = std::move(remarkStreamer);
 }
 
 bool SILModule::isStdlibModule() const {
@@ -727,4 +728,19 @@ SILLinkage swift::getDeclSILLinkage(const ValueDecl *decl) {
     break;
   }
   return linkage;
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const SILModule *M) {
+  if (!M) {
+    out << "(null)";
+    return;
+  }
+  out << "SIL for ";
+  simple_display(out, M->getSwiftModule());
+}
+
+SourceLoc swift::extractNearestSourceLoc(const SILModule *M) {
+  if (!M)
+    return SourceLoc();
+  return extractNearestSourceLoc(M->getSwiftModule());
 }

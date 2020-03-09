@@ -615,6 +615,19 @@ struct ImmutableAddressUseVerifier {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
         }
         break;
+      case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+        auto type =
+            cast<UncheckedTakeEnumDataAddrInst>(inst)->getOperand()->getType();
+        if (type.getOptionalObjectType()) {
+          for (auto result : inst->getResults()) {
+            llvm::copy(result->getUses(), std::back_inserter(worklist));
+          }
+          break;
+        }
+        llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
+        llvm_unreachable("invoking standard assertion failure");
+        break;
+      }
       default:
         llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
         llvm_unreachable("invoking standard assertion failure");
@@ -759,14 +772,19 @@ public:
     require(!value->getType().is<SILFunctionType>(),
             valueDescription + " cannot apply to a function type");
   }
-  
+
+  /// Assert that two types are equal.
+  void requireSameType(Type type1, Type type2, const Twine &complaint) {
+    _require(type1->isEqual(type2), complaint,
+             [&] { llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n'; });
+  }
+
   /// Assert that two types are equal.
   void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
-    _require(type1 == type2, complaint, [&] {
-      llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
-    });
+    _require(type1 == type2, complaint,
+             [&] { llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n'; });
   }
-  
+
   /// Require two function types to be ABI-compatible.
   void requireABICompatibleFunctionTypes(CanSILFunctionType type1,
                                          CanSILFunctionType type2,
@@ -1303,6 +1321,17 @@ public:
       });
     }
 
+    if (subs.getGenericSignature()->getCanonicalSignature() !=
+          fnTy->getSubstGenericSignature()->getCanonicalSignature()) {
+      llvm::dbgs() << "substitution map's generic signature: ";
+      subs.getGenericSignature()->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      llvm::dbgs() << "callee's generic signature: ";
+      fnTy->getSubstGenericSignature()->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      require(false,
+              "Substitution map does not match callee in apply instruction");
+    }
     // Apply the substitutions.
     return fnTy->substGenericArgs(F.getModule(), subs, F.getTypeExpansionContext());
   }
@@ -1405,8 +1434,9 @@ public:
     checkFullApplySite(AI);
 
     SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
-    require(AI->getType() == calleeConv.getSILResultType(),
-            "type of apply instruction doesn't match function result type");
+    requireSameType(
+        AI->getType(), calleeConv.getSILResultType(),
+        "type of apply instruction doesn't match function result type");
     if (AI->isNonThrowing()) {
       require(calleeConv.funcTy->hasErrorResult(),
               "nothrow flag used for callee without error result");
@@ -1463,8 +1493,9 @@ public:
     require(yields.size() == yieldResults.size(),
             "length mismatch in callee yields vs. begin_apply results");
     for (auto i : indices(yields)) {
-      require(yieldResults[i]->getType() == calleeConv.getSILType(yields[i]),
-              "callee yield type does not match begin_apply result type");
+      requireSameType(
+          yieldResults[i]->getType(), calleeConv.getSILType(yields[i]),
+          "callee yield type does not match begin_apply result type");
     }
 
     if (AI->isNonThrowing()) {
@@ -1551,10 +1582,11 @@ public:
     unsigned appliedArgStartIdx =
         substConv.getNumSILArguments() - PAI->getNumArguments();
     for (unsigned i = 0, size = PAI->getArguments().size(); i < size; ++i) {
-      require(PAI->getArguments()[i]->getType()
-                  == substConv.getSILArgumentType(appliedArgStartIdx + i),
-              "applied argument types do not match suffix of function type's "
-              "inputs");
+      requireSameType(
+          PAI->getArguments()[i]->getType(),
+          substConv.getSILArgumentType(appliedArgStartIdx + i),
+          "applied argument types do not match suffix of function type's "
+          "inputs");
     }
 
     // The arguments to the result function type must match the prefix of the
@@ -1746,9 +1778,10 @@ public:
 
   void checkGlobalAccessInst(GlobalAccessInst *GAI) {
     SILGlobalVariable *RefG = GAI->getReferencedGlobal();
-    require(GAI->getType().getObjectType() ==
-                RefG->getLoweredTypeInContext(F.getTypeExpansionContext()),
-            "global_addr/value must be the type of the variable it references");
+    requireSameType(
+        GAI->getType().getObjectType(),
+        RefG->getLoweredTypeInContext(F.getTypeExpansionContext()),
+        "global_addr/value must be the type of the variable it references");
     if (auto *VD = RefG->getDecl()) {
       require(!VD->isResilient(F.getModule().getSwiftModule(),
                                F.getResilienceExpansion()),
@@ -1792,8 +1825,8 @@ public:
             "Load must have a loadable type");
     require(LI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
-    require(LI->getOperand()->getType().getObjectType() == LI->getType(),
-            "Load operand type and result type mismatch");
+    requireSameType(LI->getOperand()->getType().getObjectType(), LI->getType(),
+                    "Load operand type and result type mismatch");
 
     // Ownership semantic checks.
     switch (LI->getOwnershipQualifier()) {
@@ -1831,8 +1864,9 @@ public:
             "Load must have a loadable type");
     require(LBI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
-    require(LBI->getOperand()->getType().getObjectType() == LBI->getType(),
-            "Load operand type and result type mismatch");
+    requireSameType(LBI->getOperand()->getType().getObjectType(),
+                    LBI->getType(),
+                    "Load operand type and result type mismatch");
   }
 
   void checkEndBorrowInst(EndBorrowInst *EBI) {
@@ -1957,8 +1991,9 @@ public:
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
-    require(SI->getDest()->getType().getObjectType() == SI->getSrc()->getType(),
-            "Store operand type and dest type mismatch");
+    requireSameType(SI->getDest()->getType().getObjectType(),
+                    SI->getSrc()->getType(),
+                    "Store operand type and dest type mismatch");
 
     // Perform ownership checks.
     switch (SI->getOwnershipQualifier()) {
@@ -1998,8 +2033,8 @@ public:
             "assign instruction can only exist in raw SIL");
     require(Src->getType().isObject(), "Can't assign from an address source");
     require(Dest->getType().isAddress(), "Must store to an address dest");
-    require(Dest->getType().getObjectType() == Src->getType(),
-            "Store operand type and dest type mismatch");
+    requireSameType(Dest->getType().getObjectType(), Src->getType(),
+                    "Store operand type and dest type mismatch");
   }
 
   // Usually the assign_by_wrapper initializer or setter has a single argument
@@ -2019,8 +2054,7 @@ public:
     SILType argTy = conv.getSILArgumentType(argIdx++);
     if (ty.isAddress() && argTy.isObject())
       ty = ty.getObjectType();
-    require(ty == argTy,
-            "wrong argument type of initializer or setter");
+    requireSameType(ty, argTy, "wrong argument type of initializer or setter");
   }
 
   void checkAssignByWrapperArgs(SILType ty, SILFunctionConventions &conv) {
@@ -2044,16 +2078,16 @@ public:
       case 0:
         require(initConv.getNumDirectSILResults() == 1,
                 "wrong number of init function results");
-        require(Dest->getType().getObjectType() ==
-                *initConv.getDirectSILResultTypes().begin(),
-                "wrong init function result type");
+        requireSameType(Dest->getType().getObjectType(),
+                        *initConv.getDirectSILResultTypes().begin(),
+                        "wrong init function result type");
         break;
       case 1:
         require(initConv.getNumDirectSILResults() == 0,
                 "wrong number of init function results");
-        require(Dest->getType() ==
-                *initConv.getIndirectSILResultTypes().begin(),
-                "wrong indirect init function result type");
+        requireSameType(Dest->getType(),
+                        *initConv.getIndirectSILResultTypes().begin(),
+                        "wrong indirect init function result type");
         break;
       default:
         require(false, "wrong number of indirect init function results");
@@ -2067,62 +2101,60 @@ public:
     checkAssignByWrapperArgs(Src->getType(), setterConv);
   }
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  void checkLoad##Name##Inst(Load##Name##Inst *LWI) { \
-    require(LWI->getType().isObject(), "Result of load must be an object"); \
-    auto isOptional = bool(LWI->getType().getOptionalObjectType()); \
-    auto optionality = optionalityOf(ReferenceOwnership::Name); \
-    if (optionality == ReferenceOwnershipOptionality::Required) \
-      require(isOptional, "Optionality mismatch"); \
-    if (optionality == ReferenceOwnershipOptionality::Disallowed) \
-      require(!isOptional, "Optionality mismatch"); \
-    auto PointerType = LWI->getOperand()->getType(); \
-    auto PointerRVType = PointerType.getASTType(); \
-    require(PointerType.isAddress() && \
-            PointerRVType->is<Name##StorageType>(), \
-            "load_" #name " operand must be a " #name " address"); \
-    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==\
-            LWI->getType().getASTType(), \
-            "Load operand type and result type mismatch"); \
-  } \
-  void checkStore##Name##Inst(Store##Name##Inst *SWI) { \
-    auto SrcTy = SWI->getSrc()->getType(); \
-    require(SrcTy.isObject(), "Can't store from an address source"); \
-    auto isOptional = bool(SrcTy.getOptionalObjectType()); \
-    auto optionality = optionalityOf(ReferenceOwnership::Name); \
-    if (optionality == ReferenceOwnershipOptionality::Required) \
-      require(isOptional, "Optionality mismatch"); \
-    if (optionality == ReferenceOwnershipOptionality::Disallowed) \
-      require(!isOptional, "Optionality mismatch"); \
-    auto PointerType = SWI->getDest()->getType(); \
-    auto PointerRVType = PointerType.getASTType(); \
-    require(PointerType.isAddress() && \
-            PointerRVType->is<Name##StorageType>(), \
-            "store_" #name " address operand must be a " #name " address"); \
-    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==\
-            SrcTy.getASTType(), \
-            "Store operand type and dest type mismatch"); \
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                    \
+  void checkLoad##Name##Inst(Load##Name##Inst *LWI) {                          \
+    require(LWI->getType().isObject(), "Result of load must be an object");    \
+    auto isOptional = bool(LWI->getType().getOptionalObjectType());            \
+    auto optionality = optionalityOf(ReferenceOwnership::Name);                \
+    if (optionality == ReferenceOwnershipOptionality::Required)                \
+      require(isOptional, "Optionality mismatch");                             \
+    if (optionality == ReferenceOwnershipOptionality::Disallowed)              \
+      require(!isOptional, "Optionality mismatch");                            \
+    auto PointerType = LWI->getOperand()->getType();                           \
+    auto PointerRVType = PointerType.getASTType();                             \
+    require(PointerType.isAddress() && PointerRVType->is<Name##StorageType>(), \
+            "load_" #name " operand must be a " #name " address");             \
+    requireSameType(                                                           \
+        PointerRVType->getReferenceStorageReferent()->getCanonicalType(),      \
+        LWI->getType().getASTType(),                                           \
+        "Load operand type and result type mismatch");                         \
+  }                                                                            \
+  void checkStore##Name##Inst(Store##Name##Inst *SWI) {                        \
+    auto SrcTy = SWI->getSrc()->getType();                                     \
+    require(SrcTy.isObject(), "Can't store from an address source");           \
+    auto isOptional = bool(SrcTy.getOptionalObjectType());                     \
+    auto optionality = optionalityOf(ReferenceOwnership::Name);                \
+    if (optionality == ReferenceOwnershipOptionality::Required)                \
+      require(isOptional, "Optionality mismatch");                             \
+    if (optionality == ReferenceOwnershipOptionality::Disallowed)              \
+      require(!isOptional, "Optionality mismatch");                            \
+    auto PointerType = SWI->getDest()->getType();                              \
+    auto PointerRVType = PointerType.getASTType();                             \
+    require(PointerType.isAddress() && PointerRVType->is<Name##StorageType>(), \
+            "store_" #name " address operand must be a " #name " address");    \
+    requireSameType(                                                           \
+        PointerRVType->getReferenceStorageReferent()->getCanonicalType(),      \
+        SrcTy.getASTType(), "Store operand type and dest type mismatch");      \
   }
-#define LOADABLE_REF_STORAGE_HELPER(Name, name) \
-  void checkRefTo##Name##Inst(RefTo##Name##Inst *I) { \
-    requireReferenceStorageCapableValue(I->getOperand(), \
-                                        "Operand of ref_to_" #name); \
-    auto operandType = I->getOperand()->getType().getASTType(); \
-    auto resultType = requireObjectType(Name##StorageType, I, \
-                                        "Result of ref_to_" #name); \
-    require(resultType.getReferentType() == operandType, \
-            "Result of ref_to_" #name " does not have the " \
-            "operand's type as its referent type"); \
-  } \
-  void check##Name##ToRefInst(Name##ToRefInst *I) { \
-    auto operandType = requireObjectType(Name##StorageType, \
-                                         I->getOperand(), \
-                                         "Operand of " #name "_to_ref"); \
-    requireReferenceStorageCapableValue(I, "Result of " #name "_to_ref"); \
-    auto resultType = I->getType().getASTType(); \
-    require(operandType.getReferentType() == resultType, \
-            "Operand of " #name "_to_ref does not have the " \
-            "operand's type as its referent type"); \
+#define LOADABLE_REF_STORAGE_HELPER(Name, name)                                \
+  void checkRefTo##Name##Inst(RefTo##Name##Inst *I) {                          \
+    requireReferenceStorageCapableValue(I->getOperand(),                       \
+                                        "Operand of ref_to_" #name);           \
+    auto operandType = I->getOperand()->getType().getASTType();                \
+    auto resultType =                                                          \
+        requireObjectType(Name##StorageType, I, "Result of ref_to_" #name);    \
+    requireSameType(resultType.getReferentType(), operandType,                 \
+                    "Result of ref_to_" #name " does not have the "            \
+                    "operand's type as its referent type");                    \
+  }                                                                            \
+  void check##Name##ToRefInst(Name##ToRefInst *I) {                            \
+    auto operandType = requireObjectType(Name##StorageType, I->getOperand(),   \
+                                         "Operand of " #name "_to_ref");       \
+    requireReferenceStorageCapableValue(I, "Result of " #name "_to_ref");      \
+    auto resultType = I->getType().getASTType();                               \
+    requireSameType(operandType.getReferentType(), resultType,                 \
+                    "Operand of " #name "_to_ref does not have the "           \
+                    "operand's type as its referent type");                    \
   }
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, closure)        \
   void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) {           \
@@ -2191,7 +2223,8 @@ public:
             Src->getType().getClassOrBoundGenericClass() ||
             Src->getType().getAs<SILBoxType>(),
             "mark_uninitialized must be an address, class, or box type");
-    require(Src->getType() == MU->getType(),"operand and result type mismatch");
+    requireSameType(Src->getType(), MU->getType(),
+                    "operand and result type mismatch");
     // FIXME: When the work to force MUI to be on Allocations/SILArguments
     // complete, turn on this assertion.
     require(isa<AllocationInst>(Src)
@@ -2226,8 +2259,8 @@ public:
             "Src value should be lvalue");
     require(SI->getDest()->getType().isAddress(),
             "Dest address should be lvalue");
-    require(SI->getDest()->getType() == SI->getSrc()->getType(),
-            "Store operand type and dest type mismatch");
+    requireSameType(SI->getDest()->getType(), SI->getSrc()->getType(),
+                    "Store operand type and dest type mismatch");
     require(F.isTypeABIAccessible(SI->getDest()->getType()),
             "cannot directly copy type with inaccessible ABI");
   }
@@ -2298,14 +2331,14 @@ public:
   void checkCopyBlockInst(CopyBlockInst *I) {
     require(I->getOperand()->getType().isBlockPointerCompatible(),
             "operand of copy_block should be a block");
-    require(I->getOperand()->getType() == I->getType(),
-            "result of copy_block should be same type as operand");
+    requireSameType(I->getOperand()->getType(), I->getType(),
+                    "result of copy_block should be same type as operand");
   }
   void checkCopyBlockInst(CopyBlockWithoutEscapingInst *I) {
     require(I->getBlock()->getType().isBlockPointerCompatible(),
             "operand of copy_block should be a block");
-    require(I->getBlock()->getType() == I->getType(),
-            "result of copy_block should be same type as operand");
+    requireSameType(I->getBlock()->getType(), I->getType(),
+                    "result of copy_block should be same type as operand");
     auto FnTy = requireObjectType(SILFunctionType, I->getClosure(),
                                   "copy_block_without_escaping operand");
     require(!FnTy->isNoEscape(),
@@ -2332,10 +2365,10 @@ public:
             "project_box operand should be a value");
     auto boxTy = I->getOperand()->getType().getAs<SILBoxType>();
     require(boxTy, "project_box operand should be a @box type");
-    require(I->getType() == getSILBoxFieldType(F.getTypeExpansionContext(), boxTy,
-                                               F.getModule().Types,
-                                               I->getFieldIndex()),
-            "project_box result should be address of boxed type");
+    requireSameType(I->getType(),
+                    getSILBoxFieldType(F.getTypeExpansionContext(), boxTy,
+                                       F.getModule().Types, I->getFieldIndex()),
+                    "project_box result should be address of boxed type");
 
     // If we have a mark_uninitialized as a user, the mark_uninitialized must be
     // our only user. This is a requirement that is asserted by allocbox to
@@ -2405,8 +2438,8 @@ public:
       SILType loweredType =
           structTy.getFieldType(field, F.getModule(), F.getTypeExpansionContext());
       if (SI->getModule().getStage() != SILStage::Lowered) {
-        require((*opi)->getType() == loweredType,
-                "struct operand type does not match field type");
+        requireSameType((*opi)->getType(), loweredType,
+                        "struct operand type does not match field type");
       }
       ++opi;
     }
@@ -2428,8 +2461,8 @@ public:
       SILType caseTy = UI->getType().getEnumElementType(
           UI->getElement(), F.getModule(), F.getTypeExpansionContext());
       if (UI->getModule().getStage() != SILStage::Lowered) {
-        require(caseTy == UI->getOperand()->getType(),
-                "EnumInst operand type does not match type of case");
+        requireSameType(caseTy, UI->getOperand()->getType(),
+                        "EnumInst operand type does not match type of case");
       }
     }
   }
@@ -2472,8 +2505,9 @@ public:
         UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
     if (UI->getModule().getStage() != SILStage::Lowered) {
-      require(caseTy == UI->getType(),
-              "UncheckedEnumData result does not match type of enum case");
+      requireSameType(
+          caseTy, UI->getType(),
+          "UncheckedEnumData result does not match type of enum case");
     }
   }
 
@@ -2493,8 +2527,9 @@ public:
         UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
     if (UI->getModule().getStage() != SILStage::Lowered) {
-      require(caseTy == UI->getType(), "UncheckedTakeEnumDataAddrInst result "
-                                       "does not match type of enum case");
+      requireSameType(caseTy, UI->getType(),
+                      "UncheckedTakeEnumDataAddrInst result "
+                      "does not match type of enum case");
     }
   }
 
@@ -2517,9 +2552,9 @@ public:
 
     if (TI->getModule().getStage() != SILStage::Lowered) {
       for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
-        require(TI->getElement(i)->getType().getASTType() ==
-                    ResTy.getElementType(i),
-                "Tuple element arguments do not match tuple type!");
+        requireSameType(TI->getElement(i)->getType().getASTType(),
+                        ResTy.getElementType(i),
+                        "Tuple element arguments do not match tuple type!");
       }
     }
   }
@@ -2650,15 +2685,16 @@ public:
     require(BI->getBoundType(), "BI must have a bound type");
     require(BI->getBase()->getType().is<BuiltinRawPointerType>(),
             "bind_memory base be a RawPointer");
-    require(BI->getIndex()->getType()
-            == SILType::getBuiltinWordType(F.getASTContext()),
-            "bind_memory index must be a Word");
+    requireSameType(BI->getIndex()->getType(),
+                    SILType::getBuiltinWordType(F.getASTContext()),
+                    "bind_memory index must be a Word");
   }
 
   void checkIndexAddrInst(IndexAddrInst *IAI) {
     require(IAI->getType().isAddress(), "index_addr must produce an address");
-    require(IAI->getType() == IAI->getBase()->getType(),
-            "index_addr must produce an address of the same type as its base");
+    requireSameType(
+        IAI->getType(), IAI->getBase()->getType(),
+        "index_addr must produce an address of the same type as its base");
     require(IAI->getIndex()->getType().is<BuiltinIntegerType>(),
             "index_addr index must be of a builtin integer type");
   }
@@ -2687,9 +2723,9 @@ public:
     require(EI->getFieldNo() < operandTy->getNumElements(),
             "invalid field index for tuple_extract instruction");
     if (EI->getModule().getStage() != SILStage::Lowered) {
-      require(EI->getType().getASTType() ==
-                  operandTy.getElementType(EI->getFieldNo()),
-              "type of tuple_extract does not match type of element");
+      requireSameType(EI->getType().getASTType(),
+                      operandTy.getElementType(EI->getFieldNo()),
+                      "type of tuple_extract does not match type of element");
     }
   }
 
@@ -2715,8 +2751,8 @@ public:
     if (EI->getModule().getStage() != SILStage::Lowered) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
-      require(loweredFieldTy == EI->getType(),
-              "result of struct_extract does not match type of field");
+      requireSameType(loweredFieldTy, EI->getType(),
+                      "result of struct_extract does not match type of field");
     }
   }
 
@@ -2733,9 +2769,10 @@ public:
     require(EI->getFieldNo() < fields.size(),
             "invalid field index for element_addr instruction");
     if (EI->getModule().getStage() != SILStage::Lowered) {
-      require(EI->getType().getASTType() ==
-                  CanType(fields[EI->getFieldNo()].getType()),
-              "type of tuple_element_addr does not match type of element");
+      requireSameType(
+          EI->getType().getASTType(),
+          CanType(fields[EI->getFieldNo()].getType()),
+          "type of tuple_element_addr does not match type of element");
     }
   }
 
@@ -2761,8 +2798,9 @@ public:
     if (EI->getModule().getStage() != SILStage::Lowered) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
-      require(loweredFieldTy == EI->getType(),
-              "result of struct_element_addr does not match type of field");
+      requireSameType(
+          loweredFieldTy, EI->getType(),
+          "result of struct_element_addr does not match type of field");
     }
   }
 
@@ -2787,8 +2825,9 @@ public:
     if (EI->getModule().getStage() != SILStage::Lowered) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
-      require(loweredFieldTy == EI->getType(),
-              "result of ref_element_addr does not match type of field");
+      requireSameType(
+          loweredFieldTy, EI->getType(),
+          "result of ref_element_addr does not match type of field");
     }
     EI->getFieldNo();  // Make sure we can access the field without crashing.
   }
@@ -2870,8 +2909,9 @@ public:
       require(AMI->getConformance().isConcrete(),
               "concrete type lookup requires concrete conformance");
       auto conformance = AMI->getConformance().getConcrete();
-      require(conformance->getType()->isEqual(AMI->getLookupType()),
-              "concrete type lookup requires conformance that matches type");
+      requireSameType(
+          conformance->getType(), AMI->getLookupType(),
+          "concrete type lookup requires conformance that matches type");
     }
 
     require(AMI->getMember().requiresNewWitnessTableEntry(),
@@ -2930,7 +2970,7 @@ public:
                                      methodTy->getYields(),
                                      dynResults,
                                      methodTy->getOptionalErrorResult(),
-                                     SubstitutionMap(), false,
+                                     SubstitutionMap(), SubstitutionMap(),
                                      F.getASTContext());
     return SILType::getPrimitiveObjectType(fnTy);
   }
@@ -3563,21 +3603,25 @@ public:
 
     require(CBI->getSuccessBB()->args_size() == 1,
             "success dest of checked_cast_br must take one argument");
-    require(CBI->getSuccessBB()->args_begin()[0]->getType() ==
-                CBI->getTargetLoweredType(),
-            "success dest block argument of checked_cast_br must match type of "
-            "cast");
-    require(!F.hasOwnership() || CBI->getFailureBB()->args_size() == 1,
-            "failure dest of checked_cast_br must take one argument in "
-            "ownership qualified sil");
-    require(!F.hasOwnership() ||
-                CBI->getFailureBB()->args_begin()[0]->getType() ==
-                    CBI->getOperand()->getType(),
-            "failure dest block argument must match type of original type in "
-            "ownership qualified sil");
-    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
-            "Failure dest of checked_cast_br must not take any argument in "
-            "non-ownership qualified sil");
+    requireSameType(
+        CBI->getSuccessBB()->args_begin()[0]->getType(),
+        CBI->getTargetLoweredType(),
+        "success dest block argument of checked_cast_br must match type of "
+        "cast");
+    if (F.hasOwnership()) {
+      require(CBI->getFailureBB()->args_size() == 1,
+              "failure dest of checked_cast_br must take one argument in "
+              "ownership qualified sil");
+      requireSameType(
+          CBI->getFailureBB()->args_begin()[0]->getType(),
+          CBI->getOperand()->getType(),
+          "failure dest block argument must match type of original type in "
+          "ownership qualified sil");
+    } else {
+      require(CBI->getFailureBB()->args_empty(),
+              "Failure dest of checked_cast_br must not take any argument in "
+              "non-ownership qualified sil");
+    }
   }
 
   void checkCheckedCastValueBranchInst(CheckedCastValueBranchInst *CBI) {
@@ -3589,10 +3633,11 @@ public:
 
     require(CBI->getSuccessBB()->args_size() == 1,
             "success dest of checked_cast_value_br must take one argument");
-    require(CBI->getSuccessBB()->args_begin()[0]->getType() ==
-                CBI->getTargetLoweredType(),
-            "success dest block argument of checked_cast_value_br must match "
-            "type of cast");
+    requireSameType(
+        CBI->getSuccessBB()->args_begin()[0]->getType(),
+        CBI->getTargetLoweredType(),
+        "success dest block argument of checked_cast_value_br must match "
+        "type of cast");
     require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
             "failure dest of checked_cast_value_br in unqualified ownership "
             "sil must take no arguments");
@@ -3650,8 +3695,8 @@ public:
     require(resTy->getRepresentation() == MetatypeRepresentation::ObjC,
             "operand of thick_to_objc_metatype must be ObjC");
 
-    require(opTy->getInstanceType()->isEqual(resTy->getInstanceType()),
-            "thick_to_objc_metatype instance types do not match");
+    requireSameType(opTy->getInstanceType(), resTy->getInstanceType(),
+                    "thick_to_objc_metatype instance types do not match");
   }
 
   void checkObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTI) {
@@ -3668,8 +3713,8 @@ public:
     require(resTy->getRepresentation() == MetatypeRepresentation::Thick,
             "operand of objc_to_thick_metatype must be thick");
 
-    require(opTy->getInstanceType()->isEqual(resTy->getInstanceType()),
-            "objc_to_thick_metatype instance types do not match");
+    requireSameType(opTy->getInstanceType(), resTy->getInstanceType(),
+                    "objc_to_thick_metatype instance types do not match");
   }
 
   void checkUpcastInst(UpcastInst *UI) {
@@ -3791,9 +3836,9 @@ public:
     require(AI->getOperand()->getType().isAnyClassReferenceType(),
             "ref-to-raw-pointer operand must be a class reference or"
             " NativeObject");
-    require(AI->getType().getASTType()->isEqual(
-                            AI->getType().getASTContext().TheRawPointerType),
-            "ref-to-raw-pointer result must be RawPointer");
+    requireSameType(AI->getType().getASTType(),
+                    AI->getType().getASTContext().TheRawPointerType,
+                    "ref-to-raw-pointer result must be RawPointer");
   }
 
   void checkRawPointerToRefInst(RawPointerToRefInst *AI) {
@@ -3803,9 +3848,9 @@ public:
             || AI->getType().getASTType()->isEqual(
                              AI->getType().getASTContext().TheNativeObjectType),
         "raw-pointer-to-ref result must be a class reference or NativeObject");
-    require(AI->getOperand()->getType().getASTType()->isEqual(
-                            AI->getType().getASTContext().TheRawPointerType),
-            "raw-pointer-to-ref operand must be NativeObject");
+    requireSameType(AI->getOperand()->getType().getASTType(),
+                    AI->getType().getASTContext().TheRawPointerType,
+                    "raw-pointer-to-ref operand must be NativeObject");
   }
   
   void checkRefToBridgeObjectInst(RefToBridgeObjectInst *RI) {
@@ -3814,31 +3859,34 @@ public:
     require(RI->getConverted()->getType().getASTType()
               ->isBridgeableObjectType(),
             "ref_to_bridge_object must convert from a heap object ref");
-    require(RI->getBitsOperand()->getType()
-              == SILType::getBuiltinWordType(F.getASTContext()),
-            "ref_to_bridge_object must take a Builtin.Word bits operand");
-    require(RI->getType() == SILType::getBridgeObjectType(F.getASTContext()),
-            "ref_to_bridge_object must produce a BridgeObject");
+    requireSameType(
+        RI->getBitsOperand()->getType(),
+        SILType::getBuiltinWordType(F.getASTContext()),
+        "ref_to_bridge_object must take a Builtin.Word bits operand");
+    requireSameType(RI->getType(),
+                    SILType::getBridgeObjectType(F.getASTContext()),
+                    "ref_to_bridge_object must produce a BridgeObject");
   }
   
   void checkBridgeObjectToRefInst(BridgeObjectToRefInst *RI) {
     verifyOpenedArchetype(RI, RI->getType().getASTType());
-    require(RI->getConverted()->getType()
-               == SILType::getBridgeObjectType(F.getASTContext()),
-            "bridge_object_to_ref must take a BridgeObject");
+    requireSameType(RI->getConverted()->getType(),
+                    SILType::getBridgeObjectType(F.getASTContext()),
+                    "bridge_object_to_ref must take a BridgeObject");
     require(RI->getType().isObject(),
             "bridge_object_to_ref must produce a value");
     require(RI->getType().getASTType()->isBridgeableObjectType(),
             "bridge_object_to_ref must produce a heap object reference");
   }
   void checkBridgeObjectToWordInst(BridgeObjectToWordInst *RI) {
-    require(RI->getConverted()->getType()
-               == SILType::getBridgeObjectType(F.getASTContext()),
-            "bridge_object_to_word must take a BridgeObject");
+    requireSameType(RI->getConverted()->getType(),
+                    SILType::getBridgeObjectType(F.getASTContext()),
+                    "bridge_object_to_word must take a BridgeObject");
     require(RI->getType().isObject(),
             "bridge_object_to_word must produce a value");
-    require(RI->getType() == SILType::getBuiltinWordType(F.getASTContext()),
-            "bridge_object_to_word must produce a Word");
+    requireSameType(RI->getType(),
+                    SILType::getBuiltinWordType(F.getASTContext()),
+                    "bridge_object_to_word must produce a Word");
   }
 
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
@@ -3908,9 +3956,9 @@ public:
   }
 
   void checkCondFailInst(CondFailInst *CFI) {
-    require(CFI->getOperand()->getType()
-              == SILType::getBuiltinIntegerType(1, F.getASTContext()),
-            "cond_fail operand must be a Builtin.Int1");
+    requireSameType(CFI->getOperand()->getType(),
+                    SILType::getBuiltinIntegerType(1, F.getASTContext()),
+                    "cond_fail operand must be a Builtin.Int1");
   }
 
   void checkReturnInst(ReturnInst *RI) {
@@ -3925,8 +3973,8 @@ public:
                functionResultType.dump();
                llvm::dbgs() << "return inst type: ";
                instResultType.dump(););
-    require(functionResultType == instResultType,
-            "return value type does not match return type of function");
+    requireSameType(functionResultType, instResultType,
+                    "return value type does not match return type of function");
   }
 
   void checkThrowInst(ThrowInst *TI) {
@@ -3946,8 +3994,9 @@ public:
                functionResultType.dump();
                llvm::dbgs() << "throw operand type: ";
                instResultType.dump(););
-    require(functionResultType == instResultType,
-            "throw operand type does not match error result type of function");
+    requireSameType(
+        functionResultType, instResultType,
+        "throw operand type does not match error result type of function");
   }
   
   void checkUnwindInst(UnwindInst *UI) {
@@ -3957,7 +4006,8 @@ public:
 
   void checkYieldInst(YieldInst *YI) {
     CanSILFunctionType fnType =
-        F.getLoweredFunctionTypeInContext(F.getTypeExpansionContext());
+        F.getLoweredFunctionTypeInContext(F.getTypeExpansionContext())
+         ->getUnsubstitutedType(F.getModule());
     require(fnType->isCoroutine(),
             "yield in non-coroutine function");
 
@@ -3968,8 +4018,8 @@ public:
     for (auto i : indices(yieldedValues)) {
       SILType yieldType =
         F.mapTypeIntoContext(fnConv.getSILType(yieldInfos[i]));
-      require(yieldedValues[i]->getType() == yieldType,
-              "yielded value does not match yield type of coroutine");
+      requireSameType(yieldedValues[i]->getType(), yieldType,
+                      "yielded value does not match yield type of coroutine");
     }
 
     // We require the resume and unwind destinations to be unique in order
@@ -4051,8 +4101,9 @@ public:
       SILBasicBlock *dest;
       std::tie(value, dest) = SVI->getCase(i);
 
-      require(value->getType() == Ty,
-             "switch_value case value should have the same type as its operand");
+      requireSameType(
+          value->getType(), Ty,
+          "switch_value case value should have the same type as its operand");
 
       require(!cases.count(value),
               "multiple switch_value cases for same value");
@@ -4191,10 +4242,11 @@ public:
       if (isSILOwnershipEnabled() && F.hasOwnership()) {
         require(SOI->getDefaultBB()->getNumArguments() == 1,
                 "Switch enum default block should have one argument");
-        require(SOI->getDefaultBB()->getArgument(0)->getType() ==
-                    SOI->getOperand()->getType(),
-                "Switch enum default block should have one argument that is "
-                "the same as the input type");
+        requireSameType(
+            SOI->getDefaultBB()->getArgument(0)->getType(),
+            SOI->getOperand()->getType(),
+            "Switch enum default block should have one argument that is "
+            "the same as the input type");
       } else if (!F.hasOwnership()) {
         require(SOI->getDefaultBB()->args_empty(),
                 "switch_enum default destination must take no arguments");
@@ -4275,37 +4327,46 @@ public:
             "branch argument types do not match arguments for dest bb");
   }
 
-  void checkCondBranchInst(CondBranchInst *CBI) {
+  void checkCondBranchInst(CondBranchInst *cbi) {
     // It is important that cond_br keeps an i1 type. ARC Sequence Opts assumes
     // that cond_br does not use reference counted values or decrement reference
     // counted values under the assumption that the instruction that computes
     // the i1 is the use/decrement that ARC cares about and that after that
     // instruction is evaluated, the scalar i1 has a different identity and the
     // object can be deallocated.
-    require(CBI->getCondition()->getType() ==
-             SILType::getBuiltinIntegerType(1,
-                                 CBI->getCondition()->getType().getASTContext()),
-            "condition of conditional branch must have Int1 type");
+    requireSameType(cbi->getCondition()->getType(),
+                    SILType::getBuiltinIntegerType(
+                        1, cbi->getCondition()->getType().getASTContext()),
+                    "condition of conditional branch must have Int1 type");
 
-    require(CBI->getTrueArgs().size() == CBI->getTrueBB()->args_size(),
+    require(cbi->getTrueArgs().size() == cbi->getTrueBB()->args_size(),
             "true branch has wrong number of arguments for dest bb");
-    require(CBI->getTrueBB() != CBI->getFalseBB(),
-            "identical destinations");
-    require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
-                       CBI->getTrueBB()->args_begin(),
+    require(cbi->getTrueBB() != cbi->getFalseBB(), "identical destinations");
+    require(std::equal(cbi->getTrueArgs().begin(), cbi->getTrueArgs().end(),
+                       cbi->getTrueBB()->args_begin(),
                        [&](SILValue branchArg, SILArgument *bbArg) {
                          return verifyBranchArgs(branchArg, bbArg);
                        }),
             "true branch argument types do not match arguments for dest bb");
 
-    require(CBI->getFalseArgs().size() == CBI->getFalseBB()->args_size(),
+    require(cbi->getFalseArgs().size() == cbi->getFalseBB()->args_size(),
             "false branch has wrong number of arguments for dest bb");
-    require(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
-                       CBI->getFalseBB()->args_begin(),
+    require(std::equal(cbi->getFalseArgs().begin(), cbi->getFalseArgs().end(),
+                       cbi->getFalseBB()->args_begin(),
                        [&](SILValue branchArg, SILArgument *bbArg) {
                          return verifyBranchArgs(branchArg, bbArg);
                        }),
             "false branch argument types do not match arguments for dest bb");
+    // When we are in ossa, cond_br can not have any arguments that are
+    // non-trivial.
+    if (!F.hasOwnership())
+      return;
+
+    require(llvm::all_of(cbi->getOperandValues(),
+                         [&](SILValue v) -> bool {
+                           return v->getType().isTrivial(*cbi->getFunction());
+                         }),
+            "cond_br must not have a non-trivial value in ossa.");
   }
 
   void checkDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
@@ -4340,8 +4401,9 @@ public:
     require(PBSI->getType().isAddress(),
             "result must be an address");
     auto captureTy = PBSI->getType().getASTType();
-    require(storageTy->getCaptureType() == captureTy,
-            "result must be the capture type of the @block_storage type");
+    requireSameType(
+        storageTy->getCaptureType(), captureTy,
+        "result must be the capture type of the @block_storage type");
   }
   
   void checkInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *IBSHI) {
@@ -4395,9 +4457,10 @@ public:
             ParameterConvention::Indirect_InoutAliasable,
             "invoke function must take block storage as @inout_aliasable "
             "parameter");
-    require(storageParam.getArgumentType(F.getModule(), invokeTy) == storageTy,
-            "invoke function must take block storage type as first parameter");
-    
+    requireSameType(
+        storageParam.getArgumentType(F.getModule(), invokeTy), storageTy,
+        "invoke function must take block storage type as first parameter");
+
     require(IBSHI->getType().isObject(), "result must be a value");
     auto blockTy = IBSHI->getType().getAs<SILFunctionType>();
     require(blockTy, "result must be a function");
@@ -4474,13 +4537,15 @@ public:
     auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
     auto pattern = KPI->getPattern();
     SubstitutionMap patternSubs = KPI->getSubstitutions();
-    require(baseTy == pattern->getRootType().subst(patternSubs)->getCanonicalType(),
-            "keypath root type should match root type of keypath pattern");
+    requireSameType(
+        baseTy, pattern->getRootType().subst(patternSubs)->getCanonicalType(),
+        "keypath root type should match root type of keypath pattern");
 
     auto leafTy = CanType(kpBGT->getGenericArgs()[1]);
-    require(leafTy == pattern->getValueType().subst(patternSubs)->getCanonicalType(),
-            "keypath value type should match value type of keypath pattern");
-    
+    requireSameType(
+        leafTy, pattern->getValueType().subst(patternSubs)->getCanonicalType(),
+        "keypath value type should match value type of keypath pattern");
+
     {
       for (auto &component : pattern->getComponents()) {
         bool hasIndices;
@@ -4511,8 +4576,9 @@ public:
           hasIndices);
       }
     }
-    require(CanType(baseTy) == CanType(leafTy),
-            "final component should match leaf value type of key path type");
+    requireSameType(
+        CanType(baseTy), CanType(leafTy),
+        "final component should match leaf value type of key path type");
   }
 
   void checkIsEscapingClosureInst(IsEscapingClosureInst *IEC) {
@@ -4532,6 +4598,28 @@ public:
                 IEC->getVerificationType() ==
                     IsEscapingClosureInst::WithoutActuallyEscaping,
             "unknown verfication type");
+  }
+
+  void checkDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *dwfi) {
+    auto witnessFnTy = dwfi->getType().castTo<SILFunctionType>();
+    auto *witness = dwfi->getWitness();
+    // `DifferentiabilityWitnessFunctionInst` constructor asserts that
+    // `witness` is non-null.
+    auto witnessKind = dwfi->getWitnessKind();
+    // Return if not witnessing a derivative function.
+    auto derivKind = witnessKind.getAsDerivativeFunctionKind();
+    if (!derivKind)
+      return;
+    // Return if witness does not define the referenced derivative.
+    auto *derivativeFn = witness->getDerivative(*derivKind);
+    if (!derivativeFn)
+      return;
+    auto derivativeFnTy = derivativeFn->getLoweredFunctionType();
+    requireSameType(SILType::getPrimitiveObjectType(witnessFnTy),
+                    SILType::getPrimitiveObjectType(derivativeFnTy),
+                    "Type of witness instruction does not match actual type of "
+                    "witnessed function");
   }
 
   // This verifies that the entry block of a SIL function doesn't have
@@ -4850,38 +4938,13 @@ public:
       CurInstruction = TI;
 
       // Check for non-cond_br critical edges.
-      auto *CBI = dyn_cast<CondBranchInst>(TI);
-      if (!CBI) {
-        for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
-          require(!isCriticalEdgePred(TI, Idx),
-                  "non cond_br critical edges not allowed");
-        }
+      if (isa<CondBranchInst>(TI)) {
         continue;
       }
-      // In ownership qualified SIL, ban critical edges from CondBranchInst that
-      // have non-trivial arguments.
-      //
-      // FIXME: it would be far simpler to ban all critical edges in general.
-      if (!F->hasOwnership())
-        continue;
 
-      if (isCriticalEdgePred(CBI, CondBranchInst::TrueIdx)) {
-        require(
-            llvm::all_of(CBI->getTrueArgs(),
-                         [](SILValue V) -> bool {
-                           return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::None;
-                         }),
-            "cond_br with critical edges must not have a non-trivial value");
-      }
-      if (isCriticalEdgePred(CBI, CondBranchInst::FalseIdx)) {
-        require(
-            llvm::all_of(CBI->getFalseArgs(),
-                         [](SILValue V) -> bool {
-                           return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::None;
-                         }),
-            "cond_br with critical edges must not have a non-trivial value");
+      for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
+        require(!isCriticalEdgePred(TI, Idx),
+                "non cond_br critical edges not allowed");
       }
     }
   }

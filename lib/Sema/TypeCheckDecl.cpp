@@ -578,7 +578,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           VD->getOriginalWrappedProperty(PropertyWrapperSynthesizedPropertyKind::Backing))
         return true;
 
-      if (auto *nominalDecl = VD->getDeclContext()->getSelfClassDecl()) {
+      if (VD->getDeclContext()->getSelfClassDecl()) {
         // If this variable is a class member, mark it final if the
         // class is final, or if it was declared with 'let'.
         auto *PBD = VD->getParentPatternBinding();

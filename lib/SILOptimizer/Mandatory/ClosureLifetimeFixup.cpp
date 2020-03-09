@@ -306,7 +306,6 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
 static SILInstruction *lookThroughRebastractionUsers(
     SILInstruction *inst,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized) {
-
   if (inst == nullptr)
     return nullptr;
 
@@ -320,34 +319,36 @@ static SILInstruction *lookThroughRebastractionUsers(
     memoized[from] = toResult;
     return toResult;
   };
+  
+  auto getSingleNonDebugNonRefCountUser =
+    [](SILValue v) -> SILInstruction* {
+      SILInstruction *singleNonDebugNonRefCountUser = nullptr;
+      for (auto *use : getNonDebugUses(v)) {
+        auto *user = use->getUser();
+        if (onlyAffectsRefCount(user))
+          continue;
+        if (singleNonDebugNonRefCountUser) {
+          return nullptr;
+        }
+        singleNonDebugNonRefCountUser = user;
+      }
+      return singleNonDebugNonRefCountUser;
+    };
 
   // If we have a convert_function, just look at its user.
   if (auto *cvt = dyn_cast<ConvertFunctionInst>(inst))
     return memoizeResult(inst, lookThroughRebastractionUsers(
-                                   getSingleNonDebugUser(cvt), memoized));
+                             getSingleNonDebugNonRefCountUser(cvt), memoized));
   if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(inst))
     return memoizeResult(inst, lookThroughRebastractionUsers(
-                                   getSingleNonDebugUser(cvt), memoized));
+                             getSingleNonDebugNonRefCountUser(cvt), memoized));
 
   // If we have a partial_apply user look at its single (non release) user.
-  auto *pa = dyn_cast<PartialApplyInst>(inst);
-  if (!pa)
-    return inst;
+  if (auto *pa = dyn_cast<PartialApplyInst>(inst))
+    return memoizeResult(inst, lookThroughRebastractionUsers(
+                             getSingleNonDebugNonRefCountUser(pa), memoized));
 
-  SILInstruction *singleNonDebugNonRefCountUser = nullptr;
-  for (auto *use : getNonDebugUses(pa)) {
-    auto *user = use->getUser();
-    if (onlyAffectsRefCount(user))
-      continue;
-    if (singleNonDebugNonRefCountUser) {
-      singleNonDebugNonRefCountUser = nullptr;
-      break;
-    }
-    singleNonDebugNonRefCountUser = user;
-  }
-
-  return memoizeResult(inst, lookThroughRebastractionUsers(
-                                 singleNonDebugNonRefCountUser, memoized));
+  return inst;
 }
 
 /// Insert a mark_dependence for any non-trivial argument of a partial_apply.
@@ -392,7 +393,7 @@ static bool tryRewriteToPartialApplyStack(
     ConvertEscapeToNoEscapeInst *cvt, SILInstruction *singleApplyUser,
     SILBasicBlock::iterator &advanceIfDelete,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized) {
-
+  
   auto *convertOrPartialApply = cast<SingleValueInstruction>(origPA);
   if (cvt->getOperand() != origPA)
     convertOrPartialApply = cast<ConvertFunctionInst>(cvt->getOperand());
@@ -419,7 +420,7 @@ static bool tryRewriteToPartialApplyStack(
       return false;
     singleNonDebugNonRefCountUser = user;
   }
-
+  
   SILBuilderWithScope b(cvt);
 
   // The convert_escape_to_noescape is the only user of the partial_apply.

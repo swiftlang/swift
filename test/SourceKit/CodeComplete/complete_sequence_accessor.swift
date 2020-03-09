@@ -39,15 +39,18 @@ enum S {
 // Enabled.
 // RUN: %sourcekitd-test \
 // RUN:   -req=track-compiles == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=12:9 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=15:15 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:15 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=23:9 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=26:15 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=27:15 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=30:9 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=33:15 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=34:15 %s -- %s > %t.response
+// RUN:   -req=complete -pos=12:9 %s -- %s -parse-as-library == \
+// RUN:   -req=complete -pos=15:15 %s -- %s -parse-as-library == \
+// RUN:   -req=complete -pos=16:15 %s -- %s -parse-as-library == \
+// RUN:   -req=complete -pos=23:9 %s -- %s -parse-as-library == \
+// RUN:   -req=complete -pos=26:15 %s -- %s -parse-as-library == \
+// RUN:   -req=complete -pos=27:15 %s -- %s -parse-as-library == \
+// RUN:   -req=complete -pos=30:9 %s -- %s -parse-as-library == \
+// RUN:   -req=complete -pos=33:15 %s -- %s -parse-as-library == \
+// RUN:   -req=complete -pos=34:15 %s -- %s -parse-as-library == \
+// RUN:   -req=complete -pos=12:1 %s -- %s -parse-as-library == \
+// RUN:   -req=complete -pos=23:1 %s -- %s -parse-as-library == \
+// RUN:   -req=complete -pos=16:1 %s -- %s -parse-as-library > %t.response
 // RUN: %FileCheck --check-prefix=RESULT  %s < %t.response
 // RUN: %FileCheck --check-prefix=TRACE  %s < %t.response
 
@@ -114,6 +117,30 @@ enum S {
 // RESULT-DAG: key.name: "a"
 // RESULT-DAG: key.name: "b"
 // RESULT: ]
+// accessor top (global var)
+// RESULT-LABEL: key.results: [
+// RESULT-DAG: key.description: "get"
+// RESULT-DAG: key.description: "set"
+// RESULT-DAG: key.description: "willSet"
+// RESULT-DAG: key.description: "didSet"
+// RESULT-DAG: key.description: "Foo"
+// RESULT: ]
+// accessor top (property)
+// RESULT-LABEL: key.results: [
+// RESULT-DAG: key.description: "get"
+// RESULT-DAG: key.description: "set"
+// RESULT-DAG: key.description: "willSet"
+// RESULT-DAG: key.description: "didSet"
+// RESULT-DAG: key.description: "Foo"
+// RESULT: ]
+// accessor second (global var)
+// RESULT-LABEL: key.results: [
+// RESULT-NOT: key.description: "Foo"
+// RESULT-DAG: key.description: "get"
+// RESULT-DAG: key.description: "set"
+// RESULT-DAG: key.description: "willSet"
+// RESULT-DAG: key.description: "didSet"
+// RESULT: ]
 
 
 // TRACE-LABEL: key.notification: source.notification.compile-did-finish,
@@ -134,3 +161,9 @@ enum S {
 // TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
 // TRACE-LABEL: key.notification: source.notification.compile-did-finish,
 // TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
+// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
+// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
+// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
+// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
+// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
+// TRACE-NOT: key.description: "completion reusing previous ASTContext (benign diagnostic)"

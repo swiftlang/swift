@@ -25,8 +25,6 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/Parser.h"
-#include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "swift/Syntax/SyntaxArena.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -103,59 +101,19 @@ SILParserTUState::~SILParserTUState() {
 }
 
 SILParserState::SILParserState(SILModule *M)
-    : Impl(M ? llvm::make_unique<SILParserTUState>(*M) : nullptr) {}
+    : Impl(M ? std::make_unique<SILParserTUState>(*M) : nullptr) {}
 
 SILParserState::~SILParserState() = default;
-
-void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
-  out << "With parser at source location: ";
-  P.Tok.getLoc().print(out, P.Context.SourceMgr);
-  out << '\n';
-}
-
-void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
-                                PersistentParserState *PersistentState,
-                                bool DelayBodyParsing) {
-  std::shared_ptr<SyntaxTreeCreator> STreeCreator;
-  if (SF.shouldBuildSyntaxTree()) {
-    STreeCreator = std::make_shared<SyntaxTreeCreator>(
-        SF.getASTContext().SourceMgr, BufferID,
-        SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
-  }
-
-  // Not supported right now.
-  if (SF.Kind == SourceFileKind::REPL)
-    DelayBodyParsing = false;
-  if (SF.hasInterfaceHash())
-    DelayBodyParsing = false;
-  if (SF.shouldCollectToken())
-    DelayBodyParsing = false;
-  if (SF.shouldBuildSyntaxTree())
-    DelayBodyParsing = false;
-
-  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Parsing");
-  Parser P(BufferID, SF, /*SIL*/ nullptr, PersistentState, STreeCreator,
-           DelayBodyParsing);
-  PrettyStackTraceParser StackTrace(P);
-
-  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(P.CurrentTokenHash,
-                                                 SF.getInterfaceHashPtr());
-  P.parseTopLevel();
-
-  if (STreeCreator) {
-    auto rawNode = P.finalizeSyntaxTree();
-    STreeCreator->acceptSyntaxRoot(rawNode, SF);
-  }
-}
 
 void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
   auto bufferID = SF.getBufferID();
   assert(bufferID);
 
-  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Parsing SIL");
+  FrontendStatsTracer tracer(SF.getASTContext().Stats,
+                             "Parsing SIL");
   Parser parser(*bufferID, SF, sil->Impl.get(),
                 /*persistentParserState*/ nullptr,
-                /*syntaxTreeCreator*/ nullptr, /*delayBodyParsing*/ false);
+                /*syntaxTreeCreator*/ nullptr);
   PrettyStackTraceParser StackTrace(parser);
   parser.parseTopLevelSIL();
 }
@@ -1264,6 +1222,10 @@ bool SILParser::parseSILType(SILType &Result,
           auto env = handleSILGenericParams(generics, SF);
           fnType->setGenericEnvironment(env);
         }
+        if (auto generics = fnType->getPatternGenericParams()) {
+          auto env = handleSILGenericParams(generics, SF);
+          fnType->setPatternGenericEnvironment(env);
+        }
       }
       if (auto boxType = dyn_cast<SILBoxTypeRepr>(T)) {
         if (auto generics = boxType->getGenericParams()) {
@@ -1690,10 +1652,10 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
                                    GenericEnvironment *GenericEnv,
                                    ProtocolDecl *defaultForProto) {
   // Check for an opening '<' bracket.
-  if (!P.Tok.isContextualPunctuator("<"))
+  if (!P.startsWithLess(P.Tok))
     return false;
   
-  P.consumeToken();
+  P.consumeStartingLess();
   
   // Parse a list of Substitutions.
   do {
@@ -1713,11 +1675,11 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
   } while (P.consumeIf(tok::comma));
   
   // Consume the closing '>'.
-  if (!P.Tok.isContextualPunctuator(">")) {
+  if (!P.startsWithGreater(P.Tok)) {
     P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ">");
     return true;
   }
-  P.consumeToken();
+  P.consumeStartingGreater();
   
   return false;
 }
@@ -2089,7 +2051,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
 
   if (FnTypeRequired &&
       !P.peekToken().is(tok::l_paren) &&
-      !P.peekToken().isContextualPunctuator("<"))
+      !P.startsWithLess(P.peekToken()))
     return false;
 
   // Type of the SILDeclRef is optional to be compatible with the old format.
@@ -2111,6 +2073,12 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
 
         genericEnv = handleSILGenericParams(generics, &P.SF);
         fnType->setGenericEnvironment(genericEnv);
+      }
+      if (auto generics = fnType->getPatternGenericParams()) {
+        assert(!Ty.wasValidated() && Ty.getType().isNull());
+
+        genericEnv = handleSILGenericParams(generics, &P.SF);
+        fnType->setPatternGenericEnvironment(genericEnv);
       }
     }
 
@@ -5021,6 +4989,47 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
       ResultVal = B.createInitBlockStorageHeader(InstLoc, Val, invokeVal,
                                                  blockType, subMap);
+      break;
+    }
+    case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+      // e.g. differentiability_witness_function
+      //      [jvp] [parameters 0 1] [results 0] <T where T: Differentiable>
+      //      @foo : <T> $(T) -> T
+      DifferentiabilityWitnessFunctionKind witnessKind;
+      StringRef witnessKindNames[3] = {"jvp", "vjp", "transpose"};
+      if (P.parseToken(
+              tok::l_square,
+              diag::
+                  sil_inst_autodiff_expected_differentiability_witness_kind) ||
+          parseSILIdentifierSwitch(
+              witnessKind, witnessKindNames,
+              diag::
+                  sil_inst_autodiff_expected_differentiability_witness_kind) ||
+          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "differentiability witness function kind"))
+        return true;
+      SourceLoc keyStartLoc = P.Tok.getLoc();
+      auto configAndFn =
+          parseSILDifferentiabilityWitnessConfigAndFunction(P, *this, InstLoc);
+      if (!configAndFn)
+        return true;
+      auto config = configAndFn->first;
+      auto originalFn = configAndFn->second;
+      auto *witness = SILMod.lookUpDifferentiabilityWitness(
+          {originalFn->getName(), config});
+      if (!witness) {
+        P.diagnose(keyStartLoc, diag::sil_diff_witness_undefined);
+        return true;
+      }
+      // Parse an optional explicit function type.
+      Optional<SILType> functionType = None;
+      if (P.consumeIf(tok::kw_as)) {
+        functionType = SILType();
+        if (parseSILType(*functionType))
+          return true;
+      }
+      ResultVal = B.createDifferentiabilityWitnessFunction(
+          InstLoc, witnessKind, witness, functionType);
       break;
     }
     }

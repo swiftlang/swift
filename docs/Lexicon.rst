@@ -264,10 +264,32 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     compiler can do something with it.
 
   overlay
-    A library that is imported whenever a C library or framework by the same
-    name is imported. The purpose of an overlay is to augment and extend a
-    library on the system when the library on the system cannot be modified.
-    Apple has a number of overlays for its own SDKs in stdlib/public/SDK/.
+    A wrapper library that is implicitly imported "on top of" another library.
+    It contains an @_exported import of the underlying library, but it augments
+    it with additional APIs which, for one reason or another, are not included
+    in the underlying library directly.
+
+    There are two kinds of overlays:
+
+    A "clang overlay" (the older kind, so it's often just called an "overlay")
+    is a Swift library that adds Swift-specific functionality to a C-family
+    library or framework. Clang overlays are used with system libraries that
+    cannot be modified to add Swift features. A clang overlay has the same
+    module name as the underlying library and can do a few special things that
+    normal modules can't, like adding required initializers to classes. If a
+    module has a clang overlay, the Clang Importer will always load it unless it
+    is actually compiling the overlay itself. Apple has a number of clang
+    overlays for its own SDKs in stdlib/public/Darwin/.
+
+    A "separately-imported overlay" is a separate module with its own name.
+    Unlike a clang overlay, it can be imported in some SourceFiles and not
+    others. When the compiler processes import declarations, it determines which
+    separately-imported overlays need to be imported and then adds them to the
+    list of imports for that file; name lookup also knows to look through the
+    overlay when it looks for declarations in the underlying module.
+    Separately-imported overlays are used to implement the "cross-import
+    overlays" feature, which is used to augment a module with additional
+    functionality when it is imported alongside another module.
 
   PCH
     Precompiled header, a type of file ending in .pch. A precompiled header is

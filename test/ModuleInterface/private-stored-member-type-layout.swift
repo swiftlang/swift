@@ -16,7 +16,7 @@
 
 // These two appear out-of-order between run lines
 
-// CHECK-DAG: [[MYCLASS:%T20PrivateStoredMembers7MyClassC]] = type opaque
+// CHECK-DAG: [[MYCLASS:%T20PrivateStoredMembers7MyClassC]] = type 
 // CHECK-DAG: [[MYSTRUCT:%T20PrivateStoredMembers8MyStructV]] = type <{ %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V }>
 
 // CHECK-MAIN-DAG: [[MYCLASS:%T4main7MyClassC]] = type <{ %swift.refcounted, %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V }>

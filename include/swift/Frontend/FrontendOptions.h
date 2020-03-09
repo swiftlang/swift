@@ -177,11 +177,6 @@ public:
   /// entity.
   bool ProfileEntities = false;
 
-  /// If true, serialization encodes an extra lookup table for use in module-
-  /// merging when emitting partial modules (the per-file modules in a non-WMO
-  /// build).
-  bool EnableSerializationNestedTypeLookupTable = true;
-
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
   bool EnableSourceImport = false;
@@ -268,6 +263,12 @@ public:
   /// Should we emit a single objc header intead of three (private, public,
   /// and internal header).
   bool EmitSingleObjcHeader = false;
+
+  /// Should we lock .swiftinterface while generating .swiftmodule from it?
+  bool DisableInterfaceFileLock = false;
+
+  /// Should we enable the dependency verifier for all primary files known to this frontend?
+  bool EnableIncrementalDependencyVerifier = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

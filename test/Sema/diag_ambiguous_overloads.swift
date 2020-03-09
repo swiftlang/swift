@@ -12,8 +12,8 @@ func fe(_: Int, _: Int) {}
 fe(E.baz) // expected-error {{type 'E' has no member 'baz'; did you mean 'bar'?}}
 fe(.baz) // expected-error {{reference to member 'baz' cannot be resolved without a contextual type}}
 
-// FIXME: maybe complain about .nope also?
-fe(.nope, .nyet) // expected-error {{reference to member 'nyet' cannot be resolved without a contextual type}}
+fe(.nope, .nyet) // expected-error {{type 'Int' has no member 'nope'}}
+// expected-error@-1 {{reference to member 'nyet' cannot be resolved without a contextual type}}
 
 func fg<T>(_ f: (T) -> T) -> Void {} // expected-note {{in call to function 'fg'}}
 fg({x in x}) // expected-error {{generic parameter 'T' could not be inferred}}

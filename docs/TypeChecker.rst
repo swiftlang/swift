@@ -978,11 +978,3 @@ We are currently working on porting type-check based diagnostics over
 to the new diagnostic framework, which is described in detail in this
 `blog post
 <https://swift.org/blog/new-diagnostic-arch-overview/>`_.
-
-The things in the queue yet to be ported are:
-
-- Problems related to calls and operator applications e.g.
-
-  - Missing explicit ``Self.`` and ``self.``
-  - Logic related to overload candidate ranking (``CalleeCandidateInfo``)
-  - ``diagnoseParameterErrors``

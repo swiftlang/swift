@@ -520,7 +520,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   // e.g. 'override'.
   if (auto *AD = dyn_cast<AccessorDecl>(this)) {
     // If this is implicit getter, accessor range should not include attributes.
-    if (!AD->getAccessorKeywordLoc().isValid())
+    if (AD->isImplicitGetter())
       return Range;
 
     // Otherwise, include attributes directly attached to the accessor.
@@ -569,7 +569,10 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
   llvm_unreachable("Unknown decl kind");
 }
 
-const Decl::CachedExternalSourceLocs *Decl::calculateSerializedLocs() const {
+const Decl::CachedExternalSourceLocs *Decl::getSerializedLocs() const {
+  if (CachedSerializedLocs) {
+    return CachedSerializedLocs;
+  }
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
   auto Locs = File->getBasicLocsForDecl(this);
   if (!Locs.hasValue()) {
@@ -585,6 +588,14 @@ Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
   CASE(StartLoc)
   CASE(EndLoc)
 #undef CASE
+
+  for (const auto &LineColumnAndLength : Locs->DocRanges) {
+    auto Start = SM.getLocFromExternalSource(Locs->SourceFilePath,
+      LineColumnAndLength.first.Line,
+      LineColumnAndLength.first.Column);
+    Result->DocRanges.push_back({ Start, LineColumnAndLength.second });
+  }
+
   return Result;
 }
 
@@ -625,10 +636,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   case FileUnitKind::SerializedAST: {
     if (!SerializedOK)
       return SourceLoc();
-    if (!CachedLocs) {
-      CachedLocs = calculateSerializedLocs();
-    }
-    return CachedLocs->Loc;
+    return getSerializedLocs()->Loc;
   }
   case FileUnitKind::Builtin:
   case FileUnitKind::ClangModule:
@@ -645,7 +653,7 @@ Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   if (auto *stmt = body.dyn_cast<Stmt *>()) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       return returnStmt->getResult();
-    } else if (auto *failStmt = dyn_cast<FailStmt>(stmt)) {
+    } else if (isa<FailStmt>(stmt)) {
       // We can only get to this point if we're a type-checked ConstructorDecl
       // which was originally spelled init?(...) { nil }.  
       //
@@ -663,7 +671,7 @@ void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       returnStmt->setResult(NewBody);
       return;
-    } else if (auto *failStmt = dyn_cast<FailStmt>(stmt)) {
+    } else if (isa<FailStmt>(stmt)) {
       // We can only get to this point if we're a type-checked ConstructorDecl
       // which was originally spelled init?(...) { nil }.  
       //
@@ -780,12 +788,18 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
       FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
-  if (auto PD = dyn_cast<ProtocolDecl>(D)) {
+  if (isa<ProtocolDecl>(D)) {
     if (treatNonBuiltinProtocolsAsPublic)
       return false;
   }
 
   return hasUnderscoredNaming();
+}
+
+bool Decl::isStdlibDecl() const {
+  DeclContext *DC = getDeclContext();
+  return DC->isModuleScopeContext() &&
+         DC->getParentModule()->isStdlibModule();
 }
 
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
@@ -1063,9 +1077,12 @@ void GenericContext::setGenericSignature(GenericSignature genericSig) {
 }
 
 SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
-  if (!isGeneric())
-    return SourceRange();
-  return getGenericParams()->getTrailingWhereClauseSourceRange();
+  if (isGeneric())
+    return getGenericParams()->getTrailingWhereClauseSourceRange();
+  else if (const auto *where = getTrailingWhereClause())
+    return where->getSourceRange();
+
+  return SourceRange();
 }
 
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
@@ -1172,6 +1189,17 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   }
 
   return FirstKind;
+}
+
+ArrayRef<ValueDecl *> ImportDecl::getDecls() const {
+  // If this isn't a scoped import, there's nothing to do.
+  if (getImportKind() == ImportKind::Module)
+    return {};
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<ImportDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ScopedImportLookupRequest{mutableThis}, {});
 }
 
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -2225,6 +2253,12 @@ AccessorDecl *AbstractStorageDecl::getOpaqueAccessor(AccessorKind kind) const {
   return getSynthesizedAccessor(kind);
 }
 
+ArrayRef<AccessorDecl*> AbstractStorageDecl::getOpaqueAccessors(
+    llvm::SmallVectorImpl<AccessorDecl*> &scratch) const {
+  visitOpaqueAccessors([&](AccessorDecl *D) { scratch.push_back(D); });
+  return scratch;
+}
+
 bool AbstractStorageDecl::hasParsedAccessors() const {
   for (auto *accessor : getAllAccessors())
     if (!accessor->isImplicit())
@@ -2657,7 +2691,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     
     // Functions and subscripts cannot overload differing only in opaque return
     // types. Replace the opaque type with `Any`.
-    if (auto opaque = type->getAs<OpaqueTypeArchetypeType>()) {
+    if (type->is<OpaqueTypeArchetypeType>()) {
       type = ProtocolCompositionType::get(ctx, {}, /*hasAnyObject*/ false);
     }
 
@@ -3150,8 +3184,8 @@ static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
   return AccessLevel::Public;
 }
 
-/// Adjust \p access based on whether \p VD is \@usableFromInline or has been
-/// testably imported from \p useDC.
+/// Adjust \p access based on whether \p VD is \@usableFromInline, has been
+/// testably imported from \p useDC or \p VD is an imported SPI.
 ///
 /// \p access isn't always just `VD->getFormalAccess()` because this adjustment
 /// may be for a write, in which case the setter's access might be used instead.
@@ -3267,7 +3301,7 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 
 /// Given the formal access level for using \p VD, compute the scope where
 /// \p VD may be accessed, taking \@usableFromInline, \@testable imports,
-/// and enclosing access levels into account.
+/// \@_spi imports, and enclosing access levels into account.
 ///
 /// \p access isn't always just `VD->getFormalAccess()` because this adjustment
 /// may be for a write, in which case the setter's access might be used instead.
@@ -3323,7 +3357,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     return AccessScope(resultDC->getParentModule());
   case AccessLevel::Public:
   case AccessLevel::Open:
-    return AccessScope::getPublic();
+    return AccessScope::getPublic(VD->isSPI());
   }
 
   llvm_unreachable("unknown access level");
@@ -3352,12 +3386,18 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
   AccessScope accessScope =
       getAccessScopeForFormalAccess(VD, access, useDC,
                                     /*treatUsableFromInlineAsPublic*/false);
-  return accessScope.getDeclContext() == useDC ||
-         AccessScope(useDC).isChildOf(accessScope);
+  if (accessScope.getDeclContext() == useDC) return true;
+  if (!AccessScope(useDC).isChildOf(accessScope)) return false;
+
+  // Check SPI access
+  if (!useDC || !VD->isSPI()) return true;
+  auto useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+  return !useSF || useSF->isImportedAsSPI(VD) ||
+         VD->getDeclContext()->getParentModule() == useDC->getParentModule();
 }
 
-/// Checks if \p VD may be used from \p useDC, taking \@testable imports into
-/// account.
+/// Checks if \p VD may be used from \p useDC, taking \@testable and \@_spi
+/// imports into account.
 ///
 /// When \p access is the same as `VD->getFormalAccess()` and the enclosing
 /// context of \p VD is usable from \p useDC, this ought to be the same as
@@ -3428,8 +3468,13 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Public:
-  case AccessLevel::Open:
+  case AccessLevel::Open: {
+    if (useDC && VD->isSPI()) {
+      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      return !useSF || useSF->isImportedAsSPI(VD);
+    }
     return true;
+  }
   }
   llvm_unreachable("bad access level");
 }
@@ -4973,8 +5018,8 @@ ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
 
   ++NumLazyRequirementSignatures;
   // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumLazyRequirementSignatures++;
+  if (auto *Stats = getASTContext().Stats)
+    Stats->getFrontendCounters().NumLazyRequirementSignatures++;
 }
 
 ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
@@ -5937,7 +5982,7 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
                  ->hasReferenceSemantics()) {
       // Do not suggest the fix-it in implicit getters
       if (auto AD = dyn_cast<AccessorDecl>(FD)) {
-        if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
+        if (AD->isImplicitGetter())
           return;
       }
 
@@ -8008,4 +8053,27 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
     simple_display(out, func);
   else
     out << "closure";
+}
+
+bool Decl::isPrivateToEnclosingFile() const {
+  if (auto *VD = dyn_cast<ValueDecl>(this))
+    return VD->getFormalAccess() <= AccessLevel::FilePrivate;
+  switch (getKind()) {
+  case DeclKind::Import:
+  case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
+  case DeclKind::TopLevelCode:
+  case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
+    return true;
+
+  case DeclKind::Extension:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    return false;
+
+  default:
+    llvm_unreachable("everything else is a ValueDecl");
+  }
 }

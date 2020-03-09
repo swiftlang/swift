@@ -1227,6 +1227,10 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
     Buffer << "CO";
   } else if (text == "@convention(witness_method)") {
     Buffer << "Cw";
+  } else if (text == "@yield_once") {
+    Buffer << "A";
+  } else if (text == "@yield_many") {
+    Buffer << "G";
   } else {
     unreachable("bad impl-function-attribute");
   }
@@ -1248,15 +1252,21 @@ void Remangler::mangleImplResult(Node *node) {
   mangleChildNodes(node); // impl convention, type
 }
 
+void Remangler::mangleImplYield(Node *node) {
+  assert(node->getNumChildren() == 2);
+  Buffer << 'Y';
+  mangleChildNodes(node); // impl convention, type
+}
+
 void Remangler::mangleImplEscaping(Node *node) {
   // The old mangler does not encode escaping.
 }
 
-void Remangler::mangleImplSubstitutions(Node *node) {
+void Remangler::mangleImplPatternSubstitutions(Node *node) {
   // The old mangler does not encode substituted function types.
 }
 
-void Remangler::mangleImplImpliedSubstitutions(Node *node) {
+void Remangler::mangleImplInvocationSubstitutions(Node *node) {
   // The old mangler does not encode substituted function types.
 }
 

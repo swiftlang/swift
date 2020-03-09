@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILInstruction.h"
@@ -110,12 +111,15 @@ public:
 #define SHOULD_NEVER_VISIT_INST(INST)                                          \
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
       INST##Inst *i) {                                                         \
-    llvm_unreachable("Visited instruction that should never be visited?!");    \
+    llvm::errs() << "Unhandled inst: " << *i;                                  \
+    llvm::report_fatal_error(                                                  \
+        "Visited instruction that should never be visited?!");                 \
   }
 SHOULD_NEVER_VISIT_INST(AllocBox)
 SHOULD_NEVER_VISIT_INST(AllocExistentialBox)
 SHOULD_NEVER_VISIT_INST(AllocGlobal)
 SHOULD_NEVER_VISIT_INST(AllocStack)
+SHOULD_NEVER_VISIT_INST(DifferentiabilityWitnessFunction)
 SHOULD_NEVER_VISIT_INST(FloatLiteral)
 SHOULD_NEVER_VISIT_INST(FunctionRef)
 SHOULD_NEVER_VISIT_INST(DynamicFunctionRef)
@@ -169,7 +173,6 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AbortApply)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, BeginAccess)
@@ -344,6 +347,7 @@ FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
+FORWARD_ANY_OWNERSHIP_INST(InitExistentialRef)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
@@ -414,8 +418,19 @@ OperandOwnershipKindClassifier::checkTerminatorArgumentMatchesDestBB(
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitBranchInst(BranchInst *bi) {
-  return checkTerminatorArgumentMatchesDestBB(bi->getDestBB(),
-                                              getOperandIndex());
+  ValueOwnershipKind destBlockArgOwnershipKind =
+      bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
+
+  // If we have a guaranteed parameter, treat this as consuming.
+  if (destBlockArgOwnershipKind == ValueOwnershipKind::Guaranteed) {
+    return Map::compatibilityMap(destBlockArgOwnershipKind,
+                                 UseLifetimeConstraint::MustBeInvalidated);
+  }
+
+  // Otherwise, defer to defaults.
+  auto lifetimeConstraint =
+      destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
 }
 
 OperandOwnershipKindMap
@@ -527,9 +542,9 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
     return Map();
 
   auto ownershipKindRange = makeTransformRange(results,
-                                               [&](const SILResultInfo &info) {
-                                                 return info.getOwnershipKind(*f);
-                                               });
+     [&](const SILResultInfo &info) {
+       return info.getOwnershipKind(*f, f->getLoweredFunctionType());
+     });
 
   // Then merge all of our ownership kinds. If we fail to merge, return an empty
   // map so we fail on all operands.
@@ -1008,6 +1023,7 @@ ANY_OWNERSHIP_BUILTIN(ZeroInitializer)
 ANY_OWNERSHIP_BUILTIN(Swift3ImplicitObjCEntrypoint)
 ANY_OWNERSHIP_BUILTIN(PoundAssert)
 ANY_OWNERSHIP_BUILTIN(GlobalStringTablePointer)
+ANY_OWNERSHIP_BUILTIN(TypePtrAuthDiscriminator)
 #undef ANY_OWNERSHIP_BUILTIN
 
 // This is correct today since we do not have any builtins which return

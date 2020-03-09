@@ -30,6 +30,7 @@
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -227,6 +228,10 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   while (doOneIteration(F, Iteration)) {
     Changed = true;
     Iteration++;
+  }
+
+  if (invalidatedStackNesting) {
+    StackNesting().correctStackNesting(&F);
   }
 
   // Cleanup the builder and return whether or not we made any changes.

@@ -30,7 +30,7 @@
 
 // FIXME: We need this so we can flush stdout but this won't
 // work on other Platforms (e.g. Windows).
-#if os(Linux)
+#if canImport(Glibc)
     import Glibc
 #else
     import Darwin.C

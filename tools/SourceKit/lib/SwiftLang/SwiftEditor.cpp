@@ -110,6 +110,9 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
   SKInfo.Description = Text.str();
 
+  for (auto notePath : Info.EducationalNotePaths)
+    SKInfo.EducationalNotePaths.push_back(notePath);
+
   Optional<unsigned> BufferIDOpt;
   if (Info.Loc.isValid()) {
     BufferIDOpt = SM.findBufferContainingLoc(Info.Loc);
@@ -710,9 +713,6 @@ public:
     registerTypeCheckerRequestFunctions(
         Parser->getParser().Context.evaluator);
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
-
-    // Collecting syntactic information shouldn't evaluate # conditions.
-    Parser->getParser().State->PerformConditionEvaluation = false;
 
     // If there is a syntax parsing cache, incremental syntax parsing is
     // performed and thus the generated AST may not be up-to-date.
@@ -1334,30 +1334,14 @@ public:
   }
 
   StringRef getObjCRuntimeName(const Decl *D, SmallString<64> &Buf) {
-    if (!D)
-      return StringRef();
-    if (!isa<ClassDecl>(D) && !isa<ProtocolDecl>(D))
-      return StringRef();
-    auto *VD = cast<ValueDecl>(D);
-    if (!VD->hasName() || (VD->hasInterfaceType() && VD->isInvalid()))
-      return StringRef();
-    auto ident = VD->getBaseName().getIdentifier().str();
-    if (ident.empty() || Mangle::isDigit(ident.front()))
-      return StringRef();
-
-    // We don't support getting the runtime name for nested classes.
-    // This would require typechecking or at least name lookup, if the nested
-    // class is in an extension.
-    if (!D->getDeclContext()->isModuleScopeContext())
-      return StringRef();
-
-    if (auto ClassD = dyn_cast<ClassDecl>(D)) {
-      // We don't vend the runtime name for generic classes for now.
-      if (ClassD->getGenericParams())
-        return StringRef();
-      return ClassD->getObjCRuntimeName(Buf);
+    // We only report runtime name for classes and protocols with an explicitly
+    // defined ObjC name, i.e. those that have @objc("SomeName")
+    if (D && (isa<ClassDecl>(D) || isa<ProtocolDecl>(D))) {
+      auto *ObjCNameAttr = D->getAttrs().getAttribute<ObjCAttr>();
+      if (ObjCNameAttr && ObjCNameAttr->hasName())
+        return ObjCNameAttr->getName()->getString(Buf);
     }
-    return cast<ProtocolDecl>(D)->getObjCRuntimeName(Buf);
+    return StringRef();
   }
 
   StringRef getObjCSelectorName(const Decl *D, SmallString<64> &Buf) {

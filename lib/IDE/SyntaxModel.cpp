@@ -664,6 +664,24 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
                           Closure->getExplicitResultTypeLoc().getSourceRange());
 
     pushStructureNode(SN, Closure);
+
+  } else if (auto *CLE = dyn_cast<CaptureListExpr>(E)) {
+    // The ASTWalker visits captured variables twice, from a `CaptureListEntry` they are visited
+    // from the `VarDecl` and the `PatternBindingDecl` entries.
+    // We take over visitation here to avoid walking the `PatternBindingDecl` ones.
+    for (auto c : CLE->getCaptureList()) {
+      if (auto *VD = c.Var) {
+        // We're skipping over the PatternBindingDecl so we need to handle the
+        // the VarDecl's attributes that we'd normally process visiting the PBD.
+        if (!handleAttrs(VD->getAttrs()))
+          return { false, nullptr };
+        VD->walk(*this);
+      }
+    }
+    if (auto *CE = CLE->getClosureBody())
+      CE->walk(*this);
+    return { false, walkToExprPost(E) };
+
   } else if (auto SE = dyn_cast<SequenceExpr>(E)) {
     // In SequenceExpr, explicit cast expressions (e.g. 'as', 'is') appear
     // twice. Skip pointers we've already seen.
@@ -849,8 +867,14 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
   if (D->isImplicit())
     return false;
 
-  if (!handleAttrs(D->getAttrs()))
-    return false;
+  // The attributes of EnumElementDecls and VarDecls are handled when visiting
+  // their parent EnumCaseDecl/PatternBindingDecl (which the attributes are
+  // attached to syntactically).
+  if (!isa<EnumElementDecl>(D) &&
+      !(isa<VarDecl>(D) && cast<VarDecl>(D)->getParentPatternBinding())) {
+    if (!handleAttrs(D->getAttrs()))
+      return false;
+  }
 
   if (isa<AccessorDecl>(D)) {
     // Don't push structure nodes for accessors.
@@ -935,6 +959,21 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                       PD->getTypeSourceRangeForDiagnostics());
     pushStructureNode(SN, PD);
+  } else if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    // Process the attributes of one of the contained VarDecls. Attributes that
+    // are syntactically attached to the PatternBindingDecl end up on the
+    // contained VarDecls.
+    VarDecl *Contained = nullptr;
+    for (auto idx : range(PBD->getNumPatternEntries())) {
+      PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) -> void {
+        Contained = VD;
+      });
+      if (Contained) {
+        if (!handleAttrs(Contained->getAttrs()))
+          return false;
+        break;
+      }
+    }
   } else if (auto *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
     SyntaxStructureNode SN;
@@ -999,15 +1038,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
     // We need to handle the special case where attributes semantically
     // attach to enum element decls while syntactically locate before enum case decl.
-    for (auto *EnumElemD : EnumCaseD->getElements()) {
-      for (auto *Att : EnumElemD->getAttrs()) {
-        if (Att->isDeclModifier() &&
-            SM.isBeforeInBuffer(Att->getLocation(), D->getSourceRange().Start)) {
-          passNonTokenNode({SyntaxNodeKind::AttributeBuiltin,
-                            charSourceRangeFromSourceRange(SM,
-                                                           Att->getLocation())});
-        }
-      }
+    if (!EnumCaseD->getElements().empty()) {
+      if (!handleAttrs(EnumCaseD->getElements().front()->getAttrs()))
+        return false;
     }
     if (pushStructureNode(SN, D)) {
       // FIXME: ASTWalker walks enum elements as members of the enum decl, not

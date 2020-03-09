@@ -109,6 +109,38 @@ enum class SourceFileKind {
   Interface ///< Came from a .swiftinterface file, representing another module.
 };
 
+/// Contains information about where a particular path is used in
+/// \c SourceFiles.
+struct SourceFilePathInfo {
+  struct Comparator {
+    bool operator () (SourceLoc lhs, SourceLoc rhs) const {
+      return lhs.getOpaquePointerValue() <
+             rhs.getOpaquePointerValue();
+    }
+  };
+
+  SourceLoc physicalFileLoc{};
+  std::set<SourceLoc, Comparator> virtualFileLocs{}; // std::set for sorting
+
+  SourceFilePathInfo() = default;
+
+  void merge(const SourceFilePathInfo &other) {
+    if (other.physicalFileLoc.isValid()) {
+      assert(!physicalFileLoc.isValid());
+      physicalFileLoc = other.physicalFileLoc;
+    }
+
+    for (auto &elem : other.virtualFileLocs) {
+      virtualFileLocs.insert(elem);
+    }
+  }
+
+  bool operator == (const SourceFilePathInfo &other) const {
+    return physicalFileLoc == other.physicalFileLoc &&
+           virtualFileLocs == other.virtualFileLocs;
+  }
+};
+
 /// Discriminator for resilience strategy.
 enum class ResilienceStrategy : unsigned {
   /// Public nominal types: fragile
@@ -123,6 +155,8 @@ enum class ResilienceStrategy : unsigned {
   /// This is the behavior with -enable-library-evolution.
   Resilient
 };
+
+class OverlayFile;
 
 /// The minimum unit of compilation.
 ///
@@ -203,6 +237,9 @@ private:
 
   SmallVector<FileUnit *, 2> Files;
 
+  llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
+    declaredCrossImports;
+
   std::unique_ptr<SourceLookupCache> Cache;
   SourceLookupCache &getSourceLookupCache() const;
 
@@ -251,6 +288,40 @@ public:
   bool isClangModule() const;
   void addFile(FileUnit &newFile);
   void removeFile(FileUnit &existingFile);
+
+  /// Creates a map from \c #filePath strings to corresponding \c #file
+  /// strings, diagnosing any conflicts.
+  ///
+  /// A given \c #filePath string always maps to exactly one \c #file string,
+  /// but it is possible for \c #sourceLocation directives to introduce
+  /// duplicates in the opposite direction. If there are such conflicts, this
+  /// method will diagnose the conflict and choose a "winner" among the paths
+  /// in a reproducible way. The \c bool paired with the \c #file string is
+  /// \c true for paths which did not have a conflict or won a conflict, and
+  /// \c false for paths which lost a conflict. Thus, if you want to generate a
+  /// reverse mapping, you should drop or special-case the \c #file strings that
+  /// are paired with \c false.
+  ///
+  /// Note that this returns an empty StringMap if concise \c #file strings are
+  /// disabled. Users should fall back to using the file path in this case.
+  llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>
+  computeMagicFileStringMap(bool shouldDiagnose) const;
+
+  /// Add a file declaring a cross-import overlay.
+  void addCrossImportOverlayFile(StringRef file);
+
+  /// Append to \p overlayNames the names of all modules that this module
+  /// declares should be imported when \p bystanderName is imported.
+  ///
+  /// This operation is asymmetric: you will get different results if you
+  /// reverse the positions of the two modules involved in the cross-import.
+  void findDeclaredCrossImportOverlays(
+      Identifier bystanderName, SmallVectorImpl<Identifier> &overlayNames,
+      SourceLoc diagLoc) const;
+
+  /// Get the list of all modules this module declares a cross-import with.
+  void getDeclaredCrossImportBystanders(
+      SmallVectorImpl<Identifier> &bystanderNames);
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
@@ -333,6 +404,11 @@ public:
   void setIsNonSwiftModule(bool flag = true) {
     Bits.ModuleDecl.IsNonSwiftModule = flag;
   }
+
+  /// Retrieve the top-level module. If this module is already top-level, this
+  /// returns itself. If this is a submodule such as \c Foo.Bar.Baz, this
+  /// returns the module \c Foo.
+  ModuleDecl *getTopLevelModule();
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
@@ -437,6 +513,11 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
+  /// Find all SPI names imported from \p importedModule by this module,
+  /// collecting the identifiers in \p spiGroups.
+  void lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                          SmallVectorImpl<Identifier> &spiGroups) const;
+
   /// \sa getImportedModules
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
@@ -444,7 +525,13 @@ public:
     /// Include "regular" imports with no special annotation.
     Private = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
-    ImplementationOnly = 1 << 2
+    ImplementationOnly = 1 << 2,
+    /// Include imports of SPIs declared with `@_spi`
+    SPIAccessControl = 1 << 3,
+    /// Include imports shadowed by a separately-imported overlay (i.e. a
+    /// cross-import overlay). Unshadowed imports are included whether or not
+    /// this flag is specified.
+    ShadowedBySeparateOverlay = 1 << 4
   };
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;

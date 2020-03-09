@@ -80,10 +80,16 @@ class SILFunctionBuilder {
       SubclassScope subclassScope = SubclassScope::NotApplicable);
 
   /// Return the declaration of a function, or create it if it doesn't exist.
-  SILFunction *
-  getOrCreateFunction(SILLocation loc, SILDeclRef constant,
-                      ForDefinition_t forDefinition,
-                      ProfileCounter entryCount = ProfileCounter());
+  /// Creating a function that references another function (a dynamic
+  /// replacement) requires getting/creating a SIL function for this reference.
+  /// In this case the function will call the \p getOrCreateDeclaration
+  /// callback.
+  SILFunction *getOrCreateFunction(
+      SILLocation loc, SILDeclRef constant, ForDefinition_t forDefinition,
+      llvm::function_ref<SILFunction *(SILLocation loc, SILDeclRef constant)>
+          getOrCreateDeclaration = [](SILLocation loc, SILDeclRef constant)
+          -> SILFunction * { return nullptr; },
+      ProfileCounter entryCount = ProfileCounter());
 
   /// Create a function declaration.
   ///
@@ -104,8 +110,11 @@ class SILFunctionBuilder {
                  SILFunction *InsertBefore = nullptr,
                  const SILDebugScope *DebugScope = nullptr);
 
-  void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
-                             SILModule &M, SILDeclRef constant = SILDeclRef());
+  void addFunctionAttributes(
+      SILFunction *F, DeclAttributes &Attrs, SILModule &M,
+      llvm::function_ref<SILFunction *(SILLocation loc, SILDeclRef constant)>
+          getOrCreateDeclaration,
+      SILDeclRef constant = SILDeclRef());
 
   /// We do not expose this to everyone, instead we allow for our users to opt
   /// into this if they need to. Please do not do this in general! We only want

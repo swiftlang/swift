@@ -41,6 +41,7 @@
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
@@ -264,7 +265,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
                                          init,
                           llvm::Twine("\01L_selector_data(") + selector + ")");
   SetCStringLiteralSection(global, ObjCLabelType::MethodVarName);
-  global->setAlignment(1);
+  global->setAlignment(llvm::MaybeAlign(1));
   addCompilerUsedGlobal(global);
 
   // Drill down to make an i8*.
@@ -295,7 +296,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
                                          init,
                                 llvm::Twine("\01L_selector(") + selector + ")");
   global->setExternallyInitialized(true);
-  global->setAlignment(getPointerAlignment().getValue());
+  global->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
 
   // This section name is magical for the Darwin static and dynamic linkers.
   global->setSection(GetObjCSectionName("__objc_selrefs",
@@ -359,7 +360,8 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
                                protocolRecord,
                                llvm::Twine("\01l_OBJC_LABEL_PROTOCOL_$_")
                                  + protocolName);
-  protocolLabel->setAlignment(getPointerAlignment().getValue());
+  protocolLabel->setAlignment(
+      llvm::MaybeAlign(getPointerAlignment().getValue()));
   protocolLabel->setVisibility(llvm::GlobalValue::HiddenVisibility);
   protocolLabel->setSection(GetObjCSectionName("__objc_protolist",
                                                "coalesced,no_dead_strip"));
@@ -375,7 +377,7 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
                                llvm::GlobalValue::WeakAnyLinkage,
                                protocolRecord,
                                llvm::Twine("\01l_OBJC_PROTOCOL_REFERENCE_$_") + protocolName);
-  protocolRef->setAlignment(getPointerAlignment().getValue());
+  protocolRef->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
   protocolRef->setVisibility(llvm::GlobalValue::HiddenVisibility);
   protocolRef->setSection(GetObjCSectionName("__objc_protorefs",
                                              "coalesced,no_dead_strip"));
@@ -897,17 +899,19 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
                                              fieldType, false);
 
   // Create the forwarding stub.
-  llvm::Function *forwarder = emitObjCPartialApplicationForwarder(IGF.IGM,
+  llvm::Value *forwarder = emitObjCPartialApplicationForwarder(IGF.IGM,
                                                                 method,
                                                                 origMethodType,
                                                                 resultType,
                                                                 layout,
                                                                 selfType);
-  llvm::Value *forwarderValue = IGF.Builder.CreateBitCast(forwarder,
-                                                          IGF.IGM.Int8PtrTy);
-  
+  forwarder =
+    IGF.IGM.getConstantSignedFunctionPointer(cast<llvm::Constant>(forwarder),
+                                             resultType);
+  forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
+
   // Emit the result explosion.
-  out.add(forwarderValue);
+  out.add(forwarder);
   out.add(data);
 }
 
@@ -1282,25 +1286,32 @@ irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   llvm_unreachable("unknown storage!");
 }
 
-static void buildMethodDescriptor(ConstantArrayBuilder &descriptors,
+static void buildMethodDescriptor(IRGenModule &IGM,
+                                  ConstantArrayBuilder &descriptors,
                                   ObjCMethodDescriptor &parts) {
   auto descriptor = descriptors.beginStruct();
   descriptor.add(parts.selectorRef);
   descriptor.add(parts.typeEncoding);
-  descriptor.add(parts.impl);
+  if (parts.impl->isNullValue()) {
+    descriptor.add(parts.impl);
+  } else {
+    descriptor.addSignedPointer(parts.impl,
+               IGM.getOptions().PointerAuth.ObjCMethodListFunctionPointers,
+                                PointerAuthEntity());
+  }
   descriptor.finishAndAddTo(descriptors);
 }
 
 static void emitObjCDescriptor(IRGenModule &IGM,
                                ConstantArrayBuilder &descriptors,
                                ObjCMethodDescriptor &descriptor) {
-  buildMethodDescriptor(descriptors, descriptor);
+  buildMethodDescriptor(IGM, descriptors, descriptor);
   auto *silFn = descriptor.silFunction;
   if (silFn && silFn->hasObjCReplacement()) {
     auto replacedSelector =
       IGM.getAddrOfObjCMethodName(silFn->getObjCReplacement().str());
     descriptor.selectorRef = replacedSelector;
-    buildMethodDescriptor(descriptors, descriptor);
+    buildMethodDescriptor(IGM, descriptors, descriptor);
   }
 }
 
@@ -1345,7 +1356,7 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
   descriptor.impl = llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 
   // Form the method_t instance.
-  buildMethodDescriptor(descriptors, descriptor);
+  buildMethodDescriptor(IGM, descriptors, descriptor);
 }
 
 llvm::Constant *

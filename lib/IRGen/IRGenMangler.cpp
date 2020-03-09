@@ -83,7 +83,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
                                   llvm::function_ref<void ()> body) {
   Mod = IGM.getSwiftModule();
   OptimizeProtocolNames = false;
-  UseObjCProtocolNames = true;
+  UseObjCRuntimeNames = true;
 
   llvm::SaveAndRestore<bool>
     AllowSymbolicReferencesLocally(AllowSymbolicReferences);
@@ -120,7 +120,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       }
 
       return true;
-    } else if (auto opaque = s.dyn_cast<const OpaqueTypeDecl *>()) {
+    } else if (s.is<const OpaqueTypeDecl *>()) {
       // Always symbolically reference opaque types.
       return true;
     } else {

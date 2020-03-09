@@ -16,32 +16,19 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "irgensil"
-#include "llvm/IR/DIBuilder.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/InlineAsm.h"
-#include "llvm/IR/Intrinsics.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Transforms/Utils/Local.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/Basic/TargetInfo.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Pattern.h"
-#include "swift/AST/ParameterList.h"
-#include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/Types.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -49,8 +36,22 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/IR/DIBuilder.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/InlineAsm.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -69,6 +70,7 @@
 #include "GenObjC.h"
 #include "GenOpaque.h"
 #include "GenPoly.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
@@ -676,7 +678,7 @@ public:
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
     ZeroInitBuilder.CreateMemSet(
         AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
-        Size, AI->getAlignment());
+        Size, llvm::MaybeAlign(AI->getAlignment()));
   }
 
   /// Account for bugs in LLVM.
@@ -1041,6 +1043,9 @@ public:
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
   
   void visitKeyPathInst(KeyPathInst *I);
+
+  void visitDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *i);
 
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
   void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
@@ -1585,12 +1590,6 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
     return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
-  llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile);
-  if (auto dc = f->getModule().getAssociatedContext()) {
-    if (auto sf = dc->getParentSourceFile()) {
-      CurSourceFile = sf;
-    }
-  }
   IRGenSILFunction(*this, f).emitSILFunction();
 }
 
@@ -1813,6 +1812,33 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   }
 
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
+}
+
+void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
+    DifferentiabilityWitnessFunctionInst *i) {
+  llvm::Value *diffWitness =
+      IGM.getAddrOfDifferentiabilityWitness(i->getWitness());
+  unsigned offset = 0;
+  switch (i->getWitnessKind()) {
+  case DifferentiabilityWitnessFunctionKind::JVP:
+    offset = 0;
+    break;
+  case DifferentiabilityWitnessFunctionKind::VJP:
+    offset = 1;
+    break;
+  case DifferentiabilityWitnessFunctionKind::Transpose:
+    llvm_unreachable("Not yet implemented");
+  }
+
+  diffWitness = Builder.CreateStructGEP(diffWitness, offset);
+  diffWitness = Builder.CreateLoad(diffWitness, IGM.getPointerAlignment());
+
+  auto fnType = cast<SILFunctionType>(i->getType().getASTType());
+  Signature signature = IGM.getSignature(fnType);
+  diffWitness =
+      Builder.CreateBitCast(diffWitness, signature.getType()->getPointerTo());
+
+  setLoweredFunctionPointer(i, FunctionPointer(diffWitness, signature));
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
@@ -2567,10 +2593,9 @@ static void emitCoroutineExit(IRGenSILFunction &IGF) {
   // Emit the block.
   IGF.Builder.emitBlock(coroEndBB);
   auto handle = IGF.getCoroutineHandle();
-  IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_end, {
-    handle,
-    /*is unwind*/ IGF.Builder.getFalse()
-  });
+  IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
+                                  {handle,
+                                   /*is unwind*/ IGF.Builder.getFalse()});
   IGF.Builder.CreateUnreachable();
 }
 
@@ -2695,7 +2720,13 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, bool isAbort) {
   continuation = Builder.CreateBitCast(continuation,
                                        sig.getType()->getPointerTo());
 
-  FunctionPointer callee(continuation, sig);
+
+  auto schemaAndEntity =
+    getCoroutineResumeFunctionPointerAuth(IGM, i->getOrigCalleeType());
+  auto pointerAuth = PointerAuthInfo::emit(*this, schemaAndEntity.first,
+                                           coroutine.Buffer.getAddress(),
+                                           schemaAndEntity.second);
+  FunctionPointer callee(continuation, pointerAuth, sig);
 
   Builder.CreateCall(callee, {
     coroutine.Buffer.getAddress(),
@@ -3544,14 +3575,17 @@ void IRGenSILFunction::visitRefTailAddrInst(RefTailAddrInst *i) {
 }
 
 static bool isInvariantAddress(SILValue v) {
-  auto root = getUnderlyingAddressRoot(v);
-  if (auto ptrRoot = dyn_cast<PointerToAddressInst>(root)) {
+  SILValue accessedAddress = getAccessedAddress(v);
+  if (auto *ptrRoot = dyn_cast<PointerToAddressInst>(accessedAddress)) {
     return ptrRoot->isInvariant();
   }
   // TODO: We could be more aggressive about considering addresses based on
   // `let` variables as invariant when the type of the address is known not to
   // have any sharably-mutable interior storage (in other words, no weak refs,
-  // atomics, etc.)
+  // atomics, etc.). However, this currently miscompiles some programs.
+  // if (accessedAddress->getType().isAddress() && isLetAddress(accessedAddress)) {
+  //  return true;
+  // }
   return false;
 }
 
@@ -5550,7 +5584,11 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
     auto sig = IGM.getSignature(methodType);
     fnPtr = Builder.CreateBitCast(fnPtr, sig.getType()->getPointerTo());
 
-    FunctionPointer fn(fnPtr, sig);
+    auto &schema = getOptions().PointerAuth.SwiftClassMethodPointers;
+    auto authInfo =
+      PointerAuthInfo::emit(*this, schema, /*storageAddress=*/nullptr, method);
+
+    FunctionPointer fn(fnPtr, authInfo, sig);
 
     setLoweredFunctionPointer(i, fn);
     return;

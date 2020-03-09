@@ -657,6 +657,9 @@ BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 /// poundAssert has type (Builtin.Int1, Builtin.RawPointer) -> ().
 BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
 
+// TypePtrAuthDiscriminator has type <T> (T.Type) -> Int64
+BUILTIN_MISC_OPERATION(TypePtrAuthDiscriminator, "typePtrAuthDiscriminator", "n", Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //

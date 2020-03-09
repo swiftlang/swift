@@ -62,6 +62,14 @@ public:
            Target->getDeclaredTypeInContext()->getCanonicalType());
     if (strategy.needsPayloadSizeInMetadata())
       asImpl().addPayloadSize();
+
+    if (asImpl().hasTrailingFlags())
+      asImpl().addTrailingFlags();
+  }
+
+  bool hasTrailingFlags() {
+    return Target->isGenericContext() &&
+           IGM.shouldPrespecializeGenericMetadata();
   }
 };
 
@@ -86,6 +94,7 @@ public:
   void addGenericWitnessTable(GenericRequirement requirement) { addPointer(); }
   void addPayloadSize() { addPointer(); }
   void noteStartOfTypeSpecificMembers() {}
+  void addTrailingFlags() { addPointer(); }
 
 private:
   void addPointer() {

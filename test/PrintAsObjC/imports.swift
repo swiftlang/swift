@@ -20,6 +20,16 @@
 // CHECK-NEXT: @import ObjectiveC;
 // CHECK-NEXT: @import ctypes.bits;
 
+// CHECK-NEXT: #else
+// CHECK-NEXT: #import <Base.ExplicitSub.h>
+// CHECK-NEXT: #import <Base.ExplicitSub.ExSub.h>
+// CHECK-NEXT: #import <Base.ImplicitSub.ExSub.h>
+// CHECK-NEXT: #import <Foundation.h>
+// CHECK-NEXT: #import <MostlyPrivate1/MostlyPrivate1.h>
+// CHECK-NEXT: #import <MostlyPrivate1_Private/MostlyPrivate1_Private.h>
+// CHECK-NEXT: #import <MostlyPrivate2_Private/MostlyPrivate2_Private.h>
+// CHECK-NEXT: #import <ctypes/bits.h>
+
 // NEGATIVE-NOT: ctypes;
 // NEGATIVE-NOT: ImSub;
 // NEGATIVE-NOT: ImplicitSub;

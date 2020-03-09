@@ -184,6 +184,11 @@ Flag<["-"], "driver-verify-fine-grained-dependency-graph-after-every-import">,
 InternalDebugOpt,
 HelpText<"Debug DriverGraph by verifying it after every import">;
 
+def verify_incremental_dependencies :
+  Flag<["-"], "verify-incremental-dependencies">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable the dependency verifier for each frontend job">;
+
 def driver_emit_fine_grained_dependency_dot_file_after_every_import :
 Flag<["-"], "driver-emit-fine-grained-dependency-dot-file-after-every-import">,
 InternalDebugOpt,
@@ -344,6 +349,9 @@ def emit_tbd_path : Separate<["-"], "emit-tbd-path">,
 def emit_tbd_path_EQ : Joined<["-"], "emit-tbd-path=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
   Alias<emit_tbd_path>;
+def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
+  Flags<[FrontendOption]>,
+  HelpText<"Embed symbols from the module in the emitted tbd file">;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -419,6 +427,12 @@ def emit_module_interface_path :
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
 
+def emit_private_module_interface_path :
+  Separate<["-"], "emit-private-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
+         DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
+
 def avoid_emit_module_source_info :
   Flag<["-"], "avoid-emit-module-source-info">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -488,7 +502,7 @@ def enable_experimental_differentiable_programming : Flag<["-"], "enable-experim
 def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable experimental concise '#file' identifier and '#filePath' alternative">;
+  HelpText<"Enable experimental concise '#file' identifier">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -539,10 +553,20 @@ def Rpass_missed_EQ : Joined<["-"], "Rpass-missed=">,
 
 def save_optimization_record : Flag<["-"], "save-optimization-record">,
   Flags<[FrontendOption]>, HelpText<"Generate a YAML optimization record file">;
+def save_optimization_record_EQ : Joined<["-"], "save-optimization-record=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Generate an optimization record file in a specific format "
+           "(default: YAML)">, MetaVarName<"<format>">;
 def save_optimization_record_path :
   Separate<["-"], "save-optimization-record-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
-  HelpText<"Specify the file name of any generated YAML optimization record">;
+  HelpText<"Specify the file name of any generated optimization record">;
+def save_optimization_record_passes :
+  Separate<["-"], "save-optimization-record-passes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Only include passes which match a specified regular expression in"
+           "the generated optimization record "
+           "(by default, include all passes)">, MetaVarName<"<regex>">;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,

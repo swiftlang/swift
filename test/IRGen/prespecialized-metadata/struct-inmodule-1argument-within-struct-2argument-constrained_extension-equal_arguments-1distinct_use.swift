@@ -1,11 +1,11 @@
-// RUN: %swift -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
+// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-// CHECK: @"$s4main9NamespaceVAAq_RszrlE5ValueVyS2i_SSGMf" = internal constant <{ 
+// CHECK: @"$s4main9NamespaceVAAq_RszrlE5ValueVyS2i_SSGMf" = linkonce_odr hidden constant <{ 
 // CHECK-SAME:   i8**, 
 // CHECK-SAME:   [[INT]], 
 // CHECK-SAME:   %swift.type_descriptor*, 
@@ -22,11 +22,7 @@
 //                 i32 0
 //               ), 
 // CHECK-SAME:   [[INT]] 512, 
-// CHECK-SAME:   %swift.type_descriptor* bitcast (
-// CHECK-SAME:     <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8, i32, i32, i32 }>* 
-// CHECK-SAME:     @"$s4main9NamespaceVAAq_RszrlE5ValueVMn" 
-// CHECK-SAME:     to %swift.type_descriptor*
-// CHECK-SAME:   ), 
+// CHECK-SAME:   %swift.type_descriptor* bitcast ({{.*}}), 
 // CHECK-SAME:   %swift.type* @"$sSiN", 
 // CHECK-SAME:   %swift.type* @"$sSSN", 
 // CHECK-SAME:   i32 0, 
@@ -77,10 +73,10 @@ func doit() {
 doit()
 
 // CHECK: ; Function Attrs: noinline nounwind readnone
-// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main9NamespaceVAAq_RszrlE5ValueVMa"([[INT]], %swift.type*, %swift.type*) #{{[0-9]+}} {
+// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main9NamespaceVAAq_RszrlE5ValueVMa"([[INT]] %0, %swift.type* [[TYPE_1:%[0-9]+]], %swift.type* [[TYPE_2:%[0-9]+]]) #{{[0-9]+}} {
 // CHECK: entry:
-// CHECK:   [[ERASED_TYPE_1:%[0-9]+]] = bitcast %swift.type* %1 to i8*
-// CHECK:   [[ERASED_TYPE_2:%[0-9]+]] = bitcast %swift.type* %2 to i8*
+// CHECK:   [[ERASED_TYPE_1:%[0-9]+]] = bitcast %swift.type* [[TYPE_1]] to i8*
+// CHECK:   [[ERASED_TYPE_2:%[0-9]+]] = bitcast %swift.type* [[TYPE_2]] to i8*
 // CHECK:   br label %[[TYPE_COMPARISON_1:[0-9]+]]
 // CHECK: [[TYPE_COMPARISON_1]]:
 // CHECK:   [[EQUAL_TYPE_1_1:%[0-9]+]] = icmp eq i8* bitcast (%swift.type* @"$sSiN" to i8*), [[ERASED_TYPE_1]]
@@ -116,11 +112,7 @@ doit()
 // CHECK-SAME:     i8* [[ERASED_TYPE_1]], 
 // CHECK-SAME:     i8* [[ERASED_TYPE_2]], 
 // CHECK-SAME:     i8* undef, 
-// CHECK-SAME:     %swift.type_descriptor* bitcast (
-// CHECK-SAME:       <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8, i32, i32, i32 }>* 
-// CHECK-SAME:       @"$s4main9NamespaceVAAq_RszrlE5ValueVMn" 
-// CHECK-SAME:       to %swift.type_descriptor*
-// CHECK-SAME:     )
+// CHECK-SAME:     %swift.type_descriptor* bitcast ({{[^)]*}})
 // CHECK-SAME:   ) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

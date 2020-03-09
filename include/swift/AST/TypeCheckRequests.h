@@ -1108,7 +1108,7 @@ class InferredGenericSignatureRequest :
     public SimpleRequest<InferredGenericSignatureRequest,
                          GenericSignature (ModuleDecl *,
                                             GenericSignatureImpl *,
-                                            GenericParamList *,
+                                            GenericParamSource,
                                             SmallVector<Requirement, 2>,
                                             SmallVector<TypeLoc, 2>,
                                             bool),
@@ -1124,7 +1124,7 @@ private:
   evaluate(Evaluator &evaluator,
            ModuleDecl *module,
            GenericSignatureImpl *baseSignature,
-           GenericParamList *gpl,
+           GenericParamSource paramSource,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,
            bool allowConcreteGenericParams) const;
@@ -2025,6 +2025,26 @@ public:
   }
 };
 
+/// List SPI group ids declared on a decl.
+class SPIGroupsRequest :
+    public SimpleRequest<SPIGroupsRequest,
+                         llvm::ArrayRef<Identifier>(const Decl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<llvm::ArrayRef<Identifier>>
+  evaluate(Evaluator &evaluator, const Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+
 /// Type-checks a `@differentiable` attribute and returns the resolved parameter
 /// indices on success. On failure, emits diagnostics and returns `nullptr`.
 ///
@@ -2052,6 +2072,51 @@ public:
   bool isCached() const { return true; }
   Optional<IndexSubset *> getCachedResult() const;
   void cacheResult(IndexSubset *value) const;
+};
+
+/// Checks whether a type eraser has a viable initializer.
+class TypeEraserHasViableInitRequest
+    : public SimpleRequest<TypeEraserHasViableInitRequest,
+                           bool(TypeEraserAttr *, ProtocolDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, TypeEraserAttr *attr,
+                                ProtocolDecl *protocol) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Looks up the decls that a scoped import references, ensuring the import is
+/// valid.
+///
+/// A "scoped import" is an import which only covers one particular
+/// declaration, such as:
+///
+///     import class Foundation.NSString
+///
+class ScopedImportLookupRequest
+    : public SimpleRequest<ScopedImportLookupRequest,
+                           ArrayRef<ValueDecl *>(ImportDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<ArrayRef<ValueDecl *>> evaluate(Evaluator &evaluator,
+                                                 ImportDecl *import) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

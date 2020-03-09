@@ -50,6 +50,7 @@ import Codable
 import Combos
 import DataBenchmarks
 import DeadArray
+import DevirtualizeProtocolComposition
 import DictOfArraysToArrayOfDicts
 import DictTest
 import DictTest2
@@ -135,6 +136,7 @@ import RC4
 import RGBHistogram
 import Radix2CooleyTukey
 import RandomShuffle
+import RandomTree
 import RandomValues
 import RangeAssignment
 import RangeIteration
@@ -231,6 +233,7 @@ registerBenchmark(Combos)
 registerBenchmark(ClassArrayGetter)
 registerBenchmark(DataBenchmarks)
 registerBenchmark(DeadArray)
+registerBenchmark(DevirtualizeProtocolComposition)
 registerBenchmark(DictOfArraysToArrayOfDicts)
 registerBenchmark(Dictionary)
 registerBenchmark(Dictionary2)
@@ -318,6 +321,7 @@ registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
 registerBenchmark(Radix2CooleyTukey)
 registerBenchmark(RandomShuffle)
+registerBenchmark(RandomTree)
 registerBenchmark(RandomValues)
 registerBenchmark(RangeAssignment)
 registerBenchmark(RangeIteration)

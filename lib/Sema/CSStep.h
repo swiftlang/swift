@@ -228,8 +228,7 @@ protected:
   Optional<Score> getBestScore() const { return CS.solverState->BestScore; }
 
   void filterSolutions(SmallVectorImpl<Solution> &solutions, bool minimize) {
-    if (!CS.retainAllSolutions())
-      CS.filterSolutions(solutions, minimize);
+    CS.filterSolutions(solutions, minimize);
   }
 
   /// Check whether constraint solver is running in "debug" mode,
@@ -475,7 +474,7 @@ private:
     if (isDebugMode())
       getDebugLogger() << "(solving component #" << Index << '\n';
 
-    ComponentScope = llvm::make_unique<Scope>(*this);
+    ComponentScope = std::make_unique<Scope>(*this);
 
     // If this component has orphaned constraint attached,
     // let's return it to the graph.
@@ -524,10 +523,10 @@ public:
       }
 
       {
-        auto scope = llvm::make_unique<Scope>(CS);
+        auto scope = std::make_unique<Scope>(CS);
         if (attempt(*choice)) {
           ActiveChoice.emplace(std::move(scope), *choice);
-          return suspend(llvm::make_unique<SplitterStep>(CS, Solutions));
+          return suspend(std::make_unique<SplitterStep>(CS, Solutions));
         }
       }
 

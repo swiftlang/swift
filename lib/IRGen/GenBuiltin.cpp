@@ -28,6 +28,7 @@
 #include "Explosion.h"
 #include "GenCall.h"
 #include "GenCast.h"
+#include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -417,7 +418,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   if (Builtin.ID == BuiltinValueKind::AssumeTrue) {
     llvm::Value *v = args.claimNext();
     if (v->getType() == IGF.IGM.Int1Ty) {
-      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::assume, v);
+      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::assume, v);
     }
     return;
   }
@@ -1012,11 +1013,23 @@ if (Builtin.ID == BuiltinValueKind::id) { \
                                /*constant*/ false,
                                llvm::GlobalValue::PrivateLinkage,
                                llvm::ConstantAggregateZero::get(flagStorageTy));
-    flag->setAlignment(IGF.IGM.getAtomicBoolAlignment().getValue());
+    flag->setAlignment(
+        llvm::MaybeAlign(IGF.IGM.getAtomicBoolAlignment().getValue()));
     entrypointArgs[6] = llvm::ConstantExpr::getBitCast(flag, IGF.IGM.Int8PtrTy);
 
     IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(),
                            entrypointArgs);
+    return;
+  }
+  
+  if (Builtin.ID == BuiltinValueKind::TypePtrAuthDiscriminator) {
+    (void)args.claimAll();
+    Type valueTy = substitutions.getReplacementTypes()[0];
+    
+    // The type should lower statically to a SILFunctionType.
+    auto loweredTy = IGF.IGM.getLoweredType(valueTy).castTo<SILFunctionType>();
+    
+    out.add(PointerAuthEntity(loweredTy).getTypeDiscriminator(IGF.IGM));
     return;
   }
 

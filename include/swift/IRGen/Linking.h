@@ -53,12 +53,10 @@ public:
   /// be promoted to public external. Used by the LLDB expression evaluator.
   bool ForcePublicDecls;
 
-  bool IsWholeModule;
-
   explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
-                       bool forcePublicDecls, bool isWholeModule);
+                       bool forcePublicDecls);
 
   /// In case of multiple llvm modules (in multi-threaded compilation) all
   /// private decls must be visible from other files.
@@ -1029,11 +1027,6 @@ public:
   std::string mangleAsString() const;
   SILLinkage getLinkage(ForDefinition_t isDefinition) const;
 
-  /// Returns true if this function or global variable is potentially defined
-  /// in a different module.
-  ///
-  bool isAvailableExternally(IRGenModule &IGM) const;
-
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
@@ -1050,10 +1043,14 @@ public:
       ::getFromOpaqueValue(reinterpret_cast<void*>(Pointer));
   }
 
-  SILFunction *getSILFunction() const {
-    assert(getKind() == Kind::SILFunction ||
+  bool hasSILFunction() const {
+    return getKind() == Kind::SILFunction ||
            getKind() == Kind::DynamicallyReplaceableFunctionVariable ||
-           getKind() == Kind::DynamicallyReplaceableFunctionKey);
+           getKind() == Kind::DynamicallyReplaceableFunctionKey;
+  }
+
+  SILFunction *getSILFunction() const {
+    assert(hasSILFunction());
     return reinterpret_cast<SILFunction*>(Pointer);
   }
 
@@ -1104,6 +1101,16 @@ public:
     assert(getKind() == Kind::SILFunction);
     return LINKENTITY_GET_FIELD(Data, IsDynamicallyReplaceableImpl);
   }
+  bool isDynamicallyReplaceableKey() const {
+    return getKind() == Kind::DynamicallyReplaceableFunctionKey ||
+      getKind() == Kind::OpaqueTypeDescriptorAccessorKey;
+  }
+  bool isOpaqueTypeDescriptorAccessor() const {
+    return getKind() == Kind::OpaqueTypeDescriptorAccessor ||
+           getKind() == Kind::OpaqueTypeDescriptorAccessorImpl ||
+           getKind() == Kind::OpaqueTypeDescriptorAccessorKey ||
+           getKind() == Kind::OpaqueTypeDescriptorAccessorVar;
+  }
   bool isAllocator() const {
     assert(getKind() == Kind::DynamicallyReplaceableFunctionImpl ||
            getKind() == Kind::DynamicallyReplaceableFunctionKeyAST ||
@@ -1111,6 +1118,7 @@ public:
     return SecondaryPointer != nullptr;
   }
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }
+  bool isContextDescriptor() const;
   CanType getType() const {
     assert(isTypeKind(getKind()));
     return CanType(reinterpret_cast<TypeBase*>(Pointer));
@@ -1130,16 +1138,16 @@ public:
   bool isSILFunction() const {
     return getKind() == Kind::SILFunction;
   }
-  bool isNominalTypeDescriptor() const {
-    return getKind() == Kind::NominalTypeDescriptor;
+  bool isDynamicallyReplaceableFunctionKey() const {
+    return getKind() == Kind::DynamicallyReplaceableFunctionKey;
   }
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const;
   
-  /// Return the source file whose codegen should trigger emission of this
-  /// link entity, if one can be identified.
-  const SourceFile *getSourceFileForEmission() const;
+  /// Return the module scope context whose codegen should trigger emission
+  /// of this link entity, if one can be identified.
+  DeclContext *getDeclContextForEmission() const;
   
   /// Get the preferred alignment for the definition of this entity.
   Alignment getAlignment(IRGenModule &IGM) const;

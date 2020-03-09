@@ -36,7 +36,7 @@ class PostOrderAnalysis : public FunctionAnalysisBase<PostOrderFunctionInfo> {
 protected:
   virtual std::unique_ptr<PostOrderFunctionInfo>
   newFunctionAnalysis(SILFunction *F) override {
-    return llvm::make_unique<PostOrderFunctionInfo>(F);
+    return std::make_unique<PostOrderFunctionInfo>(F);
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
