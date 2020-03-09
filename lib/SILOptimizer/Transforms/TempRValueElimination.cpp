@@ -227,6 +227,20 @@ bool TempRValueOptPass::collectLoads(
     }
     return collectLoadsFromProjection(oeai, srcAddr, loadInsts);
   }
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+    // In certain cases, unchecked_take_enum_data_addr invalidates the
+    // underlying memory, so by default we can not look through it... but this
+    // is not true in the case of Optional. This is an important case for us to
+    // handle, so handle it here.
+    auto *utedai = cast<UncheckedTakeEnumDataAddrInst>(user);
+    if (!utedai->getOperand()->getType().getOptionalObjectType()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  Temp use may write/destroy its source" << *utedai);
+      return false;
+    }
+
+    return collectLoadsFromProjection(utedai, srcAddr, loadInsts);
+  }
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst: {
     return collectLoadsFromProjection(cast<SingleValueInstruction>(user),

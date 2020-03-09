@@ -615,6 +615,19 @@ struct ImmutableAddressUseVerifier {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
         }
         break;
+      case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+        auto type =
+            cast<UncheckedTakeEnumDataAddrInst>(inst)->getOperand()->getType();
+        if (type.getOptionalObjectType()) {
+          for (auto result : inst->getResults()) {
+            llvm::copy(result->getUses(), std::back_inserter(worklist));
+          }
+          break;
+        }
+        llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
+        llvm_unreachable("invoking standard assertion failure");
+        break;
+      }
       default:
         llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
         llvm_unreachable("invoking standard assertion failure");
