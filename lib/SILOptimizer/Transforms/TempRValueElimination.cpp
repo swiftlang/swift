@@ -67,6 +67,9 @@ class TempRValueOptPass : public SILFunctionTransform {
   bool collectLoads(Operand *userOp, SILInstruction *userInst,
                     SingleValueInstruction *addr, SILValue srcObject,
                     SmallPtrSetImpl<SILInstruction *> &loadInsts);
+  bool collectLoadsFromProjection(SingleValueInstruction *projection,
+                                  SILValue srcAddr,
+                                  SmallPtrSetImpl<SILInstruction *> &loadInsts);
 
   bool
   checkNoSourceModification(CopyAddrInst *copyInst, SILValue copySrc,
@@ -84,6 +87,29 @@ class TempRValueOptPass : public SILFunctionTransform {
 };
 
 } // anonymous namespace
+
+bool TempRValueOptPass::collectLoadsFromProjection(
+    SingleValueInstruction *projection, SILValue srcAddr,
+    SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+  if (!srcAddr) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "  Temp has addr_projection use?! Can not yet promote to value"
+        << *projection);
+    return false;
+  }
+
+  // Transitively look through projections on stack addresses.
+  for (auto *projUseOper : projection->getUses()) {
+    auto *user = projUseOper->getUser();
+    if (user->isTypeDependentOperand(*projUseOper))
+      continue;
+
+    if (!collectLoads(projUseOper, user, projection, srcAddr, loadInsts))
+      return false;
+  }
+  return true;
+}
 
 /// Transitively explore all data flow uses of the given \p address until
 /// reaching a load or returning false.
@@ -199,32 +225,13 @@ bool TempRValueOptPass::collectLoads(
                               << *user);
       return false;
     }
-    LLVM_FALLTHROUGH;
+    return collectLoadsFromProjection(oeai, srcAddr, loadInsts);
   }
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst: {
-    auto *proj = cast<SingleValueInstruction>(user);
-
-    if (!srcAddr) {
-      LLVM_DEBUG(
-          llvm::dbgs()
-          << "  Temp has addr_projection use?! Can not yet promote to value"
-          << *user);
-      return false;
-    }
-
-    // Transitively look through projections on stack addresses.
-    for (auto *projUseOper : proj->getUses()) {
-      auto *user = projUseOper->getUser();
-      if (user->isTypeDependentOperand(*projUseOper))
-        continue;
-
-      if (!collectLoads(projUseOper, user, proj, srcAddr, loadInsts))
-        return false;
-    }
-    return true;
+    return collectLoadsFromProjection(cast<SingleValueInstruction>(user),
+                                      srcAddr, loadInsts);
   }
-
   case SILInstructionKind::LoadInst:
     // Loads are the end of the data flow chain. The users of the load can't
     // access the temporary storage.
