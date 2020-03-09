@@ -5,6 +5,8 @@
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
 
+// UNSUPPORTED: CPU=arm64e
+
 // CHECK:       [[PROTOTYPE_HOLDER_INOUT_VALUE:@"\$s29ptrauth_generalized_accessors6HolderVIetMl_TC.ptrauth"]] =
 // CHECK-SAME:     private constant { i8*, i32, i64, i64 } { i8* bitcast (void (i8*, i1)* @"$s29ptrauth_generalized_accessors6HolderVIetMl_TC" to i8*), i32 0, i64 1, i64 [[PTRAUTH_INOUT:3909]] }, section "llvm.ptrauth"
 // CHECK:       [[PROTOTYPE_HOLDER_BORROWED_VALUE:@"\$s29ptrauth_generalized_accessors6HolderVIetMg_TC.ptrauth"]] =
