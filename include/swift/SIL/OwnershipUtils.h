@@ -264,6 +264,8 @@ struct BorrowScopeIntroducingValueKind {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               BorrowScopeIntroducingValueKind kind);
 
+struct InteriorPointerOperand;
+
 /// A higher level construct for working with values that represent the
 /// introduction of a new borrow scope.
 ///
@@ -337,6 +339,15 @@ struct BorrowScopeIntroducingValue {
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
+  /// Visit each of the interior pointer uses of this underlying borrow
+  /// introduced value. These object -> address projections and any transitive
+  /// address uses must be treated as liveness requiring uses of the guaranteed
+  /// value and we can not shrink the scope beyond that point. Returns true if
+  /// we were able to understand all uses and thus guarantee we found all
+  /// interior pointer uses. Returns false otherwise.
+  bool visitInteriorPointerOperands(
+      function_ref<void(const InteriorPointerOperand &)> func) const;
+
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
@@ -374,6 +385,87 @@ getSingleBorrowIntroducingValue(SILValue value);
 /// introducer, then we return a .some(BorrowScopeIntroducingValue).
 Optional<BorrowScopeIntroducingValue>
 getSingleBorrowIntroducingValue(SILValue inputValue);
+
+struct InteriorPointerOperandKind {
+  using UnderlyingKindTy = std::underlying_type<SILInstructionKind>::type;
+
+  enum Kind : UnderlyingKindTy {
+    RefElementAddr = UnderlyingKindTy(SILInstructionKind::RefElementAddrInst),
+    RefTailAddr = UnderlyingKindTy(SILInstructionKind::RefTailAddrInst),
+  };
+
+  Kind value;
+
+  InteriorPointerOperandKind(Kind newValue) : value(newValue) {}
+  InteriorPointerOperandKind(const InteriorPointerOperandKind &other)
+      : value(other.value) {}
+  operator Kind() const { return value; }
+
+  static Optional<InteriorPointerOperandKind> get(Operand *use) {
+    switch (use->getUser()->getKind()) {
+    default:
+      return None;
+    case SILInstructionKind::RefElementAddrInst:
+      return InteriorPointerOperandKind(RefElementAddr);
+    case SILInstructionKind::RefTailAddrInst:
+      return InteriorPointerOperandKind(RefTailAddr);
+    }
+  }
+
+  void print(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP;
+};
+
+/// A mixed object->address projection that projects a memory location out of an
+/// object with guaranteed ownership. All transitive address uses of the
+/// interior pointer must be within the lifetime of the guaranteed lifetime. As
+/// such, these must be treated as implicit uses of the parent guaranteed value.
+struct InteriorPointerOperand {
+  Operand *operand;
+  InteriorPointerOperandKind kind;
+
+  InteriorPointerOperand(Operand *op)
+      : operand(op), kind(*InteriorPointerOperandKind::get(op)) {}
+
+  /// If value is a borrow introducer return it after doing some checks.
+  static Optional<InteriorPointerOperand> get(Operand *op) {
+    auto kind = InteriorPointerOperandKind::get(op);
+    if (!kind)
+      return None;
+    return InteriorPointerOperand(op, *kind);
+  }
+
+  /// Return the end scope of all borrow introducers of the parent value of this
+  /// projection. Returns true if we were able to find all borrow introducing
+  /// values.
+  bool visitBaseValueScopeEndingUses(function_ref<void(Operand *)> func) const {
+    SmallVector<BorrowScopeIntroducingValue, 4> introducers;
+    if (!getAllBorrowIntroducingValues(operand->get(), introducers))
+      return false;
+    for (const auto &introducer : introducers) {
+      if (!introducer.isLocalScope())
+        continue;
+      introducer.visitLocalScopeEndingUses(func);
+    }
+    return true;
+  }
+
+  SILValue getProjectedAddress() const {
+    switch (kind) {
+    case InteriorPointerOperandKind::RefElementAddr:
+      return cast<RefElementAddrInst>(operand->getUser());
+    case InteriorPointerOperandKind::RefTailAddr:
+      return cast<RefTailAddrInst>(operand->getUser());
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+private:
+  /// Internal constructor for failable static constructor. Please do not expand
+  /// its usage since it assumes the code passed in is well formed.
+  InteriorPointerOperand(Operand *op, InteriorPointerOperandKind kind)
+      : operand(op), kind(kind) {}
+};
 
 } // namespace swift
 

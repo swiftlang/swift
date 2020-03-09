@@ -83,7 +83,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
                                   llvm::function_ref<void ()> body) {
   Mod = IGM.getSwiftModule();
   OptimizeProtocolNames = false;
-  UseObjCProtocolNames = true;
+  UseObjCRuntimeNames = true;
 
   llvm::SaveAndRestore<bool>
     AllowSymbolicReferencesLocally(AllowSymbolicReferences);

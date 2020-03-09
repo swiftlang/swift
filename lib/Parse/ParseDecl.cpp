@@ -4822,7 +4822,8 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
           getStringLiteralIfNotInterpolated(Loc, "'#sourceLocation'");
       if (!Filename.hasValue())
         return makeParserError();
-      consumeToken(tok::string_literal);
+      SourceLoc filenameLoc = consumeToken(tok::string_literal);
+      SF.VirtualFilenames.emplace_back(*Filename, filenameLoc);
 
       if (parseToken(tok::comma, diag::sourceLocation_expected, ",") ||
           parseSpecificIdentifier("line", diag::sourceLocation_expected,

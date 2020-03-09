@@ -466,3 +466,17 @@ func testCaseMutabilityMismatches(e: E3) {
     }
   }
 }
+
+// Check for type equivalence among different case variables with the same name.
+func testCaseVarTypes(e: E3) {
+    // FIXME: Terrible diagnostic
+    tuplify(true) { c in  // expected-error{{type of expression is ambiguous without more context}}
+    "testSwitch"
+    switch e {
+    case .a(let x, let y),
+         .c(let x, let y):
+      x
+      y + "a"
+    }
+  }
+}
