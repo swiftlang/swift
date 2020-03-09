@@ -210,6 +210,15 @@ public:
       return None;
 
     applied.returnExpr = buildVarRef(bodyVar, stmt->getEndLoc());
+
+    // If there is a buildFinalResult(_:), call it.
+    ASTContext &ctx = cs->getASTContext();
+    if (builderSupports(ctx.Id_buildFinalResult, { Identifier() })) {
+      applied.returnExpr = buildCallIfWanted(
+          applied.returnExpr->getLoc(), ctx.Id_buildFinalResult,
+          { applied.returnExpr }, { Identifier() });
+    }
+
     applied.returnExpr = cs->buildTypeErasedExpr(applied.returnExpr,
                                                  dc, applied.bodyResultType,
                                                  CTP_ReturnStmt);
