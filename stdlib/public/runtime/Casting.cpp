@@ -126,17 +126,28 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
+
+/// Used as part of cache key for `TypeNameCache`.
+enum class TypeNameKind {
+  NotQualified,
+  Qualified,
+  Mangled,
+};
+
+using TypeNameCacheKey = llvm::PointerIntPair<const Metadata *, 2, TypeNameKind>;
+
+#if SWIFT_CASTING_SUPPORTS_MUTEX
+static StaticReadWriteLock TypeNameCacheLock;
+#endif
+
+/// Cache containing rendered names for Metadata.
+/// Access MUST be protected using `TypeNameCacheLock`.
+static Lazy<llvm::DenseMap<TypeNameCacheKey, std::pair<const char *, size_t>>>
+  TypeNameCache;
+
 TypeNamePair
 swift::swift_getTypeName(const Metadata *type, bool qualified) {
-  using Key = llvm::PointerIntPair<const Metadata *, 1, bool>;
-
-  #if SWIFT_CASTING_SUPPORTS_MUTEX
-  static StaticReadWriteLock TypeNameCacheLock;
-  #endif
-  static Lazy<llvm::DenseMap<Key, std::pair<const char *, size_t>>>
-    TypeNameCache;
-  
-  Key key(type, qualified);
+  TypeNameCacheKey key = TypeNameCacheKey(type, qualified ? TypeNameKind::Qualified: TypeNameKind::NotQualified);
   auto &cache = TypeNameCache.get();
 
   // Attempt read-only lookup of cache entry.
@@ -175,6 +186,60 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     result[size] = 0;
 
     cache.insert({key, {result, size}});
+    return TypeNamePair{result, size};
+  }
+}
+
+/// Return mangled name for the given type.
+TypeNamePair
+swift::swift_getMangledTypeName(const Metadata *type) {
+  TypeNameCacheKey key(type, TypeNameKind::Mangled);
+  auto &cache = TypeNameCache.get();
+
+  // Attempt read-only lookup of cache entry.
+  {
+    #if SWIFT_CASTING_SUPPORTS_MUTEX
+    StaticScopedReadLock guard(TypeNameCacheLock);
+    #endif
+
+    auto found = cache.find(key);
+    if (found != cache.end()) {
+      auto result = found->second;
+      return TypeNamePair{result.first, result.second};
+    }
+  }
+
+  // Read-only cache lookup failed, we may need to create it.
+  {
+    #if SWIFT_CASTING_SUPPORTS_MUTEX
+    StaticScopedWriteLock guard(TypeNameCacheLock);
+    #endif
+
+    // Do lookup again just to make sure it wasn't created by another
+    // thread before we acquired the write lock.
+    auto found = cache.find(key);
+    if (found != cache.end()) {
+      auto result = found->second;
+      return TypeNamePair{result.first, result.second};
+    }
+
+    // Build the mangled name.
+    Demangle::Demangler Dem;
+    auto demangling = _swift_buildDemanglingForMetadata(type, Dem);
+
+    if (demangling == nullptr) {
+      return TypeNamePair{NULL, 0};
+    }
+    auto name = Demangle::mangleNode(demangling);
+
+    // Copy it to memory we can reference forever.
+    auto size = name.size();
+    auto result = (char *)malloc(size + 1);
+    memcpy(result, name.data(), size);
+    result[size] = 0;
+
+    cache.insert({key, {result, size}});
+
     return TypeNamePair{result, size};
   }
 }
