@@ -2351,14 +2351,23 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Record the times test took and report the slowest.
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
 
+                echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
+                echo "--- Running LLDB Swift tests (ClangImporter) ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
                          ${LLVM_LIT_ARGS}
+                # Rerun the tests with DWARFImporter only.
+                echo "--- Running LLDB Swift tests (DWARFImporter) ---"
+                with_pushd ${results_dir} \
+                    call "${llvm_build_dir}/bin/llvm-lit" \
+                         "${lldb_build_dir}/test" \
+                         ${LLVM_LIT_ARGS} \
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=false"
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                     echo "Running LLDB swift compatibility tests against" \
