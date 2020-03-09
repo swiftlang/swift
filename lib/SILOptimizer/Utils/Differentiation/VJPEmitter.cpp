@@ -363,7 +363,7 @@ void VJPEmitter::visitReturnInst(ReturnInst *ri) {
     // applies, the return type may be ABI-incomaptible with the type of the
     // partially applied pullback. In these cases, produce an undef and rely on
     // other code to emit a diagnostic.
-    pullbackValue = SILUndef::get(pullbackType, *pullbackPartialApply->getFunction());
+    pullbackValue = SILUndef::get(pullbackType, *vjp);
   }
 
   // Return a tuple of the original result and pullback.

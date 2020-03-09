@@ -1431,8 +1431,12 @@ void JVPEmitter::visitReturnInst(ReturnInst *ri) {
       loc, differentialRef, jvpSubstMap, {diffStructVal},
       ParameterConvention::Direct_Guaranteed);
 
-  auto differentialType = jvp->getLoweredFunctionType()->getResults().back().getSILStorageInterfaceType();
-  differentialType = differentialType.substGenericArgs(getModule(), jvpSubstMap, TypeExpansionContext::minimal());
+  auto differentialType = jvp->getLoweredFunctionType()
+                              ->getResults()
+                              .back()
+                              .getSILStorageInterfaceType();
+  differentialType = differentialType.substGenericArgs(
+      getModule(), jvpSubstMap, TypeExpansionContext::minimal());
   differentialType = differentialType.subst(getModule(), jvpSubstMap);
   auto differentialFnType = differentialType.castTo<SILFunctionType>();
 
@@ -1452,8 +1456,7 @@ void JVPEmitter::visitReturnInst(ReturnInst *ri) {
     // applies, the return type may be ABI-incomaptible with the type of the
     // partially applied differential. In these cases, produce an undef and rely
     // on other code to emit a diagnostic.
-    differentialValue = SILUndef::get(differentialType,
-                                      *differentialPartialApply->getFunction());
+    differentialValue = SILUndef::get(differentialType, *jvp);
   }
 
   // Return a tuple of the original result and differential.

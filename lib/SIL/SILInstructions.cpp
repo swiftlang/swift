@@ -709,7 +709,6 @@ getExtracteeType(
   auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
       fnTy->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
       *kindOpt, module.Types, LookUpConformanceInModule(module.getSwiftModule()));
-  llvm::dbgs() << "getExtracteeType for " << function << ":\n" << SILType::getPrimitiveObjectType(resultFnTy) << "\n";
   return SILType::getPrimitiveObjectType(resultFnTy);
 }
 
@@ -725,8 +724,14 @@ DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
       HasExplicitExtracteeType(extracteeType.hasValue()) {
 #ifndef NDEBUG
   if (extracteeType.hasValue()) {
-    assert(module.getStage() == SILStage::Lowered &&
-           "Explicit type is valid only in lowered SIL");
+    // Note: explicit extractee type is used to avoid inconsistent typing in:
+    // - Canonical SIL, due to generic specialization.
+    // - Lowered SIL, due to LoadableByAddress.
+    // See `TypeSubstCloner::visitDifferentiableFunctionExtractInst` for an
+    // explanation of how explicit extractee type is used.
+    assert((module.getStage() == SILStage::Canonical ||
+            module.getStage() == SILStage::Lowered) &&
+           "Explicit type is valid only in canonical or lowered SIL");
   }
 #endif
 }
