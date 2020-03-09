@@ -409,6 +409,22 @@ bb0(%0 : @owned $SmallCodesizeStruct):
   return %7 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @small_tuple_test : $@convention(thin) (@owned (Klass, Klass)) -> () {
+// CHECK: bb0([[ARG0:%.*]] : @owned $(Klass, Klass)):
+// CHECK-NEXT:   ([[ARG0cls1:%.*]], [[ARG0cls2:%.*]]) = destructure_tuple [[ARG0]]
+// CHECK-NEXT:   destroy_value [[ARG0cls1]]
+// CHECK-NEXT:   destroy_value [[ARG0cls2]]
+// CHECK: } // end sil function 'small_tuple_test'
+sil [ossa] @small_tuple_test : $@convention(thin) (@owned (Klass, Klass)) -> () {
+bb0(%0 : @owned $(Klass, Klass)):
+  %1 = alloc_stack $(Klass, Klass)
+  store %0 to [init] %1 : $*(Klass, Klass)
+  destroy_addr %1 : $*(Klass, Klass)
+  dealloc_stack %1 : $*(Klass, Klass)
+  %7 = tuple ()
+  return %7 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dead_address_projections
 // CHECK-NOT: alloc_stack
 // CHECK: } // end sil function 'dead_address_projections'

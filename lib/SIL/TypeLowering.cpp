@@ -747,9 +747,13 @@ namespace {
     void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
                                 SILValue aggValue,
                                 const T &operation) const {
-      DestructureStructInst *destructured = nullptr;
+      MultipleValueInstruction *destructured = nullptr;
       if (aggValue->getFunction()->hasOwnership()) {
-        destructured = B.createDestructureStruct(loc, aggValue);
+        if (aggValue->getType().is<TupleType>()) {
+          destructured = B.createDestructureTuple(loc, aggValue);
+        } else {
+          destructured = B.createDestructureStruct(loc, aggValue);
+        }
       }
       unsigned plainIndex = 0;
       for (auto &child : getChildren(B.getModule().Types)) {
