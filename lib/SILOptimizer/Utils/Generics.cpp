@@ -797,6 +797,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
 
   unsigned IndirectResultIdx = 0;
   for (SILResultInfo RI : SubstFTy->getResults()) {
+    RI = RI.getUnsubstituted(M, SubstFTy);
     if (RI.isFormalIndirect()) {
       bool isTrivial = TrivialArgs.test(IndirectResultIdx);
       if (isFormalResultConverted(IndirectResultIdx++)) {
@@ -806,7 +807,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
         auto C = (isTrivial
                   ? ResultConvention::Unowned
                   : ResultConvention::Owned);
-        SpecializedResults.push_back(SILResultInfo(RI.getReturnValueType(M, SubstFTy), C));
+        SpecializedResults.push_back(RI.getWithConvention(C));
         continue;
       }
     }
@@ -815,6 +816,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   }
   unsigned ParamIdx = 0;
   for (SILParameterInfo PI : SubstFTy->getParameters()) {
+    PI = PI.getUnsubstituted(M, SubstFTy);
     bool isTrivial = TrivialArgs.test(param2ArgIndex(ParamIdx));
     if (!isParamConverted(ParamIdx++)) {
       // No conversion: re-use the original, substituted parameter info.
@@ -834,11 +836,11 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
         C = ParameterConvention::Direct_Owned;
       }
     }
-    SpecializedParams.push_back(SILParameterInfo(PI.getArgumentType(M, SubstFTy), C));
+    SpecializedParams.push_back(PI.getWithConvention(C));
   }
   for (SILYieldInfo YI : SubstFTy->getYields()) {
-    // For now, always just use the original, substituted parameter info.
-    SpecializedYields.push_back(YI);
+    // For now, always re-use the original, substituted yield info.
+    SpecializedYields.push_back(YI.getUnsubstituted(M, SubstFTy));
   }
 
   auto Signature = SubstFTy->isPolymorphic()

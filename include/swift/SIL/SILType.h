@@ -380,6 +380,11 @@ public:
   bool hasArchetype() const {
     return getASTType()->hasArchetype();
   }
+
+  /// True if the type involves any opaque archetypes.
+  bool hasOpaqueArchetype() const {
+    return getASTType()->hasOpaqueArchetype();
+  }
   
   /// Returns the ASTContext for the referenced Swift type.
   ASTContext &getASTContext() const {

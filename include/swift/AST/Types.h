@@ -4883,6 +4883,17 @@ public:
   CanSILFunctionType
   withPatternSubstitutions(SubstitutionMap subs) const;
 
+  /// Create a SILFunctionType with the same structure as this one,
+  /// but replacing the invocation generic signature and pattern
+  /// substitutions.  This type must either be polymorphic or have
+  /// pattern substitutions, and the substitution signature must
+  /// match `getSubstGenericSignature()`.
+  CanSILFunctionType
+  withPatternSpecialization(CanGenericSignature sign,
+                            SubstitutionMap subs,
+                            ProtocolConformanceRef witnessConformance =
+                              ProtocolConformanceRef()) const;
+
   class ABICompatibilityCheckResult {
     friend class SILFunctionType;
 

@@ -1511,6 +1511,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back('G');
     break;
   }
+
+  auto outerGenericSig = CurGenericSignature;
+  CurGenericSignature = fn->getSubstGenericSignature();
   
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
@@ -1538,8 +1541,10 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back(getResultConvention(error.getConvention()));
     appendType(error.getInterfaceType());
   }
+
   if (auto sig = fn->getInvocationGenericSignature()) {
     appendGenericSignature(sig);
+    CurGenericSignature = outerGenericSig;
   }
   if (auto subs = fn->getInvocationSubstitutions()) {
     appendFlatGenericArgs(subs);
@@ -1547,8 +1552,13 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   }
   if (auto subs = fn->getPatternSubstitutions()) {
     appendGenericSignature(subs.getGenericSignature());
+    CurGenericSignature =
+      fn->getInvocationGenericSignature()
+        ? fn->getInvocationGenericSignature()
+        : outerGenericSig;
     appendFlatGenericArgs(subs);
     appendRetroactiveConformances(subs, Mod);
+    CurGenericSignature = outerGenericSig;
   }
 
   OpArgs.push_back('_');

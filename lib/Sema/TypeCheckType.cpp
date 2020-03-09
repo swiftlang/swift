@@ -2962,6 +2962,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       return ErrorType::get(Context);
 
     Type selfType = params.back().getInterfaceType();
+    if (patternSubs)
+      selfType = selfType.subst(patternSubs);
     if (invocationSubs) {
       selfType = selfType.subst(invocationSubs);
     }

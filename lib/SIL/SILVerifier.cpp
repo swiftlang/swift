@@ -848,7 +848,7 @@ public:
 
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F),
-        fnConv(F.getLoweredFunctionType(), F.getModule()),
+        fnConv(F.getConventionsInContext()),
         TC(F.getModule().Types), OpenedArchetypes(&F), Dominance(nullptr),
         InstNumbers(numInstsInFunction(F)),
         DEBlocks(&F), SingleFunction(SingleFunction) {
@@ -1322,12 +1322,12 @@ public:
     }
 
     if (subs.getGenericSignature()->getCanonicalSignature() !=
-          fnTy->getSubstGenericSignature()->getCanonicalSignature()) {
+          fnTy->getInvocationGenericSignature()->getCanonicalSignature()) {
       llvm::dbgs() << "substitution map's generic signature: ";
       subs.getGenericSignature()->print(llvm::dbgs());
       llvm::dbgs() << "\n";
       llvm::dbgs() << "callee's generic signature: ";
-      fnTy->getSubstGenericSignature()->print(llvm::dbgs());
+      fnTy->getInvocationGenericSignature()->print(llvm::dbgs());
       llvm::dbgs() << "\n";
       require(false,
               "Substitution map does not match callee in apply instruction");
@@ -3980,9 +3980,7 @@ public:
   void checkThrowInst(ThrowInst *TI) {
     LLVM_DEBUG(TI->print(llvm::dbgs()));
 
-    CanSILFunctionType fnType =
-        F.getLoweredFunctionTypeInContext(F.getTypeExpansionContext());
-    require(fnType->hasErrorResult(),
+    require(fnConv.funcTy->hasErrorResult(),
             "throw in function that doesn't have an error result");
 
     SILType functionResultType =
@@ -4005,14 +4003,11 @@ public:
   }
 
   void checkYieldInst(YieldInst *YI) {
-    CanSILFunctionType fnType =
-        F.getLoweredFunctionTypeInContext(F.getTypeExpansionContext())
-         ->getUnsubstitutedType(F.getModule());
-    require(fnType->isCoroutine(),
+    require(fnConv.funcTy->isCoroutine(),
             "yield in non-coroutine function");
 
     auto yieldedValues = YI->getYieldedValues();
-    auto yieldInfos = fnType->getYields();
+    auto yieldInfos = fnConv.funcTy->getYields();
     require(yieldedValues.size() == yieldInfos.size(),
             "wrong number of yielded values for function");
     for (auto i : indices(yieldedValues)) {
@@ -4676,7 +4671,7 @@ public:
 
     for (auto result : fnConv.getIndirectSILResults()) {
       assert(fnConv.isSILIndirect(result));
-      check("result", fnConv.getSILType(result));
+      check("indirect result", fnConv.getSILType(result));
     }
     for (auto param : F.getLoweredFunctionType()->getParameters()) {
       check("parameter", fnConv.getSILType(param));
