@@ -109,6 +109,10 @@ class UnsafeUnownedFieldKlass {
   unowned(safe) var x: @sil_unowned Builtin.NativeObject
 }
 
+class ClassProtConformingRef {}
+protocol ClassProt : AnyObject {}
+extension ClassProtConformingRef : ClassProt {}
+
 ////////////////
 // Test Cases //
 ////////////////
@@ -1291,4 +1295,13 @@ bb4:
   %9999 = tuple()
   destroy_value %1 : $Builtin.NativeObject
   return %9999 : $()
+}
+
+sil [ossa] @init_existential_ref_forwarding : $@convention(thin) (@guaranteed ClassProtConformingRef, @owned ClassProtConformingRef) -> @owned (ClassProt, ClassProt) {
+bb0(%0 : @guaranteed $ClassProtConformingRef, %1 : @owned $ClassProtConformingRef):
+  %2 = init_existential_ref %0 : $ClassProtConformingRef : $ClassProtConformingRef, $ClassProt
+  %3 = copy_value %2 : $ClassProt
+  %4 = init_existential_ref %1 : $ClassProtConformingRef : $ClassProtConformingRef, $ClassProt
+  %5 = tuple(%3 : $ClassProt, %4 : $ClassProt)
+  return %5 : $(ClassProt, ClassProt)
 }

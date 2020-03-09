@@ -593,6 +593,7 @@ struct SemanticARCOptVisitor
   FORWARDING_INST(OpenExistentialValue)
   FORWARDING_INST(OpenExistentialBoxValue)
   FORWARDING_INST(MarkDependence)
+  FORWARDING_INST(InitExistentialRef)
 #undef FORWARDING_INST
 
 #define FORWARDING_TERM(NAME)                                                  \
