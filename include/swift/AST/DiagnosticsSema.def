@@ -1973,8 +1973,8 @@ WARNING(protocol_usable_from_inline_warn,none,
         "protocol %select{refined|used}0 by '@usableFromInline' protocol "
         "should be '@usableForInline' or public", (bool))
 ERROR(protocol_property_must_be_computed_var,none,
-      "immutable property requirement must be declared as 'var' with a "
-      "'{ get }' specifier", ())
+      "protocols cannot require properties to be immutable; declare read-only "
+      "properties by using 'var' with a '{ get }' specifier", ())
 ERROR(protocol_property_must_be_computed,none,
       "property in protocol must have explicit { get } or { get set } specifier",
       ())
