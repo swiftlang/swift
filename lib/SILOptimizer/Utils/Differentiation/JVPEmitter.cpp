@@ -1393,8 +1393,6 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   auto *differentialDecl = differentialInfo.lookUpLinearMapDecl(ai);
   auto originalDifferentialType =
       getOpType(differential->getType()).getAs<SILFunctionType>();
-  auto differentialType =
-      remapType(differential->getType()).castTo<SILFunctionType>();
   auto loweredDifferentialType =
       getOpType(getLoweredType(differentialDecl->getInterfaceType()))
           .castTo<SILFunctionType>();
@@ -1436,19 +1434,29 @@ void JVPEmitter::visitReturnInst(ReturnInst *ri) {
   auto differentialType = jvp->getLoweredFunctionType()->getResults().back().getSILStorageInterfaceType();
   differentialType = differentialType.substGenericArgs(getModule(), jvpSubstMap, TypeExpansionContext::minimal());
   differentialType = differentialType.subst(getModule(), jvpSubstMap);
+  auto differentialFnType = differentialType.castTo<SILFunctionType>();
 
+  auto differentialSubstType =
+      differentialPartialApply->getType().castTo<SILFunctionType>();
   SILValue differentialValue;
-  if (differentialPartialApply->getType().castTo<SILFunctionType>()->isABICompatibleWith(differentialType.castTo<SILFunctionType>(), *differentialPartialApply->getFunction()).isCompatible()) {
-    differentialValue = builder.createConvertFunction(loc, differentialPartialApply, differentialType, /*withoutActuallyEscaping*/ false);
+  if (differentialSubstType == differentialFnType) {
+    differentialValue = differentialPartialApply;
+  } else if (differentialSubstType
+                 ->isABICompatibleWith(differentialFnType, *jvp)
+                 .isCompatible()) {
+    differentialValue = builder.createConvertFunction(
+        loc, differentialPartialApply, differentialType,
+        /*withoutActuallyEscaping*/ false);
   } else {
     // When `diag::autodiff_loadable_value_addressonly_tangent_unsupported`
     // applies, the return type may be ABI-incomaptible with the type of the
-    // partially applied differential. In these cases, produce an undef and rely on
-    // other code to emit a diagnostic.
-    differentialValue = SILUndef::get(differentialType, *differentialPartialApply->getFunction());
+    // partially applied differential. In these cases, produce an undef and rely
+    // on other code to emit a diagnostic.
+    differentialValue = SILUndef::get(differentialType,
+                                      *differentialPartialApply->getFunction());
   }
 
-  // Return a tuple of the original result and pullback.
+  // Return a tuple of the original result and differential.
   SmallVector<SILValue, 8> directResults;
   directResults.append(origResults.begin(), origResults.end());
   directResults.push_back(differentialValue);
