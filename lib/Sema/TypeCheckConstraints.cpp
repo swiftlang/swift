@@ -4259,7 +4259,7 @@ static bool checkForDynamicAttribute(CanType ty,
   }
 
   // Otherwise, this must be a nominal type.
-  // Neither Dynamic member lookup or Dynamic Callable doesn't
+  // Neither Dynamic member lookup nor Dynamic Callable doesn't
   // work for tuples, etc.
   auto nominal = ty->getAnyNominal();
   if (!nominal)
