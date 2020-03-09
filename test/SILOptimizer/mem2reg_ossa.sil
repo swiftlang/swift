@@ -296,9 +296,9 @@ bb2:
 // CHECK: br bb3([[SECONDTHICK]] : $@callee_owned () -> Int)
   br bb3
 
-// CHECK: bb3([[ARG:%.*]] : $@callee_owned () -> Int):
+// CHECK: bb3([[ARG:%.*]] : @owned $@callee_owned () -> Int):
 bb3:
-// CHECK-NOT: load [[STACK]]
+// CHECK-NOT: load [take] [[STACK]]
   %13 = load [take] %1 : $*@callee_owned () -> Int
 // CHECK: [[RESULT:%.*]] = apply [[ARG]]
   %15 = apply %13() : $@callee_owned () -> Int
@@ -332,10 +332,12 @@ bb0:
   return %1 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @keep_release
-// CHECK: strong_release %0
-// CHECK: return
-sil [ossa] @keep_release : $@convention(thin) (@owned AnyObject) -> () {
+// CHECK-LABEL: sil [ossa] @lower_to_destory_val
+// CHECK: bb0
+// CHECK-NEXT: destroy_value %0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @lower_to_destory_val : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
   %1 = alloc_stack $AnyObject
   store %0 to [init] %1 : $*AnyObject
@@ -378,8 +380,8 @@ bb0(%0 : $*Int64):
 // Make sure that we do expand destroy_addr appropriately for code-size
 // trade-offs.
 // CHECK-LABEL: sil [ossa] @large_struct_test : $@convention(thin) (@owned LargeCodesizeStruct) -> () {
-// CHECK: bb0([[ARG0:%.*]] : $LargeCodesizeStruct):
-// CHECK:   release_value [[ARG0]]
+// CHECK: bb0([[ARG0:%.*]] : @owned $LargeCodesizeStruct):
+// CHECK:   destroy_value [[ARG0]]
 // CHECK: } // end sil function 'large_struct_test'
 sil [ossa] @large_struct_test : $@convention(thin) (@owned LargeCodesizeStruct) -> () {
 bb0(%0 : @owned $LargeCodesizeStruct):
@@ -392,11 +394,10 @@ bb0(%0 : @owned $LargeCodesizeStruct):
 }
 
 // CHECK-LABEL: sil [ossa] @small_struct_test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
-// CHECK: bb0([[ARG0:%.*]] : $SmallCodesizeStruct):
-// CHECK:   [[ARG0cls1:%.*]] = struct_extract [[ARG0]]
-// CHECK:   strong_release [[ARG0cls1]]
-// CHECK:   [[ARG0cls2:%.*]] = struct_extract [[ARG0]]
-// CHECK:   strong_release [[ARG0cls2]]
+// CHECK: bb0([[ARG0:%.*]] : @owned $SmallCodesizeStruct):
+// CHECK-NEXT:   ([[ARG0cls1:%.*]], [[ARG0cls2:%.*]]) = destructure_struct [[ARG0]]
+// CHECK-NEXT:   destroy_value [[ARG0cls1]]
+// CHECK-NEXT:   destroy_value [[ARG0cls2]]
 // CHECK: } // end sil function 'small_struct_test'
 sil [ossa] @small_struct_test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
 bb0(%0 : @owned $SmallCodesizeStruct):
@@ -445,15 +446,20 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast
-// CHECK-NOT: alloc_stack
+// TODO: we should be able to eliminate the begin_access which will allow the alloc_stack to be removed.
+// CHECK: alloc_stack
+// CHECK-NEXT: dealloc_stack
 // CHECK: [[CAST:%.*]] = unchecked_bitwise_cast %0 : $Optional<Klass> to $Klass
-// CHECK: release_value [[CAST]]
+// CHECK: [[COPY:%.*]] = copy_value [[CAST]]
+// CHECK: destroy_value [[COPY]]
 // CHECK: return
 sil [ossa] @unchecked_ref_cast : $@convention(thin) (@owned Optional<Klass>) -> () {
 bb0(%0 : @owned $Optional<Klass>):
   %1 = alloc_stack $Optional<Klass>
   store %0 to [init] %1 : $*Optional<Klass>
-  %2 = unchecked_addr_cast %1 : $*Optional<Klass> to $*Klass
+  %a = begin_access [read] [static] %1 : $*Optional<Klass>
+  %2 = unchecked_addr_cast %a : $*Optional<Klass> to $*Klass
+  end_access %a : $*Optional<Klass>
   %3 = load [copy] %2 : $*Klass
   destroy_value %3 : $Klass
   destroy_addr %1 : $*Optional<Klass>

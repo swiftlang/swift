@@ -189,7 +189,8 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
     return true;
 
   if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
-      !isa<TupleElementAddrInst>(I))
+      !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I) &&
+      !isa<BeginBorrowInst>(I))
     return false;
   
   // Recursively search for other (non-)loads in the instruction's uses.
@@ -197,6 +198,11 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
     SILInstruction *II = UI->getUser();
     if (II->getParent() != singleBlock)
       singleBlock = nullptr;
+    
+    // Ignore end access / borrow becasue they are harmless users of
+    // begin access /borrow.
+    if (isa<EndAccessInst>(II) || isa<EndBorrowInst>(II))
+      continue;
     
     if (!isAddressForLoad(II, singleBlock))
         return false;
@@ -207,7 +213,8 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
 /// Returns true if \p I is a dead struct_element_addr or tuple_element_addr.
 static bool isDeadAddrProjection(SILInstruction *I) {
   if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
-      !isa<TupleElementAddrInst>(I))
+      !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I) &&
+      !isa<BeginBorrowInst>(I))
     return false;
 
   // Recursively search for uses which are dead themselves.
@@ -228,6 +235,10 @@ static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
   // For all users of the AllocStack instruction.
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
     SILInstruction *II = UI->getUser();
+
+    // End access / borrow is OK, continue.
+    if (isa<EndAccessInst>(II) || isa<EndBorrowInst>(II))
+      continue;
 
     if (II->getParent() != singleBlock)
       singleBlock = nullptr;
@@ -320,7 +331,8 @@ static bool isLoadFromStack(SILInstruction *I, AllocStackInst *ASI) {
   ValueBase *op = I->getOperand(0);
   while (op != ASI) {
     if (!isa<UncheckedAddrCastInst>(op) && !isa<StructElementAddrInst>(op) &&
-        !isa<TupleElementAddrInst>(op))
+        !isa<TupleElementAddrInst>(op) && !isa<BeginAccessInst>(op) &&
+        !isa<BeginBorrowInst>(op))
       return false;
     
     op = cast<SingleValueInstruction>(op)->getOperand(0);
@@ -335,7 +347,8 @@ static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) 
     return;
   }
   if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
-      !isa<TupleElementAddrInst>(I))
+      !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I) &&
+      !isa<BeginBorrowInst>(I))
     return;
   
   // Recursively search for other loads in the instruction's uses.
@@ -350,24 +363,31 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   SILValue op = LI->getOperand();
   while (op != ASI) {
     assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
-           isa<TupleElementAddrInst>(op));
+           isa<TupleElementAddrInst>(op) || isa<BeginAccessInst>(op) ||
+           isa<BeginBorrowInst>(op));
     auto *Inst = cast<SingleValueInstruction>(op);
-    projections.push_back(Projection(Inst));
+    // We don't want to project these instructions but we do want to follow
+    // their operand.
+    // TODO: we should try to remove these instruction after they've been
+    // projected.
+    if (!isa<BeginAccessInst>(op) && !isa<BeginBorrowInst>(op))
+      projections.push_back(Projection(Inst));
     op = Inst->getOperand(0);
   }
   SILBuilder builder(LI);
   for (auto iter = projections.rbegin(); iter != projections.rend(); ++iter) {
     const Projection &projection = *iter;
-    auto borrowedVal = builder.createBeginBorrow(LI->getLoc(), val);
-    val = projection.createObjectProjection(builder, LI->getLoc(), borrowedVal).get();
-    builder.createEndBorrow(LI->getLoc(), borrowedVal);
+    val = projection.createObjectProjection(builder, LI->getLoc(), val).get();
   }
   op = LI->getOperand();
+  if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+    val = builder.createCopyValue(LI->getLoc(), val);
   LI->replaceAllUsesWith(val);
   LI->eraseFromParent();
   while (op != ASI && op->use_empty()) {
     assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
-           isa<TupleElementAddrInst>(op));
+           isa<TupleElementAddrInst>(op) || isa<BeginAccessInst>(op) ||
+           isa<BeginBorrowInst>(op));
     auto *Inst = cast<SingleValueInstruction>(op);
     SILValue next = Inst->getOperand(0);
     Inst->eraseFromParent();
@@ -558,7 +578,9 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     SILNode *Node = Inst;
     while (isa<StructElementAddrInst>(Node) ||
            isa<TupleElementAddrInst>(Node) ||
-           isa<UncheckedAddrCastInst>(Node)) {
+           isa<UncheckedAddrCastInst>(Node) ||
+           isa<BeginAccessInst>(Node) ||
+           isa<BeginBorrowInst>(Node)) {
       auto *I = cast<SingleValueInstruction>(Node);
       if (!I->use_empty()) break;
       Node = I->getOperand(0);

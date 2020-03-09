@@ -747,15 +747,26 @@ namespace {
     void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
                                 SILValue aggValue,
                                 const T &operation) const {
+      DestructureStructInst *destructured = nullptr;
+      if (aggValue->getFunction()->hasOwnership()) {
+        destructured = B.createDestructureStruct(loc, aggValue);
+      }
+      unsigned plainIndex = 0;
       for (auto &child : getChildren(B.getModule().Types)) {
         auto &childLowering = child.getLowering();
         // Skip trivial children.
         if (childLowering.isTrivial())
           continue;
         auto childIndex = child.getIndex();
-        auto childValue = asImpl().emitRValueProject(B, loc, aggValue,
-                                                   childIndex, childLowering);
-        operation(B, loc, childIndex, childValue, childLowering);
+        if (destructured) {
+          operation(B, loc, childIndex,
+                    destructured->getResult(plainIndex++),
+                    childLowering);
+        } else {
+          auto childValue = asImpl().emitRValueProject(B, loc, aggValue,
+                                                     childIndex, childLowering);
+          operation(B, loc, childIndex, childValue, childLowering);
+        }
       }
     }
 
