@@ -67,24 +67,41 @@ func f1() {
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
+// FIXME: whether we get a trailing closure or not depends on the order we
+// expand the placeholders.
+func f1() {
+  bar(<#T##__skip__: () -> ()##() -> ()#>, <#T##d: () -> ()##() -> ()#>)
+}
+// CHECK:   bar(<#T##__skip__: () -> ()##() -> ()#>, {
+// CHECK-NEXT:	<#code#>
+// CHECK-NEXT:	})
+
 func f1() {
   bar(<#T##d: () -> ()##() -> ()#>, <#T##d: () -> ()##() -> ()#>)
 }
 // CHECK:   bar({
-// CHECK-NEXT:	<#code#>
-// CHECK-NEXT:	}, {
-// CHECK-NEXT:	<#code#>
-// CHECK-NEXT:	})
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  }) {
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  }
 
+// FIXME: whether we get a trailing closure or not depends on the order we
+// expand the placeholders.
+func f1() {
+  bar(a : <#T##__skip__: () -> ()##() -> ()#>, b : <#T##d: () -> ()##() -> ()#>)
+}
+// CHECK: bar(a : <#T##__skip__: () -> ()##() -> ()#>, b : {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: })
 
 func f1() {
   bar(a : <#T##d: () -> ()##() -> ()#>, b : <#T##d: () -> ()##() -> ()#>)
 }
 // CHECK: bar(a : {
 // CHECK-NEXT: <#code#>
-// CHECK-NEXT: }, b : {
+// CHECK-NEXT: }) {
 // CHECK-NEXT: <#code#>
-// CHECK-NEXT: })
+// CHECK-NEXT: }
 
 
 func f1() {
