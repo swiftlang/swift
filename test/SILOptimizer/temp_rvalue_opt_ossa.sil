@@ -1075,3 +1075,52 @@ bb0(%0 : @owned $GS<Builtin.NativeObject>):
   %v = tuple ()
   return %v : $()
 }
+
+////////////////////////////////////////
+// Unchecked Take Enum Data Addr Inst //
+////////////////////////////////////////
+
+// Make sure we only handle this in the copy_addr case. With time, we should
+// also handle the store case.
+//
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_rvalue_simple : $@convention(thin) <B> (@in_guaranteed Optional<GS<B>>, @inout Optional<GS<B>>) -> () {
+// CHECK-NOT: alloc_stack
+// CHECK: } // end sil function 'unchecked_take_enum_data_addr_rvalue_simple'
+sil [ossa] @unchecked_take_enum_data_addr_rvalue_simple : $@convention(thin) <B> (@in_guaranteed Optional<GS<B>>, @inout Optional<GS<B>>) -> () {
+bb0(%0 : $*Optional<GS<B>>, %1 : $*Optional<GS<B>>):
+  %0a = unchecked_take_enum_data_addr %0 : $*Optional<GS<B>>, #Optional.some!enumelt.1
+  %2 = struct_element_addr %0a : $*GS<B>, #GS._value
+  %3 = load [trivial] %2 : $*Builtin.Int64
+  %4 = alloc_stack $Optional<GS<B>>
+  copy_addr %1 to [initialization] %4 : $*Optional<GS<B>>
+  %4a = unchecked_take_enum_data_addr %4 : $*Optional<GS<B>>, #Optional.some!enumelt.1
+  %6 = struct_element_addr %4a : $*GS<B>, #GS._value
+  %7 = load [trivial] %6 : $*Builtin.Int64
+  %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  destroy_addr %4 : $*Optional<GS<B>>
+  dealloc_stack %4 : $*Optional<GS<B>>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not support this today, since I am still bringing up store support.
+//
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_store_rvalue_simple : $@convention(thin) (@in_guaranteed Optional<GS<Klass>>, @owned Optional<GS<Klass>>) -> () {
+// CHECK: alloc_stack
+// CHECK: } // end sil function 'unchecked_take_enum_data_addr_store_rvalue_simple'
+sil [ossa] @unchecked_take_enum_data_addr_store_rvalue_simple : $@convention(thin) (@in_guaranteed Optional<GS<Klass>>, @owned Optional<GS<Klass>>) -> () {
+bb0(%0 : $*Optional<GS<Klass>>, %1 : @owned $Optional<GS<Klass>>):
+  %0a = unchecked_take_enum_data_addr %0 : $*Optional<GS<Klass>>, #Optional.some!enumelt.1
+  %2 = struct_element_addr %0a : $*GS<Klass>, #GS._value
+  %3 = load [trivial] %2 : $*Builtin.Int64
+  %4 = alloc_stack $Optional<GS<Klass>>
+  store %1 to [init] %4 : $*Optional<GS<Klass>>
+  %4a = unchecked_take_enum_data_addr %4 : $*Optional<GS<Klass>>, #Optional.some!enumelt.1
+  %6 = struct_element_addr %4a : $*GS<Klass>, #GS._value
+  %7 = load [trivial] %6 : $*Builtin.Int64
+  %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  destroy_addr %4 : $*Optional<GS<Klass>>
+  dealloc_stack %4 : $*Optional<GS<Klass>>
+  %9999 = tuple()
+  return %9999 : $()
+}
