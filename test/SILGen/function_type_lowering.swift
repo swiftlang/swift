@@ -16,7 +16,7 @@ func c<T, U, V>(_ x: (V) -> T, _: U) {}
 // CHECK-LABEL: sil {{.*}}003Hca{{.*}} : $@convention(thin) <T> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>) -> ()
 func ç<T>(_ x: (T) -> T) {}
 
-// CHECK-LABEL: sil {{.*}}returnsThrowing{{.*}} : $@convention(thin) <T, U, V> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @error Error) for <τ_0_1, τ_0_2> for <T, U, V>) -> ()
+// CHECK-LABEL: sil {{.*}}returnsThrowing{{.*}} : $@convention(thin) <T, U, V> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @error Error) for <τ_0_1, τ_0_2>) for <T, U, V>) -> () {
 func returnsThrowing<T, U, V>(_ x: (T) -> (U) throws -> V) {}
 
 
@@ -156,9 +156,10 @@ func z<T: P>(_: (SP<T>) -> Void) {}
 
 struct SCP<T: P, U: CP<T>> {}
 
-// CHECK-LABEL: sil {{.*}}2z2{{.*}} : $@convention(thin) <T, U where T : P, U : CP<T>> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : CP<T>, τ_0_1 : _NativeClass> (SCP<τ_0_0, τ_0_1>) -> () for <T, U>) -> ()
+// CHECK-LABEL: sil {{.*}}2z2{{.*}} : $@convention(thin) <T, U where T : P, U : CP<T>> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : CP<τ_0_0>, τ_0_1 : _NativeClass> (SCP<τ_0_0, τ_0_1>) -> () for <T, U>) -> ()
 func z2<T: P, U: CP<T>>(_: (SCP<T, U>) -> Void) {}
-// CHECK-LABEL: sil {{.*}}3z2a{{.*}} : $@convention(thin) <T, U where T : AnyObject, T : P, U : CP<T>> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : _RefCountedObject, τ_0_0 : P, τ_0_1 : CP<T>, τ_0_1 : _NativeClass> (SCP<τ_0_0, τ_0_1>) -> () for <T, U>) -> ()
+
+// CHECK-LABEL: sil {{.*}}3z2a{{.*}} : $@convention(thin) <T, U where T : AnyObject, T : P, U : CP<T>> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : _RefCountedObject, τ_0_0 : P, τ_0_1 : CP<τ_0_0>, τ_0_1 : _NativeClass> (SCP<τ_0_0, τ_0_1>) -> () for <T, U>) -> ()
 func z2a<T: P & AnyObject, U: CP<T>>(_: (SCP<T, U>) -> Void) {}
 
 // CHECK-LABEL: sil {{.*}}2z3{{.*}} : $@convention(thin) <T, U where T : P, U : CP<T>> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : _RefCountedObject, τ_0_1 : _RefCountedObject> (S<τ_0_0, τ_0_1>) -> () for <U, U>) -> ()

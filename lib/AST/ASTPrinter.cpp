@@ -4208,10 +4208,8 @@ public:
       }
       sub->Printer << ") -> ";
 
-      unsigned totalResults =
-        T->getNumYields() + T->getNumResults() + unsigned(T->hasErrorResult());
-
-      if (totalResults != 1)
+      bool parenthesizeResults = mustParenthesizeResults(T);
+      if (parenthesizeResults)
         sub->Printer << "(";
 
       first = true;
@@ -4235,7 +4233,7 @@ public:
         T->getErrorResult().getInterfaceType().print(sub->Printer, subOptions);
       }
 
-      if (totalResults != 1)
+      if (parenthesizeResults)
         sub->Printer << ")";
     }();
 
@@ -4250,6 +4248,24 @@ public:
       Printer << " for";
       printSubstitutions(substitutions);
     }
+  }
+
+  static bool mustParenthesizeResults(SILFunctionType *T) {
+    // If we don't have exactly one result, we must parenthesize.
+    unsigned totalResults =
+      T->getNumYields() + T->getNumResults() + unsigned(T->hasErrorResult());
+    if (totalResults != 1)
+      return true;
+
+    // If we have substitutions, we must parenthesize if the single
+    // result is a function type.
+    if (!T->hasPatternSubstitutions() && !T->hasInvocationSubstitutions())
+      return false;
+    if (T->getNumResults() == 1)
+      return isa<SILFunctionType>(T->getResults()[0].getInterfaceType());
+    if (T->getNumYields() == 1)
+      return isa<SILFunctionType>(T->getYields()[0].getInterfaceType());
+    return isa<SILFunctionType>(T->getErrorResult().getInterfaceType());
   }
 
   void visitSILBlockStorageType(SILBlockStorageType *T) {

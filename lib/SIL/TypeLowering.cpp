@@ -26,6 +26,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -2537,6 +2538,63 @@ TypeConverter::checkForABIDifferences(SILModule &M,
   return ABIDifference::NeedsThunk;
 }
 
+namespace {
+class HaveDifferentAbstractStructure
+    : public CanTypeDifferenceVisitor<HaveDifferentAbstractStructure> {
+public:
+  // Treat any sort of abstract type as equivalent.
+  static bool isAbstract(CanType type) {
+    return (isa<SubstitutableType>(type) || isa<DependentMemberType>(type));
+  };
+
+  // We can fast-path some of these checks by proviing these two overrides:
+  bool visitSubstitutableType(CanSubstitutableType type1,
+                              CanSubstitutableType type2) {
+    return false;
+  }
+  bool visitDependentMemberType(CanDependentMemberType type1,
+                                CanDependentMemberType type2) {
+    return false;
+  }
+
+  // We also need to handle the general case where we have different
+  // kinds of substitutable types.
+  bool visitDifferentComponentTypes(CanType type1, CanType type2) {
+    // This is a difference only if both types aren't abstract.
+    return !(isAbstract(type1) && isAbstract(type2));
+  }
+
+  // Change the rules used for SIL function types to only consider
+  // the basic structure, not any substitutions.
+  bool visitSILFunctionType(CanSILFunctionType type1,
+                            CanSILFunctionType type2) {
+    return visitSILFunctionTypeStructure(type1, type2)
+        || visitSILFunctionTypeComponents(type1, type2);
+  }
+};
+}
+
+static bool haveDifferentAbstractStructure(CanType type1, CanType type2) {
+  return HaveDifferentAbstractStructure().visit(type1, type2);
+}
+
+static TypeConverter::ABIDifference
+checkForABIDifferencesInYield(TypeConverter &TC, SILModule &M,
+                              SILFunctionType *fnTy1, SILYieldInfo yield1,
+                              SILFunctionType *fnTy2, SILYieldInfo yield2) {
+  // Require the interface types to have the same basic abstract
+  // structure, ignoring any substitutions from the function type.
+  // This structure is what determines the signature of the continuation
+  // function.
+  if (haveDifferentAbstractStructure(yield1.getInterfaceType(),
+                                     yield2.getInterfaceType()))
+    return TypeConverter::ABIDifference::NeedsThunk;
+
+  // Also make sure that the actual yield types match in ABI.
+  return TC.checkForABIDifferences(M, yield1.getSILStorageType(M, fnTy1),
+                                   yield2.getSILStorageType(M, fnTy2));
+}
+
 TypeConverter::ABIDifference
 TypeConverter::checkFunctionForABIDifferences(SILModule &M,
                                               SILFunctionType *fnTy1,
@@ -2596,10 +2654,7 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
     if (yield1.getConvention() != yield2.getConvention())
       return ABIDifference::NeedsThunk;
 
-    if (checkForABIDifferences(M,
-                               yield1.getSILStorageType(M, fnTy1),
-                               yield2.getSILStorageType(M, fnTy2),
-             /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
+    if (checkForABIDifferencesInYield(*this, M, fnTy1, yield1, fnTy2, yield2)
         != ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
