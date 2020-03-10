@@ -165,6 +165,9 @@ class OverlayFile;
 ///
 /// \sa FileUnit
 class ModuleDecl : public DeclContext, public TypeDecl {
+  friend class DirectOperatorLookupRequest;
+  friend class DirectPrecedenceGroupLookupRequest;
+
 public:
   typedef ArrayRef<Located<Identifier>> AccessPathTy;
   typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;

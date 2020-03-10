@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file binds the names in non-ValueDecls Decls like imports, operators,
-//  and precedence groups.
+//  This file performs import resolution.
+//  FIXME: Rename NameBinding to ImportResolution.
 //
 //===----------------------------------------------------------------------===//
 
@@ -206,12 +206,8 @@ namespace {
     }
 
   private:
-    // Special behavior for these decls:
+    // We only need to visit import decls.
     void visitImportDecl(ImportDecl *ID);
-    void visitPrecedenceGroupDecl(PrecedenceGroupDecl *group);
-    void visitPrefixOperatorDecl(PrefixOperatorDecl *OpDecl);
-    void visitInfixOperatorDecl(InfixOperatorDecl *OpDecl);
-    void visitPostfixOperatorDecl(PostfixOperatorDecl *OpDecl);
 
     // Ignore other decls.
     void visitDecl(Decl *D) {}
@@ -258,10 +254,6 @@ namespace {
     ///
     /// Returns null if no module can be loaded.
     ModuleDecl *getModule(ArrayRef<Located<Identifier>> ModuleID);
-
-    template<typename OP_DECL>
-    void insertOperatorDecl(SourceFile::OperatorMap<OP_DECL*> &Operators,
-                            OP_DECL *OpDecl);
   };
 } // end anonymous namespace
 
@@ -270,14 +262,12 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 /// performNameBinding - Once parsing is complete, this walks the AST to
-/// resolve names and do other top-level validation.
+/// resolve imports.
 ///
 /// Most names are actually bound by the type checker, but before we can
 /// type-check a source file, we need to make declarations imported from other
-/// modules available and build tables of the operators and precedecence groups
-/// declared in that file. Name binding processes top-level \c ImportDecl,
-/// \c OperatorDecl, and \c PrecedenceGroupDecl nodes to perform these tasks,
-/// along with related validation.
+/// modules available. Name binding processes top-level \c ImportDecl nodes
+/// to perform this task, along with related validation.
 ///
 /// Name binding operates on a parsed but otherwise unvalidated AST.
 void swift::performNameBinding(SourceFile &SF) {
@@ -293,7 +283,7 @@ void swift::performNameBinding(SourceFile &SF) {
 
   NameBinder Binder(SF);
 
-  // Bind each import and operator declaration.
+  // Resolve each import declaration.
   for (auto D : SF.getTopLevelDecls())
     Binder.visit(D);
 
@@ -301,52 +291,6 @@ void swift::performNameBinding(SourceFile &SF) {
 
   SF.ASTStage = SourceFile::NameBound;
   verify(SF);
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: Operator declarations
-//===----------------------------------------------------------------------===//
-
-template<typename OP_DECL> void
-NameBinder::insertOperatorDecl(SourceFile::OperatorMap<OP_DECL*> &Operators,
-                               OP_DECL *OpDecl) {
-  auto previousDecl = Operators.find(OpDecl->getName());
-  if (previousDecl != Operators.end()) {
-    diagnose(OpDecl->getLoc(), diag::operator_redeclared);
-    diagnose(previousDecl->second.getPointer(),
-             diag::previous_operator_decl);
-    return;
-  }
-
-  // FIXME: The second argument indicates whether the given operator is visible
-  // outside the current file.
-  Operators[OpDecl->getName()] = { OpDecl, true };
-}
-
-void NameBinder::visitPrefixOperatorDecl(PrefixOperatorDecl *OpDecl) {
-  insertOperatorDecl(SF.PrefixOperators, OpDecl);
-}
-
-void NameBinder::visitInfixOperatorDecl(InfixOperatorDecl *OpDecl) {
-  insertOperatorDecl(SF.InfixOperators, OpDecl);
-}
-
-void NameBinder::visitPostfixOperatorDecl(PostfixOperatorDecl *OpDecl) {
-  insertOperatorDecl(SF.PostfixOperators, OpDecl);
-}
-
-void NameBinder::visitPrecedenceGroupDecl(PrecedenceGroupDecl *group) {
-  auto previousDecl = SF.PrecedenceGroups.find(group->getName());
-  if (previousDecl != SF.PrecedenceGroups.end()) {
-    diagnose(group->getLoc(), diag::precedence_group_redeclared);
-    diagnose(previousDecl->second.getPointer(),
-             diag::previous_precedence_group_decl);
-    return;
-  }
-
-  // FIXME: The second argument indicates whether the given precedence
-  // group is visible outside the current file.
-  SF.PrecedenceGroups[group->getName()] = { group, true };
 }
 
 //===----------------------------------------------------------------------===//

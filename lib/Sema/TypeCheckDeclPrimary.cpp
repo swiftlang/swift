@@ -37,6 +37,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -416,6 +417,65 @@ static void checkGenericParams(GenericContext *ownerCtx) {
   WhereClauseOwner(ownerCtx)
       .visitRequirements(TypeResolutionStage::Interface,
                          [](Requirement, RequirementRepr *) { return false; });
+}
+
+template <typename T>
+static void checkOperatorOrPrecedenceGroupRedeclaration(
+    T *decl, Diag<> diagID, Diag<> noteID,
+    llvm::function_ref<TinyPtrVector<T *>(OperatorLookupDescriptor)>
+        lookupOthers) {
+  if (decl->isInvalid())
+    return;
+
+  auto *currentFile = decl->getDeclContext()->getParentSourceFile();
+  assert(currentFile);
+
+  auto *module = currentFile->getParentModule();
+  auto &ctx = module->getASTContext();
+  auto desc = OperatorLookupDescriptor::forModule(module, decl->getName(),
+                                                  /*cascades*/ true,
+                                                  /*diagLoc*/ SourceLoc());
+  auto otherDecls = lookupOthers(desc);
+  for (auto *other : otherDecls) {
+    if (other == decl || other->isInvalid())
+      continue;
+
+    // Emit a redeclaration error if the two declarations occur in the same
+    // source file. We currently allow redeclarations across source files to
+    // allow the user to shadow operator decls from imports, as we currently
+    // favor those decls over ones from other files.
+    // FIXME: Once we prefer operator decls from the same module, start
+    // diagnosing redeclarations across files.
+    if (currentFile == other->getDeclContext()->getParentSourceFile()) {
+      // Make sure we get the diagnostic ordering to be sensible.
+      if (decl->getLoc().isValid() && other->getLoc().isValid() &&
+          ctx.SourceMgr.isBeforeInBuffer(decl->getLoc(), other->getLoc())) {
+        std::swap(decl, other);
+      }
+      ctx.Diags.diagnose(decl, diagID);
+      ctx.Diags.diagnose(other, noteID);
+      decl->setInvalid();
+      return;
+    }
+  }
+}
+
+static void checkRedeclaration(OperatorDecl *op) {
+  checkOperatorOrPrecedenceGroupRedeclaration<OperatorDecl>(
+      op, diag::operator_redeclared, diag::previous_operator_decl,
+      [&](OperatorLookupDescriptor desc) {
+        DirectOperatorLookupRequest req{desc, op->getFixity()};
+        return evaluateOrDefault(op->getASTContext().evaluator, req, {});
+      });
+}
+
+static void checkRedeclaration(PrecedenceGroupDecl *group) {
+  checkOperatorOrPrecedenceGroupRedeclaration<PrecedenceGroupDecl>(
+      group, diag::precedence_group_redeclared,
+      diag::previous_precedence_group_decl, [&](OperatorLookupDescriptor desc) {
+        DirectPrecedenceGroupLookupRequest req{desc};
+        return evaluateOrDefault(group->getASTContext().evaluator, req, {});
+      });
 }
 
 /// Check whether \c current is a redeclaration.
@@ -1243,6 +1303,7 @@ public:
 
   void visitOperatorDecl(OperatorDecl *OD) {
     TypeChecker::checkDeclAttributes(OD);
+    checkRedeclaration(OD);
     auto &Ctx = OD->getASTContext();
     if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD)) {
       (void)IOD->getPrecedenceGroup();
@@ -1264,6 +1325,7 @@ public:
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
     TypeChecker::checkDeclAttributes(PGD);
     validatePrecedenceGroup(PGD);
+    checkRedeclaration(PGD);
     checkAccessControl(PGD);
   }
 
