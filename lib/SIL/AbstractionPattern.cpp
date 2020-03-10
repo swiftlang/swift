@@ -954,8 +954,6 @@ AbstractionPattern AbstractionPattern::getAutoDiffDerivativeFunctionType(
         indices, kind, lookupConformance, derivativeGenericSignature,
         makeSelfParamFirst);
     assert(derivativeFnTy);
-    llvm::errs() << "AbstractionPattern::getAutoDiffDerivativeFunctionType\n";
-    derivativeFnTy->dump();
     return AbstractionPattern(getGenericSignature(),
                               derivativeFnTy->getCanonicalType());
   }

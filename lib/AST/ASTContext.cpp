@@ -3424,12 +3424,6 @@ SILFunctionType::SILFunctionType(
       WitnessMethodConformance(witnessMethodConformance),
       Substitutions(substitutions) {
 
-  llvm::dbgs() << "constructing SILFunctionType\n" << genericSig << "\n";
-  for (auto param : params)
-    param.dump();
-  for (auto result : normalResults)
-    result.dump();
-
   Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
   Bits.SILFunctionType.ExtInfoBits = ext.Bits;
   Bits.SILFunctionType.HasUncommonInfo = false;
@@ -3478,27 +3472,13 @@ SILFunctionType::SILFunctionType(
            "non-witness_method SIL function with a conformance");
 
   // Make sure the type follows invariants.
-  if (!(!substitutions || genericSig)) {
-    llvm::errs() << "ERROR! '!substitutions || genericSig'\n";
-    dump();
-  }
   assert((!substitutions || genericSig)
          && "can only have substitutions with a generic signature");
-  if (!(!genericSigIsImplied || substitutions)) {
-    llvm::errs() << "ERROR! '!genericSigIsImplied || substitutions'\n";
-    dump();
-  }
   assert((!genericSigIsImplied || substitutions)
          && "genericSigIsImplied should only be set for a type with generic "
             "types and substitutions");
         
   if (substitutions) {
-    if (substitutions.getGenericSignature().getCanonicalSignature() !=
-        genericSig.getCanonicalSignature()) {
-      llvm::errs() << "GENERIC SIGNATURE MISMATCH!\n";
-      substitutions.getGenericSignature().getCanonicalSignature()->dump();
-      genericSig.getCanonicalSignature()->dump();
-    }
     assert(substitutions.getGenericSignature().getCanonicalSignature() ==
                genericSig.getCanonicalSignature() &&
            "substitutions must match generic signature");
@@ -3516,8 +3496,6 @@ SILFunctionType::SILFunctionType(
 
     for (auto param : getParameters()) {
       (void)param;
-      param.dump();
-      llvm::dbgs() << param.getInterfaceType() << "\n";
       assert(!param.getInterfaceType()->hasError()
              && "interface type of parameter should not contain error types");
       assert(!param.getInterfaceType()->hasArchetype()

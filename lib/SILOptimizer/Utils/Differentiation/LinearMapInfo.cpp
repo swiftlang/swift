@@ -243,7 +243,6 @@ VarDecl *LinearMapInfo::addLinearMapDecl(ApplyInst *ai, SILType linearMapType) {
   // convert the `SILFunctionType` of the linear map to a `FunctionType` with
   // the same parameters and results.
   auto silFnTy = linearMapType.castTo<SILFunctionType>();
-  llvm::dbgs() << "addLinearMapDecl " << linearMapType << "\n";
   SmallVector<AnyFunctionType::Param, 8> params;
   for (auto &param : silFnTy->getParameters()) {
     ParameterTypeFlags flags;
@@ -278,8 +277,6 @@ VarDecl *LinearMapInfo::addLinearMapDecl(ApplyInst *ai, SILType linearMapType) {
 
 void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
                                          SILAutoDiffIndices indices) {
-  llvm::dbgs() << "addLinearMapToStruct " << *ai << "\n";
-
   SmallVector<SILValue, 4> allResults;
   SmallVector<unsigned, 8> activeParamIndices;
   SmallVector<unsigned, 8> activeResultIndices;
@@ -360,13 +357,11 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
     return;
 
   AutoDiffDerivativeFunctionKind derivativeFnKind(kind);
-  llvm::dbgs() << "remappedOrigFnSubstTy " << remappedOrigFnSubstTy << "\n";
   auto derivativeFnType =
       remappedOrigFnSubstTy->getAutoDiffDerivativeFunctionType(
           parameters, source, derivativeFnKind, context.getTypeConverter(),
           LookUpConformanceInModule(derivative->getModule().getSwiftModule()))
       ->getUnsubstitutedType(original->getModule());
-  llvm::dbgs() << "derivativeFnTy " << derivativeFnType << "\n";
 
   auto derivativeFnResultTypes = derivativeFnType->getAllResultsInterfaceType();
   auto linearMapSILType = derivativeFnResultTypes;
@@ -374,7 +369,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
     linearMapSILType = SILType::getPrimitiveObjectType(
         tupleType->getElement(tupleType->getElements().size() - 1)
             .getType()
-            ->getAs<SILFunctionType>()
+            ->castTo<SILFunctionType>()
             ->getUnsubstitutedType(original->getModule()));
   }
   addLinearMapDecl(ai, linearMapSILType);

@@ -113,8 +113,6 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
                                   SubstitutionMap &interfaceSubs,
                                   bool withoutActuallyEscaping,
                                   DifferentiationThunkKind thunkKind) {
-  llvm::dbgs() << "buildThunkType from\n\t" << SILType::getPrimitiveObjectType(sourceType) << "\nto\n\t" << SILType::getPrimitiveObjectType(expectedType) << "\n";
-
   assert(!expectedType->isPolymorphic());
   assert(!sourceType->isPolymorphic());
 
@@ -258,7 +256,6 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
                                            SILFunction *caller,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType) {
-
   assert(!fromType->getSubstitutions());
   assert(!toType->getSubstitutions());
 
@@ -801,8 +798,6 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   auto linearMap = directResults.back();
 
   auto linearMapType = linearMap->getType().castTo<SILFunctionType>();
-  llvm::dbgs() << "linear map is " << *linearMap << "\n";
-  llvm::dbgs() << "linear map type is " << linearMap->getType() << "\n";
   auto linearMapTargetType = targetType->getResults()
                                  .back()
                                  .getSILStorageInterfaceType()
@@ -844,9 +839,6 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
     builder.createReturn(loc, thunkedLinearMap);
   }
 
-  llvm::dbgs() << "the subset parameter thunk\n";
-  thunk->dump();
-
   return {thunk, interfaceSubs};
 }
 
@@ -870,18 +862,16 @@ SILValue reabstractFunction(
   if (fromType != unsubstFromType)
     fn = builder.createConvertFunction(
         loc, fn, SILType::getPrimitiveObjectType(unsubstFromType),
-        /*withoutActuallyEscaping*/ false); // todo: what's the right val for
-                                            // the bool?
+        /*withoutActuallyEscaping*/ false);
 
   fn = builder.createPartialApply(
       loc, thunkRef, remapSubstMap(thunk->getForwardingSubstitutionMap()), {fn},
       fromType->getCalleeConvention());
 
   if (toType != unsubstToType)
-    fn = builder.createConvertFunction(
-        loc, fn, SILType::getPrimitiveObjectType(toType),
-        /*withoutActuallyEscaping*/ false); // todo: what's the right val for
-                                            // the bool?
+    fn = builder.createConvertFunction(loc, fn,
+                                       SILType::getPrimitiveObjectType(toType),
+                                       /*withoutActuallyEscaping*/ false);
 
   return fn;
 }

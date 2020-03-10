@@ -114,9 +114,11 @@ getOrCreateSubsetParametersThunkForLinearMap(
     AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
     SILAutoDiffIndices actualIndices);
 
-SILValue reabstractFunction(SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
-                            SILValue fn,
-                                           CanSILFunctionType toType, std::function<SubstitutionMap(SubstitutionMap)> remapSubstMap);
+/// Reabstract the given function-typed value to the given target type.
+SILValue reabstractFunction(
+    SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
+    SILValue fn, CanSILFunctionType toType,
+    std::function<SubstitutionMap(SubstitutionMap)> remapSubstMap);
 
 } // end namespace autodiff
 

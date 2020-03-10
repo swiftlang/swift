@@ -372,6 +372,12 @@ static SILValue reapplyFunctionConversion(
         context, newFunc, oldFunc, bbi->getOperand(), builder, loc,
         newBuffersToDealloc, parameterIndices, newFuncGenSig);
   }
+  // convert_function
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(oldConvertedFunc)) {
+    return reapplyFunctionConversion(
+        context, newFunc, oldFunc, cfi->getOperand(), builder, loc,
+        newBuffersToDealloc, parameterIndices, newFuncGenSig);
+  }
   // thin_to_thick_function
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(
@@ -382,20 +388,6 @@ static SILValue reapplyFunctionConversion(
         SILFunctionTypeRepresentation::Thick);
     auto silTy = SILType::getPrimitiveObjectType(thickTy);
     return builder.createThinToThickFunction(loc, innerNewFunc, silTy);
-  }
-  // convert_function
-  if (auto *cfi = dyn_cast<ConvertFunctionInst>(oldConvertedFunc)) {
-    auto innerNewFunc = reapplyFunctionConversion(
-        context, newFunc, oldFunc, cfi->getOperand(), builder, loc,
-        newBuffersToDealloc, parameterIndices, newFuncGenSig);
-#if 0 // todo: we prolly need this, need to add all argument for computing derivative type
-    auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
-    auto thickTy = operandFnTy->getWithRepresentation(
-        SILFunctionTypeRepresentation::Thick);
-    auto silTy = SILType::getPrimitiveObjectType(thickTy);
-    return builder.createThinToThickFunction(loc, innerNewFunc, silTy);
-#endif
-    return innerNewFunc;
   }
   // partial_apply
   if (auto *pai = dyn_cast<PartialApplyInst>(oldConvertedFunc)) {

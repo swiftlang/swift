@@ -334,7 +334,6 @@ void VJPEmitter::visitReturnInst(ReturnInst *ri) {
   auto vjpSubstMap = vjpGenericEnv
                          ? vjpGenericEnv->getForwardingSubstitutionMap()
                          : vjp->getForwardingSubstitutionMap();
-  // vjpSubstMap = vjp->getLoweredFunctionType()->getSubstitutions();
   auto *pullbackRef = builder.createFunctionRef(loc, pullback);
   auto *pullbackPartialApply =
       builder.createPartialApply(loc, pullbackRef, vjpSubstMap, {pbStructVal},
@@ -698,8 +697,6 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
 
   // Checkpoint the pullback.
   auto *pullbackDecl = pullbackInfo.lookUpLinearMapDecl(ai);
-  llvm::dbgs() << "pullbackDecl\n";
-  pullbackDecl->dump();
 
   // If actual pullback type does not match lowered pullback type, reabstract
   // the pullback using a thunk.
@@ -711,14 +708,12 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
   if (!loweredPullbackType->isEqual(actualPullbackType)) {
     // Set non-reabstracted original pullback type in nested apply info.
     nestedApplyInfo.originalPullbackType = actualPullbackType;
-    llvm::dbgs() << "reabstracting " << *ai << " to " << loweredPullbackType << "\n";
-    llvm::dbgs() << "decl is\n";
-    pullbackDecl->dump();
-    llvm::dbgs() << "in struct\n";
-    pullbackInfo.getLinearMapStruct(ai->getParent())->dump();
     SILOptFunctionBuilder fb(context.getTransform());
-    pullback = reabstractFunction(getBuilder(), fb, ai->getLoc(), pullback, loweredPullbackType,
-                                  [this](SubstitutionMap subs) -> SubstitutionMap { return this->getOpSubstitutionMap(subs); });
+    pullback = reabstractFunction(
+        getBuilder(), fb, ai->getLoc(), pullback, loweredPullbackType,
+        [this](SubstitutionMap subs) -> SubstitutionMap {
+          return this->getOpSubstitutionMap(subs);
+        });
   }
   pullbackValues[ai->getParent()].push_back(pullback);
 
