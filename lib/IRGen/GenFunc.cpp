@@ -1319,9 +1319,25 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
 
+ // Go over the params and check if any of them can cause the HeapLayout to be non-fixed
+ // This is needed because we should not consider parameters of kind ClassPointer and Metadata sources
+ // If not, we may end up with missing TypeMetadata for a type dependent generic parameter
+ // while generating code for destructor of HeapLayout.
+  bool considerParameterSources = true;
+  for (auto param : params) {
+    SILType argType = IGF.IGM.silConv.getSILType(param, origType);
+    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
+    auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
+
+    if (!isa<FixedTypeInfo>(ti)) {
+      considerParameterSources = false;
+      break;
+    }
+  }
+
   // Reserve space for polymorphic bindings.
   auto bindings =
-      NecessaryBindings::forPartialApplyForwarder(IGF.IGM, origType, subs);
+      NecessaryBindings::forPartialApplyForwarder(IGF.IGM, origType, subs, considerParameterSources);
 
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
@@ -1524,7 +1540,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
     HeapNonFixedOffsets offsets(IGF, layout);
     if (outType->isNoEscape()) {
       stackAddr = IGF.emitDynamicAlloca(
-          IGF.IGM.Int8Ty, layout.emitSize(IGF.IGM), Alignment(16));
+          IGF.IGM.Int8Ty, layout.isFixedLayout() ? layout.emitSize(IGF.IGM) : offsets.getSize() , Alignment(16));
       stackAddr = stackAddr->withAddress(IGF.Builder.CreateBitCast(
           stackAddr->getAddress(), IGF.IGM.OpaquePtrTy));
       data = stackAddr->getAddress().getAddress();

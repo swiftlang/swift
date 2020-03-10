@@ -126,6 +126,10 @@ struct Edge {
   
   /// The precise identifier of the target symbol node.
   Symbol Target;
+
+  /// If this is a conformsTo relationship, the extension that defined
+  /// the conformance.
+  const ExtensionDecl *ConformanceExtension;
   
   void serialize(llvm::json::OStream &OS) const;
 };
@@ -137,13 +141,15 @@ namespace llvm {
 using SymbolGraph = swift::symbolgraphgen::SymbolGraph;
 using Symbol = swift::symbolgraphgen::Symbol;
 using Edge = swift::symbolgraphgen::Edge;
+using ExtensionDecl = swift::ExtensionDecl;
 template <> struct DenseMapInfo<Edge> {
   static inline Edge getEmptyKey() {
     return {
       DenseMapInfo<SymbolGraph *>::getEmptyKey(),
       { "Empty" },
       DenseMapInfo<Symbol>::getEmptyKey(),
-      DenseMapInfo<Symbol>::getEmptyKey()
+      DenseMapInfo<Symbol>::getEmptyKey(),
+      DenseMapInfo<const ExtensionDecl *>::getEmptyKey(),
     };
   }
   static inline Edge getTombstoneKey() {
@@ -152,6 +158,7 @@ template <> struct DenseMapInfo<Edge> {
       { "Tombstone" },
       DenseMapInfo<Symbol>::getTombstoneKey(),
       DenseMapInfo<Symbol>::getTombstoneKey(),
+      DenseMapInfo<const ExtensionDecl *>::getTombstoneKey(),
     };
   }
   static unsigned getHashValue(const Edge E) {
@@ -159,12 +166,16 @@ template <> struct DenseMapInfo<Edge> {
     H ^= DenseMapInfo<StringRef>::getHashValue(E.Kind.Name);
     H ^= DenseMapInfo<Symbol>::getHashValue(E.Source);
     H ^= DenseMapInfo<Symbol>::getHashValue(E.Target);
+    H ^= DenseMapInfo<const ExtensionDecl *>::
+         getHashValue(E.ConformanceExtension);
     return H;
   }
   static bool isEqual(const Edge LHS, const Edge RHS) {
     return LHS.Kind == RHS.Kind &&
       DenseMapInfo<Symbol>::isEqual(LHS.Source, RHS.Source) &&
-      DenseMapInfo<Symbol>::isEqual(LHS.Target, RHS.Target);
+      DenseMapInfo<Symbol>::isEqual(LHS.Target, RHS.Target) &&
+      DenseMapInfo<const ExtensionDecl *>::isEqual(LHS.ConformanceExtension,
+                                                   RHS.ConformanceExtension);
   }
 };
 } // end namespace llvm

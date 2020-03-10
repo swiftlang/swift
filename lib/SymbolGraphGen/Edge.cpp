@@ -43,5 +43,14 @@ void Edge::serialize(llvm::json::OStream &OS) const {
       Target.printPath(PathOS);
       OS.attribute("targetFallback", Scratch.str());
     }
+
+    if (ConformanceExtension &&
+        !ConformanceExtension->getGenericRequirements().empty()) {
+      OS.attributeArray("swiftConstraints", [&](){
+        for (const auto &Req : ConformanceExtension->getGenericRequirements()) {
+          ::serialize(Req, OS);
+        }
+      });
+    }
   });
 }
