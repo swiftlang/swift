@@ -47,15 +47,24 @@ class PythonKit(product.Product):
         except OSError:
             pass
 
+        # SWIFT_ENABLE_TENSORFLOW
+        target = ''
+        if host_target.startswith('macosx'):
+            target = '-DCMAKE_Swift_COMPILER_TARGET=x86_64-apple-macosx10.13'
+        # SWIFT_ENABLE_TENSORFLOW END
+
         with shell.pushd(self.build_dir):
             shell.call([
                 self.toolchain.cmake,
                 '-G', 'Ninja',
                 '-D', 'BUILD_SHARED_LIBS=YES',
                 '-D', 'CMAKE_INSTALL_PREFIX={}/usr'.format(
-                    self.args.install_destdir),
+                    self.install_toolchain_path()),
                 '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
                 '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
+                # SWIFT_ENABLE_TENSORFLOW
+                target,
+                # SWIFT_ENABLE_TENSORFLOW END
                 '-B', self.build_dir,
                 '-S', self.source_dir,
             ])
