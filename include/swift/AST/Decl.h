@@ -7079,6 +7079,27 @@ public:
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
         DesignatedNominalTypes(DesignatedNominalTypes) {}
 
+  enum class Fixity : uint8_t {
+    Infix,
+    Prefix,
+    Postfix
+  };
+
+  /// Retrieve the operator's fixity, corresponding to the concrete subclass
+  /// of the OperatorDecl.
+  Fixity getFixity() const {
+    switch (getKind()) {
+#define DECL(Id, Name) case DeclKind::Id: llvm_unreachable("Not an operator!");
+#define OPERATOR_DECL(Id, Name)
+#include "swift/AST/DeclNodes.def"
+    case DeclKind::InfixOperator:
+      return Fixity::Infix;
+    case DeclKind::PrefixOperator:
+      return Fixity::Prefix;
+    case DeclKind::PostfixOperator:
+      return Fixity::Postfix;
+    }
+  }
 
   SourceLoc getOperatorLoc() const { return OperatorLoc; }
   SourceLoc getNameLoc() const { return NameLoc; }

@@ -995,7 +995,7 @@ namespace {
     template <typename T>
     static PrefixOperatorDecl *lookup(T &container, Identifier name) {
       return cast_or_null<PrefixOperatorDecl>(
-               container.lookupOperator(name, DeclKind::PrefixOperator));
+          container.lookupOperator(name, OperatorDecl::Fixity::Prefix));
     }
   };
 
@@ -1004,7 +1004,7 @@ namespace {
     template <typename T>
     static InfixOperatorDecl *lookup(T &container, Identifier name) {
       return cast_or_null<InfixOperatorDecl>(
-               container.lookupOperator(name, DeclKind::InfixOperator));
+          container.lookupOperator(name, OperatorDecl::Fixity::Infix));
     }
   };
 
@@ -1013,7 +1013,7 @@ namespace {
     template <typename T>
     static PostfixOperatorDecl *lookup(T &container, Identifier name) {
       return cast_or_null<PostfixOperatorDecl>(
-               container.lookupOperator(name, DeclKind::PostfixOperator));
+          container.lookupOperator(name, OperatorDecl::Fixity::Postfix));
     }
   };
 

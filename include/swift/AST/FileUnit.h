@@ -354,7 +354,8 @@ public:
   /// \param name The operator name ("+", ">>", etc.)
   ///
   /// \param fixity One of PrefixOperator, InfixOperator, or PostfixOperator.
-  virtual OperatorDecl *lookupOperator(Identifier name, DeclKind fixity) const {
+  virtual OperatorDecl *lookupOperator(Identifier name,
+                                       OperatorDecl::Fixity fixity) const {
     return nullptr;
   }
 

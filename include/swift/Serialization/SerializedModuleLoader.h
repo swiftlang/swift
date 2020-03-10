@@ -328,8 +328,8 @@ public:
   lookupNestedType(Identifier name,
                    const NominalTypeDecl *parent) const override;
 
-  virtual OperatorDecl *lookupOperator(Identifier name,
-                                       DeclKind fixity) const override;
+  virtual OperatorDecl *
+  lookupOperator(Identifier name, OperatorDecl::Fixity fixity) const override;
 
   virtual PrecedenceGroupDecl *
   lookupPrecedenceGroup(Identifier name) const override;
