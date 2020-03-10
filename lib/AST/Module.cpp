@@ -136,8 +136,8 @@ SourceFile::~SourceFile() = default;
 class swift::SourceLookupCache {
   /// A lookup map for value decls. When declarations are added they are added
   /// under all variants of the name they can be found under.
-  class DeclMap {
-    llvm::DenseMap<DeclName, TinyPtrVector<ValueDecl*>> Members;
+  class ValueDeclMap {
+    llvm::DenseMap<DeclName, TinyPtrVector<ValueDecl *>> Members;
 
   public:
     void add(ValueDecl *VD) {
@@ -156,9 +156,14 @@ class swift::SourceLookupCache {
     }
   };
 
-  DeclMap TopLevelValues;
-  DeclMap ClassMembers;
+  ValueDeclMap TopLevelValues;
+  ValueDeclMap ClassMembers;
   bool MemberCachePopulated = false;
+
+  template<typename T>
+  using OperatorMap = llvm::DenseMap<Identifier, TinyPtrVector<T *>>;
+  OperatorMap<OperatorDecl> Operators;
+  OperatorMap<PrecedenceGroupDecl> PrecedenceGroups;
 
   template<typename Range>
   void addToUnqualifiedLookupCache(Range decls, bool onlyOperators);
@@ -175,7 +180,28 @@ public:
   
   void lookupValue(DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result);
-  
+
+  /// Retrieves all the operator decls. The order of the results is not
+  /// guaranteed to be meaningful.
+  void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results);
+
+  /// Retrieves all the precedence groups. The order of the results is not
+  /// guaranteed to be meaningful.
+  void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl *> &results);
+
+  /// Look up an operator declaration.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  /// \param fixity The fixity of the operator (infix, prefix or postfix).
+  void lookupOperator(Identifier name, OperatorFixity fixity,
+                      TinyPtrVector<OperatorDecl *> &results);
+
+  /// Look up a precedence group.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  void lookupPrecedenceGroup(Identifier name,
+                             TinyPtrVector<PrecedenceGroupDecl *> &results);
+
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind);
@@ -224,6 +250,12 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
       if (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations())
         addToUnqualifiedLookupCache(ED->getMembers(), true);
     }
+
+    if (auto *OD = dyn_cast<OperatorDecl>(D))
+      Operators[OD->getName()].push_back(OD);
+
+    if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
+      PrecedenceGroups[PG->getName()].push_back(PG);
   }
 }
 
@@ -298,6 +330,39 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   Result.reserve(I->second.size());
   for (ValueDecl *Elt : I->second)
     Result.push_back(Elt);
+}
+
+void SourceLookupCache::getPrecedenceGroups(
+    SmallVectorImpl<PrecedenceGroupDecl *> &results) {
+  for (auto &groups : PrecedenceGroups)
+    results.append(groups.second.begin(), groups.second.end());
+}
+
+void SourceLookupCache::getOperatorDecls(
+    SmallVectorImpl<OperatorDecl *> &results) {
+  for (auto &ops : Operators)
+    results.append(ops.second.begin(), ops.second.end());
+}
+
+void SourceLookupCache::lookupOperator(Identifier name, OperatorFixity fixity,
+                                       TinyPtrVector<OperatorDecl *> &results) {
+  auto ops = Operators.find(name);
+  if (ops == Operators.end())
+    return;
+
+  for (auto *op : ops->second)
+    if (op->getFixity() == fixity)
+      results.push_back(op);
+}
+
+void SourceLookupCache::lookupPrecedenceGroup(
+    Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) {
+  auto groups = PrecedenceGroups.find(name);
+  if (groups == PrecedenceGroups.end())
+    return;
+
+  for (auto *group : groups->second)
+    results.push_back(group);
 }
 
 void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
