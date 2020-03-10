@@ -718,14 +718,14 @@ extension Sequence {
       return result
     } else {
       var iterator = makeIterator()
-      var result = [Element](unsafeUninitializedCapacity: underestimatedCount) { buf, count in
+      var result = [Element](unsafeUninitializedCapacity: underestimatedCount) { buf, initedCount in
         for i in 0..<underestimatedCount {
           guard let next = iterator.next() else {
               preconditionFailure("underestimatedCount greater than count")
           }
           buf[underestimatedCount - i - 1] = next
         }
-        count = underestimatedCount
+        initedCount = underestimatedCount
       }
       while let next = iterator.next() {
         result.insert(next, at: 0)
