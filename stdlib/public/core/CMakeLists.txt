@@ -39,7 +39,7 @@ set(SWIFTLIB_ESSENTIAL
   Builtin.swift
   BuiltinMath.swift
   Character.swift
-  CircularArray.swift
+  CircularBuffer.swift
   CocoaArray.swift
   Codable.swift
   Collection.swift

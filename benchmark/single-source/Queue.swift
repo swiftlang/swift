@@ -26,9 +26,9 @@ public let QueueConcrete = BenchmarkInfo(
   setUpFunction: { buildWorkload() },
   legacyFactor: 10)
 
-public let QueueCircularArray = BenchmarkInfo(
-  name: "QueueCircularArray",
-  runFunction: run_QueueCircularArray,
+public let QueueCircularBuffer = BenchmarkInfo(
+  name: "QueueCircularBuffer",
+  runFunction: run_QueueCircularBuffer,
   tags: [.validation, .api],
   setUpFunction: { buildWorkload() },
   legacyFactor: 10)
@@ -136,14 +136,14 @@ func run_QueueConcrete(_ scale: Int) {
   }
 }
 
-struct CircularArrayQueue<Element> {
+struct CircularBufferQueue<Element> {
 
     var capacity: Int
 
-    private var circularArray: CircularArray<Element>
+    private var circularArray: CircularBuffer<Element>
 
     init() {
-        circularArray = CircularArray<Element>(capacity: 20)
+        circularArray = CircularBuffer<Element>(capacity: 20)
         self.capacity = 20
     }
 
@@ -161,9 +161,9 @@ struct CircularArrayQueue<Element> {
     }
 }
 
-func testCircularArrayQueue<Elements: Collection>(elements: Elements)
+func testCircularBufferQueue<Elements: Collection>(elements: Elements)
 where Elements.Element: Equatable {
-  var q = CircularArrayQueue<Elements.Element>()
+  var q = CircularBufferQueue<Elements.Element>()
   for x in elements { q.enqueue(x) }
   let results = sequence(state: q) { $0.dequeue() }
   let i = results.reduce(0, { i,_ in i &+ 1 })
@@ -173,8 +173,8 @@ where Elements.Element: Equatable {
 }
 
 @inline(never)
-func run_QueueCircularArray(_ scale: Int) {
+func run_QueueCircularBuffer(_ scale: Int) {
   for _ in 0..<scale {
-    testCircularArrayQueue(elements: workload)
+    testCircularBufferQueue(elements: workload)
   }
 }

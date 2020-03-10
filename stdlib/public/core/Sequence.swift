@@ -902,7 +902,7 @@ extension Sequence {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
     guard maxLength != 0 else { return [] }
     
-    var circularArray = CircularArray<Element>(capacity: maxLength)
+    var circularArray = CircularBuffer<Element>(capacity: maxLength)
 
     for item in self {
       circularArray.pushBack(item)
@@ -960,7 +960,7 @@ extension Sequence {
     guard k != 0 else { return Array(self) }
 
     var result = ContiguousArray<Element>()
-    var circularArray = CircularArray<Element>(capacity: k)
+    var circularArray = CircularBuffer<Element>(capacity: k)
 
     for element in self {
       if circularArray.isFull {
