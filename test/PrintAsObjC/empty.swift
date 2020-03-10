@@ -38,7 +38,6 @@
 // CHECK-NEXT: #if __has_warning
 // CHECK-NEXT: #pragma clang diagnostic
 // CHECK-NEXT: #endif
-// CHECK-NEXT: #else
 // CHECK-NEXT: #endif
 
 
