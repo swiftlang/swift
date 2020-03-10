@@ -20,7 +20,9 @@ import TestModule
 // CHECK-SAME: <{ 
 // CHECK-SAME:   i8** getelementptr inbounds (%swift.enum_vwtable, %swift.enum_vwtable* @"$s4main5ValueOy10TestModule7IntegerVGWV", i32 0, i32 0), 
 // CHECK-SAME:   [[INT]] 513, 
-// CHECK-SAME:   %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main5ValueOMn" to %swift.type_descriptor*), 
+// CHECK-SAME:   %swift.type_descriptor* bitcast (
+// CHECK-SAME:     {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
+// CHECK-SAME:   ), 
 // CHECK-SAME:   %swift.type* @"$s10TestModule7IntegerVN", 
 // CHECK-SAME:   i64 3 
 // CHECK-SAME: }>, align [[ALIGNMENT]]
@@ -94,7 +96,9 @@ doit()
 // CHECK-SAME:   i8* %2, 
 // CHECK-SAME:   i8* undef, 
 // CHECK-SAME:   i8* undef, 
-// CHECK-SAME:   %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main5ValueOMn" to %swift.type_descriptor*)
+// CHECK-SAME:   %swift.type_descriptor* bitcast (
+// CHECK-SAME:     {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
+// CHECK-SAME:   )
 // CHECK-SAME: ) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

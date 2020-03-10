@@ -7459,7 +7459,7 @@ llvm::Expected<GenericSignature>
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator, ModuleDecl *parentModule,
         GenericSignatureImpl *parentSig,
-        GenericParamList *gpl,
+        GenericParamSource paramSource,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeLoc, 2> inferenceSources,
         bool allowConcreteGenericParams) const {
@@ -7470,78 +7470,99 @@ InferredGenericSignatureRequest::evaluate(
   // from that context.
   builder.addGenericSignature(parentSig);
 
-  // Type check the generic parameters, treating all generic type
-  // parameters as dependent, unresolved.
-  SmallVector<GenericParamList *, 2> gpLists;
-  if (gpl->getOuterParameters() && !parentSig) {
-    for (auto *outerParams = gpl;
+  DeclContext *lookupDC = nullptr;
+
+  const auto visitRequirement = [&](const Requirement &req,
+                                    RequirementRepr *reqRepr) {
+    const auto source = FloatingRequirementSource::forExplicit(reqRepr);
+
+    // If we're extending a protocol and adding a redundant requirement,
+    // for example, `extension Foo where Self: Foo`, then emit a
+    // diagnostic.
+
+    if (auto decl = lookupDC->getAsDecl()) {
+      if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
+        auto extType = extDecl->getDeclaredInterfaceType();
+        auto extSelfType = extDecl->getSelfInterfaceType();
+        auto reqLHSType = req.getFirstType();
+        auto reqRHSType = req.getSecondType();
+
+        if (extType->isExistentialType() &&
+            reqLHSType->isEqual(extSelfType) &&
+            reqRHSType->isEqual(extType)) {
+
+          auto &ctx = extDecl->getASTContext();
+          ctx.Diags.diagnose(extDecl->getLoc(),
+                             diag::protocol_extension_redundant_requirement,
+                             extType->getString(),
+                             extSelfType->getString(),
+                             reqRHSType->getString());
+        }
+      }
+    }
+
+    builder.addRequirement(req, reqRepr, source, nullptr,
+                            lookupDC->getParentModule());
+    return false;
+  };
+
+  GenericParamList *genericParams = nullptr;
+  if (auto params = paramSource.dyn_cast<GenericParamList *>())
+      genericParams = params;
+  else
+      genericParams = paramSource.get<GenericContext *>()->getGenericParams();
+
+  if (genericParams) {
+    // Extensions never have a parent signature.
+    if (genericParams->getOuterParameters())
+      assert(parentSig == nullptr);
+
+    // Type check the generic parameters, treating all generic type
+    // parameters as dependent, unresolved.
+    SmallVector<GenericParamList *, 2> gpLists;
+    for (auto *outerParams = genericParams;
          outerParams != nullptr;
          outerParams = outerParams->getOuterParameters()) {
       gpLists.push_back(outerParams);
     }
-  } else {
-    gpLists.push_back(gpl);
-  }
 
-  // The generic parameter lists MUST appear from innermost to outermost.
-  // We walk them backwards to order outer requirements before
-  // inner requirements.
-  for (auto &genericParams : llvm::reverse(gpLists)) {
-    assert(genericParams->size() > 0 &&
-           "Parsed an empty generic parameter list?");
+    // The generic parameter lists MUST appear from innermost to outermost.
+    // We walk them backwards to order outer requirements before
+    // inner requirements.
+    for (auto &genericParams : llvm::reverse(gpLists)) {
+      assert(genericParams->size() > 0 &&
+             "Parsed an empty generic parameter list?");
+
+      // First, add the generic parameters to the generic signature builder.
+      // Do this before checking the inheritance clause, since it may
+      // itself be dependent on one of these parameters.
+      for (const auto param : *genericParams)
+        builder.addGenericParameter(param);
+
+      // Add the requirements for each of the generic parameters to the builder.
+      // Now, check the inheritance clauses of each parameter.
+      for (const auto param : *genericParams)
+        builder.addGenericParameterRequirements(param);
+
+      // Determine where and how to perform name lookup.
+      lookupDC = genericParams->begin()[0]->getDeclContext();
+
+      // Add the requirements clause to the builder.
+      WhereClauseOwner(lookupDC, genericParams)
+        .visitRequirements(TypeResolutionStage::Structural,
+                           visitRequirement);
+    }
+  } else {
+    // The declaration has a where clause, but no generic parameters of its own.
+    const auto ctx = paramSource.get<GenericContext *>();
+
+    assert(ctx->getTrailingWhereClause() && "No params or where clause");
 
     // Determine where and how to perform name lookup.
-    DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
+    lookupDC = ctx;
 
-    // First, add the generic parameters to the generic signature builder.
-    // Do this before checking the inheritance clause, since it may
-    // itself be dependent on one of these parameters.
-    for (auto param : *genericParams)
-      builder.addGenericParameter(param);
-
-    // Add the requirements for each of the generic parameters to the builder.
-    // Now, check the inheritance clauses of each parameter.
-    for (auto param : *genericParams)
-      builder.addGenericParameterRequirements(param);
-
-    // Add the requirements clause to the builder.
-
-    using FloatingRequirementSource =
-      GenericSignatureBuilder::FloatingRequirementSource;
-    WhereClauseOwner(lookupDC, genericParams).visitRequirements(
-        TypeResolutionStage::Structural,
-        [&](const Requirement &req, RequirementRepr *reqRepr) {
-          auto source = FloatingRequirementSource::forExplicit(reqRepr);
-          
-          // If we're extending a protocol and adding a redundant requirement,
-          // for example, `extension Foo where Self: Foo`, then emit a
-          // diagnostic.
-          
-          if (auto decl = lookupDC->getAsDecl()) {
-            if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
-              auto extType = extDecl->getDeclaredInterfaceType();
-              auto extSelfType = extDecl->getSelfInterfaceType();
-              auto reqLHSType = req.getFirstType();
-              auto reqRHSType = req.getSecondType();
-              
-              if (extType->isExistentialType() &&
-                  reqLHSType->isEqual(extSelfType) &&
-                  reqRHSType->isEqual(extType)) {
-                
-                auto &ctx = extDecl->getASTContext();
-                ctx.Diags.diagnose(extDecl->getLoc(),
-                                   diag::protocol_extension_redundant_requirement,
-                                   extType->getString(),
-                                   extSelfType->getString(),
-                                   reqRHSType->getString());
-              }
-            }
-          }
-          
-          builder.addRequirement(req, reqRepr, source, nullptr,
-                                  lookupDC->getParentModule());
-          return false;
-        });
+    WhereClauseOwner(ctx).visitRequirements(
+      TypeResolutionStage::Structural, visitRequirement);
   }
       
   /// Perform any remaining requirement inference.

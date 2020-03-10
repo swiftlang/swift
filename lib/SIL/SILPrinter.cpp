@@ -445,7 +445,8 @@ static void printSILFunctionNameAndType(
     llvm::DenseMap<CanType, Identifier> &sugaredTypeNames) {
   function->printName(OS);
   OS << " : $";
-  auto genSig = function->getLoweredFunctionType()->getSubstGenericSignature();
+  auto genSig =
+    function->getLoweredFunctionType()->getInvocationGenericSignature();
   auto *genEnv = function->getGenericEnvironment();
   // If `genSig` and `genEnv` are both defined, get sugared names of generic
   // parameter types for printing.

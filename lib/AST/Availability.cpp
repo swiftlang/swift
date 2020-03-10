@@ -227,7 +227,10 @@ AvailabilityContext ASTContext::getObjCGetClassHookAvailability() {
 
 AvailabilityContext ASTContext::getSwift50Availability() {
   auto target = LangOpts.Target;
-  
+
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
+
   if (target.isMacOSX()) {
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(10,14,4)));
@@ -253,6 +256,9 @@ AvailabilityContext ASTContext::getObjCClassStubsAvailability() {
 AvailabilityContext ASTContext::getSwift51Availability() {
   auto target = LangOpts.Target;
   
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
+
   if (target.isMacOSX()) {
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(10,15,0)));
@@ -277,6 +283,9 @@ AvailabilityContext ASTContext::getPrespecializedGenericMetadataAvailability() {
 
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
+
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
 
   if (target.isMacOSX() ) {
     return AvailabilityContext(

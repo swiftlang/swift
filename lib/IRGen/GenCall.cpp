@@ -29,11 +29,13 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
 #include "llvm/IR/CallSite.h"
+#include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/Support/Compiler.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
 #include "GenObjC.h"
+#include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -1647,8 +1649,19 @@ llvm::CallSite CallEmission::emitCallSite() {
 
 llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
                                       ArrayRef<llvm::Value*> args) {
+  SmallVector<llvm::OperandBundleDef, 1> bundles;
+
+  // Add a pointer-auth bundle if necessary.
+  if (const auto &authInfo = fn.getAuthInfo()) {
+    auto key = getInt32(authInfo.getKey());
+    auto discriminator = authInfo.getDiscriminator();
+    llvm::Value *bundleArgs[] = { key, discriminator };
+    bundles.emplace_back("ptrauth", bundleArgs);
+  }
+
   assert(!isTrapIntrinsic(fn.getPointer()) && "Use CreateNonMergeableTrap");
-  llvm::CallInst *call = IRBuilderBase::CreateCall(fn.getPointer(), args);
+  llvm::CallInst *call =
+    IRBuilderBase::CreateCall(fn.getPointer(), args, bundles);
   call->setAttributes(fn.getAttributes());
   call->setCallingConv(fn.getCallingConv());
   return call;
@@ -2557,6 +2570,22 @@ void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
   case clang::CodeGen::ABIArgInfo::InAlloca:
     llvm_unreachable("Need to handle InAlloca during signature expansion");
   }
+}
+
+std::pair<PointerAuthSchema, PointerAuthEntity>
+irgen::getCoroutineResumeFunctionPointerAuth(IRGenModule &IGM,
+                                             CanSILFunctionType fnType) {
+  switch (fnType->getCoroutineKind()) {
+  case SILCoroutineKind::None:
+    llvm_unreachable("not a coroutine");
+  case SILCoroutineKind::YieldMany:
+    return { IGM.getOptions().PointerAuth.YieldManyResumeFunctions,
+             PointerAuthEntity::forYieldTypes(fnType) };
+  case SILCoroutineKind::YieldOnce:
+    return { IGM.getOptions().PointerAuth.YieldOnceResumeFunctions,
+             PointerAuthEntity::forYieldTypes(fnType) };
+  }
+  llvm_unreachable("bad coroutine kind");
 }
 
 static void emitRetconCoroutineEntry(IRGenFunction &IGF,
@@ -3473,7 +3502,12 @@ Callee irgen::getBlockPointerCallee(IRGenFunction &IGF,
 
   auto sig = emitCastOfFunctionPointer(IGF, invokeFnPtr, info.OrigFnType);
 
-  FunctionPointer fn(invokeFnPtr, sig);
+  auto &schema = IGF.getOptions().PointerAuth.BlockInvocationFunctionPointers;
+  auto authInfo = PointerAuthInfo::emit(IGF, schema,
+                                        invokeFnPtrAddr.getAddress(),
+                                        info.OrigFnType);
+
+  FunctionPointer fn(invokeFnPtr, authInfo, sig);
 
   return Callee(std::move(info), fn, blockPtr);
 }
@@ -3482,8 +3516,10 @@ Callee irgen::getSwiftFunctionPointerCallee(
     IRGenFunction &IGF, llvm::Value *fnPtr, llvm::Value *dataPtr,
     CalleeInfo &&calleeInfo, bool castOpaqueToRefcountedContext) {
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, calleeInfo.OrigFnType);
+  auto authInfo =
+    PointerAuthInfo::forFunctionPointer(IGF.IGM, calleeInfo.OrigFnType);
 
-  FunctionPointer fn(fnPtr, sig);
+  FunctionPointer fn(fnPtr, authInfo, sig);
   if (castOpaqueToRefcountedContext) {
     assert(dataPtr && dataPtr->getType() == IGF.IGM.OpaquePtrTy &&
            "Expecting trivial closure context");
@@ -3496,8 +3532,10 @@ Callee irgen::getCFunctionPointerCallee(IRGenFunction &IGF,
                                         llvm::Value *fnPtr,
                                         CalleeInfo &&calleeInfo) {
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, calleeInfo.OrigFnType);
+  auto authInfo =
+    PointerAuthInfo::forFunctionPointer(IGF.IGM, calleeInfo.OrigFnType);
 
-  FunctionPointer fn(fnPtr, sig);
+  FunctionPointer fn(fnPtr, authInfo, sig);
 
   return Callee(std::move(calleeInfo), fn);
 }
@@ -3514,16 +3552,24 @@ FunctionPointer::forExplosionValue(IRGenFunction &IGF, llvm::Value *fnPtr,
   // Bitcast out of an opaque pointer type.
   assert(fnPtr->getType() == IGF.IGM.Int8PtrTy);
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, fnType);
+  auto authInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, fnType);
 
-  return FunctionPointer(fnPtr, sig);
+  return FunctionPointer(fnPtr, authInfo, sig);
 }
 
 llvm::Value *
 FunctionPointer::getExplosionValue(IRGenFunction &IGF,
                                    CanSILFunctionType fnType) const {
+  llvm::Value *fnPtr = getPointer();
+
+  // Re-sign to the appropriate schema for this function pointer type.
+  auto resultAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, fnType);
+  if (getAuthInfo() != resultAuthInfo) {
+    fnPtr = emitPointerAuthResign(IGF, fnPtr, getAuthInfo(), resultAuthInfo);
+  }
+
   // Bitcast to an opaque pointer type.
-  llvm::Value *fnPtr =
-    IGF.Builder.CreateBitCast(getPointer(), IGF.IGM.Int8PtrTy);
+  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
 
   return fnPtr;
 }

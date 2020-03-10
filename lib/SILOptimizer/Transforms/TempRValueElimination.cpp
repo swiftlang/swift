@@ -67,6 +67,9 @@ class TempRValueOptPass : public SILFunctionTransform {
   bool collectLoads(Operand *userOp, SILInstruction *userInst,
                     SingleValueInstruction *addr, SILValue srcObject,
                     SmallPtrSetImpl<SILInstruction *> &loadInsts);
+  bool collectLoadsFromProjection(SingleValueInstruction *projection,
+                                  SILValue srcAddr,
+                                  SmallPtrSetImpl<SILInstruction *> &loadInsts);
 
   bool
   checkNoSourceModification(CopyAddrInst *copyInst, SILValue copySrc,
@@ -84,6 +87,29 @@ class TempRValueOptPass : public SILFunctionTransform {
 };
 
 } // anonymous namespace
+
+bool TempRValueOptPass::collectLoadsFromProjection(
+    SingleValueInstruction *projection, SILValue srcAddr,
+    SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+  if (!srcAddr) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "  Temp has addr_projection use?! Can not yet promote to value"
+        << *projection);
+    return false;
+  }
+
+  // Transitively look through projections on stack addresses.
+  for (auto *projUseOper : projection->getUses()) {
+    auto *user = projUseOper->getUser();
+    if (user->isTypeDependentOperand(*projUseOper))
+      continue;
+
+    if (!collectLoads(projUseOper, user, projection, srcAddr, loadInsts))
+      return false;
+  }
+  return true;
+}
 
 /// Transitively explore all data flow uses of the given \p address until
 /// reaching a load or returning false.
@@ -199,32 +225,27 @@ bool TempRValueOptPass::collectLoads(
                               << *user);
       return false;
     }
-    LLVM_FALLTHROUGH;
+    return collectLoadsFromProjection(oeai, srcAddr, loadInsts);
   }
-  case SILInstructionKind::StructElementAddrInst:
-  case SILInstructionKind::TupleElementAddrInst: {
-    auto *proj = cast<SingleValueInstruction>(user);
-
-    if (!srcAddr) {
-      LLVM_DEBUG(
-          llvm::dbgs()
-          << "  Temp has addr_projection use?! Can not yet promote to value"
-          << *user);
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+    // In certain cases, unchecked_take_enum_data_addr invalidates the
+    // underlying memory, so by default we can not look through it... but this
+    // is not true in the case of Optional. This is an important case for us to
+    // handle, so handle it here.
+    auto *utedai = cast<UncheckedTakeEnumDataAddrInst>(user);
+    if (!utedai->getOperand()->getType().getOptionalObjectType()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  Temp use may write/destroy its source" << *utedai);
       return false;
     }
 
-    // Transitively look through projections on stack addresses.
-    for (auto *projUseOper : proj->getUses()) {
-      auto *user = projUseOper->getUser();
-      if (user->isTypeDependentOperand(*projUseOper))
-        continue;
-
-      if (!collectLoads(projUseOper, user, proj, srcAddr, loadInsts))
-        return false;
-    }
-    return true;
+    return collectLoadsFromProjection(utedai, srcAddr, loadInsts);
   }
-
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::TupleElementAddrInst: {
+    return collectLoadsFromProjection(cast<SingleValueInstruction>(user),
+                                      srcAddr, loadInsts);
+  }
   case SILInstructionKind::LoadInst:
     // Loads are the end of the data flow chain. The users of the load can't
     // access the temporary storage.
@@ -251,7 +272,11 @@ bool TempRValueOptPass::collectLoads(
       return false;
     loadInsts.insert(user);
     return true;
-
+  case SILInstructionKind::FixLifetimeInst:
+    // If we have a fixed lifetime on our alloc_stack, we can just treat it like
+    // a load and re-write it so that it is on the old memory or old src object.
+    loadInsts.insert(user);
+    return true;
   case SILInstructionKind::CopyAddrInst: {
     // copy_addr which read from the temporary are like loads.
     auto *copyFromTmp = cast<CopyAddrInst>(user);
@@ -616,6 +641,13 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
       }
       li->replaceAllUsesWith(srcObject);
       toDelete.push_back(li);
+      break;
+    }
+    case SILInstructionKind::FixLifetimeInst: {
+      auto *fli = cast<FixLifetimeInst>(user);
+      SILBuilderWithScope builder(fli);
+      builder.createFixLifetime(fli->getLoc(), si->getSrc());
+      toDelete.push_back(fli);
       break;
     }
 

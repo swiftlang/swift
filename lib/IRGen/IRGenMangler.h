@@ -15,6 +15,7 @@
 
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ProtocolAssociations.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -345,6 +346,25 @@ public:
   std::string mangleProtocolWitnessTableLazyCacheVariable(Type type,
                                                 const ProtocolConformance *C) {
     return mangleConformanceSymbol(type, C, "WL");
+  }
+
+  std::string
+  mangleAssociatedTypeAccessFunctionDiscriminator(AssociatedType association) {
+    beginMangling();
+    appendAnyGenericType(association.getSourceProtocol());
+    appendIdentifier(association.getAssociation()->getNameStr());
+    return finalize();
+  }
+
+  std::string mangleAssociatedTypeWitnessTableAccessFunctionDiscriminator(
+                                           const AssociatedConformance &conf) {
+    beginMangling();
+    appendAnyGenericType(conf.getSourceProtocol());
+    bool isFirstAssociatedTypeIdentifier = true;
+    appendAssociatedTypePath(conf.getAssociation(),
+                             isFirstAssociatedTypeIdentifier);
+    appendAnyGenericType(conf.getAssociatedRequirement());
+    return finalize();
   }
 
   std::string mangleAssociatedTypeWitnessTableAccessFunction(

@@ -592,6 +592,46 @@ autorelease in the callee.
     importer only imports non-native methods and types as ``throws``
     when it is possible to do this automatically.
 
+- SIL function types may provide a pattern signature and substitutions
+  to express that values of the type use a particular generic abstraction
+  pattern.  Both must be provided together.  If a pattern signature is
+  present, the component types (parameters, yields, and results) must be
+  expressed in terms of the generic parameters of that signature.
+  The pattern substitutions should be expressed in terms of the generic
+  parameters of the overall generic signature, if any, or else
+  the enclosing generic context, if any.
+
+  A pattern signature follows the ``@substituted`` attribute, which
+  must be the final attribute preceding the function type.  Pattern
+  substitutions follow the function type, preceded by the ``for``
+  keyword.  For example::
+
+    @substituted <T: Collection> (@in T) -> @out T.Element for Array<Int>
+
+  The low-level representation of a value of this type may not match
+  the representation of a value of the substituted-through version of it::
+
+    (@in Array<Int>) -> @out Int
+
+  Substitution differences at the outermost level of a function value
+  may be adjusted using the ``convert_function`` instruction.  Note that
+  this only works at the outermost level and not in nested positions.
+  For example, a function which takes a parameter of the first type above
+  cannot be converted by ``convert_function`` to a function which takes
+  a parameter of the second type; such a conversion must be done with a
+  thunk.
+
+  Type substitution on a function type with a pattern signature and
+  substitutions only substitutes into the substitutions; the component
+  types are preserved with their exact original structure.
+
+- In the implementation, a SIL function type may also carry substitutions
+  for its generic signature.  This is a convenience for working with
+  applied generic types and is not generally a formal part of the SIL
+  language; in particular, values should not have such types.  Such a
+  type behaves like a non-generic type, as if the substitutions were
+  actually applied to the underlying function type.
+
 Coroutine Types
 ```````````````
 

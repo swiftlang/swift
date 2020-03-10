@@ -244,8 +244,18 @@ bool ModuleInterfaceBuilder::collectDepsForSerialization(
 bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     StringRef OutPath, bool ShouldSerializeDeps,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer) {
+
+  auto outerPrettyStackState = llvm::SavePrettyStackState();
+
   bool SubError = false;
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
+    // Pretend we're on the original thread for pretty-stack-trace purposes.
+    auto savedInnerPrettyStackState = llvm::SavePrettyStackState();
+    llvm::RestorePrettyStackState(outerPrettyStackState);
+    SWIFT_DEFER {
+      llvm::RestorePrettyStackState(savedInnerPrettyStackState);
+    };
+
     // Note that we don't assume cachePath is the same as the Clang
     // module cache path at this point.
     if (!moduleCachePath.empty())

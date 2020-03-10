@@ -577,9 +577,6 @@ ERROR(expr_swift_keypath_invalid_component,none,
       "invalid component of Swift key path", ())
 ERROR(expr_swift_keypath_not_starting_with_type,none,
       "a Swift key path must begin with a type", ())
-ERROR(expr_swift_keypath_not_starting_with_dot,none,
-      "a Swift key path with contextual root must begin with a leading dot",
-      ())
 ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
       "key path value type %0 cannot be converted to contextual type %1",
       (Type, Type))
@@ -1973,8 +1970,8 @@ WARNING(protocol_usable_from_inline_warn,none,
         "protocol %select{refined|used}0 by '@usableFromInline' protocol "
         "should be '@usableForInline' or public", (bool))
 ERROR(protocol_property_must_be_computed_var,none,
-      "immutable property requirement must be declared as 'var' with a "
-      "'{ get }' specifier", ())
+      "protocols cannot require properties to be immutable; declare read-only "
+      "properties by using 'var' with a '{ get }' specifier", ())
 ERROR(protocol_property_must_be_computed,none,
       "property in protocol must have explicit { get } or { get set } specifier",
       ())
@@ -2750,6 +2747,10 @@ ERROR(dynamic_self_stored_property_init,none,
       "covariant 'Self' type cannot be referenced from a stored property initializer", ())
 ERROR(dynamic_self_default_arg,none,
       "covariant 'Self' type cannot be referenced from a default argument expression", ())
+
+ERROR(where_nongeneric_ctx,none,
+      "'where' clause on non-generic member declaration requires a "
+      "generic context", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
@@ -4015,6 +4016,8 @@ ERROR(sil_non_coro_yields,PointsToFirstBadToken,
 ERROR(sil_function_repeat_convention,PointsToFirstBadToken,
       "repeated %select{parameter|result|callee}0 convention attribute",
       (unsigned))
+ERROR(ast_subst_function_type,none,
+      "substitutions cannot be provided on a formal function type", ())
 ERROR(sil_function_multiple_error_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
 ERROR(unsupported_sil_convention,none,
