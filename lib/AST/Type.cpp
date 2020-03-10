@@ -1493,6 +1493,9 @@ bool TypeBase::isCallableNominalType(DeclContext *dc) {
 }
 
 bool TypeBase::hasDynamicMemberLookupAttribute() {
+  if (!mayHaveMembers())
+    return false;
+
   auto canTy = getCanonicalType();
   auto &ctx = canTy->getASTContext();
   return evaluateOrDefault(
@@ -1500,6 +1503,9 @@ bool TypeBase::hasDynamicMemberLookupAttribute() {
 }
 
 bool TypeBase::hasDynamicCallableAttribute() {
+  if (!mayHaveMembers())
+    return false;
+
   auto canTy = getCanonicalType();
   auto &ctx = canTy->getASTContext();
   return evaluateOrDefault(
