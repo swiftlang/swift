@@ -473,11 +473,13 @@ static bool tryRewriteToPartialApplyStack(
     unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
     assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
     auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
-    if (paramInfo.getConvention() == ParameterConvention::Indirect_In_Guaranteed)
+    if (paramInfo.getConvention() == ParameterConvention::Indirect_In_Guaranteed) {
       // go over all the dealloc_stack, remove it
-      for (auto *use : arg.get()->getUses())
+      SmallVector<Operand*, 16> Uses(arg.get()->getUses());
+      for (auto use : Uses)
         if (auto *deallocInst = dyn_cast<DeallocStackInst>(use->getUser()))
           deallocInst->eraseFromParent();
+    }
   }
 
   // Insert destroys of arguments after the apply and the dealloc_stack.
