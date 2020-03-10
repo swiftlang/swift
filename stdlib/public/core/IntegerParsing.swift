@@ -49,8 +49,7 @@ extension FixedWidthInteger {
     let wholeGuts = text._wholeGuts
     // The specialized paths require that all of the contiguous bytes can
     // be read using UInt64 loads from (address & ~7).
-    if wholeGuts._object.isPreferredRepresentation, Self.bitWidth <= 64,
-      (0b1_0000_0100_0000_0100 &>> radix) & 1 == 1 {
+    if wholeGuts._object.isPreferredRepresentation, Self.bitWidth <= 64 {
       let r64_ = wholeGuts.withFastUTF8({ utf8 -> UInt64? in
         let utf8 = (S.self == String.self) ? utf8 :
           UnsafeBufferPointer(rebasing: utf8[text._offsetRange])
@@ -63,7 +62,8 @@ extension FixedWidthInteger {
                                             allowNegative: isSigned, max: max)
         case 2: return _parseIntegerBase2(from: utf8,
                                           allowNegative: isSigned, max: max)
-        default: preconditionFailure()
+        default: return _parseInteger(from: utf8, radix: radix,
+                                      allowNegative: isSigned, max: max)
         }
       })
       guard _fastPath(r64_ != nil), let r64 = r64_ else { return nil }
@@ -122,6 +122,21 @@ internal func _parseIntegerBase2(
 ) -> UInt64? {
   return _parseIntegerSpecialized(from: utf8, allowNegative: allowNegative,
                                   max: max, using: _parseUnsignedBase2(from:))
+}
+
+@usableFromInline
+internal func _parseInteger(
+  from utf8: UnsafeBufferPointer<UInt8>,
+  radix: Int,
+  allowNegative: Bool,
+  max: UInt64
+) -> UInt64? {
+  return _parseIntegerSpecialized(from: utf8, allowNegative: allowNegative,
+                                  max: max, using: { utf8 in
+    var iter = utf8.makeIterator()
+    let first = iter.next()._unsafelyUnwrappedUnchecked
+    return _parseFromUTF8Unsigned(first: first, rest: &iter, radix: radix)
+  })
 }
 
 @inline(__always)
@@ -359,7 +374,7 @@ internal func _loadUnalignedChunk(
   }
 }
 
-@inlinable
+@usableFromInline
 internal func _parseInteger<
   Iterator: IteratorProtocol, Result: FixedWidthInteger
 >(from utf8: inout Iterator, radix: Int) -> Result?
@@ -400,7 +415,7 @@ where Iterator.Element == UInt8 {
   return Result(truncatingIfNeeded: result)
 }
 
-@_alwaysEmitIntoClient @inline(__always)
+@inline(__always)
 internal func _parseFromUTF8Unsigned<
   Iterator: IteratorProtocol, Result: FixedWidthInteger
 >(first: UInt8, rest utf8: inout Iterator, radix: Int) -> Result?
