@@ -84,8 +84,7 @@ public:
   /// Semantically this implies that a value is never passed off as +1 to memory
   /// or another function implying it can be used everywhere at +0.
   HasConsumingUse_t
-  hasConsumingUse(FrozenMultiMap<SILPhiArgument *, OwnedValueIntroducer>
-                      *phiToIncomingValueMultiMap = nullptr) const;
+  hasUnknownConsumingUse(bool assumingFixedPoint = false) const;
 
   ArrayRef<Operand *> getDestroyingUses() const { return destroyingUses; }
 
@@ -440,9 +439,8 @@ void LiveRange::convertArgToGuaranteed(DeadEndBlocks &deadEndBlocks,
   convertOwnedGeneralForwardingUsesToGuaranteed();
 }
 
-LiveRange::HasConsumingUse_t LiveRange::hasConsumingUse(
-    FrozenMultiMap<SILPhiArgument *, OwnedValueIntroducer>
-        *phiToIncomingValueMultiMap) const {
+LiveRange::HasConsumingUse_t
+LiveRange::hasUnknownConsumingUse(bool assumingAtFixPoint) const {
   // First do a quick check if we have /any/ unknown consuming
   // uses. If we do not have any, return false early.
   if (unknownConsumingUses.empty()) {
@@ -451,7 +449,7 @@ LiveRange::HasConsumingUse_t LiveRange::hasConsumingUse(
 
   // Ok, we do have some unknown consuming uses. If we aren't asked to
   // update phiToIncomingValueMultiMap, then just return true quickly.
-  if (!phiToIncomingValueMultiMap) {
+  if (!assumingAtFixPoint) {
     return HasConsumingUse_t::Yes;
   }
 
@@ -832,7 +830,6 @@ static bool canEliminatePhi(
           if (!introducer.isConvertableToGuaranteed()) {
             return false;
           }
-
           // If this linear search is too slow, we can change the
           // multimap to sort the mapped to list by pointer
           // instead of insertion order. In such a case, we could
@@ -874,9 +871,9 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     // First compute the LiveRange for our phi argument. For simplicity, we only
     // handle cases now where our phi argument does not have any phi unknown
     // consumers.
-    SILPhiArgument *phiArg = pair.first;
-    LiveRange phiArgLiveRange(phiArg);
-    if (bool(phiArgLiveRange.hasConsumingUse())) {
+    SILPhiArgument *phi = pair.first;
+    LiveRange phiLiveRange(phi);
+    if (bool(phiLiveRange.hasUnknownConsumingUse())) {
       continue;
     }
 
@@ -884,7 +881,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     // our incoming values are able to be converted to guaranteed. Now for each
     // incoming value, compute the incoming values ownership roots and see if
     // all of the ownership roots are in our owned incoming value array.
-    if (!phiArg->getIncomingPhiOperands(incomingValueOperandList)) {
+    if (!phi->getIncomingPhiOperands(incomingValueOperandList)) {
       continue;
     }
 
@@ -907,7 +904,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     for (Operand *incomingValueOperand : incomingValueOperandList) {
       originalIncomingValues.push_back(incomingValueOperand->get());
       SILType type = incomingValueOperand->get()->getType();
-      auto *undef = SILUndef::get(type, *phiArg->getFunction());
+      auto *undef = SILUndef::get(type, *phi->getFunction());
       incomingValueOperand->set(undef);
     }
 
@@ -960,7 +957,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     }
 
     // Then convert the phi's live range to be guaranteed.
-    std::move(phiArgLiveRange)
+    std::move(phiLiveRange)
         .convertArgToGuaranteed(getDeadEndBlocks(), lifetimeFrontier,
                                 getCallbacks());
 
@@ -984,7 +981,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
 
     madeChange = true;
     if (VerifyAfterTransform) {
-      phiArg->getFunction()->verify();
+      phi->getFunction()->verify();
     }
   }
 
@@ -1179,9 +1176,9 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // forwarding or a user that truly represents a necessary consume of the value
   // (e.x. storing into memory).
   LiveRange lr(cvi);
-  auto hasConsumingUseState =
-      lr.hasConsumingUse(getPhiToIncomingValueMultiMap());
-  if (hasConsumingUseState == LiveRange::HasConsumingUse_t::Yes) {
+  auto hasUnknownConsumingUseState =
+      lr.hasUnknownConsumingUse(getPhiToIncomingValueMultiMap());
+  if (hasUnknownConsumingUseState == LiveRange::HasConsumingUse_t::Yes) {
     return false;
   }
 
@@ -1290,7 +1287,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // was consumed, the hasConsumedUse code updated phiToIncomingValueMultiMap
   // for us before returning its prognosis. After we reach a fixed point, we
   // will try to eliminate this value then.
-  if (hasConsumingUseState == LiveRange::HasConsumingUse_t::YesButAllPhiArgs) {
+  if (hasUnknownConsumingUseState ==
+      LiveRange::HasConsumingUse_t::YesButAllPhiArgs) {
     auto *op = lr.getSingleUnknownConsumingUse();
     assert(op);
     unsigned opNum = op->getOperandNumber();
@@ -1306,7 +1304,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
 
       auto *arg = succBlock->getSILPhiArguments()[opNum];
       LiveRange phiArgLR(arg);
-      if (bool(phiArgLR.hasConsumingUse())) {
+      if (bool(phiArgLR.hasUnknownConsumingUse())) {
         return false;
       }
 
@@ -1788,7 +1786,7 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // -> load_borrow if we can put a copy_value on a cold path and thus
   // eliminate RR traffic on a hot path.
   LiveRange lr(li);
-  if (bool(lr.hasConsumingUse()))
+  if (bool(lr.hasUnknownConsumingUse()))
     return false;
 
   // Then check if our address is ever written to. If it is, then we cannot use
