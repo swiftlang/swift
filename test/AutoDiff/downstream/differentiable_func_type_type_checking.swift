@@ -127,14 +127,12 @@ extension Vector: Equatable where T: Equatable {}
 extension Vector: AdditiveArithmetic where T: AdditiveArithmetic {}
 extension Vector: Differentiable where T: Differentiable {}
 
-// expected-note @+1 2 {{where 'T' = 'Int'}}
 func inferredConformancesGeneric<T, U>(_: @differentiable (Vector<T>) -> Vector<U>) {}
 
-// expected-error @+5 {{generic signature requires types 'Vector<T>' and 'Vector<T>.TangentVector' to be the same}}
-// expected-error @+4 {{generic signature requires types 'Vector<U>' and 'Vector<U>.TangentVector' to be the same}}
-// expected-error @+3 {{parameter type 'Vector<T>' does not conform to 'Differentiable' and satisfy 'Vector<T> == Vector<T>.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
-// expected-error @+2 {{result type 'Vector<U>' does not conform to 'Differentiable' and satisfy 'Vector<U> == Vector<U>.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
-// expected-note @+1 2 {{where 'T' = 'Int'}}
+// expected-error @+4 {{generic signature requires types 'Vector<T>' and 'Vector<T>.TangentVector' to be the same}}
+// expected-error @+3 {{generic signature requires types 'Vector<U>' and 'Vector<U>.TangentVector' to be the same}}
+// expected-error @+2 {{parameter type 'Vector<T>' does not conform to 'Differentiable' and satisfy 'Vector<T> == Vector<T>.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
+// expected-error @+1 {{result type 'Vector<U>' does not conform to 'Differentiable' and satisfy 'Vector<U> == Vector<U>.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
 func inferredConformancesGenericLinear<T, U>(_: @differentiable(linear) (Vector<T>) -> Vector<U>) {}
 
 func nondiff(x: Vector<Int>) -> Vector<Int> {}
@@ -162,8 +160,10 @@ extension Linear: Differentiable where T: Differentiable, T == T.TangentVector {
   typealias TangentVector = Self
 }
 
+// expected-note @+1 2 {{where 'T' = 'Int'}}
 func inferredConformancesGeneric<T, U>(_: @differentiable (Linear<T>) -> Linear<U>) {}
 
+// expected-note @+1 2 {{where 'T' = 'Int'}}
 func inferredConformancesGenericLinear<T, U>(_: @differentiable(linear) (Linear<T>) -> Linear<U>) {}
 
 func nondiff(x: Linear<Int>) -> Linear<Int> {}

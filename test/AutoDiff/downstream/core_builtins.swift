@@ -9,20 +9,20 @@ func evaldiff<T: Differentiable, U: Differentiable>(_ f: @differentiable (T) -> 
 }
 
 // CHECK-SIL-LABEL: @{{.*}}evaldiff{{.*}}
-// CHECK-SIL: bb0([[ORIG_RES_BUF:%.*]] : $*U, [[ORIG_FN:%.*]] : $@differentiable @noescape @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U>, [[ORIG_FN_ARG:%.*]] : $*T):
-// CHECK-SIL:   [[ORIG_FN_CONVERTED:%.*]] = convert_function [[ORIG_FN]] : $@differentiable @noescape @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U> to $@differentiable @noescape @callee_guaranteed (@in_guaranteed T) -> @out U
+// CHECK-SIL: bb0([[ORIG_RES_BUF:%.*]] : $*U, [[ORIG_FN:%.*]] : $@differentiable @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U>, [[ORIG_FN_ARG:%.*]] : $*T):
+// CHECK-SIL:   [[ORIG_FN_CONVERTED:%.*]] = convert_function [[ORIG_FN]] : $@differentiable @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U> to $@differentiable @noescape @callee_guaranteed (@in_guaranteed T) -> @out U
 // CHECK-SIL:   [[JVP_FN:%.*]] = differentiable_function_extract [jvp] [[ORIG_FN_CONVERTED]] : $@differentiable @noescape @callee_guaranteed (@in_guaranteed T) -> @out U
-// CHECK-SIL:   [[JVP_RES_BUF:%.*]] = alloc_stack $(U, @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>)
-// CHECK-SIL:   [[JVP_RES_BUF_0:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>), 0
-// CHECK-SIL:   [[DIFFERENTIAL:%.*]] = apply [[JVP_FN]]([[JVP_RES_BUF_0]], [[ORIG_FN_ARG]]) : $@noescape @callee_guaranteed (@in_guaranteed T) -> (@out U, @owned @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>)
-// CHECK-SIL:   [[JVP_RES_BUF_1:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>), 1
-// CHECK-SIL:   store [[DIFFERENTIAL]] to [init] [[JVP_RES_BUF_1]] : $*@callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>
-// CHECK-SIL:   [[JVP_RES_BUF_0:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>), 0
-// CHECK-SIL:   [[JVP_RES_BUF_1:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>), 1
-// CHECK-SIL:   [[DIFFERENTIAL:%.*]] = load [take] [[JVP_RES_BUF_1]] : $*@callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>
+// CHECK-SIL:   [[JVP_RES_BUF:%.*]] = alloc_stack $(U, @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>)
+// CHECK-SIL:   [[JVP_RES_BUF_0:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>), 0
+// CHECK-SIL:   [[DIFFERENTIAL:%.*]] = apply [[JVP_FN]]([[JVP_RES_BUF_0]], [[ORIG_FN_ARG]]) : $@noescape @callee_guaranteed (@in_guaranteed T) -> (@out U, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>)
+// CHECK-SIL:   [[JVP_RES_BUF_1:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>), 1
+// CHECK-SIL:   store [[DIFFERENTIAL]] to [init] [[JVP_RES_BUF_1]] : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>
+// CHECK-SIL:   [[JVP_RES_BUF_0:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>), 0
+// CHECK-SIL:   [[JVP_RES_BUF_1:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>), 1
+// CHECK-SIL:   [[DIFFERENTIAL:%.*]] = load [take] [[JVP_RES_BUF_1]] : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>
 // CHECK-SIL:   copy_addr [take] [[JVP_RES_BUF_0]] to [initialization] [[ORIG_RES_BUF]] : $*U
-// CHECK-SIL:   dealloc_stack [[JVP_RES_BUF]] : $*(U, @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>)
-// CHECK-SIL:   return [[DIFFERENTIAL]] : $@callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>
+// CHECK-SIL:   dealloc_stack [[JVP_RES_BUF]] : $*(U, @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>)
+// CHECK-SIL:   return [[DIFFERENTIAL]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, U.TangentVector>
 
 func evaldiff2<T: Differentiable, U: Differentiable, V: Differentiable>(_ f: @differentiable (T, U) -> V, _ x: T, _ y: U) -> (V, (T.TangentVector, U.TangentVector) -> V.TangentVector)
   where T == T.TangentVector, U == U.TangentVector {

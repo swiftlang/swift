@@ -44,7 +44,7 @@ struct S : Proto, AdditiveArithmetic {
     return x + p
   }
 
-  // CHECK-LABEL: sil {{.*}} @AD__{{.*}}function2{{.*}}_jvp_SSS : $@convention(witness_method: Proto) (Float, Double, @in_guaranteed S) -> (Float, @owned @callee_guaranteed <τ_0_0> in (Float, Double, @in_guaranteed τ_0_0) -> Float for <S>) {
+  // CHECK-LABEL: sil {{.*}} @AD__{{.*}}function2{{.*}}_jvp_SSS : $@convention(witness_method: Proto) (Float, Double, @in_guaranteed S) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float, Double, @in_guaranteed τ_0_0) -> Float for <S>) {
   // CHECK: [[JVP2_ORIG_FNREF:%.*]] = function_ref {{.*}}function2{{.*}} : $@convention(method) (Float, Double, S) -> Float
   // CHECK: [[JVP2_VJP_FNREF:%.*]] = differentiability_witness_function [vjp] [parameters 0 1 2] [results 0] @{{.*}}function2{{.*}}
   // CHECK: [[JVP2_ADFUNC:%.*]] = differentiable_function [parameters 0 1 2] [[JVP2_ORIG_FNREF]] : {{.*}} with_derivative {{{%.*}} : {{.*}}, [[JVP2_VJP_FNREF]] : {{.*}}}
@@ -52,7 +52,7 @@ struct S : Proto, AdditiveArithmetic {
   // CHECK: apply [[JVP2]]
   // CHECK: } // end sil function 'AD__{{.*}}function2{{.*}}_jvp_SSS'
 
-  // CHECK-LABEL: sil {{.*}} @AD__{{.*}}function2{{.*}}_vjp_SSS : $@convention(witness_method: Proto) (Float, Double, @in_guaranteed S) -> (Float, @owned @callee_guaranteed <τ_0_0> in (Float) -> (Float, Double, @out τ_0_0) for <S>) {
+  // CHECK-LABEL: sil {{.*}} @AD__{{.*}}function2{{.*}}_vjp_SSS : $@convention(witness_method: Proto) (Float, Double, @in_guaranteed S) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float) -> (Float, Double, @out τ_0_0) for <S>) {
   // CHECK: [[VJP2_ORIG_FNREF:%.*]] = function_ref {{.*}}function2{{.*}} : $@convention(method) (Float, Double, S) -> Float
   // CHECK: [[VJP2_VJP_FNREF:%.*]] = differentiability_witness_function [vjp] [parameters 0 1 2] [results 0] @{{.*}}function2{{.*}}
   // CHECK: [[VJP2_ADFUNC:%.*]] = differentiable_function [parameters 0 1 2] [[VJP2_ORIG_FNREF]] : {{.*}} with_derivative {{{%.*}} : {{.*}}, [[VJP2_VJP_FNREF]] : {{.*}}}

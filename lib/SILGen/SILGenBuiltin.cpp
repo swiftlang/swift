@@ -1050,7 +1050,8 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
       loc, kind, origFnVal);
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
-  auto derivativeFnUnsubstType = derivativeFnType->getUnsubstitutedType(SGF.getModule());
+  auto derivativeFnUnsubstType =
+      derivativeFnType->getUnsubstitutedType(SGF.getModule());
   if (derivativeFnType != derivativeFnUnsubstType) {
     derivativeFn = SGF.B.createConvertFunction(
         loc, derivativeFn,

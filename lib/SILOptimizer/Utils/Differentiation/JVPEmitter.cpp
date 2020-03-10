@@ -127,9 +127,9 @@ JVPEmitter::getNextDifferentialLocalAllocationInsertionPoint() {
 }
 
 SILType JVPEmitter::getLoweredType(Type type) {
+  auto jvpGenSig = jvp->getLoweredFunctionType()->getSubstGenericSignature();
   Lowering::AbstractionPattern pattern(
-      jvp->getLoweredFunctionType()->getSubstGenericSignature(),
-      type->getCanonicalType());
+      jvpGenSig, type->getCanonicalType(jvpGenSig));
   return jvp->getLoweredType(pattern, type);
 }
 
@@ -929,6 +929,9 @@ void JVPEmitter::prepareForDifferentialGeneration() {
         assert(diffBB->isEntry());
         createEntryArguments(&differential);
         auto *lastArg = diffBB->getArguments().back();
+        llvm::errs() << "LAST ARG TYPE\n";
+        lastArg->getType().dump();
+        diffStructLoweredType.dump();
         assert(lastArg->getType() == diffStructLoweredType);
         differentialStructArguments[&origBB] = lastArg;
       }
@@ -1094,7 +1097,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
   auto diffType = SILFunctionType::get(
       diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), dfParams, {}, dfResults, None,
-      origTy->getSubstitutions(), origTy->isGenericSignatureImplied(),
+      origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());

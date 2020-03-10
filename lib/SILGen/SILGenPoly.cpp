@@ -103,6 +103,7 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Signals.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -3058,6 +3059,32 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     bool withoutActuallyEscaping) {
   // We shouldn't be thunking generic types here, and substituted function types
   // ought to have their substitutions applied before we get here.
+  if (!(!expectedType->isPolymorphic() &&
+         !expectedType->getCombinedSubstitutions())) {
+    llvm::errs() << "BAD EXPECTED TYPE\n";
+    expectedType->dump();
+    expectedType->getCombinedSubstitutions().dump();
+  }
+#if 0
+  else {
+    llvm::errs() << "GOOD EXPECTED TYPE\n";
+    expectedType->dump();
+    expectedType->getCombinedSubstitutions().dump();
+  }
+#endif
+  if (!(!sourceType->isPolymorphic() &&
+         !sourceType->getCombinedSubstitutions())) {
+    llvm::errs() << "BAD SOURCE TYPE\n";
+    sourceType->dump();
+    sourceType->getCombinedSubstitutions().dump();
+  }
+#if 0
+  else {
+    llvm::errs() << "GOOD SOURCE TYPE\n";
+    sourceType->dump();
+    sourceType->getCombinedSubstitutions().dump();
+  }
+#endif
   assert(!expectedType->isPolymorphic() &&
          !expectedType->getCombinedSubstitutions());
   assert(!sourceType->isPolymorphic() &&
@@ -3513,6 +3540,10 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
   CanType dynamicSelfType;
   fromType = fromType->getUnsubstitutedType(getModule());
   toType = toType->getUnsubstitutedType(getModule());
+  llvm::errs() << "FROM TYPE\n";
+  fromType->dump();
+  llvm::errs() << "TO TYPE\n";
+  toType->dump();
   auto thunkType = buildThunkType(
       fromType, toType, inputSubstType, outputSubstType, genericEnv,
       interfaceSubs, dynamicSelfType);

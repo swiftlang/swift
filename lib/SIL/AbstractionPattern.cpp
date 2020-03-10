@@ -961,7 +961,7 @@ AbstractionPattern AbstractionPattern::getAutoDiffDerivativeFunctionType(
         makeSelfParamFirst);
     assert(derivativeFnTy);
     return AbstractionPattern(getGenericSignature(),
-                              derivativeFnTy->getCanonicalType());
+                              derivativeFnTy->getCanonicalType(getGenericSignature()));
   }
   case Kind::Opaque:
     return getOpaqueDerivativeFunction();

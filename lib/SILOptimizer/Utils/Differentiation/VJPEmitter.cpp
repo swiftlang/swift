@@ -89,6 +89,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
       [&](CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
+    tanType = tanType->getCanonicalType(witnessCanGenSig);
     Lowering::AbstractionPattern pattern(witnessCanGenSig, tanType);
     auto &tl = context.getTypeConverter().getTypeLowering(
         pattern, tanType, TypeExpansionContext::minimal());
@@ -113,6 +114,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // Given a type, returns its formal SIL result info.
   auto getTangentResultInfoForOriginalParameter =
       [&](CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
+    tanType = tanType->getCanonicalType(witnessCanGenSig);
     Lowering::AbstractionPattern pattern(witnessCanGenSig, tanType);
     auto &tl = context.getTypeConverter().getTypeLowering(
         pattern, tanType, TypeExpansionContext::minimal());
@@ -214,7 +216,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   auto pbType = SILFunctionType::get(
       pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
-      origTy->getSubstitutions(), origTy->isGenericSignatureImplied(),
+      origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
@@ -264,9 +266,9 @@ void VJPEmitter::visitSILInstruction(SILInstruction *inst) {
 }
 
 SILType VJPEmitter::getLoweredType(Type type) {
+  auto vjpGenSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
   Lowering::AbstractionPattern pattern(
-      vjp->getLoweredFunctionType()->getSubstGenericSignature(),
-      type->getCanonicalType());
+      vjpGenSig, type->getCanonicalType(vjpGenSig));
   return vjp->getLoweredType(pattern, type);
 }
 

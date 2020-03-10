@@ -985,12 +985,14 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   auto haveContextArgument =
       calleeHasContext || hasSelfContextParameter(origType);
 
+#if 0 // from master - is this okay?
   // Witness method calls expect self, followed by the self type followed by,
   // the witness table at the end of the parameter list. But polymorphic
   // arguments come before this.
   bool isWitnessMethodCallee = origType->getRepresentation() ==
       SILFunctionTypeRepresentation::WitnessMethod;
   Explosion witnessMethodSelfValue;
+#endif
 
   llvm::Value *lastCapturedFieldPtr = nullptr;
 

@@ -113,11 +113,10 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
                                   SubstitutionMap &interfaceSubs,
                                   bool withoutActuallyEscaping,
                                   DifferentiationThunkKind thunkKind) {
-  assert(!expectedType->isPolymorphic());
-  assert(!sourceType->isPolymorphic());
-
-  auto &module = fn->getModule();
-  auto origType = sourceType;
+  assert(!expectedType->isPolymorphic() &&
+         !expectedType->getCombinedSubstitutions());
+  assert(!sourceType->isPolymorphic() &&
+         !sourceType->getCombinedSubstitutions());
 
   // Cannot build a reabstraction thunk without context. Ownership semantics
   // on the result type are required.
@@ -169,28 +168,30 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
                             contextSubs, interfaceSubs, newArchetype);
   }
 
+  auto substTypeHelper = [&](SubstitutableType *type) -> Type {
+    if (CanType(type) == openedExistential)
+      return newArchetype;
+    return Type(type).subst(contextSubs);
+  };
+  auto substConformanceHelper =
+    LookUpConformanceInSubstitutionMap(contextSubs);
+
   // Utility function to apply contextSubs, and also replace the
   // opened existential with the new archetype.
-  auto substIntoThunkContext = [&](CanType t) -> CanType {
-    return t
-        .subst(
-            [&](SubstitutableType *type) -> Type {
-              if (CanType(type) == openedExistential)
-                return newArchetype;
-              return Type(type).subst(contextSubs);
-            },
-            LookUpConformanceInSubstitutionMap(contextSubs),
-            SubstFlags::AllowLoweredTypes)
-        ->getCanonicalType();
+  auto substLoweredTypeIntoThunkContext =
+      [&](CanSILFunctionType t) -> CanSILFunctionType {
+    return SILType::getPrimitiveObjectType(t)
+             .subst(fn->getModule(), substTypeHelper, substConformanceHelper)
+             .castTo<SILFunctionType>();
   };
 
-  sourceType = cast<SILFunctionType>(substIntoThunkContext(sourceType));
-  expectedType = cast<SILFunctionType>(substIntoThunkContext(expectedType));
+  sourceType = substLoweredTypeIntoThunkContext(sourceType);
+  expectedType = substLoweredTypeIntoThunkContext(expectedType);
 
   // If our parent function was pseudogeneric, this thunk must also be
   // pseudogeneric, since we have no way to pass generic parameters.
   if (genericSig)
-    if (origType->isPseudogeneric())
+    if (fn->getLoweredFunctionType()->isPseudogeneric())
       extInfo = extInfo.withIsPseudogeneric();
 
   // Add the function type as the parameter.
@@ -204,51 +205,51 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   // Add reabstraction function parameter only if building a reabstraction thunk
   // type.
   if (thunkKind == DifferentiationThunkKind::Reabstraction)
-    params.push_back({sourceType, sourceType->getExtInfo().hasContext()
-                                      ? contextConvention
-                                      : ParameterConvention::Direct_Unowned});
+    params.push_back({sourceType,
+                      sourceType->getExtInfo().hasContext()
+                        ? contextConvention
+                        : ParameterConvention::Direct_Unowned});
+
+  auto mapTypeOutOfContext = [&](CanType type) -> CanType {
+    return type->mapTypeOutOfContext()->getCanonicalType(genericSig);
+  };
 
   // Map the parameter and expected types out of context to get the interface
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
   interfaceParams.reserve(params.size());
   for (auto &param : params) {
-    auto paramIfaceTy = param.getInterfaceType()->mapTypeOutOfContext();
-    interfaceParams.push_back(SILParameterInfo(
-        paramIfaceTy->getCanonicalType(genericSig), param.getConvention()));
+    auto interfaceParam = param.map(mapTypeOutOfContext);
+    interfaceParams.push_back(interfaceParam);
   }
 
   SmallVector<SILYieldInfo, 4> interfaceYields;
   for (auto &yield : expectedType->getYields()) {
-    auto yieldIfaceTy = yield.getInterfaceType()->mapTypeOutOfContext();
-    auto interfaceYield =
-        yield.getWithInterfaceType(yieldIfaceTy->getCanonicalType(genericSig));
+    auto interfaceYield = yield.map(mapTypeOutOfContext);
     interfaceYields.push_back(interfaceYield);
   }
 
   SmallVector<SILResultInfo, 4> interfaceResults;
   for (auto &result : expectedType->getResults()) {
-    auto resultIfaceTy = result.getInterfaceType()->mapTypeOutOfContext();
-    auto interfaceResult = result.getWithInterfaceType(
-        resultIfaceTy->getCanonicalType(genericSig));
+    auto interfaceResult = result.map(mapTypeOutOfContext);
     interfaceResults.push_back(interfaceResult);
   }
 
   Optional<SILResultInfo> interfaceErrorResult;
   if (expectedType->hasErrorResult()) {
     auto errorResult = expectedType->getErrorResult();
-    auto errorIfaceTy = errorResult.getInterfaceType()->mapTypeOutOfContext();
-    interfaceErrorResult =
-        SILResultInfo(errorIfaceTy->getCanonicalType(genericSig),
-                      expectedType->getErrorResult().getConvention());
+    interfaceErrorResult = errorResult.map(mapTypeOutOfContext);;
   }
 
   // The type of the thunk function.
-  return SILFunctionType::get(
-      genericSig, extInfo, expectedType->getCoroutineKind(),
-      ParameterConvention::Direct_Unowned, interfaceParams, interfaceYields,
-      interfaceResults, interfaceErrorResult, {}, false,
-      module.getASTContext());
+  return SILFunctionType::get(genericSig, extInfo,
+                              expectedType->getCoroutineKind(),
+                              ParameterConvention::Direct_Unowned,
+                              interfaceParams, interfaceYields,
+                              interfaceResults, interfaceErrorResult,
+                              expectedType->getPatternSubstitutions(),
+                              SubstitutionMap(),
+                              fn->getASTContext());
 }
 
 SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
@@ -256,8 +257,8 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
                                            SILFunction *caller,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType) {
-  assert(!fromType->getSubstitutions());
-  assert(!toType->getSubstitutions());
+  assert(!fromType->getCombinedSubstitutions());
+  assert(!toType->getCombinedSubstitutions());
 
   SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
@@ -432,8 +433,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
     CanSILFunctionType linearMapType, CanSILFunctionType targetType,
     AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
     SILAutoDiffIndices actualIndices) {
-  assert(!linearMapType->getSubstitutions());
-  assert(!targetType->getSubstitutions());
+  assert(!linearMapType->getCombinedSubstitutions());
+  assert(!targetType->getCombinedSubstitutions());
 
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for " << linearMapType

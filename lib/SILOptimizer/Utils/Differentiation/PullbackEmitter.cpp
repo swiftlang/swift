@@ -149,9 +149,10 @@ void PullbackEmitter::cleanUpTemporariesForBlock(SILBasicBlock *bb,
 //--------------------------------------------------------------------------//
 
 const Lowering::TypeLowering &PullbackEmitter::getTypeLowering(Type type) {
+  auto pbGenSig =
+      getPullback().getLoweredFunctionType()->getSubstGenericSignature();
   Lowering::AbstractionPattern pattern(
-      getPullback().getLoweredFunctionType()->getSubstGenericSignature(),
-      type->getCanonicalType());
+      pbGenSig, type->getCanonicalType(pbGenSig));
   return getPullback().getTypeLowering(pattern, type);
 }
 
