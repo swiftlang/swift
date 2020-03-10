@@ -198,12 +198,12 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
     SILInstruction *II = UI->getUser();
     if (II->getParent() != singleBlock)
       singleBlock = nullptr;
-    
+
     // Ignore end access / borrow becasue they are harmless users of
     // begin access /borrow.
     if (isa<EndAccessInst>(II) || isa<EndBorrowInst>(II))
       continue;
-    
+
     if (!isAddressForLoad(II, singleBlock))
         return false;
   }
@@ -578,8 +578,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     SILNode *Node = Inst;
     while (isa<StructElementAddrInst>(Node) ||
            isa<TupleElementAddrInst>(Node) ||
-           isa<UncheckedAddrCastInst>(Node) ||
-           isa<BeginAccessInst>(Node) ||
+           isa<UncheckedAddrCastInst>(Node) || isa<BeginAccessInst>(Node) ||
            isa<BeginBorrowInst>(Node)) {
       auto *I = cast<SingleValueInstruction>(Node);
       if (!I->use_empty()) break;
@@ -660,6 +659,10 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
   LLVM_DEBUG(llvm::dbgs() << "*** Fixing the terminator " << TI << ".\n");
 
   SILValue Def = getLiveOutValue(PhiBlocks, Pred);
+  if (!isa<SILUndef>(Def))
+    Def = SILBuilderWithScope(
+              std::next(Def.getDefiningInstruction()->getIterator()))
+              .createCopyValue(Def.getLoc(), Def);
 
   LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: " << *Def);
 
@@ -846,6 +849,14 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
         // is obviously a dead PHInode, so we don't need to insert it.
         if (DSI && DT->properlyDominates(DSI->getParent(),
                                          SuccNode->getBlock()))
+          continue;
+
+        bool foundUseOfAddr = false;
+        for (auto &inst : *Succ.getBB()) {
+          foundUseOfAddr |= (&inst == ASI);
+        }
+
+        if (!foundUseOfAddr)
           continue;
 
         // The successor node is a new PHINode. If this is a new PHI node

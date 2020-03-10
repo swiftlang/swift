@@ -765,12 +765,11 @@ namespace {
         }
         auto childIndex = child.getIndex();
         if (destructured) {
-          operation(B, loc, childIndex,
-                    destructured->getResult(plainIndex++),
+          operation(B, loc, childIndex, destructured->getResult(plainIndex++),
                     childLowering);
         } else {
-          auto childValue = asImpl().emitRValueProject(B, loc, aggValue,
-                                                     childIndex, childLowering);
+          auto childValue = asImpl().emitRValueProject(
+              B, loc, aggValue, childIndex, childLowering);
           operation(B, loc, childIndex, childValue, childLowering);
         }
       }
