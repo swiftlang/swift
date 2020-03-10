@@ -788,7 +788,7 @@ public:
         return false;
       } else {
         // No payload: Payload area is reused for more cases
-        unsigned PayloadTag = 0;
+        uint32_t PayloadTag = 0;
         auto PayloadTagSize = std::min(PayloadSize, decltype(PayloadSize)(sizeof(PayloadTag)));
         if (!getReader().readInteger(EnumAddress, PayloadTagSize, &PayloadTag)) {
           return false;
