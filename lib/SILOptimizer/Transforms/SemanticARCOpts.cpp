@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "sil-semantic-arc-opts"
 #include "swift/Basic/BlotSetVector.h"
-#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
@@ -47,9 +46,8 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
 namespace {
 
 class LiveRange {
-  /// The value that we are computing the LiveRange for. Expected to be an owned
-  /// introducer and not to be forwarding.
-  OwnedValueIntroducer introducer;
+  /// The parent value that introduces the live range.
+  SILValue value;
 
   /// A list of destroy_values of the live range.
   SmallVector<Operand *, 2> destroyingUses;
@@ -58,7 +56,7 @@ class LiveRange {
   /// that are also able to forward guaranteed ownership.
   SmallVector<Operand *, 2> generalForwardingUses;
 
-  /// Consuming uses that we were not able to understand as a forwarding
+  /// Consuming users that we were not able to understand as a forwarding
   /// instruction or a destroy_value. These must be passed a strongly control
   /// equivalent +1 value.
   SmallVector<Operand *, 2> unknownConsumingUses;
@@ -68,20 +66,12 @@ public:
   LiveRange(const LiveRange &) = delete;
   LiveRange &operator=(const LiveRange &) = delete;
 
-  enum class HasConsumingUse_t {
-    No = 0,
-    YesButAllPhiArgs = 1,
-    Yes = 2,
-  };
-
   /// Return true if v only has invalidating uses that are destroy_value. Such
   /// an owned value is said to represent a dead "live range".
   ///
   /// Semantically this implies that a value is never passed off as +1 to memory
   /// or another function implying it can be used everywhere at +0.
-  HasConsumingUse_t
-  hasConsumingUse(FrozenMultiMap<SILPhiArgument *, OwnedValueIntroducer>
-                      *phiToIncomingValueMultiMap = nullptr) const;
+  bool hasConsumingUse() const { return unknownConsumingUses.size(); }
 
   ArrayRef<Operand *> getDestroyingUses() const { return destroyingUses; }
 
@@ -93,31 +83,9 @@ public:
       TransformRange<ArrayRef<Operand *>, OperandToUser>;
   DestroyingInstsRange getDestroyingInsts() const;
 
-  /// If this LiveRange has a single destroying use, return that use. Otherwise,
-  /// return nullptr.
-  Operand *getSingleDestroyingUse() const {
-    if (destroyingUses.size() != 1) {
-      return nullptr;
-    }
-    return destroyingUses.front();
-  }
-
-  /// If this LiveRange has a single unknown destroying use, return that
-  /// use. Otherwise, return nullptr.
-  Operand *getSingleUnknownConsumingUse() const {
-    if (unknownConsumingUses.size() != 1) {
-      return nullptr;
-    }
-    return unknownConsumingUses.front();
-  }
-
-  OwnedValueIntroducer getIntroducer() const { return introducer; }
-
   ArrayRef<Operand *> getNonConsumingForwardingUses() const {
     return generalForwardingUses;
   }
-
-  void convertOwnedGeneralForwardingUsesToGuaranteed();
 
   /// A consuming operation that:
   ///
@@ -135,28 +103,6 @@ public:
   ///    the caller to handle converting their ownership.
   void convertToGuaranteedAndRAUW(SILValue newGuaranteedValue,
                                   InstModCallbacks callbacks) &&;
-
-  /// A consuming operation that in order:
-  ///
-  /// 1. Converts the phi argument to be guaranteed.
-  ///
-  /// 2. Inserts end_borrows at the relevant destroy_values.
-  ///
-  /// 3. Deletes all destroy_values.
-  ///
-  /// 4. Converts all of the general forwarding instructions from @owned ->
-  /// @guaranteed. "Like Dominoes".
-  ///
-  /// NOTE: This leaves all of the unknown consuming users alone. It is up to
-  /// the caller to handle converting their ownership.
-  ///
-  /// NOTE: This routine leaves inserting begin_borrows for the incoming values
-  /// to the caller since those are not part of the LiveRange itself.
-  ///
-  /// NOTE: Asserts that value is a phi argument.
-  void convertArgToGuaranteed(DeadEndBlocks &deadEndBlocks,
-                              ValueLifetimeAnalysis::Frontier &scratch,
-                              InstModCallbacks callbacks) &&;
 
   /// Given a new guaranteed value, insert end_borrow for the newGuaranteedValue
   /// at all of our destroy_values in prepration for converting from owned to
@@ -184,13 +130,13 @@ LiveRange::DestroyingInstsRange LiveRange::getDestroyingInsts() const {
 }
 
 LiveRange::LiveRange(SILValue value)
-    : introducer(*OwnedValueIntroducer::get(value)), destroyingUses(),
-      generalForwardingUses(), unknownConsumingUses() {
-  assert(introducer.value.getOwnershipKind() == ValueOwnershipKind::Owned);
+    : value(value), destroyingUses(), generalForwardingUses(),
+      unknownConsumingUses() {
+  assert(value.getOwnershipKind() == ValueOwnershipKind::Owned);
 
   // We know that our silvalue produces an @owned value. Look through all of our
   // uses and classify them as either consuming or not.
-  SmallVector<Operand *, 32> worklist(introducer.value->getUses());
+  SmallVector<Operand *, 32> worklist(value->getUses());
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();
 
@@ -293,35 +239,10 @@ void LiveRange::insertEndBorrowsAtDestroys(
   // we do not insert multiple end_borrow.
   //
   // TODO: Hoist this out?
-  SILInstruction *inst = introducer.value->getDefiningInstruction();
-  if (!inst) {
-    // If our introducer was not for an inst, it should be from an arg. In such
-    // a case, we handle one of two cases:
-    //
-    // 1. If we have one destroy and that destroy is the initial instruction in
-    // the arguments block, we just insert the end_borrow here before the
-    // destroy_value and bail. If the destroy is not the initial instruction in
-    // the arg block, we delegate to the ValueLifetimeAnalysis code.
-    //
-    // 2. If we have multiple destroys, by the properties of owned values having
-    // a linear lifetime, we know that the destroys can not both be first in the
-    // args block since the only way that we could have two such destroys in the
-    // arg's block is if we destructured the arg. In such a case, the
-    // destructure instruction would have to be between the argument and any
-    // destroy meaning the destroys could not be first. In such a case, we
-    // delegate to the ValueLifetimeAnalysis code.
-    auto *arg = cast<SILArgument>(introducer.value);
-    auto *beginInst = &*arg->getParent()->begin();
-    if (auto *singleDestroyingUse = getSingleDestroyingUse()) {
-      if (singleDestroyingUse->getUser() == beginInst) {
-        auto loc = RegularLocation::getAutoGeneratedLocation();
-        SILBuilderWithScope builder(beginInst);
-        builder.createEndBorrow(loc, newGuaranteedValue);
-        return;
-      }
-    }
-    inst = beginInst;
-  }
+  auto *inst = value->getDefiningInstruction();
+  assert(inst && "Should only call this with value's that are actually part of "
+                 "an instruction");
+
   ValueLifetimeAnalysis analysis(inst, getDestroyingInsts());
   bool foundCriticalEdges = !analysis.computeFrontier(
       scratch, ValueLifetimeAnalysis::DontModifyCFG, &deadEndBlocks);
@@ -335,7 +256,22 @@ void LiveRange::insertEndBorrowsAtDestroys(
   }
 }
 
-void LiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() {
+void LiveRange::convertToGuaranteedAndRAUW(SILValue newGuaranteedValue,
+                                           InstModCallbacks callbacks) && {
+  assert(isa<SingleValueInstruction>(value) &&
+         "Can only convert single value instruction live ranges to guaranteed");
+  while (!destroyingUses.empty()) {
+    auto *d = destroyingUses.pop_back_val();
+    callbacks.deleteInst(d->getUser());
+    ++NumEliminatedInsts;
+  }
+
+  callbacks.eraseAndRAUWSingleValueInst(cast<SingleValueInstruction>(value),
+                                        newGuaranteedValue);
+
+  // Then change all of our guaranteed forwarding insts to have guaranteed
+  // ownership kind instead of what ever they previously had (ignoring trivial
+  // results);
   while (!generalForwardingUses.empty()) {
     auto *i = generalForwardingUses.pop_back_val()->getUser();
 
@@ -392,83 +328,6 @@ void LiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() {
       llvm_unreachable("unhandled forwarding instruction?!");
     }
   }
-}
-
-void LiveRange::convertToGuaranteedAndRAUW(SILValue newGuaranteedValue,
-                                           InstModCallbacks callbacks) && {
-  auto *value = cast<SingleValueInstruction>(introducer.value);
-  while (!destroyingUses.empty()) {
-    auto *d = destroyingUses.pop_back_val();
-    callbacks.deleteInst(d->getUser());
-    ++NumEliminatedInsts;
-  }
-
-  callbacks.eraseAndRAUWSingleValueInst(value, newGuaranteedValue);
-
-  // Then change all of our guaranteed forwarding insts to have guaranteed
-  // ownership kind instead of what ever they previously had (ignoring trivial
-  // results);
-  convertOwnedGeneralForwardingUsesToGuaranteed();
-}
-
-void LiveRange::convertArgToGuaranteed(DeadEndBlocks &deadEndBlocks,
-                                       ValueLifetimeAnalysis::Frontier &scratch,
-                                       InstModCallbacks callbacks) && {
-  // First convert the phi argument to be guaranteed.
-  auto *phiArg = cast<SILPhiArgument>(introducer.value);
-  phiArg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-
-  // Then insert end_borrows at each of our destroys. We have to convert the phi
-  // to guaranteed first since otherwise, the ownership check when we create the
-  // end_borrows will trigger.
-  insertEndBorrowsAtDestroys(phiArg, deadEndBlocks, scratch);
-
-  // Then eliminate all of the destroys...
-  while (!destroyingUses.empty()) {
-    auto *d = destroyingUses.pop_back_val();
-    callbacks.deleteInst(d->getUser());
-    ++NumEliminatedInsts;
-  }
-
-  // and change all of our guaranteed forwarding insts to have guaranteed
-  // ownership kind instead of what ever they previously had (ignoring trivial
-  // results);
-  convertOwnedGeneralForwardingUsesToGuaranteed();
-}
-
-LiveRange::HasConsumingUse_t LiveRange::hasConsumingUse(
-    FrozenMultiMap<SILPhiArgument *, OwnedValueIntroducer>
-        *phiToIncomingValueMultiMap) const {
-  // First do a quick check if we have /any/ unknown consuming
-  // uses. If we do not have any, return false early.
-  if (unknownConsumingUses.empty()) {
-    return HasConsumingUse_t::No;
-  }
-
-  // Ok, we do have some unknown consuming uses. If we aren't asked to
-  // update phiToIncomingValueMultiMap, then just return true quickly.
-  if (!phiToIncomingValueMultiMap) {
-    return HasConsumingUse_t::Yes;
-  }
-
-  // We do not know how to handle yet cases where an owned value is used by
-  // multiple phi nodes. So we bail early if unknown consuming uses is > 1.
-  //
-  // TODO: Build up phi node web.
-  auto *op = getSingleUnknownConsumingUse();
-  if (!op) {
-    return HasConsumingUse_t::Yes;
-  }
-
-  // Make sure our single unknown consuming use is a branch inst. If not, bail,
-  // this is a /real/ unknown consuming use.
-  if (!isa<BranchInst>(op->getUser())) {
-    return HasConsumingUse_t::Yes;
-  }
-
-  // Otherwise, setup the phi to incoming value map mapping the block arguments
-  // to our introducer.
-  return HasConsumingUse_t::YesButAllPhiArgs;
 }
 
 //===----------------------------------------------------------------------===//
@@ -623,25 +482,6 @@ struct SemanticARCOptVisitor
   ValueLifetimeAnalysis::Frontier lifetimeFrontier;
   IsAddressWrittenToDefUseAnalysis isAddressWrittenToDefUseAnalysis;
 
-  /// Are we assuming that we reached a fix point and are re-processing to
-  /// prepare to use the phiToIncomingValueMultiMap.
-  bool assumingAtFixedPoint = false;
-  FrozenMultiMap<SILPhiArgument *, OwnedValueIntroducer>
-      phiToIncomingValueMultiMap;
-
-  /// Returns the phiToIncomingValueMultiMap if we are re-processing our
-  /// worklist after fixed point to initialize our phi to incoming value
-  /// multi-map. Otherwise returns nullptr.
-  FrozenMultiMap<SILPhiArgument *, OwnedValueIntroducer> *
-  getPhiToIncomingValueMultiMap() {
-    if (assumingAtFixedPoint)
-      return &phiToIncomingValueMultiMap;
-    return nullptr;
-  }
-
-  using FrozenMultiMapRange =
-      decltype(phiToIncomingValueMultiMap)::PairToSecondEltRange;
-
   explicit SemanticARCOptVisitor(SILFunction &F) : F(F) {}
 
   DeadEndBlocks &getDeadEndBlocks() {
@@ -774,12 +614,10 @@ struct SemanticARCOptVisitor
   bool isWrittenTo(LoadInst *li, const LiveRange &lr);
 
   bool processWorklist();
-  bool optimize();
 
   bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi);
   bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi);
   bool tryJoiningCopyValueLiveRangeWithOperand(CopyValueInst *cvi);
-  bool performPostPeepholeOwnedArgElimination();
 };
 
 } // end anonymous namespace
@@ -787,240 +625,6 @@ struct SemanticARCOptVisitor
 static llvm::cl::opt<bool>
 VerifyAfterTransform("sil-semantic-arc-opts-verify-after-transform",
                      llvm::cl::init(false), llvm::cl::Hidden);
-
-static bool canEliminatePhi(
-    SemanticARCOptVisitor::FrozenMultiMapRange optimizableIntroducerRange,
-    ArrayRef<Operand *> incomingValueOperandList,
-    SmallVectorImpl<OwnedValueIntroducer> &ownedValueIntroducerAccumulator) {
-  // A set that we use to ensure we only add introducers to the accumulator
-  // once.
-  SmallVector<OwnedValueIntroducer, 16> scratch;
-  for (Operand *incomingValueOperand : incomingValueOperandList) {
-    SWIFT_DEFER { scratch.clear(); };
-
-    SILValue incomingValue = incomingValueOperand->get();
-
-    // Before we do anything, see if we have an incoming value with trivial
-    // ownership. This can occur in the case where we are working with enums due
-    // to trivial non-payloaded cases.
-    if (incomingValue.getOwnershipKind() == ValueOwnershipKind::None) {
-      continue;
-    }
-
-    // Now that we know it is an owned value, check for introducers of the owned
-    // value which are the copies that we may be able to eliminate.
-    //
-    // If we can not find all of the owned value's introducers, bail.
-    if (!getAllOwnedValueIntroducers(incomingValue, scratch)) {
-      return false;
-    }
-
-    // Then make sure that all of our owned value introducers are able to be
-    // converted to guaranteed and that we found it to have a LiveRange that we
-    // could have eliminated /if/ we were to get rid of this phi.
-    if (!llvm::all_of(scratch, [&](const OwnedValueIntroducer &introducer) {
-          if (!introducer.isConvertableToGuaranteed()) {
-            return false;
-          }
-
-          // If this linear search is too slow, we can change the
-          // multimap to sort the mapped to list by pointer
-          // instead of insertion order. In such a case, we could
-          // then bisect.
-          auto iter = llvm::find(optimizableIntroducerRange, introducer);
-          return iter != optimizableIntroducerRange.end();
-        })) {
-      return false;
-    }
-
-    // Otherwise, append all introducers from scratch into our result array.
-    llvm::copy(scratch, std::back_inserter(ownedValueIntroducerAccumulator));
-  }
-
-  // Now that we are done, perform a sort unique on our result array so that we
-  // on return have a unique set of values.
-  sortUnique(ownedValueIntroducerAccumulator);
-
-  return true;
-}
-
-bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
-  bool madeChange = false;
-
-  // First freeze our multi-map so we can use it for map queries. Also, setup a
-  // defer of the reset so we do not forget to reset the map when we are done.
-  phiToIncomingValueMultiMap.setFrozen();
-  SWIFT_DEFER { phiToIncomingValueMultiMap.reset(); };
-
-  // Now for each phi argument that we have in our multi-map...
-  SmallVector<Operand *, 4> incomingValueOperandList;
-  SmallVector<OwnedValueIntroducer, 4> ownedValueIntroducers;
-  for (auto pair : phiToIncomingValueMultiMap.getRange()) {
-    SWIFT_DEFER {
-      incomingValueOperandList.clear();
-      ownedValueIntroducers.clear();
-    };
-
-    // First compute the LiveRange for our phi argument. For simplicity, we only
-    // handle cases now where our phi argument does not have any phi unknown
-    // consumers.
-    SILPhiArgument *phiArg = pair.first;
-    LiveRange phiArgLiveRange(phiArg);
-    if (bool(phiArgLiveRange.hasConsumingUse())) {
-      continue;
-    }
-
-    // Ok, we know that our phi argument /could/ be converted to guaranteed if
-    // our incoming values are able to be converted to guaranteed. Now for each
-    // incoming value, compute the incoming values ownership roots and see if
-    // all of the ownership roots are in our owned incoming value array.
-    if (!phiArg->getIncomingPhiOperands(incomingValueOperandList)) {
-      continue;
-    }
-
-    // Then sort the incoming value operand list so that we can bisect search
-    // it.
-    sort(incomingValueOperandList);
-
-    // Grab our list of introducer values paired with this SILArgument. See if
-    // all of these introducer values were ones that /could/ have been
-    // eliminated if it was not for the given phi. If all of them are, we can
-    // optimize!
-    {
-      auto rawFoundOptimizableIntroducerArray = pair.second;
-      if (!canEliminatePhi(rawFoundOptimizableIntroducerArray,
-                           incomingValueOperandList, ownedValueIntroducers)) {
-        continue;
-      }
-    }
-
-    // Ok, at this point we know that we can eliminate this phi. First go
-    // through the list of incomingValueOperandList and stash the value/set the
-    // operand's stored value to undef. We will hook them back up later.
-    SmallVector<SILValue, 8> originalIncomingValues;
-    for (Operand *incomingValueOperand : incomingValueOperandList) {
-      originalIncomingValues.push_back(incomingValueOperand->get());
-      SILType type = incomingValueOperand->get()->getType();
-      auto *undef = SILUndef::get(type, *phiArg->getFunction());
-      incomingValueOperand->set(undef);
-    }
-
-    // Then go through all of our owned value introducers, compute their live
-    // ranges, and eliminate them. We know it is safe to remove them from our
-    // previous proofs.
-    //
-    // NOTE: If our introducer is a copy_value that is one of our
-    // originalIncomingValues, we need to update the originalIncomingValue array
-    // with that value since we are going to delete the copy_value here. This
-    // creates a complication since we want to binary_search on
-    // originalIncomingValues to detect this same condition! So, we create a
-    // list of updates that we apply after we no longer need to perform
-    // binary_search, but before we start RAUWing things.
-    SmallVector<std::pair<SILValue, unsigned>, 8> incomingValueUpdates;
-    for (auto introducer : ownedValueIntroducers) {
-      SILValue v = introducer.value;
-      LiveRange lr(v);
-
-      // For now, we only handle copy_value for simplicity.
-      //
-      // TODO: Add support for load [copy].
-      if (introducer.kind == OwnedValueIntroducerKind::Copy) {
-        auto *cvi = cast<CopyValueInst>(v);
-        // Before we convert from owned to guaranteed, we need to first see if
-        // cvi is one of our originalIncomingValues. If so, we need to set
-        // originalIncomingValues to be cvi->getOperand(). Otherwise, weirdness
-        // results since we are deleting one of our stashed values.
-        auto iter = lower_bound(originalIncomingValues, cvi);
-        if (iter != originalIncomingValues.end() && *iter == cvi) {
-          // We use an auxillary array here so we can continue to bisect on
-          // original incoming values. Once we are done processing here, we will
-          // not need that property anymore.
-          unsigned updateOffset =
-              std::distance(originalIncomingValues.begin(), iter);
-          incomingValueUpdates.emplace_back(cvi->getOperand(), updateOffset);
-        }
-        std::move(lr).convertToGuaranteedAndRAUW(cvi->getOperand(),
-                                                 getCallbacks());
-        continue;
-      }
-      llvm_unreachable("Unhandled optimizable introducer!");
-    }
-
-    // Now go through and update our original incoming value array now that we
-    // do not need it to be sorted for bisection purposes.
-    while (!incomingValueUpdates.empty()) {
-      auto pair = incomingValueUpdates.pop_back_val();
-      originalIncomingValues[pair.second] = pair.first;
-    }
-
-    // Then convert the phi's live range to be guaranteed.
-    std::move(phiArgLiveRange)
-        .convertArgToGuaranteed(getDeadEndBlocks(), lifetimeFrontier,
-                                getCallbacks());
-
-    // Now insert a begin_borrow along the incoming value edges and We have to
-    // do this after converting the incoming values to be guaranteed since
-    // SILBuilder checks simple ownership invariants (namely that def/use line
-    // up) when creating instructions.
-    assert(incomingValueOperandList.size() == originalIncomingValues.size());
-    while (!incomingValueOperandList.empty()) {
-      auto *incomingValueOperand = incomingValueOperandList.pop_back_val();
-      SILValue originalValue = originalIncomingValues.pop_back_val();
-
-      auto *br = cast<BranchInst>(incomingValueOperand->getUser());
-      if (originalValue.getOwnershipKind() != ValueOwnershipKind::None) {
-        auto loc = RegularLocation::getAutoGeneratedLocation();
-        SILBuilderWithScope builder(br);
-        originalValue = builder.createBeginBorrow(loc, originalValue);
-      }
-      incomingValueOperand->set(originalValue);
-    }
-
-    madeChange = true;
-    if (VerifyAfterTransform) {
-      phiArg->getFunction()->verify();
-    }
-  }
-
-  return madeChange;
-}
-
-bool SemanticARCOptVisitor::optimize() {
-  bool madeChange = false;
-
-  // First process the worklist until we reach a fixed point.
-  madeChange |= processWorklist();
-
-  {
-    // If we made a change, set that we assume we are at fixed point and then
-    // re-run the worklist so that we can
-    // properly seeded the ARC peephole map.
-    assumingAtFixedPoint = true;
-    SWIFT_DEFER { assumingAtFixedPoint = false; };
-
-    // Add everything in visitedSinceLastMutation to the worklist.
-    for (auto opt : visitedSinceLastMutation) {
-      if (!opt.hasValue()) {
-        continue;
-      }
-      worklist.insert(*opt);
-    }
-    visitedSinceLastMutation.clear();
-
-    // Then re-run the worklist. We shouldn't modify anything since we are at a
-    // fixed point and are just using this to seed the
-    // phiToIncomingValueMultiMap after we have finished changing things. If we
-    // did change something, we did something weird, so assert!
-    bool madeAdditionalChanges = processWorklist();
-    (void)madeAdditionalChanges;
-    assert(!madeAdditionalChanges && "Should be at the fixed point");
-  }
-
-  // Then use the newly seeded peephole map to
-  madeChange |= performPostPeepholeOwnedArgElimination();
-
-  return madeChange;
-}
 
 bool SemanticARCOptVisitor::processWorklist() {
   // NOTE: The madeChange here is not strictly necessary since we only have
@@ -1054,8 +658,6 @@ bool SemanticARCOptVisitor::processWorklist() {
     // the instruction).
     if (auto *defInst = next->getDefiningInstruction()) {
       if (isInstructionTriviallyDead(defInst)) {
-        assert(!assumingAtFixedPoint &&
-               "Assumed was at fixed point and recomputing state?!");
         deleteAllDebugUses(defInst);
         eraseInstruction(defInst);
         madeChange = true;
@@ -1070,8 +672,6 @@ bool SemanticARCOptVisitor::processWorklist() {
     // perhaps), try to visit that value recursively.
     if (auto *svi = dyn_cast<SingleValueInstruction>(next)) {
       bool madeSingleChange = visit(svi);
-      assert((!madeSingleChange || !assumingAtFixedPoint) &&
-             "Assumed was at fixed point and modified state?!");
       madeChange |= madeSingleChange;
       if (VerifyAfterTransform && madeSingleChange) {
         F.verify();
@@ -1172,17 +772,13 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
     return false;
 
   // Then go over all of our uses and see if the value returned by our copy
-  // value forms a dead live range or a live range that would be dead if it was
-  // not consumed by phi nodes. If we do not have such a live range, there must
-  // be some consuming use that we either do not understand is /actually/
-  // forwarding or a user that truly represents a necessary consume of the value
-  // (e.x. storing into memory).
+  // value forms a dead live range. If we do not have a dead live range, there
+  // must be some consuming use that we either do not understand is /actually/
+  // forwarding or a user that truly represents a necessary consume of the
+  // value (e.x. storing into memory).
   LiveRange lr(cvi);
-  auto hasConsumingUseState =
-      lr.hasConsumingUse(getPhiToIncomingValueMultiMap());
-  if (hasConsumingUseState == LiveRange::HasConsumingUse_t::Yes) {
+  if (lr.hasConsumingUse())
     return false;
-  }
 
   // Next check if we do not have any destroys of our copy_value and are
   // processing a local borrow scope. In such a case, due to the way we ignore
@@ -1283,52 +879,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   }
 
   // Otherwise, we know that our copy_value/destroy_values are all completely
-  // within the guaranteed value scope. So we /could/ optimize it. Now check if
-  // we were truly dead or if we are dead if we can eliminate phi arg uses. If
-  // we need to handle the phi arg uses, we bail. When we checked if the value
-  // was consumed, the hasConsumedUse code updated phiToIncomingValueMultiMap
-  // for us before returning its prognosis. After we reach a fixed point, we
-  // will try to eliminate this value then.
-  if (hasConsumingUseState == LiveRange::HasConsumingUse_t::YesButAllPhiArgs) {
-    auto *op = lr.getSingleUnknownConsumingUse();
-    assert(op);
-    unsigned opNum = op->getOperandNumber();
-    auto *br = cast<BranchInst>(op->getUser());
-    SmallVector<Operand *, 8> scratchSpace;
-    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
-
-    for (auto *succBlock : br->getSuccessorBlocks()) {
-      SWIFT_DEFER {
-        scratchSpace.clear();
-        visitedBlocks.clear();
-      };
-
-      auto *arg = succBlock->getSILPhiArguments()[opNum];
-      LiveRange phiArgLR(arg);
-      if (bool(phiArgLR.hasConsumingUse())) {
-        return false;
-      }
-
-      if (llvm::any_of(borrowScopeIntroducers,
-                       [&](BorrowScopeIntroducingValue borrowScope) {
-                         return !borrowScope.areUsesWithinScope(
-                             phiArgLR.getDestroyingUses(), scratchSpace,
-                             visitedBlocks, getDeadEndBlocks());
-                       })) {
-        return false;
-      }
-    }
-
-    for (auto *succBlock : br->getSuccessorBlocks()) {
-      auto *arg = succBlock->getSILPhiArguments()[opNum];
-      phiToIncomingValueMultiMap.insert(arg, lr.getIntroducer());
-    }
-
-    return false;
-  }
-
-  // Otherwise, our copy must truly not be needed, o RAUW and convert to
-  // guaranteed!
+  // within the guaranteed value scope. So RAUW and convert to guaranteed!
   std::move(lr).convertToGuaranteedAndRAUW(cvi->getOperand(), getCallbacks());
   ++NumEliminatedInsts;
   return true;
@@ -1787,7 +1338,7 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // -> load_borrow if we can put a copy_value on a cold path and thus
   // eliminate RR traffic on a hot path.
   LiveRange lr(li);
-  if (bool(lr.hasConsumingUse()))
+  if (lr.hasConsumingUse())
     return false;
 
   // Then check if our address is ever written to. If it is, then we cannot use
@@ -1847,9 +1398,8 @@ struct SemanticARCOpts : SILFunctionTransform {
     // Then process the worklist. We only destroy instructions, so invalidate
     // that. Once we modify the ownership of block arguments, we will need to
     // perhaps invalidate branches as well.
-    if (visitor.optimize()) {
-      invalidateAnalysis(
-          SILAnalysis::InvalidationKind::BranchesAndInstructions);
+    if (visitor.processWorklist()) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }
 };
