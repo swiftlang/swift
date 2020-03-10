@@ -279,7 +279,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     }
     else {
       let headerSize = MemoryLayout<UnsafeRawPointer>.stride * 4
-      let (storage, realCapacity) = _allocate(
+      let (storage, realTailAllocationSize) = _allocate(
         numHeaderBytes: headerSize,
         numTailBytes: MemoryLayout<Element>.stride * realMinimumCapacity,
         growthFactor: growForAppend ? 1.6 : nil
@@ -293,6 +293,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       
       _storage = storage
 
+      let realCapacity = realTailAllocationSize / MemoryLayout<Element>.stride
       _initStorageHeader(
         count: uninitializedCount, capacity: realCapacity)
     }
