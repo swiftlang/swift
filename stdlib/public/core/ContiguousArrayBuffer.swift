@@ -278,11 +278,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       self = _ContiguousArrayBuffer<Element>()
     }
     else {
-      #if arch(i386) || arch(arm) || arch(wasm32)
-      let headerSize = 16
-      #else
-      let headerSize = 32
-      #endif
+      let headerSize = MemoryLayout<UnsafeRawPointer>.stride * 4
       let (storage, realCapacity) = _allocate(
         numHeaderBytes: headerSize,
         numTailBytes: MemoryLayout<Element>.stride * realMinimumCapacity,
@@ -290,10 +286,11 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       ) { tailBytes in
         Builtin.allocWithTailElems_1(
            _ContiguousArrayStorage<Element>.self,
-           tailBytes._builtinWordValue,
+           (tailBytes / MemoryLayout<Element>.stride)._builtinWordValue,
            Element.self
         )
       }
+      
       _storage = storage
 
       _initStorageHeader(
