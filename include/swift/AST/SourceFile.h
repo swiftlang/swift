@@ -203,11 +203,15 @@ private:
 
 public:
 
-  //SWIFT_ENABLE_TENSORLFLOW
-  //For Tensorflow, keep this public because the SwiftCodeCompletion needs it
+  // SWIFT_ENABLE_TENSORLFLOW
+  /// For TensorFlow, keep this public because the SwiftCodeCompletion needs it
   /// The list of top-level declarations in the source file.
-  std::vector<Decl *> Decls;
-  //SWIFT_ENABLE_TENSORLFLOW
+  // SWIFT_ENABLE_TENSORLFLOW END
+  /// The list of top-level declarations in the source file. This is \c None if
+  /// they have not yet been parsed.
+  /// FIXME: Once addTopLevelDecl/prependTopLevelDecl/truncateTopLevelDecls
+  /// have been removed, this can become an optional ArrayRef.
+  Optional<std::vector<Decl *>> Decls;
 
   /// Appends the given declaration to the end of the top-level decls list. Do
   /// not add any additional uses of this function.

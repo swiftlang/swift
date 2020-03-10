@@ -1927,7 +1927,7 @@ SourceFile::getCachedVisibleDecls() const {
 
 // SWIFT_ENABLE_TENSORFLOW
 void SourceFile::addVisibleDecl(ValueDecl *decl) {
-  Decls.push_back(decl);
+  Decls->push_back(decl);
   getCache().AllVisibleValues.push_back(decl);
 }
 

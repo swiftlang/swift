@@ -186,6 +186,22 @@ CanType SILFunctionType::getSelfInstanceType(SILModule &M) const {
   return selfTy;
 }
 
+ClassDecl *
+SILFunctionType::getWitnessMethodClass(SILModule &M) const {
+  // TODO: When witnesses use substituted types, we'd get this from the
+  // substitution map.
+  auto selfTy = getSelfInstanceType(M);
+  auto genericSig = getSubstGenericSignature();
+  if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
+    assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
+    auto superclass = genericSig->getSuperclassBound(paramTy);
+    if (superclass)
+      return superclass->getClassOrBoundGenericClass();
+  }
+
+  return nullptr;
+}
+
 IndexSubset *
 SILFunctionType::getDifferentiabilityParameterIndices() {
   assert(isDifferentiable() && "Must be a differentiable function");
@@ -1126,19 +1142,17 @@ getAutoDiffDifferentialType(SILFunctionType *originalFnTy,
   }
   GenericSignature genericSig;
   SubstitutionMap substitutions;
-  bool impliedSignature = false;
   if (!substGenericParams.empty()) {
     genericSig = GenericSignature::get(substGenericParams, substRequirements)
                      .getCanonicalSignature();
     substitutions =
         SubstitutionMap::get(genericSig, llvm::makeArrayRef(substReplacements),
                              llvm::makeArrayRef(substConformances));
-    impliedSignature = true;
   }
   return SILFunctionType::get(
       genericSig, SILFunctionType::ExtInfo(), SILCoroutineKind::None,
       ParameterConvention::Direct_Guaranteed, differentialParams, {},
-      differentialResults, None, substitutions, impliedSignature, ctx);
+      differentialResults, None, substitutions, SubstitutionMap(), ctx);
 }
 
 /// Returns the pullback type for the given original function type, parameter
@@ -1283,19 +1297,17 @@ getAutoDiffPullbackType(SILFunctionType *originalFnTy,
   }
   GenericSignature genericSig;
   SubstitutionMap substitutions;
-  bool impliedSignature = false;
   if (!substGenericParams.empty()) {
     genericSig = GenericSignature::get(substGenericParams, substRequirements)
                      .getCanonicalSignature();
     substitutions =
         SubstitutionMap::get(genericSig, llvm::makeArrayRef(substReplacements),
                              llvm::makeArrayRef(substConformances));
-    impliedSignature = true;
   }
   return SILFunctionType::get(
       genericSig, SILFunctionType::ExtInfo(), SILCoroutineKind::None,
       ParameterConvention::Direct_Guaranteed, pullbackParams, {},
-      pullbackResults, {}, substitutions, impliedSignature, ctx);
+      pullbackResults, {}, substitutions, SubstitutionMap(), ctx);
 }
 
 /// Constrains the `original` function type according to differentiability
@@ -1316,7 +1328,7 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
     return original;
   }
 
-  assert(!original->getSubstitutions() &&
+  assert(!original->getPatternSubstitutions() &&
          "cannot constrain substituted function type");
   if (!constrainedInvocationGenSig)
     constrainedInvocationGenSig = originalInvocationGenSig;
@@ -1350,8 +1362,8 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
              original->getExtInfo(), original->getCoroutineKind(),
              original->getCalleeConvention(), newParameters,
              original->getYields(), newResults,
-             original->getOptionalErrorResult(), original->getSubstitutions(),
-             original->isGenericSignatureImplied(), original->getASTContext(),
+             original->getOptionalErrorResult(), original->getPatternSubstitutions(),
+             original->getInvocationSubstitutions(), original->getASTContext(),
              original->getWitnessMethodConformanceOrInvalid());
 }
 
@@ -1442,8 +1454,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
       constrainedOriginalFnTy->getCalleeConvention(), newParameters,
       constrainedOriginalFnTy->getYields(), newResults,
       constrainedOriginalFnTy->getOptionalErrorResult(),
-      constrainedOriginalFnTy->getSubstitutions(),
-      constrainedOriginalFnTy->isGenericSignatureImplied(),
+      constrainedOriginalFnTy->getPatternSubstitutions(),
+      constrainedOriginalFnTy->getInvocationSubstitutions(),
       constrainedOriginalFnTy->getASTContext(),
       constrainedOriginalFnTy->getWitnessMethodConformanceOrInvalid());
   return cachedResult;
@@ -1525,8 +1537,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
   return SILFunctionType::get(getSubstGenericSignature(), getExtInfo(),
                               getCoroutineKind(), getCalleeConvention(),
                               newParameters, getYields(), newResults,
-                              getOptionalErrorResult(), getSubstitutions(),
-                              isGenericSignatureImplied(), getASTContext());
+                              getOptionalErrorResult(), getPatternSubstitutions(),
+                              getInvocationSubstitutions(), getASTContext());
 }
 
 static bool isPseudogeneric(SILDeclRef c) {

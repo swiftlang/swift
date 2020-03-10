@@ -247,7 +247,7 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   return SILFunctionType::get(
       genericSig, extInfo, expectedType->getCoroutineKind(),
       ParameterConvention::Direct_Unowned, interfaceParams, interfaceYields,
-      interfaceResults, interfaceErrorResult, {}, false,
+      interfaceResults, interfaceErrorResult, {}, {},
       module.getASTContext());
 }
 
@@ -256,8 +256,8 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
                                            SILFunction *caller,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType) {
-  assert(!fromType->getSubstitutions());
-  assert(!toType->getSubstitutions());
+  assert(!fromType->getCombinedSubstitutions());
+  assert(!toType->getCombinedSubstitutions());
 
   SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
@@ -432,8 +432,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
     CanSILFunctionType linearMapType, CanSILFunctionType targetType,
     AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
     SILAutoDiffIndices actualIndices) {
-  assert(!linearMapType->getSubstitutions());
-  assert(!targetType->getSubstitutions());
+  assert(!linearMapType->getCombinedSubstitutions());
+  assert(!targetType->getCombinedSubstitutions());
 
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for " << linearMapType

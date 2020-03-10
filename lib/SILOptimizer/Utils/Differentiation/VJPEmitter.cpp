@@ -214,7 +214,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   auto pbType = SILFunctionType::get(
       pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
-      origTy->getSubstitutions(), origTy->isGenericSignatureImplied(),
+      origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
