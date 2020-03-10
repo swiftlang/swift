@@ -49,6 +49,7 @@ class BuilderClosureVisitor
   ASTContext &ctx;
   Type builderType;
   NominalTypeDecl *builder = nullptr;
+  Identifier buildOptionalId;
   llvm::SmallDenseMap<Identifier, bool> supportedOps;
 
   SkipUnhandledConstructInFunctionBuilder::UnhandledNode unhandledNode;
@@ -201,6 +202,14 @@ public:
     builder = builderType->getAnyNominal();
     applied.builderType = builderType;
     applied.bodyResultType = bodyResultType;
+
+    // Use buildOptional(_:) if available, otherwise fall back to buildIf
+    // when available.
+    if (builderSupports(ctx.Id_buildOptional) ||
+        !builderSupports(ctx.Id_buildIf))
+      buildOptionalId = ctx.Id_buildOptional;
+    else
+      buildOptionalId = ctx.Id_buildIf;
   }
 
   /// Apply the builder transform to the given statement.
@@ -416,8 +425,8 @@ protected:
     if (!isBuildableIfChainRecursive(ifStmt, numPayloads, isOptional))
       return false;
 
-    // If there's a missing 'else', we need 'buildIf' to exist.
-    if (isOptional && !builderSupports(ctx.Id_buildIf))
+    // If there's a missing 'else', we need 'buildOptional' to exist.
+    if (isOptional && !builderSupports(buildOptionalId))
       return false;
 
     // If there are multiple clauses, we need 'buildEither(first:)' and
@@ -523,9 +532,9 @@ protected:
     // The operand should have optional type if we had optional results,
     // so we just need to call `buildIf` now, since we're at the top level.
     if (isOptional && isTopLevel) {
-      thenExpr = buildCallIfWanted(ifStmt->getEndLoc(), ctx.Id_buildIf,
+      thenExpr = buildCallIfWanted(ifStmt->getEndLoc(), buildOptionalId,
                                    thenExpr,  /*argLabels=*/{ });
-      elseExpr = buildCallIfWanted(ifStmt->getEndLoc(), ctx.Id_buildIf,
+      elseExpr = buildCallIfWanted(ifStmt->getEndLoc(), buildOptionalId,
                                    elseExpr,  /*argLabels=*/{ });
     }
 
