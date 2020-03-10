@@ -583,10 +583,12 @@ mangled in to disambiguate.
 ::
 
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
-  impl-function-type ::= type* generic-signature 'I' PSEUDO-GENERIC? FUNC-ATTRIBUTES '_'
+  impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= CALLEE-ESCAPE? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? PARAM-CONVENTION* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? PARAM-CONVENTION* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION)?
 
+  PATTERN-SUBS ::= 's'                       // has pattern substitutions
+  INVOCATION-SUB ::= 'I'                     // has invocation substitutions
   PSEUDO-GENERIC ::= 'P'
 
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)

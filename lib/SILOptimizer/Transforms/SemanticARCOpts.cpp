@@ -593,6 +593,7 @@ struct SemanticARCOptVisitor
   FORWARDING_INST(OpenExistentialValue)
   FORWARDING_INST(OpenExistentialBoxValue)
   FORWARDING_INST(MarkDependence)
+  FORWARDING_INST(InitExistentialRef)
 #undef FORWARDING_INST
 
 #define FORWARDING_TERM(NAME)                                                  \
@@ -608,7 +609,6 @@ struct SemanticARCOptVisitor
   FORWARDING_TERM(SwitchEnum)
   FORWARDING_TERM(CheckedCastBranch)
   FORWARDING_TERM(Branch)
-  FORWARDING_TERM(CondBranch)
 #undef FORWARDING_TERM
 
   bool isWrittenTo(LoadInst *li, const LiveRange &lr);

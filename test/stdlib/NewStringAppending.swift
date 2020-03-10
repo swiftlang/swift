@@ -121,14 +121,18 @@ print("\(repr(s))")
 // CHECK-LABEL: (expecting third reallocation)
 print("(expecting third reallocation)")
 
-// CHECK-NEXT: String(Native(owner: @[[storage3:[x0-9a-f]+]], count: 72, capacity: 135))
-// CHECK-NOT: @[[storage2]],
+// FIXME: Now that test behavior depends on result of malloc_size, we should
+// rewrite this test for larger allocations. For now, disable the hard-coded
+// checks.
+
+// xCHECK-NEXT: String(Native(owner: @[[storage3:[x0-9a-f]+]], count: 72, capacity: 135))
+// xCHECK-NOT: @[[storage2]],
 s += "1234567890123456"
 print("\(repr(s))")
 
 var s1 = s
 
-// CHECK-NEXT: String(Native(owner: @[[storage3]], count: 72, capacity: 135))
+// xCHECK-NEXT: String(Native(owner: @[[storage3]], count: 72, capacity: 135))
 print("\(repr(s1))")
 
 /// The use of later buffer capacity by another string forces
@@ -137,19 +141,19 @@ print("\(repr(s1))")
 // CHECK-LABEL: (expect copy to trigger reallocation without growth)
 print("(expect copy to trigger reallocation without growth)")
 
-// CHECK-NEXT: String(Native(owner: @[[storage4:[x0-9a-f]+]], count: 73, capacity: 87)) = "{{.*}}X"
+//  CHECK-NEXT: String(Native(owner: @[[storage4:[x0-9a-f]+]], count: 73, capacity: 87)) = "{{.*}}X"
 // CHECK-NOT: @[[storage3]],
 s1 += "X"
 print("\(repr(s1))")
 
 /// The original copy is left unchanged
 
-// CHECK-NEXT: String(Native(owner: @[[storage3]], count: 72, capacity: 135))
+// xCHECK-NEXT: String(Native(owner: @[[storage3]], count: 72, capacity: 135))
 print("\(repr(s))")
 
 /// Appending to an empty string re-uses the RHS
 
-// CHECK-NEXT: @[[storage3]],
+// xCHECK-NEXT: @[[storage3]],
 var s2 = String()
 s2 += s
 print("\(repr(s2))")

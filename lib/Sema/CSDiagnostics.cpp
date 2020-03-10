@@ -3685,12 +3685,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // Determine the contextual type of the expression
-    Type contextualType;
-    for (auto iterateCS = &cs; contextualType.isNull() && iterateCS;
-         iterateCS = iterateCS->baseCS) {
-      contextualType = iterateCS->getContextualType(getRawAnchor());
-    }
-    
+    Type contextualType = cs.getContextualType(getRawAnchor());
     // Try to provide a fix-it that only contains a '.'
     if (contextualType && baseTy->isEqual(contextualType)) {
       Diag->fixItInsert(loc, ".");
@@ -3700,11 +3695,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // Check if the expression is the matching operator ~=, most often used in
     // case statements. If so, try to provide a single dot fix-it
     const Expr *contextualTypeNode = getRootExpr(getAnchor());
-    ConstraintSystem *lastCS = nullptr;
-    for (auto iterateCS = &cs; iterateCS; iterateCS = iterateCS->baseCS) {
-      lastCS = iterateCS;
-    }
-    
+
     // The '~=' operator is an overloaded decl ref inside a binaryExpr
     if (auto binaryExpr = dyn_cast<BinaryExpr>(contextualTypeNode)) {
       if (auto overloadedFn
@@ -3719,7 +3710,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
             // If the rhs of '~=' is the enum type, a single dot suffixes
             // since the type can be inferred
             Type secondArgType =
-            lastCS->getType(binaryExpr->getArg()->getElement(1));
+                cs.getType(binaryExpr->getArg()->getElement(1));
             if (secondArgType->isEqual(baseTy)) {
               Diag->fixItInsert(loc, ".");
               return true;

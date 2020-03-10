@@ -1108,7 +1108,7 @@ class InferredGenericSignatureRequest :
     public SimpleRequest<InferredGenericSignatureRequest,
                          GenericSignature (ModuleDecl *,
                                             GenericSignatureImpl *,
-                                            GenericParamList *,
+                                            GenericParamSource,
                                             SmallVector<Requirement, 2>,
                                             SmallVector<TypeLoc, 2>,
                                             bool),
@@ -1124,7 +1124,7 @@ private:
   evaluate(Evaluator &evaluator,
            ModuleDecl *module,
            GenericSignatureImpl *baseSignature,
-           GenericParamList *gpl,
+           GenericParamSource paramSource,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,
            bool allowConcreteGenericParams) const;
@@ -1980,6 +1980,29 @@ public:
 /// @dynamicMemberLookup attribute on it.
 class HasDynamicMemberLookupAttributeRequest
     : public SimpleRequest<HasDynamicMemberLookupAttributeRequest,
+                           bool(CanType), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, CanType ty) const;
+
+public:
+  bool isCached() const {
+    // Don't cache types containing type variables, as they must not outlive
+    // the constraint system that created them.
+    auto ty = std::get<0>(getStorage());
+    return !ty->hasTypeVariable();
+  }
+};
+
+/// Computes whether the specified type or a super-class/super-protocol has the
+/// @dynamicCallable attribute on it.
+class HasDynamicCallableAttributeRequest
+    : public SimpleRequest<HasDynamicCallableAttributeRequest,
                            bool(CanType), CacheKind::Cached> {
 public:
   using SimpleRequest::SimpleRequest;

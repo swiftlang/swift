@@ -22,11 +22,7 @@
 //                 i32 0
 //               ), 
 // CHECK-SAME:   [[INT]] 512, 
-// CHECK-SAME:   %swift.type_descriptor* bitcast (
-// CHECK-SAME:     <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8, i32, i32, i32 }>* 
-// CHECK-SAME:     @"$s4main9NamespaceVAAq_RszrlE5ValueVMn" 
-// CHECK-SAME:     to %swift.type_descriptor*
-// CHECK-SAME:   ), 
+// CHECK-SAME:   %swift.type_descriptor* bitcast ({{.*}}), 
 // CHECK-SAME:   %swift.type* @"$sSiN", 
 // CHECK-SAME:   %swift.type* @"$sSSN", 
 // CHECK-SAME:   i32 0, 
@@ -116,11 +112,7 @@ doit()
 // CHECK-SAME:     i8* [[ERASED_TYPE_1]], 
 // CHECK-SAME:     i8* [[ERASED_TYPE_2]], 
 // CHECK-SAME:     i8* undef, 
-// CHECK-SAME:     %swift.type_descriptor* bitcast (
-// CHECK-SAME:       <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8, i32, i32, i32 }>* 
-// CHECK-SAME:       @"$s4main9NamespaceVAAq_RszrlE5ValueVMn" 
-// CHECK-SAME:       to %swift.type_descriptor*
-// CHECK-SAME:     )
+// CHECK-SAME:     %swift.type_descriptor* bitcast ({{[^)]*}})
 // CHECK-SAME:   ) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

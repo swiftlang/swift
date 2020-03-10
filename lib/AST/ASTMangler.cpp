@@ -357,8 +357,8 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
                                             Type SelfType,
                                             ModuleDecl *Module) {
   Mod = Module;
-  assert(ThunkType->getSubstitutions().empty() && "not implemented");
-  GenericSignature GenSig = ThunkType->getSubstGenericSignature();
+  assert(ThunkType->getPatternSubstitutions().empty() && "not implemented");
+  GenericSignature GenSig = ThunkType->getInvocationGenericSignature();
   if (GenSig)
     CurGenericSignature = GenSig.getCanonicalSignature();
 
@@ -520,6 +520,10 @@ std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
 
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return std::string(); // not needed for the parser library.
+#endif
+
   DWARFMangling = true;
   beginManglingWithoutPrefix();
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
@@ -1456,11 +1460,11 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 
   llvm::SmallVector<char, 32> OpArgs;
 
-  if (fn->getSubstitutions()) {
+  if (fn->getPatternSubstitutions()) {
     OpArgs.push_back('s');
-    if (!fn->isGenericSignatureImplied()) {
-      OpArgs.push_back('i');
-    }
+  }
+  if (fn->getInvocationSubstitutions()) {
+    OpArgs.push_back('I');
   }
   
   if (fn->isPolymorphic() && fn->isPseudogeneric())
@@ -1511,6 +1515,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back('G');
     break;
   }
+
+  auto outerGenericSig = CurGenericSignature;
+  CurGenericSignature = fn->getSubstGenericSignature();
   
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
@@ -1538,12 +1545,24 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back(getResultConvention(error.getConvention()));
     appendType(error.getInterfaceType());
   }
-  if (auto sig = fn->getSubstGenericSignature()) {
+
+  if (auto sig = fn->getInvocationGenericSignature()) {
     appendGenericSignature(sig);
+    CurGenericSignature = outerGenericSig;
   }
-  if (auto subs = fn->getSubstitutions()) {
+  if (auto subs = fn->getInvocationSubstitutions()) {
     appendFlatGenericArgs(subs);
     appendRetroactiveConformances(subs, Mod);
+  }
+  if (auto subs = fn->getPatternSubstitutions()) {
+    appendGenericSignature(subs.getGenericSignature());
+    CurGenericSignature =
+      fn->getInvocationGenericSignature()
+        ? fn->getInvocationGenericSignature()
+        : outerGenericSig;
+    appendFlatGenericArgs(subs);
+    appendRetroactiveConformances(subs, Mod);
+    CurGenericSignature = outerGenericSig;
   }
 
   OpArgs.push_back('_');

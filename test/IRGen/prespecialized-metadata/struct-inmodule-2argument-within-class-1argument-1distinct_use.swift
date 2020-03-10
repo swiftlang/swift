@@ -6,14 +6,14 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
 // CHECK: @"$s4main9NamespaceC5ValueVySS_SiSdGWV" = linkonce_odr hidden constant %swift.vwtable {
-// CHECK-SAME:    i8* bitcast ({{(%swift.opaque\* \(\[[0-9]+ x i8\]\*, \[[0-9]+ x i8\]\*, %swift.type\*\)\* @"\$[a-zA-Z0-9_]+" to i8\*|i8\* \(i8\*, i8\*, %swift.type\*\)\* @__swift_memcpy[0-9]+_[0-9]+ to i8\*)}}),
-// CHECK-SAME:    i8* bitcast (void (i8*, %swift.type*)* @__swift_noop_void_return to i8*),
-// CHECK-SAME:    i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy{{[0-9]+}}_{{[0-9]+}} to i8*),
-// CHECK-SAME:    i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy{{[0-9]+}}_{{[0-9]+}} to i8*),
-// CHECK-SAME:    i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy{{[0-9]+}}_{{[0-9]+}} to i8*),
-// CHECK-SAME:    i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy{{[0-9]+}}_{{[0-9]+}} to i8*),
-// CHECK-SAME:    i8* bitcast (i32 (%swift.opaque*, i32, %swift.type*)* @"$s4main9NamespaceC5ValueVySS_SiSdGwet" to i8*),
-// CHECK-SAME:    i8* bitcast (void (%swift.opaque*, i32, i32, %swift.type*)* @"$s4main9NamespaceC5ValueVySS_SiSdGwst" to i8*),
+// CHECK-SAME:    i8* bitcast ({{(%swift.opaque\* \(\[[0-9]+ x i8\]\*, \[[0-9]+ x i8\]\*, %swift.type\*\)\* @"\$[a-zA-Z0-9_]+" to i8\*|[^@]+@__swift_memcpy[^[:space:]]+ to i8\*)}}),
+// CHECK-SAME:    i8* bitcast ({{[^@]*}}@__swift_noop_void_return{{[^[:space:]]* to i8\*}}),
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]+ to i8\*}}),
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]+ to i8\*}}),
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]+ to i8\*}}),
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@__swift_memcpy{{[^[:space:]]+ to i8\*}}),
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVySS_SiSdGwet{{[^@]+}} to i8*),
+// CHECK-SAME:    i8* bitcast ({{[^@]+}}@"$s4main9NamespaceC5ValueVySS_SiSdGwst{{[^@]+}} to i8*),
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    i32 {{[0-9]+}},
@@ -22,7 +22,7 @@
 // NOTE: ignore the COMDAT on PE/COFF platforms
 // CHECK-SAME: align [[ALIGNMENT]]
 
-// CHECK: @"$s4main9NamespaceC5ValueVySS_SiSdGMf" = linkonce_odr hidden constant <{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, %swift.type*, %swift.type*, i32, i32, i64 }> <{ i8** getelementptr inbounds (%swift.vwtable, %swift.vwtable* @"$s4main9NamespaceC5ValueVySS_SiSdGWV", i32 0, i32 0), [[INT]] 512, %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main9NamespaceC5ValueVMn" to %swift.type_descriptor*), %swift.type* @"$sSSN", %swift.type* @"$sSiN", %swift.type* @"$sSdN", i32 0, i32 8, i64 3 }>, align [[ALIGNMENT]]
+// CHECK: @"$s4main9NamespaceC5ValueVySS_SiSdGMf" = linkonce_odr hidden constant {{.+}}$s4main9NamespaceC5ValueVMn{{.+}} to %swift.type_descriptor*), %swift.type* @"$sSSN", %swift.type* @"$sSiN", %swift.type* @"$sSdN", i32 0, i32 8, i64 3 }>, align [[ALIGNMENT]]
 final class Namespace<Arg> {
   struct Value<First, Second> {
     let first: First
@@ -62,6 +62,6 @@ doit()
 // CHECK: [[EXIT_PRESPECIALIZED_1]]:
 // CHECK:   ret %swift.metadata_response { %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* bitcast (<{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, %swift.type*, %swift.type*, i32, i32, i64 }>* @"$s4main9NamespaceC5ValueVySS_SiSdGMf" to %swift.full_type*), i32 0, i32 1), [[INT]] 0 }
 // CHECK: [[EXIT_NORMAL]]:
-// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[ERASED_TYPE_1]], i8* [[ERASED_TYPE_2]], i8* [[ERASED_TYPE_3]], %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main9NamespaceC5ValueVMn" to %swift.type_descriptor*)) #{{[0-9]+}}
+// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[ERASED_TYPE_1]], i8* [[ERASED_TYPE_2]], i8* [[ERASED_TYPE_3]], %swift.type_descriptor* bitcast ({{.+}}$s4main9NamespaceC5ValueVMn{{.+}} to %swift.type_descriptor*)) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

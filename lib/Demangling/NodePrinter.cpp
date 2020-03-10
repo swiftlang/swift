@@ -390,8 +390,8 @@ private:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionType:
-    case Node::Kind::ImplImpliedSubstitutions:
-    case Node::Kind::ImplSubstitutions:
+    case Node::Kind::ImplInvocationSubstitutions:
+    case Node::Kind::ImplPatternSubstitutions:
     case Node::Kind::ImplicitClosure:
     case Node::Kind::ImplParameter:
     case Node::Kind::ImplResult:
@@ -748,12 +748,21 @@ private:
   }
 
   void printImplFunctionType(NodePointer fn) {
+    NodePointer patternSubs = nullptr;
+    NodePointer invocationSubs = nullptr;
     enum State { Attrs, Inputs, Results } curState = Attrs;
     auto transitionTo = [&](State newState) {
       assert(newState >= curState);
       for (; curState != newState; curState = State(curState + 1)) {
         switch (curState) {
-        case Attrs: Printer << '('; continue;
+        case Attrs:
+          if (patternSubs) {
+            Printer << "@substituted ";
+            print(patternSubs->getChild(0));
+            Printer << ' ';
+          }
+          Printer << '(';
+          continue;
         case Inputs: Printer << ") -> ("; continue;
         case Results: printer_unreachable("no state after Results");
         }
@@ -772,6 +781,10 @@ private:
         if (curState == Results) Printer << ", ";
         transitionTo(Results);
         print(child);
+      } else if (child->getKind() == Node::Kind::ImplPatternSubstitutions) {
+        patternSubs = child;
+      } else if (child->getKind() == Node::Kind::ImplInvocationSubstitutions) {
+        invocationSubs = child;
       } else {
         assert(curState == Attrs);
         print(child);
@@ -780,6 +793,17 @@ private:
     }
     transitionTo(Results);
     Printer << ')';
+
+    if (patternSubs) {
+      Printer << " for <";
+      printChildren(patternSubs->getChild(1));
+      Printer << '>';
+    }
+    if (invocationSubs) {
+      Printer << " for <";
+      printChildren(invocationSubs->getChild(0));
+      Printer << '>';
+    }
   }
 
   void printFunctionSigSpecializationParams(NodePointer Node);
@@ -2026,13 +2050,17 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::ImplFunctionType:
     printImplFunctionType(Node);
     return nullptr;
-  case Node::Kind::ImplSubstitutions:
-  case Node::Kind::ImplImpliedSubstitutions:
+  case Node::Kind::ImplInvocationSubstitutions:
     Printer << "for <";
     printChildren(Node->getChild(0), ", ");
     Printer << '>';
-    if (kind == Node::Kind::ImplImpliedSubstitutions)
-      Printer << " in";
+    return nullptr;
+  case Node::Kind::ImplPatternSubstitutions:
+    Printer << "@substituted ";
+    print(Node->getChild(0));
+    Printer << " for <";
+    printChildren(Node->getChild(1), ", ");
+    Printer << '>';
     return nullptr;
   case Node::Kind::ErrorType:
     Printer << "<ERROR TYPE>";

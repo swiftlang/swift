@@ -1516,9 +1516,6 @@ public:
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
 
-  /// The original CS if this CS was created as a simplification of another CS
-  ConstraintSystem *baseCS = nullptr;
-
   /// The total number of disjunctions created.
   unsigned CountDisjunctions = 0;
 
@@ -1696,8 +1693,6 @@ private:
     DeclContext *DC;
     llvm::BumpPtrAllocator &Allocator;
 
-    ConstraintSystem &BaseCS;
-
     // Contextual Information.
     Type CT;
     ContextualTypePurpose CTP;
@@ -1705,8 +1700,7 @@ private:
   public:
     Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), DC(cs.DC), Allocator(cs.Allocator), BaseCS(cs),
-          CT(ct), CTP(ctp) {}
+        : E(expr), DC(cs.DC), Allocator(cs.Allocator), CT(ct), CTP(ctp) {}
 
     /// Return underlying expression.
     Expr *getExpr() const { return E; }
@@ -4475,14 +4469,11 @@ public:
   /// Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   bool isExpressionAlreadyTooComplex = false;
-  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+  bool getExpressionTooComplex(size_t solutionMemory) {
     if (isExpressionAlreadyTooComplex)
       return true;
 
-    auto used = getASTContext().getSolverMemory();
-    for (auto const& s : solutions) {
-      used += s.getTotalMemory();
-    }
+    auto used = getASTContext().getSolverMemory() + solutionMemory;
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
@@ -4507,6 +4498,14 @@ public:
     }
 
     return false;
+  }
+
+  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    size_t solutionMemory = 0;
+    for (auto const& s : solutions) {
+      solutionMemory += s.getTotalMemory();
+    }
+    return getExpressionTooComplex(solutionMemory);
   }
 
   // Utility class that can collect information about the type of an
