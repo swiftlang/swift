@@ -107,6 +107,26 @@ public:
                                const ModuleDecl *importedModule,
                                SmallVectorImpl<Identifier> &spiGroups) const {};
 
+  /// Look up an operator declaration. This does a simple local lookup, not
+  /// recursively looking through imports, and doesn't record dependencies. You
+  /// almost certainly want to be using DeclContext's operator lookup members
+  /// instead.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  /// \param fixity The fixity of the operator (infix, prefix or postfix).
+  virtual void
+  lookupOperatorDirect(Identifier name, OperatorDecl::Fixity fixity,
+                       TinyPtrVector<OperatorDecl *> &results) const {}
+
+  /// Look up a precedence group. This does a simple local lookup, not
+  /// recursively looking through imports, and doesn't record dependencies. You
+  /// almost certainly want to be using DeclContext's precedencegroup lookup
+  /// member instead.
+  ///
+  /// \param name The precedence group name.
+  virtual void lookupPrecedenceGroupDirect(
+      Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) const {}
+
   /// Returns the comment attached to the given declaration.
   ///
   /// This function is an implementation detail for comment serialization.
@@ -347,23 +367,6 @@ public:
 
   virtual StringRef getFilenameForPrivateDecl(const ValueDecl *decl) const {
     return StringRef();
-  }
-
-  /// Look up an operator declaration.
-  ///
-  /// \param name The operator name ("+", ">>", etc.)
-  ///
-  /// \param fixity One of PrefixOperator, InfixOperator, or PostfixOperator.
-  virtual OperatorDecl *lookupOperator(Identifier name,
-                                       OperatorDecl::Fixity fixity) const {
-    return nullptr;
-  }
-
-  /// Look up a precedence group.
-  ///
-  /// \param name The precedence group name.
-  virtual PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name) const {
-    return nullptr;
   }
 
   /// Returns the Swift module that overlays a Clang module.

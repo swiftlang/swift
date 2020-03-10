@@ -328,11 +328,13 @@ public:
   lookupNestedType(Identifier name,
                    const NominalTypeDecl *parent) const override;
 
-  virtual OperatorDecl *
-  lookupOperator(Identifier name, OperatorDecl::Fixity fixity) const override;
+  virtual void
+  lookupOperatorDirect(Identifier name, OperatorDecl::Fixity fixity,
+                       TinyPtrVector<OperatorDecl *> &results) const override;
 
-  virtual PrecedenceGroupDecl *
-  lookupPrecedenceGroup(Identifier name) const override;
+  virtual void lookupPrecedenceGroupDirect(
+      Identifier name,
+      TinyPtrVector<PrecedenceGroupDecl *> &results) const override;
 
   virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer,

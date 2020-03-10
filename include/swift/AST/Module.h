@@ -459,6 +459,21 @@ public:
                                              SourceLoc diagLoc = {});
   /// @}
 
+  /// Look up an operator declaration. This does a simple local lookup, not
+  /// recursively looking through imports, and doesn't record dependencies.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  /// \param fixity The fixity of the operator (infix, prefix or postfix).
+  void lookupOperatorDirect(Identifier name, OperatorDecl::Fixity fixity,
+                            TinyPtrVector<OperatorDecl *> &results) const;
+
+  /// Look up a precedence group. This does a simple local lookup, not
+  /// recursively looking through imports, and doesn't record dependencies.
+  ///
+  /// \param name The precedence group name.
+  void lookupPrecedenceGroupDirect(
+      Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) const;
+
   /// Finds all class members defined in this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.

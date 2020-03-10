@@ -37,6 +37,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -416,6 +417,66 @@ static void checkGenericParams(GenericContext *ownerCtx) {
   WhereClauseOwner(ownerCtx)
       .visitRequirements(TypeResolutionStage::Interface,
                          [](Requirement, RequirementRepr *) { return false; });
+}
+
+template <typename T>
+static void checkOperatorLikeRedeclaration(
+    T *decl, Diag<> diagID, Diag<> noteID,
+    llvm::function_ref<void(ModuleDecl *, Identifier, TinyPtrVector<T *> &)>
+        lookupOtherDecls) {
+  if (decl->isInvalid())
+    return;
+
+  auto *currentFile = decl->getDeclContext()->getParentSourceFile();
+  assert(currentFile);
+
+  auto &ctx = currentFile->getASTContext();
+  auto name = decl->getName();
+  namelookup::recordLookupOfTopLevelName(currentFile, name, /*cascading*/ true);
+
+  TinyPtrVector<T *> otherDecls;
+  lookupOtherDecls(currentFile->getParentModule(), name, otherDecls);
+  for (auto *other : otherDecls) {
+    if (other == decl || other->isInvalid())
+      continue;
+
+    // Emit a declaration error if the two declarations occur in the same source
+    // file. We currently allow redeclarations across source files to allow the
+    // user to shadow operator decls from imports, as we currently favour those
+    // decls over ones from another file.
+    // FIXME: Once we prefer operator decls from the same module, start
+    // diagnosing redeclarations across files.
+    if (currentFile == other->getDeclContext()->getParentSourceFile()) {
+      // Make sure we get the diagnostic ordering to be sensible.
+      if (decl->getLoc().isValid() && other->getLoc().isValid() &&
+          ctx.SourceMgr.isBeforeInBuffer(decl->getLoc(), other->getLoc())) {
+        std::swap(decl, other);
+      }
+      ctx.Diags.diagnose(decl, diagID);
+      ctx.Diags.diagnose(other, noteID);
+      decl->setInvalid();
+      return;
+    }
+  }
+}
+
+static void checkRedeclaration(OperatorDecl *op) {
+  checkOperatorLikeRedeclaration<OperatorDecl>(
+      op, diag::operator_redeclared, diag::previous_operator_decl,
+      [&](ModuleDecl *mod, Identifier name,
+          TinyPtrVector<OperatorDecl *> &results) {
+        mod->lookupOperatorDirect(name, op->getFixity(), results);
+      });
+}
+
+static void checkRedeclaration(PrecedenceGroupDecl *group) {
+  checkOperatorLikeRedeclaration<PrecedenceGroupDecl>(
+      group, diag::precedence_group_redeclared,
+      diag::previous_precedence_group_decl,
+      [](ModuleDecl *mod, Identifier name,
+         TinyPtrVector<PrecedenceGroupDecl *> &results) {
+        mod->lookupPrecedenceGroupDirect(name, results);
+      });
 }
 
 /// Check whether \c current is a redeclaration.
@@ -1239,6 +1300,7 @@ public:
 
   void visitOperatorDecl(OperatorDecl *OD) {
     TypeChecker::checkDeclAttributes(OD);
+    checkRedeclaration(OD);
     auto &Ctx = OD->getASTContext();
     if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD)) {
       (void)IOD->getPrecedenceGroup();
@@ -1260,6 +1322,7 @@ public:
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
     TypeChecker::checkDeclAttributes(PGD);
     validatePrecedenceGroup(PGD);
+    checkRedeclaration(PGD);
     checkAccessControl(PGD);
   }
 

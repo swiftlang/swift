@@ -296,10 +296,12 @@ public:
   template <typename T>
   using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;
 
-  OperatorMap<InfixOperatorDecl*> InfixOperators;
-  OperatorMap<PostfixOperatorDecl*> PostfixOperators;
-  OperatorMap<PrefixOperatorDecl*> PrefixOperators;
-  OperatorMap<PrecedenceGroupDecl*> PrecedenceGroups;
+  // FIXME: Once operator lookup is requestified with cached requests, these can
+  // be removed.
+  OperatorMap<InfixOperatorDecl*> InfixOperatorLookupCache;
+  OperatorMap<PostfixOperatorDecl*> PostfixOperatorLookupCache;
+  OperatorMap<PrefixOperatorDecl*> PrefixOperatorLookupCache;
+  OperatorMap<PrecedenceGroupDecl*> PrecedenceGroupLookupCache;
 
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.
@@ -409,6 +411,14 @@ public:
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  lookupOperatorDirect(Identifier name, OperatorDecl::Fixity fixity,
+                       TinyPtrVector<OperatorDecl *> &results) const override;
+
+  virtual void lookupPrecedenceGroupDirect(
+      Identifier name,
+      TinyPtrVector<PrecedenceGroupDecl *> &results) const override;
 
   virtual void
   getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const override;

@@ -188,6 +188,19 @@ public:
   /// guaranteed to be meaningful.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl *> &results);
 
+  /// Look up an operator declaration.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  /// \param fixity The fixity of the operator (infix, prefix or postfix).
+  void lookupOperator(Identifier name, OperatorDecl::Fixity fixity,
+                      TinyPtrVector<OperatorDecl *> &results);
+
+  /// Look up a precedence group.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  void lookupPrecedenceGroup(Identifier name,
+                             TinyPtrVector<PrecedenceGroupDecl *> &results);
+
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind);
@@ -328,6 +341,28 @@ void SourceLookupCache::getOperatorDecls(
     SmallVectorImpl<OperatorDecl *> &results) {
   for (auto &ops : Operators)
     results.append(ops.second.begin(), ops.second.end());
+}
+
+void SourceLookupCache::lookupOperator(Identifier name,
+                                       OperatorDecl::Fixity fixity,
+                                       TinyPtrVector<OperatorDecl *> &results) {
+  auto ops = Operators.find(name);
+  if (ops == Operators.end())
+    return;
+
+  for (auto *op : ops->second)
+    if (op->getFixity() == fixity)
+      results.push_back(op);
+}
+
+void SourceLookupCache::lookupPrecedenceGroup(
+    Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) {
+  auto groups = PrecedenceGroups.find(name);
+  if (groups == PrecedenceGroups.end())
+    return;
+
+  for (auto *group : groups->second)
+    results.push_back(group);
 }
 
 void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
@@ -994,8 +1029,14 @@ namespace {
   struct OperatorLookup<PrefixOperatorDecl> {
     template <typename T>
     static PrefixOperatorDecl *lookup(T &container, Identifier name) {
-      return cast_or_null<PrefixOperatorDecl>(
-          container.lookupOperator(name, OperatorDecl::Fixity::Prefix));
+      TinyPtrVector<OperatorDecl *> results;
+      container.lookupOperatorDirect(name, OperatorDecl::Fixity::Prefix,
+                                     results);
+      if (results.empty())
+        return nullptr;
+
+      assert(results.size() == 1);
+      return cast<PrefixOperatorDecl>(results[0]);
     }
   };
 
@@ -1003,8 +1044,14 @@ namespace {
   struct OperatorLookup<InfixOperatorDecl> {
     template <typename T>
     static InfixOperatorDecl *lookup(T &container, Identifier name) {
-      return cast_or_null<InfixOperatorDecl>(
-          container.lookupOperator(name, OperatorDecl::Fixity::Infix));
+      TinyPtrVector<OperatorDecl *> results;
+      container.lookupOperatorDirect(name, OperatorDecl::Fixity::Infix,
+                                     results);
+      if (results.empty())
+        return nullptr;
+
+      assert(results.size() == 1);
+      return cast<InfixOperatorDecl>(results[0]);
     }
   };
 
@@ -1012,8 +1059,14 @@ namespace {
   struct OperatorLookup<PostfixOperatorDecl> {
     template <typename T>
     static PostfixOperatorDecl *lookup(T &container, Identifier name) {
-      return cast_or_null<PostfixOperatorDecl>(
-          container.lookupOperator(name, OperatorDecl::Fixity::Postfix));
+      TinyPtrVector<OperatorDecl *> results;
+      container.lookupOperatorDirect(name, OperatorDecl::Fixity::Postfix,
+                                     results);
+      if (results.empty())
+        return nullptr;
+
+      assert(results.size() == 1);
+      return cast<PostfixOperatorDecl>(results[0]);
     }
   };
 
@@ -1021,7 +1074,13 @@ namespace {
   struct OperatorLookup<PrecedenceGroupDecl> {
     template <typename T>
     static PrecedenceGroupDecl *lookup(T &container, Identifier name) {
-      return container.lookupPrecedenceGroup(name);
+      TinyPtrVector<PrecedenceGroupDecl *> results;
+      container.lookupPrecedenceGroupDirect(name, results);
+      if (results.empty())
+        return nullptr;
+
+      assert(results.size() == 1);
+      return results[0];
     }
   };
 } // end anonymous namespace
@@ -1122,16 +1181,20 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
   case FileUnitKind::SerializedAST:
   case FileUnitKind::ClangModule:
   case FileUnitKind::DWARFModule:
-    return OperatorLookup<OP_DECL>::lookup(cast<LoadedFile>(File), Name);
+    return OperatorLookup<OP_DECL>::lookup(File, Name);
   }
 
   auto &SF = cast<SourceFile>(File);
   assert(SF.ASTStage >= SourceFile::NameBound);
 
-  // Look for an operator declaration in the current module.
+  // Check if we have an already cached result.
   auto found = (SF.*OP_MAP).find(Name);
   if (found != (SF.*OP_MAP).end() && (includePrivate || found->second.getInt()))
     return found->second.getPointer();
+
+  // Check if the decl exists on the file.
+  if (auto *op = OperatorLookup<OP_DECL>::lookup(File, Name))
+    return op;
 
   // Look for imported operator decls.
   // Record whether they come from re-exported modules.
@@ -1181,6 +1244,40 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
   return nullptr;
 }
 
+void ModuleDecl::lookupOperatorDirect(
+    Identifier name, OperatorDecl::Fixity fixity,
+    TinyPtrVector<OperatorDecl *> &results) const {
+  // For a parsed module, we can check the source cache on the module rather
+  // than doing an O(N) search over the source files.
+  if (isParsedModule(this)) {
+    getSourceLookupCache().lookupOperator(name, fixity, results);
+    return;
+  }
+  FORWARD(lookupOperatorDirect, (name, fixity, results));
+}
+
+void SourceFile::lookupOperatorDirect(
+    Identifier name, OperatorDecl::Fixity fixity,
+    TinyPtrVector<OperatorDecl *> &results) const {
+  getCache().lookupOperator(name, fixity, results);
+}
+
+void ModuleDecl::lookupPrecedenceGroupDirect(
+    Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) const {
+  // For a parsed module, we can check the source cache on the module rather
+  // than doing an O(N) search over the source files.
+  if (isParsedModule(this)) {
+    getSourceLookupCache().lookupPrecedenceGroup(name, results);
+    return;
+  }
+  FORWARD(lookupPrecedenceGroupDirect, (name, results));
+}
+
+void SourceFile::lookupPrecedenceGroupDirect(
+    Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) const {
+  getCache().lookupPrecedenceGroup(name, results);
+}
+
 template<typename OP_DECL>
 static Optional<OP_DECL *>
 lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
@@ -1205,13 +1302,13 @@ lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
 Kind##Decl * \
 ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) { \
   auto result = lookupOperatorDeclForName(this, loc, name, \
-                                          &SourceFile::Kind##s); \
+                                          &SourceFile::Kind##LookupCache); \
   return result ? *result : nullptr; \
 } \
 Kind##Decl * \
 SourceFile::lookup##Kind(Identifier name, bool isCascading, SourceLoc loc) { \
   auto result = lookupOperatorDeclForName(*this, loc, name, true, \
-                                          &SourceFile::Kind##s); \
+                                          &SourceFile::Kind##LookupCache); \
   if (!result.hasValue()) \
     return nullptr; \
   if (ReferencedNames) {\
@@ -1222,7 +1319,7 @@ SourceFile::lookup##Kind(Identifier name, bool isCascading, SourceLoc loc) { \
   } \
   if (!result.getValue()) { \
     result = lookupOperatorDeclForName(getParentModule(), loc, name, \
-                                       &SourceFile::Kind##s); \
+                                       &SourceFile::Kind##LookupCache); \
   } \
   return result.hasValue() ? result.getValue() : nullptr; \
 }
