@@ -1596,9 +1596,12 @@ static ManagedValue applyTrivialConversions(SILGenFunction &SGF,
   auto innerASTTy = innerValue.getType().getASTType();
   auto outerASTTy = outerType.getASTType();
   // SWIFT_ENABLE_TENSORFLOW
-  // Mapping out of context is necessary for
+  // Mapping out of context is necessary to avoid assertion failures for
   // `SILGenModule::getOrCreateCustomDerivativeThunk`.
-  // Consider finding a robust fix.
+  // FIXME(TF-1198): Find a robust fix and remove this hack.
+  // Thunk type calculation in `SILGenModule::getOrCreateCustomDerivativeThunk`
+  // may be missing logic from `SILGenFunction::buildThunkType` that maps
+  // archetypes to interface types.
   if (innerASTTy->hasArchetype())
     innerASTTy = innerASTTy->mapTypeOutOfContext()->getCanonicalType();
   if (outerASTTy->hasArchetype())

@@ -4582,8 +4582,10 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void checkDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
-#warning We should re-enable `differentiable_function` verification before landing this
+    // FIXME(TF-1197): Re-enable verification after substituted SIL function
+    // types.
     return;
+#if 0
     auto origTy =
         dfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");
@@ -4624,6 +4626,7 @@ public:
                       SILType::getPrimitiveObjectType(expectedVJPType),
                       "VJP type does not match expected VJP type");
     }
+#endif
   }
 
   void checkLinearFunctionInst(LinearFunctionInst *lfi) {
@@ -5455,8 +5458,10 @@ void SILGlobalVariable::verify() const {
 // SWIFT_ENABLE_TENSORFLOW
 /// Verify that a differentiability witness follows invariants.
 void SILDifferentiabilityWitness::verify(const SILModule &M) const {
-#warning We should re-enable `differentiable_function` verification before landing this
-    return;
+  // FIXME(TF-1197): Re-enable verification after substituted SIL function
+  // types.
+  return;
+#if 0
 #ifdef NDEBUG
   if (!M.getOptions().VerifyAll)
     return;
@@ -5510,6 +5515,7 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
     requireSameType(vjp->getLoweredFunctionType(), expectedVJPType,
                     "VJP type does not match expected VJP type");
   }
+#endif
 }
 // SWIFT_ENABLE_TENSORFLOW END
 

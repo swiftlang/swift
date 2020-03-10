@@ -845,10 +845,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 SILValue reabstractFunction(
     SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
     SILValue fn, CanSILFunctionType toType,
-    std::function<SubstitutionMap(SubstitutionMap)> remapSubstMap) {
-  // TODO: I removed some calls to getOpType and getOpSubstitutionMap because we
-  // don't have a cloner here. Maybe I should have a cloner so that I can call
-  // them? Also remapSubstitutionMap from other callers.
+    std::function<SubstitutionMap(SubstitutionMap)> remapSubstitutions) {
   auto &module = *fn->getModule();
   auto fromType = fn->getType().getAs<SILFunctionType>();
   auto unsubstFromType = fromType->getUnsubstitutedType(module);
@@ -865,8 +862,8 @@ SILValue reabstractFunction(
         /*withoutActuallyEscaping*/ false);
 
   fn = builder.createPartialApply(
-      loc, thunkRef, remapSubstMap(thunk->getForwardingSubstitutionMap()), {fn},
-      fromType->getCalleeConvention());
+      loc, thunkRef, remapSubstitutions(thunk->getForwardingSubstitutionMap()),
+      {fn}, fromType->getCalleeConvention());
 
   if (toType != unsubstToType)
     fn = builder.createConvertFunction(loc, fn,
