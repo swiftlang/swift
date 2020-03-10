@@ -280,7 +280,7 @@ public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 
 // CHECK:     [[STACKALLOC:%.*]] = alloca i8
 // CHECK:     [[CONTEXT:%.*]] = bitcast i8* [[STACKALLOC]] to %swift.opaque*
-// CHECK:     call swiftcc void @"$s15enum_resilience13reabstractionyyx010resilient_A06MediumOXElF"(i8* bitcast (void (%TSi*, %swift.opaque*, %swift.refcounted*)* @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA" to i8*), %swift.opaque* [[CONTEXT:%.*]], %swift.type* @"$sSiN")
+// CHECK:     call swiftcc void @"$s15enum_resilience13reabstractionyyx010resilient_A06MediumOXElF"(i8* bitcast ({{.*}} @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA{{(\.ptrauth)?}}" to i8*), %swift.opaque* [[CONTEXT:%.*]], %swift.type* @"$sSiN")
   reabstraction(f)
 
 // CHECK:     ret void
@@ -346,6 +346,8 @@ extension ResilientMultiPayloadGenericEnum {
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[STORE_TAG:%.*]] = bitcast i8* {{%.+}} to void (%swift.opaque*, i32, i32, %swift.type*)* 
+// CHECK-arm64e-NEXT: ptrtoint i8** {{.*}} to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call void [[STORE_TAG]](%swift.opaque* noalias [[BUFFER]], i32 1, i32 1, %swift.type* [[METADATA]])
 // CHECK-NEXT: ret void
 // CHECK-NEXT: {{^}$}}
