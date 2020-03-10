@@ -4469,14 +4469,11 @@ public:
   /// Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   bool isExpressionAlreadyTooComplex = false;
-  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+  bool getExpressionTooComplex(size_t solutionMemory) {
     if (isExpressionAlreadyTooComplex)
       return true;
 
-    auto used = getASTContext().getSolverMemory();
-    for (auto const& s : solutions) {
-      used += s.getTotalMemory();
-    }
+    auto used = getASTContext().getSolverMemory() + solutionMemory;
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
@@ -4501,6 +4498,14 @@ public:
     }
 
     return false;
+  }
+
+  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    size_t solutionMemory = 0;
+    for (auto const& s : solutions) {
+      solutionMemory += s.getTotalMemory();
+    }
+    return getExpressionTooComplex(solutionMemory);
   }
 
   // Utility class that can collect information about the type of an
