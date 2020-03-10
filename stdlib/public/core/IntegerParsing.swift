@@ -132,14 +132,14 @@ internal func _parseIntegerSpecialized(
   using parseUnsigned: (UnsafeBufferPointer<UInt8>) -> UInt64?
 ) -> UInt64? {
   var utf8 = utf8
-  var hasMinus = false
+  var minusBit: UInt64 = 0
   guard _fastPath(utf8.count > 0) else { return nil }
   let first = utf8.first._unsafelyUnwrappedUnchecked
   if first < 0x30 { // Plus, minus or an invalid character.
     guard _fastPath(utf8.count > 1), // Disallow "-"/"+" without any digits.
       _fastPath(first == UInt8(ascii: "-")) // Note "-0" is valid for UInts.
       || _fastPath(first == UInt8(ascii: "+")) else { return nil }
-    hasMinus = _fastPath(first == UInt8(ascii: "-"))
+    minusBit = _fastPath(first == UInt8(ascii: "-")) ? 1 : 0
     utf8 = UnsafeBufferPointer(start: utf8.baseAddress.unsafelyUnwrapped + 1,
                                count: utf8.count &- 1)
   }
@@ -147,14 +147,13 @@ internal func _parseIntegerSpecialized(
   let result_ = parseUnsigned(utf8)
   guard _fastPath(result_ != nil), var result = result_ else { return nil }
   // Apply sign & check limits.
-  if allowNegative {
+    if allowNegative {
     // Note: This assumes Result is stored as two's complement,
     //   but this is also already assumed elsewhere in the stdlib.
-    let max = max &+ (hasMinus ? 1 : 0)
-    guard _fastPath(result <= max) else { return nil }
-    if hasMinus { result = 0 &- result }
+    guard _fastPath(result <= max &+ minusBit) else { return nil }
+    result = (result ^ (0 &- minusBit)) &+ minusBit
   } else {
-    guard _fastPath(!hasMinus) || result == 0,
+    guard _fastPath(minusBit == 0) || result == 0,
       _fastPath(result <= max) else { return nil }
   }
   return result
