@@ -58,11 +58,11 @@ public class CircleManager : ShapeManager {
 // CHECK: function_ref @$s4test14publicFunctionyyF
 // CHECK: }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s4test9RectangleVAA5ShapeA2aDP4areaSfvgTW : $@convention(witness_method: Shape) (@in_guaranteed Rectangle) -> Float {
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s4test9RectangleVAA5ShapeA2aDP4areaSfvgTW :
 // CHECK: function_ref @$s4test9RectangleV4areaSfvg
 // CHECK: }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s4test9RectangleVAA5ShapeA2aDP4drawyyFTW : $@convention(witness_method: Shape) (@in_guaranteed Rectangle) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s4test9RectangleVAA5ShapeA2aDP4drawyyFTW :
 // CHECK: function_ref @$s4test9RectangleV4drawyyF
 // CHECK: }
 

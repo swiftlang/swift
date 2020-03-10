@@ -338,11 +338,37 @@ void VJPEmitter::visitReturnInst(ReturnInst *ri) {
   auto *pullbackPartialApply =
       builder.createPartialApply(loc, pullbackRef, vjpSubstMap, {pbStructVal},
                                  ParameterConvention::Direct_Guaranteed);
+  auto pullbackType = vjp->getLoweredFunctionType()
+                          ->getResults()
+                          .back()
+                          .getSILStorageInterfaceType();
+  pullbackType = pullbackType.substGenericArgs(getModule(), vjpSubstMap,
+                                               TypeExpansionContext::minimal());
+  pullbackType = pullbackType.subst(getModule(), vjpSubstMap);
+  auto pullbackFnType = pullbackType.castTo<SILFunctionType>();
+
+  auto pullbackSubstType =
+      pullbackPartialApply->getType().castTo<SILFunctionType>();
+  SILValue pullbackValue;
+  if (pullbackSubstType == pullbackFnType) {
+    pullbackValue = pullbackPartialApply;
+  } else if (pullbackSubstType->isABICompatibleWith(pullbackFnType, *vjp)
+                 .isCompatible()) {
+    pullbackValue =
+        builder.createConvertFunction(loc, pullbackPartialApply, pullbackType,
+                                      /*withoutActuallyEscaping*/ false);
+  } else {
+    // When `diag::autodiff_loadable_value_addressonly_tangent_unsupported`
+    // applies, the return type may be ABI-incomaptible with the type of the
+    // partially applied pullback. In these cases, produce an undef and rely on
+    // other code to emit a diagnostic.
+    pullbackValue = SILUndef::get(pullbackType, *vjp);
+  }
 
   // Return a tuple of the original result and pullback.
   SmallVector<SILValue, 8> directResults;
   directResults.append(origResults.begin(), origResults.end());
-  directResults.push_back(pullbackPartialApply);
+  directResults.push_back(pullbackValue);
   builder.createReturn(ri->getLoc(), joinElements(directResults, builder, loc));
 }
 
@@ -683,14 +709,11 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     // Set non-reabstracted original pullback type in nested apply info.
     nestedApplyInfo.originalPullbackType = actualPullbackType;
     SILOptFunctionBuilder fb(context.getTransform());
-    auto *thunk =
-        getOrCreateReabstractionThunk(fb, getModule(), loc, /*caller*/ vjp,
-                                      actualPullbackType, loweredPullbackType);
-    auto *thunkRef = getBuilder().createFunctionRef(loc, thunk);
-    pullback = getBuilder().createPartialApply(
-        ai->getLoc(), thunkRef,
-        getOpSubstitutionMap(thunk->getForwardingSubstitutionMap()), {pullback},
-        actualPullbackType->getCalleeConvention());
+    pullback = reabstractFunction(
+        getBuilder(), fb, ai->getLoc(), pullback, loweredPullbackType,
+        [this](SubstitutionMap subs) -> SubstitutionMap {
+          return this->getOpSubstitutionMap(subs);
+        });
   }
   pullbackValues[ai->getParent()].push_back(pullback);
 

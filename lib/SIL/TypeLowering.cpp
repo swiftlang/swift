@@ -271,11 +271,11 @@ namespace {
       auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::JVP, TC,
-          LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
+          LookUpConformanceInModule(&M), CanGenericSignature());
       auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::VJP, TC,
-          LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
+          LookUpConformanceInModule(&M), CanGenericSignature());
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
       props.addSubobject(classifyType(origType, jvpTy, TC, Expansion));
@@ -325,7 +325,10 @@ namespace {
 
     RetTy visitAbstractTypeParamType(CanType type,
                                      AbstractionPattern origType) {
-      if (origType.isTypeParameterOrOpaqueArchetype()) {
+      // SWIFT_ENABLE_TENSORFLOW
+      if (origType.isTypeParameterOrOpaqueArchetype() ||
+          origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
+      // SWIFT_ENABLE_TENSORFLOW END
         if (origType.requiresClass()) {
           return asImpl().handleReference(type);
         } else {
@@ -2739,6 +2742,10 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   // IR for platforms that don't differentiate function type representations.
   bool DifferentFunctionTypesHaveDifferentRepresentation
     = Context.LangOpts.EnableSubstSILFunctionTypesForFunctionValues;
+  
+  // TODO: For C language types we should consider the attached Clang types.
+  if (fnTy1->getLanguage() == SILFunctionLanguage::C)
+    DifferentFunctionTypesHaveDifferentRepresentation = false;
   
   // Fast path -- if both functions were unwrapped from a CanSILFunctionType,
   // we might have pointer equality here.

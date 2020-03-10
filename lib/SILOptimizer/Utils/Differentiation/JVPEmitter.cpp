@@ -807,15 +807,11 @@ void JVPEmitter::emitTangentForApplyInst(
   // differential.
   if (!differentialType->isEqual(originalDifferentialType)) {
     SILOptFunctionBuilder fb(context.getTransform());
-    auto *thunk = getOrCreateReabstractionThunk(
-        fb, context.getModule(), loc, &getDifferential(), differentialType,
-        originalDifferentialType);
-    auto *thunkRef = diffBuilder.createFunctionRef(loc, thunk);
-    differential = diffBuilder.createPartialApply(
-        loc, thunkRef,
-        remapSubstitutionMapInDifferential(
-            thunk->getForwardingSubstitutionMap()),
-        {differential}, differentialType->getCalleeConvention());
+    differential = reabstractFunction(
+        diffBuilder, fb, loc, differential, originalDifferentialType,
+        [this](SubstitutionMap subs) -> SubstitutionMap {
+          return this->getOpSubstitutionMap(subs);
+        });
   }
 
   // Call the differential.
@@ -1400,8 +1396,6 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   auto *differentialDecl = differentialInfo.lookUpLinearMapDecl(ai);
   auto originalDifferentialType =
       getOpType(differential->getType()).getAs<SILFunctionType>();
-  auto differentialType =
-      remapType(differential->getType()).castTo<SILFunctionType>();
   auto loweredDifferentialType =
       getOpType(getLoweredType(differentialDecl->getInterfaceType()))
           .castTo<SILFunctionType>();
@@ -1409,14 +1403,11 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   // reabstract the differential using a thunk.
   if (!loweredDifferentialType->isEqual(originalDifferentialType)) {
     SILOptFunctionBuilder fb(context.getTransform());
-    auto *thunk = getOrCreateReabstractionThunk(
-        fb, context.getModule(), loc, &getDifferential(), differentialType,
-        loweredDifferentialType);
-    auto *thunkRef = builder.createFunctionRef(loc, thunk);
-    differential = builder.createPartialApply(
-        loc, thunkRef,
-        getOpSubstitutionMap(thunk->getForwardingSubstitutionMap()),
-        {differential}, differentialType->getCalleeConvention());
+    differential = reabstractFunction(
+        builder, fb, loc, differential, loweredDifferentialType,
+        [this](SubstitutionMap subs) -> SubstitutionMap {
+          return this->getOpSubstitutionMap(subs);
+        });
   }
   differentialValues[ai->getParent()].push_back(differential);
 
@@ -1446,10 +1437,38 @@ void JVPEmitter::visitReturnInst(ReturnInst *ri) {
       loc, differentialRef, jvpSubstMap, {diffStructVal},
       ParameterConvention::Direct_Guaranteed);
 
-  // Return a tuple of the original result and pullback.
+  auto differentialType = jvp->getLoweredFunctionType()
+                              ->getResults()
+                              .back()
+                              .getSILStorageInterfaceType();
+  differentialType = differentialType.substGenericArgs(
+      getModule(), jvpSubstMap, TypeExpansionContext::minimal());
+  differentialType = differentialType.subst(getModule(), jvpSubstMap);
+  auto differentialFnType = differentialType.castTo<SILFunctionType>();
+
+  auto differentialSubstType =
+      differentialPartialApply->getType().castTo<SILFunctionType>();
+  SILValue differentialValue;
+  if (differentialSubstType == differentialFnType) {
+    differentialValue = differentialPartialApply;
+  } else if (differentialSubstType
+                 ->isABICompatibleWith(differentialFnType, *jvp)
+                 .isCompatible()) {
+    differentialValue = builder.createConvertFunction(
+        loc, differentialPartialApply, differentialType,
+        /*withoutActuallyEscaping*/ false);
+  } else {
+    // When `diag::autodiff_loadable_value_addressonly_tangent_unsupported`
+    // applies, the return type may be ABI-incomaptible with the type of the
+    // partially applied differential. In these cases, produce an undef and rely
+    // on other code to emit a diagnostic.
+    differentialValue = SILUndef::get(differentialType, *jvp);
+  }
+
+  // Return a tuple of the original result and differential.
   SmallVector<SILValue, 8> directResults;
   directResults.append(origResults.begin(), origResults.end());
-  directResults.push_back(differentialPartialApply);
+  directResults.push_back(differentialValue);
   builder.createReturn(ri->getLoc(), joinElements(directResults, builder, loc));
 }
 

@@ -195,6 +195,10 @@ public:
   SILType getSubstCalleeSILType() const {
     FOREACH_IMPL_RETURN(getSubstCalleeSILType());
   }
+  void setSubstCalleeType(CanSILFunctionType t) {
+    FOREACH_IMPL_RETURN(setSubstCalleeType(t));
+  }
+
   /// Get the conventions of the callee with the applied substitutions.
   SILFunctionConventions getSubstCalleeConv() const {
     return SILFunctionConventions(getSubstCalleeType(), getModule());

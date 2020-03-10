@@ -1234,6 +1234,7 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   auto actualPullbackType = applyInfo.originalPullbackType
                                 ? *applyInfo.originalPullbackType
                                 : pullbackType;
+  actualPullbackType = actualPullbackType->getUnsubstitutedType(getModule());
   for (auto indRes : actualPullbackType->getIndirectFormalResults()) {
     auto *alloc = builder.createAllocStack(
         loc, remapType(indRes.getSILStorageInterfaceType()));
@@ -1244,14 +1245,11 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   // If callee pullback was reabstracted in VJP, reabstract callee pullback.
   if (applyInfo.originalPullbackType) {
     SILOptFunctionBuilder fb(getContext().getTransform());
-    auto *thunk = getOrCreateReabstractionThunk(
-        fb, getContext().getModule(), loc, &getPullback(), pullbackType,
-        *applyInfo.originalPullbackType);
-    auto *thunkRef = builder.createFunctionRef(loc, thunk);
-    pullback = builder.createPartialApply(
-        loc, thunkRef,
-        remapSubstitutionMap(thunk->getForwardingSubstitutionMap()), {pullback},
-        pullbackType->getCalleeConvention());
+    pullback = reabstractFunction(
+        builder, fb, loc, pullback, *applyInfo.originalPullbackType,
+        [this](SubstitutionMap subs) -> SubstitutionMap {
+          return this->remapSubstitutionMap(subs);
+        });
   }
   args.push_back(seed);
 

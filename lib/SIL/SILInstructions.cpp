@@ -417,6 +417,7 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
   SILType SubstCalleeSILTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
   auto SubstCalleeTy = SubstCalleeSILTy.getAs<SILFunctionType>();
+  
   SILFunctionConventions Conv(SubstCalleeTy,
                               ModuleConventions.hasValue()
                                   ? ModuleConventions.getValue()
@@ -553,6 +554,7 @@ PartialApplyInst *PartialApplyInst::create(
     OnStackKind onStack) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
+
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
       F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(), {},
       CalleeConvention, onStack);
@@ -705,9 +707,8 @@ getExtracteeType(
     return SILType::getPrimitiveObjectType(originalFnTy);
   }
   auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        fnTy->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
-        *kindOpt, module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
+      fnTy->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
+      *kindOpt, module.Types, LookUpConformanceInModule(module.getSwiftModule()));
   return SILType::getPrimitiveObjectType(resultFnTy);
 }
 
@@ -723,8 +724,14 @@ DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
       HasExplicitExtracteeType(extracteeType.hasValue()) {
 #ifndef NDEBUG
   if (extracteeType.hasValue()) {
-    assert(module.getStage() == SILStage::Lowered &&
-           "Explicit type is valid only in lowered SIL");
+    // Note: explicit extractee type is used to avoid inconsistent typing in:
+    // - Canonical SIL, due to generic specialization.
+    // - Lowered SIL, due to LoadableByAddress.
+    // See `TypeSubstCloner::visitDifferentiableFunctionExtractInst` for an
+    // explanation of how explicit extractee type is used.
+    assert((module.getStage() == SILStage::Canonical ||
+            module.getStage() == SILStage::Lowered) &&
+           "Explicit type is valid only in canonical or lowered SIL");
   }
 #endif
 }
@@ -2309,6 +2316,14 @@ ConvertFunctionInst *ConvertFunctionInst::create(
            "Can not convert in between ABI incompatible function types");
   }
   return CFI;
+}
+
+bool ConvertFunctionInst::onlyConvertsSubstitutions() const {
+  auto fromType = getOperand()->getType().castTo<SILFunctionType>();
+  auto toType = getType().castTo<SILFunctionType>();
+  auto &M = getModule();
+  
+  return fromType->getUnsubstitutedType(M) == toType->getUnsubstitutedType(M);
 }
 
 ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(

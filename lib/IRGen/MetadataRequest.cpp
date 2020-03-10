@@ -556,7 +556,7 @@ irgen::tryEmitConstantTypeMetadataRef(IRGenModule &IGM, CanType type,
                                       SymbolReferenceKind refKind) {
   if (IGM.isStandardLibrary())
     return ConstantReference();
-  if (!isTypeMetadataAccessTrivial(IGM, type))
+  if (isCompleteTypeMetadataStaticallyAddressable(IGM, type))
     return ConstantReference();
   return IGM.getAddrOfTypeMetadata(type, refKind);
 }
@@ -722,7 +722,7 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
     };
     auto isExistential = [&]() { return argument->isExistentialType(); };
     auto metadataAccessIsTrivial = [&]() {
-      return irgen::isTypeMetadataAccessTrivial(IGM,
+      return irgen::isCompleteTypeMetadataStaticallyAddressable(IGM,
                                                 argument->getCanonicalType());
     };
     return !isGenericWithoutPrespecializedConformance() && !isExistential() && 
@@ -732,9 +732,9 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
   && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
 }
 
-/// Is it basically trivial to access the given metadata?  If so, we don't
-/// need a cache variable in its accessor.
-bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
+/// Is complete metadata for the given type available at a fixed address?
+bool irgen::isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM,
+                                                        CanType type) {
   assert(!type->hasArchetype());
 
   // Value type metadata only requires dynamic initialization on first
@@ -775,10 +775,6 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   if (isa<SILBoxType>(type))
     return true;
 
-  // DynamicSelfType is actually local.
-  if (type->hasDynamicSelfType())
-    return true;
-
   if (isa<BoundGenericStructType>(type) || isa<BoundGenericEnumType>(type)) {
     auto nominalType = cast<BoundGenericType>(type);
     auto *nominalDecl = nominalType->getDecl();
@@ -792,6 +788,19 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   }
 
   return false;
+}
+
+/// Should requests for the given type's metadata be cached?
+bool irgen::shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type) {
+  // DynamicSelfType is actually local.
+  if (type->hasDynamicSelfType())
+    return false;
+
+  // Statically addressable metadata does not need a cache.
+  if (isCompleteTypeMetadataStaticallyAddressable(IGM, type))
+    return false;
+  
+  return true;
 }
 
 /// Return the standard access strategy for getting a non-dependent
@@ -2036,7 +2045,7 @@ emitDirectTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   }
 
   // We should not be doing more serious work along this path.
-  assert(isTypeMetadataAccessTrivial(IGF.IGM, type));
+  assert(isCompleteTypeMetadataStaticallyAddressable(IGF.IGM, type));
 
   // Okay, everything else is built from a Swift metadata object.
   llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type);
@@ -2084,7 +2093,7 @@ irgen::createTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
 
   // If our preferred access method is to go via an accessor, it means
   // there is some non-trivial computation that needs to be cached.
-  if (isTypeMetadataAccessTrivial(IGM, type)) {
+  if (!shouldCacheTypeMetadataAccess(IGM, type)) {
     cacheStrategy = CacheStrategy::None;
   } else {
     switch (cacheStrategy) {
@@ -2214,7 +2223,7 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
       // others may require accessors to trigger instantiation.
       //
       // TODO: Also need to count the parent type's generic arguments.
-      if (isTypeMetadataAccessTrivial(IGM, nom)) {
+      if (!shouldCacheTypeMetadataAccess(IGM, nom)) {
         NumAddresses += 1;
       } else {
         NumCalls += 1;
@@ -2565,8 +2574,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   }
   
   if (type->hasArchetype() ||
-      isTypeMetadataAccessTrivial(IGM, type)) {
-    // FIXME: propagate metadata request!
+      !shouldCacheTypeMetadataAccess(IGM, type)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 

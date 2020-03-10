@@ -1038,10 +1038,25 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   for (auto& arg : args.drop_front(1))
     origFnArgVals.push_back(arg.getValue());
 
+  auto origFnType = origFnVal->getType().castTo<SILFunctionType>();
+  auto origFnUnsubstType = origFnType->getUnsubstitutedType(SGF.getModule());
+  if (origFnType != origFnUnsubstType) {
+    origFnVal = SGF.B.createConvertFunction(
+        loc, origFnVal, SILType::getPrimitiveObjectType(origFnUnsubstType),
+        /*withoutActuallyEscaping*/ false);
+  }
+
   // Get the derivative function.
   SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
       loc, kind, origFnVal);
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
+  auto derivativeFnUnsubstType = derivativeFnType->getUnsubstitutedType(SGF.getModule());
+  if (derivativeFnType != derivativeFnUnsubstType) {
+    derivativeFn = SGF.B.createConvertFunction(
+        loc, derivativeFn,
+        SILType::getPrimitiveObjectType(derivativeFnUnsubstType),
+        /*withoutActuallyEscaping*/ false);
+  }
 
   // We don't need to destroy the original function or retain the
   // `derivativeFn`, because they are trivial (because they are @noescape).
@@ -1058,8 +1073,9 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     numParameters += currentLevel->getNumParameters();
     if (currentLevel->getNumResults() != 1)
       break;
-    currentLevel =
-        currentLevel->getSingleResult().getInterfaceType()->getAs<SILFunctionType>();
+    currentLevel = currentLevel->getSingleResult()
+                       .getInterfaceType()
+                       ->getAs<SILFunctionType>();
   }
   assert(numParameters == origFnArgVals.size());
 
@@ -1117,6 +1133,14 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
                       StoreOwnershipQualifier::Init);
     return SGF.manageBufferForExprResult(
         indResBuffer, SGF.getTypeLowering(indResBuffer->getType()), C);
+#if 0
+    AbstractionPattern pattern(
+        SGF.F.getLoweredFunctionType()->getSubstGenericSignature(),
+        indResBuffer->getType().getASTType());
+    auto &tl =
+        SGF.getTypeLowering(pattern, indResBuffer->getType().getASTType());
+    return SGF.manageBufferForExprResult(indResBuffer, tl, C);
+#endif
   }
 
   // Apply the last curry level, in the case where it only has direct results.
@@ -1147,6 +1171,15 @@ static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
   SILValue transposeFn = SGF.B.createLinearFunctionExtract(
       loc, LinearDifferentiableFunctionTypeComponent::Transpose, origFnVal);
   auto transposeFnType = transposeFn->getType().castTo<SILFunctionType>();
+  auto transposeFnUnsubstType =
+      transposeFnType->getUnsubstitutedType(SGF.getModule());
+  if (transposeFnType != transposeFnUnsubstType) {
+    transposeFn = SGF.B.createConvertFunction(
+        loc, transposeFn,
+        SILType::getPrimitiveObjectType(transposeFnUnsubstType),
+        /*withoutActuallyEscaping*/ false);
+    transposeFnType = transposeFn->getType().castTo<SILFunctionType>();
+  }
 
   SmallVector<SILValue, 2> applyArgs;
   if (transposeFnType->hasIndirectFormalResults())
@@ -1159,9 +1192,13 @@ static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
   auto *apply = SGF.B.createApply(
       loc, transposeFn, SubstitutionMap(), applyArgs);
   if (transposeFnType->hasIndirectFormalResults()) {
-    auto resBuffer = applyArgs.front();
-    return SGF.manageBufferForExprResult(
-        resBuffer, SGF.getTypeLowering(resBuffer->getType()), C);
+    auto resultAddress = applyArgs.front();
+    AbstractionPattern pattern(
+        SGF.F.getLoweredFunctionType()->getSubstGenericSignature(),
+        resultAddress->getType().getASTType());
+    auto &tl =
+        SGF.getTypeLowering(pattern, resultAddress->getType().getASTType());
+    return SGF.manageBufferForExprResult(resultAddress, tl, C);
   } else {
     return SGF.emitManagedRValueWithCleanup(apply);
   }

@@ -4561,6 +4561,14 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
     break;
   }
 }
+  
+void LayoutConstraint::dump() const {
+  if (!*this) {
+    llvm::errs() << "(null)\n";
+    return;
+  }
+  getPointer()->print(llvm::errs());
+}
 
 void GenericSignatureImpl::print(raw_ostream &OS, PrintOptions PO) const {
   GenericSignature(const_cast<GenericSignatureImpl *>(this)).print(OS, PO);

@@ -2859,10 +2859,13 @@ template<typename ImplClass>
 void SILCloner<ImplClass>::
 visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  Optional<SILType> explicitExtracteeType = None;
+  if (Inst->hasExplicitExtracteeType())
+    explicitExtracteeType = Inst->getType();
   recordClonedInstruction(
       Inst, getBuilder().createDifferentiableFunctionExtract(
                 getOpLocation(Inst->getLoc()), Inst->getExtractee(),
-                getOpValue(Inst->getFunctionOperand())));
+                getOpValue(Inst->getFunctionOperand()), explicitExtracteeType));
 }
 
 template<typename ImplClass>

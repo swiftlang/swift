@@ -19,16 +19,18 @@ func reabstractFunctionInOut() {
   // CHECK: [[THICK_ARG:%.*]] = thin_to_thick_function [[ARG]]
   // CHECK: store [[THICK_ARG:%.*]] to [init] [[PB]]
   // CHECK:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*@callee_guaranteed (Int) -> Double
-  // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_guaranteed (@in_guaranteed Int) -> @out Double
+  // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Double>
   // CHECK: [[THICK_ARG:%.*]] = load [copy] [[WRITE]]
   // CHECK: [[THUNK1:%.*]] = function_ref @$sSiSdIegyd_SiSdIegnr_TR
   // CHECK: [[ABSTRACTED_ARG:%.*]] = partial_apply [callee_guaranteed] [[THUNK1]]([[THICK_ARG]])
-  // CHECK: store [[ABSTRACTED_ARG]] to [init] [[ABSTRACTED_BOX]]
+  // CHECK: [[CONVERTED_ARG:%.*]] = convert_function [[ABSTRACTED_ARG]]
+  // CHECK: store [[CONVERTED_ARG]] to [init] [[ABSTRACTED_BOX]]
   // CHECK: [[FUNC:%.*]] = function_ref @$s17reabstract_lvalue19consumeGenericInOut{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC]]<(Int) -> Double>([[ABSTRACTED_BOX]])
   // CHECK: [[NEW_ABSTRACTED_ARG:%.*]] = load [take] [[ABSTRACTED_BOX]]
+  // CHECK: [[NEW_CONVERTED_ARG:%.*]] = convert_function [[NEW_ABSTRACTED_ARG]]
   // CHECK: [[THUNK2:%.*]] = function_ref @$sSiSdIegnr_SiSdIegyd_TR
-  // CHECK: [[NEW_ARG:%.*]] = partial_apply [callee_guaranteed] [[THUNK2]]([[NEW_ABSTRACTED_ARG]])
+  // CHECK: [[NEW_ARG:%.*]] = partial_apply [callee_guaranteed] [[THUNK2]]([[NEW_CONVERTED_ARG]])
   var minimallyAbstracted = transform
   consumeGenericInOut(&minimallyAbstracted)
 }

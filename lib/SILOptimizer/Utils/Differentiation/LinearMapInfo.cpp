@@ -360,7 +360,8 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   auto derivativeFnType =
       remappedOrigFnSubstTy->getAutoDiffDerivativeFunctionType(
           parameters, source, derivativeFnKind, context.getTypeConverter(),
-          LookUpConformanceInModule(derivative->getModule().getSwiftModule()));
+          LookUpConformanceInModule(derivative->getModule().getSwiftModule()))
+      ->getUnsubstitutedType(original->getModule());
 
   auto derivativeFnResultTypes = derivativeFnType->getAllResultsInterfaceType();
   auto linearMapSILType = derivativeFnResultTypes;
@@ -368,7 +369,8 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
     linearMapSILType = SILType::getPrimitiveObjectType(
         tupleType->getElement(tupleType->getElements().size() - 1)
             .getType()
-            ->getCanonicalType());
+            ->castTo<SILFunctionType>()
+            ->getUnsubstitutedType(original->getModule()));
   }
   addLinearMapDecl(ai, linearMapSILType);
 }

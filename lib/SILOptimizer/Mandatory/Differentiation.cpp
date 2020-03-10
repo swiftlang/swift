@@ -372,6 +372,12 @@ static SILValue reapplyFunctionConversion(
         context, newFunc, oldFunc, bbi->getOperand(), builder, loc,
         newBuffersToDealloc, parameterIndices, newFuncGenSig);
   }
+  // convert_function
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(oldConvertedFunc)) {
+    return reapplyFunctionConversion(
+        context, newFunc, oldFunc, cfi->getOperand(), builder, loc,
+        newBuffersToDealloc, parameterIndices, newFuncGenSig);
+  }
   // thin_to_thick_function
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(
