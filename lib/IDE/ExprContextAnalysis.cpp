@@ -351,6 +351,14 @@ static void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Expr *baseExpr, DeclNameRef name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   ConcreteDeclRef ref = nullptr;
+
+  // Re-typecheck TypeExpr so it's typechecked without the arguments which may
+  // affects the inference of the generic arguments.
+  if (TypeExpr *tyExpr = dyn_cast<TypeExpr>(baseExpr)) {
+    tyExpr->setType(nullptr);
+    tyExpr->getTypeLoc().setType(nullptr);
+  }
+
   auto baseTyOpt = getTypeOfCompletionContextExpr(
       DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr, ref);
   if (!baseTyOpt)
@@ -435,7 +443,7 @@ static bool collectPossibleCalleesForApply(
     auto baseTy = AMT->getInstanceType();
     if (isa<TypeExpr>(fnExpr) && baseTy->mayHaveMembers()) {
       collectPossibleCalleesByQualifiedLookup(
-          DC, AMT, DeclNameRef::createConstructor(), candidates);
+          DC, fnExpr, DeclNameRef::createConstructor(), candidates);
     }
   }
 
