@@ -449,7 +449,7 @@ class ExistentialTypeInfoBuilder {
             }
 
             if (!isa<ReferenceTypeInfo>(SuperclassTI)) {
-              DEBUG_LOG(fprintf(stderr, "Superclass not a reference type: ")
+              DEBUG_LOG(fprintf(stderr, "Superclass not a reference type: ");
                         SuperclassTI->dump());
               Invalid = true;
               continue;
@@ -1134,7 +1134,10 @@ class EnumTypeInfoBuilder {
   }
 
   void addCase(const std::string &Name) {
-    Cases.push_back({Name, /*offset=*/0, /*value=*/-1, nullptr, TypeInfo()});
+    // FieldInfo's TI field is a reference, so give it a reference to a value
+    // that stays alive forever.
+    static TypeInfo emptyTI;
+    Cases.push_back({Name, /*offset=*/0, /*value=*/-1, nullptr, emptyTI});
   }
 
   void addCase(const std::string &Name, const TypeRef *TR,
@@ -1566,7 +1569,7 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
                                                         unsigned start) {
   auto FD = getBuilder().getFieldTypeInfo(TR);
   if (FD == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No field descriptor: ";) TR->dump());
+    DEBUG_LOG(fprintf(stderr, "No field descriptor: "); TR->dump());
     return nullptr;
   }
 
