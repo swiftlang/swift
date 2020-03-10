@@ -759,8 +759,10 @@ namespace {
       for (auto &child : getChildren(B.getModule().Types)) {
         auto &childLowering = child.getLowering();
         // Skip trivial children.
-        if (childLowering.isTrivial())
+        if (childLowering.isTrivial()) {
+          (void)++plainIndex;
           continue;
+        }
         auto childIndex = child.getIndex();
         if (destructured) {
           operation(B, loc, childIndex,

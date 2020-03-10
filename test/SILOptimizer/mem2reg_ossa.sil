@@ -483,3 +483,16 @@ bb0(%0 : @owned $Optional<Klass>):
   %4 = tuple()
   return %4 : $()
 }
+
+// TODO: tuple with single trivial element
+sil [ossa] @half_trivial : $@convention(thin) (@owned (Builtin.BridgeObject, Builtin.Int32)) -> () {
+bb0(%0 : @owned $(Builtin.BridgeObject, Builtin.Int32)):
+  %1 = alloc_stack $(Builtin.BridgeObject, Builtin.Int32)
+  store %0 to [init] %1 : $*(Builtin.BridgeObject, Builtin.Int32)
+  %3 = load [copy] %2 : $*(Builtin.BridgeObject, Builtin.Int32)
+  destroy_value %3 : $(Builtin.BridgeObject, Builtin.Int32)
+  destroy_addr %1 : $*(Builtin.BridgeObject, Builtin.Int32)
+  dealloc_stack %1 : $*(Builtin.BridgeObject, Builtin.Int32)
+  %7 = tuple ()
+  return %7 : $()
+}
