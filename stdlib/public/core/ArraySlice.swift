@@ -703,8 +703,7 @@ extension ArraySlice: RangeReplaceableCollection {
   ) -> _Buffer {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: 0,
-      minimumCapacity: minimumCapacity,
-      growForAppend: false
+      minimumCapacity: minimumCapacity
     )
     return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
@@ -815,8 +814,7 @@ extension ArraySlice: RangeReplaceableCollection {
 
       let newBuffer = _ContiguousArrayBuffer<Element>(
         _uninitializedCount: count,
-        minimumCapacity: minimumCapacity,
-        growForAppend: false
+        minimumCapacity: minimumCapacity
       )
 
       _buffer._copyContents(
@@ -985,9 +983,8 @@ extension ArraySlice: RangeReplaceableCollection {
       minimumCapacity: newCount) == nil {
 
       let newBuffer = _ContiguousArrayBuffer<Element>(
-        _uninitializedCount: newCount,
-        minimumCapacity: oldCapacity,
-        growForAppend: true
+        _uninitializedCountForAppend: newCount,
+        minimumCapacity: oldCapacity
       )
 
       _buffer._copyContents(

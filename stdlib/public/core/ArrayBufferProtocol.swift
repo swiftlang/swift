@@ -133,8 +133,7 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
   internal init(copying buffer: Self) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count,
-      minimumCapacity: buffer.count,
-      growForAppend: false
+      minimumCapacity: buffer.count
     )
     buffer._copyContents(
       subRange: buffer.indices,

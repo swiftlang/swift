@@ -82,8 +82,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     // No contiguous storage found; we must allocate
     let result = _ContiguousArrayBuffer<AnyObject>(
       _uninitializedCount: boundsCount,
-      minimumCapacity: 0,
-      growForAppend: false
+      minimumCapacity: 0
     )
 
     // Tell Cocoa to copy the objects into our storage
