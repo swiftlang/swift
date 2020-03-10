@@ -46,20 +46,34 @@ extension FixedWidthInteger {
   @inlinable @inline(__always)
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     precondition(2...36 ~= radix)
-    let result_: Self?
-    if let text = text as? String, text._guts.isSmall {
-      result_ = _parseSmall(text._guts.rawBits, radix: radix)
+    let wholeGuts = text._wholeGuts
+    // The specialized paths require that all of the contiguous bytes can
+    // be read using UInt64 loads from (address & ~7).
+    if wholeGuts._object.isPreferredRepresentation, Self.bitWidth <= 64,
+      (0b1_0000_0100_0000_0100 &>> radix) & 1 == 1 {
+      let r64_ = wholeGuts.withFastUTF8({ utf8 -> UInt64? in
+        let utf8 = (S.self == String.self) ? utf8 :
+          UnsafeBufferPointer(rebasing: utf8[text._offsetRange])
+        let isSigned = Self.isSigned
+        let max = UInt64(Self.max)
+        switch radix {
+        case 10: return _parseIntegerBase10(from: utf8,
+                                            allowNegative: isSigned, max: max)
+        case 16: return _parseIntegerBase16(from: utf8,
+                                            allowNegative: isSigned, max: max)
+        case 2: return _parseIntegerBase2(from: utf8,
+                                          allowNegative: isSigned, max: max)
+        default: preconditionFailure()
+        }
+      })
+      guard _fastPath(r64_ != nil), let r64 = r64_ else { return nil }
+      self = Self(truncatingIfNeeded: r64)
     } else {
-      result_ = text.utf8.withContiguousStorageIfAvailable { utf8 -> Self? in
-        var iter = utf8.makeIterator()
-        return _parseFromUTF8Inlined(&iter, radix: radix)
-      } ?? {
-        var iter = text.utf8.makeIterator()
-        return _parseFromUTF8(&iter, radix: radix)
-      }()
+      var iter = text.utf8.makeIterator()
+      let result_: Self? = _parseInteger(from: &iter, radix: radix)
+      guard _fastPath(result_ != nil), let result = result_ else { return nil }
+      self = result
     }
-    guard _fastPath(result_ != nil), let result = result_ else { return nil }
-    self = result
   }
 
   /// Creates a new integer value from the given string.
@@ -86,71 +100,71 @@ extension FixedWidthInteger {
   }
 }
 
-@inlinable @inline(__always)
-internal func _parseSmall<Result: FixedWidthInteger>(
-  _ rawGuts: _StringObject.RawBitPattern, radix: Int
-) -> Result? {
-  // We work with the bytes as they are arranged in the StringObject,
-  // i.e. the leading characters are in the least-significant bits.
-  // This is as opposed to SmallString order, which swaps them on big-endian
-  // platforms to maintain the same in-memory order.
-  var word1 = rawGuts.0
-  let word2 = rawGuts.1 & 0x00ff_ffff_ffff_ffff
-  let count = Int((rawGuts.1 &>> 56) & 0x0f)
-  // Handle sign.
-  // "0"..."9" == 0x30...0x39
-  // "-" == 0x2d
-  // "+" == 0x2b
+@usableFromInline
+internal func _parseIntegerBase10(
+  from utf8: UnsafeBufferPointer<UInt8>, allowNegative: Bool, max: UInt64
+) -> UInt64? {
+  return _parseIntegerSpecialized(from: utf8, allowNegative: allowNegative,
+                                  max: max, using: _parseUnsignedBase10(from:))
+}
+
+@usableFromInline
+internal func _parseIntegerBase16(
+  from utf8: UnsafeBufferPointer<UInt8>, allowNegative: Bool, max: UInt64
+) -> UInt64? {
+  return _parseIntegerSpecialized(from: utf8, allowNegative: allowNegative,
+                                  max: max, using: _parseUnsignedBase16(from:))
+}
+
+@usableFromInline
+internal func _parseIntegerBase2(
+  from utf8: UnsafeBufferPointer<UInt8>, allowNegative: Bool, max: UInt64
+) -> UInt64? {
+  return _parseIntegerSpecialized(from: utf8, allowNegative: allowNegative,
+                                  max: max, using: _parseUnsignedBase2(from:))
+}
+
+@inline(__always)
+internal func _parseIntegerSpecialized(
+  from utf8: UnsafeBufferPointer<UInt8>,
+  allowNegative: Bool,
+  max: UInt64,
+  using parseUnsigned: (UnsafeBufferPointer<UInt8>) -> UInt64?
+) -> UInt64? {
+  var utf8 = utf8
   var hasMinus = false
-  let first = word1 & 0xff
+  guard _fastPath(utf8.count > 0) else { return nil }
+  let first = utf8.first._unsafelyUnwrappedUnchecked
   if first < 0x30 { // Plus, minus or an invalid character.
-    guard _fastPath(count > 1), // Disallow "-"/"+" without any digits.
-      _fastPath(first == UInt8(ascii: "-"))
+    guard _fastPath(utf8.count > 1), // Disallow "-"/"+" without any digits.
+      _fastPath(first == UInt8(ascii: "-")) // Note "-0" is valid for UInts.
       || _fastPath(first == UInt8(ascii: "+")) else { return nil }
     hasMinus = _fastPath(first == UInt8(ascii: "-"))
-    word1 = (word1 ^ first) | 0x30 // Clear first char and a "0".
-  } else {
-    guard _fastPath(count > 0) else { return nil }
+    utf8 = UnsafeBufferPointer(start: utf8.baseAddress.unsafelyUnwrapped + 1,
+                               count: utf8.count &- 1)
   }
   // Choose specialization based on radix (normally branch is optimized away).
-  let result_: UInt64?
-  switch radix {
-  case 10: result_ = _parseBase10Unsigned(from: (word1, word2), count: count)
-  case 16: result_ = _parseHexUnsigned(from: (word1, word2), count: count)
-  case 2: result_ = _parseBinaryUnsigned(from: (word1, word2), count: count)
-  default:
-    var raw = (word1.littleEndian, word2.littleEndian)
-    result_ = withUnsafeBytes(of: &raw) { rawBufPtr -> UInt64? in
-      let start = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
-        .assumingMemoryBound(to: UInt8.self)
-      let ptr = UnsafeBufferPointer(start: start, count: count)
-      var utf8 = ptr.makeIterator()
-      let first = utf8.next()._unsafelyUnwrappedUnchecked
-      return _parseFromUTF8Unsigned(first: first, rest: &utf8, radix: radix)
-    }
-  }
+  let result_ = parseUnsigned(utf8)
   guard _fastPath(result_ != nil), var result = result_ else { return nil }
   // Apply sign & check limits.
-  // Note: This assumes Result is stored as two's complement,
-  //   which is already assumed elsewhere in the stdlib.
-  if Result.isSigned {
-    let max = Result.max.magnitude &+ (hasMinus ? 1 : 0)
+  if allowNegative {
+    // Note: This assumes Result is stored as two's complement,
+    //   but this is also already assumed elsewhere in the stdlib.
+    let max = max &+ (hasMinus ? 1 : 0)
     guard _fastPath(result <= max) else { return nil }
     if hasMinus { result = 0 &- result }
   } else {
     guard _fastPath(!hasMinus) || result == 0,
-      _fastPath(result <= Result.max.magnitude) else { return nil }
+      _fastPath(result <= max) else { return nil }
   }
-  // Or ensure the compiler generates a conditional negate.
-  return Result(truncatingIfNeeded: result)
+  return result
 }
 
-@inlinable @inline(__always)
-internal func _parseBase10Unsigned(
-  from rawGuts: _StringObject.RawBitPattern, count: Int
+@inline(__always)
+internal func _parseUnsignedBase10(
+  from utf8: UnsafeBufferPointer<UInt8>
 ) -> UInt64? {
   // Note: Base 10 is parsed in 4-byte chunks.
-  let (word1, word2) = rawGuts
   func convertToDigits(_ word: UInt64, bitCount: Int) -> UInt64? {
     let shift = (64 &- bitCount) // bitCount must be >0.
     // Convert characters to digits.
@@ -184,46 +198,39 @@ internal func _parseBase10Unsigned(
     // bits will never affect those bits since 0x000r * 100 is always < 0x1_000.
     return (chunk &* 0x03e8_000a_0064_0001) &>> 48
   }
-  // Main.
-  let bitCount = count &* 8
-  if bitCount <= 32 { // 1 chunk case (results <= 9999).
-    let digits_ = convertToDigits(word1, bitCount: bitCount)
-    guard _fastPath(digits_ != nil), let digits = digits_ else { return nil }
-    return parseDigitChunk(UInt32(digits &>> 32))
-  } else {
-    // To handle the 2-word case more easily, we'll only parse the characters
-    // that wouldn't fit into word2 as part of word1.
-    let word1ParsedBitCount = bitCount % 64
-    // Normally digitCount should be >0 but atm it handles that
-    // as if it where 8, so that still actually checks out for our case.
-    let d1_ = convertToDigits(word1, bitCount: word1ParsedBitCount)
-    guard _fastPath(d1_ != nil), let d1 = d1_ else { return nil }
-    var result = parseDigitChunk(UInt32(truncatingIfNeeded: d1))
-    result &*= 10_000
-    result &+= parseDigitChunk(UInt32(d1 &>> 32))
-    // 2-word case (results > 99_999_999).
-    if bitCount > 64 {
-      // Move unparsed bits from word1 to word2 to fill it up to 64.
-      let shift = (64 &- word1ParsedBitCount) // We know 0 < shift < 64.
-      let word2 = (word2 &<< shift) | (word1 &>> word1ParsedBitCount)
-      // Parse word2.
-      let d2_ = convertToDigits(word2, bitCount: 64)
-      guard _fastPath(d2_ != nil), let d2 = d2_ else { return nil }
-      result &*= 10_000
-      result &+= parseDigitChunk(UInt32(truncatingIfNeeded: d2))
-      result &*= 10_000
-      result &+= parseDigitChunk(UInt32(d2 &>> 32))
-    }
-    return result
+  let p = UnsafeRawPointer(utf8.baseAddress._unsafelyUnwrappedUnchecked)
+  let count = utf8.count
+  let firstCount = (count &- 1) % 8 &+ 1
+  let firstChunk = _loadUnalignedChunk(p, count: firstCount)
+  let firstDigits_ = convertToDigits(firstChunk, bitCount: firstCount &* 8)
+  guard _fastPath(firstDigits_ != nil), let firstDigits = firstDigits_
+      else { return nil }
+  var value = parseDigitChunk(UInt32(truncatingIfNeeded: firstDigits &>> 32))
+  if count <= 4 { return value }
+  value &+= parseDigitChunk(UInt32(truncatingIfNeeded: firstDigits)) &* 10_000
+  var consumed = firstCount
+  while consumed < count {
+    let chunk = _loadUnalignedChunk(p + consumed, count: 8)
+    let chunkDigits_ = convertToDigits(chunk, bitCount: 64)
+    guard _fastPath(chunkDigits_ != nil), let chunkDigits = chunkDigits_
+      else { return nil }
+    let chunkValue =
+      parseDigitChunk(UInt32(truncatingIfNeeded: chunkDigits)) &* 10_000
+      &+ parseDigitChunk(UInt32(truncatingIfNeeded: chunkDigits &>> 32))
+    let overflow1, overflow2: Bool
+    (value, overflow1) = value.multipliedReportingOverflow(by: 100_000_000)
+    (value, overflow2) = value.addingReportingOverflow(chunkValue)
+    guard _fastPath(!overflow1 && !overflow2) else { return nil }
+    consumed &+= 8
   }
+  return value
 }
 
-@inlinable @inline(__always)
-internal func _parseHexUnsigned(
-  from rawGuts: _StringObject.RawBitPattern, count: Int
+@inline(__always)
+internal func _parseUnsignedBase16(
+  from utf8: UnsafeBufferPointer<UInt8>
 ) -> UInt64? {
-  let (word1, word2) = rawGuts
-  func parseChunk(chunk: UInt64, bitCount: Int) -> UInt64? {
+  func parseChunk(_ chunk: UInt64, bitCount: Int) -> UInt64? {
     let shift = 64 &- bitCount // bitCount must be >0.
     // "0"..."9" == 0x30...0x39
     // "A"..."Z" == 0x41...0x5A
@@ -257,27 +264,32 @@ internal func _parseHexUnsigned(
     x = (x &<< 16 | x &>> 32) & 0xffff_ffff    // 0x0000_0000_pqrs_tuvw
     return x
   }
-  // Branch between simple path (results <= UInt32.max) and the general path.
-  let bitCount = count &* 8
-  if bitCount <= 64 {
-    return parseChunk(chunk: word1, bitCount: bitCount)
-  } else {
-    let value1_ = parseChunk(chunk: word1, bitCount: 64)
-    guard _fastPath(value1_ != nil), let value1 = value1_ else { return nil }
-    let word2BitCount = bitCount &- 64
-    let value2_ = parseChunk(chunk: word2, bitCount: word2BitCount)
-    guard _fastPath(value2_ != nil), let value2 = value2_ else { return nil }
-    return (value1 &<< (word2BitCount/2)) | value2
+  let p = UnsafeRawPointer(utf8.baseAddress._unsafelyUnwrappedUnchecked)
+  let count = utf8.count
+  let firstCount = (count &- 1) % 8 &+ 1
+  let firstChunk = _loadUnalignedChunk(p, count: firstCount)
+  let firstValue_ = parseChunk(firstChunk, bitCount: firstCount &* 8)
+  guard _fastPath(firstValue_ != nil), var value = firstValue_
+      else { return nil }
+  var consumed = firstCount
+  while consumed < count {
+    guard _fastPath(value < 0x1_0000_0000) else { return nil }
+    let chunk = _loadUnalignedChunk(p + consumed, count: 8)
+    let chunkValue_ = parseChunk(chunk, bitCount: 64)
+    guard _fastPath(chunkValue_ != nil), let chunkValue = chunkValue_
+      else { return nil }
+    value = (value &<< 32) &+ chunkValue
+    consumed &+= 8
   }
+  return value
 }
 
-@inlinable @inline(__always)
-internal func _parseBinaryUnsigned(
-  from rawGuts: _StringObject.RawBitPattern, count: Int
+@inline(__always)
+internal func _parseUnsignedBase2(
+  from utf8: UnsafeBufferPointer<UInt8>
 ) -> UInt64? {
-  let (word1, word2) = rawGuts
   /// - Note: `chunk` must store leading char in LSB. `bitCount` must be `>0`.
-  func parseChunk(chunk: UInt64, bitCount: Int) -> UInt64? {
+  func parseChunk(_ chunk: UInt64, bitCount: Int) -> UInt64? {
     let shift = 64 &- bitCount // Note: bitCount must be >0.
     // Convert characters to digits.
     var digits = chunk &- _allLanes(UInt8(ascii: "0"))
@@ -300,32 +312,58 @@ internal func _parseBinaryUnsigned(
     // Making the most-significant byte our desired output.
     return (digits &* 0x8040_2010_0804_0201) &>> 56
   }
-  // Branch between simple path (results <= UInt8.max) and the general path.
-  let bitCount = count &* 8
-  if bitCount <= 64 {
-    return parseChunk(chunk: word1, bitCount: bitCount)
+  let p = UnsafeRawPointer(utf8.baseAddress._unsafelyUnwrappedUnchecked)
+  let count = utf8.count
+  let firstCount = (count &- 1) % 8 &+ 1
+  let firstChunk = _loadUnalignedChunk(p, count: firstCount)
+  let firstValue_ = parseChunk(firstChunk, bitCount: firstCount &* 8)
+  guard _fastPath(firstValue_ != nil), var value = firstValue_
+      else { return nil }
+  var consumed = firstCount
+  while consumed < count {
+    guard _fastPath(value < 0x100_0000_0000_0000) else { return nil }
+    let chunk = _loadUnalignedChunk(p + consumed, count: 8)
+    let chunkValue_ = parseChunk(chunk, bitCount: 64)
+    guard _fastPath(chunkValue_ != nil), let chunkValue = chunkValue_
+      else { return nil }
+    value = (value &<< 8) &+ chunkValue
+    consumed &+= 8
+  }
+  return value
+}
+
+@_alwaysEmitIntoClient
+internal func _loadUnalignedChunk(
+  _ ptr: UnsafeRawPointer, count: Int
+) -> UInt64 {
+  // Load up to 8 bytes into a UInt64, in little-endian order. Caller must
+  // guarantee that for each byte the entire 64 bits in which it falls using
+  // 64-bit alignment is allowed to be read. The unused parts of the UInt64
+  // are garbage and are the caller's resposibility to ignore.
+  let first = UInt(bitPattern: ptr)
+  let last = first &+ UInt(bitPattern: count) &- 1
+    let w1 = UnsafeRawPointer(bitPattern: first & ~0x07)
+    ._unsafelyUnwrappedUnchecked.load(as: UInt64.self)
+  let w2 = UnsafeRawPointer(bitPattern: last & ~0x07)
+    ._unsafelyUnwrappedUnchecked.load(as: UInt64.self)
+  let offset = (first & 0x07) &* 8 // Bit offset inside first UInt64.
+  // Combine the two words.
+  // If count is not high enough to push `last` into the next UInt64, w1 and w2
+  // will be identical, but the shift below will push the second copy out of
+  // relevance. Also note that if offset is 0, the second shift will mask to 0
+  // instead of 64, but in this case w1 and w2 must be identical and neither
+  // is shifted thus making `w1 | w2` still correct.
+  if 1 == 1.littleEndian {
+    return (w1 &>> offset) | (w2 &<< (64 &- offset))
   } else {
-    let value1_ = parseChunk(chunk: word1, bitCount: 64)
-    guard _fastPath(value1_ != nil), let value1 = value1_ else { return nil }
-    let word2BitCount = bitCount &- 64
-    let value2_ = parseChunk(chunk: word2, bitCount: word2BitCount)
-    guard _fastPath(value2_ != nil), let value2 = value2_ else { return nil }
-    return (value1 &<< (word2BitCount/8)) | value2
+    return ((w1 &<< offset) | (w2 &>> (64 &- offset))).littleEndian
   }
 }
 
 @inlinable
-internal func _parseFromUTF8<
+internal func _parseInteger<
   Iterator: IteratorProtocol, Result: FixedWidthInteger
->(_ utf8: inout Iterator, radix: Int) -> Result?
-where Iterator.Element == UInt8 {
-  return _parseFromUTF8Inlined(&utf8, radix: radix)
-}
-
-@inlinable @inline(__always)
-internal func _parseFromUTF8Inlined<
-  Iterator: IteratorProtocol, Result: FixedWidthInteger
->(_ utf8: inout Iterator, radix: Int) -> Result?
+>(from utf8: inout Iterator, radix: Int) -> Result?
 where Iterator.Element == UInt8 {
   typealias UResult = Result.Magnitude
   guard _fastPath(UResult(exactly: radix) != nil) else {
@@ -363,7 +401,7 @@ where Iterator.Element == UInt8 {
   return Result(truncatingIfNeeded: result)
 }
 
-@inlinable @inline(__always)
+@_alwaysEmitIntoClient @inline(__always)
 internal func _parseFromUTF8Unsigned<
   Iterator: IteratorProtocol, Result: FixedWidthInteger
 >(first: UInt8, rest utf8: inout Iterator, radix: Int) -> Result?
@@ -380,7 +418,7 @@ where Iterator.Element == UInt8, Result: UnsignedInteger {
       // Overwrite digit value if we have a letter (a ^ a == 0; 0 ^ a == a).
       digit ^= (digit ^ letterValue) & isLetter
     }
-    // We only need to check the upper bound as we're using a UInt8.
+    // We only need to check the upper bound since we're using an unsigned int.
     guard _fastPath(digit < radix) else { return nil }
     return Result(truncatingIfNeeded: digit)
   }
@@ -398,7 +436,7 @@ where Iterator.Element == UInt8, Result: UnsignedInteger {
   return result
 }
 
-@_alwaysEmitIntoClient
+@_alwaysEmitIntoClient @inline(__always)
 internal func _allLanes(_ x: UInt8) -> UInt64 {
   return UInt64(x) &* 0x0101_0101_0101_0101
 }
