@@ -2893,19 +2893,9 @@ findBridgeWitness(const Metadata *T) {
   // storage to avoid repeatedly looking up this conformance.
   if (T->getKind() == MetadataKind::Struct) {
     auto structDescription = cast<StructMetadata>(T)->Description;
-    // Check for a _very_ small number of heavily-used types.
-    // Cache the protocol witness for these to avoid lookup overhead.
     if (structDescription == &NOMINAL_TYPE_DESCR_SYM(SS)) {
       static auto *Swift_String_ObjectiveCBridgeable = swift_conformsToObjectiveCBridgeable(T);
       return Swift_String_ObjectiveCBridgeable;
-    }
-    if (structDescription == &NOMINAL_TYPE_DESCR_SYM(SD)) {
-      static auto *Swift_Dictionary_ObjectiveCBridgeable = swift_conformsToObjectiveCBridgeable(T);
-      return Swift_Dictionary_ObjectiveCBridgeable;
-    }
-    if (structDescription == &NOMINAL_TYPE_DESCR_SYM(Sa)) {
-      static auto *Swift_Array_ObjectiveCBridgeable = swift_conformsToObjectiveCBridgeable(T);
-      return Swift_Array_ObjectiveCBridgeable;
     }
   }
 
