@@ -1493,10 +1493,23 @@ bool TypeBase::isCallableNominalType(DeclContext *dc) {
 }
 
 bool TypeBase::hasDynamicMemberLookupAttribute() {
+  if (!mayHaveMembers())
+    return false;
+
   auto canTy = getCanonicalType();
   auto &ctx = canTy->getASTContext();
   return evaluateOrDefault(
       ctx.evaluator, HasDynamicMemberLookupAttributeRequest{canTy}, false);
+}
+
+bool TypeBase::hasDynamicCallableAttribute() {
+  if (!mayHaveMembers())
+    return false;
+
+  auto canTy = getCanonicalType();
+  auto &ctx = canTy->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, HasDynamicCallableAttributeRequest{canTy}, false);
 }
 
 Type TypeBase::getSuperclass(bool useArchetypes) {

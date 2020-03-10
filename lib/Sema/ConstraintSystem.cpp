@@ -504,6 +504,12 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
                                   {LocatorPathElt::ApplyFunction(),
                                    LocatorPathElt::ImplicitCallAsFunction()});
     }
+
+    // Handling an apply for a nominal type that supports @dynamicCallable.
+    if (fnTy->hasDynamicCallableAttribute()) {
+      return getConstraintLocator(anchor, LocatorPathElt::ApplyFunction());
+    }
+
     return nullptr;
   };
 

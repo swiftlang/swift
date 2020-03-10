@@ -81,6 +81,8 @@ SWIFT_REQUEST(TypeChecker, HasCircularRawValueRequest,
               bool(EnumDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasDynamicMemberLookupAttributeRequest,
               bool(CanType), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasDynamicCallableAttributeRequest,
+              bool(CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
               GenericSignature (ModuleDecl *, GenericSignatureImpl *,
                                  GenericParamSource,
