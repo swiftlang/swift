@@ -1077,6 +1077,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
+    assert(isAlwaysSharedLinkage() && "kind should always be shared linkage");
     return nullptr;
 
   // TODO
@@ -1087,5 +1088,21 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::ValueWitnessTable:
   case Kind::DifferentiabilityWitness:
     return nullptr;
+  }
+}
+
+bool LinkEntity::isAlwaysSharedLinkage() const {
+  switch (getKind()) {
+  case Kind::ModuleDescriptor:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+  case Kind::ObjCClassRef:
+  case Kind::TypeMetadataAccessFunction:
+  case Kind::TypeMetadataLazyCacheVariable:
+  case Kind::TypeMetadataDemanglingCacheVariable:
+    return true;
+
+  default:
+    return false;
   }
 }

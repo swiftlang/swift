@@ -1725,8 +1725,8 @@ void IRGenModule::emitVTableStubs() {
 
 static IRLinkage
 getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
-             ForDefinition_t isDefinition,
-             bool isWeakImported) {
+             ForDefinition_t isDefinition, bool isWeakImported,
+             bool isKnownLocal = false) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   IRLinkage{llvm::GlobalValue::LINKAGE##Linkage,                               \
             llvm::GlobalValue::VISIBILITY##Visibility,                         \
@@ -1766,7 +1766,8 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
   case SILLinkage::Private: {
     if (info.forcePublicDecls() && !isDefinition)
       return getIRLinkage(info, SILLinkage::PublicExternal, isDefinition,
-                          isWeakImported);
+                          isWeakImported, isKnownLocal);
+
     auto linkage = info.needLinkerToMergeDuplicateSymbols()
                        ? llvm::GlobalValue::LinkOnceODRLinkage
                        : llvm::GlobalValue::InternalLinkage;
@@ -1782,7 +1783,10 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
     auto linkage = isWeakImported ? llvm::GlobalValue::ExternalWeakLinkage
                                   : llvm::GlobalValue::ExternalLinkage;
-    return {linkage, llvm::GlobalValue::DefaultVisibility, ImportedStorage};
+    return {linkage, llvm::GlobalValue::DefaultVisibility,
+            isKnownLocal
+                ? llvm::GlobalValue::DefaultStorageClass
+                : ImportedStorage};
   }
 
   case SILLinkage::HiddenExternal:
@@ -1791,8 +1795,10 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
       return RESULT(AvailableExternally, Hidden, Default);
 
     return {llvm::GlobalValue::ExternalLinkage,
-            llvm::GlobalValue::DefaultVisibility, ImportedStorage};
-
+            llvm::GlobalValue::DefaultVisibility,
+            isKnownLocal
+                ? llvm::GlobalValue::DefaultStorageClass
+                : ImportedStorage};
   }
 
   llvm_unreachable("bad SIL linkage");
@@ -1807,9 +1813,15 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   // entire linkage computation.
   UniversalLinkageInfo linkInfo(IGM);
   bool weakImported = entity.isWeakImported(IGM.getSwiftModule());
+
+  bool isKnownLocal = entity.isAlwaysSharedLinkage();
+  if (const auto *DC = entity.getDeclContextForEmission())
+    if (const auto *MD = DC->getParentModule())
+      isKnownLocal = IGM.getSwiftModule() == MD;
+
   auto IRL =
       getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
-                   ForDefinition, weakImported);
+                   ForDefinition, weakImported, isKnownLocal);
   ApplyIRLinkage(IRL).to(global);
 
   // Everything externally visible is considered used in Swift.
@@ -1834,21 +1846,16 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
                        const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
   LinkInfo result;
-  // FIXME: For anything in the standard library, we assume is locally defined.
-  // The only two ways imported interfaces are currently created is via a shims
-  // interface where the ClangImporter will correctly give us the proper DLL
-  // storage for the declaration.  Otherwise, it is from a `@_silgen_name`
-  // attributed declaration, which we explicitly handle elsewhere.  So, in the
-  // case of a standard library build, just assume everything is locally
-  // defined.  Ideally, we would integrate the linkage calculation properly to
-  // avoid this special casing.
-  ForDefinition_t isStdlibOrDefinition =
-      ForDefinition_t(swiftModule->isStdlibModule() || isDefinition);
+
+  bool isKnownLocal = entity.isAlwaysSharedLinkage();
+  if (const auto *DC = entity.getDeclContextForEmission())
+    if (const auto *MD = DC->getParentModule())
+      isKnownLocal = MD == swiftModule;
 
   entity.mangle(result.Name);
   bool weakImported = entity.isWeakImported(swiftModule);
-  result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isStdlibOrDefinition),
-                            isDefinition, weakImported);
+  result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
+                            isDefinition, weakImported, isKnownLocal);
   result.ForDefinition = isDefinition;
   return result;
 }
