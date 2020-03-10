@@ -21,6 +21,9 @@
 
 // EDUCATIONAL_NOTES(DIAG_ID, EDUCATIONAL_NOTE_FILENAMES...)
 
+EDUCATIONAL_NOTES(unsupported_existential_type,
+                  "associated-type-requirements.md")
+
 EDUCATIONAL_NOTES(non_nominal_no_initializers, "nominal-types.md")
 EDUCATIONAL_NOTES(non_nominal_extension, "nominal-types.md")
 EDUCATIONAL_NOTES(associated_type_witness_conform_impossible,
