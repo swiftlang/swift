@@ -12,7 +12,6 @@
 
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
-#include "swift/AST/Module.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 
 #include "SymbolGraphASTWalker.h"
@@ -22,7 +21,7 @@ using namespace symbolgraphgen;
 
 namespace {
 int serializeSymbolGraph(SymbolGraph &SG,
-                             const SymbolGraphOptions &Options) {
+                         const SymbolGraphOptions &Options) {
   SmallString<256> FileName(SG.M.getNameStr());
   if (SG.ExtendedModule.hasValue()) {
     FileName.push_back('@');

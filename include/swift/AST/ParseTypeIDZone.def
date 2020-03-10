@@ -19,3 +19,6 @@ SWIFT_REQUEST(Parse, ParseMembersRequest,
 SWIFT_REQUEST(Parse, ParseAbstractFunctionBodyRequest,
               BraceStmt *(AbstractFunctionDecl *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(Parse, ParseSourceFileRequest,
+              ArrayRef<Decl *>(SourceFile *), SeparatelyCached,
+              NoLocationInfo)

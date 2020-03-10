@@ -4892,14 +4892,11 @@ StringRef SILGenFunction::getMagicFilePathString(SourceLoc loc) {
 std::string SILGenFunction::getMagicFileString(SourceLoc loc) {
   auto path = getMagicFilePathString(loc);
 
-  if (!getASTContext().LangOpts.EnableConcisePoundFile)
-    return path;
+  auto result = SGM.MagicFileStringsByFilePath.find(path);
+  if (result != SGM.MagicFileStringsByFilePath.end())
+    return std::get<0>(result->second);
 
-  auto value = llvm::sys::path::filename(path).str();
-  value += " (";
-  value += getModule().getSwiftModule()->getNameStr();
-  value += ")";
-  return value;
+  return path;
 }
 
 /// Emit an application of the given allocating initializer.
@@ -5067,24 +5064,10 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
 RValue SILGenFunction::emitApplyOfPropertyWrapperBackingInitializer(
     SILLocation loc,
     VarDecl *var,
+    SubstitutionMap subs,
     RValue &&originalValue,
     SGFContext C) {
   SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
-
-  SubstitutionMap subs;
-  auto varDC = var->getInnermostDeclContext();
-  if (auto genericSig = varDC->getGenericSignatureOfContext()) {
-    subs = SubstitutionMap::get(
-        genericSig,
-        [&](SubstitutableType *type) {
-          if (auto gp = type->getAs<GenericTypeParamType>()) {
-            return F.mapTypeIntoContext(gp);
-          }
-
-          return Type(type);
-        },
-        LookUpConformanceInModule(varDC->getParentModule()));
-  }
 
   FormalEvaluationScope writebackScope(*this);
 

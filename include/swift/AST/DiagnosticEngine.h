@@ -676,8 +676,8 @@ namespace swift {
     /// Print diagnostic names after their messages
     bool printDiagnosticNames = false;
 
-    /// Use descriptive diagnostic style when available.
-    bool useDescriptiveDiagnostics = false;
+    /// Use educational notes when available.
+    bool useEducationalNotes = false;
 
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
@@ -705,6 +705,11 @@ namespace swift {
       return state.getShowDiagnosticsAfterFatalError();
     }
 
+    void flushConsumers() {
+      for (auto consumer : Consumers)
+        consumer->flush();
+    }
+
     /// Whether to skip emitting warnings
     void setSuppressWarnings(bool val) { state.setSuppressWarnings(val); }
     bool getSuppressWarnings() const {
@@ -725,12 +730,8 @@ namespace swift {
       return printDiagnosticNames;
     }
 
-    void setUseDescriptiveDiagnostics(bool val) {
-       useDescriptiveDiagnostics = val;
-    }
-    bool getUseDescriptiveDiagnostics() const {
-      return useDescriptiveDiagnostics;
-    }
+    void setUseEducationalNotes(bool val) { useEducationalNotes = val; }
+    bool getUseEducationalNotes() const { return useEducationalNotes; }
 
     void setDiagnosticDocumentationPath(std::string path) {
       diagnosticDocumentationPath = path;

@@ -126,6 +126,9 @@ public:
   /// \returns true if an error occurred while finishing-up.
   virtual bool finishProcessing() { return false; }
 
+  /// Flush any in-flight diagnostics.
+  virtual void flush() {}
+
   /// In batch mode, any error causes failure for all primary files, but
   /// anyone consulting .dia files will only see an error for a particular
   /// primary in that primary's serialized diagnostics file. For other

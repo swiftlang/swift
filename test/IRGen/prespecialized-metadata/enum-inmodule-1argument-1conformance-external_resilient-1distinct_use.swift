@@ -51,7 +51,9 @@ doit()
 // CHECK-SAME:     i8* [[ERASED_TYPE]], 
 // CHECK-SAME:     i8* [[ERASED_TABLE]], 
 // CHECK-SAME:     i8* undef, 
-// CHECK-SAME:     %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8, i32, i32, i32 }>* @"$s4main5ValueOMn" to %swift.type_descriptor*)
+// CHECK-SAME:     %swift.type_descriptor* bitcast (
+// CHECK-SAME:       {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
+// CHECK-SAME:     )
 // CHECK-SAME:   )
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

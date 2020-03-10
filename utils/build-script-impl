@@ -424,6 +424,7 @@ function verify_host_is_supported() {
       | iphoneos-armv7          \
       | iphoneos-armv7s         \
       | iphoneos-arm64          \
+      | iphoneos-arm64e         \
       | appletvsimulator-x86_64 \
       | appletvos-arm64         \
       | watchsimulator-i386     \
@@ -521,6 +522,13 @@ function set_build_options_for_host() {
                     ;;
                 iphoneos-arm64)
                     SWIFT_HOST_TRIPLE="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="IOS"
+                    cmake_osx_deployment_target=""
+                    ;;
+                iphoneos-arm64e)
+                    SWIFT_HOST_TRIPLE="arm64e-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     llvm_target_arch="AArch64"
 
                     SWIFT_HOST_VARIANT_SDK="IOS"
@@ -1722,10 +1730,17 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_SDKS:STRING="$(join ";" ${SWIFT_SDKS[@]})"
                     )
                 fi
+
                 if [[ "${SWIFT_PRIMARY_VARIANT_SDK}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_PRIMARY_VARIANT_SDK:STRING="${SWIFT_PRIMARY_VARIANT_SDK}"
+                    )
+                fi
+
+                if [[ "${SWIFT_PRIMARY_VARIANT_ARCH}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
                         -DSWIFT_PRIMARY_VARIANT_ARCH:STRING="${SWIFT_PRIMARY_VARIANT_ARCH}"
                     )
                 fi

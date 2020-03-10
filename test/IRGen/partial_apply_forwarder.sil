@@ -275,7 +275,7 @@ public struct Outermost<Value> {
 sil @$closure : $@convention(method) <Value where Value : MyEquatable> (Outer<Value>, Outer<Value>, @thin Outer<Value>.Type) -> Builtin.Int1
 sil @$closure2 : $@convention(method) <Value where Value : MyEquatable> (Outermost<Value>, Outermost<Value>, @thin Outermost<Value>.Type) -> Builtin.Int1
 
-sil @$dont_crash_test_caputre_specialized_conditional_conformance : $@convention(thin) <Element where Element : MyEquatable> (Outer<Inner<Element>>) -> () {
+sil @$dont_crash_test_capture_specialized_conditional_conformance : $@convention(thin) <Element where Element : MyEquatable> (Outer<Inner<Element>>) -> () {
 bb0(%0 : $Outer<Inner<Element>>):
   %2 = alloc_stack $Outer<Inner<Element>>
   store %0 to %2 : $*Outer<Inner<Element>>
@@ -288,7 +288,7 @@ bb0(%0 : $Outer<Inner<Element>>):
   return %15 : $()
 }
 
-sil @$dont_crash_test_caputre_specialized_conditional_conformance_nested : $@convention(thin) <Element where Element : MyEquatable> (Outer<Inner<Element>>) -> () {
+sil @$dont_crash_test_capture_specialized_conditional_conformance_nested : $@convention(thin) <Element where Element : MyEquatable> (Outer<Inner<Element>>) -> () {
 bb0(%0 : $Outer<Inner<Element>>):
   %4 = metatype $@thin Outermost<Outer<Inner<Element>>>.Type
   %5 = function_ref @$closure2 : $@convention(method) <Value where Value : MyEquatable> (Outermost<Value>, Outermost<Value>, @thin Outermost<Value>.Type) -> Builtin.Int1

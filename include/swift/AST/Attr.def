@@ -524,7 +524,7 @@ SIMPLE_DECL_ATTR(_inheritsConvenienceInitializers,
   93)
 
 DECL_ATTR(_typeEraser, TypeEraser,
-  OnProtocol | UserInaccessible | NotSerialized |
+  OnProtocol | UserInaccessible |
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   94)
 
@@ -545,8 +545,9 @@ DECL_ATTR(derivative, Derivative,
   97)
 
 DECL_ATTR(_spi, SPIAccessControl,
-  OnFunc | OnExtension | OnGenericType | OnVar | OnSubscript | OnConstructor |
-  OnImport | AllowMultipleAttributes | UserInaccessible |
+  OnAbstractFunction | OnExtension | OnGenericType | OnVar | OnSubscript |
+  OnImport | OnAccessor | OnEnumElement |
+  AllowMultipleAttributes | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   98)
 

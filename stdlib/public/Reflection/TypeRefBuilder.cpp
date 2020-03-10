@@ -211,14 +211,16 @@ bool TypeRefBuilder::getFieldTypeRefs(
   if (!Subs)
     return false;
 
+  int FieldValue = -1;
   for (auto &FieldRef : *FD.getLocalBuffer()) {
     auto Field = FD.getField(FieldRef);
     
     auto FieldName = getTypeRefString(readTypeRef(Field, Field->FieldName));
+    FieldValue += 1;
 
     // Empty cases of enums do not have a type
     if (FD->isEnum() && !Field->hasMangledTypeName()) {
-      Fields.push_back(FieldTypeInfo::forEmptyCase(FieldName));
+      Fields.push_back(FieldTypeInfo::forEmptyCase(FieldName, FieldValue));
       continue;
     }
 
@@ -230,11 +232,11 @@ bool TypeRefBuilder::getFieldTypeRefs(
     auto Substituted = Unsubstituted->subst(*this, *Subs);
 
     if (FD->isEnum() && Field->isIndirectCase()) {
-      Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName, Substituted));
+      Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName, FieldValue, Substituted));
       continue;
     }
 
-    Fields.push_back(FieldTypeInfo::forField(FieldName, Substituted));
+    Fields.push_back(FieldTypeInfo::forField(FieldName, FieldValue, Substituted));
   }
   return true;
 }

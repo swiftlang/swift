@@ -696,7 +696,9 @@ public:
 
   /// Construct a new generic environment for the given declaration context.
   ///
-  /// \param genericParams The generic parameters to validate.
+  /// \param paramSource The source of generic info: either a generic parameter
+  /// list or a generic context with a \c where clause dependent on outer
+  /// generic parameters.
   ///
   /// \param dc The declaration context in which to perform the validation.
   ///
@@ -714,7 +716,7 @@ public:
   ///
   /// \returns the resulting generic signature.
   static GenericSignature checkGenericSignature(
-                        GenericParamList *genericParams,
+                        GenericParamSource paramSource,
                         DeclContext *dc,
                         GenericSignature outerSignature,
                         bool allowConcreteGenericParams,
@@ -837,12 +839,6 @@ public:
       ConcreteDeclRef &referencedDecl,
       FreeTypeVariableBinding allowFreeTypeVariables =
                               FreeTypeVariableBinding::Disallow,
-      ExprTypeCheckListener *listener = nullptr);
-
-  static void getPossibleTypesOfExpressionWithoutApplying(
-      Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
-      FreeTypeVariableBinding allowFreeTypeVariables =
-          FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
 
   /// Return the type of operator function for specified LHS, or a null
@@ -1662,6 +1658,34 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      GenericSignature sig,
                                      SubstitutionMap Substitutions,
                                      bool isExtension);
+
+/// Check for restrictions on the use of the @unknown attribute on a
+/// case statement.
+void checkUnknownAttrRestrictions(
+    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
+    bool &limitExhaustivityChecks);
+
+/// Bind all of the pattern variables that occur within a case statement and
+/// all of its case items to their "parent" pattern variables, forming chains
+/// of variables with the same name.
+///
+/// Given a case such as:
+/// \code
+/// case .a(let x), .b(let x), .c(let x):
+/// \endcode
+///
+/// Each case item contains a (different) pattern variable named.
+/// "x". This function will set the "parent" variable of the
+/// second and third "x" variables to the "x" variable immediately
+/// to its left. A fourth "x" will be the body case variable,
+/// whose parent will be set to the "x" within the final case
+/// item.
+///
+/// Each of the "x" variables must eventually have the same type, and agree on
+/// let vs. var. This function does not perform any of that validation, leaving
+/// it to later stages.
+void bindSwitchCasePatternVars(CaseStmt *stmt);
+
 } // end namespace swift
 
 #endif

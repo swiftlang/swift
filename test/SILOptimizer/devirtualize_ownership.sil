@@ -25,17 +25,17 @@ sil_global @x : $Bar
 // YAML-NEXT: Pass:            sil-devirtualizer
 // YAML-NEXT: Name:            sil.ClassMethodDevirtualized
 // YAML-NEXT: DebugLoc:
-// YAML-NEXT:   File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:   Line:            46
-// YAML-NEXT:   Column:          8
+// YAML:        File:            {{.*}}/devirtualize_ownership.sil
+// YAML:        Line:            46
+// YAML:        Column:          8
 // YAML-NEXT: Function:        function_with_cm
 // YAML-NEXT: Args:
 // YAML-NEXT:   - String:          'Devirtualized call to class method '
 // YAML-NEXT:   - Method:          '"main.Bar.foo(_:)"'
 // YAML-NEXT:     DebugLoc:
-// YAML-NEXT:       File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:       Line:            52
-// YAML-NEXT:       Column:          6
+// YAML:            File:            {{.*}}/devirtualize_ownership.sil
+// YAML:            Line:            52
+// YAML:            Column:          6
 // YAML-NEXT: ...
 
 sil [ossa] @function_with_cm : $@convention(thin) () -> () {
@@ -83,17 +83,17 @@ bb0(%0 : @guaranteed $Node):
 // YAML-NEXT: Pass:            sil-devirtualizer
 // YAML-NEXT: Name:            sil.ClassMethodDevirtualized
 // YAML-NEXT: DebugLoc:
-// YAML-NEXT:   File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:   Line:            75
-// YAML-NEXT:   Column:          8
+// YAML:        File:            {{.*}}/devirtualize_ownership.sil
+// YAML:        Line:            75
+// YAML:        Column:          8
 // YAML-NEXT: Function:        class_method_apply
 // YAML-NEXT: Args:
 // YAML-NEXT:   - String:          'Devirtualized call to class method '
 // YAML-NEXT:   - Method:          '"transparent_target"'
 // YAML-NEXT:     DebugLoc:
-// YAML-NEXT:       File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:       Line:            101
-// YAML-NEXT:       Column:          46
+// YAML:            File:            {{.*}}/devirtualize_ownership.sil
+// YAML:            Line:            101
+// YAML:            Column:          46
 // YAML-NEXT: ...
 
 
@@ -135,17 +135,17 @@ bb0(%0 : $@thick C.Type):
 // YAML-NEXT: Pass:            sil-devirtualizer
 // YAML-NEXT: Name:            sil.ClassMethodDevirtualized
 // YAML-NEXT: DebugLoc:
-// YAML-NEXT:   File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:   Line:            128
-// YAML-NEXT:   Column:          8
+// YAML:        File:            {{.*}}/devirtualize_ownership.sil
+// YAML:        Line:            128
+// YAML:        Column:          8
 // YAML-NEXT: Function:        'caller(_:)'
 // YAML-NEXT: Args:
 // YAML-NEXT:   - String:          'Devirtualized call to class method '
 // YAML-NEXT:   - Method:          '"static meta.B.foo(_:)"'
 // YAML-NEXT:     DebugLoc:
-// YAML-NEXT:       File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:       Line:            119
-// YAML-NEXT:       Column:          13
+// YAML:            File:            {{.*}}/devirtualize_ownership.sil
+// YAML:            Line:            119
+// YAML:            Column:          13
 // YAML-NEXT: ...
 
 sil_vtable B {

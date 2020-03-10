@@ -21,8 +21,7 @@
 // CHECK-SAME:   ), 
 // CHECK-SAME:   [[INT]] 513, 
 // CHECK-SAME:   %swift.type_descriptor* bitcast (
-// CHECK-SAME:     <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main5OuterOMn" 
-// CHECK-SAME:     to %swift.type_descriptor*
+// CHECK-SAME:     {{.*}}$s4main5OuterOMn{{.*}} to %swift.type_descriptor*
 // CHECK-SAME:   ), 
 // CHECK-SAME:   %swift.type* getelementptr inbounds (
 // CHECK-SAME:     %swift.full_type, 
@@ -92,9 +91,7 @@ doit()
 // CHECK-SAME:     i8* undef, 
 // CHECK-SAME:     i8* undef, 
 // CHECK-SAME:     %swift.type_descriptor* bitcast (
-// CHECK-SAME:       <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* 
-// CHECK-SAME:       @"$s4main5OuterOMn" 
-// CHECK-SAME:       to %swift.type_descriptor*
+// CHECK-SAME:       {{.*}}$s4main5OuterOMn{{.*}} to %swift.type_descriptor*
 // CHECK-SAME:     )
 // CHECK-SAME:   ) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}

@@ -381,7 +381,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
       NewGenericSig, ExtInfo, FTy->getCoroutineKind(),
       FTy->getCalleeConvention(), InterfaceParams, FTy->getYields(),
       FTy->getResults(), InterfaceErrorResult,
-      SubstitutionMap(), false,
+      SubstitutionMap(), SubstitutionMap(),
       Ctx, witnessMethodConformance);
 }
 

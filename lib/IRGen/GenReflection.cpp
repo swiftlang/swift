@@ -1156,7 +1156,7 @@ public:
     B.addInt32(Layout.getBindings().size());
 
     auto sig =
-        OrigCalleeType->getSubstGenericSignature().getCanonicalSignature();
+      OrigCalleeType->getInvocationGenericSignature().getCanonicalSignature();
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {

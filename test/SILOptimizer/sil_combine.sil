@@ -3449,6 +3449,19 @@ bb0(%0 : $*Builtin.Int64, %1 : $B):
   return %4 : $Builtin.Int64
 }
 
+// CHECK-LABEL: sil @mark_dependence_trivial_object_base :
+// CHECK: bb0(
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'mark_dependence_trivial_object_base'
+sil @mark_dependence_trivial_object_base : $@convention(thin) (@guaranteed B) -> @owned B {
+bb0(%0 : $B):
+  strong_retain %0 : $B
+  %1 = enum $Optional<Int>, #Optional.none!enumelt
+  %2 = mark_dependence %0 : $B on %1 : $Optional<Int>
+  return %2 : $B
+}
+
 protocol _NSArrayCore {}
 
 // CHECK-LABEL: sil @mark_dependence_base2
@@ -3657,9 +3670,9 @@ bb0(%0 : $@thin T.Type):
 // CHECK:         apply %0
 sil @convert_function_substitution : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> () {
 bb0(%0 : $@callee_guaranteed () -> @out ()):
-  %1 = convert_function %0 : $@callee_guaranteed () -> @out () to $@callee_guaranteed <A> in () -> @out A for <()>
+  %1 = convert_function %0 : $@callee_guaranteed () -> @out () to $@callee_guaranteed @substituted <A> () -> @out A for <()>
   %2 = alloc_stack $()
-  apply %1(%2) : $@callee_guaranteed <A> in () -> @out A for <()>
+  apply %1(%2) : $@callee_guaranteed @substituted <A> () -> @out A for <()>
   dealloc_stack %2 : $*()
   return undef : $()
 }
@@ -3667,10 +3680,10 @@ bb0(%0 : $@callee_guaranteed () -> @out ()):
 // CHECK-LABEL: sil @convert_function_substitution_pa :
 sil @convert_function_substitution_pa : $@convention(thin) (@guaranteed @callee_guaranteed (@in Int, @in Int) -> @out (), @in Int) -> @owned @callee_guaranteed () -> @out () {
 bb0(%0 : $@callee_guaranteed (@in Int, @in Int) -> @out (), %1 : $*Int):
-  %2 = convert_function %0 : $@callee_guaranteed (@in Int, @in Int) -> @out () to $@callee_guaranteed <A, B, C> in (@in A, @in B) -> @out C for <Int, Int, ()>
-  %3 = partial_apply [callee_guaranteed] %2(%1) : $@callee_guaranteed <A, B, C> in (@in A, @in B) -> @out C for <Int, Int, ()>
-  %4 = partial_apply [callee_guaranteed] %3(%1) : $@callee_guaranteed <A, B, C> in (@in A) -> @out C for <Int, Int, ()>
-  %5 = convert_function %4 : $@callee_guaranteed <A, B, C> in () -> @out C for <Int, Int, ()> to $@callee_guaranteed () -> @out ()
+  %2 = convert_function %0 : $@callee_guaranteed (@in Int, @in Int) -> @out () to $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
+  %4 = partial_apply [callee_guaranteed] %3(%1) : $@callee_guaranteed @substituted <A, B, C> (@in A) -> @out C for <Int, Int, ()>
+  %5 = convert_function %4 : $@callee_guaranteed @substituted <A, B, C> () -> @out C for <Int, Int, ()> to $@callee_guaranteed () -> @out ()
   return %5 : $@callee_guaranteed () -> @out ()
 
 }

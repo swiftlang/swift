@@ -2525,22 +2525,24 @@ namespace {
 
 // protocol _ObjectiveCBridgeable {
 struct _ObjectiveCBridgeableWitnessTable : WitnessTable {
+  #define _protocolWitnessSignedPointer(n) \
+    __ptrauth_swift_protocol_witness_function_pointer(SpecialPointerAuthDiscriminators::n##Discriminator) n
+
   static_assert(WitnessTableFirstRequirementOffset == 1,
                 "Witness table layout changed");
 
-  // associatedtype _ObjectiveCType : class
   void *_ObjectiveCType;
 
   // func _bridgeToObjectiveC() -> _ObjectiveCType
   SWIFT_CC(swift)
-  HeapObject *(*bridgeToObjectiveC)(
+  HeapObject *(*_protocolWitnessSignedPointer(bridgeToObjectiveC))(
                 SWIFT_CONTEXT OpaqueValue *self, const Metadata *Self,
                 const _ObjectiveCBridgeableWitnessTable *witnessTable);
 
   // class func _forceBridgeFromObjectiveC(x: _ObjectiveCType,
   //                                       inout result: Self?)
   SWIFT_CC(swift)
-  void (*forceBridgeFromObjectiveC)(
+  void (*_protocolWitnessSignedPointer(forceBridgeFromObjectiveC))(
          HeapObject *sourceValue,
          OpaqueValue *result,
          SWIFT_CONTEXT const Metadata *self,
@@ -2550,7 +2552,7 @@ struct _ObjectiveCBridgeableWitnessTable : WitnessTable {
   // class func _conditionallyBridgeFromObjectiveC(x: _ObjectiveCType,
   //                                              inout result: Self?) -> Bool
   SWIFT_CC(swift)
-  bool (*conditionallyBridgeFromObjectiveC)(
+  bool (*_protocolWitnessSignedPointer(conditionallyBridgeFromObjectiveC))(
          HeapObject *sourceValue,
          OpaqueValue *result,
          SWIFT_CONTEXT const Metadata *self,

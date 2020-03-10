@@ -1043,10 +1043,14 @@ public:
       ::getFromOpaqueValue(reinterpret_cast<void*>(Pointer));
   }
 
-  SILFunction *getSILFunction() const {
-    assert(getKind() == Kind::SILFunction ||
+  bool hasSILFunction() const {
+    return getKind() == Kind::SILFunction ||
            getKind() == Kind::DynamicallyReplaceableFunctionVariable ||
-           getKind() == Kind::DynamicallyReplaceableFunctionKey);
+           getKind() == Kind::DynamicallyReplaceableFunctionKey;
+  }
+
+  SILFunction *getSILFunction() const {
+    assert(hasSILFunction());
     return reinterpret_cast<SILFunction*>(Pointer);
   }
 
@@ -1097,6 +1101,16 @@ public:
     assert(getKind() == Kind::SILFunction);
     return LINKENTITY_GET_FIELD(Data, IsDynamicallyReplaceableImpl);
   }
+  bool isDynamicallyReplaceableKey() const {
+    return getKind() == Kind::DynamicallyReplaceableFunctionKey ||
+      getKind() == Kind::OpaqueTypeDescriptorAccessorKey;
+  }
+  bool isOpaqueTypeDescriptorAccessor() const {
+    return getKind() == Kind::OpaqueTypeDescriptorAccessor ||
+           getKind() == Kind::OpaqueTypeDescriptorAccessorImpl ||
+           getKind() == Kind::OpaqueTypeDescriptorAccessorKey ||
+           getKind() == Kind::OpaqueTypeDescriptorAccessorVar;
+  }
   bool isAllocator() const {
     assert(getKind() == Kind::DynamicallyReplaceableFunctionImpl ||
            getKind() == Kind::DynamicallyReplaceableFunctionKeyAST ||
@@ -1104,6 +1118,7 @@ public:
     return SecondaryPointer != nullptr;
   }
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }
+  bool isContextDescriptor() const;
   CanType getType() const {
     assert(isTypeKind(getKind()));
     return CanType(reinterpret_cast<TypeBase*>(Pointer));

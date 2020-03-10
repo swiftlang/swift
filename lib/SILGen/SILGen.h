@@ -131,6 +131,9 @@ public:
 
   ASTContext &getASTContext() { return M.getASTContext(); }
 
+  llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>
+  MagicFileStringsByFilePath;
+
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
   
@@ -415,6 +418,7 @@ public:
                               AbstractStorageDecl *storage,
                               ArrayRef<ProtocolConformanceRef> indexHashables,
                               CanType baseTy,
+                              DeclContext *useDC,
                               bool forPropertyDescriptor);
 
   /// Known functions for bridging.

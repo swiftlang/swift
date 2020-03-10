@@ -1466,16 +1466,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     LLVM_FALLTHROUGH;
   }
 
-  case tok::pound_filePath:
-    // Check twice because of fallthrough--this is ugly but temporary.
-    if (Tok.is(tok::pound_filePath) && !Context.LangOpts.EnableConcisePoundFile)
-      diagnose(Tok.getLoc(), diag::unknown_pound_expr, "filePath");
-    // Continue since we actually do know how to handle it. This avoids extra
-    // diagnostics.
-    LLVM_FALLTHROUGH;
-
   case tok::pound_column:
   case tok::pound_file:
+  case tok::pound_filePath:
   case tok::pound_function:
   case tok::pound_line:
   case tok::pound_dsohandle: {
@@ -2745,8 +2738,10 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
   for (unsigned i = 0, e = params->size(); i != e; ++i) {
     auto *param = params->get(i);
-    if (!isTupleDestructuring(param))
+    if (!isTupleDestructuring(param)) {
+      param->setDestructured(false);
       continue;
+    }
 
     auto argName = "arg" + std::to_string(i);
 

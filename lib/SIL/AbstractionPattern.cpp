@@ -46,12 +46,13 @@ TypeConverter::getAbstractionPattern(AbstractStorageDecl *decl,
 
 AbstractionPattern
 TypeConverter::getAbstractionPattern(SubscriptDecl *decl, bool isNonObjC) {
+  auto type = decl->getElementInterfaceType()->getCanonicalType();
   CanGenericSignature genericSig;
-  if (auto sig = decl->getGenericSignatureOfContext())
+  if (auto sig = decl->getGenericSignatureOfContext()) {
     genericSig = sig.getCanonicalSignature();
-  return AbstractionPattern(genericSig,
-                            decl->getElementInterfaceType()
-                                ->getCanonicalType());
+    type = sig->getCanonicalTypeInContext(type);
+  }
+  return AbstractionPattern(genericSig, type);
 }
 
 static const clang::Type *getClangType(const clang::Decl *decl) {
@@ -76,12 +77,14 @@ static Bridgeability getClangDeclBridgeability(const clang::Decl *decl) {
 
 AbstractionPattern
 TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
-  CanGenericSignature genericSig;
-  if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
-    genericSig = sig.getCanonicalSignature();
-
   CanType swiftType = var->getInterfaceType()
                          ->getCanonicalType();
+
+  CanGenericSignature genericSig;
+  if (auto sig = var->getDeclContext()->getGenericSignatureOfContext()) {
+    genericSig = sig.getCanonicalSignature();
+    swiftType = genericSig->getCanonicalTypeInContext(swiftType);
+  }
 
   if (isNonObjC)
     return AbstractionPattern(genericSig, swiftType);
@@ -109,12 +112,15 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
          "Optional.Some does not have a unique abstraction pattern because "
          "optionals are re-abstracted");
 
+  CanType type = decl->getArgumentInterfaceType()->getCanonicalType();
+
   CanGenericSignature genericSig;
-  if (auto sig = decl->getParentEnum()->getGenericSignatureOfContext())
+  if (auto sig = decl->getParentEnum()->getGenericSignatureOfContext()) {
     genericSig = sig.getCanonicalSignature();
-  return AbstractionPattern(genericSig,
-                            decl->getArgumentInterfaceType()
-                                ->getCanonicalType());
+    type = genericSig->getCanonicalTypeInContext(type);
+  }
+
+  return AbstractionPattern(genericSig, type);
 }
 
 AbstractionPattern::EncodedForeignErrorInfo

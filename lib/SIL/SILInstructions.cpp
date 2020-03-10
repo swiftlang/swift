@@ -1503,26 +1503,29 @@ CondBranchInst::create(SILDebugLocation Loc, SILValue Condition,
                                        TrueBBCount, FalseBBCount);
 }
 
-SILValue CondBranchInst::getArgForDestBB(const SILBasicBlock *DestBB,
-                                         const SILArgument *Arg) const {
-  return getArgForDestBB(DestBB, Arg->getIndex());
+Operand *CondBranchInst::getOperandForDestBB(const SILBasicBlock *destBlock,
+                                             const SILArgument *arg) const {
+  return getOperandForDestBB(destBlock, arg->getIndex());
 }
 
-SILValue CondBranchInst::getArgForDestBB(const SILBasicBlock *DestBB,
-                                         unsigned ArgIndex) const {
+Operand *CondBranchInst::getOperandForDestBB(const SILBasicBlock *destBlock,
+                                             unsigned argIndex) const {
   // If TrueBB and FalseBB equal, we cannot find an arg for this DestBB so
   // return an empty SILValue.
   if (getTrueBB() == getFalseBB()) {
-    assert(DestBB == getTrueBB() && "DestBB is not a target of this cond_br");
-    return SILValue();
+    assert(destBlock == getTrueBB() &&
+           "DestBB is not a target of this cond_br");
+    return nullptr;
   }
 
-  if (DestBB == getTrueBB())
-    return getAllOperands()[NumFixedOpers + ArgIndex].get();
+  auto *self = const_cast<CondBranchInst *>(this);
+  if (destBlock == getTrueBB()) {
+    return &self->getAllOperands()[NumFixedOpers + argIndex];
+  }
 
-  assert(DestBB == getFalseBB()
-         && "By process of elimination BB must be false BB");
-  return getAllOperands()[NumFixedOpers + getNumTrueArgs() + ArgIndex].get();
+  assert(destBlock == getFalseBB() &&
+         "By process of elimination BB must be false BB");
+  return &self->getAllOperands()[NumFixedOpers + getNumTrueArgs() + argIndex];
 }
 
 void CondBranchInst::swapSuccessors() {

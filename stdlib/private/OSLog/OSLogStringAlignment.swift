@@ -23,8 +23,9 @@ public enum OSLogCollectionBound {
 public struct OSLogStringAlignment {
   /// Minimum number of characters to be displayed. If the value to be printed
   /// is shorter than this number, the result is padded with spaces. The value
-  /// is not truncated even if the result is larger.
-  public var minimumColumnWidth: Int
+  /// is not truncated even if the result is larger.This value need not be a
+  /// compile-time constant, and is therefore an autoclosure.
+  public var minimumColumnWidth: (() -> Int)?
   /// This captures right/left alignment.
   public var anchor: OSLogCollectionBound
 
@@ -36,8 +37,8 @@ public struct OSLogStringAlignment {
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
-  public init(
-    minimumColumnWidth: Int = 0,
+  internal init(
+    minimumColumnWidth: (() -> Int)? = nil,
     anchor: OSLogCollectionBound = .end
   ) {
     self.minimumColumnWidth = minimumColumnWidth
@@ -70,7 +71,9 @@ public struct OSLogStringAlignment {
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
-  public static func right(columns: Int = 0) -> OSLogStringAlignment {
+  public static func right(
+    columns: @escaping @autoclosure () -> Int
+  ) -> OSLogStringAlignment {
     OSLogStringAlignment(minimumColumnWidth: columns, anchor: .end)
   }
 
@@ -78,7 +81,9 @@ public struct OSLogStringAlignment {
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
-  public static func left(columns: Int = 0) -> OSLogStringAlignment {
+  public static func left(
+    columns: @escaping @autoclosure () -> Int
+  ) -> OSLogStringAlignment {
     OSLogStringAlignment(minimumColumnWidth: columns, anchor: .start)
   }
 }

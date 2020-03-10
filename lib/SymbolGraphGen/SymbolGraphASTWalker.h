@@ -60,9 +60,6 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
 
   // MARK: - Utilities
 
-  /// Returns `true` if the symbol should be included as a node in the graph.
-  bool shouldIncludeNode(const Decl *D) const;
-
   /// Get a "sub" symbol graph for the parent module of a type that the main module `M` is extending.
   SymbolGraph &getExtendedModuleSymbolGraph(ModuleDecl *M);
 

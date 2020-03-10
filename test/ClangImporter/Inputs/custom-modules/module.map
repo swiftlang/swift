@@ -59,6 +59,11 @@ module HasSubmodule {
   }
 }
 
+module ImageInitializers {
+  header "ImageInitializers.h"
+  export *
+}
+
 module ImportsMissingHeader {
   header "ImportsMissingHeader.h"
   export *

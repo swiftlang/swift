@@ -56,8 +56,19 @@ using namespace llvm::yaml;
 using StringSet = llvm::StringSet<>;
 using SymbolKind = llvm::MachO::SymbolKind;
 
+static constexpr StringLiteral ObjC2ClassNamePrefix = "_OBJC_CLASS_$_";
+static constexpr StringLiteral ObjC2MetaClassNamePrefix = "_OBJC_METACLASS_$_";
+
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
+}
+
+// If a symbol is implied, we don't need to emit it explictly into the tbd file.
+// e.g. When a symbol is in the `objc-classes` section in a tbd file, a additional
+// symbol with `_OBJC_CLASS_$_` is implied.
+static bool isSymbolImplied(StringRef name) {
+  return name.startswith(ObjC2ClassNamePrefix) ||
+    name.startswith(ObjC2MetaClassNamePrefix);
 }
 
 void TBDGenVisitor::addSymbolInternal(StringRef name,
@@ -65,7 +76,8 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
                                       bool isLinkerDirective) {
   if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
     return;
-  Symbols.addSymbol(kind, name, Targets);
+  if (!isSymbolImplied(name))
+    Symbols.addSymbol(kind, name, Targets);
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(name).second;
     (void)isNewValue;
@@ -1095,7 +1107,11 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
 
   llvm::MachO::Target target(triple);
   file.addTarget(target);
-
+  // Add target variant
+  if (ctx.LangOpts.TargetVariant.hasValue()) {
+    llvm::MachO::Target targetVar(*ctx.LangOpts.TargetVariant);
+    file.addTarget(targetVar);
+  }
   StringSet symbols;
   auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   TBDGenVisitor visitor(file, {target}, &symbols,

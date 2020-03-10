@@ -507,7 +507,7 @@ enum class CompletionKind {
   AfterPoundDirective,
   PlatformConditon,
   AfterIfStmtElse,
-  GenericParams,
+  GenericRequirement,
   PrecedenceGroup,
 };
 

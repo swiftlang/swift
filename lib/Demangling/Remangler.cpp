@@ -1428,23 +1428,24 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
   unreachable("handled inline");
 }
 
-void Remangler::mangleImplSubstitutions(Node *node) {
+void Remangler::mangleImplInvocationSubstitutions(Node *node) {
   unreachable("handled inline");
 }
 
-void Remangler::mangleImplImpliedSubstitutions(Node *node) {
+void Remangler::mangleImplPatternSubstitutions(Node *node) {
   unreachable("handled inline");
 }
 
 void Remangler::mangleImplFunctionType(Node *node) {
   const char *PseudoGeneric = "";
   Node *GenSig = nullptr;
-  Node *GenSubs = nullptr;
-  bool isImplied;
+  Node *PatternSubs = nullptr;
+  Node *InvocationSubs = nullptr;
   for (NodePointer Child : *node) {
     switch (auto kind = Child->getKind()) {
     case Node::Kind::ImplParameter:
     case Node::Kind::ImplResult:
+    case Node::Kind::ImplYield:
     case Node::Kind::ImplErrorResult:
       mangleChildNode(Child, 1);
       break;
@@ -1454,10 +1455,11 @@ void Remangler::mangleImplFunctionType(Node *node) {
     case Node::Kind::DependentGenericSignature:
       GenSig = Child;
       break;
-    case Node::Kind::ImplSubstitutions:
-    case Node::Kind::ImplImpliedSubstitutions:
-      GenSubs = Child;
-      isImplied = kind == Node::Kind::ImplImpliedSubstitutions;
+    case Node::Kind::ImplPatternSubstitutions:
+      PatternSubs = Child;
+      break;
+    case Node::Kind::ImplInvocationSubstitutions:
+      InvocationSubs = Child;
       break;
     default:
       break;
@@ -1465,20 +1467,26 @@ void Remangler::mangleImplFunctionType(Node *node) {
   }
   if (GenSig)
     mangle(GenSig);
-  if (GenSubs) {
+  if (InvocationSubs) {
     Buffer << 'y';
-    mangleChildNodes(GenSubs->getChild(0));
-    if (GenSubs->getNumChildren() >= 2)
-      mangleRetroactiveConformance(GenSubs->getChild(1));
+    mangleChildNodes(InvocationSubs->getChild(0));
+    if (InvocationSubs->getNumChildren() >= 2)
+      mangleRetroactiveConformance(InvocationSubs->getChild(1));
+  }
+  if (PatternSubs) {
+    mangle(PatternSubs->getChild(0));
+    Buffer << 'y';
+    mangleChildNodes(PatternSubs->getChild(1));
+    if (PatternSubs->getNumChildren() >= 3)
+      mangleRetroactiveConformance(PatternSubs->getChild(2));
   }
 
   Buffer << 'I';
 
-  if (GenSubs) {
+  if (PatternSubs)
     Buffer << 's';
-    if (!isImplied)
-      Buffer << 'i';
-  }
+  if (InvocationSubs)
+    Buffer << 'I';
 
   Buffer << PseudoGeneric;
   for (NodePointer Child : *node) {
@@ -1513,11 +1521,16 @@ void Remangler::mangleImplFunctionType(Node *node) {
                         .Case("@convention(objc_method)", 'O')
                         .Case("@convention(closure)", 'K')
                         .Case("@convention(witness_method)", 'W')
+                        .Case("@yield_once", 'A')
+                        .Case("@yield_many", 'G')
                         .Default(0);
         assert(FuncAttr && "invalid impl function attribute");
         Buffer << FuncAttr;
         break;
       }
+      case Node::Kind::ImplYield:
+        Buffer << 'Y';
+        LLVM_FALLTHROUGH;
       case Node::Kind::ImplParameter: {
         char ConvCh =
             llvm::StringSwitch<char>(Child->getFirstChild()->getText())
@@ -1569,6 +1582,10 @@ void Remangler::mangleImplParameter(Node *node) {
 }
 
 void Remangler::mangleImplResult(Node *node) {
+  unreachable("handled inline");
+}
+
+void Remangler::mangleImplYield(Node *node) {
   unreachable("handled inline");
 }
 

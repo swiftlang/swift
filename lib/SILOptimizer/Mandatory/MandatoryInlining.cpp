@@ -15,8 +15,8 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -136,9 +136,8 @@ static void fixupReferenceCounts(
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
       LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-      auto error = checker.checkValue(
-          pai, {BranchPropagatedUser(applySite.getCalleeOperand())}, {},
-          errorBehavior, &leakingBlocks);
+      auto error = checker.checkValue(pai, {applySite.getCalleeOperand()}, {},
+                                      errorBehavior, &leakingBlocks);
       if (error.getFoundLeak()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();

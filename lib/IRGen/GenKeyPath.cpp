@@ -22,6 +22,7 @@
 #include "GenClass.h"
 #include "GenDecl.h"
 #include "GenMeta.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
@@ -362,12 +363,11 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
     isTrivial &= ti.isPOD(ResilienceExpansion::Minimal);
   }
   
-  llvm::Constant *destroy;
+  llvm::Constant *destroy = nullptr;
   llvm::Constant *copy;
   if (isTrivial) {
     // We can use prefab witnesses for handling trivial copying and destruction.
     // A null destructor witness signals that the payload is trivial.
-    destroy = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     copy = IGM.getCopyKeyPathTrivialIndicesFn();
   } else {
     // Generate a destructor for this set of indices.
@@ -500,12 +500,23 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
                                       genericEnv, requirements,
                                       !component.getSubscriptIndices().empty());
   
-  auto witnesses = llvm::ConstantStruct::getAnon({destroy, copy, equals, hash});
-  return new llvm::GlobalVariable(IGM.Module, witnesses->getType(),
-                                  /*constant*/ true,
-                                  llvm::GlobalValue::PrivateLinkage,
-                                  witnesses,
-                                  "keypath_witnesses");
+  ConstantInitBuilder builder(IGM);
+  ConstantStructBuilder fields = builder.beginStruct();
+  auto schemaKeyPath = IGM.getOptions().PointerAuth.KeyPaths;
+  if (destroy)
+    fields.addSignedPointer(destroy, schemaKeyPath,
+                            PointerAuthEntity::Special::KeyPathDestroy);
+  else
+    fields.addNullPointer(IGM.FunctionPtrTy);
+  fields.addSignedPointer(copy, schemaKeyPath,
+                          PointerAuthEntity::Special::KeyPathCopy);
+  fields.addSignedPointer(equals, schemaKeyPath,
+                          PointerAuthEntity::Special::KeyPathEquals);
+  fields.addSignedPointer(hash, schemaKeyPath,
+                          PointerAuthEntity::Special::KeyPathHash);
+  return fields.finishAndCreateGlobal(
+      "keypath_witnesses", IGM.getPointerAlignment(), /*constant*/ true,
+      llvm::GlobalVariable::PrivateLinkage);
 }
 
 /// Information about each index operand for a key path pattern that is used
@@ -794,7 +805,7 @@ emitKeyPathComponent(IRGenModule &IGM,
 
       switch (getClassFieldAccess(IGM, loweredBaseContextTy, property)) {
       case FieldAccess::ConstantDirect: {
-        // Known constant fixed offset.
+        // Known compile-time constant field offset.
         auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(
             IGM, loweredClassTy, property);
         assert(offset && "no constant offset for ConstantDirect field?!");
@@ -804,6 +815,9 @@ emitKeyPathComponent(IRGenModule &IGM,
       case FieldAccess::NonConstantDirect: {
         // A constant offset that's determined at class realization time.
         // We have to load the offset from a global ivar.
+        //
+        // This means the field offset is constant at runtime, but is not known
+        // at compile time.
         auto header = KeyPathComponentHeader
           ::forClassComponentWithUnresolvedIndirectOffset(property->isLet());
         fields.addInt32(header.getData());
@@ -814,10 +828,15 @@ emitKeyPathComponent(IRGenModule &IGM,
       }
       case FieldAccess::ConstantIndirect: {
         // An offset that depends on the instance's generic parameterization,
-        // but whose field offset is at a known vtable offset.
+        // but whose field offset is at a known metadata offset.
         auto header = KeyPathComponentHeader
           ::forClassComponentWithUnresolvedFieldOffset(property->isLet());
         fields.addInt32(header.getData());
+
+        // FIXME: This doesn't support classes with resilient ancestry, because
+        // the offset into the metadata is itself not constant.
+        //
+        // SILGen emits the descriptor as a computed property in this case.
         auto fieldOffset = getClassFieldOffsetOffset(
             IGM, loweredClassTy.getClassOrBoundGenericClass(), property);
         fields.addInt32(fieldOffset.getValue());
@@ -877,9 +896,10 @@ emitKeyPathComponent(IRGenModule &IGM,
   
     // Encode the settability.
     bool settable = kind == KeyPathPatternComponent::Kind::SettableProperty;
+    bool mutating = settable && component.isComputedSettablePropertyMutating();
     KeyPathComponentHeader::ComputedPropertyKind componentKind;
     if (settable) {
-      componentKind = component.isComputedSettablePropertyMutating()
+      componentKind = mutating
         ? KeyPathComponentHeader::SettableMutating
         : KeyPathComponentHeader::SettableNonmutating;
     } else {
@@ -894,6 +914,7 @@ emitKeyPathComponent(IRGenModule &IGM,
     switch (id.getKind()) {
     case KeyPathPatternComponent::ComputedPropertyId::Function: {
       idKind = KeyPathComponentHeader::Pointer;
+      // FIXME: Does this need to be signed?
       auto idRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
         LinkEntity::forSILFunction(id.getFunction(), false));
       

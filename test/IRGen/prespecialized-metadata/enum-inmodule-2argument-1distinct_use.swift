@@ -6,21 +6,21 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
 // CHECK: @"$s4main5ValueOyS2iGWV" = linkonce_odr hidden constant %swift.enum_vwtable { 
-// CHECK-SAME:   i8* bitcast ({{(%swift.opaque\* \(\[[0-9]+ x i8\]\*, \[[0-9]+ x i8\]\*, %swift.type\*\)\* @"\$[a-zA-Z0-9_]+" to i8\*|i8\* \(i8\*, i8\*, %swift.type\*\)\* @__swift_memcpy[0-9]+_[0-9]+ to i8\*)}}), 
-// CHECK-SAME:   i8* bitcast (void (i8*, %swift.type*)* @__swift_noop_void_return to i8*), 
-// CHECK-SAME:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy{{[0-9]+}}_{{[0-9]+}} to i8*), 
-// CHECK-SAME:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy{{[0-9]+}}_{{[0-9]+}} to i8*), 
-// CHECK-SAME:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy{{[0-9]+}}_{{[0-9]+}} to i8*), 
-// CHECK-SAME:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy{{[0-9]+}}_{{[0-9]+}} to i8*), 
-// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, i32, %swift.type*)* @"$s4main5ValueOyS2iGwet" to i8*), 
-// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, i32, %swift.type*)* @"$s4main5ValueOyS2iGwst" to i8*), 
+// CHECK-SAME:   i8* bitcast ({{(%swift.opaque\* \(\[[0-9]+ x i8\]\*, \[[0-9]+ x i8\]\*, %swift.type\*\)\* @"\$[a-zA-Z0-9_]+" to i8\*|[^@]+@__swift_memcpy[0-9]+_[0-9]+[^\)]* to i8\*)}}), 
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@__swift_noop_void_return{{[^)]*}} to i8*), 
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@__swift_memcpy{{[0-9]+}}_{{[0-9]+}}{{[^)]*}} to i8*), 
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@__swift_memcpy{{[0-9]+}}_{{[0-9]+}}{{[^)]*}} to i8*), 
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@__swift_memcpy{{[0-9]+}}_{{[0-9]+}}{{[^)]*}} to i8*), 
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@__swift_memcpy{{[0-9]+}}_{{[0-9]+}}{{[^)]*}} to i8*), 
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOyS2iGwet{{[^)]+}} to i8*), 
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOyS2iGwst{{[^)]+}} to i8*), 
 // CHECK-SAME:   [[INT]] {{[0-9]+}}, 
 // CHECK-SAME:   [[INT]] {{[0-9]+}}, 
 // CHECK-SAME:   i32 {{[0-9]+}}, 
 // CHECK-SAME:   i32 {{[0-9]+}}, 
-// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$s4main5ValueOyS2iGwug" to i8*), 
-// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, %swift.type*)* @"$s4main5ValueOyS2iGwup" to i8*), 
-// CHECK-SAME    i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$s4main5ValueOyS2iGwui" to i8*) 
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOyS2iGwug{{[^)]+}} to i8*), 
+// CHECK-SAME:   i8* bitcast ({{[^@]+}}@"$s4main5ValueOyS2iGwup{{[^)]+}} to i8*), 
+// CHECK-SAME    i8* bitcast ({{[^@]+}}@"$s4main5ValueOyS2iGwui{{[^)]+}} to i8*) 
 // CHECK-SAME: }, align [[ALIGNMENT]]
 // CHECK: @"$s4main5ValueOyS2iGMf" = linkonce_odr hidden constant <{ 
 // CHECK-SAME:   i8**, 
@@ -31,7 +31,9 @@
 // CHECK-SAME:   }> <{ 
 // CHECK-SAME:   i8** getelementptr inbounds (%swift.enum_vwtable, %swift.enum_vwtable* @"$s4main5ValueOyS2iGWV", i32 0, i32 0), 
 // CHECK-SAME:   [[INT]] 513, 
-// CHECK-SAME:   %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main5ValueOMn" to %swift.type_descriptor*), 
+// CHECK-SAME:   %swift.type_descriptor* bitcast (
+// CHECK-SAME:     {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
+// CHECK-SAME:   ), 
 // CHECK-SAME:   %swift.type* @"$sSiN", 
 // CHECK-SAME:   %swift.type* @"$sSiN", 
 // CHECK-SAME:   [[INT]] {{16|8}}, 
@@ -108,11 +110,13 @@ doit()
 // CHECK-SAME:   }
 // CHECK: [[EXIT_NORMAL]]:
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
-// CHECK-SAME: [[INT]] %0, 
-// CHECK-SAME: i8* [[ERASED_TYPE_1]], 
-// CHECK-SAME: i8* [[ERASED_TYPE_2]], 
-// CHECK-SAME: i8* undef, 
-// CHECK-SAME: %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main5ValueOMn" to %swift.type_descriptor*)
-// CHECK-SAME: ) #{{[0-9]+}}
+// CHECK-SAME:     [[INT]] %0, 
+// CHECK-SAME:     i8* [[ERASED_TYPE_1]], 
+// CHECK-SAME:     i8* [[ERASED_TYPE_2]], 
+// CHECK-SAME:     i8* undef, 
+// CHECK-SAME:     %swift.type_descriptor* bitcast (
+// CHECK-SAME:       {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
+// CHECK-SAME:     )
+// CHECK-SAME:   ) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

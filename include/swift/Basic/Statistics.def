@@ -280,6 +280,10 @@ FRONTEND_STATISTIC(SILModule, NumSILGenWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILGenDefaultWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILGenGlobalVariables)
 
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(SILOptimizer, NAME)
+#include "swift/AST/SILOptimizerTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 FRONTEND_STATISTIC(SILModule, NumSILOptFunctions)
 FRONTEND_STATISTIC(SILModule, NumSILOptVtables)
 FRONTEND_STATISTIC(SILModule, NumSILOptWitnessTables)

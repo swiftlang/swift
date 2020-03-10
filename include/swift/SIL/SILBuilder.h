@@ -197,6 +197,8 @@ public:
     assert(F && "cannot create this instruction without a function context");
     return *F;
   }
+  
+  bool isInsertingIntoGlobal() const { return F == nullptr; }
 
   TypeExpansionContext getTypeExpansionContext() const {
     return TypeExpansionContext(getFunction());
@@ -726,6 +728,7 @@ public:
   }
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV) {
+    assert(!LV->getType().isAddress());
     return insert(new (getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV));
   }

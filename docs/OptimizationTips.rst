@@ -21,20 +21,13 @@ Enabling Optimizations
 ======================
 
 The first thing one should always do is to enable optimization. Swift provides
-four different optimization levels:
+three different optimization levels:
 
 - ``-Onone``: This is meant for normal development. It performs minimal
   optimizations and preserves all debug info.
 - ``-O``: This is meant for most production code. The compiler performs
   aggressive optimizations that can drastically change the type and amount of
   emitted code. Debug information will be emitted but will be lossy.
-- ``-Ounchecked``: This is a special optimization mode meant for specific
-  libraries or applications where one is willing to trade safety for
-  performance.  The compiler will remove all overflow checks as well as some
-  implicit type checks.  This is not intended to be used in general since it may
-  result in undetected memory safety issues and integer overflows. Only use this
-  if you have carefully reviewed that your code is safe with respect to integer
-  overflow and type casts.
 - ``-Osize``: This is a special optimization mode where the compiler prioritizes
   code size over performance.
 
@@ -43,8 +36,8 @@ In the Xcode UI, one can modify the current optimization level as follows:
 ...
 
 
-Whole Module Optimizations
-==========================
+Whole Module Optimizations (WMO)
+================================
 
 By default Swift compiles each file individually. This allows Xcode to
 compile multiple files in parallel very quickly. However, compiling
@@ -55,8 +48,11 @@ mode is enabled using the ``swiftc`` command line flag
 ``-whole-module-optimization``. Programs that are compiled in this
 mode will most likely take longer to compile, but may run faster.
 
-This mode can be enabled using the Xcode build setting 'Whole Module Optimization'.
+This mode can be enabled using the Xcode build setting 'Whole Module
+Optimization'.
 
+NOTE: In sections below, for brevity purposes, we will refer to 'Whole
+Module Optimization' by the abbreviation 'WMO'.
 
 Reducing Dynamic Dispatch
 =========================
@@ -167,6 +163,20 @@ assuming ``E``, ``F`` do not have any overriding declarations in the same file:
   func usingF(_ f: F) -> Int {
     return f.myPrivateVar
   }
+
+Advice: If WMO is enabled, use 'internal' when a declaration does not need to be accessed outside of module
+-----------------------------------------------------------------------------------------------------------
+
+WMO (see section above) causes the compiler to compile a module's
+sources all together at once. This allows the optimizer to have module
+wide visibility when compiling individual declarations. Since an
+internal declaration is not visible outside of the current module, the
+optimizer can then infer `final` by automatically discovering all
+potentially overridding declarations.
+
+NOTE: Since in Swift the default access control level is ``internal``
+anyways, by enabling Whole Module Optimization, one can gain
+additional devirtualization without any further work.
 
 Using Container Types Efficiently
 =================================

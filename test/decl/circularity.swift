@@ -102,3 +102,11 @@ class D4 : C4, P1 { // expected-note 2 {{through reference here}}
     super.init(x: x)
   }
 }
+
+// SR-12236
+// N.B. This used to compile in 5.1.
+protocol SR12236 { }
+class SR12236_A { // expected-note {{through reference here}}
+    typealias Nest = SR12236 // expected-error {{circular reference}} expected-note {{through reference here}}
+}
+extension SR12236_A: SR12236_A.Nest { }

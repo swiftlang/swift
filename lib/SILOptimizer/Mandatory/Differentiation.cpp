@@ -926,7 +926,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
               SILFunctionTypeRepresentation::Thin),
           SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
           /*interfaceYields*/ {}, neverResultInfo,
-          /*interfaceErrorResults*/ None, {}, false, context.getASTContext());
+          /*interfaceErrorResults*/ None, {}, {}, context.getASTContext());
       auto fnBuilder = SILOptFunctionBuilder(context.getTransform());
       auto *fatalErrrorJvpFunc = fnBuilder.getOrCreateFunction(
           loc, "_printJVPErrorAndExit", SILLinkage::PublicExternal,
@@ -1007,7 +1007,8 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
             thunkTy->getSubstGenericSignature(), thunkTy->getExtInfo(),
             thunkTy->getCoroutineKind(), thunkTy->getCalleeConvention(),
             thunkTy->getParameters(), {}, {newThunkResult}, {},
-            thunkTy->getSubstitutions(), thunkTy->isGenericSignatureImplied(),
+            thunkTy->getPatternSubstitutions(),
+            thunkTy->getInvocationSubstitutions(),
             thunkTy->getASTContext());
 
         // Construct new curry thunk, returning a `@differentiable` function.

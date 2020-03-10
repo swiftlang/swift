@@ -751,6 +751,15 @@ bool TypeBase::isExistentialWithError() {
   return layout.isExistentialWithError(getASTContext());
 }
 
+bool TypeBase::isStdlibType() {
+  if (auto *NTD = getAnyNominal()) {
+    auto *DC = NTD->getDeclContext();
+    return DC->isModuleScopeContext() &&
+           DC->getParentModule()->isStdlibModule();
+  }
+  return false;
+}
+
 /// Remove argument labels from the function type.
 Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   // If there is nothing to remove, don't.
@@ -1760,21 +1769,48 @@ public:
     if (auto substFunc = dyn_cast<SILFunctionType>(subst)) {
       if (func->getExtInfo() != substFunc->getExtInfo())
         return CanType();
-      
+
+      if (func->getInvocationGenericSignature()
+          || substFunc->getInvocationGenericSignature()) {
+        auto sig = func->getInvocationGenericSignature();
+        if (sig != substFunc->getInvocationGenericSignature())
+          return CanType();
+
+        auto origSubs = func->getPatternSubstitutions();
+        auto substSubs = substFunc->getPatternSubstitutions();
+
+        if ((bool) origSubs != (bool) substSubs)
+          return CanType();
+
+        for (unsigned i : indices(origSubs.getReplacementTypes())) {
+          auto origType =
+            origSubs.getReplacementTypes()[i]->getCanonicalType(sig);
+          auto substType =
+            substSubs.getReplacementTypes()[i]->getCanonicalType(sig);
+
+          auto newType = visit(origType, substType, nullptr, {});
+
+          if (!newType)
+            return CanType();
+
+          // We can test SILFunctionTypes for bindability, but we can't
+          // transform them.
+          assert(newType == substType
+                 && "cannot transform SILFunctionTypes");
+        }
+      }
+
       // Compare substituted function types.
-      if (func->getSubstGenericSignature()
-          || substFunc->getSubstGenericSignature()) {
-        if (func->getSubstGenericSignature()
-              != substFunc->getSubstGenericSignature())
+      if (func->getPatternGenericSignature()
+          || substFunc->getPatternGenericSignature()) {
+        if (func->getPatternGenericSignature()
+              != substFunc->getPatternGenericSignature())
           return CanType();
         
-        auto sig = func->getSubstGenericSignature();
+        auto sig = func->getPatternGenericSignature();
         
-        auto origSubs = func->getSubstitutions();
-        auto substSubs = substFunc->getSubstitutions();
-        
-        if (!origSubs || !substSubs)
-          return CanType();
+        auto origSubs = func->getPatternSubstitutions();
+        auto substSubs = substFunc->getPatternSubstitutions();
         
         for (unsigned i : indices(origSubs.getReplacementTypes())) {
           auto origType =
@@ -3646,10 +3682,17 @@ static Type substType(Type derivedType,
     }
     
     if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
-      if (auto subs = silFnTy->getSubstitutions()) {
+      if (silFnTy->isPolymorphic())
+        return None;
+      if (auto subs = silFnTy->getInvocationSubstitutions()) {
         auto newSubs = subs.subst(substitutions, lookupConformances, options);
-        return silFnTy->withSubstitutions(newSubs);
+        return silFnTy->withInvocationSubstitutions(newSubs);
       }
+      if (auto subs = silFnTy->getPatternSubstitutions()) {
+        auto newSubs = subs.subst(substitutions, lookupConformances, options);
+        return silFnTy->withPatternSubstitutions(newSubs);
+      }
+      return None;
     }
 
     // Special-case TypeAliasType; we need to substitute conformances.
@@ -4171,13 +4214,13 @@ case TypeKind::Id:
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
-    
-    if (auto subs = fnTy->getSubstitutions()) {
+
+    auto updateSubs = [&](SubstitutionMap &subs) -> bool {
       // This interface isn't suitable for updating the substitution map in a
       // substituted SILFunctionType.
       // TODO(SILFunctionType): Is it suitable for any SILFunctionType??
       SmallVector<Type, 4> newReplacements;
-      for (Type type : fnTy->getSubstitutions().getReplacementTypes()) {
+      for (Type type : subs.getReplacementTypes()) {
         auto transformed = type.transformRec(fn);
         assert((type->isEqual(transformed)
                 || (type->hasTypeParameter() && transformed->hasTypeParameter()))
@@ -4186,12 +4229,29 @@ case TypeKind::Id:
         if (!type->isEqual(transformed))
           changed = true;
       }
-      
+
       if (changed) {
-        auto newSubs = SubstitutionMap::get(fnTy->getSubstitutions().getGenericSignature(),
-                                            newReplacements,
-                                            fnTy->getSubstitutions().getConformances());
-        return fnTy->withSubstitutions(newSubs);
+        subs = SubstitutionMap::get(subs.getGenericSignature(),
+                                    newReplacements,
+                                    subs.getConformances());
+      }
+
+      return changed;
+    };
+
+    if (fnTy->isPolymorphic())
+      return fnTy;
+
+    if (auto subs = fnTy->getInvocationSubstitutions()) {
+      if (updateSubs(subs)) {
+        return fnTy->withInvocationSubstitutions(subs);
+      }
+      return fnTy;
+    }
+
+    if (auto subs = fnTy->getPatternSubstitutions()) {
+      if (updateSubs(subs)) {
+        return fnTy->withPatternSubstitutions(subs);
       }
       return fnTy;
     }
@@ -4224,7 +4284,7 @@ case TypeKind::Id:
     if (!changed) return *this;
 
     return SILFunctionType::get(
-        fnTy->getSubstGenericSignature(),
+        fnTy->getInvocationGenericSignature(),
         fnTy->getExtInfo(),
         fnTy->getCoroutineKind(),
         fnTy->getCalleeConvention(),
@@ -4233,7 +4293,7 @@ case TypeKind::Id:
         transInterfaceResults,
         transErrorResult,
         SubstitutionMap(),
-        /*genericSigIsImplied*/ false,
+        SubstitutionMap(),
         Ptr->getASTContext(),
         fnTy->getWitnessMethodConformanceOrInvalid());
   }
@@ -5178,13 +5238,37 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
 }
 
 CanSILFunctionType
-SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
-  return SILFunctionType::get(getSubstGenericSignature(),
+SILFunctionType::withInvocationSubstitutions(SubstitutionMap subs) const {
+  subs = subs.getCanonical();
+  if (subs == getInvocationSubstitutions())
+    return CanSILFunctionType(const_cast<SILFunctionType*>(this));
+
+  assert(!subs || CanGenericSignature(subs.getGenericSignature())
+                    == getInvocationGenericSignature());
+  return SILFunctionType::get(getInvocationGenericSignature(),
                           getExtInfo(), getCoroutineKind(),
                           getCalleeConvention(),
                           getParameters(), getYields(), getResults(),
                           getOptionalErrorResult(),
-                          subs.getCanonical(), isGenericSignatureImplied(),
+                          getPatternSubstitutions(), subs,
+                          const_cast<SILFunctionType*>(this)->getASTContext(),
+                          getWitnessMethodConformanceOrInvalid());
+}
+
+CanSILFunctionType
+SILFunctionType::withPatternSubstitutions(SubstitutionMap subs) const {
+  subs = subs.getCanonical();
+  if (subs == getPatternSubstitutions())
+    return CanSILFunctionType(const_cast<SILFunctionType*>(this));
+
+  assert(!subs || CanGenericSignature(subs.getGenericSignature())
+                    == getPatternGenericSignature());
+  return SILFunctionType::get(getInvocationGenericSignature(),
+                          getExtInfo(), getCoroutineKind(),
+                          getCalleeConvention(),
+                          getParameters(), getYields(), getResults(),
+                          getOptionalErrorResult(),
+                          subs, getInvocationSubstitutions(),
                           const_cast<SILFunctionType*>(this)->getASTContext(),
                           getWitnessMethodConformanceOrInvalid());
 }

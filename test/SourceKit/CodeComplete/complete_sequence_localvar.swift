@@ -5,11 +5,11 @@ func test() {
 }
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=3:1 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=3:1 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=3:1 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=3:1 %s -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=3:1 %s -- %s | %FileCheck %s
+// RUN:   -req=complete -pos=3:1 %s -- %s == \
+// RUN:   -req=complete -pos=3:1 %s -- %s == \
+// RUN:   -req=complete -pos=3:1 %s -- %s == \
+// RUN:   -req=complete -pos=3:1 %s -- %s == \
+// RUN:   -req=complete -pos=3:1 %s -- %s | %FileCheck %s
 
 // CHECK-NOT: key.name: "localVar"
 // CHECK-NOT: key.name: "afterVar"
