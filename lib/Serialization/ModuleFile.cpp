@@ -2694,6 +2694,17 @@ void ModuleFile::getTopLevelDecls(
   }
 }
 
+void ModuleFile::getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) {
+  PrettyStackTraceModuleFile stackEntry(*this);
+  if (!OperatorDecls)
+    return;
+
+  for (auto entry : OperatorDecls->data()) {
+    for (auto item : entry)
+      results.push_back(cast<OperatorDecl>(getDecl(item.second)));
+  }
+}
+
 void ModuleFile::getPrecedenceGroups(
        SmallVectorImpl<PrecedenceGroupDecl*> &results) {
   PrettyStackTraceModuleFile stackEntry(*this);

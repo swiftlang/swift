@@ -620,6 +620,12 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const;
 
+  /// Finds all operator decls of this module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const;
+
   /// Finds all precedence group decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.

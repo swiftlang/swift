@@ -829,6 +829,9 @@ public:
          SmallVectorImpl<Decl*> &Results,
          llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
+  /// Adds all operators to the given vector.
+  void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &Results);
+
   /// Adds all precedence groups to the given vector.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results);
 

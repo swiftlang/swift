@@ -745,18 +745,36 @@ void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   Results.append(decls.begin(), decls.end());
 }
 
+void ModuleDecl::getOperatorDecls(
+    SmallVectorImpl<OperatorDecl *> &results) const {
+  // For a parsed module, we can check the source cache on the module rather
+  // than doing an O(N) search over the source files.
+  if (isParsedModule(this)) {
+    getSourceLookupCache().getOperatorDecls(results);
+    return;
+  }
+  FORWARD(getOperatorDecls, (results));
+}
+
+void SourceFile::getOperatorDecls(
+       SmallVectorImpl<OperatorDecl*> &results) const {
+  getCache().getOperatorDecls(results);
+}
+
 void ModuleDecl::getPrecedenceGroups(
-       SmallVectorImpl<PrecedenceGroupDecl*> &Results) const {
-  FORWARD(getPrecedenceGroups, (Results));
+       SmallVectorImpl<PrecedenceGroupDecl*> &results) const {
+  // For a parsed module, we can check the source cache on the module rather
+  // than doing an O(N) search over the source files.
+  if (isParsedModule(this)) {
+    getSourceLookupCache().getPrecedenceGroups(results);
+    return;
+  }
+  FORWARD(getPrecedenceGroups, (results));
 }
 
 void SourceFile::getPrecedenceGroups(
-       SmallVectorImpl<PrecedenceGroupDecl*> &Results) const {
-  for (auto pair : PrecedenceGroups) {
-    if (pair.second.getPointer() && pair.second.getInt()) {
-      Results.push_back(pair.second.getPointer());
-    }
-  }
+       SmallVectorImpl<PrecedenceGroupDecl*> &results) const {
+  getCache().getPrecedenceGroups(results);
 }
 
 void SourceFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {

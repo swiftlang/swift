@@ -449,6 +449,9 @@ public:
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void
+  getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const override;
+
+  virtual void
   getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &results) const override;
 
   virtual TypeDecl *lookupLocalType(llvm::StringRef MangledName) const override;

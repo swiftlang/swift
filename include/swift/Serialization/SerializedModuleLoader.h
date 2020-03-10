@@ -385,6 +385,9 @@ public:
       llvm::function_ref<bool(DeclAttributes)> matchAttributes) const override;
 
   virtual void
+  getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const override;
+
+  virtual void
   getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const override;
 
   virtual void
