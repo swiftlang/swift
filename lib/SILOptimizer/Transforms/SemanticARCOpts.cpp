@@ -769,7 +769,6 @@ struct SemanticARCOptVisitor
   FORWARDING_TERM(SwitchEnum)
   FORWARDING_TERM(CheckedCastBranch)
   FORWARDING_TERM(Branch)
-  FORWARDING_TERM(CondBranch)
 #undef FORWARDING_TERM
 
   bool isWrittenTo(LoadInst *li, const LiveRange &lr);
