@@ -126,11 +126,6 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
     return CaptureKind::Box;
   }
 
-  // For 'let' constants
-  if (!var->supportsMutation()) {
-    return CaptureKind::Immutable;
-  }
-
   // If we're capturing into a non-escaping closure, we can generally just
   // capture the address of the value as no-escape.
   return (capture.isNoEscape()
