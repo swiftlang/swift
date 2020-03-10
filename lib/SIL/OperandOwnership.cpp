@@ -435,27 +435,9 @@ OperandOwnershipKindClassifier::visitBranchInst(BranchInst *bi) {
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitCondBranchInst(CondBranchInst *cbi) {
-  // If our conditional branch is the condition, it is trivial. Check that the
-  // ownership kind is trivial.
-  if (cbi->isConditionOperandIndex(getOperandIndex()))
-    return Map::allLive();
-
-  // Otherwise, make sure that our operand matches the ownership of the relevant
-  // argument.
-  //
-  // TODO: Use more updated APIs here to get the operands/etc.
-  if (cbi->isTrueOperandIndex(getOperandIndex())) {
-    unsigned trueOffset = 1;
-    return checkTerminatorArgumentMatchesDestBB(cbi->getTrueBB(),
-                                                getOperandIndex() - trueOffset);
-  }
-
-  assert(cbi->isFalseOperandIndex(getOperandIndex()) &&
-         "If an operand is not the condition index or a true operand index, it "
-         "must be a false operand index");
-  unsigned falseOffset = 1 + cbi->getTrueOperands().size();
-  return checkTerminatorArgumentMatchesDestBB(cbi->getFalseBB(),
-                                              getOperandIndex() - falseOffset);
+  // In ossa, cond_br insts are not allowed to take non-trivial values. Thus, we
+  // just accept anything since we know all of our operands will be trivial.
+  return Map::allLive();
 }
 
 OperandOwnershipKindMap

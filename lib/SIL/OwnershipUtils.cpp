@@ -42,7 +42,6 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::SelectEnumInst:
   case SILNodeKind::SwitchEnumInst:
   case SILNodeKind::CheckedCastBranchInst:
-  case SILNodeKind::CondBranchInst:
   case SILNodeKind::DestructureStructInst:
   case SILNodeKind::DestructureTupleInst:
   case SILNodeKind::MarkDependenceInst:
