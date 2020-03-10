@@ -54,9 +54,13 @@ class LiveRange {
   /// A list of destroy_values of the live range.
   SmallVector<Operand *, 2> destroyingUses;
 
-  /// A list of forwarding instructions that forward our destroys ownership, but
-  /// that are also able to forward guaranteed ownership.
-  SmallVector<Operand *, 2> generalForwardingUses;
+  /// A list of forwarding instructions that forward owned ownership, but that
+  /// are also able to be converted to guaranteed ownership. If we are able to
+  /// eliminate this LiveRange due to it being from a guaranteed value, we must
+  /// flip the ownership of all of these instructions to guaranteed from owned.
+  ///
+  /// Corresponds to isOwnershipForwardingInst(...).
+  SmallVector<Operand *, 2> ownershipForwardingUses;
 
   /// Consuming uses that we were not able to understand as a forwarding
   /// instruction or a destroy_value. These must be passed a strongly control
@@ -113,8 +117,8 @@ public:
 
   OwnedValueIntroducer getIntroducer() const { return introducer; }
 
-  ArrayRef<Operand *> getNonConsumingForwardingUses() const {
-    return generalForwardingUses;
+  ArrayRef<Operand *> getOwnershipForwardingUses() const {
+    return ownershipForwardingUses;
   }
 
   void convertOwnedGeneralForwardingUsesToGuaranteed();
@@ -185,7 +189,7 @@ LiveRange::DestroyingInstsRange LiveRange::getDestroyingInsts() const {
 
 LiveRange::LiveRange(SILValue value)
     : introducer(*OwnedValueIntroducer::get(value)), destroyingUses(),
-      generalForwardingUses(), unknownConsumingUses() {
+      ownershipForwardingUses(), unknownConsumingUses() {
   assert(introducer.value.getOwnershipKind() == ValueOwnershipKind::Owned);
 
   // We know that our silvalue produces an @owned value. Look through all of our
@@ -246,7 +250,7 @@ LiveRange::LiveRange(SILValue value)
 
     // Ok, this is a forwarding instruction whose ownership we can flip from
     // owned -> guaranteed.
-    generalForwardingUses.push_back(op);
+    ownershipForwardingUses.push_back(op);
 
     // If we have a non-terminator, just visit its users recursively to see if
     // the the users force the live range to be alive.
@@ -336,8 +340,8 @@ void LiveRange::insertEndBorrowsAtDestroys(
 }
 
 void LiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() {
-  while (!generalForwardingUses.empty()) {
-    auto *i = generalForwardingUses.pop_back_val()->getUser();
+  while (!ownershipForwardingUses.empty()) {
+    auto *i = ownershipForwardingUses.pop_back_val()->getUser();
 
     // If this is a term inst, just convert all of its incoming values that are
     // owned to be guaranteed.
