@@ -78,6 +78,7 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 @_silgen_name("swift_getMangledTypeName")
 public func _getMangledTypeName(_ type: Any.Type)
   -> (UnsafePointer<UInt8>, Int)
