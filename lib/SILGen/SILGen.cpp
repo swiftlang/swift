@@ -75,12 +75,8 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
               SILGenModule &SGM,
               Identifier moduleName,
               StringRef functionName,
-              Optional<std::initializer_list<Type>> inputTypes,
-              Optional<Type> outputType) {
-  // FIXME: the optionality of outputType and the presence of trustInputTypes
-  // are hacks for cases where coming up with those types is complicated, i.e.,
-  // when dealing with generic bridging functions.
-
+              std::initializer_list<Type> inputTypes,
+              Type outputType) {
   if (!cacheSlot) {
     ASTContext &ctx = SGM.M.getASTContext();
     ModuleDecl *mod = ctx.getLoadedModule(moduleName);
@@ -122,21 +118,18 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
       return SGM.Types.getLoweredType(ty, TypeExpansionContext::minimal());
     };
 
-    if (inputTypes) {
-      if (fnConv.hasIndirectSILResults()
-          || funcTy->getNumParameters() != inputTypes->size()
-          || !std::equal(
-                 fnConv.getParameterSILTypes().begin(),
-                 fnConv.getParameterSILTypes().end(),
-                 makeTransformIterator(inputTypes->begin(), toSILType))) {
-        SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
-                     moduleName.str(), functionName);
-        llvm::report_fatal_error("unable to set up the ObjC bridge!");
-      }
+    if (fnConv.hasIndirectSILResults()
+        || funcTy->getNumParameters() != inputTypes.size()
+        || !std::equal(
+               fnConv.getParameterSILTypes().begin(),
+               fnConv.getParameterSILTypes().end(),
+               makeTransformIterator(inputTypes.begin(), toSILType))) {
+      SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
+                   moduleName.str(), functionName);
+      llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
-    if (outputType
-        && fnConv.getSingleSILResultType() != toSILType(*outputType)) {
+    if (fnConv.getSingleSILResultType() != toSILType(outputType)) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName.str(), functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
@@ -153,16 +146,15 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
   return *cacheSlot;
 }
 
-#define REQUIRED(X) { Types.get##X##Type() }
-#define OPTIONAL(X) { OptionalType::get(Types.get##X##Type()) }
-#define GENERIC(X) None
+#define REQUIRED(X) Types.get##X##Type()
+#define OPTIONAL(X) OptionalType::get(Types.get##X##Type())
 
 #define GET_BRIDGING_FN(Module, FromKind, FromTy, ToKind, ToTy) \
   SILDeclRef SILGenModule::get##FromTy##To##ToTy##Fn() { \
     return getBridgingFn(FromTy##To##ToTy##Fn, *this, \
                          getASTContext().Id_##Module, \
                          "_convert" #FromTy "To" #ToTy, \
-                         FromKind(FromTy), \
+                         { FromKind(FromTy) }, \
                          ToKind(ToTy)); \
   }
 
@@ -178,7 +170,6 @@ GET_BRIDGING_FN(WinSDK, REQUIRED, WindowsBool, REQUIRED, Bool)
 #undef GET_BRIDGING_FN
 #undef REQUIRED
 #undef OPTIONAL
-#undef GENERIC
 
 static FuncDecl *diagnoseMissingIntrinsic(SILGenModule &sgm,
                                           SILLocation loc,
