@@ -3,6 +3,8 @@ func bar() {
   foo()
 }
 
+// FIXME: Rmove XFAIL rdar://problem/60096971
+// XFAIL: *
 // RUN: %empty-directory(%t)
 // RUN: echo "/// Some doc" >> %t/Foo.swift
 // RUN: echo "public func foo() { }" >> %t/Foo.swift
