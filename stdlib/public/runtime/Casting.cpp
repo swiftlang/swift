@@ -2876,37 +2876,14 @@ id _bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 extern "C" const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
 #endif
 
-struct ObjCBridgeConformanceMemo {
-  // TODO: If asserts are not being compiled, don't allocate this extra var
-  const Metadata *destType;
-  const _ObjectiveCBridgeableWitnessTable *destBridgeWitness;
-  swift_once_t fetchWitnessOnce;
-
-  const _ObjectiveCBridgeableWitnessTable *
-  findBridgeWitness(const Metadata *T) {
-    struct SetupData {
-      const Metadata *destType;
-      struct ObjCBridgeConformanceMemo *memo;
-    } setupData { T, this };
-
-    swift_once(&fetchWitnessOnce,
-               [](void *data) {
-                 struct SetupData *setupData = (struct SetupData *)data;
-                 struct ObjCBridgeConformanceMemo *memo = setupData->memo;
-                 // Check that this always gets called with the same destType.
-                 assert((memo->destType == nullptr) || (memo->destType == setupData->destType));
-                 memo->destType = setupData->destType;
-                 auto w = swift_conformsToProtocol(
-                   memo->destType, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable));
-                 memo->destBridgeWitness =
-                   reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
-               }, (void *)&setupData);
-    return destBridgeWitness;
-  }
-};
-
 /// Nominal type descriptor for Swift.String.
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
+
+static const _ObjectiveCBridgeableWitnessTable *
+swift_conformsToObjectiveCBridgeable(const Metadata *T) {
+  return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>
+    (swift_conformsToProtocol(T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable)));
+}
 
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
@@ -2914,14 +2891,15 @@ findBridgeWitness(const Metadata *T) {
   // Swift.String is the most heavily used bridge because of the prevalence of
   // string-keyed dictionaries in Obj-C.  It's worth burning a few words of static
   // storage to avoid repeatedly looking up this conformance.
-  if (T->getKind() == MetadataKind::Struct
-      && (cast<StructMetadata>(T)->Description == &NOMINAL_TYPE_DESCR_SYM(SS))) {
-    static ObjCBridgeConformanceMemo memo;
-    return memo.findBridgeWitness(T);
+  if (T->getKind() == MetadataKind::Struct) {
+    auto structDescription = cast<StructMetadata>(T)->Description;
+    if (structDescription == &NOMINAL_TYPE_DESCR_SYM(SS)) {
+      static auto *Swift_String_ObjectiveCBridgeable = swift_conformsToObjectiveCBridgeable(T);
+      return Swift_String_ObjectiveCBridgeable;
+    }
   }
 
-  auto w = swift_conformsToProtocol(T,
-                                &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable));
+  auto w = swift_conformsToObjectiveCBridgeable(T);
   if (LLVM_LIKELY(w))
     return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
   // Class and ObjC existential metatypes can be bridged, but metatypes can't
