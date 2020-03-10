@@ -398,6 +398,9 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
 
+  // Cleanup after SILGen: remove trivial copies to temporaries.
+  P.addTempRValueOpt();
+  // Cleanup after SILGen: remove unneeded borrows/copies.
   P.addSemanticARCOpts();
 
   // SWIFT_ENABLE_TENSORFLOW
@@ -409,10 +412,12 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   if (P.getOptions().StripOwnershipAfterSerialization)
     P.addNonTransparentFunctionOwnershipModelEliminator();
 
-  // Start by cloning functions from stdlib.
+  // Start by linking in referenced functions from other modules.
   P.addPerformanceSILLinker();
 
-  // Cleanup after SILGen: remove trivial copies to temporaries.
+  // Cleanup after SILGen: remove trivial copies to temporaries. This version of
+  // temp-rvalue opt is here so that we can hit copies from non-ossa code that
+  // is linked in from the stdlib.
   P.addTempRValueOpt();
 
   // Add the outliner pass (Osize).

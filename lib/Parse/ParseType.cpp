@@ -371,10 +371,12 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   parseTypeAttributeList(specifier, specifierLoc, attrs);
 
   Optional<Scope> GenericsScope;
+  Optional<Scope> patternGenericsScope;
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
-  bool isImplied = false;
+  SourceLoc substitutedLoc;
+  GenericParamList *patternGenerics = nullptr;
   if (isInSILMode()) {
     // If this is part of a sil function decl, generic parameters are visible in
     // the function body; otherwise, they are visible when parsing the type.
@@ -382,11 +384,24 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
     
-    isImplied = consumeIf(tok::kw_in);
+    if (Tok.is(tok::at_sign) && peekToken().getText() == "substituted") {
+      consumeToken(tok::at_sign);
+      substitutedLoc = consumeToken(tok::identifier);
+      patternGenericsScope.emplace(this, ScopeKind::Generics);
+      patternGenerics = maybeParseGenericParams().getPtrOrNull();
+      if (!patternGenerics) {
+        diagnose(Tok.getLoc(), diag::sil_function_subst_expected_generics);
+        patternGenericsScope.reset();
+      }
+    }
   }
   
   // In SIL mode, parse box types { ... }.
   if (isInSILMode() && Tok.is(tok::l_brace)) {
+    if (patternGenerics) {
+      diagnose(Tok.getLoc(), diag::sil_function_subst_expected_function);
+      patternGenericsScope.reset();
+    }
     return parseSILBoxType(generics, attrs, GenericsScope);
   }
 
@@ -482,45 +497,81 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     }
     
     // Parse substitutions for substituted SIL types.
-    SourceLoc SubsLAngleLoc, SubsRAngleLoc;
-    MutableArrayRef<TypeRepr *> SubsTypes;
-    if (isInSILMode() && consumeIf(tok::kw_for)) {
-      if (!startsWithLess(Tok)) {
-        diagnose(Tok, diag::sil_function_subst_expected_l_angle);
-        return makeParserError();
-      }
-      
-      SubsLAngleLoc = consumeStartingLess();
+    MutableArrayRef<TypeRepr *> invocationSubsTypes;
+    MutableArrayRef<TypeRepr *> patternSubsTypes;
+    if (isInSILMode()) {
+      auto parseSubstitutions =
+          [&](MutableArrayRef<TypeRepr*> &subs) -> Optional<bool> {
+        if (!consumeIf(tok::kw_for)) return None;
 
-      SmallVector<TypeRepr*, 4> SubsTypesVec;
-      for (;;) {
-        auto argTy = parseType();
-        if (!argTy.getPtrOrNull())
+        if (!startsWithLess(Tok)) {
+          diagnose(Tok, diag::sil_function_subst_expected_l_angle);
+          return false;
+        }
+
+        consumeStartingLess();
+
+        SmallVector<TypeRepr*, 4> SubsTypesVec;
+        for (;;) {
+          auto argTy = parseType();
+          if (!argTy.getPtrOrNull())
+            return false;
+          SubsTypesVec.push_back(argTy.get());
+          if (consumeIf(tok::comma))
+            continue;
+          break;
+        }
+        if (!startsWithGreater(Tok)) {
+          diagnose(Tok, diag::sil_function_subst_expected_r_angle);
+          return false;
+        }
+        consumeStartingGreater();
+
+        subs = Context.AllocateCopy(SubsTypesVec);
+        return true;
+      };
+
+      // Parse pattern substitutions.  These must exist if we had pattern
+      // generics above.
+      if (patternGenerics) {
+        // These substitutions are outside of the scope of the
+        // pattern generics.
+        patternGenericsScope.reset();
+
+        auto result = parseSubstitutions(patternSubsTypes);
+        if (!result || patternSubsTypes.empty()) {
+          diagnose(Tok, diag::sil_function_subst_expected_subs);
+          patternGenerics = nullptr;
+        } else if (!*result) {
           return makeParserError();
-        SubsTypesVec.push_back(argTy.get());
-        if (consumeIf(tok::comma))
-          continue;
-        break;
+        }
       }
-      if (!startsWithGreater(Tok)) {
-        diagnose(Tok, diag::sil_function_subst_expected_r_angle);
+
+      if (generics) {
+        // These substitutions are outside of the scope of the
+        // invocation generics.
+        GenericsScope.reset();
+
+        if (auto result = parseSubstitutions(invocationSubsTypes))
+          if (!*result) return makeParserError();
+      }
+
+      if (Tok.is(tok::kw_for)) {
+        diagnose(Tok, diag::sil_function_subs_without_generics);
         return makeParserError();
       }
-      
-      SubsRAngleLoc = consumeStartingGreater();
-
-      SubsTypes = Context.AllocateCopy(SubsTypesVec);
     }
 
     tyR = new (Context) FunctionTypeRepr(generics, argsTyR, throwsLoc, arrowLoc,
                                          SecondHalf.get(),
-                                         isImplied,
-                                         SubsTypes);
-  } else if (generics) {
+                                         patternGenerics, patternSubsTypes,
+                                         invocationSubsTypes);
+  } else if (auto firstGenerics = generics ? generics : patternGenerics) {
     // Only function types may be generic.
-    auto brackets = generics->getSourceRange();
+    auto brackets = firstGenerics->getSourceRange();
     diagnose(brackets.Start, diag::generic_non_function);
     GenericsScope.reset();
+    patternGenericsScope.reset();
 
     // Forget any generic parameters we saw in the type.
     class EraseTypeParamWalker : public ASTWalker {

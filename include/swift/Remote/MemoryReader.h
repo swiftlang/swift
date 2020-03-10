@@ -61,6 +61,50 @@ public:
                      sizeof(IntegerType));
   }
 
+  /// Attempts to read an integer of the specified size from the given
+  /// address in the remote process.
+  ///
+  /// Returns false if the operation failed, the request size is not
+  /// 1, 2, 4, or 8, or the request size is larger than the provided destination.
+  template <typename IntegerType>
+  bool readInteger(RemoteAddress address, size_t bytes, IntegerType *dest) {
+    if (bytes > sizeof(IntegerType))
+      return false;
+    switch (bytes) {
+    case 1: {
+      uint8_t n;
+      if (!readInteger(address, &n))
+        return false;
+      *dest = n;
+      break;
+    }
+    case 2: {
+      uint16_t n;
+      if (!readInteger(address, &n))
+        return false;
+      *dest = n;
+      break;
+    }
+    case 4: {
+      uint32_t n;
+      if (!readInteger(address, &n))
+        return false;
+      *dest = n;
+      break;
+    }
+    case 8: {
+      uint64_t n;
+      if (!readInteger(address, &n))
+        return false;
+      *dest = n;
+      break;
+    }
+    default:
+      return false;
+    }
+    return true;
+  }
+
   /// Attempts to read 'size' bytes from the given address in the remote process.
   ///
   /// Returns a pointer to the requested data and a function that must be called to
@@ -125,6 +169,65 @@ public:
     return resolvePointer(address, pointerData);
   }
           
+
+  // Parse extra inhabitants stored in a pointer.
+  // Sets *extraInhabitant to -1 if the pointer at this address
+  // is actually a valid pointer.
+  // Otherwise, it sets *extraInhabitant to the inhabitant
+  // index (counting from 0).
+  bool readHeapObjectExtraInhabitantIndex(RemoteAddress address,
+                                          int *extraInhabitantIndex) {
+    uint8_t PointerSize;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize,
+                         nullptr, &PointerSize)) {
+      return false;
+    }
+    uint64_t LeastValidPointerValue;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetLeastValidPointerValue,
+                         nullptr, &LeastValidPointerValue)) {
+      return false;
+    }
+    uint8_t ObjCReservedLowBits;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetObjCReservedLowBits,
+                         nullptr, &ObjCReservedLowBits)) {
+      return false;
+    }
+    uint64_t RawPointerValue;
+    if (!readInteger(address, PointerSize, &RawPointerValue)) {
+      return false;
+    }
+    if (RawPointerValue >= LeastValidPointerValue) {
+      *extraInhabitantIndex = -1; // Valid value, not an XI
+    } else {
+      *extraInhabitantIndex = (RawPointerValue >> ObjCReservedLowBits);
+    }
+    return true;
+  }
+
+  bool readFunctionPointerExtraInhabitantIndex(RemoteAddress address,
+                                               int *extraInhabitantIndex) {
+    uint8_t PointerSize;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize,
+                         nullptr, &PointerSize)) {
+      return false;
+    }
+    uint64_t LeastValidPointerValue;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetLeastValidPointerValue,
+                         nullptr, &LeastValidPointerValue)) {
+      return false;
+    }
+    uint64_t RawPointerValue;
+    if (!readInteger(address, PointerSize, &RawPointerValue)) {
+      return false;
+    }
+    if (RawPointerValue >= LeastValidPointerValue) {
+      *extraInhabitantIndex = -1; // Valid value, not an XI
+    } else {
+      *extraInhabitantIndex = RawPointerValue;
+    }
+    return true;
+  }
+
   virtual ~MemoryReader() = default;
 };
 

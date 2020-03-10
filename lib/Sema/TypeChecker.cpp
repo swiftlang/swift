@@ -363,7 +363,8 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   // Could build scope maps here because the AST is stable now.
 
   {
-    FrontendStatsTracer tracer(Ctx.Stats, "Type checking and Semantic analysis");
+    FrontendStatsTracer tracer(Ctx.Stats,
+                               "Type checking and Semantic analysis");
 
     if (Ctx.TypeCheckerOpts.SkipNonInlinableFunctionBodies)
       // Disable this optimization if we're compiling SwiftOnoneSupport, because
@@ -412,7 +413,8 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
-  FrontendStatsTracer tracer(Ctx.Stats, "perform-whole-module-type-checking");
+  FrontendStatsTracer tracer(Ctx.Stats,
+                             "perform-whole-module-type-checking");
   diagnoseAttrsRequiringFoundation(SF);
   diagnoseObjCMethodConflicts(SF);
   diagnoseObjCUnsatisfiedOptReqConflicts(SF);

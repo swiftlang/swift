@@ -210,6 +210,10 @@ public:
       return None;
 
     applied.returnExpr = buildVarRef(bodyVar, stmt->getEndLoc());
+    applied.returnExpr = cs->buildTypeErasedExpr(applied.returnExpr,
+                                                 dc, applied.bodyResultType,
+                                                 CTP_ReturnStmt);
+
     applied.returnExpr = cs->generateConstraints(applied.returnExpr, dc);
     if (!applied.returnExpr) {
       hadError = true;
@@ -259,17 +263,13 @@ protected:
 
       // Generate constraints for the initialization.
       auto target = SolutionApplicationTarget::forInitialization(
-          patternBinding->getInit(index), dc, patternType, pattern);
+          patternBinding->getInit(index), dc, patternType, pattern,
+          /*bindPatternVarsOneWay=*/true);
       if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
         continue;
 
       // Keep track of this binding entry.
       applied.patternBindingEntries.insert({{patternBinding, index}, target});
-
-      // Bind the variables that occur in the pattern to the corresponding
-      // type entry for the pattern itself.
-      cs->bindVariablesInPattern(
-          pattern, cs->getConstraintLocator(target.getAsExpr()));
     }
   }
 
@@ -335,7 +335,7 @@ protected:
       addChild(captureExpr(expr, /*oneWay=*/true, node.get<Expr *>()));
     }
 
-    if (!cs)
+    if (!cs || hadError)
       return nullptr;
 
     // Call Builder.buildBlock(... args ...)
@@ -380,10 +380,6 @@ protected:
   static bool isBuildableIfChainRecursive(IfStmt *ifStmt,
                                           unsigned &numPayloads,
                                           bool &isOptional) {
-    // Check whether we can handle the conditional.
-    if (!ConstraintSystem::canGenerateConstraints(ifStmt->getCond()))
-      return false;
-
     // The 'then' clause contributes a payload.
     numPayloads++;
 
@@ -451,6 +447,14 @@ protected:
                                  unsigned numPayloads, bool isOptional,
                                  bool isTopLevel = false) {
     assert(payloadIndex < numPayloads);
+
+    // First generate constraints for the conditions. This can introduce
+    // variable bindings that will be used within the "then" branch.
+    if (cs && cs->generateConstraints(ifStmt->getCond(), dc)) {
+      hadError = true;
+      return nullptr;
+    }
+
     // Make sure we recursively visit both sides even if we're not
     // building expressions.
 
@@ -505,12 +509,6 @@ protected:
       elseExpr = buildWrappedChainPayload(
           buildVarRef(*elseChainVar, ifStmt->getEndLoc()),
           payloadIndex + 1, numPayloads, isOptional);
-    }
-
-    // Generate constraints for the conditions.
-    if (cs->generateConstraints(ifStmt->getCond(), dc)) {
-      hadError = true;
-      return nullptr;
     }
 
     // The operand should have optional type if we had optional results,
@@ -628,12 +626,107 @@ protected:
         DeclNameLoc(endLoc), /*implicit=*/true);
   }
 
+  VarDecl *visitSwitchStmt(SwitchStmt *switchStmt) {
+    // Generate constraints for the subject expression, and capture its
+    // type for use in matching the various patterns.
+    Expr *subjectExpr = switchStmt->getSubjectExpr();
+    if (cs) {
+      // Form a one-way constraint to prevent backward propagation.
+      subjectExpr = new (ctx) OneWayExpr(subjectExpr);
+
+      // FIXME: Add contextual type purpose for switch subjects?
+      SolutionApplicationTarget target(subjectExpr, dc, CTP_Unused, Type(),
+                                       /*isDiscarded=*/false);
+      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+        hadError = true;
+        return nullptr;
+      }
+
+      cs->setSolutionApplicationTarget(switchStmt, target);
+      subjectExpr = target.getAsExpr();
+      assert(subjectExpr && "Must have a subject expression here");
+    }
+
+    // Generate constraints and capture variables for all of the cases.
+    SmallVector<std::pair<CaseStmt *, VarDecl *>, 4> capturedCaseVars;
+    for (auto *caseStmt : switchStmt->getCases()) {
+      if (auto capturedCaseVar = visitCaseStmt(caseStmt, subjectExpr)) {
+        capturedCaseVars.push_back({caseStmt, capturedCaseVar});
+      }
+    }
+
+    if (!cs)
+      return nullptr;
+
+    // Form the expressions that inject the result of each case into the
+    // appropriate
+    llvm::TinyPtrVector<Expr *> injectedCaseExprs;
+    SmallVector<std::pair<Type, ConstraintLocator *>, 4> injectedCaseTerms;
+    for (unsigned idx : indices(capturedCaseVars)) {
+      auto caseStmt = capturedCaseVars[idx].first;
+      auto caseVar = capturedCaseVars[idx].second;
+
+      // Build the expression that injects the case variable into appropriate
+      // buildEither(first:)/buildEither(second:) chain.
+      Expr *caseVarRef = buildVarRef(caseVar, caseStmt->getEndLoc());
+      Expr *injectedCaseExpr = buildWrappedChainPayload(
+          caseVarRef, idx, capturedCaseVars.size(), /*isOptional=*/false);
+
+      // Generate constraints for this injected case result.
+      injectedCaseExpr = cs->generateConstraints(injectedCaseExpr, dc);
+      if (!injectedCaseExpr) {
+        hadError = true;
+        return nullptr;
+      }
+
+      // Record this injected case expression.
+      injectedCaseExprs.push_back(injectedCaseExpr);
+
+      // Record the type and locator for this injected case expression, to be
+      // used in the "join" constraint later.
+      injectedCaseTerms.push_back(
+        { cs->getType(injectedCaseExpr)->getRValueType(),
+          cs->getConstraintLocator(injectedCaseExpr) });
+    }
+
+    // Form the type of the switch itself.
+    // FIXME: Need a locator for the "switch" statement.
+    Type resultType = cs->addJoinConstraint(nullptr, injectedCaseTerms);
+    if (!resultType) {
+      hadError = true;
+      return nullptr;
+    }
+
+    // Create a variable to capture the result of evaluating the switch.
+    auto switchVar = buildVar(switchStmt->getStartLoc());
+    cs->setType(switchVar, resultType);
+    applied.capturedStmts.insert(
+        {switchStmt, { switchVar, std::move(injectedCaseExprs) } });
+    return switchVar;
+  }
+
+  VarDecl *visitCaseStmt(CaseStmt *caseStmt, Expr *subjectExpr) {
+    // If needed, generate constraints for everything in the case statement.
+    if (cs) {
+      auto locator = cs->getConstraintLocator(
+          subjectExpr, LocatorPathElt::ContextualType());
+      Type subjectType = cs->getType(subjectExpr);
+
+      if (cs->generateConstraints(caseStmt, dc, subjectType, locator)) {
+        hadError = true;
+        return nullptr;
+      }
+    }
+
+    // Translate the body.
+    return visit(caseStmt->getBody());
+  }
+
   CONTROL_FLOW_STMT(Guard)
   CONTROL_FLOW_STMT(While)
   CONTROL_FLOW_STMT(DoCatch)
   CONTROL_FLOW_STMT(RepeatWhile)
   CONTROL_FLOW_STMT(ForEach)
-  CONTROL_FLOW_STMT(Switch)
   CONTROL_FLOW_STMT(Case)
   CONTROL_FLOW_STMT(Catch)
   CONTROL_FLOW_STMT(Break)
@@ -926,30 +1019,9 @@ public:
 
   Stmt *visitIfStmt(IfStmt *ifStmt, FunctionBuilderTarget target) {
     // Rewrite the condition.
-    auto condition = ifStmt->getCond();
-    for (auto &condElement : condition) {
-      switch (condElement.getKind()) {
-      case StmtConditionElement::CK_Availability:
-        continue;
-
-      case StmtConditionElement::CK_Boolean: {
-        auto condExpr = condElement.getBoolean();
-        auto finalCondExpr = rewriteExpr(condExpr);
-
-        // Load the condition if needed.
-        if (finalCondExpr->getType()->hasLValueType()) {
-          finalCondExpr = TypeChecker::addImplicitLoadExpr(ctx, finalCondExpr);
-        }
-
-        condElement.setBoolean(finalCondExpr);
-        continue;
-      }
-
-      case StmtConditionElement::CK_PatternBinding:
-        llvm_unreachable("unhandled statement condition");
-      }
-    }
-    ifStmt->setCond(condition);
+    if (auto condition = rewriteTarget(
+            SolutionApplicationTarget(ifStmt->getCond(), dc)))
+      ifStmt->setCond(*condition->getAsStmtCondition());
 
     assert(target.kind == FunctionBuilderTarget::TemporaryVar);
     auto temporaryVar = target.captured.first;
@@ -1023,6 +1095,74 @@ public:
     return doStmt;
   }
 
+  Stmt *visitSwitchStmt(SwitchStmt *switchStmt, FunctionBuilderTarget target) {
+    // Translate the subject expression.
+    ConstraintSystem &cs = solution.getConstraintSystem();
+    auto subjectTarget =
+        rewriteTarget(*cs.getSolutionApplicationTarget(switchStmt));
+    if (!subjectTarget)
+      return nullptr;
+
+    switchStmt->setSubjectExpr(subjectTarget->getAsExpr());
+
+    // Handle any declaration nodes within the case list first; we'll
+    // handle the cases in a second pass.
+    for (auto child : switchStmt->getRawCases()) {
+      if (auto decl = child.dyn_cast<Decl *>()) {
+        TypeChecker::typeCheckDecl(decl);
+      }
+    }
+
+    // Translate all of the cases.
+    bool limitExhaustivityChecks = false;
+    assert(target.kind == FunctionBuilderTarget::TemporaryVar);
+    auto temporaryVar = target.captured.first;
+    unsigned caseIndex = 0;
+    for (auto caseStmt : switchStmt->getCases()) {
+      if (!visitCaseStmt(
+            caseStmt,
+            FunctionBuilderTarget::forAssign(
+              temporaryVar, {target.captured.second[caseIndex]})))
+        return nullptr;
+
+      // Check restrictions on '@unknown'.
+      if (caseStmt->hasUnknownAttr()) {
+        checkUnknownAttrRestrictions(
+            cs.getASTContext(), caseStmt, /*fallthroughDest=*/nullptr,
+            limitExhaustivityChecks);
+      }
+
+      ++caseIndex;
+    }
+
+    TypeChecker::checkSwitchExhaustiveness(
+        switchStmt, dc, limitExhaustivityChecks);
+
+    return switchStmt;
+  }
+
+  Stmt *visitCaseStmt(CaseStmt *caseStmt, FunctionBuilderTarget target) {
+    // Translate the patterns and guard expressions for each case label item.
+    for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
+      SolutionApplicationTarget caseLabelTarget(&caseLabelItem, dc);
+      if (!rewriteTarget(caseLabelTarget))
+        return nullptr;
+    }
+
+    // Transform the body of the case.
+    auto body = cast<BraceStmt>(caseStmt->getBody());
+    auto captured = takeCapturedStmt(body);
+    auto newInnerBody = cast<BraceStmt>(
+        visitBraceStmt(
+          body,
+          target,
+          FunctionBuilderTarget::forAssign(
+            captured.first, {captured.second.front()})));
+    caseStmt->setBody(newInnerBody);
+
+    return caseStmt;
+  }
+
 #define UNHANDLED_FUNCTION_BUILDER_STMT(STMT) \
   Stmt *visit##STMT##Stmt(STMT##Stmt *stmt, FunctionBuilderTarget target) { \
     llvm_unreachable("Function builders do not allow statement of kind " \
@@ -1037,8 +1177,6 @@ public:
   UNHANDLED_FUNCTION_BUILDER_STMT(DoCatch)
   UNHANDLED_FUNCTION_BUILDER_STMT(RepeatWhile)
   UNHANDLED_FUNCTION_BUILDER_STMT(ForEach)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Switch)
-  UNHANDLED_FUNCTION_BUILDER_STMT(Case)
   UNHANDLED_FUNCTION_BUILDER_STMT(Catch)
   UNHANDLED_FUNCTION_BUILDER_STMT(Break)
   UNHANDLED_FUNCTION_BUILDER_STMT(Continue)
@@ -1168,11 +1306,13 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     func->getBody()->walk(walker);
   }
 
-  // FIXME: check the result
-  cs.matchFunctionBuilder(func, builderType, resultContextType,
-                          resultConstraintKind,
-                          /*calleeLocator=*/cs.getConstraintLocator(fakeAnchor),
-                          /*FIXME:*/cs.getConstraintLocator(fakeAnchor));
+  if (auto result = cs.matchFunctionBuilder(
+          func, builderType, resultContextType, resultConstraintKind,
+          /*calleeLocator=*/cs.getConstraintLocator(fakeAnchor),
+          /*FIXME:*/cs.getConstraintLocator(fakeAnchor))) {
+    if (result->isFailure())
+      return nullptr;
+  }
 
   // Solve the constraint system.
   SmallVector<Solution, 4> solutions;
@@ -1380,6 +1520,11 @@ public:
 
     // Otherwise, recurse into the statement normally.
     return std::make_pair(true, S);
+  }
+
+  /// Ignore patterns.
+  std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
+    return { false, pat };
   }
 };
 

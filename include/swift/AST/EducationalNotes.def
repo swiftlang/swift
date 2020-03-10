@@ -34,4 +34,13 @@ EDUCATIONAL_NOTES(invalid_dynamic_callable_type,
 EDUCATIONAL_NOTES(missing_dynamic_callable_kwargs_method,
                   "dynamic-callable-requirements.md")
 
+EDUCATIONAL_NOTES(property_wrapper_no_value_property,
+                  "property-wrapper-requirements.md")
+EDUCATIONAL_NOTES(property_wrapper_wrong_initial_value_init,
+                  "property-wrapper-requirements.md")
+EDUCATIONAL_NOTES(property_wrapper_failable_init,
+                  "property-wrapper-requirements.md")
+EDUCATIONAL_NOTES(property_wrapper_type_requirement_not_accessible,
+                  "property-wrapper-requirements.md")
+
 #undef EDUCATIONAL_NOTES

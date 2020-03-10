@@ -579,7 +579,10 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
   llvm_unreachable("Unknown decl kind");
 }
 
-const Decl::CachedExternalSourceLocs *Decl::calculateSerializedLocs() const {
+const Decl::CachedExternalSourceLocs *Decl::getSerializedLocs() const {
+  if (CachedSerializedLocs) {
+    return CachedSerializedLocs;
+  }
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
   auto Locs = File->getBasicLocsForDecl(this);
   if (!Locs.hasValue()) {
@@ -595,6 +598,14 @@ Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
   CASE(StartLoc)
   CASE(EndLoc)
 #undef CASE
+
+  for (const auto &LineColumnAndLength : Locs->DocRanges) {
+    auto Start = SM.getLocFromExternalSource(Locs->SourceFilePath,
+      LineColumnAndLength.first.Line,
+      LineColumnAndLength.first.Column);
+    Result->DocRanges.push_back({ Start, LineColumnAndLength.second });
+  }
+
   return Result;
 }
 
@@ -636,10 +647,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   case FileUnitKind::SerializedAST: {
     if (!SerializedOK)
       return SourceLoc();
-    if (!CachedLocs) {
-      CachedLocs = calculateSerializedLocs();
-    }
-    return CachedLocs->Loc;
+    return getSerializedLocs()->Loc;
   }
   case FileUnitKind::Builtin:
   case FileUnitKind::ClangModule:
@@ -797,6 +805,12 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   }
 
   return hasUnderscoredNaming();
+}
+
+bool Decl::isStdlibDecl() const {
+  DeclContext *DC = getDeclContext();
+  return DC->isModuleScopeContext() &&
+         DC->getParentModule()->isStdlibModule();
 }
 
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
@@ -1074,9 +1088,12 @@ void GenericContext::setGenericSignature(GenericSignature genericSig) {
 }
 
 SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
-  if (!isGeneric())
-    return SourceRange();
-  return getGenericParams()->getTrailingWhereClauseSourceRange();
+  if (isGeneric())
+    return getGenericParams()->getTrailingWhereClauseSourceRange();
+  else if (const auto *where = getTrailingWhereClause())
+    return where->getSourceRange();
+
+  return SourceRange();
 }
 
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
@@ -1183,6 +1200,17 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   }
 
   return FirstKind;
+}
+
+ArrayRef<ValueDecl *> ImportDecl::getDecls() const {
+  // If this isn't a scoped import, there's nothing to do.
+  if (getImportKind() == ImportKind::Module)
+    return {};
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<ImportDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ScopedImportLookupRequest{mutableThis}, {});
 }
 
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -3197,8 +3225,7 @@ static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
 static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
                                            AccessLevel access,
                                            const DeclContext *useDC,
-                                           bool treatUsableFromInlineAsPublic,
-                                           bool treatSPIAsPublic) {
+                                           bool treatUsableFromInlineAsPublic) {
   // If access control is disabled in the current context, adjust
   // access level of the current declaration to be as open as possible.
   if (useDC && VD->getASTContext().isAccessControlDisabled())
@@ -3217,10 +3244,6 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     if (!useSF) return access;
     if (useSF->hasTestableOrPrivateImport(access, VD))
       return getMaximallyOpenAccessFor(VD);
-  } else if (!treatSPIAsPublic &&
-             VD->getAttrs().hasAttribute<SPIAccessControlAttr>()) {
-    // Restrict access to SPI decls.
-    return AccessLevel::Internal;
   }
 
   return access;
@@ -3230,18 +3253,15 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
 /// adjust.
 static AccessLevel
 getAdjustedFormalAccess(const ValueDecl *VD, const DeclContext *useDC,
-                        bool treatUsableFromInlineAsPublic,
-                        bool treatSPIAsPublic) {
+                        bool treatUsableFromInlineAsPublic) {
   return getAdjustedFormalAccess(VD, VD->getFormalAccess(), useDC,
-                                 treatUsableFromInlineAsPublic,
-                                 treatSPIAsPublic);
+                                 treatUsableFromInlineAsPublic);
 }
 
 AccessLevel ValueDecl::getEffectiveAccess() const {
   auto effectiveAccess =
     getAdjustedFormalAccess(this, /*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true,
-                            /*treatSPIAsPublic=*/true);
+                            /*treatUsableFromInlineAsPublic=*/true);
 
   // Handle @testable/@_private(sourceFile:)
   switch (effectiveAccess) {
@@ -3308,8 +3328,7 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 
   AccessLevel access =
       getAdjustedFormalAccess(this, useDC,
-                              /*treatUsableFromInlineAsPublic*/false,
-                              /*treatSPIAsPublic=*/false);
+                              /*treatUsableFromInlineAsPublic*/false);
   return access == AccessLevel::Open;
 }
 
@@ -3325,8 +3344,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
                               const DeclContext *useDC,
                               bool treatUsableFromInlineAsPublic) {
   AccessLevel access = getAdjustedFormalAccess(VD, formalAccess, useDC,
-                                               treatUsableFromInlineAsPublic,
-                                               /*treatSPIAsPublic=*/false);
+                                               treatUsableFromInlineAsPublic);
   const DeclContext *resultDC = VD->getDeclContext();
 
   while (!resultDC->isModuleScopeContext()) {
@@ -3341,8 +3359,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     if (auto enclosingNominal = dyn_cast<GenericTypeDecl>(resultDC)) {
       auto enclosingAccess =
           getAdjustedFormalAccess(enclosingNominal, useDC,
-                                  treatUsableFromInlineAsPublic,
-                                  /*treatSPIAsPublic=*/false);
+                                  treatUsableFromInlineAsPublic);
       access = std::min(access, enclosingAccess);
 
     } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(resultDC)) {
@@ -3352,8 +3369,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
         if (nominal->getParentModule() == enclosingExt->getParentModule()) {
           auto nominalAccess =
               getAdjustedFormalAccess(nominal, useDC,
-                                      treatUsableFromInlineAsPublic,
-                                      /*treatSPIAsPublic=*/false);
+                                      treatUsableFromInlineAsPublic);
           access = std::min(access, nominalAccess);
         }
       }
@@ -3373,16 +3389,8 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Internal:
     return AccessScope(resultDC->getParentModule());
   case AccessLevel::Public:
-  case AccessLevel::Open: {
-    if (useDC) {
-      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
-      if (useSF &&
-          VD->getAttrs().hasAttribute<SPIAccessControlAttr>() &&
-          !useSF->isImportedAsSPI(VD))
-        return AccessScope(VD->getModuleContext(), /*private*/false);
-    }
-    return AccessScope::getPublic();
-  }
+  case AccessLevel::Open:
+    return AccessScope::getPublic(VD->isSPI());
   }
 
   llvm_unreachable("unknown access level");
@@ -3411,8 +3419,14 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
   AccessScope accessScope =
       getAccessScopeForFormalAccess(VD, access, useDC,
                                     /*treatUsableFromInlineAsPublic*/false);
-  return accessScope.getDeclContext() == useDC ||
-         AccessScope(useDC).isChildOf(accessScope);
+  if (accessScope.getDeclContext() == useDC) return true;
+  if (!AccessScope(useDC).isChildOf(accessScope)) return false;
+
+  // Check SPI access
+  if (!useDC || !VD->isSPI()) return true;
+  auto useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+  return !useSF || useSF->isImportedAsSPI(VD) ||
+         VD->getDeclContext()->getParentModule() == useDC->getParentModule();
 }
 
 /// Checks if \p VD may be used from \p useDC, taking \@testable and \@_spi
@@ -3488,12 +3502,9 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   }
   case AccessLevel::Public:
   case AccessLevel::Open: {
-    if (useDC) {
+    if (useDC && VD->isSPI()) {
       auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
-      if (useSF &&
-          VD->getAttrs().hasAttribute<SPIAccessControlAttr>() &&
-          !useSF->isImportedAsSPI(VD))
-        return false;
+      return !useSF || useSF->isImportedAsSPI(VD);
     }
     return true;
   }
@@ -5113,8 +5124,8 @@ ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
 
   ++NumLazyRequirementSignatures;
   // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumLazyRequirementSignatures++;
+  if (auto *Stats = getASTContext().Stats)
+    Stats->getFrontendCounters().NumLazyRequirementSignatures++;
 }
 
 ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
@@ -8152,4 +8163,27 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
     simple_display(out, func);
   else
     out << "closure";
+}
+
+bool Decl::isPrivateToEnclosingFile() const {
+  if (auto *VD = dyn_cast<ValueDecl>(this))
+    return VD->getFormalAccess() <= AccessLevel::FilePrivate;
+  switch (getKind()) {
+  case DeclKind::Import:
+  case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
+  case DeclKind::TopLevelCode:
+  case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
+    return true;
+
+  case DeclKind::Extension:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    return false;
+
+  default:
+    llvm_unreachable("everything else is a ValueDecl");
+  }
 }

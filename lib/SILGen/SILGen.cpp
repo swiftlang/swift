@@ -50,7 +50,9 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 
 SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
-    : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr) {
+    : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
+      MagicFileStringsByFilePath(
+          SM->computeMagicFileStringMap(/*shouldDiagnose=*/true)) {
   const SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
     auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
@@ -432,7 +434,8 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                          yields,
                                          /*results*/ {},
                                          /*error result*/ {},
-                                         SubstitutionMap(), false,
+                                         SubstitutionMap(),
+                                         SubstitutionMap(),
                                          getASTContext());
 
   auto env = sig->getGenericEnvironment();
@@ -493,7 +496,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
                                    None,
-                                   SubstitutionMap(), false,
+                                   SubstitutionMap(), SubstitutionMap(),
                                    C);
 
   SILGenFunctionBuilder builder(*this);
@@ -612,9 +615,13 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   // Note: Do not provide any SILLocation. You can set it afterwards.
   SILGenFunctionBuilder builder(*this);
-  auto *F = builder.getOrCreateFunction(constant.hasDecl() ? constant.getDecl()
-                                                           : (Decl *)nullptr,
-                                        constant, forDefinition);
+  auto &IGM = *this;
+  auto *F = builder.getOrCreateFunction(
+      constant.hasDecl() ? constant.getDecl() : (Decl *)nullptr, constant,
+      forDefinition,
+      [&IGM](SILLocation loc, SILDeclRef constant) -> SILFunction * {
+        return IGM.getFunction(constant, NotForDefinition);
+      });
   setUpForProfiling(constant, F, forDefinition);
 
   assert(F && "SILFunction should have been defined");
@@ -935,7 +942,8 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   emitAbstractFuncDecl(fd);
 
   if (fd->hasBody()) {
-    FrontendStatsTracer Tracer(getASTContext().Stats, "SILGen-funcdecl", fd);
+    FrontendStatsTracer Tracer(getASTContext().Stats,
+                               "SILGen-funcdecl", fd);
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
@@ -1480,6 +1488,24 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
     // unowned properties.
     if (decl->getInterfaceType()->is<ReferenceStorageType>())
       return false;
+
+    // If the field offset depends on the generic instantiation, we have to
+    // load it from metadata when instantiating the keypath component.
+    //
+    // However the metadata offset itself will not be fixed if the superclass
+    // is resilient. Fall back to treating the property as computed in this
+    // case.
+    //
+    // See the call to getClassFieldOffsetOffset() inside
+    // emitKeyPathComponent().
+    if (auto *parentClass = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+      if (parentClass->isGeneric()) {
+        auto ancestry = parentClass->checkAncestry();
+        if (ancestry.contains(AncestryFlags::ResilientOther))
+          return false;
+      }
+    }
+
     // If the stored value would need to be reabstracted in fully opaque
     // context, then we have to treat the component as computed.
     auto componentObjTy = decl->getValueInterfaceType();
@@ -1587,6 +1613,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
                                                baseOperand, needsGenericContext,
                                                subs, decl, {},
                                                baseTy->getCanonicalType(),
+                                               M.getSwiftModule(),
                                                /*property descriptor*/ true);
   
   (void)SILProperty::create(M, /*serialized*/ false, decl, component);

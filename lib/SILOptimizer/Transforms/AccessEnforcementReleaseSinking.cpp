@@ -136,6 +136,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::WillThrow:
     case BuiltinValueKind::CondFailMessage:
     case BuiltinValueKind::PoundAssert:
+    case BuiltinValueKind::TypePtrAuthDiscriminator:
     case BuiltinValueKind::GlobalStringTablePointer:
       return false;
 

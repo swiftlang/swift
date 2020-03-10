@@ -60,6 +60,7 @@
 #include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -1463,6 +1464,22 @@ static llvm::GlobalVariable *getChainEntryForDynamicReplacement(
   auto *funPtr =
       implFunction ? llvm::ConstantExpr::getBitCast(implFunction, IGM.Int8PtrTy)
                    : llvm::ConstantExpr::getNullValue(IGM.Int8PtrTy);
+
+  if (implFunction) {
+    llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, 0),
+                                 llvm::ConstantInt::get(IGM.Int32Ty, 0)};
+    auto *storageAddr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        nullptr, linkEntry, indices);
+
+    auto &schema = IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
+    assert(entity.hasSILFunction() || entity.isOpaqueTypeDescriptorAccessor());
+    auto authEntity = entity.hasSILFunction()
+                          ? PointerAuthEntity(entity.getSILFunction())
+                          : PointerAuthEntity::Special::TypeDescriptor;
+    funPtr =
+        IGM.getConstantSignedPointer(funPtr, schema, authEntity, storageAddr);
+  }
+
   auto *nextEntry =
       llvm::ConstantExpr::getNullValue(IGM.DynamicReplacementLinkEntryPtrTy);
   llvm::Constant *fields[] = {funPtr, nextEntry};
@@ -2309,7 +2326,17 @@ static llvm::GlobalVariable *createGlobalForDynamicReplacementFunctionKey(
   ConstantInitBuilder builder(IGM);
   auto B = builder.beginStruct(IGM.DynamicReplacementKeyTy);
   B.addRelativeAddress(linkEntry);
-  B.addInt32(0);
+  auto schema = IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
+  if (schema) {
+    assert(keyEntity.hasSILFunction() ||
+           keyEntity.isOpaqueTypeDescriptorAccessor());
+    auto authEntity = keyEntity.hasSILFunction()
+                          ? PointerAuthEntity(keyEntity.getSILFunction())
+                          : PointerAuthEntity::Special::TypeDescriptor;
+    B.addInt32(PointerAuthInfo::getOtherDiscriminator(IGM, schema, authEntity)
+                   ->getZExtValue());
+  } else
+    B.addInt32(0);
   B.finishAndSetAsInitializer(key);
   key->setConstant(true);
   IGM.setTrueConstGlobal(key);
@@ -2349,20 +2376,25 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto *FnAddr = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
       IGF.CurFn, FunctionPtrTy);
 
-  llvm::Value *ReplFn = nullptr, *rhs = nullptr;
+  auto &schema = getOptions().PointerAuth.SwiftDynamicReplacements;
+  llvm::Value *ReplFn = nullptr, *hasReplFn = nullptr;
 
   if (UseBasicDynamicReplacement) {
     ReplFn = IGF.Builder.CreateLoad(fnPtrAddr, getPointerAlignment());
-    rhs = FnAddr;
+    llvm::Value *lhs = ReplFn;
+    if (schema.isEnabled()) {
+      lhs = emitPointerAuthStrip(IGF, lhs, schema.getKey());
+    }
+    hasReplFn = IGF.Builder.CreateICmpEQ(lhs, FnAddr);
   } else {
     // Call swift_getFunctionReplacement to check which function to call.
     auto *callRTFunc =
         IGF.Builder.CreateCall(getGetReplacementFn(), {ReplAddr, FnAddr});
     callRTFunc->setDoesNotThrow();
     ReplFn = callRTFunc;
-    rhs = llvm::ConstantExpr::getNullValue(ReplFn->getType());
+    hasReplFn = IGF.Builder.CreateICmpEQ(ReplFn,
+                  llvm::ConstantExpr::getNullValue(ReplFn->getType()));
   }
-  auto *hasReplFn = IGF.Builder.CreateICmpEQ(ReplFn, rhs);
 
   auto *replacedBB = IGF.createBasicBlock("forward_to_replaced");
   auto *origEntryBB = IGF.createBasicBlock("original_entry");
@@ -2377,7 +2409,11 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto *fnType = signature.getType()->getPointerTo();
   auto *realReplFn = IGF.Builder.CreateBitCast(ReplFn, fnType);
 
-  auto *Res = IGF.Builder.CreateCall(FunctionPointer(realReplFn, signature),
+  auto authEntity = PointerAuthEntity(f);
+  auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
+
+  auto *Res = IGF.Builder.CreateCall(FunctionPointer(realReplFn, authInfo,
+                                                     signature),
                                      forwardedArgs);
   Res->setTailCall();
   if (IGF.CurFn->getReturnType()->isVoidTy())
@@ -2414,16 +2450,26 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
     IGM.DebugInfo->emitArtificialFunction(IGF, dispatchFn);
   llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, 0),
                                llvm::ConstantInt::get(IGM.Int32Ty, 0)};
-  auto *fnPtr = IGF.Builder.CreateLoad(
-      llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices),
-      IGM.getPointerAlignment());
-  auto *typeFnPtr =
-      IGF.Builder.CreateBitOrPointerCast(fnPtr, implFn->getType());
+
+  auto *fnPtrAddr =
+      llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices);
+  auto *fnPtr = IGF.Builder.CreateLoad(fnPtrAddr, IGM.getPointerAlignment());
+  auto *typeFnPtr = IGF.Builder.CreateBitOrPointerCast(fnPtr, implFn->getType());
+
   SmallVector<llvm::Value *, 16> forwardedArgs;
   for (auto &arg : dispatchFn->args())
     forwardedArgs.push_back(&arg);
-  auto *Res = IGF.Builder.CreateCall(FunctionPointer(typeFnPtr, signature),
-                                     forwardedArgs);
+
+  auto &schema = IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
+  assert(keyEntity.hasSILFunction() ||
+         keyEntity.isOpaqueTypeDescriptorAccessor());
+  auto authEntity = keyEntity.hasSILFunction()
+                        ? PointerAuthEntity(keyEntity.getSILFunction())
+                        : PointerAuthEntity::Special::TypeDescriptor;
+  auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
+  auto *Res = IGF.Builder.CreateCall(
+      FunctionPointer(typeFnPtr, authInfo, signature), forwardedArgs);
+
   Res->setTailCall();
   if (implFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
@@ -2532,8 +2578,13 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   SmallVector<llvm::Value *, 16> forwardedArgs;
   for (auto &arg : implFn->args())
     forwardedArgs.push_back(&arg);
-  auto *Res = IGF.Builder.CreateCall(FunctionPointer(typeFnPtr, signature),
-                                     forwardedArgs);
+
+  auto &schema = getOptions().PointerAuth.SwiftDynamicReplacements;
+  auto authInfo = PointerAuthInfo::emit(
+      IGF, schema, fnPtrAddr,
+      PointerAuthEntity(f->getDynamicallyReplacedFunction()));
+  auto *Res = IGF.Builder.CreateCall(
+      FunctionPointer(typeFnPtr, authInfo, signature), forwardedArgs);
 
   if (implFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
@@ -2664,11 +2715,36 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
   
   // rdar://problem/53836960: i386 ld64 also mis-links relative references
   // to GOT entries.
-  if (!IGM.Triple.isOSDarwin() || IGM.Triple.getArch() != llvm::Triple::x86) {
+  // rdar://problem/59782487: issue with on-device JITd expressions.
+  // The JIT gets confused by private vars accessed accross object files.
+  if (!IGM.getOptions().UseJIT &&
+      (!IGM.Triple.isOSDarwin() || IGM.Triple.getArch() != llvm::Triple::x86)) {
     gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   } else {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
       .to(gotEquivalent);
+  }
+
+  // Context descriptor pointers need to be signed.
+  // TODO: We should really sign a pointer to *any* code entity or true-const
+  // metadata structure that may reference data structures with function
+  // pointers inside them.
+  if (entity.isContextDescriptor()) {
+    auto schema = IGM.getOptions().PointerAuth.TypeDescriptors;
+    if (schema) {
+      auto signedValue = IGM.getConstantSignedPointer(
+          global, schema, PointerAuthEntity::Special::TypeDescriptor,
+          /*storageAddress*/ gotEquivalent);
+      gotEquivalent->setInitializer(signedValue);
+    }
+  } else if (entity.isDynamicallyReplaceableKey()) {
+    auto schema = IGM.getOptions().PointerAuth.SwiftDynamicReplacementKeys;
+    if (schema) {
+      auto signedValue = IGM.getConstantSignedPointer(
+          global, schema, PointerAuthEntity::Special::DynamicReplacementKey,
+          /*storageAddress*/ gotEquivalent);
+      gotEquivalent->setInitializer(signedValue);
+    }
   }
 
   return gotEquivalent;
@@ -2681,8 +2757,8 @@ llvm::Constant *IRGenModule::getOrCreateGOTEquivalent(llvm::Constant *global,
     return gotEntry;
   }
 
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumGOTEntries++;
+  if (auto *Stats = Context.Stats)
+    Stats->getFrontendCounters().NumGOTEntries++;
 
   // Use the global as the initializer for an anonymous constant. LLVM can treat
   // this as equivalent to the global's GOT entry.

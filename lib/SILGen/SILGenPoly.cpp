@@ -3058,8 +3058,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     bool withoutActuallyEscaping) {
   // We shouldn't be thunking generic types here, and substituted function types
   // ought to have their substitutions applied before we get here.
-  assert(!expectedType->isPolymorphic() && !expectedType->getSubstitutions());
-  assert(!sourceType->isPolymorphic() && !sourceType->getSubstitutions());
+  assert(!expectedType->isPolymorphic() &&
+         !expectedType->getCombinedSubstitutions());
+  assert(!sourceType->isPolymorphic() &&
+         !sourceType->getCombinedSubstitutions());
 
   // Can't build a thunk without context, so we require ownership semantics
   // on the result type.
@@ -3109,36 +3111,40 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                                      newArchetype);
   }
 
+  auto substTypeHelper = [&](SubstitutableType *type) -> Type {
+    if (CanType(type) == openedExistential)
+      return newArchetype;
+    return Type(type).subst(contextSubs);
+  };
+  auto substConformanceHelper =
+    LookUpConformanceInSubstitutionMap(contextSubs);
+
   // Utility function to apply contextSubs, and also replace the
   // opened existential with the new archetype.
-  auto substIntoThunkContext = [&](CanType t) -> CanType {
-    return t.subst(
-      [&](SubstitutableType *type) -> Type {
-        if (CanType(type) == openedExistential)
-          return newArchetype;
-        return Type(type).subst(contextSubs);
-      },
-      LookUpConformanceInSubstitutionMap(contextSubs),
-      SubstFlags::AllowLoweredTypes)
-        ->getCanonicalType();
+  auto substFormalTypeIntoThunkContext =
+      [&](CanType t) -> CanType {
+    return t.subst(substTypeHelper, substConformanceHelper)
+               ->getCanonicalType();
+  };
+  auto substLoweredTypeIntoThunkContext =
+      [&](CanSILFunctionType t) -> CanSILFunctionType {
+    return SILType::getPrimitiveObjectType(t)
+             .subst(SGM.M, substTypeHelper, substConformanceHelper)
+             .castTo<SILFunctionType>();
   };
 
-  sourceType = cast<SILFunctionType>(
-    substIntoThunkContext(sourceType));
-  expectedType = cast<SILFunctionType>(
-    substIntoThunkContext(expectedType));
+  sourceType = substLoweredTypeIntoThunkContext(sourceType);
+  expectedType = substLoweredTypeIntoThunkContext(expectedType);
 
   bool hasDynamicSelf = false;
 
   if (inputSubstType) {
-    inputSubstType = cast<AnyFunctionType>(
-      substIntoThunkContext(inputSubstType));
+    inputSubstType = substFormalTypeIntoThunkContext(inputSubstType);
     hasDynamicSelf |= inputSubstType->hasDynamicSelfType();
   }
 
   if (outputSubstType) {
-    outputSubstType = cast<AnyFunctionType>(
-      substIntoThunkContext(outputSubstType));
+    outputSubstType = substFormalTypeIntoThunkContext(outputSubstType);
     hasDynamicSelf |= outputSubstType->hasDynamicSelfType();
   }
 
@@ -3175,40 +3181,35 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     params.push_back({dynamicSelfType, ParameterConvention::Direct_Unowned});
   }
 
+  auto mapTypeOutOfContext = [&](CanType type) -> CanType {
+    return type->mapTypeOutOfContext()->getCanonicalType(genericSig);
+  };
+
   // Map the parameter and expected types out of context to get the interface
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
   interfaceParams.reserve(params.size());
   for (auto &param : params) {
-    auto paramIfaceTy = param.getInterfaceType()->mapTypeOutOfContext();
-    interfaceParams.push_back(
-      SILParameterInfo(paramIfaceTy->getCanonicalType(genericSig),
-                       param.getConvention()));
+    auto interfaceParam = param.map(mapTypeOutOfContext);
+    interfaceParams.push_back(interfaceParam);
   }
 
   SmallVector<SILYieldInfo, 4> interfaceYields;
   for (auto &yield : expectedType->getYields()) {
-    auto yieldIfaceTy = yield.getInterfaceType()->mapTypeOutOfContext();
-    auto interfaceYield =
-      yield.getWithInterfaceType(yieldIfaceTy->getCanonicalType(genericSig));
+    auto interfaceYield = yield.map(mapTypeOutOfContext);
     interfaceYields.push_back(interfaceYield);
   }
 
   SmallVector<SILResultInfo, 4> interfaceResults;
   for (auto &result : expectedType->getResults()) {
-    auto resultIfaceTy = result.getInterfaceType()->mapTypeOutOfContext();
-    auto interfaceResult =
-      result.getWithInterfaceType(resultIfaceTy->getCanonicalType(genericSig));
+    auto interfaceResult = result.map(mapTypeOutOfContext);
     interfaceResults.push_back(interfaceResult);
   }
 
   Optional<SILResultInfo> interfaceErrorResult;
   if (expectedType->hasErrorResult()) {
     auto errorResult = expectedType->getErrorResult();
-    auto errorIfaceTy = errorResult.getInterfaceType()->mapTypeOutOfContext();
-    interfaceErrorResult = SILResultInfo(
-        errorIfaceTy->getCanonicalType(genericSig),
-        expectedType->getErrorResult().getConvention());
+    interfaceErrorResult = errorResult.map(mapTypeOutOfContext);;
   }
   
   // The type of the thunk function.
@@ -3217,8 +3218,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                               ParameterConvention::Direct_Unowned,
                               interfaceParams, interfaceYields,
                               interfaceResults, interfaceErrorResult,
-                              expectedType->getSubstitutions(),
-                              expectedType->isGenericSignatureImplied(),
+                              expectedType->getPatternSubstitutions(),
+                              SubstitutionMap(),
                               getASTContext());
 }
 
@@ -3267,7 +3268,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   // Apply substitutions in the source and destination types, since the thunk
   // doesn't change because of different function representations.
   CanSILFunctionType sourceType;
-  if (substSourceType->getSubstitutions()) {
+  if (substSourceType->getPatternSubstitutions()) {
     sourceType = substSourceType->getUnsubstitutedType(SGF.SGM.M);
     fn = SGF.B.createConvertFunction(loc, fn,
                                    SILType::getPrimitiveObjectType(sourceType));

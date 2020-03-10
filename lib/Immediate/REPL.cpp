@@ -25,7 +25,6 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/Utils.h"
-#include "swift/Parse/PersistentParserState.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
@@ -157,7 +156,6 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 static ModuleDecl *
 typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
-                   PersistentParserState &PersistentState,
                    std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   using ImplicitModuleImportKind = SourceFile::ImplicitModuleImportKind;
   assert(MostRecentModule);
@@ -187,7 +185,6 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
     REPLInputFile.addImports(ImportsWithOptions);
   }
 
-  parseIntoSourceFile(REPLInputFile, BufferID, &PersistentState);
   performTypeChecking(REPLInputFile);
   return REPLModule;
 }
@@ -753,7 +750,6 @@ class REPLEnvironment {
   const SILOptions SILOpts;
 
   REPLInput Input;
-  PersistentParserState PersistentState;
   unsigned NextLineNumber = 0;
 
 private:
@@ -853,12 +849,17 @@ private:
   }
 
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
+    SWIFT_DEFER {
+      // Always flush diagnostic consumers after executing a line.
+      CI.getDiags().flushConsumers();
+    };
+
     // Parse the current line(s).
     auto InputBuf = llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
     SmallString<8> Name{"REPL_"};
     llvm::raw_svector_ostream(Name) << NextLineNumber;
     ++NextLineNumber;
-    ModuleDecl *M = typeCheckREPLInput(MostRecentModule, Name, PersistentState,
+    ModuleDecl *M = typeCheckREPLInput(MostRecentModule, Name,
                                        std::move(InputBuf));
     
     // SILGen the module and produce SIL diagnostics.
@@ -957,8 +958,7 @@ public:
       DumpModule("REPL", LLVMContext),
       IRGenOpts(),
       SILOpts(),
-      Input(*this),
-      PersistentState()
+      Input(*this)
   {
     ASTContext &Ctx = CI.getASTContext();
     Ctx.LangOpts.EnableAccessControl = false;
@@ -1005,8 +1005,7 @@ public:
       auto Buffer =
           llvm::MemoryBuffer::getMemBufferCopy(WarmUpStmt,
                                                "<REPL Initialization>");
-      (void)typeCheckREPLInput(MostRecentModule, "__Warmup", PersistentState,
-                               std::move(Buffer));
+      (void)typeCheckREPLInput(MostRecentModule, "__Warmup", std::move(Buffer));
 
       if (Ctx.hadError())
         return;

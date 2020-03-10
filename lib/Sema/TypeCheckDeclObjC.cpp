@@ -2035,6 +2035,11 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
         continue;
     }
 
+    // Require the declaration to actually come from a class. Selectors that
+    // come from protocol requirements are not actually overrides.
+    if (!overriddenMethod->getDeclContext()->getSelfClassDecl())
+      continue;
+
     // Diagnose the override.
     auto methodDiagInfo = getObjCMethodDiagInfo(method);
     auto overriddenDiagInfo = getObjCMethodDiagInfo(overriddenMethod);

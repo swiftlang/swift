@@ -86,7 +86,7 @@ func testClonable(c: Clonable) {
 // CHECK-NEXT:    [[OUTER_RESULT:%.*]] = init_existential_metatype [[INNER_RESULT]]
 // CHECK-NEXT:    return [[OUTER_RESULT]]
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sxlyxIsegr_Iego_22partial_apply_protocol8Clonable_pIegr_Iego_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @owned @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <τ_0_0>) -> @owned @callee_guaranteed () -> @out Clonable
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sxlyxIsegr_Iego_22partial_apply_protocol8Clonable_pIegr_Iego_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>) -> @owned @callee_guaranteed () -> @out Clonable
 // CHECK:       bb0(%0 :
 // CHECK-NEXT:    [[INNER_RESULT:%.*]] = apply %0()
 // CHECK-NEXT:    [[INNER_RESULT_CONV:%.*]] = convert_function [[INNER_RESULT]]
@@ -144,8 +144,8 @@ func testClonableInGenericContext<T>(c: Clonable, t: T) {
 // CHECK-NEXT:      dealloc_stack [[INNER_RESULT]]
 // CHECK-NEXT:      return [[EMPTY]]
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sxxlyqd__Isegr_Iegno_x22partial_apply_protocol8Clonable_pIegr_Iegno_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <τ_1_0>) -> @owned @callee_guaranteed () -> @out Clonable {
-// CHECK: bb0(%0 : $*τ_0_0, %1 : @guaranteed $@callee_guaranteed (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <τ_1_0>):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sxxlyqd__Isegr_Iegno_x22partial_apply_protocol8Clonable_pIegr_Iegno_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_1_0>) -> @owned @callee_guaranteed () -> @out Clonable {
+// CHECK: bb0(%0 : $*τ_0_0, %1 : @guaranteed $@callee_guaranteed (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_1_0>):
 // CHECK-NEXT:      [[RES:%.*]] = apply %1(%0)
 // CHECK-NEXT:      [[RES_CONV:%.*]] = convert_function [[RES]]
 // CHECK:           [[THUNK_FN:%.*]] = function_ref @$sqd__Iegr_22partial_apply_protocol8Clonable_pIegr_AaBRd__r__lTR

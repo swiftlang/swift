@@ -30,6 +30,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenMeta.cpp
   GenObjC.cpp
   GenOpaque.cpp
+  GenPointerAuth.cpp
   GenPoly.cpp
   GenProto.cpp
   GenReflection.cpp
@@ -43,6 +44,7 @@ add_swift_host_library(swiftIRGen STATIC
   IRGenFunction.cpp
   IRGenMangler.cpp
   IRGenModule.cpp
+  IRGenSILPasses.cpp
   IRGenSIL.cpp
   Linking.cpp
   LoadableByAddress.cpp

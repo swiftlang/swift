@@ -118,12 +118,20 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitSILFunctionType(SILFunctionType *ty) {
     // TODO: Should this be the only kind of walk we allow?
-    if (auto subs = ty->getSubstitutions()) {
+    if (auto subs = ty->getInvocationSubstitutions()) {
       for (auto paramTy : subs.getReplacementTypes()) {
         if (doIt(paramTy))
           return true;
       }
-      
+
+      return false;
+    }
+    if (auto subs = ty->getPatternSubstitutions()) {
+      for (auto paramTy : subs.getReplacementTypes()) {
+        if (doIt(paramTy))
+          return true;
+      }
+
       return false;
     }
     

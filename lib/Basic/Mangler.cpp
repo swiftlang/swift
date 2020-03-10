@@ -130,8 +130,15 @@ std::string Mangler::finalize() {
   Storage.clear();
 
 #ifndef NDEBUG
+/*
+  Verification is temporarily disabled, because of:
+  rdar://problem/59813007
+  rdar://problem/59496022
+  https://bugs.swift.org/browse/SR-12204
+
   if (StringRef(result).startswith(MANGLING_PREFIX_STR))
     verify(result);
+*/
 #endif
 
   return result;

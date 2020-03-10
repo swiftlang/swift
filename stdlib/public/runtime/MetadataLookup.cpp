@@ -72,16 +72,39 @@ public:
   }
 };
 
+/// Resolve the relative reference in a mangled symbolic reference.
+static uintptr_t resolveSymbolicReferenceOffset(SymbolicReferenceKind kind,
+                                                Directness isIndirect,
+                                                int32_t offset,
+                                                const void *base) {
+  auto ptr = detail::applyRelativeOffset(base, offset);
+
+  // Indirect references may be authenticated in a way appropriate for the
+  // referent.
+  if (isIndirect == Directness::Indirect) {
+    switch (kind) {
+    case SymbolicReferenceKind::Context: {
+      ContextDescriptor *contextPtr =
+        *(const TargetSignedContextPointer<InProcess> *)ptr;
+      return (uintptr_t)contextPtr;
+    }
+    case SymbolicReferenceKind::AccessorFunctionReference: {
+      swift_runtime_unreachable("should not be indirectly referenced");
+    }
+    }
+    swift_runtime_unreachable("unknown symbolic reference kind");
+  } else {
+    return ptr;
+  }
+}
+
 NodePointer
 ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
                                        Directness isIndirect,
                                        int32_t offset,
                                        const void *base) {
   // Resolve the absolute pointer to the entity being referenced.
-  auto ptr = detail::applyRelativeOffset(base, offset);
-  if (isIndirect == Directness::Indirect) {
-    ptr = *(const uintptr_t *)ptr;
-  }
+  auto ptr = resolveSymbolicReferenceOffset(kind, isIndirect, offset, base);
 
   // Figure out this symbolic reference's grammatical role.
   Node::Kind nodeKind;
@@ -118,6 +141,11 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
     // invoke the function to resolve the thing they're trying to access.
     nodeKind = Node::Kind::AccessorFunctionReference;
     isType = false;
+#if SWIFT_PTRAUTH
+    // The pointer refers to an accessor function, which we need to sign.
+    ptr = (uintptr_t)ptrauth_sign_unauthenticated((void*)ptr,
+      ptrauth_key_function_pointer, 0);
+#endif
     break;
   }
   }
@@ -140,6 +168,11 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
     return _buildDemanglingForContext(
       (const ContextDescriptor *)resolvedReference, {}, Dem);
   case SymbolicReferenceKind::AccessorFunctionReference:
+#if SWIFT_PTRAUTH
+    // The pointer refers to an accessor function, which we need to sign.
+    resolvedReference = ptrauth_sign_unauthenticated(resolvedReference,
+      ptrauth_key_function_pointer, 0);
+#endif
     return Dem.createNode(Node::Kind::AccessorFunctionReference,
                           (uintptr_t)resolvedReference);
   }
@@ -152,11 +185,8 @@ ResolveToDemanglingForContext::operator()(SymbolicReferenceKind kind,
                                           Directness isIndirect,
                                           int32_t offset,
                                           const void *base) {
-  auto ptr = detail::applyRelativeOffset(base, offset);
-  if (isIndirect == Directness::Indirect) {
-    ptr = *(const uintptr_t *)ptr;
-  }
-  
+  auto ptr = resolveSymbolicReferenceOffset(kind, isIndirect, offset, base);
+
   return _buildDemanglingForSymbolicReference(kind, (const void *)ptr, Dem);
 }
 
@@ -1371,10 +1401,11 @@ public:
     auto flags = TupleTypeFlags().withNumElements(elements.size());
     if (!labels.empty())
       flags = flags.withNonConstantLabels(true);
-    return swift_getTupleTypeMetadata(MetadataState::Abstract,
-                                      flags, elements.data(),
-                                      labels.empty() ? nullptr : labels.c_str(),
-                                      /*proposedWitnesses=*/nullptr).Value;
+    return MetadataResponse(swift_getTupleTypeMetadata(
+                                MetadataState::Abstract, flags, elements.data(),
+                                labels.empty() ? nullptr : labels.c_str(),
+                                /*proposedWitnesses=*/nullptr))
+        .Value;
   }
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base) const {
@@ -1459,7 +1490,7 @@ static TypeInfo swift_getTypeByMangledNodeImpl(
     // The accessor function is passed the pointer to the original argument
     // buffer. It's assumed to match the generic context.
     auto accessorFn =
-      (const Metadata *(*)(const void * const *))node->getIndex();
+        (const Metadata *(*)(const void * const *))node->getIndex();
     auto type = accessorFn(origArgumentVector);
     // We don't call checkMetadataState here since the result may not really
     // *be* type metadata. If the accessor returns a type, it is responsible
@@ -1687,6 +1718,13 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
     auto node = demangler.demangleSymbol(typeName);
     if (!node)
       return NO;
+
+    // If we successfully demangled but there is a suffix, then we did NOT use
+    // the entire name, and this is NOT a match. Reject it.
+    if (node->hasChildren() &&
+        node->getLastChild()->getKind() == Node::Kind::Suffix)
+      return NO;
+
     metadata = swift_getTypeByMangledNode(
       MetadataState::Complete, demangler, node,
       nullptr,
@@ -2083,18 +2121,31 @@ void DynamicReplacementDescriptor::enableReplacement() const {
   if (!shouldChain() && chainRoot->next) {
     auto *previous = chainRoot->next;
     chainRoot->next = previous->next;
-    chainRoot->implementationFunction = previous->implementationFunction;
+    //chainRoot->implementationFunction = previous->implementationFunction;
+    swift_ptrauth_copy(
+      reinterpret_cast<void **>(&chainRoot->implementationFunction),
+      reinterpret_cast<void *const *>(&previous->implementationFunction),
+      replacedFunctionKey->getExtraDiscriminator());
   }
 
   // First populate the current replacement's chain entry.
   auto *currentEntry =
       const_cast<DynamicReplacementChainEntry *>(chainEntry.get());
-  currentEntry->implementationFunction = chainRoot->implementationFunction;
+  // currentEntry->implementationFunction = chainRoot->implementationFunction;
+  swift_ptrauth_copy(
+      reinterpret_cast<void **>(&currentEntry->implementationFunction),
+      reinterpret_cast<void *const *>(&chainRoot->implementationFunction),
+      replacedFunctionKey->getExtraDiscriminator());
+
   currentEntry->next = chainRoot->next;
 
   // Link the replacement entry.
   chainRoot->next = chainEntry.get();
-  chainRoot->implementationFunction = replacementFunction.get();
+  // chainRoot->implementationFunction = replacementFunction.get();
+  swift_ptrauth_init(
+      reinterpret_cast<void **>(&chainRoot->implementationFunction),
+      reinterpret_cast<void *>(replacementFunction.get()),
+      replacedFunctionKey->getExtraDiscriminator());
 }
 
 void DynamicReplacementDescriptor::disableReplacement() const {
@@ -2114,7 +2165,11 @@ void DynamicReplacementDescriptor::disableReplacement() const {
   // Unlink this entry.
   auto *previous = const_cast<DynamicReplacementChainEntry *>(prev);
   previous->next = thisEntry->next;
-  previous->implementationFunction = thisEntry->implementationFunction;
+  // previous->implementationFunction = thisEntry->implementationFunction;
+  swift_ptrauth_copy(
+      reinterpret_cast<void **>(&previous->implementationFunction),
+      reinterpret_cast<void *const *>(&thisEntry->implementationFunction),
+      replacedFunctionKey->getExtraDiscriminator());
 }
 
 /// An automatic dymamic replacement entry.
@@ -2159,7 +2214,10 @@ public:
 
 /// A map from original to replaced opaque type descriptor of a some type.
 class DynamicReplacementSomeDescriptor {
-  RelativeIndirectablePointer<const OpaqueTypeDescriptor, false>
+  RelativeIndirectablePointer<
+      const OpaqueTypeDescriptor, false, int32_t,
+      TargetSignedPointer<InProcess, OpaqueTypeDescriptor *
+                                         __ptrauth_swift_type_descriptor>>
       originalOpaqueTypeDesc;
   RelativeDirectPointer<const OpaqueTypeDescriptor, false>
       replacementOpaqueTypeDesc;
@@ -2256,11 +2314,15 @@ void swift::addImageDynamicReplacementBlockCallback(
 
 void swift::swift_enableDynamicReplacementScope(
     const DynamicReplacementScope *scope) {
+  scope = swift_auth_data_non_address(
+      scope, SpecialPointerAuthDiscriminators::DynamicReplacementScope);
   DynamicReplacementLock.get().withLock([=] { scope->enable(); });
 }
 
 void swift::swift_disableDynamicReplacementScope(
     const DynamicReplacementScope *scope) {
+  scope = swift_auth_data_non_address(
+      scope, SpecialPointerAuthDiscriminators::DynamicReplacementScope);
   DynamicReplacementLock.get().withLock([=] { scope->disable(); });
 }
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE

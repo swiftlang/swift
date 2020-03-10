@@ -522,3 +522,22 @@ enum E {
 // CHECK: <kw>var</kw> <kw>_</kw> = <int>10</int>
 @available(iOS 99, *)
 var _ = 10
+
+// CHECK: <type>Array</type><<type>T</type>> <kw>where</kw> <type>T</type>: <type>Equatable</type>
+typealias GenericAlias<T> = Array<T> where T: Equatable
+
+// Where clauses on contextually generic declarations
+//
+struct FreeWhere<T> {
+  // CHECK: <kw>func</kw> foo() <kw>where</kw> <type>T</type> == <type>Int</type>
+  func foo() where T == Int {}
+
+  // CHECK: <kw>subscript</kw>() -> <type>Int</type> <kw>where</kw> <type>T</type>: <type>Sequence</type>
+  subscript() -> Int where T: Sequence {}
+
+  // CHECK: <kw>enum</kw> Enum <kw>where</kw> <type>T</type> == <type>Int</type>
+  enum Enum where T == Int {}
+
+  // CHECK: <kw>typealias</kw> Alias = <type>Int</type> <kw>where</kw> <type>T</type> == <type>Int</type>
+  typealias Alias = Int where T == Int
+}

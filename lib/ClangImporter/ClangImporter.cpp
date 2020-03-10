@@ -732,9 +732,12 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   } else if (triple.isOSDarwin()) {
     // Special case: arm64 defaults to the "cyclone" CPU for Darwin,
+    // and arm64e defaults to the "vortex" CPU for Darwin,
     // but Clang only detects this if we use -arch.
-    if (triple.getArch() == llvm::Triple::aarch64 ||
-        triple.getArch() == llvm::Triple::aarch64_be) {
+    if (triple.getArchName() == "arm64e")
+      invocationArgStrs.push_back("-mcpu=vortex");
+    else if (triple.getArch() == llvm::Triple::aarch64 ||
+             triple.getArch() == llvm::Triple::aarch64_be) {
       invocationArgStrs.push_back("-mcpu=cyclone");
     }
   } else if (triple.getArch() == llvm::Triple::systemz) {
@@ -1884,6 +1887,10 @@ ModuleDecl *ClangImporter::getImportedHeaderModule() const {
   return Impl.ImportedHeaderUnit->getParentModule();
 }
 
+ModuleDecl *ClangImporter::getWrapperForModule(const clang::Module *mod) const {
+  return Impl.getWrapperForModule(mod)->getParentModule();
+}
+
 PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
     : platformKind(targetPlatform(langOpts)) {
   switch (platformKind) {
@@ -2771,8 +2778,10 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     // Add the extensions produced by importing categories.
     for (auto category : lookupTable->categories()) {
       if (auto extension = cast_or_null<ExtensionDecl>(
-              owner.importDecl(category, owner.CurrentVersion)))
+              owner.importDecl(category, owner.CurrentVersion,
+                               /*UseCanonical*/false))) {
         results.push_back(extension);
+      }
     }
 
     auto findEnclosingExtension = [](Decl *importedDecl) -> ExtensionDecl * {
@@ -3153,6 +3162,9 @@ void ClangModuleUnit::lookupObjCMethods(
     // Verify that this method came from this module.
     auto owningClangModule = getClangTopLevelOwningModule(objcMethod, clangCtx);
     if (owningClangModule != clangModule) continue;
+
+    if (shouldSuppressDeclImport(objcMethod))
+      continue;
 
     // If we found a property accessor, import the property.
     if (objcMethod->isPropertyAccessor())

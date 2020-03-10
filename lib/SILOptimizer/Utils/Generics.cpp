@@ -772,8 +772,9 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   // First substitute concrete types into the existing function type.
   CanSILFunctionType FnTy;
   {
-    FnTy = OrigF->getLoweredFunctionType()->substGenericArgs(
-        M, SubstMap, getResilienceExpansion());
+    FnTy = OrigF->getLoweredFunctionType()
+                ->substGenericArgs(M, SubstMap, getResilienceExpansion())
+                ->getUnsubstitutedType(M);
     // FIXME: Some of the added new requirements may not have been taken into
     // account by the substGenericArgs. So, canonicalize in the context of the
     // specialized signature.
@@ -791,8 +792,9 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   auto NewFnTy = SILFunctionType::get(
       CanSpecializedGenericSig, FnTy->getExtInfo(), FnTy->getCoroutineKind(),
       FnTy->getCalleeConvention(), FnTy->getParameters(), FnTy->getYields(),
-      FnTy->getResults(), FnTy->getOptionalErrorResult(), SubstitutionMap(),
-      false, M.getASTContext(), FnTy->getWitnessMethodConformanceOrInvalid());
+      FnTy->getResults(), FnTy->getOptionalErrorResult(),
+      FnTy->getPatternSubstitutions(), SubstitutionMap(), M.getASTContext(),
+      FnTy->getWitnessMethodConformanceOrInvalid());
 
   // This is an interface type. It should not have any archetypes.
   assert(!NewFnTy->hasArchetype());
@@ -852,11 +854,15 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
     // For now, always just use the original, substituted parameter info.
     SpecializedYields.push_back(YI);
   }
+
+  auto Signature = SubstFTy->isPolymorphic()
+                     ? SubstFTy->getInvocationGenericSignature()
+                     : CanGenericSignature();
   return SILFunctionType::get(
-      SubstFTy->getInvocationGenericSignature(), SubstFTy->getExtInfo(),
+      Signature, SubstFTy->getExtInfo(),
       SubstFTy->getCoroutineKind(), SubstFTy->getCalleeConvention(),
       SpecializedParams, SpecializedYields, SpecializedResults,
-      SubstFTy->getOptionalErrorResult(), SubstitutionMap(), false,
+      SubstFTy->getOptionalErrorResult(), SubstitutionMap(), SubstitutionMap(),
       M.getASTContext(), SubstFTy->getWitnessMethodConformanceOrInvalid());
 }
 
@@ -1941,15 +1947,6 @@ static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
   }
 }
 
-/// Return a substituted callee function type.
-static CanSILFunctionType
-getCalleeSubstFunctionType(SILValue Callee, SubstitutionMap Subs,
-                           TypeExpansionContext context) {
-  // Create a substituted callee type.
-  auto CanFnTy = Callee->getType().castTo<SILFunctionType>();
-  return CanFnTy->substGenericArgs(*Callee->getModule(), Subs, context);
-}
-
 /// Create a new apply based on an old one, but with a different
 /// function being applied.
 static ApplySite replaceWithSpecializedCallee(ApplySite AI,
@@ -1963,13 +1960,16 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
   prepareCallArguments(AI, Builder, ReInfo, Arguments, StoreResultTo);
 
   // Create a substituted callee type.
+  auto CanFnTy = Callee->getType().castTo<SILFunctionType>();
   SubstitutionMap Subs;
   if (ReInfo.getSpecializedType()->isPolymorphic()) {
     Subs = ReInfo.getCallerParamSubstitutionMap();
+    Subs = SubstitutionMap::get(CanFnTy->getSubstGenericSignature(), Subs);
   }
 
   auto CalleeSubstFnTy =
-      getCalleeSubstFunctionType(Callee, Subs, ReInfo.getResilienceExpansion());
+      CanFnTy->substGenericArgs(*Callee->getModule(), Subs,
+                                ReInfo.getResilienceExpansion());
   auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
   SILFunctionConventions substConv(CalleeSubstFnTy, Builder.getModule());
 
@@ -2467,6 +2467,8 @@ void swift::trySpecializeApplyOfGeneric(
       Arguments.push_back(Op.get());
     }
     auto Subs = ReInfo.getCallerParamSubstitutionMap();
+    auto FnTy = Thunk->getLoweredFunctionType();
+    Subs = SubstitutionMap::get(FnTy->getSubstGenericSignature(), Subs);
     auto *NewPAI = Builder.createPartialApply(
         PAI->getLoc(), FRI, Subs, Arguments,
         PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),

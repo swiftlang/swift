@@ -228,7 +228,7 @@ public:
 /// A relative reference to an object stored in memory. The reference may be
 /// direct or indirect, and uses the low bit of the (assumed at least
 /// 2-byte-aligned) pointer to differentiate.
-template<typename ValueTy, bool Nullable = false, typename Offset = int32_t>
+template<typename ValueTy, bool Nullable = false, typename Offset = int32_t, typename IndirectType = const ValueTy *>
 class RelativeIndirectablePointer {
 private:
   static_assert(std::is_integral<Offset>::value &&
@@ -290,7 +290,7 @@ public:
     // If the low bit is set, then this is an indirect address. Otherwise,
     // it's direct.
     if (offsetPlusIndirect & 1) {
-      return *reinterpret_cast<const ValueTy * const *>(address);
+      return *reinterpret_cast<IndirectType const *>(address);
     } else {
       return reinterpret_cast<const ValueTy *>(address);
     }
@@ -315,7 +315,8 @@ public:
 /// 2-byte-aligned) pointer to differentiate. The remaining low bits store
 /// an additional tiny integer value.
 template<typename ValueTy, typename IntTy, bool Nullable = false,
-         typename Offset = int32_t>
+         typename Offset = int32_t,
+         typename IndirectType = const ValueTy *>
 class RelativeIndirectablePointerIntPair {
 private:
   static_assert(std::is_integral<Offset>::value &&
@@ -363,7 +364,7 @@ public:
     // If the low bit is set, then this is an indirect address. Otherwise,
     // it's direct.
     if (offsetPlusIndirect & 1) {
-      return *reinterpret_cast<const ValueTy * const *>(address);
+      return *reinterpret_cast<const IndirectType *>(address);
     } else {
       return reinterpret_cast<const ValueTy *>(address);
     }
@@ -447,10 +448,15 @@ public:
   }
 };
 
-/// A direct relative reference to an object.
-template<typename T, bool Nullable = true, typename Offset = int32_t>
-class RelativeDirectPointer :
-  private RelativeDirectPointerImpl<T, Nullable, Offset>
+template <typename T, bool Nullable = true, typename Offset = int32_t,
+          typename = void>
+class RelativeDirectPointer;
+
+/// A direct relative reference to an object that is not a function pointer.
+template <typename T, bool Nullable, typename Offset>
+class RelativeDirectPointer<T, Nullable, Offset,
+    typename std::enable_if<!std::is_function<T>::value>::type>
+    : private RelativeDirectPointerImpl<T, Nullable, Offset>
 {
   using super = RelativeDirectPointerImpl<T, Nullable, Offset>;
 public:
@@ -475,26 +481,44 @@ public:
 
 /// A specialization of RelativeDirectPointer for function pointers,
 /// allowing for calls.
-template<typename RetTy, typename...ArgTy, bool Nullable, typename Offset>
-class RelativeDirectPointer<RetTy (ArgTy...), Nullable, Offset> :
-  private RelativeDirectPointerImpl<RetTy (ArgTy...), Nullable, Offset>
+template<typename T, bool Nullable, typename Offset>
+class RelativeDirectPointer<T, Nullable, Offset,
+    typename std::enable_if<std::is_function<T>::value>::type>
+    : private RelativeDirectPointerImpl<T, Nullable, Offset>
 {
-  using super = RelativeDirectPointerImpl<RetTy (ArgTy...), Nullable, Offset>;
+  using super = RelativeDirectPointerImpl<T, Nullable, Offset>;
 public:
-  using super::get;
   using super::super;
 
-  RelativeDirectPointer &operator=(RetTy (*absolute)(ArgTy...)) & {
+  RelativeDirectPointer &operator=(T absolute) & {
     super::operator=(absolute);
     return *this;
   }
-  
+
+  typename super::PointerTy get() const & {
+    auto ptr = this->super::get();
+#if SWIFT_PTRAUTH
+    if (Nullable && !ptr)
+      return ptr;
+    return ptrauth_sign_unauthenticated(ptr, ptrauth_key_function_pointer, 0);
+#else
+    return ptr;
+#endif
+  }
+
   operator typename super::PointerTy() const & {
     return this->get();
   }
 
-  RetTy operator()(ArgTy...arg) const {
-    return this->get()(std::forward<ArgTy>(arg)...);
+  template <typename...ArgTy>
+  typename std::result_of<T* (ArgTy...)>::type operator()(ArgTy...arg) const {
+#if SWIFT_PTRAUTH
+    return ptrauth_sign_unauthenticated(this->super::get(),
+                                        ptrauth_key_function_pointer,
+                                        0)(std::forward<ArgTy>(arg)...);
+#else
+    return this->super::get()(std::forward<ArgTy>(arg)...);
+#endif
   }
 
   using super::isNull;
@@ -504,17 +528,17 @@ public:
 /// tiny integer value crammed into its low bits.
 template<typename PointeeTy, typename IntTy, bool Nullable = false,
          typename Offset = int32_t>
-class RelativeDirectPointerIntPair {
+class RelativeDirectPointerIntPairImpl {
   Offset RelativeOffsetPlusInt;
 
   /// RelativePointers should appear in statically-generated metadata. They
   /// shouldn't be constructed or copied.
-  RelativeDirectPointerIntPair() = delete;
-  RelativeDirectPointerIntPair(RelativeDirectPointerIntPair &&) = delete;
-  RelativeDirectPointerIntPair(const RelativeDirectPointerIntPair &) = delete;
-  RelativeDirectPointerIntPair &operator=(RelativeDirectPointerIntPair &&)
+  RelativeDirectPointerIntPairImpl() = delete;
+  RelativeDirectPointerIntPairImpl(RelativeDirectPointerIntPairImpl &&) = delete;
+  RelativeDirectPointerIntPairImpl(const RelativeDirectPointerIntPairImpl &) = delete;
+  RelativeDirectPointerIntPairImpl &operator=(RelativeDirectPointerIntPairImpl &&)
     = delete;
-  RelativeDirectPointerIntPair &operator=(const RelativeDirectPointerIntPair&)
+  RelativeDirectPointerIntPairImpl &operator=(const RelativeDirectPointerIntPairImpl&)
     = delete;
 
   static Offset getMask() {
@@ -544,6 +568,24 @@ public:
   Offset getOpaqueValue() const & {
     return RelativeOffsetPlusInt;
   }
+};
+
+/// A direct relative reference to an aligned object, with an additional
+/// tiny integer value crammed into its low bits.
+template<typename PointeeTy, typename IntTy, bool Nullable = false,
+         typename Offset = int32_t, typename = void>
+class RelativeDirectPointerIntPair;
+
+template<typename PointeeTy, typename IntTy, bool Nullable, typename Offset>
+class RelativeDirectPointerIntPair<PointeeTy, IntTy, Nullable, Offset,
+    typename std::enable_if<!std::is_function<PointeeTy>::value>::type>
+    : private RelativeDirectPointerIntPairImpl<PointeeTy, IntTy, Nullable, Offset>
+{
+  using super = RelativeDirectPointerIntPairImpl<PointeeTy, IntTy, Nullable, Offset>;
+public:
+  using super::getPointer;
+  using super::getInt;
+  using super::getOpaqueValue;
 };
 
 // Type aliases for "far" relative pointers, which need to be able to reach

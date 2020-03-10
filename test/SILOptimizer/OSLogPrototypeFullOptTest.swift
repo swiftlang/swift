@@ -211,5 +211,72 @@ func testFloatInterpolation(h: Logger, doubleValue: Double) {
     // CHECK-NEXT: ret void
 }
 
+// This test checks that the precision and alignment are optimally "stored" into the
+// byte buffer at the right positions.
+// CHECK-LABEL: define hidden swiftcc void @"${{.*}}testDynamicPrecisionAndAlignment
+@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+func testDynamicPrecisionAndAlignment(h: Logger) {
+  h.debug(
+    """
+     Maximum Int64 value: \
+     \(Int32.max, format: .decimal(minDigits: 10), align: .left(columns: 5))
+     """)
+    // CHECK: entry:
+    // CHECK-NEXT: tail call swiftcc %TSo9OS_os_logC* @"$s14OSLogPrototype6LoggerV9logObjectSo06OS_os_D0Cvg"
+    // CHECK-NEXT: [[LOGLEVEL:%.+]] = tail call swiftcc i8 @"$sSo13os_log_type_ta0A0E5debugABvgZ"()
+    // CHECK-NEXT: [[LOGOBJ:%.+]] = bitcast %TSo9OS_os_logC*
+    // CHECK-NEXT: tail call zeroext i1 @os_log_type_enabled
+    // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
+
+    // CHECK: [[ENABLED]]:
+    //
+    // Header bytes.
+    //
+    // CHECK-NEXT: [[BUFFER:%.+]] = tail call noalias i8* @swift_slowAlloc(i{{.*}} 20
+    // CHECK-NEXT: store i8 0, i8* [[BUFFER]], align 1
+    // CHECK-NEXT: [[OFFSET1:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 1
+    // CHECK-NEXT: store i8 3, i8* [[OFFSET1]], align 1
+    //
+    // First argument bytes.
+    //
+    // CHECK-NEXT: [[OFFSET2:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 2
+    // CHECK-NEXT: store i8 16, i8* [[OFFSET2]], align 1
+    // CHECK-NEXT: [[OFFSET3:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 3
+    // CHECK-NEXT: store i8 4, i8* [[OFFSET3]], align 1
+    // CHECK-NEXT: [[OFFSET4:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 4
+    // CHECK-NEXT: [[BITCASTED:%.+]] = bitcast i8* [[OFFSET4]] to i32*
+    // CHECK-NEXT: store i32 5, i32* [[BITCASTED]], align 1
+    //
+    // Second argument
+    //
+    // CHECK-NEXT: [[OFFSET12:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 8
+    // CHECK-NEXT: store i8 16, i8* [[OFFSET12]], align 1
+    // CHECK-NEXT: [[OFFSET13:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 9
+    // CHECK-NEXT: store i8 4, i8* [[OFFSET13]], align 1
+    // CHECK-NEXT: [[OFFSET14:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 10
+    // CHECK-NEXT: [[BITCASTED2:%.+]] = bitcast i8* [[OFFSET14]] to i32*
+    // CHECK-NEXT: store i32 10, i32* [[BITCASTED2]], align 1
+    //
+    // Third argument
+    //
+    // CHECK-NEXT: [[OFFSET22:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 14
+    // CHECK-NEXT: store i8 0, i8* [[OFFSET22]], align 1
+    // CHECK-NEXT: [[OFFSET23:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 15
+    // CHECK-NEXT: store i8 4, i8* [[OFFSET23]], align 1
+    // CHECK-NEXT: [[OFFSET24:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 16
+    // CHECK-NEXT: [[BITCASTED3:%.+]] = bitcast i8* [[OFFSET24]] to i32*
+    // CHECK-NEXT: store i32 2147483647, i32* [[BITCASTED3]], align 1
+    //
+    // os_log_impl call.
+    // CHECK-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([28 x i8], [28 x i8]* @{{.*}}, i{{.*}} 0, i{{.*}} 0), i8* {{(nonnull )?}}[[BUFFER]], i32 20)
+    // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
+    // CHECK-NEXT: br label %[[NOT_ENABLED]]
+
+    // CHECK: [[NOT_ENABLED]]:
+    // CHECK-NEXT: bitcast
+    // CHECK-NEXT: tail call void @llvm.objc.release
+    // CHECK-NEXT: ret void
+}
+
 // TODO: add test for String. It is more complicated due to more complex logic
 // in string serialization.

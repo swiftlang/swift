@@ -534,7 +534,7 @@ Type ASTBuilder::createImplFunctionType(
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
                               funcResults, funcErrorResult,
-                              SubstitutionMap(), false, Ctx);
+                              SubstitutionMap(), SubstitutionMap(), Ctx);
 }
 
 Type ASTBuilder::createProtocolCompositionType(

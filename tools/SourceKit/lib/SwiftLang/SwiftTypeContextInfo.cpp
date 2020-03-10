@@ -39,8 +39,8 @@ static bool swiftTypeContextInfoImpl(
         std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
             ide::makeTypeContextInfoCallbacksFactory(Consumer));
 
-        performCodeCompletionSecondPass(CI.getPersistentParserState(),
-                                        *callbacksFactory);
+        auto SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
       });
 }
 

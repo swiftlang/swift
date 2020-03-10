@@ -19,7 +19,7 @@ struct MyStruct {
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=track-compiles == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:1 -repeat-request=2 %s -- %s > %t.response
+// RUN:   -req=complete -pos=16:1 -repeat-request=2 %s -- %s > %t.response
 // RUN: %FileCheck --check-prefix=RESULT  %s < %t.response
 // RUN: %FileCheck --check-prefix=TRACE  %s < %t.response
 

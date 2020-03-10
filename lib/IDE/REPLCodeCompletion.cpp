@@ -232,11 +232,9 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
     newSF.addImports(importsWithOptions);
   }
 
-  PersistentParserState PersistentState;
-  parseIntoSourceFile(newSF, *BufferID, &PersistentState);
   performTypeChecking(newSF);
 
-  performCodeCompletionSecondPass(PersistentState, *CompletionCallbacksFactory);
+  performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);
 
   // Reset the error state because it's only relevant to the code that we just
   // processed, which now gets thrown away.

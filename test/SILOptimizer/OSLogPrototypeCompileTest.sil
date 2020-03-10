@@ -834,15 +834,15 @@ bb0(%0 : $Builtin.Int1):
   %3 = apply %2<() -> Int32>(%1) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
   %4 = tuple_extract %3 : $(Array<() -> Int32>, Builtin.RawPointer), 0
   %5 = tuple_extract %3 : $(Array<() -> Int32>, Builtin.RawPointer), 1
-  %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*@callee_guaranteed <A> in () -> @out A for <Int32>
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*@callee_guaranteed @substituted <A> () -> @out A for <Int32>
   %7 = integer_literal $Builtin.Int32, 81
   %8 = struct $Int32 (%7 : $Builtin.Int32)
   %9 = function_ref @closure1 : $@convention(thin) (Int32) -> Int32
   %10 = partial_apply [callee_guaranteed] %9(%8) : $@convention(thin) (Int32) -> Int32
   %11 = function_ref @$ss5Int32VIegd_ABIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int32) -> @out Int32 
   %12 = partial_apply [callee_guaranteed] %11(%10) : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int32) -> @out Int32 
-  %13 = convert_function %12 : $@callee_guaranteed () -> @out Int32 to $@callee_guaranteed <A> in () -> @out A for <Int32>
-  store %13 to %6 : $*@callee_guaranteed <A> in () -> @out A for <Int32>
+  %13 = convert_function %12 : $@callee_guaranteed () -> @out Int32 to $@callee_guaranteed @substituted <A> () -> @out A for <Int32>
+  store %13 to %6 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int32>
 
   // Create an instance of OSLogMessageClosureArrayStub using the above array
   // of closures.

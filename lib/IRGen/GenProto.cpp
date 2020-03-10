@@ -65,6 +65,7 @@
 #include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
+#include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenType.h"
 #include "GenericRequirement.h"
@@ -790,6 +791,17 @@ namespace {
     void addMethod(SILDeclRef func) {
       // SWIFT_ENABLE_TENSORFLOW
       Entries.push_back(WitnessTableEntry::forFunction(func));
+      // SWIFT_ENABLE_TENSORFLOW END
+#if 0 // master
+      auto decl = cast<AbstractFunctionDecl>(func.getDecl());
+      // If this assert needs to be changed, be sure to also change
+      // ProtocolDescriptorBuilder::getRequirementInfo.
+      assert((isa<ConstructorDecl>(decl)
+                ? (func.kind == SILDeclRef::Kind::Allocator)
+                : (func.kind == SILDeclRef::Kind::Func))
+             && "unexpected kind for protocol witness declaration ref");
+      Entries.push_back(WitnessTableEntry::forFunction(decl));
+#endif
     }
 
     void addPlaceholder(MissingMemberDecl *placeholder) {
@@ -797,6 +809,7 @@ namespace {
         (void)i;
         // SWIFT_ENABLE_TENSORFLOW
         Entries.push_back(WitnessTableEntry::forPlaceholder());
+        // SWIFT_ENABLE_TENSORFLOW END
       }
     }
 
@@ -1276,7 +1289,10 @@ public:
         // It should be never called. We add a pointer to an error function.
         witness = IGM.getDeletedMethodErrorFn();
       }
-      Table.addBitCast(witness, IGM.Int8PtrTy);
+      witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
+
+      auto &schema = IGM.getOptions().PointerAuth.ProtocolWitnesses;
+      Table.addSignedPointer(witness, schema, requirement);
       return;
     }
 
@@ -1313,7 +1329,11 @@ public:
             associate,
             Conformance.getDeclContext()->getGenericSignatureOfContext(),
             /*inProtocolContext=*/false);
-      Table.addBitCast(witness, IGM.Int8PtrTy);
+      witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
+
+      auto &schema = IGM.getOptions().PointerAuth
+                        .ProtocolAssociatedTypeAccessFunctions;
+      Table.addSignedPointer(witness, schema, requirement);
     }
 
     void addAssociatedConformance(AssociatedConformance requirement) {
@@ -1353,7 +1373,10 @@ public:
       llvm::Constant *witnessEntry =
         getAssociatedConformanceWitness(requirement, associate,
                                         associatedConformance);
-      Table.addBitCast(witnessEntry, IGM.Int8PtrTy);
+
+      auto &schema = IGM.getOptions().PointerAuth
+                        .ProtocolAssociatedTypeWitnessTableAccessFunctions;
+      Table.addSignedPointer(witnessEntry, schema, requirement);
     }
 
     /// Build the instantiation function that runs at the end of witness
@@ -1457,11 +1480,11 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
   auto typeRef = getTypeRef(type, sig, role).first;
 
   // Set the low bit to indicate that this is a mangled name.
-  auto witness = llvm::ConstantExpr::getPtrToInt(typeRef, IntPtrTy);
+  auto witness = llvm::ConstantExpr::getBitCast(typeRef, Int8PtrTy);
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
-  witness = llvm::ConstantExpr::getAdd(witness, bitConstant);
-  return llvm::ConstantExpr::getIntToPtr(witness, Int8PtrTy);
+  return llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, witness,
+                                                      bitConstant);
 }
 
 static void buildAssociatedTypeValueName(CanType depAssociatedType,
@@ -3061,7 +3084,8 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
                                 /*params*/ {}, /*yields*/ {},
                                 /*results*/ {}, /*error*/ None,
-                                /*subs*/ SubstitutionMap(), /*implied*/ false,
+                                /*pattern subs*/ SubstitutionMap(),
+                                /*invocation subs*/ SubstitutionMap(),
                                 IGM.Context);
 
   // Figure out what we're actually still required to pass 
@@ -3282,9 +3306,14 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
   // SWIFT_ENABLE_TENSORFLOW
   auto index = fnProtoInfo.getFunctionIndex(member);
+  // SWIFT_ENABLE_TENSORFLOW END
+#if 0 // from master
+  auto index = fnProtoInfo.getFunctionIndex(fn);
+#endif
+  llvm::Value *slot;
   llvm::Value *witnessFnPtr =
     emitInvariantLoadOfOpaqueWitness(IGF, wtable,
-                                     index.forProtocolWitnessTable());
+                                     index.forProtocolWitnessTable(), &slot);
 
   auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(
       IGF.IGM.getMaximalTypeExpansionContext(), member);
@@ -3292,7 +3321,10 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
                                            signature.getType()->getPointerTo());
 
-  return FunctionPointer(witnessFnPtr, signature);
+  auto &schema = IGF.getOptions().PointerAuth.ProtocolWitnesses;
+  auto authInfo = PointerAuthInfo::emit(IGF, schema, slot, member);
+
+  return FunctionPointer(witnessFnPtr, authInfo, signature);
 }
 
 FunctionPointer irgen::emitWitnessMethodValue(

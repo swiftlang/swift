@@ -145,8 +145,11 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
       if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
         return false;
 
-      // Skip anything that isn't 'public' or '@usableFromInline',
-      // or SPI if desired.
+      // Skip SPI decls if `PrintSPIs`.
+      if (!options.PrintSPIs && D->isSPI())
+        return false;
+
+      // Skip anything that isn't 'public' or '@usableFromInline'.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         if (!isPublicOrUsableFromInline(VD)) {
           // We do want to print private stored properties, without their
@@ -154,11 +157,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
           if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD))
             if (contributesToParentTypeStorage(ASD))
               return true;
-
-          // Always print SPI decls if `PrintSPIs`.
-          if (options.PrintSPIs &&
-              VD->getAttrs().hasAttribute<SPIAccessControlAttr>())
-            return true;
 
           return false;
         }
@@ -989,6 +987,17 @@ void PrintAST::printAttributes(const Decl *D) {
              !hasLessAccessibleSetter(vd)))
           Options.ExcludeAttrList.push_back(DAK_HasStorage);
       }
+    }
+
+    // SPI groups
+    if (Options.PrintSPIs) {
+      interleave(D->getSPIGroups(),
+             [&](Identifier spiName) {
+               Printer.printAttrName("_spi", true);
+               Printer << "(" << spiName << ") ";
+             },
+             [&] { Printer << ""; });
+      Options.ExcludeAttrList.push_back(DAK_SPIAccessControl);
     }
 
     // Don't print any contextual decl modifiers.
@@ -4173,6 +4182,13 @@ public:
     printFunctionExtInfo(T->getASTContext(), T->getExtInfo(),
                          T->getWitnessMethodConformanceOrInvalid());
     printCalleeConvention(T->getCalleeConvention());
+
+    if (auto sig = T->getInvocationGenericSignature()) {
+      printGenericSignature(sig,
+                            PrintAST::PrintParams |
+                            PrintAST::PrintRequirements);
+      Printer << " ";
+    }
   
     // If this is a substituted function type, then its generic signature is
     // independent of the enclosing context, and defines the parameters active
@@ -4185,25 +4201,21 @@ public:
     TypePrinter *sub = this;
     Optional<TypePrinter> subBuffer;
     PrintOptions subOptions = Options;
-    if (T->getSubstitutions()) {
+    if (auto substitutions = T->getPatternSubstitutions()) {
       subOptions.GenericEnv = nullptr;
       subBuffer.emplace(Printer, subOptions);
       sub = &*subBuffer;
+
+      sub->Printer << "@substituted ";
+      sub->printGenericSignature(substitutions.getGenericSignature(),
+                                 PrintAST::PrintParams |
+                                 PrintAST::PrintRequirements);
+      sub->Printer << " ";
     }
   
     // Capture list used here to ensure we don't print anything using `this`
     // printer, but only the sub-Printer.
-    [T, sub, &subOptions]{
-      if (auto sig = T->getSubstGenericSignature()) {
-        sub->printGenericSignature(sig,
-                              PrintAST::PrintParams |
-                              PrintAST::PrintRequirements);
-        sub->Printer << " ";
-        if (T->isGenericSignatureImplied()) {
-          sub->Printer << "in ";
-        }
-      }
-
+    [T, sub, &subOptions] {
       sub->Printer << "(";
       bool first = true;
       for (auto param : T->getParameters()) {
@@ -4242,9 +4254,15 @@ public:
       if (totalResults != 1)
         sub->Printer << ")";
     }();
-  
-    // The substitution types are always in terms of the outer environment.
-    if (auto substitutions = T->getSubstitutions()) {
+
+    // Both the pattern and invocation substitution types are always in
+    // terms of the outer environment.  But this wouldn't necessarily be
+    // true with higher-rank polymorphism.
+    if (auto substitutions = T->getPatternSubstitutions()) {
+      Printer << " for";
+      printSubstitutions(substitutions);
+    }
+    if (auto substitutions = T->getInvocationSubstitutions()) {
       Printer << " for";
       printSubstitutions(substitutions);
     }

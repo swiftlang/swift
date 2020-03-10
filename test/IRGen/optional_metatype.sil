@@ -14,6 +14,8 @@ import gizmo
 // i386:           icmp eq i32 %0, 0
 // arm64-LABEL:  define{{( protected)?}} swiftcc void @optional_objc_metatype(i64 %0)
 // arm64:          icmp eq i64 %0, 0
+// arm64e-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i64 %0)
+// arm64e:         icmp eq i64 %0, 0
 // armv7-LABEL:  define{{( protected)?}} swiftcc void @optional_objc_metatype(i32 %0)
 // armv7:           icmp eq i32 %0, 0
 // armv7s-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i32 %0)
@@ -38,6 +40,8 @@ cont:
 // i386:             icmp eq i32 %0, 0
 // arm64-LABEL:  define{{( protected)?}} swiftcc void @optional_swift_metatype(i64 %0)
 // arm64:            icmp eq i64 %0, 0
+// arm64e-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i64 %0)
+// arm64e:           icmp eq i64 %0, 0
 // armv7-LABEL:  define{{( protected)?}} swiftcc void @optional_swift_metatype(i32 %0)
 // armv7:            icmp eq i32 %0, 0
 // armv7s-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i32 %0)
