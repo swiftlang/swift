@@ -31,7 +31,7 @@ struct SymbolGraph {
   /**
    The options to use while building the graph.
    */
-  const SymbolGraphOptions &Options;
+  SymbolGraphASTWalker &Walker;
 
   /**
    The module this symbol graph represents.
@@ -42,11 +42,6 @@ struct SymbolGraph {
    The module whose types were extended in `M`.
    */
   Optional<ModuleDecl *> ExtendedModule;
-  
-  /**
-   The module's target triple.
-  */
-  llvm::Triple Target;
 
   /**
    A context for allocations.
@@ -69,10 +64,9 @@ struct SymbolGraph {
    */
   llvm::DenseSet<Edge> Edges;
 
-  SymbolGraph(const SymbolGraphOptions &Options,
+  SymbolGraph(SymbolGraphASTWalker &Walker,
               ModuleDecl &M,
               Optional<ModuleDecl *> ExtendedModule,
-              llvm::Triple Target,
               markup::MarkupContext &Ctx,
               Optional<llvm::VersionTuple> ModuleVersion = None);
 
@@ -99,7 +93,8 @@ struct SymbolGraph {
    directed graph.
    \param Kind The kind of relationship the edge represents.
    */
-  void recordEdge(Symbol Source, Symbol Target, RelationshipKind Kind);
+  void recordEdge(Symbol Source, Symbol Target, RelationshipKind Kind,
+                  const ExtensionDecl *ConformanceExtension = nullptr);
 
   /**
    Record a MemberOf relationship, if the given declaration is nested
@@ -109,8 +104,11 @@ struct SymbolGraph {
 
   /**
    If a declaration has members by conforming to a protocol, such as default
-   implementations, with a "synthesized" USR to disambiguate from the protocol's
-   real implementation.
+   implementations, record a symbol with a "synthesized" USR to disambiguate
+   from the protocol's real implementation.
+
+   This makes it more convenient to curate symbols on
+   a conformer's documentation.
 
    The reason these "virtual" members are recorded is to show documentation
    under a conforming type for members with the concrete types substituted.
@@ -120,7 +118,16 @@ struct SymbolGraph {
    wish to show this function as `subscript(index: Int) -> Element` instead,
    and show unique documentation for it.
    */
-  void recordSynthesizedMemberRelationship(Symbol S);
+  void recordConformanceSynthesizedMemberRelationships(Symbol S);
+
+  /**
+   If a declaration has members by subclassing, record a symbol with a
+   "synthesized" USR to disambiguate from the superclass's real implementation.
+
+   This makes it more convenient
+   to curate symbols on a subclass's documentation.
+   */
+  void recordSuperclassSynthesizedMemberRelationships(Symbol S);
 
   /**
    Record InheritsFrom relationships for every class from which the
@@ -153,6 +160,12 @@ struct SymbolGraph {
    the declaration.
    */
   void recordConformanceRelationships(Symbol S);
+
+  /**
+   Record ConformsTo relationships for each protocol conformance of
+   a declaration through via an extension.
+   */
+  void recordExtensionConformanceRelationships(Symbol S);
 
   /**
    Records an Overrides relationship if the given declaration

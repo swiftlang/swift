@@ -58,9 +58,6 @@ class Symbol {
   void serializeGenericParam(const swift::GenericTypeParamType &Param,
                              llvm::json::OStream &OS) const;
 
-  void serializeGenericRequirement(const swift::Requirement &Req,
-                                   llvm::json::OStream &OS) const;
-
   void serializeSwiftGenericMixin(llvm::json::OStream &OS) const;
 
   void serializeSwiftExtensionMixin(llvm::json::OStream &OS) const;
