@@ -884,10 +884,6 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
       continue;
     }
 
-    // Then sort the incoming value operand list so that we can bisect search
-    // it.
-    sort(incomingValueOperandList);
-
     // Grab our list of introducer values paired with this SILArgument. See if
     // all of these introducer values were ones that /could/ have been
     // eliminated if it was not for the given phi. If all of them are, we can
@@ -936,8 +932,8 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
         // cvi is one of our originalIncomingValues. If so, we need to set
         // originalIncomingValues to be cvi->getOperand(). Otherwise, weirdness
         // results since we are deleting one of our stashed values.
-        auto iter = lower_bound(originalIncomingValues, cvi);
-        if (iter != originalIncomingValues.end() && *iter == cvi) {
+        auto iter = find(originalIncomingValues, cvi);
+        if (iter != originalIncomingValues.end()) {
           // We use an auxillary array here so we can continue to bisect on
           // original incoming values. Once we are done processing here, we will
           // not need that property anymore.
