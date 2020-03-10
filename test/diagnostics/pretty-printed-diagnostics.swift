@@ -80,6 +80,13 @@ foo(b:
 // CHECK:             |   ^ warning: result of operator '+' is unused
 // CHECK: [[#LINE+1]] |
 
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:5
+// CHECK: [[#LINE-1]] | func foo(a: Int, b: Int) {
+// CHECK: [[#LINE]]   |   a + b
+// CHECK:             |   ~   ~
+// CHECK:             |     ^ warning: result of operator '+' is unused
+// CHECK: [[#LINE+1]] | }
+
 // Test inline fix-it rendering.
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:11
 // CHECK:  [[#LINE-1]] |
@@ -88,6 +95,19 @@ foo(b:
 // CHECK:              |                 ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
 // CHECK: [[#LINE+1]]  |
 
+// Test snippet truncation.
+// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:3
+// CHECK: [[#LINE-1]] | func baz() {
+// CHECK: [[#LINE]]   |   bar(a: "hello, world!")
+// CHECK:             |   ^ error: no exact matches in call to global function 'bar'
+// CHECK: [[#LINE+1]] | }
+// CHECK:   ...
+// CHECK: [[#LINE:]]  |
+// CHECK: [[#LINE+1]] | func bar(a: Int) {}
+// CHECK:             |      ^ note: candidate expects value of type 'Int' for parameter #1
+// CHECK: [[#LINE+2]] | func bar(a: Float) {}
+// CHECK:             |      ^ note: candidate expects value of type 'Float' for parameter #1
+// CHECK: [[#LINE+3]] |
 
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:7
 // CHECK: [[#LINE-2]] | struct Foo {
@@ -191,24 +211,3 @@ foo(b:
 // CHECK:             |     ----
 // CHECK:             |     ^ error: argument 'a' must precede argument 'b' [remove ',\n    a: 2' and insert 'a: 2, ']
 // CHECK: [[#LINE+1]] |
-
-// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:5
-// CHECK: [[#LINE-1]] | func foo(a: Int, b: Int) {
-// CHECK: [[#LINE]]   |   a + b
-// CHECK:             |   ~   ~
-// CHECK:             |     ^ warning: result of operator '+' is unused
-// CHECK: [[#LINE+1]] | }
-
-// Test snippet truncation.
-// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:3
-// CHECK: [[#LINE-1]] | func baz() {
-// CHECK: [[#LINE]]   |   bar(a: "hello, world!")
-// CHECK:             |   ^ error: no exact matches in call to global function 'bar'
-// CHECK: [[#LINE+1]] | }
-// CHECK:   ...
-// CHECK: [[#LINE:]]  |
-// CHECK: [[#LINE+1]] | func bar(a: Int) {}
-// CHECK:             |      ^ note: candidate expects value of type 'Int' for parameter #1
-// CHECK: [[#LINE+2]] | func bar(a: Float) {}
-// CHECK:             |      ^ note: candidate expects value of type 'Float' for parameter #1
-// CHECK: [[#LINE+3]] |

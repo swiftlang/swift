@@ -113,13 +113,13 @@ struct Generic<T> { // expected-note {{'T' declared as parameter to type 'Generi
 }
 
 protocol P { // expected-note {{'P' previously declared here}}
-  // expected-note@-1 2{{did you mean 'P'?}}
+  // expected-note@-1 {{did you mean 'P'?}}
   // expected-note@-2 {{'P' declared here}}
   typealias a = Generic
 }
 
 protocol P {} // expected-error {{invalid redeclaration of 'P'}}
-// expected-note@-1 2{{did you mean 'P'?}}
+// expected-note@-1 {{did you mean 'P'?}}
 // expected-note@-2 {{'P' declared here}}
 
 func hasTypo() {
@@ -175,7 +175,7 @@ class CircularValidationWithTypo {
 // Crash with invalid extension that has not been bound -- https://bugs.swift.org/browse/SR-8984
 protocol PP {}
 
-func boo() {
+func boo() { // expected-note {{did you mean 'boo'?}}
   extension PP { // expected-error {{declaration is only valid at file scope}}
     func g() {
       booo() // expected-error {{use of unresolved identifier 'booo'}}
@@ -217,7 +217,7 @@ protocol P2 {
 }
 
 extension P2 {
-  func f() { // expected-note {{did you mean 'f'?}}
+  func f() {
     _ = a // expected-error {{use of unresolved identifier 'a'}}
   }
 }

@@ -1166,8 +1166,18 @@ namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
   ASTContext &Ctx;
+  std::vector<AbstractFunctionDecl *> definedFunctions;
 
   explicit DeclChecker(ASTContext &ctx) : Ctx(ctx) {}
+  ~DeclChecker() {
+    for (AbstractFunctionDecl *AFD : definedFunctions) {
+      TypeChecker::typeCheckAbstractFunctionBody(AFD);
+    }
+
+    for (AbstractFunctionDecl *FD : llvm::reverse(definedFunctions)) {
+      TypeChecker::computeCaptures(FD);
+    }
+  }
 
   ASTContext &getASTContext() const { return Ctx; }
 
@@ -2150,9 +2160,7 @@ public:
     } else if (shouldSkipBodyTypechecking(FD)) {
       FD->setBodySkipped(FD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(FD);
+      definedFunctions.push_back(FD);
     }
 
     checkExplicitAvailability(FD);
@@ -2484,9 +2492,8 @@ public:
     } else if (shouldSkipBodyTypechecking(CD)) {
       CD->setBodySkipped(CD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(CD);
+      TypeChecker::typeCheckAbstractFunctionBody(CD);
+      TypeChecker::computeCaptures(CD);
     }
 
     checkDefaultArguments(CD->getParameters());
@@ -2501,9 +2508,8 @@ public:
     } else if (shouldSkipBodyTypechecking(DD)) {
       DD->setBodySkipped(DD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(DD);
+      TypeChecker::typeCheckAbstractFunctionBody(DD);
+      TypeChecker::computeCaptures(DD);
     }
   }
 };

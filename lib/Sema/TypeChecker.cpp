@@ -290,20 +290,8 @@ static void bindExtensions(SourceFile &SF) {
 }
 
 static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
-  unsigned currentFunctionIdx = 0;
   unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
-    // Type check the body of each of the function in turn.  Note that outside
-    // functions must be visited before nested functions for type-checking to
-    // work correctly.
-    for (unsigned n = TC.definedFunctions.size(); currentFunctionIdx != n;
-         ++currentFunctionIdx) {
-      auto *AFD = TC.definedFunctions[currentFunctionIdx];
-      assert(!AFD->getDeclContext()->isLocalContext());
-
-      TypeChecker::typeCheckAbstractFunctionBody(AFD);
-    }
-
     // Type check synthesized functions and their bodies.
     for (unsigned n = SF.SynthesizedDecls.size();
          currentSynthesizedDecl != n;
@@ -312,15 +300,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       TypeChecker::typeCheckDecl(decl);
     }
 
-  } while (currentFunctionIdx < TC.definedFunctions.size() ||
-           currentSynthesizedDecl < SF.SynthesizedDecls.size());
-
-
-  for (AbstractFunctionDecl *FD : llvm::reverse(TC.definedFunctions)) {
-    TypeChecker::computeCaptures(FD);
-  }
-
-  TC.definedFunctions.clear();
+  } while (currentSynthesizedDecl < SF.SynthesizedDecls.size());
 }
 
 void swift::performTypeChecking(SourceFile &SF) {
