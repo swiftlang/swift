@@ -91,17 +91,11 @@ public:
     frozen = true;
   }
 
-  /// Reset the frozen multimap in an unfrozen state with its storage cleared.
-  void reset() {
-    storage.clear();
-    frozen = false;
-  }
-
   unsigned size() const { return storage.size(); }
   bool empty() const { return storage.empty(); }
 
   struct iterator : std::iterator<std::forward_iterator_tag,
-                                  std::pair<Key, PairToSecondEltRange>> {
+                                  std::pair<Key, ArrayRef<Value>>> {
     using base_iterator = typename decltype(storage)::iterator;
 
     FrozenMultiMap &map;
@@ -165,11 +159,9 @@ public:
     }
   };
 
-  using RangeType = llvm::iterator_range<iterator>;
-
   /// Return a range of (key, ArrayRef<Value>) pairs. The keys are guaranteed to
   /// be in key sorted order and the ArrayRef<Value> are in insertion order.
-  RangeType getRange() const {
+  llvm::iterator_range<iterator> getRange() const {
     assert(isFrozen() &&
            "Can not create range until data structure is frozen?!");
     auto *self = const_cast<FrozenMultiMap *>(this);
