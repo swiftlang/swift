@@ -673,18 +673,6 @@ struct SemanticARCOptVisitor
     eraseInstruction(i);
   }
 
-  /// Pop values off of visitedSinceLastMutation, adding .some values to the
-  /// worklist.
-  void drainVisitedSinceLastMutationIntoWorklist() {
-    while (!visitedSinceLastMutation.empty()) {
-      Optional<SILValue> nextValue = visitedSinceLastMutation.pop_back_val();
-      if (!nextValue.hasValue()) {
-        continue;
-      }
-      worklist.insert(*nextValue);
-    }
-  }
-
   /// Remove all results of the given instruction from the worklist and then
   /// erase the instruction. Assumes that the instruction does not have any
   /// users left.
@@ -698,7 +686,13 @@ struct SemanticARCOptVisitor
     i->eraseFromParent();
 
     // Add everything else from visitedSinceLastMutation to the worklist.
-    drainVisitedSinceLastMutationIntoWorklist();
+    for (auto opt : visitedSinceLastMutation) {
+      if (!opt.hasValue()) {
+        continue;
+      }
+      worklist.insert(*opt);
+    }
+    visitedSinceLastMutation.clear();
   }
 
   InstModCallbacks getCallbacks() {
@@ -1004,9 +998,14 @@ bool SemanticARCOptVisitor::optimize() {
     assumingAtFixedPoint = true;
     SWIFT_DEFER { assumingAtFixedPoint = false; };
 
-    // Add everything in visitedSinceLastMutation to the worklist so we
-    // recompute our fixed point.
-    drainVisitedSinceLastMutationIntoWorklist();
+    // Add everything in visitedSinceLastMutation to the worklist.
+    for (auto opt : visitedSinceLastMutation) {
+      if (!opt.hasValue()) {
+        continue;
+      }
+      worklist.insert(*opt);
+    }
+    visitedSinceLastMutation.clear();
 
     // Then re-run the worklist. We shouldn't modify anything since we are at a
     // fixed point and are just using this to seed the
