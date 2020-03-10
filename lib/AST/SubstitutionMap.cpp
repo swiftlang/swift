@@ -657,6 +657,7 @@ void SubstitutionMap::verify() const {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 
+    SWIFT_DEFER { ++conformanceIndex; };
     auto substType = req.getFirstType().subst(*this);
     if (substType->isTypeParameter() ||
         substType->is<ArchetypeType>() ||
@@ -677,15 +678,44 @@ void SubstitutionMap::verify() const {
       llvm::dbgs() << "SubstitutionMap:\n";
       dump(llvm::dbgs());
       llvm::dbgs() << "\n";
+      llvm::dbgs() << "Requirement:\n";
+      req.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
     }
     assert(conformance.isConcrete() && "Conformance should be concrete");
+    
+    if (substType->is<UnboundGenericType>())
+      continue;
+    
+    auto conformanceTy = conformance.getConcrete()->getType();
+    if (conformanceTy->hasTypeParameter()
+        && !substType->hasTypeParameter()) {
+      conformanceTy = conformance.getConcrete()->getDeclContext()
+        ->mapTypeIntoContext(conformanceTy);
+    }
+    
+    if (!substType->isEqual(conformanceTy)) {
+      llvm::dbgs() << "Conformance must match concrete replacement type:\n";
+      substType->dump(llvm::dbgs());
+      llvm::dbgs() << "Conformance type:\n";
+      conformance.getConcrete()->getType()->dump(llvm::dbgs());
+      llvm::dbgs() << "Conformance:\n";
+      conformance.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      llvm::dbgs() << "SubstitutionMap:\n";
+      dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      llvm::dbgs() << "Requirement:\n";
+      req.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+    assert(substType->isEqual(conformanceTy)
+           && "conformance should match corresponding type");
 
     if (substType->isExistentialType()) {
       assert(isa<SelfProtocolConformance>(conformance.getConcrete()) &&
               "Existential type cannot have normal conformance");
     }
-
-    ++conformanceIndex;
   }
 #endif
 }
