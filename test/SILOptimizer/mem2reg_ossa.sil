@@ -496,3 +496,64 @@ bb0(%0 : @owned $(Builtin.BridgeObject, Builtin.Int32)):
   %7 = tuple ()
   return %7 : $()
 }
+
+// TODO: arg test (one copied, one undef)
+// TODO: arg test (no uses)
+
+sil [ossa] @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
+
+sil [ossa] @test : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $Builtin.BridgeObject
+  cond_br undef, bb1, bb2
+  
+bb1:
+  %2 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
+  %3 = apply %2() : $@convention(thin) () -> @owned Builtin.BridgeObject
+  store %3 to [init] %1 : $*Builtin.BridgeObject
+  br bb3
+
+bb2:
+  %5 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
+  %6 = apply %5() : $@convention(thin) () -> @owned Builtin.BridgeObject
+  store %6 to [init] %1 : $*Builtin.BridgeObject
+  br bb3
+  
+bb3:
+  destroy_addr %1 : $*Builtin.BridgeObject
+  dealloc_stack %1 : $*Builtin.BridgeObject
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil [ossa] @test_single_bb : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $Builtin.BridgeObject
+  cond_br undef, bb1, bb2
+  
+  %2 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
+  %3 = apply %2() : $@convention(thin) () -> @owned Builtin.BridgeObject
+  store %3 to [init] %1 : $*Builtin.BridgeObject
+
+  destroy_addr %1 : $*Builtin.BridgeObject
+  dealloc_stack %1 : $*Builtin.BridgeObject
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil [ossa] @test_single_bb_fold_destroy_value : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $Builtin.BridgeObject
+  cond_br undef, bb1, bb2
+  
+  %2 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
+  %3 = apply %2() : $@convention(thin) () -> @owned Builtin.BridgeObject
+  %4 = copy_value %3 : $Builtin.BridgeObject
+  // CHECK-NOT: destroy_value
+  store %4 to [init] %1 : $*Builtin.BridgeObject
+
+  destroy_addr %1 : $*Builtin.BridgeObject
+  dealloc_stack %1 : $*Builtin.BridgeObject
+  %7 = tuple ()
+  return %7 : $()
+}

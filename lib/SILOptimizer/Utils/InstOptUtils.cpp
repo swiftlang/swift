@@ -614,9 +614,9 @@ void swift::eraseUsesOfInstruction(SILInstruction *inst, CallbackTy callback) {
       // nothing uses this instruction.
       eraseUsesOfInstruction(user, callback);
 
+      callback(user);
       // Walk through the operand list and delete any random instructions that
       // will become trivially dead when this instruction is removed.
-
       for (auto &operand : user->getAllOperands()) {
         if (auto *operandI = operand.get()->getDefiningInstruction()) {
           // Don't recursively delete the instruction we're working on.
@@ -628,7 +628,6 @@ void swift::eraseUsesOfInstruction(SILInstruction *inst, CallbackTy callback) {
           }
         }
       }
-      callback(user);
       user->eraseFromParent();
     }
   }

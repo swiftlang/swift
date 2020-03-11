@@ -586,6 +586,21 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       I->eraseFromParent();
       NumInstRemoved++;
     }
+    
+    // In ossa we need to consume `x` after removing the stack_alloc/store:
+    //   sa = stack_alloc
+    //   x = apply
+    //   store x to sa
+    //   destroy_addr sa
+    // We know that RunningVal was found in a store instruction if it's not
+    // a SILUndef. We check at the end of the function so `use_empty` will
+    // return a correct value.
+    if (RunningVal && !isa<SILUndef>(RunningVal) &&
+        RunningVal->getFunction()->hasOwnership() &&
+        RunningVal->use_empty() &&
+        !RunningVal->getType().isTrivial(*RunningVal->getFunction()))
+      SILBuilderWithScope(std::next(RunningVal.getDefiningInstruction()->getIterator()))
+        .emitDestroyValueAndFold(RunningVal.getLoc(), RunningVal);
   }
 }
 
@@ -914,9 +929,29 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
     return false;
   }
 
+  // In ossa we need to consume `x` after removing a consuming store:
+  //   sa = stack_alloc
+  //   x = apply
+  //   store x to sa
+  //   destroy_addr sa
+  auto consumeStoreSrc = [](SILInstruction *i) {
+    // To do this we check that the instruction was a store instruction, we get
+    // the src and check if it's only use is the store. If so, emit a destroy
+    // value.
+    if (auto store = dyn_cast<StoreInst>(i)) {
+      if (store->getFunction()->hasOwnership() &&
+          store->getSrc()->getSingleUse() &&
+          store->getSrc()->getSingleUse()->getUser() == store &&
+          !store->getSrc()->getType().isTrivial(*store->getFunction())) {
+        SILBuilderWithScope(std::next(store->getSrc().getDefiningInstruction()->getIterator()))
+          .emitDestroyValueAndFold(store->getSrc().getLoc(), store->getSrc());
+      }
+    }
+  };
+
   // Remove write-only AllocStacks.
   if (isWriteOnlyAllocation(alloc)) {
-    eraseUsesOfInstruction(alloc);
+    eraseUsesOfInstruction(alloc, consumeStoreSrc);
 
     LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: "<< *alloc);
     return true;
@@ -948,7 +983,7 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
   // Make sure that all of the allocations were promoted into registers.
   assert(isWriteOnlyAllocation(alloc) && "Non-write uses left behind");
   // ... and erase the allocation.
-  eraseUsesOfInstruction(alloc);
+  eraseUsesOfInstruction(alloc, consumeStoreSrc);
   return true;
 }
 
