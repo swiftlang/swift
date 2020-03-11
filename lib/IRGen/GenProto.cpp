@@ -1148,11 +1148,9 @@ public:
   }
 };
 
-  /// A class which lays out a specific conformance to a protocol.
-  class WitnessTableBuilder : public SILWitnessVisitor<WitnessTableBuilder> {
+  class WitnessTableBuilderBase {
+  protected:
     IRGenModule &IGM;
-    ConstantArrayBuilder &Table;
-    unsigned TableSize = ~0U; // will get overwritten unconditionally
     SILWitnessTable *SILWT;
     CanType ConcreteType;
     const RootProtocolConformance &Conformance;
@@ -1162,22 +1160,15 @@ public:
         SILConditionalConformances;
 
     Optional<FulfillmentMap> Fulfillments;
-    SmallVector<std::pair<size_t, const ConformanceInfo *>, 4>
-      SpecializedBaseConformances;
 
     SmallVector<size_t, 4> ConditionalRequirementPrivateDataIndices;
 
     // Conditional conformances and metadata caches are stored at negative
     // offsets, with conditional conformances closest to 0.
     unsigned NextPrivateDataIndex = 0;
-    bool ResilientConformance;
 
-    const ProtocolInfo &PI;
-
-  public:
-    WitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
-                        SILWitnessTable *SILWT)
-        : IGM(IGM), Table(table), SILWT(SILWT),
+    WitnessTableBuilderBase(IRGenModule &IGM, SILWitnessTable *SILWT)
+        : IGM(IGM), SILWT(SILWT),
           ConcreteType(SILWT->getConformance()->getDeclContext()
                           ->mapTypeIntoContext(
                             SILWT->getConformance()->getType())
@@ -1187,7 +1178,94 @@ public:
             mapConformanceIntoContext(IGM, Conformance,
                                       Conformance.getDeclContext())),
           SILEntries(SILWT->getEntries()),
-          SILConditionalConformances(SILWT->getConditionalConformances()),
+          SILConditionalConformances(SILWT->getConditionalConformances()) {}
+
+    void addConditionalConformances() {
+      assert(NextPrivateDataIndex == 0);
+      for (auto conditional : SILConditionalConformances) {
+        // We don't actually need to know anything about the specific
+        // conformances here, just make sure we get right private data slots.
+        (void)conditional;
+
+        auto reqtIndex = getNextPrivateDataIndex();
+        ConditionalRequirementPrivateDataIndices.push_back(reqtIndex);
+      }
+    }
+
+    void defineAssociatedTypeWitnessTableAccessFunction(
+                                        AssociatedConformance requirement,
+                                        CanType associatedType,
+                                        ProtocolConformanceRef conformance);
+
+    llvm::Constant *getAssociatedConformanceWitness(
+                                    AssociatedConformance requirement,
+                                    CanType associatedType,
+                                    ProtocolConformanceRef conformance);
+
+    /// Allocate another word of private data storage in the conformance table.
+    unsigned getNextPrivateDataIndex() {
+      return NextPrivateDataIndex++;
+    }
+
+    const FulfillmentMap &getFulfillmentMap() {
+      if (Fulfillments) return *Fulfillments;
+
+      Fulfillments.emplace();
+      if (ConcreteType->hasArchetype()) {
+        struct Callback : FulfillmentMap::InterestingKeysCallback {
+          bool isInterestingType(CanType type) const override {
+            return isa<ArchetypeType>(type);
+          }
+          bool hasInterestingType(CanType type) const override {
+            return type->hasArchetype();
+          }
+          bool hasLimitedInterestingConformances(CanType type) const override {
+            return false;
+          }
+          GenericSignature::ConformsToArray
+          getInterestingConformances(CanType type) const override {
+            llvm_unreachable("no limits");
+          }
+          CanType getSuperclassBound(CanType type) const override {
+            if (auto superclassTy = cast<ArchetypeType>(type)->getSuperclass())
+              return superclassTy->getCanonicalType();
+            return CanType();
+          }
+        } callback;
+        Fulfillments->searchTypeMetadata(IGM, ConcreteType, IsExact,
+                                         MetadataState::Abstract,
+                                         /*sourceIndex*/ 0, MetadataPath(),
+                                         callback);
+      }
+      return *Fulfillments;
+    }
+
+    /// The top-level entry point.
+    void build() {
+      addConditionalConformances();
+    }
+
+  public:
+    /// The number of private entries in the witness table.
+    unsigned getTablePrivateSize() const { return NextPrivateDataIndex; }
+  };
+
+  /// A class which lays out a specific conformance to a protocol.
+  class WitnessTableBuilder : public WitnessTableBuilderBase,
+                              public SILWitnessVisitor<WitnessTableBuilder> {
+    ConstantArrayBuilder &Table;
+    unsigned TableSize = ~0U; // will get overwritten unconditionally
+    SmallVector<std::pair<size_t, const ConformanceInfo *>, 4>
+      SpecializedBaseConformances;
+
+    bool ResilientConformance;
+
+    const ProtocolInfo &PI;
+
+  public:
+    WitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
+                        SILWitnessTable *SILWT)
+        : WitnessTableBuilderBase(IGM, SILWT), Table(table),
           ResilientConformance(IGM.isResilientConformance(&Conformance)),
           PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol(),
                                  (ResilientConformance
@@ -1196,9 +1274,6 @@ public:
 
     /// The number of entries in the witness table.
     unsigned getTableSize() const { return TableSize; }
-
-    /// The number of private entries in the witness table.
-    unsigned getTablePrivateSize() const { return NextPrivateDataIndex; }
 
     /// The top-level entry point.
     void build();
@@ -1376,75 +1451,6 @@ public:
     /// table specialization.
     llvm::Constant *buildInstantiationFunction();
 
-  private:
-    void addConditionalConformances() {
-      assert(NextPrivateDataIndex == 0);
-      for (auto conditional : SILConditionalConformances) {
-        // We don't actually need to know anything about the specific
-        // conformances here, just make sure we get right private data slots.
-        (void)conditional;
-
-        auto reqtIndex = getNextPrivateDataIndex();
-        ConditionalRequirementPrivateDataIndices.push_back(reqtIndex);
-      }
-    }
-
-    void defineAssociatedTypeWitnessTableAccessFunction(
-                                        AssociatedConformance requirement,
-                                        CanType associatedType,
-                                        ProtocolConformanceRef conformance);
-
-    llvm::Constant *getAssociatedConformanceWitness(
-                                    AssociatedConformance requirement,
-                                    CanType associatedType,
-                                    ProtocolConformanceRef conformance);
-
-    /// Allocate another word of private data storage in the conformance table.
-    unsigned getNextPrivateDataIndex() {
-      return NextPrivateDataIndex++;
-    }
-
-    Address getAddressOfPrivateDataSlot(IRGenFunction &IGF, Address table,
-                                        unsigned index) {
-      assert(index < NextPrivateDataIndex);
-      return IGF.Builder.CreateConstArrayGEP(
-          table, privateWitnessTableIndexToTableOffset(index),
-          IGF.IGM.getPointerSize());
-    }
-
-    const FulfillmentMap &getFulfillmentMap() {
-      if (Fulfillments) return *Fulfillments;
-
-      Fulfillments.emplace();
-      if (ConcreteType->hasArchetype()) {
-        struct Callback : FulfillmentMap::InterestingKeysCallback {
-          bool isInterestingType(CanType type) const override {
-            return isa<ArchetypeType>(type);
-          }
-          bool hasInterestingType(CanType type) const override {
-            return type->hasArchetype();
-          }
-          bool hasLimitedInterestingConformances(CanType type) const override {
-            return false;
-          }
-          GenericSignature::ConformsToArray
-          getInterestingConformances(CanType type) const override {
-            llvm_unreachable("no limits");
-          }
-          CanType getSuperclassBound(CanType type) const override {
-            if (auto superclassTy = cast<ArchetypeType>(type)->getSuperclass())
-              return superclassTy->getCanonicalType();
-            return CanType();
-          }
-        } callback;
-        Fulfillments->searchTypeMetadata(IGM, ConcreteType, IsExact,
-                                         MetadataState::Abstract,
-                                         /*sourceIndex*/ 0, MetadataPath(),
-                                         callback);
-      }
-      return *Fulfillments;
-    }
-
   public:
     /// Collect the set of resilient witnesses, which will become part of the
     /// protocol conformance descriptor.
@@ -1455,7 +1461,7 @@ public:
 
 /// Build the witness table.
 void WitnessTableBuilder::build() {
-  addConditionalConformances();
+  WitnessTableBuilderBase::build();
   visitProtocolDecl(Conformance.getProtocol());
   TableSize = Table.size();
 }
@@ -1491,7 +1497,7 @@ static void buildAssociatedTypeValueName(CanType depAssociatedType,
   }
 }
 
-llvm::Constant *WitnessTableBuilder::getAssociatedConformanceWitness(
+llvm::Constant *WitnessTableBuilderBase::getAssociatedConformanceWitness(
                                 AssociatedConformance requirement,
                                 CanType associatedType,
                                 ProtocolConformanceRef conformance) {
@@ -1502,7 +1508,7 @@ llvm::Constant *WitnessTableBuilder::getAssociatedConformanceWitness(
   return IGM.getMangledAssociatedConformance(conf, requirement);
 }
 
-void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
+void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
                                 AssociatedConformance requirement,
                                 CanType associatedType,
                                 ProtocolConformanceRef associatedConformance) {
@@ -2155,24 +2161,23 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   auto conf = wt->getConformance();
   PrettyStackTraceConformance _st(Context, "emitting witness table for", conf);
 
-  // Build the witness table.
-  ConstantInitBuilder builder(*this);
-  auto wtableContents = builder.beginArray(Int8PtrTy);
-  WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
-  wtableBuilder.build();
-
-  SmallVector<llvm::Constant *, 4> resilientWitnesses;
-  // Collect the resilient witnesses to go into the conformance descriptor.
-  wtableBuilder.collectResilientWitnesses(resilientWitnesses);
-
-  // Produce the initializer value.
-  auto initializer = wtableContents.finishAndCreateFuture();
-
-  bool isDependent = isDependentConformance(conf);
-
+  unsigned tableSize = 0;
+  unsigned tablePrivateSize = 0;
   llvm::GlobalVariable *global = nullptr;
-  unsigned tableSize;
+  llvm::Constant *instantiationFunction = nullptr;
+  bool isDependent = isDependentConformance(conf);
+  SmallVector<llvm::Constant *, 4> resilientWitnesses;
+
   if (!isResilientConformance(conf)) {
+    // Build the witness table.
+    ConstantInitBuilder builder(*this);
+    auto wtableContents = builder.beginArray(Int8PtrTy);
+    WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
+    wtableBuilder.build();
+
+    // Produce the initializer value.
+    auto initializer = wtableContents.finishAndCreateFuture();
+
     global = cast<llvm::GlobalVariable>(
       (isDependent && conf->getDeclContext()->isGenericContext())
         ? getAddrOfWitnessTablePattern(cast<NormalProtocolConformance>(conf),
@@ -2181,20 +2186,36 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     global->setConstant(isConstantWitnessTable(wt));
     global->setAlignment(
         llvm::MaybeAlign(getWitnessTableAlignment().getValue()));
+
     tableSize = wtableBuilder.getTableSize();
+    tablePrivateSize = wtableBuilder.getTablePrivateSize();
+
+    instantiationFunction = wtableBuilder.buildInstantiationFunction();
   } else {
+    // Build the witness table.
+    ConstantInitBuilder builder(*this);
+    auto wtableContents = builder.beginArray(Int8PtrTy);
+    WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
+    wtableBuilder.build();
+
+    // Collect the resilient witnesses to go into the conformance descriptor.
+    wtableBuilder.collectResilientWitnesses(resilientWitnesses);
+
+    // Produce the initializer value.
+    auto initializer = wtableContents.finishAndCreateFuture();
     initializer.abandon();
+
     tableSize = 0;
+    tablePrivateSize = wtableBuilder.getTablePrivateSize();
   }
 
   // Collect the information that will go into the protocol conformance
   // descriptor.
   ConformanceDescription description(conf, wt, global, tableSize,
-                                     wtableBuilder.getTablePrivateSize(),
-                                     isDependent);
+                                     tablePrivateSize, isDependent);
 
   // Build the instantiation function, we if need one.
-  description.instantiationFn = wtableBuilder.buildInstantiationFunction();
+  description.instantiationFn = instantiationFunction;
   description.resilientWitnesses = std::move(resilientWitnesses);
 
   // Record this conformance descriptor.
