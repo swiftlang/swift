@@ -3674,6 +3674,10 @@ public:
     return !checkStatements;
   }
 
+  void visitTypeRepr(TypeRepr *T) {
+    // Do nothing for all TypeReprs except the ones listed below.
+  }
+
   void visitIdentTypeRepr(IdentTypeRepr *T) {
     if (T->isInvalid())
       return;

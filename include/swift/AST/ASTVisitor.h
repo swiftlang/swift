@@ -127,10 +127,6 @@ public:
     llvm_unreachable("Not reachable, all cases handled");
   }
 
-  TypeReprRetTy visitTypeRepr(TypeRepr *T, Args... AA) {
-    return TypeReprRetTy();
-  }
-
 #define TYPEREPR(CLASS, PARENT) \
   TypeReprRetTy visit##CLASS##TypeRepr(CLASS##TypeRepr *T, Args... AA) {\
     return static_cast<ImplClass*>(this)->visit##PARENT(T, \
