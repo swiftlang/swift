@@ -606,9 +606,8 @@ SILInstruction *getInstructionFollowingValueDefinition(SILValue value) {
 /// \p value is a trivial type, return the value itself.
 SILValue makeOwnedCopyOfSILValue(SILValue value, SILFunction &fun) {
   SILType type = value->getType();
-  if (type.isTrivial(fun))
+  if (type.isTrivial(fun) || type.isAddress())
     return value;
-  assert(!type.isAddress() && "cannot make owned copy of addresses");
 
   SILInstruction *instAfterValueDefinition =
       getInstructionFollowingValueDefinition(value);
