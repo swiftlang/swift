@@ -112,7 +112,7 @@ protected:
   }
 
 public:
-  PolymorphicConvention(IRGenModule &IGM, CanSILFunctionType fnType, bool considerParameterSources);
+  PolymorphicConvention(IRGenModule &IGM, CanSILFunctionType fnType);
 
   ArrayRef<MetadataSource> getSources() const { return Sources; }
 
@@ -179,9 +179,8 @@ private:
 } // end anonymous namespace
 
 PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
-                                             CanSILFunctionType fnType,
-                                             bool considerParameterSources = true)
-  : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType){
+                                             CanSILFunctionType fnType)
+  : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType) {
   initGenerics();
 
   auto rep = fnType->getRepresentation();
@@ -213,18 +212,16 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
     unsigned selfIndex = ~0U;
     auto params = fnType->getParameters();
 
-    if (considerParameterSources) {
-      // Consider 'self' first.
-      if (fnType->hasSelfParam()) {
-        selfIndex = params.size() - 1;
-        considerParameter(params[selfIndex], selfIndex, true);
-      }
+    // Consider 'self' first.
+    if (fnType->hasSelfParam()) {
+      selfIndex = params.size() - 1;
+      considerParameter(params[selfIndex], selfIndex, true);
+    }
 
-      // Now consider the rest of the parameters.
-      for (auto index : indices(params)) {
-        if (index != selfIndex)
-          considerParameter(params[index], index, false);
-      }
+    // Now consider the rest of the parameters.
+    for (auto index : indices(params)) {
+      if (index != selfIndex)
+        considerParameter(params[index], index, false);
     }
   }
 }
@@ -3003,16 +3000,14 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
 NecessaryBindings
 NecessaryBindings::forPartialApplyForwarder(IRGenModule &IGM,
                                           CanSILFunctionType origType,
-                                          SubstitutionMap subs,
-                                          bool considerParameterSources) {
+                                          SubstitutionMap subs) {
   return computeBindings(IGM, origType, subs,
-                         true  /*forPartialApplyForwarder*/,
-                         considerParameterSources);
+                         true /*forPartialApplyForwarder*/);
 }
 
 NecessaryBindings NecessaryBindings::computeBindings(
     IRGenModule &IGM, CanSILFunctionType origType, SubstitutionMap subs,
-    bool forPartialApplyForwarder, bool considerParameterSources) {
+    bool forPartialApplyForwarder) {
 
   NecessaryBindings bindings;
   bindings.forPartialApply = forPartialApplyForwarder;
@@ -3022,7 +3017,7 @@ NecessaryBindings NecessaryBindings::computeBindings(
     return bindings;
 
   // Figure out what we're actually required to pass:
-  PolymorphicConvention convention(IGM, origType, considerParameterSources);
+  PolymorphicConvention convention(IGM, origType);
 
   //  - unfulfilled requirements
   convention.enumerateUnfulfilledRequirements(
