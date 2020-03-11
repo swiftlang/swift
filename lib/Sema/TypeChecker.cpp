@@ -289,16 +289,16 @@ static void bindExtensions(SourceFile &SF) {
   // typeCheckDecl().
 }
 
-static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
+static void typeCheckDelayedFunctions(SourceFile &SF) {
   unsigned currentFunctionIdx = 0;
   unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
     // work correctly.
-    for (unsigned n = TC.definedFunctions.size(); currentFunctionIdx != n;
+    for (unsigned n = SF.DelayedFunctions.size(); currentFunctionIdx != n;
          ++currentFunctionIdx) {
-      auto *AFD = TC.definedFunctions[currentFunctionIdx];
+      auto *AFD = SF.DelayedFunctions[currentFunctionIdx];
       assert(!AFD->getDeclContext()->isLocalContext());
 
       TypeChecker::typeCheckAbstractFunctionBody(AFD);
@@ -312,15 +312,15 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       TypeChecker::typeCheckDecl(decl);
     }
 
-  } while (currentFunctionIdx < TC.definedFunctions.size() ||
+  } while (currentFunctionIdx < SF.DelayedFunctions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size());
 
 
-  for (AbstractFunctionDecl *FD : llvm::reverse(TC.definedFunctions)) {
+  for (AbstractFunctionDecl *FD : llvm::reverse(SF.DelayedFunctions)) {
     TypeChecker::computeCaptures(FD);
   }
 
-  TC.definedFunctions.clear();
+  SF.DelayedFunctions.clear();
 }
 
 void swift::performTypeChecking(SourceFile &SF) {
@@ -392,7 +392,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     if (SF->Kind == SourceFileKind::REPL && !Ctx.hadError())
       TypeChecker::processREPLTopLevel(*SF);
 
-    typeCheckFunctionsAndExternalDecls(*SF, TC);
+    typeCheckDelayedFunctions(*SF);
   }
 
   // Checking that benefits from having the whole module available.

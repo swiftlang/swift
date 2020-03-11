@@ -405,10 +405,6 @@ enum class CheckedCastContextKind {
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker final {
-public:
-  /// The list of function definitions we've encountered.
-  std::vector<AbstractFunctionDecl *> definedFunctions;
-
 private:
   TypeChecker() = default;
   ~TypeChecker() = default;
