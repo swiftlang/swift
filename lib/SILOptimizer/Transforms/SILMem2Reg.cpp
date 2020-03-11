@@ -189,8 +189,7 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
     return true;
 
   if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
-      !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I) &&
-      !isa<BeginBorrowInst>(I))
+      !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I))
     return false;
   
   // Recursively search for other (non-)loads in the instruction's uses.
@@ -213,8 +212,7 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
 /// Returns true if \p I is a dead struct_element_addr or tuple_element_addr.
 static bool isDeadAddrProjection(SILInstruction *I) {
   if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
-      !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I) &&
-      !isa<BeginBorrowInst>(I))
+      !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I))
     return false;
 
   // Recursively search for uses which are dead themselves.
@@ -331,8 +329,7 @@ static bool isLoadFromStack(SILInstruction *I, AllocStackInst *ASI) {
   ValueBase *op = I->getOperand(0);
   while (op != ASI) {
     if (!isa<UncheckedAddrCastInst>(op) && !isa<StructElementAddrInst>(op) &&
-        !isa<TupleElementAddrInst>(op) && !isa<BeginAccessInst>(op) &&
-        !isa<BeginBorrowInst>(op))
+        !isa<TupleElementAddrInst>(op) && !isa<BeginAccessInst>(op))
       return false;
     
     op = cast<SingleValueInstruction>(op)->getOperand(0);
@@ -347,8 +344,7 @@ static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) 
     return;
   }
   if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
-      !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I) &&
-      !isa<BeginBorrowInst>(I))
+      !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I))
     return;
   
   // Recursively search for other loads in the instruction's uses.
@@ -363,14 +359,13 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   SILValue op = LI->getOperand();
   while (op != ASI) {
     assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
-           isa<TupleElementAddrInst>(op) || isa<BeginAccessInst>(op) ||
-           isa<BeginBorrowInst>(op));
+           isa<TupleElementAddrInst>(op) || isa<BeginAccessInst>(op));
     auto *Inst = cast<SingleValueInstruction>(op);
     // We don't want to project these instructions but we do want to follow
     // their operand.
     // TODO: we should try to remove these instruction after they've been
     // projected.
-    if (!isa<BeginAccessInst>(op) && !isa<BeginBorrowInst>(op))
+    if (!isa<BeginAccessInst>(op))
       projections.push_back(Projection(Inst));
     op = Inst->getOperand(0);
   }
@@ -386,8 +381,7 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   LI->eraseFromParent();
   while (op != ASI && op->use_empty()) {
     assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
-           isa<TupleElementAddrInst>(op) || isa<BeginAccessInst>(op) ||
-           isa<BeginBorrowInst>(op));
+           isa<TupleElementAddrInst>(op) || isa<BeginAccessInst>(op));
     auto *Inst = cast<SingleValueInstruction>(op);
     SILValue next = Inst->getOperand(0);
     Inst->eraseFromParent();
@@ -444,7 +438,10 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
         // If we don't know the content of the AllocStack then the loaded
         // value *is* the new value;
         LLVM_DEBUG(llvm::dbgs() << "*** First load: " << *Load);
-        RunningVal = Load;
+        // TODO: we can handle `load [take]` by emiting a destroy of the
+        // operand.
+        if (!Load->getFunction()->hasOwnership())
+          RunningVal = Load;
       }
       continue;
     }
@@ -578,8 +575,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     SILNode *Node = Inst;
     while (isa<StructElementAddrInst>(Node) ||
            isa<TupleElementAddrInst>(Node) ||
-           isa<UncheckedAddrCastInst>(Node) || isa<BeginAccessInst>(Node) ||
-           isa<BeginBorrowInst>(Node)) {
+           isa<UncheckedAddrCastInst>(Node) ||
+           isa<BeginAccessInst>(Node)) {
       auto *I = cast<SingleValueInstruction>(Node);
       if (!I->use_empty()) break;
       Node = I->getOperand(0);

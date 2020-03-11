@@ -484,7 +484,6 @@ bb0(%0 : @owned $Optional<Klass>):
   return %4 : $()
 }
 
-// TODO: tuple with single trivial element
 sil [ossa] @half_trivial : $@convention(thin) (@owned (Builtin.BridgeObject, Builtin.Int32)) -> () {
 bb0(%0 : @owned $(Builtin.BridgeObject, Builtin.Int32)):
   %1 = alloc_stack $(Builtin.BridgeObject, Builtin.Int32)
@@ -572,3 +571,106 @@ bb0(%0 : @guaranteed $__CocoaDictionary):
   %7 = tuple ()
   return %7 : $()
 } // end sil function '$ss17__CocoaDictionaryV6lookupyyXlSgyXlF'
+
+sil [ossa] @test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+bb0(%0 : @owned $SmallCodesizeStruct):
+  %1 = alloc_stack $SmallCodesizeStruct
+  store %0 to [init] %1 : $*SmallCodesizeStruct
+  cond_br undef, bb1, bb2
+  
+bb1:
+  %3 = load [copy] %1 : $*SmallCodesizeStruct
+  destroy_addr %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  %4 = begin_borrow %3 : $SmallCodesizeStruct
+  debug_value %4 : $SmallCodesizeStruct
+  end_borrow %4 : $SmallCodesizeStruct
+  destroy_value %3 : $SmallCodesizeStruct
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  br bb3
+  
+bb3:
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil [ossa] @test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+bb0(%0 : @owned $SmallCodesizeStruct):
+  %1 = alloc_stack $SmallCodesizeStruct
+  store %0 to [init] %1 : $*SmallCodesizeStruct
+  cond_br undef, bb1, bb2
+  
+bb1:
+  // TODO: ideally we can destructure in this block as well.
+  %3 = load [take] %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  destroy_value %3 : $SmallCodesizeStruct
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  br bb3
+  
+bb3:
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil [ossa] @test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+bb0(%0 : @owned $SmallCodesizeStruct):
+  %1 = alloc_stack $SmallCodesizeStruct
+  store %0 to [init] %1 : $*SmallCodesizeStruct
+  cond_br undef, bb1, bb2
+  
+bb1:
+  %3 = load [take] %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  %4 = begin_borrow %3 : $SmallCodesizeStruct
+  debug_value %4 : $SmallCodesizeStruct
+  end_borrow %4 : $SmallCodesizeStruct
+  destroy_value %3 : $SmallCodesizeStruct
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  br bb3
+  
+bb3:
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil [ossa] @test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+bb0(%0 : @owned $SmallCodesizeStruct):
+  %1 = alloc_stack $SmallCodesizeStruct
+  store %0 to [init] %1 : $*SmallCodesizeStruct
+
+  %3 = load [take] %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  destroy_value %3 : $SmallCodesizeStruct
+
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil [ossa] @test_x : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %65 = alloc_stack $AnyObject                    // users: %67, %71, %70, %68
+  %66 = copy_value %0 : $AnyObject                // user: %67
+  store %66 to [init] %65 : $*AnyObject           // id: %67
+  %68 = unchecked_addr_cast %65 : $*AnyObject to $*_NSDictionary // user: %69
+  %69 = load [copy] %68 : $*_NSDictionary         // users: %73, %74, %79
+  destroy_addr %65 : $*AnyObject                  // id: %70
+  dealloc_stack %65 : $*AnyObject                 // id: %71
+  destroy_value %69 : $_NSDictionary
+
+  %7 = tuple ()
+  return %7 : $()
+}
+
