@@ -2720,7 +2720,7 @@ public:
     /// The conformance the param is constrained to use.
     ///
     /// Only valid if the requirement has SameConformance kind.
-    RelativeIndirectablePointer<TargetProtocolConformanceRecord<Runtime>,
+    RelativeIndirectablePointer<TargetProtocolConformanceDescriptor<Runtime>,
                                 /*nullable*/ false> Conformance;
     
     /// The kind of layout constraint.
@@ -2758,7 +2758,7 @@ public:
 
   /// Retrieve the protocol conformance record for a SameConformance
   /// requirement.
-  const TargetProtocolConformanceRecord<Runtime> *getConformance() const {
+  const TargetProtocolConformanceDescriptor<Runtime> *getConformance() const {
     assert(getKind() == GenericRequirementKind::SameConformance);
     return Conformance;
   }
