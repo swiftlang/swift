@@ -617,3 +617,50 @@ testSwitchCombined(getE(1))
 // CHECK: testSwitchCombined
 // CHECK-SAME: second("just 42")
 testSwitchCombined(getE(2))
+
+
+// Test buildOptional(_:) as an alternative to buildIf(_:).
+@_functionBuilder
+struct TupleBuilderWithOpt {
+  static func buildBlock<T1>(_ t1: T1) -> (T1) {
+    return (t1)
+  }
+
+  static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
+    return (t1, t2)
+  }
+  
+  static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
+      -> (T1, T2, T3) {
+    return (t1, t2, t3)
+  }
+
+  static func buildBlock<T1, T2, T3, T4>(_ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4)
+      -> (T1, T2, T3, T4) {
+    return (t1, t2, t3, t4)
+  }
+
+  static func buildBlock<T1, T2, T3, T4, T5>(
+    _ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4, _ t5: T5
+  ) -> (T1, T2, T3, T4, T5) {
+    return (t1, t2, t3, t4, t5)
+  }
+
+  static func buildDo<T>(_ value: T) -> T { return value }
+  static func buildOptional<T>(_ value: T?) -> T? { return value }
+
+  static func buildEither<T,U>(first value: T) -> Either<T,U> {
+    return .first(value)
+  }
+  static func buildEither<T,U>(second value: U) -> Either<T,U> {
+    return .second(value)
+  }
+}
+
+func tuplifyWithOpt<T>(_ cond: Bool, @TupleBuilderWithOpt body: (Bool) -> T) {
+  print(body(cond))
+}
+tuplifyWithOpt(true) { c in
+  "1"
+  3.14159
+}
