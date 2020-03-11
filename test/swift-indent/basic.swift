@@ -115,7 +115,9 @@ if #available(
 
 // Trailing closures, subscript expressions and argument tuples/parens should
 // indent relative to the line containing the start of the last named component
-// of their function, or the function start if their are none.
+// of their function, or the function start if their are none. Any child
+// tuples/parens/brackets should that start after them on the same line should
+// do the same.
 //
 let _ = []
         .map {
@@ -145,6 +147,51 @@ basename
     {
         fatalError()
     }
+
+[foo(a: Int,
+     b: Int)[z: {
+    fatalError()
+}],
+"hello"
+]
+
+[foo(a: Int,
+     b: Int)[z: foo ({
+    fatalError()
+}, {
+    fatalError()
+})],
+"hello"
+]
+
+[foo(a: Int,
+     b: Int) {
+    fatalError()
+} [y: 10,
+   z: foo ({
+    fatalError()
+   }, {
+    fatalError()
+   })],
+"hello"
+]
+
+[foo(a: Int,
+     b: Int) [z: foo ()
+{
+    fatalError()
+})],
+"hello"
+]
+
+[foo(a: Int,
+     b: Int) [z: foo (a: 1,
+                      b: 2)
+{
+    fatalError()
+})],
+"hello"
+]
 
 
 // Closing arg parens shouldn't indent.
@@ -239,6 +286,34 @@ let s = """
         b
             c
     """
+
+
+// Interpolations shouldn't change how multiline strings are handled.
+//
+switch self {
+case .first:
+    return """
+        foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo \
+        foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo.
+        """
+case .second(let a, let b):
+    return """
+        foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo \(bar.bar), \
+        foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo foo \(bar.bar).
+        """
+}
+
+
+// Comments after the last item of a collection should still indent.
+//
+let x = [
+    // hello
+    124,
+    // hello
+    123
+    // hello
+]
+
 
 // Pound directives aren't indentation contexts, though this should probably be
 // configurable.
@@ -717,6 +792,11 @@ let myFunc: () -> (Int,
                    Int)
 
 
+// Tuple types should align on their outer label locs (if present)
+//
+typealias Thing = (_ tmpURL: URL,
+                   _ secondURL: URL) -> (destinationURL: URL, options: Options)
+
 // Type member access shouldn't indent.
 //
 func foo(
@@ -818,10 +898,12 @@ foo.bar() {
     return
 }
 
+
 // Handle invalid for each (missing 'in' location)
 //
 for query: foo
 bar;
+
 
 // Handle custom attributes
 //
@@ -834,3 +916,17 @@ struct Foo {
     )
     var d: Int = 10
 }
+
+// Ignore postfix expressions when determining context locations.
+//
+return Foo(deferred) {
+    print("hello")
+}++
+
+IncrementedFirst++
+    .foo()++
+    .bar {
+
+    }++
+    .baz()
+

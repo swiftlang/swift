@@ -41,33 +41,34 @@ static void widenOrSet(SourceRange &First, SourceRange Second) {
   }
 }
 
-static bool isFirstTokenOnLine(SourceManager &SM, SourceLoc Loc, bool SkipComments = true) {
+/// \returns true if \c Loc is the location of the first non-comment token on
+///   its line.
+static bool isFirstTokenOnLine(SourceManager &SM, SourceLoc Loc) {
   assert(Loc.isValid());
   SourceLoc LineStart = Lexer::getLocForStartOfLine(SM, Loc);
-  CommentRetentionMode Mode = SkipComments
-    ? CommentRetentionMode::None
-    : CommentRetentionMode::ReturnAsTokens;
-  Token First = Lexer::getTokenAtLocation(SM, LineStart, Mode);
+  CommentRetentionMode SkipComments = CommentRetentionMode::None;
+  Token First = Lexer::getTokenAtLocation(SM, LineStart, SkipComments);
   return First.getLoc() == Loc;
 }
 
+/// \returns the location of the first non-whitespace character on the line
+///   containing \c Loc.
 static SourceLoc
-getLocForContentStartOnSameLine(SourceManager &SM, SourceLoc Loc,
-                                bool SkipComments = true) {
+getLocForContentStartOnSameLine(SourceManager &SM, SourceLoc Loc) {
   assert(Loc.isValid());
   SourceLoc LineStart = Lexer::getLocForStartOfLine(SM, Loc);
   StringRef Indentation = Lexer::getIndentationForLine(SM, LineStart);
   return LineStart.getAdvancedLoc(Indentation.size());
 }
 
+/// \returns the first token after the token at \c Loc.
 static Optional<Token>
-getNextToken(SourceManager &SM, SourceLoc Loc, bool SkipComments = true) {
+getTokenAfter(SourceManager &SM, SourceLoc Loc, bool SkipComments = true) {
   assert(Loc.isValid());
   CommentRetentionMode Mode = SkipComments
     ? CommentRetentionMode::None
     : CommentRetentionMode::ReturnAsTokens;
-  Token Given = Lexer::getTokenAtLocation(SM, Loc, Mode);
-  assert(Given.getLoc() == Loc);
+  assert(Lexer::getTokenAtLocation(SM, Loc, Mode).getLoc() == Loc);
   SourceLoc End = Lexer::getLocForEndOfToken(SM, Loc);
   Token Next = Lexer::getTokenAtLocation(SM, End, Mode);
   if (Next.getKind() == tok::NUM_TOKENS)
@@ -75,11 +76,13 @@ getNextToken(SourceManager &SM, SourceLoc Loc, bool SkipComments = true) {
   return Next;
 }
 
+/// \returns the last token of the given kind in the open range between \c From
+///   and \c To.
 static Optional<Token>
-getLastTokenOfKindInRange(SourceManager &SM, tok Kind,
-                          SourceLoc From, SourceLoc To) {
+getLastTokenOfKindInOpenRange(SourceManager &SM, tok Kind,
+                              SourceLoc From, SourceLoc To) {
   Optional<Token> Match;
-  while (auto Next = getNextToken(SM, From)) {
+  while (auto Next = getTokenAfter(SM, From)) {
     if (!Next || !SM.isBeforeInBuffer(Next->getLoc(), To))
       break;
     if (Next->getKind() == Kind)
@@ -89,12 +92,15 @@ getLastTokenOfKindInRange(SourceManager &SM, tok Kind,
   return Match;
 }
 
+/// \returns true if the token at \c Loc is one of the given \c Kinds.
 static bool locIsKind(SourceManager &SM, SourceLoc Loc, ArrayRef<tok> Kinds) {
   Token Tok = Lexer::getTokenAtLocation(SM, Loc);
-  return Tok.getLoc() == Loc && Tok.getKind() != tok::NUM_TOKENS &&
+  return Tok.getLoc() == Loc &&
       std::find(Kinds.begin(), Kinds.end(), Tok.getKind()) != Kinds.end();
 }
 
+/// \returns the given \c Loc if there is a token at that location that is one
+///   of the given \c Kinds and an invalid \c SourceLocation otherwise.
 static SourceLoc getLocIfKind(SourceManager &SM, SourceLoc Loc,
                               ArrayRef<tok> Kinds) {
   if (!locIsKind(SM, Loc, Kinds))
@@ -102,6 +108,8 @@ static SourceLoc getLocIfKind(SourceManager &SM, SourceLoc Loc,
   return Loc;
 }
 
+/// \returns the given \c Loc if there is a token at that location that is
+///   spelled with the given \c Text and an invalid \c SourceLocation otherwise.
 static SourceLoc
 getLocIfTokenTextMatches(SourceManager &SM, SourceLoc Loc, StringRef Text) {
   Token Tok = Lexer::getTokenAtLocation(SM, Loc);
@@ -111,6 +119,8 @@ getLocIfTokenTextMatches(SourceManager &SM, SourceLoc Loc, StringRef Text) {
   return Loc;
 }
 
+/// \returns true if the given \c VarDecl has grouping accessor braces containing
+///   one or more explicit accessors.
 static bool hasExplicitAccessors(VarDecl *VD) {
   auto Getter = VD->getParsedAccessor(AccessorKind::Get);
   SourceRange Braces = VD->getBracesRange();
@@ -127,7 +137,7 @@ struct IndentContext {
   SourceLoc ContextLoc;
 
   /// Indicates whether to indent relative to the extact column of ContextLoc
-  /// (Exact) or to the start of the content on line it appears on (LineStart).
+  /// (Exact) or to the start of the content of the line it appears on (LineStart).
   ContextKind Kind;
 
   /// The number of levels to indent by.
@@ -138,42 +148,104 @@ struct IndentContext {
   : ContextLoc(Context), Kind(Kind), IndentLevel(AddsIndent ? 1 : 0) {
     assert(Context.isValid());
   }
-  IndentContext(SourceLoc Context, unsigned NumIndents,
-                ContextKind Kind = LineStart)
-  : ContextLoc(Context), Kind(Kind), IndentLevel(NumIndents) {
-    assert(Context.isValid());
-  }
 };
 
 
-/// A helper class used to override the ContextLoc and Kind of an IndentContext.
+/// A helper class used to optionally override the ContextLoc and Kind of an
+/// IndentContext.
 class ContextOverride {
-  SourceLoc ContextLoc; ///< The overriding ContextLoc.
-  IndentContext::ContextKind Kind; ///< The overriding Kind.
-
-  /// The location after which this override takes effect.
-  SourceLoc ApplicableFromLoc;
+  struct Override {
+    /// The overriding ContextLoc.
+    SourceLoc ContextLoc;
+    /// The overriding Kind.
+    IndentContext::ContextKind Kind;
+    /// The location after which this override takes effect.
+    SourceLoc ApplicableFrom;
+  };
+  Optional<Override> Value;
 
 public:
-  ContextOverride(SourceLoc ContextLoc, IndentContext::ContextKind Kind,
-                    SourceLoc ApplicableLoc = SourceLoc())
-  : ContextLoc(ContextLoc), Kind(Kind), ApplicableFromLoc(ApplicableLoc) {
-    if (ApplicableFromLoc.isInvalid())
-      ApplicableFromLoc = ContextLoc;
+  /// Sets this override to make an IndentContext indent relative to the exact
+  /// column of AlignLoc if the IndentContext's ContextLoc is >= AlignLoc and
+  /// on the same line.
+  void setExact(SourceManager &SM, SourceLoc AlignLoc) {
+    Value = {AlignLoc, IndentContext::Exact, AlignLoc};
   }
 
-  SourceLoc getContextLoc() const { return ContextLoc; };
+  /// Sets this override to propagate the given ContextLoc along to any
+  /// IndentContext with a ContextLoc >= L and on the same line. If this
+  /// override's existing value applies to the provided ContextLoc, its
+  /// ContextLoc is propagated instead.
+  ///
+  /// This propagation is necessary for cases like the trailing closure of 'bar'
+  /// in the example below. It's direct ContextLoc is 'bar', but we want
+  /// it to be 'foo' (the ContextLoc of its parent tuple expression):
+  ///
+  /// \code
+  /// foo(a: 1,
+  ///     b: 2)(45, bar(c: 1,
+  ///                   d: 2) {
+  ///   fatalError()
+  /// })
+  /// \endcode
+  SourceLoc propagateContext(SourceManager &SM, SourceLoc ContextLoc,
+                             IndentContext::ContextKind Kind,
+                             SourceLoc L, SourceLoc R) {
+    // If the range ends on the same line as it starts, we know up front that
+    // no child range can span multiple lines, so there's no need to propagate
+    // ContextLoc via this override.
+    if (R.isValid() && isOnSameLine(SM, L, R))
+      return ContextLoc;
+
+    Override NewValue = {ContextLoc, Kind, L};
+    if (Value) {
+      // If the existing override applies to the same line, it's ContextLoc
+      // should override this ContextLoc - don't propagate the intermediary.
+      if (isOnSameLine(SM, Value->ApplicableFrom, NewValue.ApplicableFrom)) {
+        assert(!SM.isBeforeInBuffer(NewValue.ContextLoc,
+                                    Value->ContextLoc) &&
+               "children walked before parents?");
+        return ContextLoc;
+      }
+      // Apply the existing value to NewValue before we overwrite it so its
+      // ContextLoc propagates.
+      applyIfNeeded(SM, NewValue.ContextLoc, NewValue.Kind);
+    }
+    Value = NewValue;
+    return Value->ContextLoc;
+  }
 
   /// Applies the overriding ContextLoc and Kind to the given IndentContext if it
-  /// starts after ApplicableFromLoc but on the same line, and its kind isn't
-  /// already 'Exact'.
+  /// starts after ApplicableFrom and on the same line.
   void applyIfNeeded(SourceManager &SM, IndentContext &Ctx) {
-    if (!isOnSameLine(SM, Ctx.ContextLoc, ApplicableFromLoc) ||
-        Ctx.Kind == IndentContext::Exact)
-      return;
-    Ctx.ContextLoc = ContextLoc;
-    Ctx.Kind = Kind;
+    applyIfNeeded(SM, Ctx.ContextLoc, Ctx.Kind);
   }
+
+  /// Applies the overriding ContextLoc and Kind to the given ContextLoc and
+  /// Kind if the given ContextLoc starts after ApplicableFrom and on the same
+  /// line.
+  void applyIfNeeded(SourceManager &SM, SourceLoc &ContextLoc,
+                     IndentContext::ContextKind &Kind) {
+    if (!Value)
+      return;
+
+    if (!isOnSameLine(SM, ContextLoc, Value->ApplicableFrom) ||
+        SM.isBeforeInBuffer(ContextLoc, Value->ApplicableFrom))
+      return;
+
+    // Exactly aligned indent contexts should always set a matching exact
+    // alignment context override so child braces/parens/brackets are indented
+    // correctly. If the given innermost indent context is Exact and the
+    // override doesn't match its Kind and ContextLoc, something is wrong.
+    assert((Kind != IndentContext::Exact ||
+            (Value->Kind == IndentContext::Exact &&
+             ContextLoc == Value->ContextLoc)) &&
+           "didn't set override ctx when exact innermost context was set?");
+    ContextLoc = Value->ContextLoc;
+    Kind = Value->Kind;
+  }
+
+  void clear() { Value = None; }
 };
 
 
@@ -219,7 +291,7 @@ public:
       SpaceLength += C == '\t' ? FmtOptions.TabWidth : 1;
     SpaceLength += InnermostCtx->IndentLevel * FmtOptions.TabWidth;
 
-    // If we're indenting past the exact column, round up to the next tab.
+    // If we're indenting past the exact column, round down to the next tab.
     if (InnermostCtx->IndentLevel)
       SpaceLength -= SpaceLength % FmtOptions.TabWidth;
 
@@ -263,14 +335,17 @@ static Expr *getContextExprOf(SourceManager &SM, Expr *E) {
   if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(E)) {
     if (auto *Sub = USE->getSubExpr())
       return getContextExprOf(SM, Sub);
-  } else if (auto *AE = dyn_cast<ApplyExpr>(E)) {
-    if (auto *Fn = AE->getFn())
+  } else if (auto *CE = dyn_cast<CallExpr>(E)) {
+    if (auto *Fn = CE->getFn())
       return getContextExprOf(SM, Fn);
   } else if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
     if (auto *B = SE->getBase())
       return getContextExprOf(SM, B);
   } else if (auto *OBE = dyn_cast<BindOptionalExpr>(E)) {
     if (auto *B = OBE->getSubExpr())
+      return getContextExprOf(SM, B);
+  } else if (auto *PUE = dyn_cast<PostfixUnaryExpr>(E)) {
+    if (auto *B = PUE->getArg())
       return getContextExprOf(SM, B);
   }
   return E;
@@ -283,15 +358,15 @@ static Expr *getContextExprOf(SourceManager &SM, Expr *E) {
 /// in the example below, where 'select' is the desired ContextLoc to use.
 ///
 /// \code
-///     Base()
-///      .select(x: 10
-///              y: 20)[10] {
-///        print($0)
-///      }
-///      .count
+/// Base()
+///   .select(x: 10
+///           y: 20)[10] {
+///     print($0)
+///   }
+///   .count
 /// \endcode
 static SourceLoc getContextLocForArgs(SourceManager &SM, Expr *E) {
-  assert(isa<SubscriptExpr>(E) || isa<ApplyExpr>(E) || isa<UnresolvedSpecializeExpr>(E));
+  assert(isa<SubscriptExpr>(E) || isa<CallExpr>(E) || isa<UnresolvedSpecializeExpr>(E));
   Expr *Base = getContextExprOf(SM, E);
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(Base))
     return UDE->getDotLoc();
@@ -304,17 +379,13 @@ static SourceLoc getContextLocForArgs(SourceManager &SM, Expr *E) {
 /// braces, angle brackets, and square brackets in a given AST node, along with their ContextLoc.
 class RangeWalker: protected ASTWalker {
 protected:
-  bool IsDone = false;
   SourceManager &SM;
 
 public:
   explicit RangeWalker(SourceManager &SM) : SM(SM) {}
 
   /// \returns true to continue walking.
-  virtual bool handleRange(SourceLoc Start, SourceLoc End,
-                           SourceLoc ContextLoc) {
-    return true;
-  }
+  virtual bool handleRange(SourceLoc L, SourceLoc R, SourceLoc ContextLoc) = 0;
 
 private:
   bool handleBraces(SourceLoc L, SourceLoc R, SourceLoc ContextLoc) {
@@ -544,17 +615,24 @@ private:
                           PL->getStartLoc()))
           return Stop;
       }
-    } else if (isa<ApplyExpr>(E) || isa<SubscriptExpr>(E)) {
+    } else if (isa<CallExpr>(E) || isa<SubscriptExpr>(E)) {
       SourceLoc ContextLoc = getContextLocForArgs(SM, E);
       Expr *Arg;
-      if (auto *AE = dyn_cast<ApplyExpr>(E)) {
-        Arg = AE->getArg();
+      if (auto *CE = dyn_cast<CallExpr>(E)) {
+        Arg = CE->getArg();
       } else {
         Arg = cast<SubscriptExpr>(E)->getIndex();
       }
       ClosureExpr *TC = nullptr;
       CaptureListExpr *TCL = nullptr;
       if (auto *PE = dyn_cast_or_null<ParenExpr>(Arg)) {
+        if (isa<SubscriptExpr>(E)) {
+          if (!handleSquares(PE->getLParenLoc(), PE->getRParenLoc(), ContextLoc))
+            return Stop;
+        } else {
+          if (!handleParens(PE->getLParenLoc(), PE->getRParenLoc(), ContextLoc))
+            return Stop;
+        }
         if (PE->hasTrailingClosure()) {
           if (auto *Last = PE->getSubExpr()) {
             TC = dyn_cast<ClosureExpr>(Last);
@@ -562,6 +640,13 @@ private:
           }
         }
       } else if (auto *TE = dyn_cast_or_null<TupleExpr>(Arg)) {
+        if (isa<SubscriptExpr>(E)) {
+          if (!handleSquares(TE->getLParenLoc(), TE->getRParenLoc(), ContextLoc))
+            return Stop;
+        } else {
+          if (!handleParens(TE->getLParenLoc(), TE->getRParenLoc(), ContextLoc))
+            return Stop;
+        }
         if (TE->hasTrailingClosure()) {
           if (auto *Last = TE->getElements().back()) {
             TC = dyn_cast<ClosureExpr>(Last);
@@ -614,43 +699,158 @@ private:
   bool shouldWalkIntoGenericParams() override { return true; }
 };
 
-/// Whether to include or exclude the range of the node itself
-enum class CheckMode {Inclusive, Exclusive};
+/// Indicates whether a range is an open or closed range.
+enum class RangeKind {Closed, Open};
 
 /// A helper class that determines whether a given node, or subrage of a node
 /// should indent or not when it spans multiple lines.
 class OutdentChecker: protected RangeWalker {
   SourceRange CheckRange; ///< The source range to consider.
-  CheckMode Mode; ///< Whether to ignore the range matching CheckRange.
+  RangeKind CheckRangeKind; ///< Whether \c CheckRange is open or closed.
   bool IsOutdenting = false; ///< Tracks whether a seen range prevents indenting.
+  llvm::DenseMap<SourceLoc, ContextOverride> LineStartToOverride;
 
   explicit OutdentChecker(SourceManager &SM,
-                          SourceRange CheckRange,  CheckMode Mode)
-  : RangeWalker(SM), CheckRange(CheckRange), Mode(Mode) {
+                          SourceRange CheckRange,  RangeKind CheckRangeKind)
+  : RangeWalker(SM), CheckRange(CheckRange), CheckRangeKind(CheckRangeKind) {
     assert(CheckRange.isValid());
   }
 
-  bool handleRange(SourceLoc Start, SourceLoc End, SourceLoc ContextLoc) override {
-    assert(Start.isValid() && ContextLoc.isValid());
-    if ((Mode == CheckMode::Exclusive && Start == CheckRange.Start) ||
-        !isOnSameLine(SM, ContextLoc, CheckRange.Start) ||
-        !isInCheckRange(Start, End) ||
-        (End.isValid() && isOnSameLine(SM, ContextLoc, End)))
+  bool handleRange(SourceLoc L, SourceLoc R, SourceLoc ContextLoc) override {
+    assert(L.isValid() && ContextLoc.isValid());
+
+    // Ignore parens/braces/brackets outside of the open/closed check range.
+    if (!isInCheckRange(L, R))
       return true;
-    if (ContextLoc != Start && isFirstTokenOnLine(SM, Start)) {
+
+    // The CheckRange is made outdenting by any parens/braces/brackets with:
+    // 1) a ContextLoc starts on the same line as the start of CheckRange, and
+    // 2) either:
+    //   a) an R token that starts its containing line, or
+    //   b) an L token that isn't the ContextLoc and starts its containing line.
+    //
+    // E.g. for an open CheckRange covering the contents of an array literal
+    // with various line bresk positions:
+    //
+    //   // This doesn't outdent because:
+    //   [ // The array brackets are outside the open CheckRange so ignored.
+    //     (1, (2, 3)), // both parens fail conditions 1 and 2.
+    //     (4, (5, 6))  // both parens fail conditions 1 and 2.
+    //   ]
+    //
+    //   // This doesn't outdent because:
+    //   [(1, (2, 3)), // both parens fail condition 2.
+    //      ( // these parens fail condition 1.
+    //        4, (5, 6) // these parens fail conditions 1 and 2.
+    //      )]
+    //
+    //   This outdents because:
+    //   [( // These parens meet conditions 1 and 2a.
+    //     1, (2, 3)
+    //   ), (
+    //     4, (5, 6)
+    //   )]
+    //
+    //   This outdents because:
+    //   [(1, ( // The inner parens meet conditions 1 and 2a.
+    //     2, 3
+    //   ), (4, (5, 6)]
+    //
+    //   This outdents because:
+    //   [(1, (2, 3), ( // The inner parens meet conditions 1 and 2a.
+    //     4, (5, 6)
+    //   )]
+    //
+    // For a closed CheckRange covering the variable declaration below:
+    //
+    //   This doesn't outdent because:
+    //   var x = foo(1) { // The parens and braces fail condition 2
+    //     return 42 }
+    //
+    //   This outdents because:
+    //   var x = foo(1) { // These braces meet conditions 1 and 2a.
+    //      return 42
+    //   }
+    //
+    //   This outdents because:
+    //   var x = foo(1)
+    //   { // These braces meet conditions 1 and 2b (their ContextLoc is 'foo').
+    //      return 42
+    //   }
+    //
+    // And for a closed CheckRange covering the call expression below:
+    //
+    //   This doesn't outdent because:
+    //   foo(1, // These parens fail condition 2.
+    //     2, 3) { return 42 } // These braces fail condition 1 and 2.
+    //
+    //   This outdents because:
+    //   foo(1, 2, 3)
+    //   { // These braces meet conditions 1 and 2b (their ContextLoc is 'foo').
+    //     return 42
+    //   }
+
+    // The above conditions are not sufficient to handle cases like the below,
+    // which we would like to be considered outdenting:
+    //   foo(a: 1,
+    //       b: 2)[x: bar { // These braces fail condition 1.
+    //       return 42
+    //   }]
+    // To handle them, we propagate the ContextLoc of each parent range down to
+    // any child ranges that start on the same line as the parent. The braces
+    // above then 'inherit' the ContextLoc of their parent brackets ('foo'), and
+    // pass condition 1.
+    ContextLoc = propagateContextLocs(ContextLoc, L, R);
+
+    // Ignore parens/braces/brackets that fail Condition 1.
+    if (!isOnSameLine(SM, ContextLoc, CheckRange.Start))
+      return true;
+
+    // Ignore parens/braces/brackets that can't meet Condition 2.
+    if (R.isValid() && isOnSameLine(SM, ContextLoc, R))
+      return true;
+
+    // Check condition 2b.
+    if (ContextLoc != L && isFirstTokenOnLine(SM, L)) {
       IsOutdenting = true;
-    } else if (End.isValid()) {
-      SourceLoc LineStart = Lexer::getLocForStartOfLine(SM, End);
+    } else if (R.isValid()) {
+      // Check condition 2a.
+      SourceLoc LineStart = Lexer::getLocForStartOfLine(SM, R);
       Token First = Lexer::getTokenAtLocation(SM, LineStart,
                                               CommentRetentionMode::None);
-      IsOutdenting |= First.getLoc() == End;
+      IsOutdenting |= First.getLoc() == R;
     }
+
+    // We only need to continue checking if it's not already outdenting.
     return !IsOutdenting;
   }
 
-  bool isInCheckRange(SourceLoc Start, SourceLoc End) const {
-    return !SM.isBeforeInBuffer(Start, CheckRange.Start) &&
-      (End.isInvalid() || !SM.isBeforeInBuffer(CheckRange.End, End));
+  SourceLoc propagateContextLocs(SourceLoc ContextLoc, SourceLoc L, SourceLoc R) {
+    // Update ContextLoc for the currently active override on its line.
+    ContextOverride &CtxOverride = getOverrideForLineContaining(ContextLoc);
+    IndentContext::ContextKind Kind = IndentContext::LineStart;
+    CtxOverride.applyIfNeeded(SM, ContextLoc, Kind);
+
+    // If ContextLoc is L there's nothing to propagate.
+    if (L == ContextLoc)
+      return ContextLoc;
+
+    // Set an override to propagate the context loc onto the line of L.
+    ContextOverride &Propagated = getOverrideForLineContaining(L);
+    ContextLoc = Propagated.propagateContext(SM, ContextLoc,
+                                             Kind, L, R);
+    return ContextLoc;
+  }
+
+  bool isInCheckRange(SourceLoc L, SourceLoc R) const {
+    switch (CheckRangeKind) {
+    case RangeKind::Open:
+      return SM.isBeforeInBuffer(CheckRange.Start, L) &&
+      (R.isInvalid() || SM.isBeforeInBuffer(R, CheckRange.End));
+    case RangeKind::Closed:
+      return !SM.isBeforeInBuffer(L, CheckRange.Start) &&
+        (R.isInvalid() || !SM.isBeforeInBuffer(CheckRange.End, R));
+    }
   }
 
 public:
@@ -663,15 +863,15 @@ public:
   /// \param WalkableParent
   ///   A parent AST node that when walked covers all relevant nodes in the
   ///   given source range.
-  /// \param Mode
-  ///   Whether to consider the given source range itself, or its contents.
+  /// \param RangeKind
+  ///   Whether the given range to check is closed (the default) or open.
   template <typename T>
   static bool hasOutdent(SourceManager &SM, SourceRange Range, T *WalkableParent,
-                         CheckMode Mode = CheckMode::Inclusive) {
+                         RangeKind RangeKind = RangeKind::Closed) {
     assert(Range.isValid());
     if (isOnSameLine(SM, Range.Start, Range.End))
       return false;
-    OutdentChecker Checker(SM, Range, Mode);
+    OutdentChecker Checker(SM, Range, RangeKind);
     WalkableParent->walk(Checker);
     return Checker.IsOutdenting;
   }
@@ -682,12 +882,21 @@ public:
   ///   The SourceManager managing the given source range.
   /// \param WalkableNode
   ///   The AST node to check.
-  /// \param Mode
-  ///   Whether to consider the given source range itself, or its contents.
+  /// \param RangeKind
+  ///   Whether to check the source range of \c WalkableNode as a closed (the
+  ///   default) or open range.
   template <typename T>
   static bool hasOutdent(SourceManager &SM, T *WalkableNode,
-                         CheckMode Mode = CheckMode::Inclusive) {
-    return hasOutdent(SM, WalkableNode->getSourceRange(), WalkableNode, Mode);
+                         RangeKind RangeKind = RangeKind::Closed) {
+    return hasOutdent(SM, WalkableNode->getSourceRange(), WalkableNode,
+                      RangeKind);
+  }
+
+private:
+  ContextOverride &getOverrideForLineContaining(SourceLoc Loc) {
+    SourceLoc LineStart = Lexer::getLocForStartOfLine(SM, Loc);
+    auto Ret = LineStartToOverride.insert({LineStart, ContextOverride()});
+    return Ret.first->getSecond();
   }
 };
 
@@ -776,13 +985,13 @@ public:
   /// \param Override
   ///   An optional ContextOverride object to set
   IndentContext
-  getContextAndSetAlignment(Optional<ContextOverride> &Override) {
+  getContextAndSetAlignment(ContextOverride &Override) {
     assert(CloseLoc.isInvalid() || !SM.isBeforeInBuffer(CloseLoc, TargetLoc));
     bool ShouldIndent = !HasOutdent && TargetLoc != IntroducerLoc;
     if (ShouldIndent && isTargetTrailing()) {
       if (TargetLoc == CloseLoc) {
         ShouldIndent = !AllowsTrailingSeparator && hasTrailingComma();
-      } else {
+      } else if (CloseLoc.isInvalid()) {
         ShouldIndent = isEmpty() || hasTrailingComma();
       }
     }
@@ -797,11 +1006,10 @@ public:
   ///
   /// This should be called before returning an \c IndentContext for a subrange
   /// of the list.
-  void setAlignmentIfNeeded(Optional<ContextOverride> &Override) {
+  void setAlignmentIfNeeded(ContextOverride &Override) {
     if (HasOutdent || AlignLoc.isInvalid())
       return;
-    assert(!Override || SM.isBeforeInBuffer(Override->getContextLoc(), AlignLoc));
-    Override = ContextOverride {AlignLoc, IndentContext::Exact};
+    Override.setExact(SM, AlignLoc);
   }
 
 private:
@@ -810,7 +1018,7 @@ private:
       return false;
     if (locIsKind(SM, LastEndLoc, tok::comma))
       return true;
-    Optional<Token> AfterLast = getNextToken(SM, LastEndLoc);
+    Optional<Token> AfterLast = getTokenAfter(SM, LastEndLoc);
     return AfterLast && AfterLast->is(tok::comma);
   }
 
@@ -859,7 +1067,7 @@ class FormatWalker : public ASTWalker {
   /// The innermost indent context of the target location.
   Optional<IndentContext> InnermostCtx;
   /// A conditionally applicable indent context override.
-  Optional<ContextOverride> CtxOverride;
+  ContextOverride CtxOverride;
   /// Whether the target location appears within a doc comment block.
   bool InDocCommentBlock = false;
   /// Whether the target location appears within a line comment.
@@ -877,7 +1085,7 @@ public:
   /// \note The given location should point to the content start of its line.
   FormatContext walkToLocation(SourceLoc Loc) {
     InnermostCtx = None;
-    CtxOverride = None;
+    CtxOverride.clear();
     TargetLocation = Loc;
     TargetLineLoc = Lexer::getLocForStartOfLine(SM, TargetLocation);
     InDocCommentBlock = InCommentLine = InStringLiteral = false;
@@ -887,8 +1095,8 @@ public:
     SF.walk(*this);
     scanTokensUntil(SourceLoc());
 
-    if (CtxOverride && InnermostCtx)
-      CtxOverride->applyIfNeeded(SM, *InnermostCtx);
+    if (InnermostCtx)
+      CtxOverride.applyIfNeeded(SM, *InnermostCtx);
 
     return FormatContext(SM, InnermostCtx, InDocCommentBlock,
                          InCommentLine, InStringLiteral);
@@ -1007,16 +1215,35 @@ private:
     }
 
     // Don't visit the child expressions of interpolated strings directly -
-    // visit only the argument of each appendInterpolation call instead.
+    // visit only the argument of each appendInterpolation call instead, and
+    // update InStringLiteral for each segment.
     if (auto *ISL = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       if (Action.shouldVisitChildren()) {
         llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, ISL);
+        SourceLoc PrevStringStart = ISL->getStartLoc();
         ISL->forEachSegment(SF.getASTContext(),
                             [&](bool IsInterpolation, CallExpr *CE) {
-          if (IsInterpolation)
-            if (auto *Arg = CE->getArg())
+          if (auto *Arg = CE->getArg()) {
+            if (IsInterpolation) {
+              // Handle the preceeding string segment.
+              CharSourceRange StringRange(SM, PrevStringStart, CE->getStartLoc());
+              if (StringRange.contains(TargetLocation)) {
+                InStringLiteral = true;
+                return;
+              }
+              // Walk into the interpolation segment.
               Arg->walk(*this);
+            } else {
+              PrevStringStart = CE->getStartLoc();
+            }
+          }
         });
+        // Handle the trailing string segment.
+        SourceLoc End = Lexer::getLocForEndOfToken(SM, ISL->getStartLoc());
+        CharSourceRange StringRange(SM, PrevStringStart, End);
+        if (StringRange.contains(TargetLocation))
+          InStringLiteral = true;
+
         return {false, E};
       }
     }
@@ -1110,10 +1337,15 @@ private:
          (Invalid || SM.isBeforeInBuffer(CurrentTokIt->getLoc(), Loc));
          CurrentTokIt++) {
       if (CurrentTokIt->getKind() == tok::comment) {
+        CharSourceRange CommentRange = CurrentTokIt->getRange();
         SourceLoc StartLineLoc = Lexer::getLocForStartOfLine(
-            SM, CurrentTokIt->getRange().getStart());
+            SM, CommentRange.getStart());
+
+        // The -1 is needed in case the past-the-end position is a newline
+        // character. In that case getLocForStartOfLine returns the start of
+        // the next line.
         SourceLoc EndLineLoc = Lexer::getLocForStartOfLine(
-            SM, CurrentTokIt->getRange().getEnd());
+            SM, CommentRange.getEnd().getAdvancedLoc(-1));
         auto TokenStr = CurrentTokIt->getRange().str();
         InDocCommentBlock |= SM.isBeforeInBuffer(StartLineLoc, TargetLineLoc) && !SM.isBeforeInBuffer(EndLineLoc, TargetLineLoc) &&
             TokenStr.startswith("/*");
@@ -1127,7 +1359,7 @@ private:
   checkForTrailingTarget(SourceLoc End) {
     if (!SM.isBeforeInBuffer(End, TargetLocation))
       return None;
-    auto Next = getNextToken(SM, End, /*SkipComments=*/false);
+    auto Next = getTokenAfter(SM, End, /*SkipComments=*/false);
     if (Next && Next->getLoc() == TargetLocation)
       return Trailing {Next};
     if (!Next || !SM.isBeforeInBuffer(Next->getLoc(), TargetLocation))
@@ -1177,7 +1409,7 @@ private:
 
   /// Checks whether the given range overlaps the target location.
   ///
-  /// \return \c Start <= \c TargetLocation <= \c End
+  /// \return \c Range.Start <= \c TargetLocation <= \c Range.End
   bool overlapsTarget(SourceRange Range) const {
     assert(Range.isValid());
     return overlapsTarget(Range.Start, Range.End);
@@ -1186,15 +1418,15 @@ private:
   /// Checks whether the given range contains the target location.
   ///
   /// \return \c Start < \c TargetLocation < \c End
-  bool containsTarget(SourceLoc L, SourceLoc R) const {
-    assert(L.isValid());
-    return SM.isBeforeInBuffer(L, TargetLocation) &&
-      (R.isInvalid() || SM.isBeforeInBuffer(TargetLocation, R));
+  bool containsTarget(SourceLoc Start, SourceLoc End) const {
+    assert(Start.isValid());
+    return SM.isBeforeInBuffer(Start, TargetLocation) &&
+      (End.isInvalid() || SM.isBeforeInBuffer(TargetLocation, End));
   }
 
   /// Checks whether the given range contains the target location.
   ///
-  /// \return \c Start < \c TargetLocation < \c End
+  /// \return \c Range.Start < \c TargetLocation < \c Range.End
   bool containsTarget(SourceRange Range) const {
     assert(Range.isValid());
     return containsTarget(Range.Start, Range.End);
@@ -1441,7 +1673,8 @@ private:
     if (!GP)
       return None;
 
-    SourceLoc L = GP->getLAngleLoc(), R = GP->getRAngleLoc();
+    SourceLoc L = GP->getLAngleLoc();
+    SourceLoc R = getLocIfTokenTextMatches(SM, GP->getRAngleLoc(), ">");
 
     if (L.isValid() && overlapsTarget(L, R)) {
       ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
@@ -1500,7 +1733,7 @@ private:
       ContextLoc,
       containsTarget(L, R) &&
         !OutdentChecker::hasOutdent(SM, SourceRange(L, End), WalkableParent,
-                                    CheckMode::Exclusive)
+                                    RangeKind::Open)
     };
   }
 
@@ -1525,7 +1758,8 @@ private:
     return None;
 
     // FIXME: Add the colon location to the AST.
-    auto ColonLoc = getLastTokenOfKindInRange(SM, tok::colon, ContextLoc, Range.Start);
+    auto ColonLoc = getLastTokenOfKindInOpenRange(SM, tok::colon, ContextLoc,
+                                                  Range.Start);
     assert(ColonLoc.hasValue() && "inherits list without leading colon?");
     Range.widen(ColonLoc->getLoc());
 
@@ -1776,7 +2010,7 @@ private:
       NodesToSkip.insert(static_cast<Stmt*>(BS));
     }
     bool shouldIndent = containsTarget(L, R) &&
-      !OutdentChecker::hasOutdent(SM, BS, CheckMode::Exclusive);
+      !OutdentChecker::hasOutdent(SM, BS, RangeKind::Open);
     return IndentContext {ContextLoc, shouldIndent};
   }
 
@@ -1840,7 +2074,7 @@ private:
 
     SourceRange Bounds = SourceRange(Condition.front().getStartLoc(),
                                      Condition.back().getEndLoc());
-    if (auto Next = getNextToken(SM, Bounds.End)) {
+    if (auto Next = getTokenAfter(SM, Bounds.End)) {
       if (Next->getKind() == tok::comma)
         Bounds.widen(Next->getLoc());
     }
@@ -1852,7 +2086,7 @@ private:
   Optional<IndentContext>
   getIndentContextFrom(Expr *E, Optional<Trailing> TrailingTarget) {
 
-    // These expression may claim a trailing target.
+    // All handled expressions may claim a trailing target.
 
     if (auto *TE = dyn_cast<TupleExpr>(E)) {
       if (TrailingTarget && TE->hasTrailingClosure())
@@ -1885,7 +2119,8 @@ private:
     }
 
     if (auto *AE = dyn_cast<ArrayExpr>(E)) {
-      SourceLoc L = AE->getLBracketLoc(), R = AE->getRBracketLoc();
+      SourceLoc L = AE->getLBracketLoc();
+      SourceLoc R = getLocIfKind(SM, AE->getRBracketLoc(), tok::r_square);
       if (L.isInvalid() || !overlapsTarget(L, R))
         return None;
 
@@ -1910,21 +2145,17 @@ private:
       return Aligner.getContextAndSetAlignment(CtxOverride);
     }
 
-    // The expressions below never claim a trailing target
-    if (TrailingTarget)
-      return None;
-
     if (auto *CLE = dyn_cast<CaptureListExpr>(E))
       return getIndentContextFrom(CLE);
 
     if (auto *CE = dyn_cast<ClosureExpr>(E))
       return getIndentContextFrom(CE);
 
-    if (isa<ApplyExpr>(E) || isa<SubscriptExpr>(E)) {
+    if (isa<CallExpr>(E) || isa<SubscriptExpr>(E)) {
       SourceLoc ContextLoc = getContextLocForArgs(SM, E);
       Expr *Arg;
-      if (auto *AE = dyn_cast<ApplyExpr>(E)) {
-        Arg = AE->getArg();
+      if (auto *CE = dyn_cast<CallExpr>(E)) {
+        Arg = CE->getArg();
       } else {
         Arg = cast<SubscriptExpr>(E)->getIndex();
       }
@@ -1932,19 +2163,14 @@ private:
       ClosureExpr *TCE = nullptr;
       CaptureListExpr *TCL = nullptr;
       if (auto *PE = dyn_cast_or_null<ParenExpr>(Arg)) {
-        if (overlapsTarget(PE->getSourceRange()))
-            CtxOverride = ContextOverride {ContextLoc, IndentContext::LineStart, PE->getLParenLoc()};
-        if (auto Ctx = getIndentContextFrom(PE, ContextLoc)) {
+        if (auto Ctx = getIndentContextFrom(PE, ContextLoc))
           return Ctx;
-        }
         if (PE->hasTrailingClosure()) {
           Expr *Last = PE->getSubExpr();
           TCE = dyn_cast_or_null<ClosureExpr>(Last);
           TCL = dyn_cast_or_null<CaptureListExpr>(Last);
         }
       } else if (auto *TE = dyn_cast_or_null<TupleExpr>(Arg)) {
-        if (overlapsTarget(TE->getSourceRange()))
-            CtxOverride = ContextOverride {ContextLoc, IndentContext::LineStart, TE->getLParenLoc()};
         if (auto Ctx = getIndentContextFrom(TE, ContextLoc)) {
           return Ctx;
         }
@@ -1957,11 +2183,11 @@ private:
 
       if (TCL) {
         SourceRange Range = TCL->getSourceRange();
-        if (Range.isValid() && overlapsTarget(Range))
+        if (Range.isValid() && (TrailingTarget || overlapsTarget(Range)))
           return getIndentContextFrom(TCL, ContextLoc);
       } else if (TCE) {
         SourceRange Range = TCE->getSourceRange();
-        if (Range.isValid() && overlapsTarget(Range))
+        if (Range.isValid() && (TrailingTarget || overlapsTarget(Range)))
           return getIndentContextFrom(TCE, ContextLoc);
       }
     }
@@ -1974,81 +2200,95 @@ private:
                        SourceLoc ContextLoc = SourceLoc()) {
     ClosureExpr *CE = CL->getClosureBody();
     BraceStmt *BS = CE->getBody();
+    if (!CE || !BS)
+      return None;
 
     if (ContextLoc.isValid()) {
       NodesToSkip.insert(static_cast<Expr*>(CL));
     } else {
       NodesToSkip.insert(static_cast<Expr*>(CE));
-      if (BS)
-        NodesToSkip.insert(static_cast<Stmt*>(BS));
     }
 
-    SourceRange Brackets = CL->getClosureBody()->getBracketRange();
-    if (Brackets.isInvalid() || !isTargetContext(Brackets))
-      return getIndentContextFrom(CE, ContextLoc, CL);
-
-    ContextLoc = CL->getStartLoc();
-    SourceLoc L = Brackets.Start, R = Brackets.End;
-    ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
-    for (auto &Entry: CL->getCaptureList()) {
-      if (auto *PBD = Entry.Init) {
-        NodesToSkip.insert(PBD);
-        SourceRange Range = PBD->getSourceRangeIncludingAttrs();
-        Aligner.updateAlignment(Range, PBD);
-
-        if (isTargetContext(Range)) {
-          Aligner.setAlignmentIfNeeded(CtxOverride);
-          return IndentContext {
-            Range.Start,
-            !OutdentChecker::hasOutdent(SM, Range, PBD)
-          };
-        }
-      }
-    }
-    return Aligner.getContextAndSetAlignment(CtxOverride);
+    return getIndentContextFrom(CE, ContextLoc, CL);
   }
 
   Optional<IndentContext>
   getIndentContextFrom(ClosureExpr *CE, SourceLoc ContextLoc = SourceLoc(),
                        CaptureListExpr *ParentCapture = nullptr) {
-    if (ContextLoc.isValid())
+    BraceStmt *BS = CE->getBody();
+    if (!BS)
+      return None;
+    NodesToSkip.insert(static_cast<Stmt*>(BS));
+
+    SourceLoc L = BS->getLBraceLoc();
+    SourceLoc R = getLocIfKind(SM, BS->getRBraceLoc(), tok::r_brace);
+
+    if (ContextLoc.isValid()) {
       NodesToSkip.insert(static_cast<Expr*>(CE));
-
-    if (BraceStmt *BS = CE->getBody()) {
-      SourceRange CL = CE->getBracketRange();
-      if (CL.isValid() && isTargetContext(CL))
-        return IndentContext {CL.Start, true};
-
-      if (auto Ctx = getIndentContextFrom(CE->getParameters()))
-        return Ctx;
-
-      SourceLoc L = BS->getLBraceLoc(), R = BS->getRBraceLoc();
-      if (L.isInvalid() || !overlapsTarget(L, R))
-        return None;
-
-      NodesToSkip.insert(static_cast<Stmt*>(BS));
-      Expr *WalkableParent = CE;
-      if (ParentCapture)
-        WalkableParent = ParentCapture;
-      if (ContextLoc.isInvalid())
-        ContextLoc = L;
-
-      auto InLoc = CE->getInLoc();
-      if (InLoc.isValid()) {
-        SourceRange InToEnd = SourceRange(InLoc, R);
-        if (isTargetContext(InToEnd) && TargetLocation != R)
-          return IndentContext {
-            ContextLoc,
-            !OutdentChecker::hasOutdent(SM, InToEnd, WalkableParent)
-          };
-      }
-
-      bool shouldIndent = containsTarget(L, R) &&
-        !OutdentChecker::hasOutdent(SM, WalkableParent, CheckMode::Exclusive);
-      return IndentContext {ContextLoc, shouldIndent};
+      if (isTargetContext(L, R))
+        ContextLoc = CtxOverride.propagateContext(SM, ContextLoc,
+                                                  IndentContext::LineStart,
+                                                  L, R);
     }
 
-    return None;
+    // Handle the capture list.
+    SourceRange CL = CE->getBracketRange();
+    if (CL.isValid()) {
+      SourceLoc L = CL.Start;
+      SourceLoc R = getLocIfKind(SM, CL.End, tok::r_square);
+      if (isTargetContext(L, R)) {
+        ContextLoc = L;
+        if (!ParentCapture) // empty capture list
+          return IndentContext {ContextLoc, containsTarget(L, R)};
+
+        ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
+        for (auto &Entry: ParentCapture->getCaptureList()) {
+          if (auto *PBD = Entry.Init) {
+            NodesToSkip.insert(PBD);
+            SourceRange Range = PBD->getSourceRangeIncludingAttrs();
+            Aligner.updateAlignment(Range, PBD);
+
+            if (isTargetContext(Range)) {
+              Aligner.setAlignmentIfNeeded(CtxOverride);
+              return IndentContext {
+                Range.Start,
+                !OutdentChecker::hasOutdent(SM, Range, PBD)
+              };
+            }
+          }
+        }
+        return Aligner.getContextAndSetAlignment(CtxOverride);
+      }
+    }
+
+    // Handle parameter list
+    if (auto Ctx = getIndentContextFrom(CE->getParameters()))
+      return Ctx;
+
+    // Handle outer braces.
+    if (L.isInvalid() || !isTargetContext(L, R))
+      return None;
+
+    if (ContextLoc.isInvalid())
+      ContextLoc = L;
+    Expr *WalkableParent = CE;
+    if (ParentCapture)
+      WalkableParent = ParentCapture;
+
+    auto InLoc = CE->getInLoc();
+    if (InLoc.isValid()) {
+      if (containsTarget(InLoc, R)) {
+        SourceRange InToEnd = SourceRange(InLoc, BS->getEndLoc());
+        return IndentContext {
+          ContextLoc,
+          !OutdentChecker::hasOutdent(SM, InToEnd, WalkableParent)
+        };
+      }
+    }
+
+    bool shouldIndent = containsTarget(L, R) &&
+      !OutdentChecker::hasOutdent(SM, WalkableParent, RangeKind::Open);
+    return IndentContext {ContextLoc, shouldIndent};
   }
 
   Optional<IndentContext>
@@ -2058,7 +2298,7 @@ private:
       return None;
     Expr *Key = TE->getElement(0);
     SourceLoc ColonLoc;
-    if (auto Next = getNextToken(SM, Key->getEndLoc())) {
+    if (auto Next = getTokenAfter(SM, Key->getEndLoc())) {
       if (Next && Next->getKind() == tok::colon)
         ColonLoc = Next->getLoc();
     }
@@ -2080,8 +2320,13 @@ private:
     if (L.isInvalid() || !overlapsTarget(L, R))
       return None;
 
-    if (ContextLoc.isInvalid())
+    if (ContextLoc.isValid()) {
+      ContextLoc = CtxOverride.propagateContext(SM, ContextLoc,
+                                                IndentContext::LineStart,
+                                                L, R);
+    } else {
       ContextLoc = L;
+    }
 
     ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
     auto NumElems = TE->getNumElements();
@@ -2115,8 +2360,13 @@ private:
     if (L.isInvalid() || !overlapsTarget(L, R))
       return None;
 
-    if (ContextLoc.isInvalid())
+    if (ContextLoc.isValid()) {
+      ContextLoc = CtxOverride.propagateContext(SM, ContextLoc,
+                                                IndentContext::LineStart,
+                                                L, R);
+    } else {
       ContextLoc = L;
+    }
 
     ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
     if (!PE->hasTrailingClosure()) {
@@ -2148,8 +2398,9 @@ private:
       if (Brackets.isInvalid())
         return None;
 
+      SourceLoc L = Brackets.Start;
       SourceLoc R = getLocIfTokenTextMatches(SM, Brackets.End, ">");
-      ListAligner Aligner(SM, TargetLocation, ContextLoc, Brackets.Start, R);
+      ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
       for (auto *Arg: GIT->getGenericArgs())
         Aligner.updateAlignment(Arg->getSourceRange(), GIT);
 
@@ -2162,9 +2413,12 @@ private:
       if (Parens.isInvalid())
         return None;
 
-      ListAligner Aligner(SM, TargetLocation, ContextLoc, Parens.Start, Parens.End);
+      SourceLoc L = Parens.Start;
+      SourceLoc R = getLocIfKind(SM, Parens.End, tok::r_paren);
+      ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
       for (auto &Elem: TT->getElements()) {
         SourceRange ElemRange = Elem.NameLoc;
+        widenOrSet(ElemRange, Elem.UnderscoreLoc);
         if (auto *T = Elem.Type)
           widenOrSet(ElemRange, T->getSourceRange());
 
@@ -2191,7 +2445,7 @@ private:
       return IndentContext {
         ContextLoc,
         containsTarget(Brackets.Start, Brackets.End) &&
-          !OutdentChecker::hasOutdent(SM, AT, CheckMode::Exclusive)
+          !OutdentChecker::hasOutdent(SM, AT, RangeKind::Open)
       };
     }
 
@@ -2215,7 +2469,7 @@ private:
       return IndentContext {
         ContextLoc,
         containsTarget(Brackets) &&
-          !OutdentChecker::hasOutdent(SM, DT, CheckMode::Exclusive)
+          !OutdentChecker::hasOutdent(SM, DT, RangeKind::Open)
       };
     }
 
@@ -2234,7 +2488,7 @@ private:
       auto *LHS = TP->getSubPattern();
 
       SourceLoc ColonLoc;
-      if (auto Next = getNextToken(SM, LHS->getEndLoc())) {
+      if (auto Next = getTokenAfter(SM, LHS->getEndLoc())) {
         if (Next->getKind() == tok::colon)
           ColonLoc = Next->getLoc();
       }
@@ -2251,7 +2505,8 @@ private:
 
     if (auto *PP = dyn_cast<ParenPattern>(P)) {
       SourceLoc ContextLoc = PP->getStartLoc();
-      SourceLoc L = PP->getLParenLoc(), R = PP->getRParenLoc();
+      SourceLoc L = PP->getLParenLoc();
+      SourceLoc R = getLocIfKind(SM, PP->getRParenLoc(), tok::r_paren);
       if (L.isInvalid())
         return None;
       ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
