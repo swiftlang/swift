@@ -586,22 +586,22 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       I->eraseFromParent();
       NumInstRemoved++;
     }
-    
-    // In ossa we need to consume `x` after removing the stack_alloc/store:
-    //   sa = stack_alloc
-    //   x = apply
-    //   store x to sa
-    //   destroy_addr sa
-    // We know that RunningVal was found in a store instruction if it's not
-    // a SILUndef. We check at the end of the function so `use_empty` will
-    // return a correct value.
-    if (RunningVal && !isa<SILUndef>(RunningVal) &&
-        RunningVal->getFunction()->hasOwnership() &&
-        RunningVal->use_empty() &&
-        !RunningVal->getType().isTrivial(*RunningVal->getFunction()))
-      SILBuilderWithScope(std::next(RunningVal.getDefiningInstruction()->getIterator()))
-        .emitDestroyValueAndFold(RunningVal.getLoc(), RunningVal);
   }
+  
+  // In ossa we need to consume `x` after removing the stack_alloc/store:
+  //   sa = stack_alloc
+  //   x = apply
+  //   store x to sa
+  //   destroy_addr sa
+  // We know that RunningVal was found in a store instruction if it's not
+  // a SILUndef. We check at the end of the function so `use_empty` will
+  // return a correct value.
+  if (RunningVal && !isa<SILUndef>(RunningVal) &&
+      RunningVal->getFunction()->hasOwnership() &&
+      RunningVal->use_empty() &&
+      !RunningVal->getType().isTrivial(*RunningVal->getFunction()))
+    SILBuilderWithScope(std::next(RunningVal.getDefiningInstruction()->getIterator()))
+      .emitDestroyValueAndFold(RunningVal.getLoc(), RunningVal);
 }
 
 void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {

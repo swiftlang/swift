@@ -557,3 +557,18 @@ bb0:
   %7 = tuple ()
   return %7 : $()
 }
+
+sil [ossa] @test : $@convention(method) (@guaranteed __CocoaDictionary) -> () {
+bb0(%0 : @guaranteed $__CocoaDictionary):
+  %4 = struct_extract %0 : $__CocoaDictionary, #__CocoaDictionary.object // user: %66
+  %65 = alloc_stack $AnyObject                    // users: %67, %71, %70, %68
+  %66 = copy_value %4 : $AnyObject                // user: %67
+  store %66 to [init] %65 : $*AnyObject           // id: %67
+  %68 = unchecked_addr_cast %65 : $*AnyObject to $*_NSDictionary // user: %69
+  %69 = load [copy] %68 : $*_NSDictionary         // users: %73, %74, %79
+  destroy_value %69 : $_NSDictionary              // id: %79
+  destroy_addr %65 : $*AnyObject                  // id: %70
+  dealloc_stack %65 : $*AnyObject                 // id: %71
+  %7 = tuple ()
+  return %7 : $()
+} // end sil function '$ss17__CocoaDictionaryV6lookupyyXlSgyXlF'
