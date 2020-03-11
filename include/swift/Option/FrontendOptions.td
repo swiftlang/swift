@@ -548,6 +548,9 @@ def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
 
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
+  
+def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
+  HelpText<"Verify all SubstitutionMaps on construction">;
 
 def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
   HelpText<"Do not eliminate functions in Mandatory Inlining/SILCombine dead "

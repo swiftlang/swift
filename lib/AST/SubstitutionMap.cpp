@@ -56,7 +56,12 @@ SubstitutionMap::SubstitutionMap(
                                 GenericSignature genericSig,
                                 ArrayRef<Type> replacementTypes,
                                 ArrayRef<ProtocolConformanceRef> conformances)
-  : storage(Storage::get(genericSig, replacementTypes, conformances)) { }
+  : storage(Storage::get(genericSig, replacementTypes, conformances)) {
+#ifndef NDEBUG
+  if (genericSig->getASTContext().LangOpts.VerifyAllSubstitutionMaps)
+    verify();
+#endif
+}
 
 ArrayRef<Type> SubstitutionMap::getReplacementTypesBuffer() const {
   return storage ? storage->getReplacementTypes() : ArrayRef<Type>();
@@ -476,7 +481,7 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
       newConformances.push_back(
         conformance.subst(substType, subs, conformances, options));
     }
-
+    
     oldConformances = oldConformances.slice(1);
   }
 
