@@ -1329,6 +1329,17 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
       worklist.push_back(storeInst);
       candidateStartInstructions.insert(storeInst);
     }
+    // Skip other uses of alloc_stack including function calls on the
+    // alloc_stack and data dependenceis through them. This is done because
+    // all functions using the alloc_stack are expected to be constant evaluated
+    // and therefore should only be passed constants or auto closures. These
+    // constants must be constructed immediately before the call and would only
+    // appear in the SIL after the alloc_stack instruction. This invariant is
+    // relied upon here so as to restrict the backward dependency search, which
+    // in turn keeps the code that is constant evaluated small.
+    // Note that if the client code violates this assumption, it will be
+    // diagnosed by this pass (in function detectAndDiagnoseErrors) as it will
+    // result in non-constant values for OSLogMessage instance.
   }
 
   // Find the first basic block in the control-flow order. Typically, if
@@ -1342,14 +1353,27 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
   }
 
   SILBasicBlock *firstBB = nullptr;
-  SILBasicBlock *entryBB = oslogInit->getFunction()->getEntryBlock();
-  for (SILBasicBlock *bb: llvm::breadth_first<SILBasicBlock *>(entryBB)) {
-    if (candidateBBs.count(bb)) {
-      firstBB = bb;
-      break;
+  if (candidateBBs.size() == 1) {
+    firstBB = *candidateBBs.begin();
+  } else {
+    SILBasicBlock *entryBB = oslogInit->getFunction()->getEntryBlock();
+    for (SILBasicBlock *bb : llvm::breadth_first<SILBasicBlock *>(entryBB)) {
+      if (candidateBBs.count(bb)) {
+        firstBB = bb;
+        break;
+      }
+    }
+    if (!firstBB) {
+      // This case will be reached only if the log call appears in unreachable
+      // code and, for some reason, its data depedencies extend beyond a basic
+      // block. This case should generally not happen unless the library
+      // implementation of the os log APIs change. It is better to warn in this
+      // case, rather than skipping the call silently.
+      diagnose(callee->getASTContext(), oslogInit->getLoc().getSourceLoc(),
+               diag::oslog_call_in_unreachable_code);
+      return nullptr;
     }
   }
-  assert(firstBB);
 
   // Iterate over the instructions in the firstBB and find the instruction that
   // starts the interpolation.
@@ -1360,7 +1384,7 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
       break;
     }
   }
-  assert(startInst);
+  assert(startInst && "could not find beginning of interpolation");
   return startInst;
 }
 
@@ -1450,7 +1474,10 @@ class OSLogOptimization : public SILFunctionTransform {
     // iteration.
     for (auto *oslogInit : oslogMessageInits) {
       SILInstruction *interpolationStart = beginOfInterpolation(oslogInit);
-      assert(interpolationStart);
+      if (!interpolationStart) {
+        // The log call is in unreachable code here.
+        continue;
+      }
       madeChange |= constantFold(interpolationStart, oslogInit, assertConfig);
     }
 
