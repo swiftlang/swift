@@ -1251,26 +1251,21 @@ public:
   };
 
   /// A class which lays out a specific conformance to a protocol.
-  class WitnessTableBuilder : public WitnessTableBuilderBase,
-                              public SILWitnessVisitor<WitnessTableBuilder> {
+  class FragileWitnessTableBuilder : public WitnessTableBuilderBase,
+                                     public SILWitnessVisitor<FragileWitnessTableBuilder> {
     ConstantArrayBuilder &Table;
     unsigned TableSize = ~0U; // will get overwritten unconditionally
     SmallVector<std::pair<size_t, const ConformanceInfo *>, 4>
       SpecializedBaseConformances;
 
-    bool ResilientConformance;
-
     const ProtocolInfo &PI;
 
   public:
-    WitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
-                        SILWitnessTable *SILWT)
+    FragileWitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
+                               SILWitnessTable *SILWT)
         : WitnessTableBuilderBase(IGM, SILWT), Table(table),
-          ResilientConformance(IGM.isResilientConformance(&Conformance)),
           PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol(),
-                                 (ResilientConformance
-                                  ? ProtocolInfoKind::RequirementSignature
-                                  : ProtocolInfoKind::Full))) {}
+                                 ProtocolInfoKind::Full)) {}
 
     /// The number of entries in the witness table.
     unsigned getTableSize() const { return TableSize; }
@@ -1293,10 +1288,6 @@ public:
       auto &entry = SILEntries.front();
 #endif
       SILEntries = SILEntries.slice(1);
-
-      // Resilient conformances get a resilient witness table.
-      if (ResilientConformance)
-        return;
 
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::BaseProtocol
@@ -1331,10 +1322,6 @@ public:
     void addMethod(SILDeclRef requirement) {
       auto &entry = SILEntries.front();
       SILEntries = SILEntries.slice(1);
-
-      // Resilient conformances get a resilient witness table.
-      if (ResilientConformance)
-        return;
 
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::Method
@@ -1372,10 +1359,6 @@ public:
       auto &entry = SILEntries.front();
       SILEntries = SILEntries.slice(1);
 
-      // Resilient conformances get a resilient witness table.
-      if (ResilientConformance)
-        return;
-
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::AssociatedType
              && "sil witness table does not match protocol");
@@ -1410,9 +1393,6 @@ public:
       auto &entry = SILEntries.front();
       (void)entry;
       SILEntries = SILEntries.slice(1);
-
-      if (ResilientConformance)
-        return;
 
       auto associate =
         ConformanceInContext.getAssociatedType(
@@ -1450,8 +1430,17 @@ public:
     /// Build the instantiation function that runs at the end of witness
     /// table specialization.
     llvm::Constant *buildInstantiationFunction();
+  };
 
+  class ResilientWitnessTableBuilder : public WitnessTableBuilderBase {
   public:
+    ResilientWitnessTableBuilder(IRGenModule &IGM, SILWitnessTable *SILWT)
+        : WitnessTableBuilderBase(IGM, SILWT) {}
+
+    void build() {
+      WitnessTableBuilderBase::build();
+    }
+
     /// Collect the set of resilient witnesses, which will become part of the
     /// protocol conformance descriptor.
     void collectResilientWitnesses(
@@ -1460,7 +1449,7 @@ public:
 } // end anonymous namespace
 
 /// Build the witness table.
-void WitnessTableBuilder::build() {
+void FragileWitnessTableBuilder::build() {
   WitnessTableBuilderBase::build();
   visitProtocolDecl(Conformance.getProtocol());
   TableSize = Table.size();
@@ -1627,11 +1616,8 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
   IGF.Builder.CreateRet(wtable);
 }
 
-void WitnessTableBuilder::collectResilientWitnesses(
+void ResilientWitnessTableBuilder::collectResilientWitnesses(
                       SmallVectorImpl<llvm::Constant *> &resilientWitnesses) {
-  if (!ResilientConformance)
-    return;
-
   assert(isa<NormalProtocolConformance>(Conformance) &&
          "resilient conformance should always be normal");
   auto &conformance = cast<NormalProtocolConformance>(Conformance);
@@ -1707,7 +1693,7 @@ void WitnessTableBuilder::collectResilientWitnesses(
   }
 }
 
-llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
+llvm::Constant *FragileWitnessTableBuilder::buildInstantiationFunction() {
   // We need an instantiation function if any base conformance
   // is non-dependent.
   if (SpecializedBaseConformances.empty())
@@ -2172,7 +2158,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     // Build the witness table.
     ConstantInitBuilder builder(*this);
     auto wtableContents = builder.beginArray(Int8PtrTy);
-    WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
+    FragileWitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
     wtableBuilder.build();
 
     // Produce the initializer value.
@@ -2193,17 +2179,11 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     instantiationFunction = wtableBuilder.buildInstantiationFunction();
   } else {
     // Build the witness table.
-    ConstantInitBuilder builder(*this);
-    auto wtableContents = builder.beginArray(Int8PtrTy);
-    WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
+    ResilientWitnessTableBuilder wtableBuilder(*this, wt);
     wtableBuilder.build();
 
     // Collect the resilient witnesses to go into the conformance descriptor.
     wtableBuilder.collectResilientWitnesses(resilientWitnesses);
-
-    // Produce the initializer value.
-    auto initializer = wtableContents.finishAndCreateFuture();
-    initializer.abandon();
 
     tableSize = 0;
     tablePrivateSize = wtableBuilder.getTablePrivateSize();
