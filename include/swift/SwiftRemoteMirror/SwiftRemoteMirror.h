@@ -149,6 +149,16 @@ swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
                                            const char *MangledName,
                                            uint64_t Length);
 
+/// Returns the demangled name for a typeref, or NULL if the name couldn't be
+/// created.
+///
+/// The returned string is heap allocated and the caller must free() it when
+/// done.
+SWIFT_REMOTE_MIRROR_LINKAGE
+char *
+swift_reflection_copyDemangledNameForTypeRef(
+  SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef);
+
 /// Returns a structure describing the layout of a value of a typeref.
 /// For classes, this returns the reference value itself.
 SWIFT_REMOTE_MIRROR_LINKAGE
