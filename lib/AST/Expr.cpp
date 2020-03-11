@@ -1851,6 +1851,11 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
   case AutoClosureExpr::Kind::SingleCurryThunk: {
     auto *body = getSingleExpressionBody();
     body = body->getSemanticsProvidingExpr();
+
+    if (auto *openExistential = dyn_cast<OpenExistentialExpr>(body)) {
+      body = openExistential->getSubExpr();
+    }
+
     if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
       return outerCall->getFn();
     }
@@ -1866,6 +1871,11 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
                AutoClosureExpr::Kind::SingleCurryThunk);
       auto *innerBody = innerClosure->getSingleExpressionBody();
       innerBody = innerBody->getSemanticsProvidingExpr();
+
+      if (auto *openExistential = dyn_cast<OpenExistentialExpr>(innerBody)) {
+        innerBody = openExistential->getSubExpr();
+      }
+
       if (auto *outerCall = dyn_cast<ApplyExpr>(innerBody)) {
         if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
           if (auto *declRef = dyn_cast<DeclRefExpr>(innerCall->getFn())) {

@@ -276,9 +276,11 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
                                              OpAccess)))
           return stopTraversal;
 
-        return { true, E };
+        return doSkipChildren();
       }
     }
+
+    return { true, E };
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
