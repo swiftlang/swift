@@ -714,18 +714,21 @@ extension Sequence {
       var result = Array(self)
       let count = result.count
       for i in 0..<count/2 {
-        result.swapAt(i, count - ((i + 1) as Int))      }
+        result.swapAt(i, count - ((i + 1) as Int))
+      }
       return result
     } else {
       var iterator = makeIterator()
-      var result = [Element](unsafeUninitializedCapacity: underestimatedCount) { buf, initedCount in
+      var result: [Element] =
+        .init(unsafeUninitializedCapacity: underestimatedCount)
+      { buf, initializedCount in
         for i in 0..<underestimatedCount {
           guard let next = iterator.next() else {
-              preconditionFailure("underestimatedCount greater than count")
+            _internalInvariantFailure("underestimatedCount greater than count")
           }
           buf[underestimatedCount - i - 1] = next
         }
-        initedCount = underestimatedCount
+        initializedCount = underestimatedCount
       }
       while let next = iterator.next() {
         result.insert(next, at: 0)
