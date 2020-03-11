@@ -162,14 +162,18 @@ void Symbol::serializeRange(size_t InitialIndentation,
 }
 
 void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
+  const auto *DocCommentProvidingDecl =
+      dyn_cast_or_null<ValueDecl>(
+          getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
+  if (!DocCommentProvidingDecl) {
+    DocCommentProvidingDecl = VD;
+  }
+  auto RC = DocCommentProvidingDecl->getRawComment(/*SerializedOK=*/true);
+  if (RC.isEmpty()) {
+    return;
+  }
+
   OS.attributeObject("docComment", [&](){
-    const auto *DocCommentProvidingDecl =
-        dyn_cast_or_null<ValueDecl>(
-            getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
-    if (!DocCommentProvidingDecl) {
-      DocCommentProvidingDecl = VD;
-    }
-    auto RC = DocCommentProvidingDecl->getRawComment(/*SerializedOK=*/true);
     auto LL = Graph->Ctx.getLineList(RC);
     size_t InitialIndentation = LL.getLines().empty()
       ? 0
