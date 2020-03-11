@@ -1091,7 +1091,7 @@ shouldBePartiallySpecialized(Type Replacement,
   return true;
 }
 
-namespace swift {
+namespace {
 
 /// A helper class for creating partially specialized function signatures.
 ///
@@ -1257,7 +1257,7 @@ public:
   void computeCallerInterfaceSubs(SubstitutionMap &CallerInterfaceSubs);
 };
 
-} // end of namespace
+} // end anonymous namespace
 
 GenericTypeParamType *
 FunctionSignaturePartialSpecializer::createGenericParam() {
