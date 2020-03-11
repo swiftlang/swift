@@ -166,7 +166,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     SILParameterInfo inoutParamTanParam(
         origResult.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getCanonicalType(),
+            ->getType()->getCanonicalType(witnessCanGenSig),
         inoutParamTanConvention);
     pbParams.push_back(inoutParamTanParam);
   } else {
@@ -176,7 +176,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     pbParams.push_back(getTangentParameterInfoForOriginalResult(
         origResult.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getCanonicalType(),
+            ->getType()->getCanonicalType(witnessCanGenSig),
         origResult.getConvention()));
   }
 
@@ -184,7 +184,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // returned pullback's closure context.
   auto *origExit = &*original->findReturnBB();
   auto *pbStruct = pullbackInfo.getLinearMapStruct(origExit);
-  auto pbStructType = pbStruct->getDeclaredInterfaceType()->getCanonicalType();
+  auto pbStructType = pbStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
   pbParams.push_back({pbStructType, ParameterConvention::Direct_Owned});
 
   // Add pullback results for the requested wrt parameters.
@@ -197,7 +197,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     adjResults.push_back(getTangentResultInfoForOriginalParameter(
         origParam.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getCanonicalType(),
+            ->getType()->getCanonicalType(witnessCanGenSig),
         origParam.getConvention()));
   }
 

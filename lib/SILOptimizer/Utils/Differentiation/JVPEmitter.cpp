@@ -1048,7 +1048,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
     dfResults.push_back(
         SILResultInfo(inoutDiffParam->getInterfaceType()
                           ->getAutoDiffTangentSpace(lookupConformance)
-                          ->getCanonicalType(),
+                          ->getType()->getCanonicalType(witnessCanGenSig),
                       ResultConvention::Indirect));
   } else {
     auto origResult = origTy->getResults()[indices.source];
@@ -1057,7 +1057,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
     dfResults.push_back(
         SILResultInfo(origResult.getInterfaceType()
                           ->getAutoDiffTangentSpace(lookupConformance)
-                          ->getCanonicalType(),
+                          ->getType()->getCanonicalType(witnessCanGenSig),
                       origResult.getConvention()));
   }
 
@@ -1069,7 +1069,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
     dfParams.push_back(SILParameterInfo(
         origParam.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getCanonicalType(),
+            ->getType()->getCanonicalType(witnessCanGenSig),
         origParam.getConvention()));
   }
 
@@ -1077,7 +1077,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
   // the returned differential's closure context.
   auto *origEntry = original->getEntryBlock();
   auto *dfStruct = linearMapInfo->getLinearMapStruct(origEntry);
-  auto dfStructType = dfStruct->getDeclaredInterfaceType()->getCanonicalType();
+  auto dfStructType = dfStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
   dfParams.push_back({dfStructType, ParameterConvention::Direct_Owned});
 
   Mangle::ASTMangler mangler;

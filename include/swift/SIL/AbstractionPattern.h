@@ -388,9 +388,10 @@ class AbstractionPattern {
     GenericSig = CanGenericSignature();
     if (OrigType->hasTypeParameter()) {
       if (OrigType != signature->getCanonicalTypeInContext(origType)) {
-        llvm::errs() << "MISMATCH\n";
+        llvm::errs() << "MISMATCH, ORIG TYPE VS SIGNATURE\n";
         OrigType->dump();
         signature->getCanonicalTypeInContext(origType)->dump();
+        signature->dump();
       }
       assert(OrigType == signature->getCanonicalTypeInContext(origType));
       GenericSig = signature;
