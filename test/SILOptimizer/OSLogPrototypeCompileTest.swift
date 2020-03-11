@@ -600,3 +600,21 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
   }
 }
 
+protocol Proto {
+  var property: String { get set }
+}
+
+// Test capturing of address-only types in autoclosures.
+
+if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+  // CHECK-LABEL: @${{.*}}testInterpolationOfExistentialsL_
+  func testInterpolationOfExistentials(h: Logger, p: Proto) {
+    h.debug("A protocol's property \(p.property)")
+  }
+
+  // CHECK-LABEL: @${{.*}}testInterpolationOfGenericsL_
+  func testInterpolationOfGenerics<T : Proto>(h: Logger, p: T) {
+    h.debug("A generic argument's property \(p.property)")
+  }
+}
+

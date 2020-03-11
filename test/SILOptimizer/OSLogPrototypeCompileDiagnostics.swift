@@ -75,7 +75,7 @@ internal enum Color {
 
 if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
-  // No error is expected here.
+  // Invoking the log calls in unreachable code should not crash the compiler.
   func testUnreachableLogCall(h: Logger, c: Color)  {
     let arg = 10
     switch c {
@@ -92,6 +92,14 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
         \(arg, align: .right(columns: 10))
         """)
     }
+  }
+
+  // Passing InOut values to the logger should not crash the compiler.
+  func foo(_ logger: Logger, _ mutableValue: inout String) {
+     logger.log("FMFLabelledLocation: initialized with coder \(mutableValue)")
+      // expected-error@-1 {{escaping closure captures 'inout' parameter 'mutableValue'}}
+      // expected-note@-3 {{parameter 'mutableValue' is declared 'inout'}}
+      // expected-note@-3 {{captured here}}
   }
 }
 
