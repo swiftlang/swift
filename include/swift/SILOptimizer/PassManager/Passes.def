@@ -243,6 +243,8 @@ PASS(NonTransparentFunctionOwnershipModelEliminator,
      "Eliminate Ownership Annotations from non-transparent SIL Functions")
 PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
+PASS(AlwaysInlineInliner, "always-inline",
+     "Inline always inline functions")
 PASS(PerfInliner, "inline",
      "Performance Function Inlining")
 PASS(PerformanceConstantPropagation, "performance-constant-propagation",
