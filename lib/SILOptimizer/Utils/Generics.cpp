@@ -1939,8 +1939,8 @@ static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
 /// function being applied.
 static ApplySite replaceWithSpecializedCallee(ApplySite AI,
                                               SILValue Callee,
-                                              SILBuilder &Builder,
                                               const ReabstractionInfo &ReInfo) {
+  SILBuilderWithScope Builder(AI.getInstruction());
   SILLocation Loc = AI.getLoc();
   SmallVector<SILValue, 4> Arguments;
   SILValue StoreResultTo;
@@ -2029,7 +2029,7 @@ replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,
                                const ReabstractionInfo &ReInfo) {
   SILBuilderWithScope Builder(AI.getInstruction());
   FunctionRefInst *FRI = Builder.createFunctionRef(AI.getLoc(), NewF);
-  return replaceWithSpecializedCallee(AI, FRI, Builder, ReInfo);
+  return replaceWithSpecializedCallee(AI, FRI, ReInfo);
 }
 
 namespace {
@@ -2444,11 +2444,11 @@ void swift::trySpecializeApplyOfGeneric(
     // thunk which converts from the re-abstracted function back to the
     // original function with indirect parameters/results.
     auto *PAI = cast<PartialApplyInst>(Apply.getInstruction());
-    SILBuilderWithScope Builder(PAI);
     SILFunction *Thunk =
       ReabstractionThunkGenerator(FuncBuilder, ReInfo, PAI, SpecializedF)
         .createThunk();
     NewFunctions.push_back(Thunk);
+    SILBuilderWithScope Builder(PAI);
     auto *FRI = Builder.createFunctionRef(PAI->getLoc(), Thunk);
     SmallVector<SILValue, 4> Arguments;
     for (auto &Op : PAI->getArgumentOperands()) {
@@ -2476,8 +2476,7 @@ void swift::trySpecializeApplyOfGeneric(
     for (Operand *Use : NewPAI->getUses()) {
       SILInstruction *User = Use->getUser();
       if (auto FAS = FullApplySite::isa(User)) {
-        SILBuilder Builder(User);
-        replaceWithSpecializedCallee(FAS, NewPAI, Builder, ReInfo);
+        replaceWithSpecializedCallee(FAS, NewPAI, ReInfo);
         DeadApplies.insert(FAS.getInstruction());
         continue;
       }
