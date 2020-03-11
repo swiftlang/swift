@@ -1174,9 +1174,22 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   bool hadAnyError = false;
 
   if (opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+    std::string BridgingHeaderPathForPrint;
+    if (!opts.ImplicitObjCHeaderPath.empty()) {
+      if (opts.BridgingHeaderDirForPrint.hasValue()) {
+        // User specified preferred directory for including, use that dir.
+        llvm::SmallString<32> Buffer(*opts.BridgingHeaderDirForPrint);
+        llvm::sys::path::append(Buffer,
+          llvm::sys::path::filename(opts.ImplicitObjCHeaderPath));
+        BridgingHeaderPathForPrint = Buffer.str();
+      } else {
+        // By default, include the given bridging header path directly.
+        BridgingHeaderPathForPrint = opts.ImplicitObjCHeaderPath;
+      }
+    }
     hadAnyError |= printAsObjCIfNeeded(
         Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+        Instance.getMainModule(), BridgingHeaderPathForPrint, moduleIsPublic);
   }
 
   if (opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
