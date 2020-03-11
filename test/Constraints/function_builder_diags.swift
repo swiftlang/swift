@@ -480,3 +480,63 @@ func testCaseVarTypes(e: E3) {
     }
   }
 }
+
+// Test for buildFinalResult.
+@_functionBuilder
+struct WrapperBuilder {
+  static func buildBlock() -> () { }
+  
+  static func buildBlock<T1>(_ t1: T1) -> T1 {
+    return t1
+  }
+  
+  static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
+    return (t1, t2)
+  }
+  
+  static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
+      -> (T1, T2, T3) {
+    return (t1, t2, t3)
+  }
+
+  static func buildBlock<T1, T2, T3, T4>(_ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4)
+      -> (T1, T2, T3, T4) {
+    return (t1, t2, t3, t4)
+  }
+
+  static func buildBlock<T1, T2, T3, T4, T5>(
+    _ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4, _ t5: T5
+  ) -> (T1, T2, T3, T4, T5) {
+    return (t1, t2, t3, t4, t5)
+  }
+
+  static func buildDo<T>(_ value: T) -> T { return value }
+  static func buildIf<T>(_ value: T?) -> T? { return value }
+
+  static func buildEither<T,U>(first value: T) -> Either<T,U> {
+    return .first(value)
+  }
+  static func buildEither<T,U>(second value: U) -> Either<T,U> {
+    return .second(value)
+  }
+  static func buildFinalResult<T>(_ value: T) -> Wrapper<T> {
+    return Wrapper(value: value)
+  }
+}
+
+struct Wrapper<T> {
+  var value: T
+}
+
+func wrapperify<T>(_ cond: Bool, @WrapperBuilder body: (Bool) -> T) -> T{
+  return body(cond)
+}
+
+func testWrapperBuilder() {
+  let x = wrapperify(true) { c in
+    3.14159
+    "hello"
+  }
+
+  let _: Int = x // expected-error{{cannot convert value of type 'Wrapper<(Double, String)>' to specified type 'Int'}}
+}
