@@ -13,7 +13,7 @@ The following must take place in the **developer command prompt** (provided by V
 2. Microsoft.VisualStudio.Component.Windows10SDK.17763
 3. Microsoft.VisualStudio.Component.VC.Tools.x86.x64
 
-The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019)) helps in finding the component name given its ID for Visual Studio 2019.
+The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019) helps in finding the component name given its ID for Visual Studio 2019.
 
 ## Clone the repositories
 
@@ -92,7 +92,25 @@ Warning: Creating the above links usually requires administrator privileges. The
 
 ```cmd
 md "S:\b\toolchain"
-cmake -B "S:\b\toolchain" -G Ninja -S S:\toolchain\llvm -C S:\windows-swift\cmake\caches\Windows-x86_64.cmake -C S:\windows-swift\cmake\caches\org.compnerd.dt.cmake -DLLVM_ENABLE_ASSERTIONS=YES -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;cmark;swift;lldb;lld" -DLLVM_EXTERNAL_PROJECTS="cmark;swift" -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\toolchain\swift-corelibs-libdispatch -DLLVM_ENABLE_PDB=YES -DLLDB_DISABLE_PYTHON=YES -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-64/usr/include" -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-64/usr/lib/icuuc64.lib" -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-64/usr/include" -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-64/usr/lib/icuin64.lib" -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr" -DPYTHON_EXECUTABLE=C:\Python27\python.exe -DSWIFT_BUILD_DYNAMIC_STDLIB=YES -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=YES
+cmake -B "S:\b\toolchain" -G Ninja -S S:\toolchain\llvm ^
+  -C S:\windows-swift\cmake\caches\Windows-x86_64.cmake ^
+  -C S:\windows-swift\cmake\caches\org.compnerd.dt.cmake ^
+  -DLLVM_ENABLE_ASSERTIONS=YES ^
+  -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;cmark;swift;lldb;lld" ^
+  -DLLVM_EXTERNAL_PROJECTS="cmark;swift" ^
+  -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\toolchain\swift-corelibs-libdispatch ^
+  -DLLVM_ENABLE_PDB=YES ^
+  -DLLVM_ENABLE_LIBEDIT=NO ^
+  -DLLDB_DISABLE_PYTHON=YES ^
+  -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-64/usr/include" ^
+  -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-64/usr/lib/icuuc64.lib" ^
+  -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-64/usr/include" ^
+  -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-64/usr/lib/icuin64.lib" ^
+  -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr" ^
+  -DPYTHON_EXECUTABLE=C:\Python27\python.exe ^
+  -DSWIFT_BUILD_DYNAMIC_STDLIB=YES ^
+  -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=YES
+
 ninja -C S:\b\toolchain
 ```
 
