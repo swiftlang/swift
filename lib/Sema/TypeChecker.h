@@ -90,8 +90,6 @@ class LookupTypeResult {
   /// The set of results found.
   SmallVector<LookupTypeResultEntry, 4> Results;
 
-  friend class TypeChecker;
-
 public:
   using iterator = SmallVectorImpl<LookupTypeResultEntry>::iterator;
   iterator begin() { return Results.begin(); }

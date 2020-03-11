@@ -429,7 +429,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // Add the type to the result set, so that we can diagnose the
       // reference instead of just saying the member does not exist.
       if (types.insert(memberType->getCanonicalType()).second)
-        result.Results.push_back({typeDecl, memberType, nullptr});
+        result.addResult({typeDecl, memberType, nullptr});
 
       continue;
     }
@@ -475,10 +475,10 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)
-      result.Results.push_back({typeDecl, memberType, nullptr});
+      result.addResult({typeDecl, memberType, nullptr});
   }
 
-  if (result.Results.empty()) {
+  if (!result) {
     // We couldn't find any normal declarations. Let's try inferring
     // associated types.
     ConformanceCheckOptions conformanceOptions;
@@ -517,7 +517,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       auto memberType =
           substMemberTypeWithBase(dc->getParentModule(), typeDecl, type);
       if (types.insert(memberType->getCanonicalType()).second)
-        result.Results.push_back({typeDecl, memberType, assocType});
+        result.addResult({typeDecl, memberType, assocType});
     }
   }
 
