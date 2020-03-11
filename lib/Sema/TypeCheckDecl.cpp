@@ -1274,7 +1274,8 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
                                    PrecedenceGroupDescriptor::HigherThan};
     auto group = evaluateOrDefault(PGD->getASTContext().evaluator,
-                                   LookupPrecedenceGroupRequest{desc}, nullptr);
+                                   ValidatedPrecedenceGroupRequest{desc},
+                                   nullptr);
     if (group) {
       rel.Group = group;
       addedHigherThan = true;
@@ -1294,7 +1295,8 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
                                    PrecedenceGroupDescriptor::LowerThan};
     auto group = evaluateOrDefault(PGD->getASTContext().evaluator,
-                                   LookupPrecedenceGroupRequest{desc}, nullptr);
+                                   ValidatedPrecedenceGroupRequest{desc},
+                                   nullptr);
     bool hadError = false;
     if (group) {
       rel.Group = group;
@@ -1328,7 +1330,8 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     checkPrecedenceCircularity(Diags, PGD);
 }
 
-llvm::Expected<PrecedenceGroupDecl *> LookupPrecedenceGroupRequest::evaluate(
+llvm::Expected<PrecedenceGroupDecl *>
+ValidatedPrecedenceGroupRequest::evaluate(
     Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
   if (auto *group = lookupPrecedenceGroup(descriptor)) {
     validatePrecedenceGroup(group);
@@ -1343,7 +1346,7 @@ PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
                                                         SourceLoc nameLoc) {
   return evaluateOrDefault(
       dc->getASTContext().evaluator,
-      LookupPrecedenceGroupRequest({dc, name, nameLoc, None}), nullptr);
+      ValidatedPrecedenceGroupRequest({dc, name, nameLoc, None}), nullptr);
 }
 
 static NominalTypeDecl *resolveSingleNominalTypeDecl(

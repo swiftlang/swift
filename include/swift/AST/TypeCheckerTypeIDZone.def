@@ -115,7 +115,7 @@ SWIFT_REQUEST(TypeChecker, IsSetterMutatingRequest, bool(AbstractStorageDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LazyStoragePropertyRequest, VarDecl *(VarDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, LookupPrecedenceGroupRequest,
+SWIFT_REQUEST(TypeChecker, ValidatedPrecedenceGroupRequest,
               PrecedenceGroupDecl *(DeclContext *, Identifier, SourceLoc),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest,
