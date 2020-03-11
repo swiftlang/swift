@@ -291,6 +291,10 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
     // DebugValueAddr uses.
     if (isa<DebugValueAddrInst>(II))
       continue;
+    
+    // Destroying the address is a write only instruction so, it's OK.
+    if (isa<DestroyAddrInst>(II))
+      continue;
 
     if (isDeadAddrProjection(II))
       continue;
@@ -428,7 +432,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
 
     if (isLoadFromStack(Inst, ASI)) {
       auto Load = cast<LoadInst>(Inst);
-      if (RunningVal) {
+      if (RunningVal && !isa<SILUndef>(RunningVal)) {
         // If we are loading from the AllocStackInst and we already know the
         // content of the Alloca then use it.
         LLVM_DEBUG(llvm::dbgs() << "*** Promoting load: " << *Load);
@@ -480,7 +484,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
     // Replace destroys with a release of the value.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
       if (DAI->getOperand() == ASI &&
-          RunningVal) {
+          RunningVal && !isa<SILUndef>(RunningVal)) {
         replaceDestroy(DAI, RunningVal);
       }
       continue;
@@ -556,7 +560,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
 
     // Replace destroys with a release of the value.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
-      if (DAI->getOperand() == ASI) {
+      if (DAI->getOperand() == ASI &&
+          RunningVal && !isa<SILUndef>(RunningVal)) {
         replaceDestroy(DAI, RunningVal);
       }
       continue;
@@ -596,8 +601,9 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
   // return a correct value.
   if (RunningVal && !isa<SILUndef>(RunningVal) &&
       RunningVal->getFunction()->hasOwnership() &&
-      RunningVal->use_empty() &&
-      !RunningVal->getType().isTrivial(*RunningVal->getFunction()))
+      !RunningVal->getType().isTrivial(*RunningVal->getFunction()) &&
+      std::all_of(RunningVal->use_begin(), RunningVal->use_end(),
+                  [](Operand *use) { return use->isConsumingUse(); }))
     SILBuilderWithScope(std::next(RunningVal.getDefiningInstruction()->getIterator()))
       .emitDestroyValueAndFold(RunningVal.getLoc(), RunningVal);
 }
@@ -704,9 +710,9 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
 
       LLVM_DEBUG(llvm::dbgs() << "*** Replacing " << *LI
                               << " with Def " << *Def);
-
       // Replace the load with the definition that we found.
-      replaceLoad(LI, Def, ASI);
+      if (Def && !isa<SILUndef>(Def))
+        replaceLoad(LI, Def, ASI);
       removedUser = true;
       NumInstRemoved++;
     }
@@ -730,7 +736,8 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
     // Replace destroys with a release of the value.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
       SILValue Def = getLiveInValue(PhiBlocks, BB);
-      replaceDestroy(DAI, Def);
+      if (Def && !isa<SILUndef>(Def))
+        replaceDestroy(DAI, Def);
       continue;
     }
   }
@@ -937,11 +944,16 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
     // the src and check if it's only use is the store. If so, emit a destroy
     // value.
     if (auto store = dyn_cast<StoreInst>(i)) {
-      if (store->getFunction()->hasOwnership() &&
-          store->getSrc()->getSingleUse() &&
-          store->getSrc()->getSingleUse()->getUser() == store &&
-          !store->getSrc()->getType().isTrivial(*store->getFunction())) {
-        SILBuilderWithScope(std::next(store->getSrc().getDefiningInstruction()->getIterator()))
+      if (!store->getFunction()->hasOwnership() ||
+          store->getSrc()->getType().isTrivial(*store->getFunction()))
+        return;
+
+      if (std::all_of(store->getSrc()->use_begin(),
+                      store->getSrc()->use_end(),
+                      [&store](Operand *use) {
+        return !use->isConsumingUse() || use->getUser() == store;
+      })) {
+        SILBuilderWithScope(store)
           .emitDestroyValueAndFold(store->getSrc().getLoc(), store->getSrc());
       }
     }
@@ -979,7 +991,9 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
   StackAllocationPromoter(alloc, DT, DomTreeLevels, B).run();
 
   // Make sure that all of the allocations were promoted into registers.
-  assert(isWriteOnlyAllocation(alloc) && "Non-write uses left behind");
+  // Otherwise, bail.
+  if (!isWriteOnlyAllocation(alloc))
+    return false;
   // ... and erase the allocation.
   eraseUsesOfInstruction(alloc, consumeStoreSrc);
   return true;

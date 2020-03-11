@@ -693,3 +693,29 @@ bb0(%0 : @guaranteed $AnyObject):
   %7 = tuple ()
   return %7 : $()
 }
+
+sil [ossa] @test : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $Builtin.BridgeObject
+  cond_br undef, bb1, bb2
+  
+bb1:
+  %2 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
+  %3 = apply %2() : $@convention(thin) () -> @owned Builtin.BridgeObject
+  %4 = copy_value %3 : $Builtin.BridgeObject
+  store %3 to [init] %1 : $*Builtin.BridgeObject
+  destroy_value %4 : $Builtin.BridgeObject
+  br bb3
+
+bb2:
+  %5 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
+  %6 = apply %5() : $@convention(thin) () -> @owned Builtin.BridgeObject
+  store %6 to [init] %1 : $*Builtin.BridgeObject
+  br bb3
+  
+bb3:
+  destroy_addr %1 : $*Builtin.BridgeObject
+  dealloc_stack %1 : $*Builtin.BridgeObject
+  %7 = tuple ()
+  return %7 : $()
+}

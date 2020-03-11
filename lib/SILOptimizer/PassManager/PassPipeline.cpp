@@ -279,6 +279,8 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // Promote stack allocations to values.
   P.addMem2Reg();
 
+  P.addNonTransparentFunctionOwnershipModelEliminator();
+  
   // Run the existential specializer Pass.
   P.addExistentialSpecializer();
 
