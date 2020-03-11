@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %gyb -D TEMPDIR=%t %s -o %t/magic_identifier_file_conflicting.swift
+// RUN: %gyb -D TEMPDIR=%t %s > %t/magic_identifier_file_conflicting.swift
+// RUN: %{python} -c "import sys; t = open(sys.argv[1], 'rb').read().replace('\r\n', '\n'); open(sys.argv[1], 'wb').write(t)" %t/magic_identifier_file_conflicting.swift
 
 // We want to check both the diagnostics and the SIL output.
 // RUN: %target-swift-emit-silgen -verify -emit-sorted-sil -enable-experimental-concise-pound-file -module-name Foo %t/magic_identifier_file_conflicting.swift %S/Inputs/magic_identifier_file_conflicting_other.swift | %FileCheck %s
@@ -11,12 +12,14 @@
 
 %{
 TEMPDIR_ESC = TEMPDIR.replace('\\', '\\\\')
+
+import os
 def fixit_loc(start_col, orig_suffix):
   """
   Computes a "start-end" string for a fix-it replacing a string literal which
   starts at start_col and joins orig_suffix to TEMPDIR with a slash.
   """
-  original = '"{0}/{1}"'.format(TEMPDIR, orig_suffix)
+  original = '"{0}"'.format(os.path.join(TEMPDIR, orig_suffix))
   end_col = start_col + len(original)
   return '{0}-{1}'.format(start_col, end_col)
 }%
