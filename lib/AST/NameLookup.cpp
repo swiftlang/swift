@@ -19,6 +19,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
@@ -247,10 +248,11 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
 
 /// Given a set of declarations whose names and signatures have matched,
 /// figure out which of these declarations have been shadowed by others.
+template<typename T>
 static void recordShadowedDeclsAfterSignatureMatch(
-                              ArrayRef<ValueDecl *> decls,
+                              ArrayRef<T> decls,
                               const DeclContext *dc,
-                              llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
+                              llvm::SmallPtrSetImpl<T> &shadowed) {
   assert(decls.size() > 1 && "Nothing collided");
 
   // Compare each declaration to every other declaration. This is
@@ -354,9 +356,9 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // This is due to the fact that in Swift 4, we only gave custom overload
       // types to properties in extensions of generic types, otherwise we
       // used the null type.
-      if (!ctx.isSwiftVersionAtLeast(5)) {
-        auto secondSig = secondDecl->getOverloadSignature();
-        auto firstSig = firstDecl->getOverloadSignature();
+      if (!ctx.isSwiftVersionAtLeast(5) && isa<ValueDecl>(firstDecl)) {
+        auto secondSig = cast<ValueDecl>(secondDecl)->getOverloadSignature();
+        auto firstSig = cast<ValueDecl>(firstDecl)->getOverloadSignature();
         if (firstSig.IsVariable && secondSig.IsVariable)
           if (firstSig.InExtensionOfGenericType !=
               secondSig.InExtensionOfGenericType)
@@ -583,8 +585,8 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
 
   // Check whether we have shadowing for signature collisions.
   for (auto signature : collisionTypes) {
-    recordShadowedDeclsAfterSignatureMatch(collisions[signature], dc,
-                                           shadowed);
+    ArrayRef<ValueDecl *> collidingDecls = collisions[signature];
+    recordShadowedDeclsAfterSignatureMatch(collidingDecls, dc, shadowed);
   }
 
   // Check whether we have shadowing for imported initializer collisions.
@@ -594,11 +596,30 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
   }
 }
 
-bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                                const DeclContext *dc) {
+static void
+recordShadowedDecls(ArrayRef<OperatorDecl *> decls, const DeclContext *dc,
+                    llvm::SmallPtrSetImpl<OperatorDecl *> &shadowed) {
+#ifndef NDEBUG
+  // Make sure all the operators have the same fixity.
+  auto fixity = decls[0]->getFixity();
+  for (auto *op : decls)
+    assert(op->getFixity() == fixity);
+#endif
+  recordShadowedDeclsAfterSignatureMatch(decls, dc, shadowed);
+}
+
+static void
+recordShadowedDecls(ArrayRef<PrecedenceGroupDecl *> decls,
+                    const DeclContext *dc,
+                    llvm::SmallPtrSetImpl<PrecedenceGroupDecl *> &shadowed) {
+  // Always considered to have the same signature.
+  recordShadowedDeclsAfterSignatureMatch(decls, dc, shadowed);
+}
+
+template<typename T, typename Container>
+static bool removeShadowedDeclsImpl(Container &decls, const DeclContext *dc) {
   // Collect declarations with the same (full) name.
-  llvm::SmallDenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>>
-    collidingDeclGroups;
+  llvm::SmallDenseMap<DeclName, llvm::TinyPtrVector<T>> collidingDeclGroups;
   bool anyCollisions = false;
   for (auto decl : decls) {
     // Record this declaration based on its full name.
@@ -614,7 +635,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     return false;
 
   // Walk through the declarations again, marking any declarations that shadow.
-  llvm::SmallPtrSet<ValueDecl *, 4> shadowed;
+  llvm::SmallPtrSet<T, 4> shadowed;
   for (auto decl : decls) {
     auto known = collidingDeclGroups.find(decl->getFullName());
     if (known == collidingDeclGroups.end()) {
@@ -633,8 +654,8 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
   // Remove shadowed declarations from the list of declarations.
   bool anyRemoved = false;
   decls.erase(std::remove_if(decls.begin(), decls.end(),
-                             [&](ValueDecl *vd) {
-                               if (shadowed.count(vd) > 0) {
+                             [&](T decl) {
+                               if (shadowed.count(decl) > 0) {
                                  anyRemoved = true;
                                  return true;
                                }
@@ -644,6 +665,21 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
               decls.end());
 
   return anyRemoved;
+}
+
+bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
+                                const DeclContext *dc) {
+  return removeShadowedDeclsImpl<ValueDecl *>(decls, dc);
+}
+
+bool swift::removeShadowedDecls(TinyPtrVector<OperatorDecl *> &decls,
+                                const DeclContext *dc) {
+  return removeShadowedDeclsImpl<OperatorDecl *>(decls, dc);
+}
+
+bool swift::removeShadowedDecls(TinyPtrVector<PrecedenceGroupDecl *> &decls,
+                                const DeclContext *dc) {
+  return removeShadowedDeclsImpl<PrecedenceGroupDecl *>(decls, dc);
 }
 
 namespace {
@@ -2432,6 +2468,233 @@ swift::getDirectlyInheritedNominalTypeDecls(
     result.emplace_back(inheritedNominal, loc);
 
   return result;
+}
+
+/// A helper class to sneak around C++ access control rules.
+class SourceFile::Impl {
+public:
+  /// Only intended for use by operator lookup.
+  static ArrayRef<SourceFile::ImportedModuleDesc>
+  getImportsForSourceFile(const SourceFile &SF) {
+    return SF.Imports;
+  }
+};
+
+template <typename T>
+static TinyPtrVector<T *> lookupOperatorImpl(
+    DeclContext *moduleDC,
+    llvm::function_ref<void(ModuleDecl *, TinyPtrVector<T *> &)> lookupInModule,
+    llvm::function_ref<void(FileUnit *, TinyPtrVector<T *> &)> lookupInFile) {
+  assert(moduleDC->isModuleScopeContext());
+  auto &ctx = moduleDC->getASTContext();
+
+  // First try to use the new operator lookup logic.
+  {
+    TinyPtrVector<T *> results;
+    for (auto &import : getAllImports(moduleDC))
+      lookupInModule(import.second, results);
+
+    // If there's no ambiguity, or the new logic is completely enabled, perform
+    // shadowing checks and return. Otherwise fall through to the old logic.
+    if (results.size() <= 1 || ctx.LangOpts.EnableNewOperatorLookup) {
+      removeShadowedDecls(results, moduleDC);
+      return std::move(results);
+    }
+  }
+
+  // There are three stages to the old operator lookup:
+  // 1) Lookup directly in the file.
+  // 2) Lookup in the file's direct imports (not looking through exports).
+  // 3) Lookup in other files.
+  // If any step yields results, we return them without performing the next
+  // steps. Note that this means when we come to look in other files, we can
+  // accumulate ambiguities, unlike when looking in the original file.
+
+  TinyPtrVector<T *> results;
+  SmallPtrSet<ModuleDecl *, 8> visitedModules;
+
+  auto lookupInFileAndImports = [&](FileUnit *file,
+                                    bool includePrivate) -> bool {
+    // If we find something in the file itself, bail without checking imports.
+    lookupInFile(file, results);
+    if (!results.empty())
+      return true;
+
+    // Only look into SourceFile imports.
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      return false;
+
+    for (auto &import : SourceFile::Impl::getImportsForSourceFile(*SF)) {
+      bool isExported =
+          import.importOptions.contains(SourceFile::ImportFlags::Exported);
+
+      // If we're looking into another file, we can only explore its exports.
+      if (!includePrivate && !isExported)
+        continue;
+
+      auto *mod = import.module.second;
+      if (!visitedModules.insert(mod).second)
+        continue;
+
+      lookupInModule(mod, results);
+    }
+    return !results.empty();
+  };
+
+  // If we have a SourceFile context, search it and its private imports.
+  auto *SF = dyn_cast<SourceFile>(moduleDC);
+  if (SF && lookupInFileAndImports(SF, /*includePrivate*/ true))
+    return std::move(results);
+
+  // Protect against source files that contrive to import their own modules.
+  auto *mod = moduleDC->getParentModule();
+  visitedModules.insert(mod);
+
+  // Search all the other files of the module, this time excluding private
+  // imports.
+  for (auto *file : mod->getFiles()) {
+    if (file != SF)
+      lookupInFileAndImports(file, /*includePrivate*/ false);
+  }
+  return std::move(results);
+}
+
+static TinyPtrVector<OperatorDecl *>
+lookupOperator(DeclContext *moduleDC, Identifier name,
+               OperatorDecl::Fixity fixity) {
+  return lookupOperatorImpl<OperatorDecl>(
+      moduleDC,
+      [&](ModuleDecl *mod, TinyPtrVector<OperatorDecl *> &results) {
+        mod->lookupOperatorDirect(name, fixity, results);
+      },
+      [&](FileUnit *file, TinyPtrVector<OperatorDecl *> &results) {
+        file->lookupOperatorDirect(name, fixity, results);
+      });
+}
+
+void InfixOperatorLookupResult::diagnoseAmbiguity(SourceLoc loc) const {
+  auto &ctx = ModuleDC->getASTContext();
+  ctx.Diags.diagnose(loc, diag::ambiguous_operator_decls);
+  for (auto *op : *this)
+    op->diagnose(diag::found_this_operator_decl);
+}
+
+void InfixOperatorLookupResult::diagnoseMissing(SourceLoc loc,
+                                                bool forBuiltin) const {
+  ModuleDC->getASTContext().Diags.diagnose(loc, diag::unknown_binop);
+}
+
+llvm::Expected<TinyPtrVector<InfixOperatorDecl *>>
+InfixOperatorLookupRequest::evaluate(Evaluator &evaluator,
+                                     DeclContext *moduleDC,
+                                     Identifier name) const {
+  auto ops = lookupOperator(moduleDC, name, OperatorDecl::Fixity::Infix);
+
+  // Only take the first infix operator we see with a particular precedence
+  // group. This avoids an ambiguity if two different modules declare the same
+  // operator with the same precedence.
+  TinyPtrVector<InfixOperatorDecl *> results;
+  SmallPtrSet<PrecedenceGroupDecl *, 2> groups;
+  for (auto *op : ops) {
+    auto *infix = cast<InfixOperatorDecl>(op);
+    if (groups.insert(infix->getPrecedenceGroup()).second)
+      results.push_back(infix);
+  }
+  return std::move(results);
+}
+
+InfixOperatorLookupResult
+DeclContext::lookupInfixOperator(Identifier name, bool isCascading) const {
+  auto *moduleDC = getModuleScopeContext();
+  recordLookupOfTopLevelName(moduleDC, name, isCascading);
+
+  auto &ctx = moduleDC->getASTContext();
+  auto ops = evaluateOrDefault(ctx.evaluator,
+                               InfixOperatorLookupRequest{moduleDC, name}, {});
+  return InfixOperatorLookupResult(this, name, std::move(ops));
+}
+
+llvm::Expected<PrefixOperatorDecl *> PrefixOperatorLookupRequest::evaluate(
+    Evaluator &evaluator, DeclContext *moduleDC, Identifier name) const {
+  auto ops = lookupOperator(moduleDC, name, OperatorDecl::Fixity::Prefix);
+  if (ops.empty())
+    return nullptr;
+
+  // We can return the first prefix operator. All prefix operators of the same
+  // name are equivalent.
+  return cast<PrefixOperatorDecl>(ops[0]);
+}
+
+NullablePtr<PrefixOperatorDecl>
+DeclContext::lookupPrefixOperator(Identifier name, bool isCascading) const {
+  auto *moduleDC = getModuleScopeContext();
+  recordLookupOfTopLevelName(moduleDC, name, isCascading);
+
+  auto &ctx = moduleDC->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, PrefixOperatorLookupRequest{moduleDC, name}, nullptr);
+}
+
+llvm::Expected<PostfixOperatorDecl *> PostfixOperatorLookupRequest::evaluate(
+    Evaluator &evaluator, DeclContext *moduleDC, Identifier name) const {
+  auto ops = lookupOperator(moduleDC, name, OperatorDecl::Fixity::Postfix);
+  if (ops.empty())
+    return nullptr;
+
+  // We can return the first postfix operator. All postfix operators of the same
+  // name are equivalent.
+  return cast<PostfixOperatorDecl>(ops[0]);
+}
+
+NullablePtr<PostfixOperatorDecl>
+DeclContext::lookupPostfixOperator(Identifier name, bool isCascading) const {
+  auto *moduleDC = getModuleScopeContext();
+  recordLookupOfTopLevelName(moduleDC, name, isCascading);
+
+  auto &ctx = moduleDC->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, PostfixOperatorLookupRequest{moduleDC, name}, nullptr);
+}
+
+void PrecedenceGroupLookupResult::diagnoseAmbiguity(SourceLoc loc) const {
+  auto &ctx = ModuleDC->getASTContext();
+  ctx.Diags.diagnose(loc, diag::ambiguous_precedence_groups);
+  for (auto *group : *this)
+    group->diagnose(diag::found_this_precedence_group);
+}
+
+void PrecedenceGroupLookupResult::diagnoseMissing(SourceLoc loc,
+                                                  bool forBuiltin) const {
+  auto &ctx = ModuleDC->getASTContext();
+  auto diagID = forBuiltin ? diag::missing_builtin_precedence_group
+                           : diag::unknown_precedence_group;
+  ctx.Diags.diagnose(loc, diagID, Name);
+}
+
+llvm::Expected<TinyPtrVector<PrecedenceGroupDecl *>>
+PrecedenceGroupLookupRequest::evaluate(Evaluator &evaluator,
+                                       DeclContext *moduleDC,
+                                       Identifier name) const {
+  return lookupOperatorImpl<PrecedenceGroupDecl>(
+      moduleDC,
+      [&](ModuleDecl *mod, TinyPtrVector<PrecedenceGroupDecl *> &results) {
+        mod->lookupPrecedenceGroupDirect(name, results);
+      },
+      [&](FileUnit *file, TinyPtrVector<PrecedenceGroupDecl *> &results) {
+        file->lookupPrecedenceGroupDirect(name, results);
+      });
+}
+
+PrecedenceGroupLookupResult
+DeclContext::lookupPrecedenceGroup(Identifier name, bool isCascading) const {
+  auto *moduleDC = getModuleScopeContext();
+  recordLookupOfTopLevelName(moduleDC, name, isCascading);
+
+  auto &ctx = moduleDC->getASTContext();
+  auto groups = evaluateOrDefault(
+      ctx.evaluator, PrecedenceGroupLookupRequest{moduleDC, name}, {});
+  return PrecedenceGroupLookupResult(this, name, std::move(groups));
 }
 
 void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {

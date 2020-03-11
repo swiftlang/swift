@@ -1217,9 +1217,8 @@ public:
   static PrecedenceGroupDecl *
   lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op);
 
-  static PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc,
-                                                    Identifier name,
-                                                    SourceLoc nameLoc);
+  static PrecedenceGroupLookupResult
+  lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
 
   /// Check whether the given declaration can be written as a
   /// member of the given base type.

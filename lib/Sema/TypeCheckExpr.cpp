@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
@@ -127,31 +128,26 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
 static PrecedenceGroupDecl *lookupPrecedenceGroupForOperator(DeclContext *DC,
                                                              Identifier name,
                                                              SourceLoc loc) {
-  SourceFile *SF = DC->getParentSourceFile();
   bool isCascading = DC->isCascadingContextForLookup(true);
-  if (auto op = SF->lookupInfixOperator(name, isCascading, loc)) {
-    return op->getPrecedenceGroup();
-  } else {
-    DC->getASTContext().Diags.diagnose(loc, diag::unknown_binop);
-  }
-  return nullptr;
+  auto ops = DC->lookupInfixOperator(name, isCascading);
+  auto single = ops.getSingleOrDiagnose(loc);
+  if (!single)
+    return nullptr;
+
+  return single->getPrecedenceGroup();
 }
 
 PrecedenceGroupDecl *
 TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
   /// Look up the builtin precedence group with the given name.
+  auto &Context = DC->getASTContext();
 
-  auto getBuiltinPrecedenceGroup = [](DeclContext *DC, Identifier name,
-                                      SourceLoc loc) {
-    auto group = TypeChecker::lookupPrecedenceGroup(DC, name, loc);
-    if (!group) {
-      DC->getASTContext().Diags.diagnose(
-          loc, diag::missing_builtin_precedence_group, name);
-    }
-    return group;
+  auto getBuiltinPrecedenceGroup = [&](DeclContext *DC, Identifier name,
+                                       SourceLoc loc) -> PrecedenceGroupDecl * {
+    auto groups = TypeChecker::lookupPrecedenceGroup(DC, name, loc);
+    return groups.getSingleOrDiagnose(loc, /*forBuiltin*/ true);
   };
   
-  auto &Context = DC->getASTContext();
   if (auto ifExpr = dyn_cast<IfExpr>(E)) {
     // Ternary has fixed precedence.
     return getBuiltinPrecedenceGroup(DC, Context.Id_TernaryPrecedence,

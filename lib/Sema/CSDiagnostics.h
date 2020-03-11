@@ -771,20 +771,20 @@ private:
   bool exprNeedsParensBeforeAddingAs(Expr *expr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
     if (!asPG)
       return true;
-    return exprNeedsParensInsideFollowingOperator(DC, expr, asPG);
+    return exprNeedsParensInsideFollowingOperator(DC, expr, asPG.get());
   }
 
   bool exprNeedsParensAfterAddingAs(Expr *expr, Expr *rootExpr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
     if (!asPG)
       return true;
 
-    return exprNeedsParensOutsideFollowingOperator(DC, expr, rootExpr, asPG);
+    return exprNeedsParensOutsideFollowingOperator(DC, expr, rootExpr, asPG.get());
   }
 };
 

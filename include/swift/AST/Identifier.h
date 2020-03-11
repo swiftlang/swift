@@ -160,6 +160,10 @@ public:
     return Identifier((const char*)P);
   }
 
+  friend llvm::hash_code hash_value(Identifier identifier) {
+    return llvm::hash_value(identifier.getAsOpaquePointer());
+  }
+
   /// Compare two identifiers, producing -1 if \c *this comes before \c other,
   /// 1 if \c *this comes after \c other, and 0 if they are equal.
   ///

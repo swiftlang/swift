@@ -21,6 +21,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
@@ -1346,19 +1347,29 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     Identifier opName = getIdentifier(IID);
     pathTrace.addOperator(opName);
 
+    NullablePtr<Decl> result;
     switch (rawOpKind) {
     case OperatorKind::Infix:
-      return baseModule->lookupInfixOperator(opName);
+      result = baseModule->lookupInfixOperator(opName).getSingle();
+      break;
     case OperatorKind::Prefix:
-      return baseModule->lookupPrefixOperator(opName);
+      result = baseModule->lookupPrefixOperator(opName);
+      break;
     case OperatorKind::Postfix:
-      return baseModule->lookupPostfixOperator(opName);
+      result = baseModule->lookupPostfixOperator(opName);
+      break;
     case OperatorKind::PrecedenceGroup:
-      return baseModule->lookupPrecedenceGroup(opName);
+      result = baseModule->lookupPrecedenceGroup(opName).getSingle();
+      break;
     default:
       // Unknown operator kind.
       fatal();
     }
+    if (!result) {
+      return llvm::make_error<XRefError>("operator not found", pathTrace,
+                                         opName);
+    }
+    return result.get();
   }
 
   case XREF_GENERIC_PARAM_PATH_PIECE:

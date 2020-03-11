@@ -25,6 +25,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
@@ -54,6 +55,9 @@ namespace swift {
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
+  class InfixOperatorDecl;
+  class InfixOperatorLookupResult;
+  class PrecedenceGroupDecl;
   class ProtocolDecl;
   class Requirement;
   class SourceFile;
@@ -61,6 +65,9 @@ namespace swift {
   class ModuleDecl;
   class GenericTypeDecl;
   class NominalTypeDecl;
+  class PrecedenceGroupLookupResult;
+  class PostfixOperatorDecl;
+  class PrefixOperatorDecl;
   class ProtocolConformance;
   class ValueDecl;
   class Initializer;
@@ -536,6 +543,31 @@ public:
   void lookupAllObjCMethods(
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
+
+  /// Looks up an infix operator with a given \p name.
+  ///
+  /// This returns a vector of results, as it's possible to find multiple infix
+  /// operators with different precedence groups.
+  InfixOperatorLookupResult lookupInfixOperator(Identifier name,
+                                                bool isCascading = true) const;
+
+  /// Looks up an prefix operator with a given \p name.
+  ///
+  /// If multiple results are found, one is chosen in a stable manner, as
+  /// prefix operator decls cannot differ other than in name.
+  NullablePtr<PrefixOperatorDecl>
+  lookupPrefixOperator(Identifier name, bool isCascading = true) const;
+
+  /// Looks up an postfix operator with a given \p name.
+  ///
+  /// If multiple results are found, one is chosen in a stable manner, as
+  /// postfix operator decls cannot differ other than in name.
+  NullablePtr<PostfixOperatorDecl>
+  lookupPostfixOperator(Identifier name, bool isCascading = true) const;
+
+  /// Looks up a precedence group with a given \p name.
+  PrecedenceGroupLookupResult
+  lookupPrecedenceGroup(Identifier name, bool isCascading = true) const;
 
   /// Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.

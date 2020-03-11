@@ -36,6 +36,9 @@ SWIFT_REQUEST(NameLookup, GenericParamListRequest,
               NoLocationInfo)
 SWIFT_REQUEST(NameLookup, GetDestructorRequest, DestructorDecl *(ClassDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, InfixOperatorLookupRequest,
+              TinyPtrVector<InfixOperatorDecl *>(DeclContext *, Identifier),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest,
               DirectlyReferencedTypeDecls(
                   llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned),
@@ -49,6 +52,15 @@ SWIFT_REQUEST(NameLookup, ModuleQualifiedLookupRequest,
               QualifiedLookupResult(
                   const DeclContext *, ModuleDecl *, DeclNameRef, NLOptions),
               Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, PostfixOperatorLookupRequest,
+              PostfixOperatorDecl *(DeclContext *, Identifier),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, PrecedenceGroupLookupRequest,
+              TinyPtrVector<PrecedenceGroupDecl *>(DeclContext *, Identifier),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, PrefixOperatorLookupRequest,
+              PrefixOperatorDecl *(DeclContext *, Identifier),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, QualifiedLookupRequest,
               QualifiedLookupResult(
                   const DeclContext *, SmallVector<NominalTypeDecl *, 4>,

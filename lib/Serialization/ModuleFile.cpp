@@ -2171,9 +2171,6 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name,
     if (getStableFixity(fixity) == item.first)
       return cast<OperatorDecl>(getDecl(item.second));
   }
-
-  // FIXME: operators re-exported from other modules?
-
   return nullptr;
 }
 

@@ -29,6 +29,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -7078,20 +7079,25 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
 
 bool swift::exprNeedsParensBeforeAddingNilCoalescing(DeclContext *DC,
                                                      Expr *expr) {
+  auto &ctx = DC->getASTContext();
   auto asPG = TypeChecker::lookupPrecedenceGroup(
-      DC, DC->getASTContext().Id_NilCoalescingPrecedence, SourceLoc());
+                  DC, ctx.Id_NilCoalescingPrecedence, SourceLoc())
+                  .getSingle();
   if (!asPG)
     return true;
-  return exprNeedsParensInsideFollowingOperator(DC, expr, asPG);
+  return exprNeedsParensInsideFollowingOperator(DC, expr, asPG.get());
 }
 
 bool swift::exprNeedsParensAfterAddingNilCoalescing(DeclContext *DC,
                                                     Expr *expr,
                                                     Expr *rootExpr) {
+  auto &ctx = DC->getASTContext();
   auto asPG = TypeChecker::lookupPrecedenceGroup(
-      DC, DC->getASTContext().Id_NilCoalescingPrecedence, SourceLoc());
-  if (!asPG) return true;
-  return exprNeedsParensOutsideFollowingOperator(DC, expr, rootExpr, asPG);
+                  DC, ctx.Id_NilCoalescingPrecedence, SourceLoc())
+                  .getSingle();
+  if (!asPG)
+    return true;
+  return exprNeedsParensOutsideFollowingOperator(DC, expr, rootExpr, asPG.get());
 }
 
 namespace {

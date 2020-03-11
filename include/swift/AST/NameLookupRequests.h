@@ -515,6 +515,80 @@ private:
   evaluate(Evaluator &evaluator, DirectLookupDescriptor desc) const;
 };
 
+/// Look up an 'infix operator' decl by name.
+class InfixOperatorLookupRequest
+    : public SimpleRequest<InfixOperatorLookupRequest,
+                           TinyPtrVector<InfixOperatorDecl *>(DeclContext *,
+                                                              Identifier),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<TinyPtrVector<InfixOperatorDecl *>>
+  evaluate(Evaluator &evaluator, DeclContext *moduleDC, Identifier name) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Look up an 'prefix operator' decl by name.
+class PrefixOperatorLookupRequest
+    : public SimpleRequest<PrefixOperatorLookupRequest,
+                           PrefixOperatorDecl *(DeclContext *, Identifier),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<PrefixOperatorDecl *>
+  evaluate(Evaluator &evaluator, DeclContext *moduleDC, Identifier name) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Look up an 'postfix operator' decl by name.
+class PostfixOperatorLookupRequest
+    : public SimpleRequest<PostfixOperatorLookupRequest,
+                           PostfixOperatorDecl *(DeclContext *, Identifier),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<PostfixOperatorDecl *>
+  evaluate(Evaluator &evaluator, DeclContext *moduleDC, Identifier name) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Look up a precedencegroup decl by name.
+class PrecedenceGroupLookupRequest
+    : public SimpleRequest<PrecedenceGroupLookupRequest,
+                           TinyPtrVector<PrecedenceGroupDecl *>(DeclContext *,
+                                                                Identifier),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<TinyPtrVector<PrecedenceGroupDecl *>>
+  evaluate(Evaluator &evaluator, DeclContext *moduleDC, Identifier name) const;
+};
+
 #define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

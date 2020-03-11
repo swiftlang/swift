@@ -293,16 +293,6 @@ public:
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
 
-  template <typename T>
-  using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;
-
-  // FIXME: Once operator lookup is requestified with cached requests, these can
-  // be removed.
-  OperatorMap<InfixOperatorDecl*> InfixOperatorLookupCache;
-  OperatorMap<PostfixOperatorDecl*> PostfixOperatorLookupCache;
-  OperatorMap<PrefixOperatorDecl*> PrefixOperatorLookupCache;
-  OperatorMap<PrecedenceGroupDecl*> PrecedenceGroupLookupCache;
-
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.
   const SourceFileKind Kind;
@@ -445,25 +435,6 @@ public:
   Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
 
   virtual bool walk(ASTWalker &walker) override;
-
-  /// @{
-
-  /// Look up the given operator in this file.
-  ///
-  /// The file must be name-bound already. If the operator is not found, or if
-  /// there is an ambiguity, returns null.
-  ///
-  /// \param isCascading If true, the lookup of this operator may affect
-  /// downstream files.
-  InfixOperatorDecl *lookupInfixOperator(Identifier name, bool isCascading,
-                                         SourceLoc diagLoc = {});
-  PrefixOperatorDecl *lookupPrefixOperator(Identifier name, bool isCascading,
-                                           SourceLoc diagLoc = {});
-  PostfixOperatorDecl *lookupPostfixOperator(Identifier name, bool isCascading,
-                                             SourceLoc diagLoc = {});
-  PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name, bool isCascading,
-                                             SourceLoc diagLoc = {});
-  /// @}
 
   ReferencedNameTracker *getReferencedNameTracker() {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
