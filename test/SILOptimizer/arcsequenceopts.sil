@@ -2251,3 +2251,47 @@ bb0:
   %9999 = tuple()
   return %9999 : $()
 }
+
+//===----------------------------------------------------------------------===//
+// Test invoking EscapeAnalysis:mayReleaseContent on a builtin that takes
+// an address. This should simply not assert.
+//
+// <rdar://problem/60190962> Escape analysis crashes with
+// "an address is never a reference" error with -O -thread=sanitize
+//===----------------------------------------------------------------------===//
+
+// bufferMemory
+sil_global hidden @$s4test12bufferMemorySpys5UInt8VGvp : $UnsafeMutablePointer<UInt8>
+
+// x
+sil_global hidden @$s4test1xypvp : $Any
+
+sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+
+// CHECK-LABEL: sil @testTsanInoutAccess : $@convention(thin) () -> () {
+// CHECK:   alloc_global @$s4test12bufferMemorySpys5UInt8VGvp
+// CHECK:   [[GLOBAL:%.*]] = global_addr @$s4test12bufferMemorySpys5UInt8VGvp : $*UnsafeMutablePointer<UInt8>
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*UnsafeMutablePointer<UInt8>
+// CHECK:   builtin "tsanInoutAccess"([[ACCESS]] : $*UnsafeMutablePointer<UInt8>) : $()
+// CHECK-LABEL: } // end sil function 'testTsanInoutAccess'
+sil @testTsanInoutAccess : $@convention(thin) () -> () {
+bb0:
+  alloc_global @$s4test12bufferMemorySpys5UInt8VGvp
+  %1 = global_addr @$s4test12bufferMemorySpys5UInt8VGvp : $*UnsafeMutablePointer<UInt8>
+  %2 = integer_literal $Builtin.Int1, -1
+  alloc_global @$s4test1xypvp
+  %4 = global_addr @$s4test1xypvp : $*Any
+  %5 = string_literal utf8 ""
+  %6 = integer_literal $Builtin.Word, 0
+  %7 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %8 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %9 = apply %8(%5, %6, %2, %7) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %10 = init_existential_addr %4 : $*Any, $String
+  store %9 to %10 : $*String
+  %12 = begin_access [modify] [dynamic] %1 : $*UnsafeMutablePointer<UInt8>
+  %13 = builtin "tsanInoutAccess"(%12 : $*UnsafeMutablePointer<UInt8>) : $()
+  end_access %12 : $*UnsafeMutablePointer<UInt8>
+  %15 = tuple ()
+  return %15 : $()
+}

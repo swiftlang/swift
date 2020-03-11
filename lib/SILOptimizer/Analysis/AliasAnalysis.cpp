@@ -701,8 +701,11 @@ bool AliasAnalysis::canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr) {
       continue;
 
     // A builtin can only release an object if it can escape to one of the
-    // builtin's arguments.
-    if (EA->mayReleaseContent(Arg, Ptr))
+    // builtin's arguments. 'EscapeAnalysis::mayReleaseContent()' expects 'Arg'
+    // to be an owned reference and disallows addresses. Conservatively handle
+    // address type arguments as and conservatively treat all other values
+    // potential owned references.
+    if (Arg->getType().isAddress() || EA->mayReleaseContent(Arg, Ptr))
       return true;
   }
   return false;
