@@ -35,7 +35,8 @@ class SideEffectAnalysis;
 enum class InlineSelection {
   Everything,
   NoGlobalInit, // and no availability semantics calls
-  NoSemanticsAndGlobalInit
+  NoSemanticsAndGlobalInit,
+  OnlyInlineAlways,
 };
 
 // Returns the callee of an apply_inst if it is basically inlinable.
