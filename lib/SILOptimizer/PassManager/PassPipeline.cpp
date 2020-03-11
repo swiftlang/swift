@@ -618,7 +618,10 @@ SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
     return P;
   }
 
+  // These are optimizations that we do not do if we are only emitting
+  // diagnostics, but otherwise, we always guarantee will occur.
   P.startPipeline("SILOpt Prepare Passes");
+  P.addAlwaysInlineInliner();
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
   P.addAccessMarkerElimination();
@@ -678,7 +681,10 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
 
-  P.startPipeline("Mandatory Combines");
+  // These are optimizations that we do not do if we are only emitting
+  // diagnostics, but otherwise, we always guarantee will occur.
+  P.startPipeline("Mandatory Optimizations");
+  P.addAlwaysInlineInliner();
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
 
