@@ -1135,9 +1135,8 @@ checkOperatorConflicts(const SourceFile &SF, SourceLoc loc,
       if (loc.isValid()) {
         ASTContext &C = SF.getASTContext();
         C.Diags.diagnose(loc, diag::ambiguous_operator_decls);
-        C.Diags.diagnose(start->first->getLoc(),
-                         diag::found_this_operator_decl);
-        C.Diags.diagnose(i->first->getLoc(), diag::found_this_operator_decl);
+        start->first->diagnose(diag::found_this_operator_decl);
+        i->first->diagnose(diag::found_this_operator_decl);
       }
       return end;
     }
@@ -1157,8 +1156,7 @@ checkOperatorConflicts(const SourceFile &SF, SourceLoc loc,
     ASTContext &C = SF.getASTContext();
     C.Diags.diagnose(loc, diag::ambiguous_precedence_groups);
     for (auto &entry : importedGroups) {
-      C.Diags.diagnose(entry.first->getLoc(),
-                       diag::found_this_precedence_group);
+      entry.first->diagnose(diag::found_this_precedence_group);
     }
   }
   return importedGroups.end();
