@@ -3003,6 +3003,31 @@ public:
     OS << " type="; Ty.dump(OS);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
+    printCommon("sil_box");
+    Indent += 2;
+
+    ArrayRef<SILBoxTypeReprField> Fields = T->getFields();
+    for (unsigned i = 0, end = Fields.size(); i != end; ++i) {
+      OS << '\n';
+      printCommon("sil_box_field");
+      if (Fields[i].isMutable()) {
+        OS << " mutable";
+      }
+      OS << '\n';
+      printRec(Fields[i].getFieldType());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    for (auto genArg : T->getGenericArguments()) {
+      OS << '\n';
+      printRec(genArg);
+    }
+
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    Indent -= 2;
+  }
 };
 
 } // end anonymous namespace
