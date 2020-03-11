@@ -665,7 +665,7 @@ private:
     return M;
   }
 
-  using ASTSourceDescriptor = clang::ExternalASTSource::ASTSourceDescriptor;
+  using ASTSourceDescriptor = clang::ASTSourceDescriptor;
   /// Create a DIModule from a clang module or PCH.
   /// The clang::Module pointer is passed separately because the recursive case
   /// needs to fudge the AST descriptor.
