@@ -1148,6 +1148,8 @@ public:
   }
 };
 
+  /// A base class for some code shared between fragile and resilient witness
+  /// table layout.
   class WitnessTableBuilderBase {
   protected:
     IRGenModule &IGM;
@@ -1155,17 +1157,8 @@ public:
     CanType ConcreteType;
     const RootProtocolConformance &Conformance;
     const ProtocolConformance &ConformanceInContext;
-    ArrayRef<SILWitnessTable::Entry> SILEntries;
-    ArrayRef<SILWitnessTable::ConditionalConformance>
-        SILConditionalConformances;
 
     Optional<FulfillmentMap> Fulfillments;
-
-    SmallVector<size_t, 4> ConditionalRequirementPrivateDataIndices;
-
-    // Conditional conformances and metadata caches are stored at negative
-    // offsets, with conditional conformances closest to 0.
-    unsigned NextPrivateDataIndex = 0;
 
     WitnessTableBuilderBase(IRGenModule &IGM, SILWitnessTable *SILWT)
         : IGM(IGM), SILWT(SILWT),
@@ -1176,21 +1169,7 @@ public:
           Conformance(*SILWT->getConformance()),
           ConformanceInContext(
             mapConformanceIntoContext(IGM, Conformance,
-                                      Conformance.getDeclContext())),
-          SILEntries(SILWT->getEntries()),
-          SILConditionalConformances(SILWT->getConditionalConformances()) {}
-
-    void addConditionalConformances() {
-      assert(NextPrivateDataIndex == 0);
-      for (auto conditional : SILConditionalConformances) {
-        // We don't actually need to know anything about the specific
-        // conformances here, just make sure we get right private data slots.
-        (void)conditional;
-
-        auto reqtIndex = getNextPrivateDataIndex();
-        ConditionalRequirementPrivateDataIndices.push_back(reqtIndex);
-      }
-    }
+                                      Conformance.getDeclContext())) {}
 
     void defineAssociatedTypeWitnessTableAccessFunction(
                                         AssociatedConformance requirement,
@@ -1201,11 +1180,6 @@ public:
                                     AssociatedConformance requirement,
                                     CanType associatedType,
                                     ProtocolConformanceRef conformance);
-
-    /// Allocate another word of private data storage in the conformance table.
-    unsigned getNextPrivateDataIndex() {
-      return NextPrivateDataIndex++;
-    }
 
     const FulfillmentMap &getFulfillmentMap() {
       if (Fulfillments) return *Fulfillments;
@@ -1239,18 +1213,11 @@ public:
       }
       return *Fulfillments;
     }
-
-    /// The top-level entry point.
-    void build() {
-      addConditionalConformances();
-    }
-
-  public:
-    /// The number of private entries in the witness table.
-    unsigned getTablePrivateSize() const { return NextPrivateDataIndex; }
   };
 
-  /// A class which lays out a specific conformance to a protocol.
+  /// A fragile witness table is emitted to look like one in memory, except
+  /// possibly with some blank slots which are filled in by an instantiation
+  /// function.
   class FragileWitnessTableBuilder : public WitnessTableBuilderBase,
                                      public SILWitnessVisitor<FragileWitnessTableBuilder> {
     ConstantArrayBuilder &Table;
@@ -1258,12 +1225,28 @@ public:
     SmallVector<std::pair<size_t, const ConformanceInfo *>, 4>
       SpecializedBaseConformances;
 
+    ArrayRef<SILWitnessTable::Entry> SILEntries;
+    ArrayRef<SILWitnessTable::ConditionalConformance>
+        SILConditionalConformances;
+
     const ProtocolInfo &PI;
+
+    SmallVector<size_t, 4> ConditionalRequirementPrivateDataIndices;
+
+    void addConditionalConformances() {
+      for (auto reqtIndex : indices(SILConditionalConformances)) {
+        // We don't actually need to know anything about the specific
+        // conformances here, just make sure we get right private data slots.
+        ConditionalRequirementPrivateDataIndices.push_back(reqtIndex);
+      }
+    }
 
   public:
     FragileWitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
                                SILWitnessTable *SILWT)
         : WitnessTableBuilderBase(IGM, SILWT), Table(table),
+          SILEntries(SILWT->getEntries()),
+          SILConditionalConformances(SILWT->getConditionalConformances()),
           PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol(),
                                  ProtocolInfoKind::Full)) {}
 
@@ -1271,7 +1254,11 @@ public:
     unsigned getTableSize() const { return TableSize; }
 
     /// The top-level entry point.
-    void build();
+    void build() {
+      addConditionalConformances();
+      visitProtocolDecl(Conformance.getProtocol());
+      TableSize = Table.size();
+    }
 
     /// Add reference to the protocol conformance descriptor that generated
     /// this table.
@@ -1432,14 +1419,14 @@ public:
     llvm::Constant *buildInstantiationFunction();
   };
 
+  /// A resilient witness table consists of a list of descriptor/witness pairs,
+  /// and a runtime function builds the actual witness table in memory, placing
+  /// entries in the correct oder and filling in default implementations as
+  /// needed.
   class ResilientWitnessTableBuilder : public WitnessTableBuilderBase {
   public:
     ResilientWitnessTableBuilder(IRGenModule &IGM, SILWitnessTable *SILWT)
         : WitnessTableBuilderBase(IGM, SILWT) {}
-
-    void build() {
-      WitnessTableBuilderBase::build();
-    }
 
     /// Collect the set of resilient witnesses, which will become part of the
     /// protocol conformance descriptor.
@@ -1447,13 +1434,6 @@ public:
                         SmallVectorImpl<llvm::Constant *> &resilientWitnesses);
   };
 } // end anonymous namespace
-
-/// Build the witness table.
-void FragileWitnessTableBuilder::build() {
-  WitnessTableBuilderBase::build();
-  visitProtocolDecl(Conformance.getProtocol());
-  TableSize = Table.size();
-}
 
 llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
                                                       GenericSignature sig,
@@ -2148,7 +2128,6 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   PrettyStackTraceConformance _st(Context, "emitting witness table for", conf);
 
   unsigned tableSize = 0;
-  unsigned tablePrivateSize = 0;
   llvm::GlobalVariable *global = nullptr;
   llvm::Constant *instantiationFunction = nullptr;
   bool isDependent = isDependentConformance(conf);
@@ -2174,23 +2153,18 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
         llvm::MaybeAlign(getWitnessTableAlignment().getValue()));
 
     tableSize = wtableBuilder.getTableSize();
-    tablePrivateSize = wtableBuilder.getTablePrivateSize();
-
     instantiationFunction = wtableBuilder.buildInstantiationFunction();
   } else {
     // Build the witness table.
     ResilientWitnessTableBuilder wtableBuilder(*this, wt);
-    wtableBuilder.build();
 
     // Collect the resilient witnesses to go into the conformance descriptor.
     wtableBuilder.collectResilientWitnesses(resilientWitnesses);
-
-    tableSize = 0;
-    tablePrivateSize = wtableBuilder.getTablePrivateSize();
   }
 
   // Collect the information that will go into the protocol conformance
   // descriptor.
+  unsigned tablePrivateSize = wt->getConditionalConformances().size();
   ConformanceDescription description(conf, wt, global, tableSize,
                                      tablePrivateSize, isDependent);
 
