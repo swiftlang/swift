@@ -38,7 +38,6 @@ namespace swift {
 class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
-class TypeChecker;
 class TypeResolution;
 class TypeResolutionOptions;
 class TypoCorrectionResults;

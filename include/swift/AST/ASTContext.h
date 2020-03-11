@@ -105,7 +105,6 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
-  class TypeChecker;
   class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
@@ -441,9 +440,6 @@ public:
 
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);
-
-private:
-  friend class TypeChecker;
 
 public:
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the

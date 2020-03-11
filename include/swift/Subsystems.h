@@ -66,7 +66,6 @@ namespace swift {
   class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
-  class TypeChecker;
   class TypeCheckerOptions;
   struct TypeLoc;
   class UnifiedStatsReporter;
