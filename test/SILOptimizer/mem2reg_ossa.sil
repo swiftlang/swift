@@ -674,3 +674,22 @@ bb0(%0 : @guaranteed $AnyObject):
   return %7 : $()
 }
 
+sil [ossa] @test_g : $@convention(thin) (@guaranteed _NSDictionary) -> ()
+
+sil [ossa] @test_take : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %65 = alloc_stack $AnyObject                    // users: %67, %71, %70, %68
+  %66 = copy_value %0 : $AnyObject                // user: %67
+  store %66 to [init] %65 : $*AnyObject           // id: %67
+  
+  %68 = unchecked_addr_cast %65 : $*AnyObject to $*_NSDictionary // user: %69
+  %69 = load [take] %68 : $*_NSDictionary         // users: %73, %74, %79
+  %g = function_ref @test_g : $@convention(thin) (@guaranteed _NSDictionary) -> ()
+  %dummy2 = apply %g(%69) : $@convention(thin) (@guaranteed _NSDictionary) -> ()
+  
+  dealloc_stack %65 : $*AnyObject                 // id: %71
+  destroy_value %69 : $_NSDictionary
+
+  %7 = tuple ()
+  return %7 : $()
+}

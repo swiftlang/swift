@@ -184,9 +184,10 @@ public:
 /// tuple address projections. Sets \p singleBlock to null if the load (or
 /// it's address is not in \p singleBlock.
 static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
-  
-  if (isa<LoadInst>(I))
-    return true;
+  // TODO: we could support load [take] in the future by promoting it to
+  // load [copy] and creating an extra destroy_addr.
+  if (auto load = dyn_cast<LoadInst>(I))
+    return load->getOwnershipQualifier() != LoadOwnershipQualifier::Take;
 
   if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
       !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I))
@@ -376,7 +377,7 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   }
   op = LI->getOperand();
   if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
-    val = builder.createCopyValue(LI->getLoc(), val);
+    val = builder.createCopyValue(val.getLoc(), val);
   LI->replaceAllUsesWith(val);
   LI->eraseFromParent();
   while (op != ASI && op->use_empty()) {
