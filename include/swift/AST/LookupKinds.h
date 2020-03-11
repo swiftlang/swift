@@ -62,12 +62,15 @@ enum NLOptions : unsigned {
   /// Include synonyms declared with @_implements()
   NL_IncludeAttributeImplements = 0x100,
 
+  /// Synthesize property wrappers and include them in the lookup results.
+  NL_IncludePropertyWrappers = 0x200,
+
   /// This lookup is known to not add any additional dependencies to the
   /// primary source file.
   ///
   /// \see NL_KnownDependencyMask
   NL_KnownNoDependency =
-      NL_KnownNonCascadingDependency|NL_KnownCascadingDependency,
+      NL_KnownNonCascadingDependency | NL_KnownCascadingDependency,
 
   /// A mask of all options controlling how a lookup should be recorded as a
   /// dependency.
@@ -83,10 +86,12 @@ enum NLOptions : unsigned {
   ///
   /// FIXME: Eventually, add NL_ProtocolMembers to this, once all of the
   /// callers can handle it.
-  NL_QualifiedDefault = NL_RemoveNonVisible | NL_RemoveOverridden,
+  NL_QualifiedDefault =
+      NL_RemoveNonVisible | NL_RemoveOverridden | NL_IncludePropertyWrappers,
 
   /// The default set of options used for unqualified name lookup.
-  NL_UnqualifiedDefault = NL_RemoveNonVisible | NL_RemoveOverridden
+  NL_UnqualifiedDefault =
+      NL_RemoveNonVisible | NL_RemoveOverridden | NL_IncludePropertyWrappers,
 };
 
 static inline NLOptions operator|(NLOptions lhs, NLOptions rhs) {

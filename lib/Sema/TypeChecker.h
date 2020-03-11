@@ -412,13 +412,6 @@ private:
   friend class ASTContext;
 
 public:
-  /// Create a new type checker instance for the given ASTContext, if it
-  /// doesn't already have one.
-  ///
-  /// \returns a reference to the type checker.
-  static TypeChecker &createForContext(ASTContext &ctx);
-
-public:
   TypeChecker(const TypeChecker&) = delete;
   TypeChecker& operator=(const TypeChecker&) = delete;
 

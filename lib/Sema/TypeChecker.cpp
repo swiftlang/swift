@@ -53,15 +53,6 @@
 
 using namespace swift;
 
-TypeChecker &TypeChecker::createForContext(ASTContext &ctx) {
-  assert(!ctx.getLegacyGlobalTypeChecker() &&
-         "Cannot install more than one instance of the global type checker!");
-  auto *TC = new TypeChecker();
-  ctx.installGlobalTypeChecker(TC);
-  ctx.addCleanup([=](){ delete TC; });
-  return *ctx.getLegacyGlobalTypeChecker();
-}
-
 ProtocolDecl *TypeChecker::getProtocol(ASTContext &Context, SourceLoc loc,
                                        KnownProtocolKind kind) {
   auto protocol = Context.getProtocol(kind);
@@ -346,7 +337,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   BufferIndirectlyCausingDiagnosticRAII cpr(*SF);
 
   // Make sure we have a type checker.
-  TypeChecker &TC = createTypeChecker(Ctx);
+  createTypeChecker(Ctx);
 
   // Make sure that name binding has been completed before doing any type
   // checking.
@@ -537,7 +528,6 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
-  assert(Ctx.areSemanticQueriesEnabled());
   return TypeChecker::validateType(Ctx, T, resolution, options);
 }
 
@@ -675,11 +665,7 @@ bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   return true;
 }
 
-TypeChecker &swift::createTypeChecker(ASTContext &Ctx) {
-  if (auto *TC = Ctx.getLegacyGlobalTypeChecker())
-    return *TC;
-  return TypeChecker::createForContext(Ctx);
-}
+void swift::createTypeChecker(ASTContext &Ctx) {}
 
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
   if (C.TypeCheckerOpts.DebugForbidTypecheckPrefix.empty())
