@@ -101,6 +101,11 @@ swift_reflection_interop_typeRefForMangledTypeName(
   const char *MangledName,
   uint64_t Length);
 
+static inline char *
+swift_reflection_interop_copyDemangledNameForTypeRef(
+  SwiftReflectionInteropContextRef ContextRef,
+  swift_typeref_interop_t OpaqueTypeRef);
+
 static inline swift_typeinfo_t
 swift_reflection_interop_infoForTypeRef(SwiftReflectionInteropContextRef ContextRef,
                                         swift_typeref_interop_t OpaqueTypeRef);
@@ -249,6 +254,9 @@ struct SwiftReflectionFunctions {
   swift_typeref_t (*typeRefForMangledTypeName)(SwiftReflectionContextRef ContextRef,
                                            const char *MangledName,
                                            uint64_t Length);
+
+  char * (*copyDemangledNameForTypeRef)(
+  SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef);
 
   swift_typeinfo_t (*infoForTypeRef)(SwiftReflectionContextRef ContextRef,
                                       swift_typeref_t OpaqueTypeRef);
@@ -464,6 +472,7 @@ swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Con
   LOAD(typeRefForMetadata);
   LOAD(typeRefForInstance);
   LOAD(typeRefForMangledTypeName);
+  LOAD_OPT(copyDemangledNameForTypeRef);
   LOAD(infoForTypeRef);
   LOAD(childOfTypeRef);
   LOAD(infoForMetadata);
@@ -964,6 +973,17 @@ swift_reflection_interop_typeRefForMangledTypeName(
   Result.Typeref = 0;
   Result.Library = 0;
   return Result;
+}
+
+static inline char *
+swift_reflection_interop_copyDemangledNameForTypeRef(
+  SwiftReflectionInteropContextRef ContextRef,
+  swift_typeref_interop_t OpaqueTypeRef) {
+  DECLARE_LIBRARY(OpaqueTypeRef.Library);
+  if (Library->Functions.copyDemangledNameForTypeRef)
+    return Library->Functions.copyDemangledNameForTypeRef(Library->Context,
+                                                          OpaqueTypeRef.Typeref);
+  return NULL;
 }
 
 static inline swift_typeinfo_t
