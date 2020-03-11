@@ -828,7 +828,7 @@ public:
           *CaseIndex = tag;
           return true;
         }
-        auto PayloadTagSize = std::min(PayloadSize, static_cast<size_t>(4));
+        auto PayloadTagSize = std::min(PayloadSize, 4UL);
         // Treat the tag as a page selector; payload carries the offset within the page
         auto Page = tag - PayloadCaseCount;
         // Zero for 32-bit because we'll never have more than one page
