@@ -1385,7 +1385,7 @@ void *TypeLowering::operator new(size_t size, TypeConverter &tc) {
   return tc.TypeLoweringBPA.Allocate(size, alignof(TypeLowering&));
 }
 
-const TypeLowering *TypeConverter::find(TypeKey k) {
+const TypeLowering *TypeConverter::find(const TypeKey &k) {
   if (!k.isCacheable()) return nullptr;
 
   auto ck = k.getCachingKey();
@@ -1399,7 +1399,7 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
 }
 
 #ifndef NDEBUG
-void TypeConverter::removeNullEntry(TypeKey k) {
+void TypeConverter::removeNullEntry(const TypeKey &k) {
   if (!k.isCacheable())
     return;
 
@@ -1413,7 +1413,7 @@ void TypeConverter::removeNullEntry(TypeKey k) {
 }
 #endif
 
-void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
+void TypeConverter::insert(const TypeKey &k, const TypeLowering *tl) {
   if (!k.isCacheable()) return;
 
   LoweredTypes[k.getCachingKey()] = tl;
