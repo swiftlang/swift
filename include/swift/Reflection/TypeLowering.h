@@ -42,6 +42,23 @@ class EnumTypeInfoBuilder;
 class RecordTypeInfoBuilder;
 class ExistentialTypeInfoBuilder;
 
+enum class EnumKind : unsigned {
+  // An enum with no payload cases. The record will have no fields, but
+  // will have the correct size.
+  NoPayloadEnum,
+
+  // An enum with a single payload case and zero or more no-payload
+  // cases.  The no-payload cases may be encoded with an extra tag
+  // byte or as invalid payload values ("extra inhabitants").
+  SinglePayloadEnum,
+
+  // An enum with multiple payload cases and zero or more non-payload
+  // cases.  The selector that indicates what case is currently active
+  // may be encoded in unused "spare bits" common to all payloads and/or
+  // may use a separate tag byte.
+  MultiPayloadEnum,
+};
+
 enum class RecordKind : unsigned {
   Invalid,
 
@@ -50,18 +67,6 @@ enum class RecordKind : unsigned {
 
   // A Swift struct type.
   Struct,
-
-  // An enum with no payload cases. The record will have no fields, but
-  // will have the correct size.
-  NoPayloadEnum,
-
-  // An enum with a single payload case. The record consists of a single
-  // field, being the enum payload.
-  SinglePayloadEnum,
-
-  // An enum with multiple payload cases. The record consists of a multiple
-  // fields, one for each enum payload.
-  MultiPayloadEnum,
 
   // A Swift-native function is always a function pointer followed by a
   // retainable, nullable context pointer.
@@ -107,6 +112,7 @@ enum class TypeInfoKind : unsigned {
   Record,
   Reference,
   Invalid,
+  Enum,
 };
 
 class TypeInfo {
@@ -206,6 +212,65 @@ public:
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Record;
+  }
+};
+
+/// Enums
+class EnumTypeInfo : public TypeInfo {
+  EnumKind SubKind;
+  std::vector<FieldInfo> Cases;
+
+protected:
+  EnumTypeInfo(unsigned Size, unsigned Alignment,
+               unsigned Stride, unsigned NumExtraInhabitants,
+               bool BitwiseTakable,
+               EnumKind SubKind, const std::vector<FieldInfo> &Cases)
+    : TypeInfo(TypeInfoKind::Enum, Size, Alignment, Stride,
+               NumExtraInhabitants, BitwiseTakable),
+      SubKind(SubKind), Cases(Cases) {}
+
+public:
+  EnumKind getEnumKind() const { return SubKind; }
+  const std::vector<FieldInfo> &getCases() const { return Cases; }
+  unsigned getNumCases() const { return Cases.size(); }
+  unsigned getNumPayloadCases() const {
+    auto Cases = getCases();
+    return std::count_if(Cases.begin(), Cases.end(),
+                         [](const FieldInfo &Case){return Case.TR != 0;});
+  }
+  // Size of the payload area.
+  unsigned getPayloadSize() const {
+    return EnumTypeInfo::getPayloadSizeForCases(Cases);
+  }
+
+  static unsigned getPayloadSizeForCases(const std::vector<FieldInfo> &Cases) {
+    unsigned size = 0;
+    for (auto Case : Cases) {
+      if (Case.TR != 0 && Case.TI.getSize() > size) {
+        size = Case.TI.getSize();
+      }
+    }
+    return size;
+  }
+
+  // Returns true if this enum is `Optional`
+  // (This was factored out of a piece of code that was just
+  // checking the EnumKind.  This is vastly better than that,
+  // but could probably be improved further.)
+  bool isOptional() const {
+    return
+      SubKind == EnumKind::SinglePayloadEnum
+      && Cases.size() == 2
+      && Cases[0].Name == "some"
+      && Cases[1].Name == "none";
+  }
+
+  virtual bool projectEnumValue(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *CaseIndex) const = 0;
+
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Enum;
   }
 };
 

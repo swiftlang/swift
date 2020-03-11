@@ -47,6 +47,18 @@ public:
   uint64_t getAddressData() const {
     return Data;
   }
+
+  template<typename IntegerType>
+  RemoteAddress& operator+=(const IntegerType& rhs) {
+    Data += rhs;
+    return *this;
+  }
+
+  template<typename IntegerType>
+  friend RemoteAddress operator+(RemoteAddress lhs,
+                                 const IntegerType& rhs) {
+    return lhs += rhs;
+  }
 };
 
 /// A symbolic relocated absolute pointer value.

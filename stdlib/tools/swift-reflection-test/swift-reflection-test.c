@@ -581,28 +581,26 @@ int reflectEnum(SwiftReflectionContextRef RC,
     PipeMemoryReader_sendDoneMessage(&Pipe);
     return 1; // <<< Test cases also verify failures, so this must "succeed"
   }
-
-  char *CaseName = NULL;
-  swift_typeref_t PayloadTypeRef = 0;
-  if (!swift_reflection_getEnumCaseTypeRef(RC, EnumTypeRef, CaseIndex, &CaseName, &PayloadTypeRef)) {
-    printf("swift_reflection_getEnumCaseTypeRef failed.\n");
+  if ((unsigned)CaseIndex > InstanceTypeInfo.NumFields) {
+    printf("swift_reflection_projectEnumValue returned invalid case.\n\n");
     PipeMemoryReader_sendDoneMessage(&Pipe);
     return 0;
   }
 
-  if (PayloadTypeRef == 0) {
+  swift_childinfo_t CaseInfo
+    = swift_reflection_childOfTypeRef(RC, EnumTypeRef, CaseIndex);
+
+  if (CaseInfo.TR == 0) {
     // Enum case has no payload
     printf("(enum_value name=%s index=%llu)\n",
-           CaseName, (unsigned long long)CaseIndex);
+           CaseInfo.Name, (unsigned long long)CaseIndex);
   } else {
     printf("(enum_value name=%s index=%llu\n",
-           CaseName, (unsigned long long)CaseIndex);
-    swift_reflection_dumpTypeRef(PayloadTypeRef);
+           CaseInfo.Name, (unsigned long long)CaseIndex);
+    swift_reflection_dumpTypeRef(CaseInfo.TR);
     printf(")\n");
   }
   printf("\n");
-  // FIXME: Is there a better idiom for handling the returned case name?
-  free(CaseName);
   PipeMemoryReader_sendDoneMessage(&Pipe);
   return 1;
 }
@@ -654,21 +652,16 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
       PipeMemoryReader_sendDoneMessage(&Pipe);
       return 1; // <<< Test cases rely on detecting this, so must "succeed"
     }
-
-    char *CaseName = NULL;
-    swift_typeref_t PayloadTypeRef = 0;
-    if (!swift_reflection_getEnumCaseTypeRef(RC, EnumTypeRef, CaseIndex,
-                                             &CaseName, &PayloadTypeRef)) {
-      printf("swift_reflection_getEnumCaseTypeRef failed.\n");
+    if ((unsigned)CaseIndex > EnumTypeInfo.NumFields) {
+      printf("swift_reflection_projectEnumValue returned invalid case.\n\n");
       PipeMemoryReader_sendDoneMessage(&Pipe);
       return 0;
     }
 
-    printf(".%s", CaseName);
-    // FIXME: Is there a better idiom for handling the returned case name?
-    free(CaseName);
-
-    EnumTypeRef = PayloadTypeRef;
+    swift_childinfo_t CaseInfo
+      = swift_reflection_childOfTypeRef(RC, EnumTypeRef, CaseIndex);
+    printf(".%s", CaseInfo.Name);
+    EnumTypeRef = CaseInfo.TR;
     if (EnumTypeRef != 0) {
       printf("(");
       parens += 1;
