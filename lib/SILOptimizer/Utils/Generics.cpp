@@ -791,9 +791,9 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 /// on the ReabstractionInfo.
 CanSILFunctionType ReabstractionInfo::
 createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
-  llvm::SmallVector<SILResultInfo, 8> SpecializedResults;
-  llvm::SmallVector<SILYieldInfo, 8> SpecializedYields;
-  llvm::SmallVector<SILParameterInfo, 8> SpecializedParams;
+  SmallVector<SILResultInfo, 8> SpecializedResults;
+  SmallVector<SILYieldInfo, 8> SpecializedYields;
+  SmallVector<SILParameterInfo, 8> SpecializedParams;
 
   unsigned IndirectResultIdx = 0;
   for (SILResultInfo RI : SubstFTy->getResults()) {
@@ -918,7 +918,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
       // we should return true.
       auto First = Req.getFirstType()->getCanonicalType();
       auto Second = Req.getSecondType()->getCanonicalType();
-      llvm::SmallSetVector<TypeBase *, 2> UsedGenericParams;
+      SmallSetVector<TypeBase *, 2> UsedGenericParams;
       First.visit([&](Type Ty) {
         if (auto *GP = Ty->getAs<GenericTypeParamType>()) {
           UsedGenericParams.insert(GP);
@@ -969,7 +969,7 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
       // we should return true.
       auto First = Req.getFirstType()->getCanonicalType();
       auto Second = Req.getSecondType()->getCanonicalType();
-      llvm::SmallSetVector<GenericTypeParamType *, 2> UsedGenericParams;
+      SmallSetVector<GenericTypeParamType *, 2> UsedGenericParams;
       First.visit([&](Type Ty) {
         if (auto *GP = Ty->getAs<GenericTypeParamType>()) {
           UsedGenericParams.insert(GP);
@@ -2310,7 +2310,7 @@ static bool createPrespecializations(ApplySite Apply, SILFunction *ProxyFunc,
 void swift::trySpecializeApplyOfGeneric(
     SILOptFunctionBuilder &FuncBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
-    llvm::SmallVectorImpl<SILFunction *> &NewFunctions,
+    SmallVectorImpl<SILFunction *> &NewFunctions,
     OptRemark::Emitter &ORE) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
   auto *F = Apply.getFunction();
