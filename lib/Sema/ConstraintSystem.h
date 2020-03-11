@@ -2229,8 +2229,15 @@ private:
   /// constraint system for further exploration.
   void applySolution(const Solution &solution);
 
-  // FIXME: Allows the type checker to apply solutions.
-  friend class swift::TypeChecker;
+  // FIXME: Perhaps these belong on ConstraintSystem itself.
+  friend Optional<BraceStmt *>
+  swift::TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *func,
+                                                        Type builderType);
+  friend Optional<SolutionApplicationTarget>
+  swift::TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
+                                          bool &unresolvedTypeExprs,
+                                          TypeCheckExprOptions options,
+                                          ExprTypeCheckListener *listener);
 
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
