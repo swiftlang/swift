@@ -912,7 +912,10 @@ public:
     CanGenericSignature origSig = origType.getGenericSignature();
     if (substituteBindingsInSubstType) {
       origContextType = substType;
-      origSig = GenericSig;
+      origSig = TC.getCurGenericSignature();
+      assert((!substType->hasTypeParameter() || origSig) &&
+             "lowering mismatched interface types in a context without "
+             "a generic signature");
     }
     
     if (!origContextType->hasTypeParameter()
@@ -925,10 +928,11 @@ public:
     }
     
     // Extract structural substitutions.
-    if (origContextType->hasTypeParameter())
+    if (origContextType->hasTypeParameter()) {
       origContextType = origSig->getGenericEnvironment()
         ->mapTypeIntoContext(origContextType)
         ->getCanonicalType(origSig);
+    }
 
     auto result = origContextType
       ->substituteBindingsTo(substType,
@@ -1647,6 +1651,9 @@ static CanSILFunctionType getSILFunctionType(
   // Find the generic parameters.
   CanGenericSignature genericSig =
     substFnInterfaceType.getOptGenericSignature();
+
+  Optional<TypeConverter::GenericContextRAII> contextRAII;
+  if (genericSig) contextRAII.emplace(TC, genericSig);
 
   // Per above, only fully honor opaqueness in the abstraction pattern
   // for thick or polymorphic functions.  We don't need to worry about
