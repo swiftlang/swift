@@ -7701,15 +7701,6 @@ ProtocolConformanceRef Solution::resolveConformance(
   return ProtocolConformanceRef::forInvalid();
 }
 
-Type Solution::getType(const Expr *expr) const {
-  auto result = nodeTypes.find(expr);
-  if (result != nodeTypes.end())
-    return result->second;
-
-  auto &cs = getConstraintSystem();
-  return cs.getType(expr);
-}
-
 void Solution::setExprTypes(Expr *expr) const {
   if (!expr)
     return;
