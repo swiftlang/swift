@@ -788,7 +788,7 @@ public:
         return false;
       } else {
         // No payload: Payload area is reused for more cases
-        unsigned PayloadTag = 0;
+        uint32_t PayloadTag = 0;
         auto PayloadTagSize = std::min(PayloadSize, decltype(PayloadSize)(sizeof(PayloadTag)));
         if (!getReader().readInteger(EnumAddress, PayloadTagSize, &PayloadTag)) {
           return false;
@@ -801,7 +801,50 @@ public:
     }
 
     case RecordKind::MultiPayloadEnum: {
-      // TODO: Support multipayload enums
+      // Collect basic statistics about the enum
+      unsigned long PayloadCaseCount = 0;
+      unsigned long NonPayloadCaseCount = 0;
+      unsigned long PayloadSize = 0;
+      for (auto Field : Fields) {
+        if (Field.TR != 0) {
+          PayloadCaseCount += 1;
+          if (Field.TI.getSize() > PayloadSize) {
+            PayloadSize = Field.TI.getSize();
+          }
+        } else {
+          NonPayloadCaseCount += 1;
+        }
+      }
+      if (EnumSize > PayloadSize) {
+        // If the compiler laid this out with a separate tag, use that.
+        unsigned tag = 0;
+        auto TagSize = EnumSize - PayloadSize;
+        auto TagAddress = remote::RemoteAddress(EnumAddress.getAddressData() + PayloadSize);
+        if (!getReader().readInteger(TagAddress, TagSize, &tag)
+           || tag >= Fields.size()) {
+          return false;
+        }
+        if (tag < PayloadCaseCount) {
+          *CaseIndex = tag;
+          return true;
+        }
+        auto PayloadTagSize = std::min(PayloadSize, 4UL);
+        // Treat the tag as a page selector; payload carries the offset within the page
+        auto Page = tag - PayloadCaseCount;
+        // Zero for 32-bit because we'll never have more than one page
+        auto PageSize = PayloadTagSize >= 4 ? 0 : 1 << (PayloadSize * 8U);
+        auto PageStart = Page * PageSize;
+        unsigned PayloadTag;
+        if (!getReader().readInteger(EnumAddress, PayloadTagSize, &PayloadTag)) {
+          return false;
+        }
+        *CaseIndex = PageStart + PayloadTag + PayloadCaseCount;
+        return true;
+      } else {
+        // XXX TODO: If the payloads have common spare bits (e.g., all pointers)
+        // then use those to decode the case.
+        return false;
+      }
       break;
     }
 
