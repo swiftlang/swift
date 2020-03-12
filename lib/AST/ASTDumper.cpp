@@ -3679,8 +3679,26 @@ namespace {
 
     void visitSILFunctionType(SILFunctionType *T, StringRef label) {
       printCommon(label, "sil_function_type");
-      // FIXME: Print the structure of the type.
       printField("type", T->getString());
+
+      for (auto param : T->getParameters()) {
+        printRec("input", param.getInterfaceType());
+      }
+      for (auto yield : T->getYields()) {
+        printRec("yield", yield.getInterfaceType());
+      }
+      for (auto result : T->getResults()) {
+        printRec("result", result.getInterfaceType());
+      }
+      if (auto error  = T->getOptionalErrorResult()) {
+        printRec("error", error->getInterfaceType());
+      }
+      OS << '\n';
+      T->getPatternSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
+                                        Indent+2);
+      OS << '\n';
+      T->getInvocationSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
+                                           Indent+2);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
