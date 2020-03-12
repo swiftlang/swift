@@ -10,8 +10,15 @@ SWIFT_BUILD_FLAGS="-c release"
 SWIFT_BUILD=${NIGHTLY_TOOLCHAIN}/usr/bin/swift-build
 
 build_swiftpm() {
+  local build_flags=$SWIFT_BUILD_FLAGS
+  if [[ "$(uname)" == "Darwin" ]]; then
+    rpath_prefix='@executable_path/../'
+  else
+    rpath_prefix='$ORIGIN/../'
+  fi
+  build_flags="${build_flags} -Xlinker -rpath -Xlinker ${rpath_prefix}"
   cd ${SOURCE_PATH}/swiftpm
-  ${SWIFT_BUILD} ${SWIFT_BUILD_FLAGS}
+  ${SWIFT_BUILD} ${build_flags}
 }
 
 install_binary() {
