@@ -35,7 +35,7 @@ Swift Next
     func boxes() -> [Box<Wrapped.Element>] where Wrapped: Sequence { ... }
   }
   ```
-  Because contextual `where` clauses are effectively visibility constraints, overrides adopting this feature must be at least as visible as the overriden method:
+  Because contextual `where` clauses are effectively visibility constraints, overrides adopting this feature must be at least as visible as the overridden method:
   
   ```swift
   class Base<T> {
