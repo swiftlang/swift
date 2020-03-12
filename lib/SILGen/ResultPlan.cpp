@@ -249,7 +249,8 @@ public:
                                          origType.getType(), substType,
                                          loweredResultTy);
         } else {
-          return Conversion::getOrigToSubst(origType, substType);
+          return Conversion::getOrigToSubst(origType, substType,
+                                            loweredResultTy);
         }
       }();
 

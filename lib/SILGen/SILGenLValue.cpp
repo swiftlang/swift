@@ -1969,8 +1969,11 @@ namespace {
                                        keyPathTy->getGenericArgs(),
                                        ArrayRef<ProtocolConformanceRef>());
 
+      auto origType = AbstractionPattern::getOpaque();
+      auto loweredTy = SGF.getLoweredType(origType, value.getSubstRValueType());
+
       auto setValue =
-        std::move(value).getAsSingleValue(SGF, AbstractionPattern::getOpaque());
+        std::move(value).getAsSingleValue(SGF, origType, loweredTy);
       if (!setValue.getType().isAddress()) {
         setValue = setValue.materialize(SGF, loc);
       }
@@ -3523,7 +3526,8 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
       ? Conversion::getBridging(Conversion::BridgeFromObjC,
                                 origFormalType.getType(),
                                 substFormalType, rvalueTL.getLoweredType())
-      : Conversion::getOrigToSubst(origFormalType, substFormalType);
+      : Conversion::getOrigToSubst(origFormalType, substFormalType,
+                                   rvalueTL.getLoweredType());
 
   return emitConvertedRValue(loc, conversion, C,
       [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {

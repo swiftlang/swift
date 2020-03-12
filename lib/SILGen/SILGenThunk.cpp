@@ -211,7 +211,8 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
       toClosure =
         emitTransformedValue(loc, toClosure,
                              appliedFnPattern, formalType,
-                             appliedThunkPattern, formalType);
+                             appliedThunkPattern, formalType,
+                             resultTy);
     }
   }
   toClosure = S.popPreservingValue(toClosure);
