@@ -447,8 +447,8 @@ LiveRange::hasUnknownConsumingUse(bool assumingAtFixPoint) const {
     return HasConsumingUse_t::No;
   }
 
-  // Ok, we do have some unknown consuming uses. If we aren't asked to
-  // update phiToIncomingValueMultiMap, then just return true quickly.
+  // Ok, we do have some unknown consuming uses. If we aren't assuming we are at
+  // the fixed point yet, just bail.
   if (!assumingAtFixPoint) {
     return HasConsumingUse_t::Yes;
   }
@@ -628,21 +628,35 @@ struct SemanticARCOptVisitor
   /// Are we assuming that we reached a fix point and are re-processing to
   /// prepare to use the phiToIncomingValueMultiMap.
   bool assumingAtFixedPoint = false;
-  FrozenMultiMap<SILPhiArgument *, OwnedValueIntroducer>
-      phiToIncomingValueMultiMap;
 
-  /// Returns the phiToIncomingValueMultiMap if we are re-processing our
-  /// worklist after fixed point to initialize our phi to incoming value
-  /// multi-map. Otherwise returns nullptr.
-  FrozenMultiMap<SILPhiArgument *, OwnedValueIntroducer> *
-  getPhiToIncomingValueMultiMap() {
-    if (assumingAtFixedPoint)
-      return &phiToIncomingValueMultiMap;
-    return nullptr;
-  }
+  /// A map from a value that acts as a "joined owned introducer" in the def-use
+  /// graph.
+  ///
+  /// A "joined owned introducer" is a value with owned ownership whose
+  /// ownership is derived from multiple non-trivial owned operands of a related
+  /// instruction. Some examples are phi arguments, tuples, structs. Naturally,
+  /// all of these instructions must be non-unary instructions and only have
+  /// this property if they have multiple operands that are non-trivial.
+  ///
+  /// In such a case, we can not just treat them like normal forwarding concepts
+  /// since we can only eliminate optimize such a value if we are able to reason
+  /// about all of its operands together jointly. This is not amenable to a
+  /// small peephole analysis.
+  ///
+  /// Instead, as we perform the peephole analysis, using the multimap, we map
+  /// each joined owned value introducer to the set of its @owned operands that
+  /// we thought we could convert to guaranteed only if we could do the same to
+  /// the joined owned value introducer. Then once we finish performing
+  /// peepholes, we iterate through the map and see if any of our joined phi
+  /// ranges had all of their operand's marked with this property by iterating
+  /// over the multimap. Since we are dealing with owned values and we know that
+  /// our LiveRange can not see through joined live ranges, we know that we
+  /// should only be able to have a single owned value introducer for each
+  /// consumed operand.
+  FrozenMultiMap<SILValue, Operand *> joinedOwnedIntroducerToConsumedOperands;
 
   using FrozenMultiMapRange =
-      decltype(phiToIncomingValueMultiMap)::PairToSecondEltRange;
+      decltype(joinedOwnedIntroducerToConsumedOperands)::PairToSecondEltRange;
 
   explicit SemanticARCOptVisitor(SILFunction &F) : F(F) {}
 
@@ -800,55 +814,72 @@ static bool canEliminatePhi(
     SemanticARCOptVisitor::FrozenMultiMapRange optimizableIntroducerRange,
     ArrayRef<Operand *> incomingValueOperandList,
     SmallVectorImpl<OwnedValueIntroducer> &ownedValueIntroducerAccumulator) {
-  // A set that we use to ensure we only add introducers to the accumulator
-  // once.
-  SmallVector<OwnedValueIntroducer, 16> scratch;
   for (Operand *incomingValueOperand : incomingValueOperandList) {
-    SWIFT_DEFER { scratch.clear(); };
-
     SILValue incomingValue = incomingValueOperand->get();
 
     // Before we do anything, see if we have an incoming value with trivial
     // ownership. This can occur in the case where we are working with enums due
-    // to trivial non-payloaded cases.
+    // to trivial non-payloaded cases. Skip that.
     if (incomingValue.getOwnershipKind() == ValueOwnershipKind::None) {
       continue;
     }
 
-    // Now that we know it is an owned value, check for introducers of the owned
-    // value which are the copies that we may be able to eliminate.
+    // Then see if this is an introducer that we actually saw as able to be
+    // optimized if we could flip this joined live range.
     //
-    // If we can not find all of the owned value's introducers, bail.
-    if (!getAllOwnedValueIntroducers(incomingValue, scratch)) {
+    // NOTE: If this linear search is too slow, we can change the multimap to
+    // sort the mapped to list by pointer instead of insertion order. In such a
+    // case, we could then bisect.
+    if (llvm::find(optimizableIntroducerRange, incomingValueOperand) ==
+        optimizableIntroducerRange.end()) {
       return false;
     }
 
-    // Then make sure that all of our owned value introducers are able to be
-    // converted to guaranteed and that we found it to have a LiveRange that we
-    // could have eliminated /if/ we were to get rid of this phi.
-    if (!llvm::all_of(scratch, [&](const OwnedValueIntroducer &introducer) {
-          if (!introducer.isConvertableToGuaranteed()) {
-            return false;
-          }
-          // If this linear search is too slow, we can change the
-          // multimap to sort the mapped to list by pointer
-          // instead of insertion order. In such a case, we could
-          // then bisect.
-          auto iter = llvm::find(optimizableIntroducerRange, introducer);
-          return iter != optimizableIntroducerRange.end();
-        })) {
+    // Now that we know it is an owned value that we saw before, check for
+    // introducers of the owned value which are the copies that we may be able
+    // to eliminate. Since we do not look through joined live ranges, we must
+    // only have a single introducer. So look for that one and if not, bail.
+    auto singleIntroducer = getSingleOwnedValueIntroducer(incomingValue);
+    if (!singleIntroducer.hasValue()) {
       return false;
     }
 
-    // Otherwise, append all introducers from scratch into our result array.
-    llvm::copy(scratch, std::back_inserter(ownedValueIntroducerAccumulator));
+    // Then make sure that our owned value introducer is able to be converted to
+    // guaranteed and that we found it to have a LiveRange that we could have
+    // eliminated /if/ we were to get rid of this phi.
+    if (!singleIntroducer->isConvertableToGuaranteed()) {
+      return false;
+    }
+
+    // Otherwise, add the introducer to our result array.
+    ownedValueIntroducerAccumulator.push_back(*singleIntroducer);
   }
 
-  // Now that we are done, perform a sort unique on our result array so that we
-  // on return have a unique set of values.
-  sortUnique(ownedValueIntroducerAccumulator);
+#ifndef NDEBUG
+  // Other parts of the pass ensure that we only add values to the list if their
+  // owned value introducer is not used by multiple live ranges. That being
+  // said, lets assert that.
+  {
+    SmallVector<OwnedValueIntroducer, 32> uniqueCheck;
+    llvm::copy(ownedValueIntroducerAccumulator,
+               std::back_inserter(uniqueCheck));
+    sortUnique(uniqueCheck);
+    assert(
+        uniqueCheck.size() == ownedValueIntroducerAccumulator.size() &&
+        "multiple joined live range operands are from the same live range?!");
+  }
+#endif
 
   return true;
+}
+
+static bool getIncomingJoinedLiveRangeOperands(
+    SILValue joinedLiveRange, SmallVectorImpl<Operand *> &resultingOperands) {
+  if (auto *phi = dyn_cast<SILPhiArgument>(joinedLiveRange)) {
+    return phi->getIncomingPhiOperands(resultingOperands);
+  }
+
+  llvm_unreachable("Unhandled joined live range?!");
 }
 
 bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
@@ -856,24 +887,24 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
 
   // First freeze our multi-map so we can use it for map queries. Also, setup a
   // defer of the reset so we do not forget to reset the map when we are done.
-  phiToIncomingValueMultiMap.setFrozen();
-  SWIFT_DEFER { phiToIncomingValueMultiMap.reset(); };
+  joinedOwnedIntroducerToConsumedOperands.setFrozen();
+  SWIFT_DEFER { joinedOwnedIntroducerToConsumedOperands.reset(); };
 
   // Now for each phi argument that we have in our multi-map...
   SmallVector<Operand *, 4> incomingValueOperandList;
   SmallVector<OwnedValueIntroducer, 4> ownedValueIntroducers;
-  for (auto pair : phiToIncomingValueMultiMap.getRange()) {
+  for (auto pair : joinedOwnedIntroducerToConsumedOperands.getRange()) {
     SWIFT_DEFER {
       incomingValueOperandList.clear();
       ownedValueIntroducers.clear();
     };
 
-    // First compute the LiveRange for our phi argument. For simplicity, we only
-    // handle cases now where our phi argument does not have any phi unknown
-    // consumers.
-    SILPhiArgument *phi = pair.first;
-    LiveRange phiLiveRange(phi);
-    if (bool(phiLiveRange.hasUnknownConsumingUse())) {
+    // First compute the LiveRange for ownershipPhi value. For simplicity, we
+    // only handle cases now where the result does not have any additional
+    // ownershipPhi uses.
+    SILValue joinedIntroducer = pair.first;
+    LiveRange joinedLiveRange(joinedIntroducer);
+    if (bool(joinedLiveRange.hasUnknownConsumingUse())) {
       continue;
     }
 
@@ -881,7 +912,8 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     // our incoming values are able to be converted to guaranteed. Now for each
     // incoming value, compute the incoming values ownership roots and see if
     // all of the ownership roots are in our owned incoming value array.
-    if (!phi->getIncomingPhiOperands(incomingValueOperandList)) {
+    if (!getIncomingJoinedLiveRangeOperands(joinedIntroducer,
+                                            incomingValueOperandList)) {
       continue;
     }
 
@@ -904,7 +936,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     for (Operand *incomingValueOperand : incomingValueOperandList) {
       originalIncomingValues.push_back(incomingValueOperand->get());
       SILType type = incomingValueOperand->get()->getType();
-      auto *undef = SILUndef::get(type, *phi->getFunction());
+      auto *undef = SILUndef::get(type, F);
       incomingValueOperand->set(undef);
     }
 
@@ -957,7 +989,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     }
 
     // Then convert the phi's live range to be guaranteed.
-    std::move(phiLiveRange)
+    std::move(joinedLiveRange)
         .convertArgToGuaranteed(getDeadEndBlocks(), lifetimeFrontier,
                                 getCallbacks());
 
@@ -981,7 +1013,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
 
     madeChange = true;
     if (VerifyAfterTransform) {
-      phi->getFunction()->verify();
+      F.verify();
     }
   }
 
@@ -1007,8 +1039,8 @@ bool SemanticARCOptVisitor::optimize() {
 
     // Then re-run the worklist. We shouldn't modify anything since we are at a
     // fixed point and are just using this to seed the
-    // phiToIncomingValueMultiMap after we have finished changing things. If we
-    // did change something, we did something weird, so assert!
+    // joinedOwnedIntroducerToConsumedOperands after we have finished changing
+    // things. If we did change something, we did something weird, so assert!
     bool madeAdditionalChanges = processWorklist();
     (void)madeAdditionalChanges;
     assert(!madeAdditionalChanges && "Should be at the fixed point");
@@ -1177,7 +1209,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // (e.x. storing into memory).
   LiveRange lr(cvi);
   auto hasUnknownConsumingUseState =
-      lr.hasUnknownConsumingUse(getPhiToIncomingValueMultiMap());
+      lr.hasUnknownConsumingUse(assumingAtFixedPoint);
   if (hasUnknownConsumingUseState == LiveRange::HasConsumingUse_t::Yes) {
     return false;
   }
@@ -1283,10 +1315,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // Otherwise, we know that our copy_value/destroy_values are all completely
   // within the guaranteed value scope. So we /could/ optimize it. Now check if
   // we were truly dead or if we are dead if we can eliminate phi arg uses. If
-  // we need to handle the phi arg uses, we bail. When we checked if the value
-  // was consumed, the hasConsumedUse code updated phiToIncomingValueMultiMap
-  // for us before returning its prognosis. After we reach a fixed point, we
-  // will try to eliminate this value then.
+  // we need to handle the phi arg uses, we bail. After we reach a fixed point,
+  // we will try to eliminate this value then.
   if (hasUnknownConsumingUseState ==
       LiveRange::HasConsumingUse_t::YesButAllPhiArgs) {
     auto *op = lr.getSingleUnknownConsumingUse();
@@ -1320,7 +1350,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
 
     for (auto *succBlock : br->getSuccessorBlocks()) {
       auto *arg = succBlock->getSILPhiArguments()[opNum];
-      phiToIncomingValueMultiMap.insert(arg, lr.getIntroducer());
+      joinedOwnedIntroducerToConsumedOperands.insert(arg, op);
     }
 
     return false;
