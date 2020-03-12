@@ -157,7 +157,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
                                 inlineStrategy, EK);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
 
-  F->setGlobalInit(constant.isGlobal());
+  if (constant.isGlobal())
+    F->setSpecialPurpose(SILFunction::Purpose::GlobalInit);
+
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
 
@@ -172,6 +174,12 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       // Add attributes for e.g. computed properties.
       addFunctionAttributes(F, storage->getAttrs(), mod,
                             getOrCreateDeclaration);
+                            
+      auto *varDecl = dyn_cast<VarDecl>(storage);
+      if (varDecl && varDecl->getAttrs().hasAttribute<LazyAttr>() &&
+          accessor->getAccessorKind() == AccessorKind::Get) {
+        F->setSpecialPurpose(SILFunction::Purpose::LazyPropertyGetter);
+      }
     }
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
                           constant);
