@@ -687,4 +687,8 @@ def disable_type_layouts : Flag<["-"], "disable-type-layout">,
 
 def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
   HelpText<"Don't lock interface file when building module">;
+
+def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
+    HelpText<"Directory for bridging header to be printed in compatibility header">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
