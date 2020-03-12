@@ -4626,7 +4626,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
                                       const ProtocolRequirement *assocType) {
 #ifndef NDEBUG
   {
-    const ProtocolConformanceDescriptor *conformance = wtable->Description;
+    const ProtocolConformanceDescriptor *conformance = wtable->getDescription();
     const ProtocolDescriptor *protocol = conformance->getProtocol();
     auto requirements = protocol->getRequirements();
     assert(assocType >= requirements.begin() &&
@@ -4671,7 +4671,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
   }
 
   // Dig out the protocol.
-  const ProtocolConformanceDescriptor *conformance = wtable->Description;
+  const ProtocolConformanceDescriptor *conformance = wtable->getDescription();
   const ProtocolDescriptor *protocol = conformance->getProtocol();
 
   // Extract the mangled name itself.
@@ -4790,7 +4790,7 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
                                   const ProtocolRequirement *assocConformance) {
 #ifndef NDEBUG
   {
-    const ProtocolConformanceDescriptor *conformance = wtable->Description;
+    const ProtocolConformanceDescriptor *conformance = wtable->getDescription();
     const ProtocolDescriptor *protocol = conformance->getProtocol();
     auto requirements = protocol->getRequirements();
     assert(assocConformance >= requirements.begin() &&

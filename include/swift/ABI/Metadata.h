@@ -1871,11 +1871,16 @@ using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
 /// the layout of a witness table is dependent on the protocol being
 /// represented.
 template <typename Runtime>
-struct TargetWitnessTable {
+class TargetWitnessTable {
   /// The protocol conformance descriptor from which this witness table
   /// was generated.
   ConstTargetMetadataPointer<Runtime, TargetProtocolConformanceDescriptor>
     Description;
+
+public:
+  const TargetProtocolConformanceDescriptor<Runtime> *getDescription() const {
+    return Description;
+  }
 };
 
 using WitnessTable = TargetWitnessTable<InProcess>;

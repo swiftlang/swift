@@ -365,8 +365,8 @@ class MetadataCacheKey {
     if (awt == bwt)
       return 0;
 
-    auto *aDescription = awt->Description;
-    auto *bDescription = bwt->Description;
+    auto *aDescription = awt->getDescription();
+    auto *bDescription = bwt->getDescription();
     if (aDescription == bDescription)
       return 0;
 
