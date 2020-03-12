@@ -203,6 +203,12 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
+  /// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
+  /// the default value of <resource-dir>/<platform>/prebuilt-modules.
+  /// @note This should be called once, after search path options and frontend
+  ///       options have been parsed.
+  void setDefaultPrebuiltCacheIfNecessary();
+
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
   static void computeRuntimeResourcePathFromExecutablePath(
