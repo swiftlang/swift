@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -module-name let_properties_opts %s -O -enforce-exclusivity=checked -emit-sil | %FileCheck -check-prefix=CHECK-WMO %s
 // RUN: %target-swift-frontend -module-name let_properties_opts -primary-file %s -O -emit-sil | %FileCheck %s
 
+// REQUIRES: optimized_stdlib
+
 // Test propagation of non-static let properties with compile-time constant values.
 
 // TODO: Once this optimization can remove the propagated fileprivate/internal let properties or
