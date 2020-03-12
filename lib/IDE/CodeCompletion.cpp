@@ -3120,6 +3120,17 @@ public:
         }
 
         addMethodCall(FD, Reason, dynamicLookupInfo);
+
+        // SE-0253: Callable values of user-defined nominal types.
+        if (FD->isCallAsFunctionMethod() && !HaveDot &&
+            !ExprType->is<AnyMetatypeType>()) {
+          Type funcType = getTypeOfMember(FD, dynamicLookupInfo)
+                              ->castTo<AnyFunctionType>()
+                              ->getResult();
+          addFunctionCallPattern(
+              funcType->castTo<AnyFunctionType>(), FD,
+              getSemanticContext(FD, Reason, dynamicLookupInfo));
+        }
         return;
       }
 

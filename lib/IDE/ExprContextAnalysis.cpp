@@ -445,6 +445,11 @@ static bool collectPossibleCalleesForApply(
       collectPossibleCalleesByQualifiedLookup(
           DC, fnExpr, DeclNameRef::createConstructor(), candidates);
     }
+  } else {
+    // Otherwise, look for `callAsFunction` (SE-0253).
+    collectPossibleCalleesByQualifiedLookup(
+        DC, fnExpr, DeclNameRef(DC.getASTContext().Id_callAsFunction),
+        candidates);
   }
 
   return !candidates.empty();
