@@ -768,7 +768,7 @@ func testInsideFunctionCall4() {
 func testInsideFunctionCall5() {
   FooStruct().instanceFunc2(42, #^INSIDE_FUNCTION_CALL_5^#
 // INSIDE_FUNCTION_CALL_5: Begin completions
-// INSIDE_FUNCTION_CALL_5-DAG: Keyword/ExprSpecific:               b: [#Argument name#]; name=b:
+// INSIDE_FUNCTION_CALL_5-DAG: Pattern/ExprSpecific: {#b: &Double#}[#Argument#];
 // INSIDE_FUNCTION_CALL_5: End completions
 }
 

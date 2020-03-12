@@ -3936,14 +3936,23 @@ public:
     }
   }
 
-  void addArgNameCompletionResults(ArrayRef<StringRef> Names) {
-    for (auto Name : Names) {
-      CodeCompletionResultBuilder Builder(Sink,
-                                          CodeCompletionResult::ResultKind::Keyword,
-                                          SemanticContextKind::ExpressionSpecific, {});
-      Builder.addTextChunk(Name);
-      Builder.addCallParameterColon();
-      Builder.addTypeAnnotation("Argument name");
+  void addCallArgumentCompletionResults(
+      ArrayRef<const AnyFunctionType::Param *> Args) {
+    Type ContextType;
+    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+      ContextType = typeContext->getDeclaredTypeInContext();
+
+    for (auto *Arg : Args) {
+      CodeCompletionResultBuilder Builder(
+          Sink, CodeCompletionResult::ResultKind::Pattern,
+          SemanticContextKind::ExpressionSpecific, {});
+      Builder.addCallParameter(Arg->getLabel(), Identifier(),
+                               Arg->getPlainType(), ContextType,
+                               Arg->isVariadic(), Arg->isInOut(),
+                               /*isIUO=*/false, Arg->isAutoClosure());
+      Builder.addTypeAnnotation("Argument");
+      Builder.setExpectedTypeRelation(
+          CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
     }
   }
 
@@ -5432,7 +5441,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       }
     } else {
       // Add argument labels, then fallthrough to get values.
-      Lookup.addArgNameCompletionResults(ContextInfo.getPossibleNames());
+      Lookup.addCallArgumentCompletionResults(ContextInfo.getPossibleParams());
     }
 
     if (!Lookup.FoundFunctionCalls ||
@@ -5570,8 +5579,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           !Lookup.FoundFunctionCalls ||
           (Lookup.FoundFunctionCalls &&
            Lookup.FoundFunctionsWithoutFirstKeyword);
-    } else if (!ContextInfo.getPossibleNames().empty()) {
-      Lookup.addArgNameCompletionResults(ContextInfo.getPossibleNames());
+    } else if (!ContextInfo.getPossibleParams().empty()) {
+      Lookup.addCallArgumentCompletionResults(ContextInfo.getPossibleParams());
 
       shouldPerformGlobalCompletion = !ContextInfo.getPossibleTypes().empty();
     }
