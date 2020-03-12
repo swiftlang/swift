@@ -2568,7 +2568,7 @@ MetadataResponse _getBridgedObjectiveCType(
                              const Metadata *conformingType,
                              const _ObjectiveCBridgeableWitnessTable *wtable) {
   // FIXME: Can we directly reference the descriptor somehow?
-  const ProtocolConformanceDescriptor *conformance = wtable->Description;
+  const ProtocolConformanceDescriptor *conformance = wtable->getDescription();
   const ProtocolDescriptor *protocol = conformance->getProtocol();
   auto assocTypeRequirement = protocol->getRequirements().begin();
   assert(assocTypeRequirement->Flags.getKind() ==
