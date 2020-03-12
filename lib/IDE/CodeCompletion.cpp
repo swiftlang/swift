@@ -3950,7 +3950,15 @@ public:
                                Arg->getPlainType(), ContextType,
                                Arg->isVariadic(), Arg->isInOut(),
                                /*isIUO=*/false, Arg->isAutoClosure());
-      Builder.addTypeAnnotation("Argument");
+      auto Ty = Arg->getPlainType();
+      if (Arg->isInOut()) {
+        Ty = InOutType::get(Ty);
+      } else if (Arg->isAutoClosure()) {
+        // 'Ty' may be ErrorType.
+        if (auto funcTy = Ty->getAs<FunctionType>())
+          Ty = funcTy->getResult();
+      }
+      addTypeAnnotation(Builder, Ty);
       Builder.setExpectedTypeRelation(
           CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
     }
