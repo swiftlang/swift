@@ -403,8 +403,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addSemanticARCOpts();
 
   // Strip ownership from non-transparent functions.
-  //  if (P.getOptions().StripOwnershipAfterSerialization)
-  //    P.addNonTransparentFunctionOwnershipModelEliminator();
+//  if (P.getOptions().StripOwnershipAfterSerialization)
+//    P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Start by linking in referenced functions from other modules.
   P.addPerformanceSILLinker();

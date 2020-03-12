@@ -432,7 +432,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
 
     if (isLoadFromStack(Inst, ASI)) {
       auto Load = cast<LoadInst>(Inst);
-      if (RunningVal && !isa<SILUndef>(RunningVal)) {
+      if (RunningVal) { //  && !isa<SILUndef>(RunningVal)
         // If we are loading from the AllocStackInst and we already know the
         // content of the Alloca then use it.
         LLVM_DEBUG(llvm::dbgs() << "*** Promoting load: " << *Load);
@@ -445,7 +445,10 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
         LLVM_DEBUG(llvm::dbgs() << "*** First load: " << *Load);
         // TODO: we can handle `load [take]` by emiting a destroy of the
         // operand.
-        if (!Load->getFunction()->hasOwnership())
+        if (Load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+          RunningVal = SILBuilderWithScope(std::next(Load->getIterator()))
+            .createCopyValue(Load->getLoc(), Load);
+        else if (Load->getOwnershipQualifier() != LoadOwnershipQualifier::Take)
           RunningVal = Load;
       }
       continue;

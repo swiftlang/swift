@@ -298,8 +298,8 @@ bb2:
 
 // CHECK: bb3([[ARG:%.*]] : @owned $@callee_owned () -> Int):
 bb3:
-// CHECK-NOT: load [take] [[STACK]]
-  %13 = load [take] %1 : $*@callee_owned () -> Int
+// CHECK-NOT: load [copy] [[STACK]]
+  %13 = load [copy] %1 : $*@callee_owned () -> Int
 // CHECK: [[RESULT:%.*]] = apply [[ARG]]
   %15 = apply %13() : $@callee_owned () -> Int
   br bb4
@@ -309,6 +309,7 @@ bb3:
   //       block.
 // CHECK: bb4
 bb4:
+  destroy_addr %1 : $*@callee_owned () -> Int
 // CHECK-NOT: dealloc_stack [[STACK]]
   dealloc_stack %1 : $*@callee_owned () -> Int
 // CHECK: return [[RESULT]]
@@ -484,11 +485,17 @@ bb0(%0 : @owned $Optional<Klass>):
   return %4 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @half_trivial
+// CHECK: destructure_tuple %0
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end function 'half_trivial'
 sil [ossa] @half_trivial : $@convention(thin) (@owned (Builtin.BridgeObject, Builtin.Int32)) -> () {
 bb0(%0 : @owned $(Builtin.BridgeObject, Builtin.Int32)):
   %1 = alloc_stack $(Builtin.BridgeObject, Builtin.Int32)
   store %0 to [init] %1 : $*(Builtin.BridgeObject, Builtin.Int32)
-  %3 = load [copy] %2 : $*(Builtin.BridgeObject, Builtin.Int32)
+  %3 = load [copy] %1 : $*(Builtin.BridgeObject, Builtin.Int32)
   destroy_value %3 : $(Builtin.BridgeObject, Builtin.Int32)
   destroy_addr %1 : $*(Builtin.BridgeObject, Builtin.Int32)
   dealloc_stack %1 : $*(Builtin.BridgeObject, Builtin.Int32)
@@ -501,7 +508,20 @@ bb0(%0 : @owned $(Builtin.BridgeObject, Builtin.Int32)):
 
 sil [ossa] @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
 
-sil [ossa] @test : $@convention(thin) () -> () {
+// This tests that once the store / stack_alloc is removed we still consume the
+// result of the apply.
+// CHECK-LABEL: sil [ossa] @apply_then_store
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: store
+// CHECK: [[a1:%.*]] = apply
+// CHECK-NEXT: destroy_value [[a1]]
+// CHECK: [[a2:%.*]] = apply
+// CHECK-NEXT: destroy_value [[a2]]
+// CHECK: bb3
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end function 'apply_then_store'
+sil [ossa] @apply_then_store : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_stack $Builtin.BridgeObject
   cond_br undef, bb1, bb2
@@ -525,10 +545,60 @@ bb3:
   return %7 : $()
 }
 
-sil [ossa] @test_single_bb : $@convention(thin) () -> () {
+// Same as above but with a non-consuming user.
+// CHECK-LABEL: sil [ossa] @apply_then_store_with_copy_val
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: store
+// CHECK: [[a1:%.*]] = apply
+// CHECK-NEXT: destroy_value [[a1]]
+// CHECK: [[a2:%.*]] = apply
+// CHECK-NEXT: destroy_value [[a2]]
+// CHECK: bb3:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end function 'apply_then_store_with_copy_val'
+sil [ossa] @apply_then_store_with_copy_val : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_stack $Builtin.BridgeObject
   cond_br undef, bb1, bb2
+  
+bb1:
+  %2 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
+  %3 = apply %2() : $@convention(thin) () -> @owned Builtin.BridgeObject
+  %4 = copy_value %3 : $Builtin.BridgeObject
+  store %3 to [init] %1 : $*Builtin.BridgeObject
+  destroy_value %4 : $Builtin.BridgeObject
+  br bb3
+
+bb2:
+  %5 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
+  %6 = apply %5() : $@convention(thin) () -> @owned Builtin.BridgeObject
+  store %6 to [init] %1 : $*Builtin.BridgeObject
+  br bb3
+  
+bb3:
+  destroy_addr %1 : $*Builtin.BridgeObject
+  dealloc_stack %1 : $*Builtin.BridgeObject
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Same as above but in a single block. We optimize single blocks differently
+// so its important to have two tests.
+// CHECK-LABEL: sil [ossa] @apply_then_store_single_bb
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: store
+// CHECK: bb0:
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end function 'apply_then_store_single_bb'
+sil [ossa] @apply_then_store_single_bb : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $Builtin.BridgeObject
   
   %2 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
   %3 = apply %2() : $@convention(thin) () -> @owned Builtin.BridgeObject
@@ -540,39 +610,58 @@ bb0:
   return %7 : $()
 }
 
-sil [ossa] @test_single_bb_fold_destroy_value : $@convention(thin) () -> () {
+// Make sure that we can fold the copy_value (single block).
+// CHECK-LABEL: sil [ossa] @apply_then_store_single_bb_fold_destroy_value
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: store
+// CHECK-NOT: copy_value
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end function 'apply_then_store_single_bb_fold_destroy_value'
+sil [ossa] @apply_then_store_single_bb_fold_destroy_value : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_stack $Builtin.BridgeObject
-  cond_br undef, bb1, bb2
   
   %2 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
   %3 = apply %2() : $@convention(thin) () -> @owned Builtin.BridgeObject
   %4 = copy_value %3 : $Builtin.BridgeObject
-  // CHECK-NOT: destroy_value
   store %4 to [init] %1 : $*Builtin.BridgeObject
 
+  destroy_value %3 : $Builtin.BridgeObject
   destroy_addr %1 : $*Builtin.BridgeObject
   dealloc_stack %1 : $*Builtin.BridgeObject
   %7 = tuple ()
   return %7 : $()
 }
 
-sil [ossa] @test : $@convention(method) (@guaranteed __CocoaDictionary) -> () {
-bb0(%0 : @guaranteed $__CocoaDictionary):
-  %4 = struct_extract %0 : $__CocoaDictionary, #__CocoaDictionary.object // user: %66
-  %65 = alloc_stack $AnyObject                    // users: %67, %71, %70, %68
-  %66 = copy_value %4 : $AnyObject                // user: %67
-  store %66 to [init] %65 : $*AnyObject           // id: %67
-  %68 = unchecked_addr_cast %65 : $*AnyObject to $*_NSDictionary // user: %69
-  %69 = load [copy] %68 : $*_NSDictionary         // users: %73, %74, %79
-  destroy_value %69 : $_NSDictionary              // id: %79
-  destroy_addr %65 : $*AnyObject                  // id: %70
-  dealloc_stack %65 : $*AnyObject                 // id: %71
-  %7 = tuple ()
-  return %7 : $()
-} // end sil function '$ss17__CocoaDictionaryV6lookupyyXlSgyXlF'
-
-sil [ossa] @test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+// This will generate a consuming destructure. We need to make sure that we copy
+// the value before updating the user.
+// CHECK-LABEL: sil [ossa] @multiblock_copy_and_use
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: store
+// CHECK: bb1:
+// CHECK-NEXT: [[COPY:%.*]] = copy_value %0
+// CHECK-NEXT: destructure_struct %0
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: begin_borrow [[COPY]]
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: destroy_value [[COPY]]
+// CHECK bb2:
+// CHECK-NEXT: destructure_struct %0
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: destroy_value
+// CHECK: bb3:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end function 'multiblock_copy_and_use'
+sil [ossa] @multiblock_copy_and_use : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
 bb0(%0 : @owned $SmallCodesizeStruct):
   %1 = alloc_stack $SmallCodesizeStruct
   store %0 to [init] %1 : $*SmallCodesizeStruct
@@ -598,7 +687,8 @@ bb3:
   return %7 : $()
 }
 
-sil [ossa] @test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+// This is now obsolete because we don't support load [take] yet.
+sil [ossa] @multiblock_take : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
 bb0(%0 : @owned $SmallCodesizeStruct):
   %1 = alloc_stack $SmallCodesizeStruct
   store %0 to [init] %1 : $*SmallCodesizeStruct
@@ -621,7 +711,8 @@ bb3:
   return %7 : $()
 }
 
-sil [ossa] @test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+// Will become relevant when the above test does.
+sil [ossa] @multiblock_take_and_use : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
 bb0(%0 : @owned $SmallCodesizeStruct):
   %1 = alloc_stack $SmallCodesizeStruct
   store %0 to [init] %1 : $*SmallCodesizeStruct
@@ -646,7 +737,8 @@ bb3:
   return %7 : $()
 }
 
-sil [ossa] @test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+// Same test as above but in just one block.
+sil [ossa] @single_block_take : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
 bb0(%0 : @owned $SmallCodesizeStruct):
   %1 = alloc_stack $SmallCodesizeStruct
   store %0 to [init] %1 : $*SmallCodesizeStruct
@@ -659,7 +751,48 @@ bb0(%0 : @owned $SmallCodesizeStruct):
   return %7 : $()
 }
 
-sil [ossa] @test_x : $@convention(thin) (@guaranteed AnyObject) -> () {
+// CHECK-LABEL: sil [ossa] @extract_to_copy_val_to_cast
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: store
+// CHECK: bb0
+// CHECK-NEXT: [[E:%.*]] = struct_extract
+// CHECK-NEXT: [[COPY_E:%.*]] = copy_value [[E]]
+// CHECK-NEXT: [[CAST_OF_COPY_E:%.*]] = unchecked_bitwise_cast [[COPY_E]]
+// CHECK-NEXT: [[CAST_COPY:%.*]] = copy_value [[CAST_OF_COPY_E]]
+// CHECK-NEXT: destroy_value [[CAST_COPY]]
+// CHECK-NEXT: destroy_value [[COPY_E]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end function 'extract_to_copy_val_to_cast'
+sil [ossa] @extract_to_copy_val_to_cast : $@convention(method) (@guaranteed __CocoaDictionary) -> () {
+bb0(%0 : @guaranteed $__CocoaDictionary):
+  %4 = struct_extract %0 : $__CocoaDictionary, #__CocoaDictionary.object // user: %66
+  %65 = alloc_stack $AnyObject                    // users: %67, %71, %70, %68
+  %66 = copy_value %4 : $AnyObject                // user: %67
+  store %66 to [init] %65 : $*AnyObject           // id: %67
+  %68 = unchecked_addr_cast %65 : $*AnyObject to $*_NSDictionary // user: %69
+  %69 = load [copy] %68 : $*_NSDictionary         // users: %73, %74, %79
+  destroy_value %69 : $_NSDictionary              // id: %79
+  destroy_addr %65 : $*AnyObject                  // id: %70
+  dealloc_stack %65 : $*AnyObject                 // id: %71
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_val_to_cast
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: store
+// CHECK: bb0
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: unchecked_bitwise_cast
+// TODO: this copy_value is redundent and could be removed.
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end function 'copy_val_to_cast'
+sil [ossa] @copy_val_to_cast : $@convention(thin) (@guaranteed AnyObject) -> () {
 bb0(%0 : @guaranteed $AnyObject):
   %65 = alloc_stack $AnyObject                    // users: %67, %71, %70, %68
   %66 = copy_value %0 : $AnyObject                // user: %67
@@ -669,53 +802,27 @@ bb0(%0 : @guaranteed $AnyObject):
   destroy_addr %65 : $*AnyObject                  // id: %70
   dealloc_stack %65 : $*AnyObject                 // id: %71
   destroy_value %69 : $_NSDictionary
-
   %7 = tuple ()
   return %7 : $()
 }
 
-sil [ossa] @test_g : $@convention(thin) (@guaranteed _NSDictionary) -> ()
+// use_guaranteed
+sil @use_guaranteed : $@convention(thin) (@guaranteed _NSDictionary) -> ()
 
-sil [ossa] @test_take : $@convention(thin) (@guaranteed AnyObject) -> () {
+// load_take_use
+sil [ossa] @load_take_use : $@convention(thin) (@guaranteed AnyObject) -> () {
+// %0                                             // user: %2
 bb0(%0 : @guaranteed $AnyObject):
-  %65 = alloc_stack $AnyObject                    // users: %67, %71, %70, %68
-  %66 = copy_value %0 : $AnyObject                // user: %67
-  store %66 to [init] %65 : $*AnyObject           // id: %67
-  
-  %68 = unchecked_addr_cast %65 : $*AnyObject to $*_NSDictionary // user: %69
-  %69 = load [take] %68 : $*_NSDictionary         // users: %73, %74, %79
-  %g = function_ref @test_g : $@convention(thin) (@guaranteed _NSDictionary) -> ()
-  %dummy2 = apply %g(%69) : $@convention(thin) (@guaranteed _NSDictionary) -> ()
-  
-  dealloc_stack %65 : $*AnyObject                 // id: %71
-  destroy_value %69 : $_NSDictionary
-
-  %7 = tuple ()
-  return %7 : $()
-}
-
-sil [ossa] @test : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_stack $Builtin.BridgeObject
-  cond_br undef, bb1, bb2
-  
-bb1:
-  %2 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
-  %3 = apply %2() : $@convention(thin) () -> @owned Builtin.BridgeObject
-  %4 = copy_value %3 : $Builtin.BridgeObject
-  store %3 to [init] %1 : $*Builtin.BridgeObject
-  destroy_value %4 : $Builtin.BridgeObject
-  br bb3
-
-bb2:
-  %5 = function_ref @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
-  %6 = apply %5() : $@convention(thin) () -> @owned Builtin.BridgeObject
-  store %6 to [init] %1 : $*Builtin.BridgeObject
-  br bb3
-  
-bb3:
-  destroy_addr %1 : $*Builtin.BridgeObject
-  dealloc_stack %1 : $*Builtin.BridgeObject
-  %7 = tuple ()
-  return %7 : $()
-}
+  %1 = alloc_stack $AnyObject                     // users: %8, %4, %3
+  %2 = copy_value %0 : $AnyObject                 // user: %3
+  store %2 to [init] %1 : $*AnyObject             // id: %3
+  %4 = unchecked_addr_cast %1 : $*AnyObject to $*_NSDictionary // user: %5
+  %5 = load [take] %4 : $*_NSDictionary           // users: %9, %7
+  // function_ref use_guaranteed
+  %6 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed _NSDictionary) -> () // user: %7
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed _NSDictionary) -> ()
+  dealloc_stack %1 : $*AnyObject                  // id: %8
+  destroy_value %5 : $_NSDictionary               // id: %9
+  %10 = tuple ()                                  // user: %11
+  return %10 : $()                                // id: %11
+} // end sil function 'load_take_use'
