@@ -565,6 +565,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
+  Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
+
   Opts.UseDarwinPreStableABIBit =
     (Target.isMacOSX() && Target.isMacOSXVersionLT(10, 14, 4)) ||
     (Target.isiOS() && Target.isOSVersionLT(12, 2)) ||
@@ -795,7 +797,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   // Assumes exactly one of setMainExecutablePath() or setRuntimeIncludePath() 
   // is called before setTargetTriple() and parseArgs().
   // TODO: improve the handling of RuntimeIncludePath.
-
+  
   return false;
 }
 

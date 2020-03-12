@@ -2400,7 +2400,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   if (wasOptional && !result.isRepresentableAsOptional())
     return failure();
-
+  
   // If our nominal type has type arguments, make sure they are
   // representable as well. Because type arguments are not actually
   // translated separately, whether they are trivially representable
@@ -2446,6 +2446,16 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       case ForeignRepresentableKind::BridgedError:
         break;
       }
+    }
+    
+    // Specialize the conformance we were given for the type we're testing.
+    if (result.getKind() == ForeignRepresentableKind::Bridged
+        && !result.getConformance()->getType()->isEqual(type)) {
+      auto specialized = type->getASTContext()
+        .getSpecializedConformance(type, result.getConformance(),
+             boundGenericType->getContextSubstitutionMap(dc->getParentModule(),
+                                                 boundGenericType->getDecl()));
+      result = ForeignRepresentationInfo::forBridged(specialized);
     }
   }
 

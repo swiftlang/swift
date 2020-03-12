@@ -322,6 +322,9 @@ namespace swift {
     /// `@differentiable` declaration attribute, etc.
     bool EnableExperimentalDifferentiableProgramming = false;
 
+    /// Enable verification when every SubstitutionMap is constructed.
+    bool VerifyAllSubstitutionMaps = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
@@ -512,6 +515,7 @@ namespace swift {
     /// Enable constraint solver support for experimental
     ///        operator protocol designator feature.
     bool SolverEnableOperatorDesignatedTypes = false;
+    
   };
 } // end namespace swift
 
