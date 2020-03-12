@@ -179,6 +179,15 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       if (varDecl && varDecl->getAttrs().hasAttribute<LazyAttr>() &&
           accessor->getAccessorKind() == AccessorKind::Get) {
         F->setSpecialPurpose(SILFunction::Purpose::LazyPropertyGetter);
+        
+        // Lazy property getters should not get inlined because they are usually
+        // non-tivial functions (otherwise the user would not implement it as
+        // lazy property). Inlining such getters would most likely not benefit
+        // other optimizations because the top-level switch_enum cannot be
+        // constant folded in most cases.
+        // Also, not inlining lazy property getters enables optimizing them in
+        // CSE.
+        F->setInlineStrategy(NoInline);
       }
     }
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
