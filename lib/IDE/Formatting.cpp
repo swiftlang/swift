@@ -162,9 +162,14 @@ class ContextOverride {
     /// The location after which this override takes effect.
     SourceLoc ApplicableFrom;
   };
+
+  /// The current override, if set.
   Optional<Override> Value;
 
 public:
+  /// Clears this override.
+  void clear() { Value = None; }
+
   /// Sets this override to make an IndentContext indent relative to the exact
   /// column of AlignLoc if the IndentContext's ContextLoc is >= AlignLoc and
   /// on the same line.
@@ -172,10 +177,10 @@ public:
     Value = {AlignLoc, IndentContext::Exact, AlignLoc};
   }
 
-  /// Sets this override to propagate the given ContextLoc along to any
+  /// Sets this override to propagate the given ContextLoc and Kind along to any
   /// IndentContext with a ContextLoc >= L and on the same line. If this
   /// override's existing value applies to the provided ContextLoc, its
-  /// ContextLoc is propagated instead.
+  /// ContextLoc and Kind are propagated instead.
   ///
   /// This propagation is necessary for cases like the trailing closure of 'bar'
   /// in the example below. It's direct ContextLoc is 'bar', but we want
@@ -197,55 +202,47 @@ public:
     if (R.isValid() && isOnSameLine(SM, L, R))
       return ContextLoc;
 
-    Override NewValue = {ContextLoc, Kind, L};
-    if (Value) {
-      // If the existing override applies to the same line, it's ContextLoc
-      // should override this ContextLoc - don't propagate the intermediary.
-      if (isOnSameLine(SM, Value->ApplicableFrom, NewValue.ApplicableFrom)) {
-        assert(!SM.isBeforeInBuffer(NewValue.ContextLoc,
-                                    Value->ContextLoc) &&
-               "children walked before parents?");
-        return ContextLoc;
-      }
-      // Apply the existing value to NewValue before we overwrite it so its
-      // ContextLoc propagates.
-      applyIfNeeded(SM, NewValue.ContextLoc, NewValue.Kind);
-    }
-    Value = NewValue;
-    return Value->ContextLoc;
+    // Similarly if the ContextLoc and L are on the same line, there's no need
+    // to propagate. Overrides applicable to ContextLoc will already apply
+    // to child ranges on the same line as L.
+    if (isOnSameLine(SM, ContextLoc, L))
+      return ContextLoc;
+
+    applyIfNeeded(SM, ContextLoc, Kind);
+    Value = {ContextLoc, Kind, L};
+    return ContextLoc;
   }
 
   /// Applies the overriding ContextLoc and Kind to the given IndentContext if it
   /// starts after ApplicableFrom and on the same line.
   void applyIfNeeded(SourceManager &SM, IndentContext &Ctx) {
-    applyIfNeeded(SM, Ctx.ContextLoc, Ctx.Kind);
-  }
-
-  /// Applies the overriding ContextLoc and Kind to the given ContextLoc and
-  /// Kind if the given ContextLoc starts after ApplicableFrom and on the same
-  /// line.
-  void applyIfNeeded(SourceManager &SM, SourceLoc &ContextLoc,
-                     IndentContext::ContextKind &Kind) {
-    if (!Value)
-      return;
-
-    if (!isOnSameLine(SM, ContextLoc, Value->ApplicableFrom) ||
-        SM.isBeforeInBuffer(ContextLoc, Value->ApplicableFrom))
-      return;
-
     // Exactly aligned indent contexts should always set a matching exact
     // alignment context override so child braces/parens/brackets are indented
     // correctly. If the given innermost indent context is Exact and the
     // override doesn't match its Kind and ContextLoc, something is wrong.
-    assert((Kind != IndentContext::Exact ||
-            (Value->Kind == IndentContext::Exact &&
-             ContextLoc == Value->ContextLoc)) &&
+    assert((Ctx.Kind != IndentContext::Exact ||
+            (Value && Value->Kind == IndentContext::Exact &&
+             Value->ContextLoc == Ctx.ContextLoc)) &&
            "didn't set override ctx when exact innermost context was set?");
+
+    applyIfNeeded(SM, Ctx.ContextLoc, Ctx.Kind);
+  }
+
+  /// Applies the overriding ContextLoc and Kind to the given Override if its
+  /// ContextLoc starts after ApplicableFrom and on the same line.
+  void applyIfNeeded(SourceManager &SM, SourceLoc &ContextLoc,
+                     IndentContext::ContextKind &Kind) {
+    if (!isApplicableTo(SM, ContextLoc))
+      return;
     ContextLoc = Value->ContextLoc;
     Kind = Value->Kind;
   }
 
-  void clear() { Value = None; }
+private:
+  bool isApplicableTo(SourceManager &SM, SourceLoc Loc) const {
+    return Value && isOnSameLine(SM, Loc, Value->ApplicableFrom) &&
+        !SM.isBeforeInBuffer(Loc, Value->ApplicableFrom);
+  }
 };
 
 
@@ -826,18 +823,23 @@ class OutdentChecker: protected RangeWalker {
   }
 
   SourceLoc propagateContextLocs(SourceLoc ContextLoc, SourceLoc L, SourceLoc R) {
-    // Update ContextLoc for the currently active override on its line.
-    ContextOverride &CtxOverride = getOverrideForLineContaining(ContextLoc);
-    IndentContext::ContextKind Kind = IndentContext::LineStart;
-    CtxOverride.applyIfNeeded(SM, ContextLoc, Kind);
+    bool HasSeparateContext = !isOnSameLine(SM, L, ContextLoc);
 
-    // If ContextLoc is L there's nothing to propagate.
-    if (L == ContextLoc)
+    // Update ContextLoc for the currently active override on its line.
+    ContextOverride &Upstream = getOverrideForLineContaining(ContextLoc);
+    IndentContext::ContextKind Kind = IndentContext::LineStart;
+    Upstream.applyIfNeeded(SM, ContextLoc, Kind);
+
+    // If the original ContextLoc and L were on the same line, there's no need
+    // to propagate anything. Child ranges later on the same line will pick up
+    // whatever override we picked up above anyway, and if there wasn't
+    // one, their normal ContextLoc should already be correct.
+    if (!HasSeparateContext)
       return ContextLoc;
 
-    // Set an override to propagate the context loc onto the line of L.
-    ContextOverride &Propagated = getOverrideForLineContaining(L);
-    ContextLoc = Propagated.propagateContext(SM, ContextLoc,
+     // Set an override to propagate the context loc onto the line of L.
+    ContextOverride &Downstream = getOverrideForLineContaining(L);
+    ContextLoc = Downstream.propagateContext(SM, ContextLoc,
                                              Kind, L, R);
     return ContextLoc;
   }
