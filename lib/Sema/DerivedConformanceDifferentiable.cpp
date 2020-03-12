@@ -206,7 +206,7 @@ bool DerivedConformance::canDeriveEuclideanDifferentiable(
   auto *eucDiffProto =
       C.getProtocol(KnownProtocolKind::EuclideanDifferentiable);
   // Return true if all differentiation stored properties conform to
-  // `AdditiveArithmetic` and their `TangentVector` equals themselves.
+  // `EuclideanDifferentiable`.
   SmallVector<VarDecl *, 16> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, DC, diffProperties);
   return llvm::all_of(diffProperties, [&](VarDecl *member) {
