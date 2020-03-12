@@ -678,7 +678,9 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
   LLVM_DEBUG(llvm::dbgs() << "*** Fixing the terminator " << TI << ".\n");
 
   SILValue Def = getLiveOutValue(PhiBlocks, Pred);
-  if (!isa<SILUndef>(Def))
+  if (!isa<SILUndef>(Def) &&
+      Def->getFunction()->hasOwnership() &&
+      !Def->getType().isTrivial(*Def->getFunction()))
     Def = SILBuilderWithScope(
               std::next(Def.getDefiningInstruction()->getIterator()))
               .createCopyValue(Def.getLoc(), Def);
