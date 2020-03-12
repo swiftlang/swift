@@ -35,6 +35,7 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -359,7 +360,7 @@ static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) 
 }
 
 
-static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
+static SILValue replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   ProjectionPath projections(val->getType());
   SILValue op = LI->getOperand();
   while (op != ASI) {
@@ -380,9 +381,17 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
     val = projection.createObjectProjection(builder, LI->getLoc(), val).get();
   }
   op = LI->getOperand();
-  if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
-    val = builder.createCopyValue(val.getLoc(), val);
-  LI->replaceAllUsesWith(val);
+  while (!LI->use_empty()) {
+    Operand *userOp = *LI->use_begin();
+    // We'll handle destorys later.
+    // Otherwise, make sure we copy and consume that.
+    if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy &&
+        userOp->isConsumingUse() && !isa<DestroyValueInst>(userOp->getUser()))
+      userOp->set(builder.createCopyValue(LI->getLoc(), val));
+    else
+      userOp->set(val);
+  }
+  assert(LI->use_empty());
   LI->eraseFromParent();
   while (op != ASI && op->use_empty()) {
     assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
@@ -392,6 +401,8 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
     Inst->eraseFromParent();
     op = next;
   }
+  
+  return val;
 }
 
 static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
@@ -424,6 +435,9 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
   SILValue RunningVal = SILValue();
   // Keep track of the last StoreInst that we found.
   StoreInst *LastStore = nullptr;
+  // Keep track of the sources of the [copy] loads we have replaced and what we
+  // replaced them with.
+  llvm::MapVector<SILValue, SILValue> replacedCopyLoads;
 
   // For all instructions in the block.
   for (auto BBI = BB->begin(), E = BB->end(); BBI != E;) {
@@ -432,12 +446,15 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
 
     if (isLoadFromStack(Inst, ASI)) {
       auto Load = cast<LoadInst>(Inst);
-      if (RunningVal) { //  && !isa<SILUndef>(RunningVal)
+      if (RunningVal) {
         // If we are loading from the AllocStackInst and we already know the
         // content of the Alloca then use it.
         LLVM_DEBUG(llvm::dbgs() << "*** Promoting load: " << *Load);
-        
-        replaceLoad(Load, RunningVal, ASI);
+
+        if (Load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+          replacedCopyLoads[Load->getOperand()] = replaceLoad(Load, RunningVal, ASI);
+        else if (!isa<SILUndef>(RunningVal))
+          replaceLoad(Load, RunningVal, ASI);
         NumInstRemoved++;
       } else if (Load->getOperand() == ASI) {
         // If we don't know the content of the AllocStack then the loaded
@@ -445,10 +462,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
         LLVM_DEBUG(llvm::dbgs() << "*** First load: " << *Load);
         // TODO: we can handle `load [take]` by emiting a destroy of the
         // operand.
-        if (Load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
-          RunningVal = SILBuilderWithScope(std::next(Load->getIterator()))
-            .createCopyValue(Load->getLoc(), Load);
-        else if (Load->getOwnershipQualifier() != LoadOwnershipQualifier::Take)
+        if (Load->getOwnershipQualifier() != LoadOwnershipQualifier::Take)
           RunningVal = Load;
       }
       continue;
@@ -488,17 +502,31 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
     if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
       if (DAI->getOperand() == ASI &&
           RunningVal && !isa<SILUndef>(RunningVal)) {
-        replaceDestroy(DAI, RunningVal);
+        if (replacedCopyLoads.count(DAI->getOperand())) {
+          // If we know that we've removed a load and that load was a copy of
+          // this address. We can omit the destroy.
+          DAI->eraseFromParent();
+          continue;
+        } else if (!RunningVal->getFunction()->hasOwnership() ||
+                   !isa<LoadInst>(RunningVal)) {
+          // If we have an ownership load that wans't optimized we can't safely
+          // replace the destroy.
+          replaceDestroy(DAI, RunningVal);
+        }
       }
       continue;
     }
-
-    // Stop on deallocation.
-    if (auto *DSI = dyn_cast<DeallocStackInst>(Inst)) {
-      if (DSI->getOperand() == ASI)
-        break;
+  }
+  
+  // Destroys could live in any block. We need to cleanup the remaining
+  // destroy_values.
+  for (auto loadAndVal : replacedCopyLoads) {
+    for (auto *use : loadAndVal.second->getUses()) {
+      if (isa<DestroyValueInst>(use->getUser()))
+        use->getUser()->eraseFromParent();
     }
   }
+
   if (LastStore) {
     LLVM_DEBUG(llvm::dbgs() << "*** Finished promotion. Last store: "
                             << *LastStore);
@@ -517,11 +545,15 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
   // uninitialized variables in Swift.
   SILValue RunningVal = SILValue();
 
-  // For all instructions in the block.
-  for (auto BBI = BB->begin(), E = BB->end(); BBI != E;) {
-    SILInstruction *Inst = &*BBI;
-    ++BBI;
+  // Keep track of the sources of the [copy] loads we have replaced and what we
+  // replaced them with.
+  llvm::MapVector<SILValue, SILValue> replacedCopyLoads;
 
+  // For all instructions in the block.
+  SmallVector<SILInstruction*, 64> instructions;
+  for (auto BBI = BB->begin(), E = BB->end(); BBI != E; ++BBI)
+    instructions.push_back(&*BBI);
+  for (SILInstruction *Inst : instructions) {
     // Remove instructions that we are loading from. Replace the loaded value
     // with our running value.
     if (isLoadFromStack(Inst, ASI)) {
@@ -530,7 +562,11 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
         // Void (= empty tuple) or a tuple of Voids.
         RunningVal = SILUndef::get(ASI->getElementType(), *ASI->getFunction());
       }
-      replaceLoad(cast<LoadInst>(Inst), RunningVal, ASI);
+      auto load = cast<LoadInst>(Inst);
+      if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+        replacedCopyLoads[load->getOperand()] = replaceLoad(load, RunningVal, ASI);
+      else
+        replaceLoad(load, RunningVal, ASI);
       NumInstRemoved++;
       continue;
     }
@@ -563,8 +599,17 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
 
     // Replace destroys with a release of the value.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
-      if (DAI->getOperand() == ASI &&
-          RunningVal && !isa<SILUndef>(RunningVal)) {
+      if (replacedCopyLoads.count(DAI->getOperand())) {
+        // If we know that we've removed a load and that load was a copy of
+        // this address. We can omit the destroy.
+        DAI->eraseFromParent();
+        continue;
+      } else if (DAI->getOperand() == ASI && RunningVal &&
+                 !isa<SILUndef>(RunningVal) &&
+                 (!RunningVal->getFunction()->hasOwnership() ||
+                  !isa<LoadInst>(RunningVal))) {
+        // If we have an ownership load that wans't optimized we can't safely
+        // replace the destroy.
         replaceDestroy(DAI, RunningVal);
       }
       continue;
@@ -575,8 +620,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       if (DSI->getOperand() == ASI) {
         Inst->eraseFromParent();
         NumInstRemoved++;
-        // No need to continue scanning after deallocation.
-        break;
+        continue;
       }
     }
 
@@ -591,6 +635,15 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       Node = I->getOperand(0);
       I->eraseFromParent();
       NumInstRemoved++;
+    }
+  }
+  
+  // Destroys could live in any block. We need to cleanup the remaining
+  // destroy_values.
+  for (auto loadAndVal : replacedCopyLoads) {
+    for (auto *use : loadAndVal.second->getUses()) {
+      if (isa<DestroyValueInst>(use->getUser()))
+        use->getUser()->eraseFromParent();
     }
   }
   
@@ -697,6 +750,9 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
 void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
   // First update uses of the value.
   SmallVector<LoadInst *, 4> collectedLoads;
+  // Keep track of the sources of the [copy] loads we have replaced and what we
+  // replaced them with.
+  llvm::MapVector<SILValue, SILValue> replacedCopyLoads;
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E;) {
     auto *Inst = UI->getUser();
     UI++;
@@ -715,8 +771,10 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
 
       LLVM_DEBUG(llvm::dbgs() << "*** Replacing " << *LI
                               << " with Def " << *Def);
+      if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+        replacedCopyLoads[LI->getOperand()] = replaceLoad(LI, Def, ASI);
       // Replace the load with the definition that we found.
-      if (Def && !isa<SILUndef>(Def))
+      else if (Def && !isa<SILUndef>(Def))
         replaceLoad(LI, Def, ASI);
       removedUser = true;
       NumInstRemoved++;
@@ -740,10 +798,31 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
 
     // Replace destroys with a release of the value.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
-      SILValue Def = getLiveInValue(PhiBlocks, BB);
-      if (Def && !isa<SILUndef>(Def))
-        replaceDestroy(DAI, Def);
+      if (replacedCopyLoads.count(DAI->getOperand())) {
+        // If we know that we've removed a load and that load was a copy of
+        // this address. We can omit the destroy.
+        DAI->eraseFromParent();
+        continue;
+      } else {
+        // If we have an ownership load that wans't optimized we can't safely
+        // replace the destroy.
+        SILValue Def = getLiveInValue(PhiBlocks, BB);
+        if (isa<SILUndef>(Def))
+          continue;
+        if (!Def->getFunction()->hasOwnership() || !isa<LoadInst>(Def)) {
+          replaceDestroy(DAI, Def);
+        }
+      }
       continue;
+    }
+  }
+
+  // Destroys could live in any block. We need to cleanup the remaining
+  // destroy_values.
+  for (auto loadAndVal : replacedCopyLoads) {
+    for (auto *use : loadAndVal.second->getUses()) {
+      if (isa<DestroyValueInst>(use->getUser()))
+        use->getUser()->eraseFromParent();
     }
   }
 
@@ -874,14 +953,6 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
         // is obviously a dead PHInode, so we don't need to insert it.
         if (DSI && DT->properlyDominates(DSI->getParent(),
                                          SuccNode->getBlock()))
-          continue;
-
-        bool foundUseOfAddr = false;
-        for (auto &inst : *Succ.getBB()) {
-          foundUseOfAddr |= (&inst == ASI);
-        }
-
-        if (!foundUseOfAddr)
           continue;
 
         // The successor node is a new PHINode. If this is a new PHI node

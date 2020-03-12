@@ -503,8 +503,37 @@ bb0(%0 : @owned $(Builtin.BridgeObject, Builtin.Int32)):
   return %7 : $()
 }
 
-// TODO: arg test (one copied, one undef)
-// TODO: arg test (no uses)
+// Make sure that we don't add a copy in bb2.
+sil hidden [ossa] @test_no_leak_consuming_post_dom : $@convention(method) (@guaranteed String, @owned Builtin.BridgeObject) -> () {
+bb0(%1 : @guaranteed $String, %2: @owned $Builtin.BridgeObject):
+  %8 = alloc_stack $String
+  %9 = copy_value %1 : $String
+  store %9 to [init] %8 : $*String
+  
+  %18 = alloc_stack $Builtin.BridgeObject
+  store %2 to [init] %18 : $*Builtin.BridgeObject
+  
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %35 = load [copy] %8 : $*String
+  destroy_value %35 : $String
+  %42 = copy_value %1 : $String
+  store %42 to [assign] %8 : $*String
+  br bb1
+
+bb3:
+  destroy_addr %18 : $*Builtin.BridgeObject
+  destroy_addr %8 : $*String
+  dealloc_stack %18 : $*Builtin.BridgeObject
+  dealloc_stack %8 : $*String
+  %55 = tuple ()
+  return %55 : $()
+}
+
 
 sil [ossa] @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
 
@@ -770,9 +799,9 @@ bb0(%0 : @guaranteed $__CocoaDictionary):
   %65 = alloc_stack $AnyObject                    // users: %67, %71, %70, %68
   %66 = copy_value %4 : $AnyObject                // user: %67
   store %66 to [init] %65 : $*AnyObject           // id: %67
-  %68 = unchecked_addr_cast %65 : $*AnyObject to $*_NSDictionary // user: %69
-  %69 = load [copy] %68 : $*_NSDictionary         // users: %73, %74, %79
-  destroy_value %69 : $_NSDictionary              // id: %79
+  %68 = unchecked_addr_cast %65 : $*AnyObject to $*Builtin.BridgeObject // user: %69
+  %69 = load [copy] %68 : $*Builtin.BridgeObject         // users: %73, %74, %79
+  destroy_value %69 : $Builtin.BridgeObject              // id: %79
   destroy_addr %65 : $*AnyObject                  // id: %70
   dealloc_stack %65 : $*AnyObject                 // id: %71
   %7 = tuple ()
@@ -797,17 +826,17 @@ bb0(%0 : @guaranteed $AnyObject):
   %65 = alloc_stack $AnyObject                    // users: %67, %71, %70, %68
   %66 = copy_value %0 : $AnyObject                // user: %67
   store %66 to [init] %65 : $*AnyObject           // id: %67
-  %68 = unchecked_addr_cast %65 : $*AnyObject to $*_NSDictionary // user: %69
-  %69 = load [copy] %68 : $*_NSDictionary         // users: %73, %74, %79
+  %68 = unchecked_addr_cast %65 : $*AnyObject to $*Builtin.BridgeObject // user: %69
+  %69 = load [copy] %68 : $*Builtin.BridgeObject         // users: %73, %74, %79
   destroy_addr %65 : $*AnyObject                  // id: %70
   dealloc_stack %65 : $*AnyObject                 // id: %71
-  destroy_value %69 : $_NSDictionary
+  destroy_value %69 : $Builtin.BridgeObject
   %7 = tuple ()
   return %7 : $()
 }
 
 // use_guaranteed
-sil @use_guaranteed : $@convention(thin) (@guaranteed _NSDictionary) -> ()
+sil @use_guaranteed : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> ()
 
 // load_take_use
 sil [ossa] @load_take_use : $@convention(thin) (@guaranteed AnyObject) -> () {
@@ -816,13 +845,82 @@ bb0(%0 : @guaranteed $AnyObject):
   %1 = alloc_stack $AnyObject                     // users: %8, %4, %3
   %2 = copy_value %0 : $AnyObject                 // user: %3
   store %2 to [init] %1 : $*AnyObject             // id: %3
-  %4 = unchecked_addr_cast %1 : $*AnyObject to $*_NSDictionary // user: %5
-  %5 = load [take] %4 : $*_NSDictionary           // users: %9, %7
+  %4 = unchecked_addr_cast %1 : $*AnyObject to $*Builtin.BridgeObject // user: %5
+  %5 = load [take] %4 : $*Builtin.BridgeObject           // users: %9, %7
   // function_ref use_guaranteed
-  %6 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed _NSDictionary) -> () // user: %7
-  %7 = apply %6(%5) : $@convention(thin) (@guaranteed _NSDictionary) -> ()
+  %6 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> () // user: %7
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> ()
   dealloc_stack %1 : $*AnyObject                  // id: %8
-  destroy_value %5 : $_NSDictionary               // id: %9
+  destroy_value %5 : $Builtin.BridgeObject               // id: %9
   %10 = tuple ()                                  // user: %11
   return %10 : $()                                // id: %11
 } // end sil function 'load_take_use'
+
+sil hidden [ossa] @test : $@convention(method) (@guaranteed Builtin.BridgeObject) -> () {
+bb0(%1 : @guaranteed $String, %2: @owned $Builtin.BridgeObject):
+  %8 = alloc_stack $String
+  %9 = copy_value %1 : $String
+  store %9 to [init] %8 : $*String
+  
+  %18 = alloc_stack $Builtin.BridgeObject
+  store %2 to [init] %18 : $*Builtin.BridgeObject
+  
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %35 = load [copy] %8 : $*String
+  destroy_value %35 : $String
+  %42 = copy_value %1 : $String
+  store %42 to [assign] %8 : $*String
+  br bb1
+
+bb3:
+  destroy_addr %18 : $*Builtin.BridgeObject
+  destroy_addr %8 : $*String
+  dealloc_stack %18 : $*Builtin.BridgeObject
+  dealloc_stack %8 : $*String
+  %55 = tuple ()
+  return %55 : $()
+}
+
+// Check that we remove load copy *and* destroy_value. Also after dealloc.
+sil hidden [ossa] @test : $@convention(method) (@guaranteed __CocoaDictionary) -> () {
+bb0(%1 : @guaranteed $__CocoaDictionary):
+  %4 = struct_extract %1 : $__CocoaDictionary, #__CocoaDictionary.object // user: %66
+  %65 = alloc_stack $AnyObject                    // users: %67, %71, %70, %68
+  %66 = copy_value %4 : $AnyObject                // user: %67
+  store %66 to [init] %65 : $*AnyObject           // id: %67
+  %68 = unchecked_addr_cast %65 : $*AnyObject to $*_NSDictionary // user: %69
+  %69 = load [copy] %68 : $*_NSDictionary         // users: %73, %74, %79
+  destroy_addr %65 : $*AnyObject                  // id: %70
+  dealloc_stack %65 : $*AnyObject                 // id: %71
+  %74 = begin_borrow %69 : $_NSDictionary
+  end_borrow %74 : $_NSDictionary
+  destroy_value %69 : $_NSDictionary
+  %55 = tuple ()
+  return %55 : $()
+}
+
+// Same as above but two blocks.
+sil hidden [ossa] @test : $@convention(method) (@guaranteed __CocoaDictionary) -> () {
+bb0(%1 : @guaranteed $__CocoaDictionary):
+  %4 = struct_extract %1 : $__CocoaDictionary, #__CocoaDictionary.object // user: %66
+  %65 = alloc_stack $AnyObject                    // users: %67, %71, %70, %68
+  %66 = copy_value %4 : $AnyObject                // user: %67
+  store %66 to [init] %65 : $*AnyObject           // id: %67
+  %68 = unchecked_addr_cast %65 : $*AnyObject to $*_NSDictionary // user: %69
+  %69 = load [copy] %68 : $*_NSDictionary         // users: %73, %74, %79
+  destroy_addr %65 : $*AnyObject                  // id: %70
+  dealloc_stack %65 : $*AnyObject                 // id: %71
+  %74 = begin_borrow %69 : $_NSDictionary
+  end_borrow %74 : $_NSDictionary
+  br bb1
+  
+bb1:
+  destroy_value %69 : $_NSDictionary
+  %55 = tuple ()
+  return %55 : $()
+}
