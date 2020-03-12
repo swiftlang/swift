@@ -1178,7 +1178,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         llvm::SmallString<32> Buffer(*opts.BridgingHeaderDirForPrint);
         llvm::sys::path::append(Buffer,
           llvm::sys::path::filename(opts.ImplicitObjCHeaderPath));
-        BridgingHeaderPathForPrint = Buffer.str();
+        BridgingHeaderPathForPrint = (std::string)Buffer;
       } else {
         // By default, include the given bridging header path directly.
         BridgingHeaderPathForPrint = opts.ImplicitObjCHeaderPath;
