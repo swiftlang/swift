@@ -26,6 +26,28 @@ CHANGELOG
 Swift Next
 ----------
 
+* [SE-0267][]:
+  
+  Non-generic members that support a generic parameter list, including nested type declarations, are now allowed to carry a contextual `where` clause against outer generic parameters. Previously, such declarations could only be expressed by placing the member inside a dedicated constrained extension.
+
+  ```swift
+  struct Box<Wrapped> {
+    func boxes() -> [Box<Wrapped.Element>] where Wrapped: Sequence { ... }
+  }
+  ```
+  Because contextual `where` clauses are effectively visibility constraints, overrides adopting this feature must be at least as visible as the overriden method:
+  
+  ```swift
+  class Base<T> {
+    func foo() where T == Int { ... }
+  }
+  
+  class Derived<T>: Base<T> {
+    // OK, <T where T: Equatable> has broader visibility than <T where T == Int>
+    override func foo() where T: Equatable { ... } 
+  }
+  ```
+
 * [SE-0266][]:
   
   Enumerations with no associated values, or only `Comparable` associated values, can opt-in to synthesized `Comparable` conformance by declaring conformance to the `Comparable` protocol. The synthesized implementation orders the cases first by case-declaration order, and then by lexicographic order of the associated values (if any).
@@ -7914,6 +7936,7 @@ Swift 1.0
 [SE-0253]: <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
 [SE-0266]: <https://github.com/apple/swift-evolution/blob/master/proposals/0266-synthesized-comparable-for-enumerations.md>
+[SE-0267]: <https://github.com/apple/swift-evolution/blob/master/proposals/0267-where-on-contextually-generic.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
