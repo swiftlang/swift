@@ -451,8 +451,12 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     if (!rootConformance) {
       continue;
     }
-
-    addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
+    // We cannot emit the witness table symbol if the protocol is imported from
+    // another module and it's resilient, because initialization of that protocol
+    // is necessary in this case
+    if (!rootConformance->getProtocol()->isResilient(DC->getParentModule(),
+                                                     ResilienceExpansion::Maximal))
+      addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
     addSymbol(LinkEntity::forProtocolConformanceDescriptor(rootConformance));
 
     // FIXME: the logic around visibility in extensions is confusing, and
