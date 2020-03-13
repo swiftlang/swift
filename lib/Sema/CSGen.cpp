@@ -3207,6 +3207,15 @@ namespace {
     }
 
     Type visitForceValueExpr(ForceValueExpr *expr) {
+      // Diagnose force-unwrapping a 'nil' literal
+      auto &DE = CS.getASTContext().Diags;
+      auto subExpr = expr->getSubExpr();
+      if (isa<NilLiteralExpr>(subExpr)) {
+          DE.diagnose(subExpr->getLoc(), diag::cannot_force_unwrap_nil_literal);
+          return Type();
+      }
+
+
       // Force-unwrap an optional of type T? to produce a T.
       auto locator = CS.getConstraintLocator(expr);
 
