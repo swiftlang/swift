@@ -534,6 +534,37 @@ bb3:
   return %55 : $()
 }
 
+// We can optimize this without PHI.
+sil hidden [ossa] @test_no_leak_consuming_post_dom : $@convention(method) (@guaranteed String, @owned Builtin.BridgeObject) -> () {
+bb0(%1 : @guaranteed $String, %2: @owned $Builtin.BridgeObject):
+  %8 = alloc_stack $String
+  %9 = copy_value %1 : $String
+  store %9 to [init] %8 : $*String
+  
+  %18 = alloc_stack $Builtin.BridgeObject
+  store %2 to [init] %18 : $*Builtin.BridgeObject
+  
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %42 = copy_value %1 : $String
+  store %42 to [assign] %8 : $*String
+  %35 = load [copy] %8 : $*String
+  destroy_value %35 : $String
+  br bb1
+
+bb3:
+  destroy_addr %18 : $*Builtin.BridgeObject
+  destroy_addr %8 : $*String
+  dealloc_stack %18 : $*Builtin.BridgeObject
+  dealloc_stack %8 : $*String
+  %55 = tuple ()
+  return %55 : $()
+}
+
 
 sil [ossa] @get_obj : $@convention(thin) () -> @owned Builtin.BridgeObject
 
@@ -924,3 +955,24 @@ bb1:
   %55 = tuple ()
   return %55 : $()
 }
+
+// TODO:
+// store guarenteed to sa
+// x = addr_cast sa
+// y = load [copy] x
+// dealloc_stack sa
+// use_guarenteed y
+// destroy_val y
+
+// TODO:
+// store
+// bb
+
+// TODO:
+// store
+// bb guarenteed
+
+// TODO: bail correctly on unoptimizable code.
+
+// TODO: trivial PHI promotion.
+// TODO: don't optimize non-trivial stores / copies.

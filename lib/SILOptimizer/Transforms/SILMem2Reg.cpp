@@ -416,7 +416,22 @@ static SILValue replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   return val;
 }
 
-static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
+static void tryRemoveDestroyAddr(DestroyAddrInst *destroyAddr) {
+  for (auto *use : destroyAddr->getOperand()->getUses()) {
+    if (!isa<DestroyAddrInst>(use->getUser()) &&
+        !isa<DeallocStackInst>(use->getUser()))
+      return;
+  }
+  destroyAddr->eraseFromParent();
+}
+
+static void tryReplaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
+  for (auto *use : DAI->getOperand()->getUses()) {
+    if (!isa<DestroyAddrInst>(use->getUser()) &&
+        !isa<DeallocStackInst>(use->getUser()))
+      return;
+  }
+
   SILFunction *F = DAI->getFunction();
 
   assert(DAI->getOperand()->getType().isLoadable(*F) &&
@@ -516,13 +531,13 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
         if (replacedCopyLoads.count(DAI->getOperand())) {
           // If we know that we've removed a load and that load was a copy of
           // this address. We can omit the destroy.
-          DAI->eraseFromParent();
+          tryRemoveDestroyAddr(DAI);
           continue;
         } else if (!RunningVal->getFunction()->hasOwnership() ||
                    !isa<LoadInst>(RunningVal)) {
           // If we have an ownership load that wans't optimized we can't safely
           // replace the destroy.
-          replaceDestroy(DAI, RunningVal);
+          tryReplaceDestroy(DAI, RunningVal);
         }
       }
       continue;
@@ -613,7 +628,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       if (replacedCopyLoads.count(DAI->getOperand())) {
         // If we know that we've removed a load and that load was a copy of
         // this address. We can omit the destroy.
-        DAI->eraseFromParent();
+        tryRemoveDestroyAddr(DAI);
         continue;
       } else if (DAI->getOperand() == ASI && RunningVal &&
                  !isa<SILUndef>(RunningVal) &&
@@ -621,7 +636,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
                   !isa<LoadInst>(RunningVal))) {
         // If we have an ownership load that wans't optimized we can't safely
         // replace the destroy.
-        replaceDestroy(DAI, RunningVal);
+        tryReplaceDestroy(DAI, RunningVal);
       }
       continue;
     }
@@ -747,6 +762,23 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
   SILValue Def = getLiveOutValue(PhiBlocks, Pred);
   LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: " << *Def);
 
+  // We may be adding a consuming use so we need to check that we don't already
+  // consume the value. And if so, we need to emit a copy.
+  if (!isa<SILUndef>(Def) && Def->getFunction()->hasOwnership() &&
+      !Def->getType().isTrivial(*Def->getFunction()) &&
+      !(Def.getOwnershipKind() == ValueOwnershipKind::Guaranteed) &&
+      std::any_of(Def->use_begin(),
+                      Def->use_end(),
+                      [](Operand *use) {
+        return use->isConsumingUse();
+      })) {
+        auto builder = SILBuilderWithScope(Def->getParentBlock());
+        if (Def.getDefiningInstruction()) {
+          builder.setInsertionPoint(std::next(Def.getDefiningInstruction()->getIterator()));
+        }
+        Def = builder.createCopyValue(Def.getLoc(), Def);
+  }
+
   addArgumentToBranch(Def, Dest, TI);
   TI->eraseFromParent();
 }
@@ -807,7 +839,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
       if (replacedCopyLoads.count(DAI->getOperand())) {
         // If we know that we've removed a load and that load was a copy of
         // this address. We can omit the destroy.
-        DAI->eraseFromParent();
+        tryRemoveDestroyAddr(DAI);
         continue;
       } else {
         // If we have an ownership load that wans't optimized we can't safely
@@ -816,7 +848,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
         if (isa<SILUndef>(Def))
           continue;
         if (!Def->getFunction()->hasOwnership() || !isa<LoadInst>(Def)) {
-          replaceDestroy(DAI, Def);
+          tryReplaceDestroy(DAI, Def);
         }
       }
       continue;
@@ -900,11 +932,21 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
   // we have at most one store per block.
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
     SILInstruction *II = UI->getUser();
+    if (auto load = dyn_cast<LoadInst>(II)) {
+      if (load->getOwnershipQualifier() != LoadOwnershipQualifier::Trivial &&
+          load->getOwnershipQualifier() != LoadOwnershipQualifier::Unqualified)
+        // TODO: these are currently unsupported in alloc to phi.
+        return;
+    }
+
     // We need to place Phis for this block.
-    if (isa<StoreInst>(II)) {
+    if (auto store = dyn_cast<StoreInst>(II)) {
       // If the block is in the dom tree (dominated by the entry block).
       if (DomTreeNode *Node = DT->getNode(II->getParent()))
-        PQ.push(std::make_pair(Node, DomTreeLevels[Node]));
+        // TODO: these are currently unsupported in alloc to phi.
+        if (store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial ||
+            store->getOwnershipQualifier() == StoreOwnershipQualifier::Unqualified)
+          PQ.push(std::make_pair(Node, DomTreeLevels[Node]));
     }
   }
 
