@@ -12,6 +12,7 @@ $SWIFT_PATH/utils/build-script --wasm \
     -DSWIFT_BUILD_SOURCEKIT=FALSE \
     -DSWIFT_ENABLE_SOURCEKIT_TESTS=FALSE \
     -DSWIFT_BUILD_SYNTAXPARSERLIB=FALSE \
+    -DSWIFT_INCLUDE_TESTS=FALSE \
     -DCMAKE_AR='$SOURCE_PATH/wasi-sdk/bin/llvm-ar' \
     -DCMAKE_RANLIB='$SOURCE_PATH/wasi-sdk/bin/llvm-ranlib' \
   " \
