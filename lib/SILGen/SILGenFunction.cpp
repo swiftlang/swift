@@ -345,8 +345,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       else {
         auto entryValue = getAddressValue(Entry.value);
         auto addr = emitTemporaryAllocation(vd, entryValue->getType());
-        auto val = B.createCopyAddr(loc, entryValue, addr, IsNotTake,
-                         IsInitialization);
+        B.createCopyAddr(loc, entryValue, addr, IsNotTake, IsInitialization);
         capturedArgs.push_back(ManagedValue::forLValue(addr));
       }
       break;
