@@ -39,7 +39,7 @@ func testCallAsFunction(add: Adder, addTy: Adder.Type) {
 
   let _ = add(x: 12, #^INSTANCE_ARG2^#)
 // INSTANCE_ARG2: Begin completions, 1 items
-// INSTANCE_ARG2: Keyword/ExprSpecific:               y: [#Argument name#];
+// INSTANCE_ARG2: Pattern/ExprSpecific:               {#y: Int#}[#Int#];
 // INSTANCE_ARG2: End completions
 
   let _ = addTy#^METATYPE_NO_DOT^#;
@@ -105,8 +105,8 @@ func testCallAsFunctionOverloaded(fn: Functor) {
   fn(h: .left, #^OVERLOADED_ARG2_LABEL^#)
 // FIXME: Should only suggest 'v:' (rdar://problem/60346573).
 //OVERLOADED_ARG2_LABEL: Begin completions, 2 items
-//OVERLOADED_ARG2_LABEL-DAG: Keyword/ExprSpecific:               v: [#Argument name#];
-//OVERLOADED_ARG2_LABEL-DAG: Keyword/ExprSpecific:               h: [#Argument name#];
+//OVERLOADED_ARG2_LABEL-DAG: Pattern/ExprSpecific:               {#v: Functor.Vertical#}[#Functor.Vertical#];
+//OVERLOADED_ARG2_LABEL-DAG: Pattern/ExprSpecific:               {#h: Functor.Horizontal#}[#Functor.Horizontal#];
 //OVERLOADED_ARG2_LABEL: End completions
 
   fn(h: .left, v: .#^OVERLOADED_ARG2_VALUE^#)

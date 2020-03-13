@@ -725,64 +725,66 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     assert(expectedType->is<AnyFunctionType>() ||
            expectedType->is<SILFunctionType>());
 
-    SymbolicClosure *closure = symVal.getClosure();
-    SubstitutionMap callSubstMap = closure->getCallSubstitutionMap();
     SILModule &module = builder.getModule();
-    ArrayRef<SymbolicClosureArgument> captures = closure->getCaptures();
-
-    // Recursively emit code for all captured values that are mapped to a
-    // symbolic value. If there is a captured value that is not mapped
-    // to a symbolic value, use the captured value as such (after possibly
-    // copying non-trivial captures).
-    SmallVector<SILValue, 4> capturedSILVals;
-    for (SymbolicClosureArgument capture : captures) {
-      SILValue captureOperand = capture.first;
-      Optional<SymbolicValue> captureSymVal = capture.second;
-      if (!captureSymVal) {
-        SILFunction &fun = builder.getFunction();
-        assert(captureOperand->getFunction() == &fun &&
-               "non-constant captured arugment not defined in this function");
-        // If the captureOperand is a non-trivial value, it should be copied
-        // as it now used in a new folded closure.
-        SILValue captureCopy = makeOwnedCopyOfSILValue(captureOperand, fun);
-        capturedSILVals.push_back(captureCopy);
-        continue;
+    SymbolicClosure *closure = symVal.getClosure();
+    SILValue resultVal;
+    if (!closure->hasOnlyConstantCaptures()) {
+      // If the closure captures a value that is not a constant, it should only
+      // come from the caller of the log call. Therefore, assert this and reuse
+      // the closure value.
+      SingleValueInstruction *originalClosureInst = closure->getClosureInst();
+      SILFunction &fun = builder.getFunction();
+      assert(originalClosureInst->getFunction() == &fun &&
+             "closure with non-constant captures not defined in this function");
+      // Copy the closure, since the returned value must be owned.
+      resultVal = makeOwnedCopyOfSILValue(originalClosureInst, fun);
+    } else {
+      SubstitutionMap callSubstMap = closure->getCallSubstitutionMap();
+      ArrayRef<SymbolicClosureArgument> captures = closure->getCaptures();
+      // Recursively emit code for all captured values which must be mapped to a
+      // symbolic value.
+      SmallVector<SILValue, 4> capturedSILVals;
+      for (SymbolicClosureArgument capture : captures) {
+        SILValue captureOperand = capture.first;
+        Optional<SymbolicValue> captureSymVal = capture.second;
+        assert(captureSymVal);
+        // Note that the captured operand type may have generic parameters which
+        // has to be substituted with the substitution map that was inferred by
+        // the constant evaluator at the partial-apply site.
+        SILType operandType = captureOperand->getType();
+        SILType captureType = operandType.subst(module, callSubstMap);
+        SILValue captureSILVal = emitCodeForSymbolicValue(
+            captureSymVal.getValue(), captureType.getASTType(), builder, loc,
+            stringInfo);
+        capturedSILVals.push_back(captureSILVal);
       }
-      // Here, we have a symbolic value for the capture. Therefore, use it to
-      // create a new constant at this point. Note that the captured operand
-      // type may have generic parameters which has to be substituted with the
-      // substitution map that was inferred by the constant evaluator at the
-      // partial-apply site.
-      SILType operandType = captureOperand->getType();
-      SILType captureType = operandType.subst(module, callSubstMap);
-      SILValue captureSILVal = emitCodeForSymbolicValue(
-          captureSymVal.getValue(), captureType.getASTType(), builder, loc,
-          stringInfo);
-      capturedSILVals.push_back(captureSILVal);
+      FunctionRefInst *functionRef =
+          builder.createFunctionRef(loc, closure->getTarget());
+      SILType closureType = closure->getClosureType();
+      ParameterConvention convention =
+          closureType.getAs<SILFunctionType>()->getCalleeConvention();
+      resultVal = builder.createPartialApply(loc, functionRef, callSubstMap,
+                                             capturedSILVals, convention);
     }
-
-    FunctionRefInst *functionRef =
-        builder.createFunctionRef(loc, closure->getTarget());
-    SILType closureType = closure->getClosureType();
-    ParameterConvention convention =
-        closureType.getAs<SILFunctionType>()->getCalleeConvention();
-    PartialApplyInst *papply = builder.createPartialApply(
-        loc, functionRef, callSubstMap, capturedSILVals, convention);
-    // The type of the created closure must be a lowering of the expected type.
-    auto resultType = papply->getType().castTo<SILFunctionType>();
+    // If the expected type is a SILFunctionType convert the closure to the
+    // expected type using a convert_function instruction. Otherwise, if the
+    // expected type is AnyFunctionType, nothing needs to be done.
+    // Note that we cannot assert the lowering in the latter case, as that
+    // utility doesn't exist yet.
+    auto resultType = resultVal->getType().castTo<SILFunctionType>();
     CanType expectedCanType = expectedType->getCanonicalType();
     if (auto expectedFnType = dyn_cast<SILFunctionType>(expectedCanType)) {
       assert(expectedFnType->getUnsubstitutedType(module)
                == resultType->getUnsubstitutedType(module));
       // Convert to the expected type if necessary.
       if (expectedFnType != resultType) {
-        auto convert = builder.createConvertFunction(loc, papply,
-                               SILType::getPrimitiveObjectType(expectedFnType),
-                               false);
+        auto convert = builder.createConvertFunction(
+            loc, resultVal, SILType::getPrimitiveObjectType(expectedFnType),
+            false);
         return convert;
       }
     }
-    return papply;
+    return resultVal;
   }
   default: {
     llvm_unreachable("Symbolic value kind is not supported");
