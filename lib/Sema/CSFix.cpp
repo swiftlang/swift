@@ -268,7 +268,7 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
     auto exprType = cs.getType(anchor);
     return std::make_tuple(cs.getContextualTypePurpose(anchor), exprType,
                            contextualType);
-  } else if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
+  } else if (auto argApplyInfo = solution.getFunctionArgApplyInfo(locator)) {
     return std::make_tuple(CTP_CallArgument,
                            argApplyInfo->getArgType(),
                            argApplyInfo->getParamType());

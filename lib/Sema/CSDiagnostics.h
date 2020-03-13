@@ -178,6 +178,11 @@ protected:
     return cs.getConstraintLocator(anchor, path);
   }
 
+  Optional<FunctionArgApplyInfo>
+  getFunctionArgApplyInfo(ConstraintLocator *locator) const {
+    return S.getFunctionArgApplyInfo(locator);
+  }
+
   /// \returns true is locator hasn't been simplified down to expression.
   bool hasComplexLocator() const { return HasComplexLocator; }
 
@@ -1717,7 +1722,7 @@ public:
   ArgumentMismatchFailure(const Solution &solution, Type argType,
                           Type paramType, ConstraintLocator *locator)
       : ContextualFailure(solution, argType, paramType, locator),
-        Info(*cs.getFunctionArgApplyInfo(getLocator())) {}
+        Info(*getFunctionArgApplyInfo(getLocator())) {}
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;

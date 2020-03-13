@@ -790,8 +790,7 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
     // Let's check whether this is a function parameter passed
     // as an argument to another function which accepts @escaping
     // function at that position.
-    auto &cs = getConstraintSystem();
-    if (auto argApplyInfo = cs.getFunctionArgApplyInfo(getLocator())) {
+    if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator())) {
       auto paramInterfaceTy = argApplyInfo->getParamInterfaceType();
       if (paramInterfaceTy->isTypeParameter()) {
         auto diagnoseGenericParamFailure = [&](GenericTypeParamDecl *decl) {
@@ -1001,8 +1000,7 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   if (!anchor || isa<InOutExpr>(anchor))
     return;
 
-  auto &cs = getConstraintSystem();
-  if (auto argApplyInfo = cs.getFunctionArgApplyInfo(getLocator()))
+  if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator()))
     if (argApplyInfo->getParameterFlags().isInOut())
       return;
 
@@ -3815,7 +3813,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // foo(bar) // `() -> Void` vs. `(Int) -> Void`
   // ```
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    auto info = *(cs.getFunctionArgApplyInfo(locator));
+    auto info = *(getFunctionArgApplyInfo(locator));
 
     auto *argExpr = info.getArgExpr();
     emitDiagnostic(argExpr->getLoc(), diag::cannot_convert_argument_value,
@@ -4040,13 +4038,12 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
 }
 
 bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
-  auto &cs = getConstraintSystem();
   FunctionType *funcType = nullptr;
 
   auto *locator = getLocator();
   if (locator->isForContextualType()) {
     funcType = getContextualType(locator->getAnchor())->getAs<FunctionType>();
-  } else if (auto info = cs.getFunctionArgApplyInfo(locator)) {
+  } else if (auto info = getFunctionArgApplyInfo(locator)) {
     auto paramType = info->getParamType();
     // Drop a single layer of optionality because argument could get injected
     // into optional and that doesn't contribute to the problem.
@@ -4781,8 +4778,7 @@ SourceLoc InvalidUseOfAddressOf::getLoc() const {
 }
 
 bool InvalidUseOfAddressOf::diagnoseAsError() {
-  auto &cs = getConstraintSystem();
-  if (auto argApplyInfo = cs.getFunctionArgApplyInfo(getLocator())) {
+  if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator())) {
     if (!argApplyInfo->getParameterFlags().isInOut()) {
       auto anchor = getAnchor();
       emitDiagnostic(anchor->getLoc(), diag::extra_address_of, getToType())
@@ -5298,14 +5294,13 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 }
 
 bool InOutConversionFailure::diagnoseAsError() {
-  auto &cs = getConstraintSystem();
   auto *anchor = getAnchor();
   auto *locator = getLocator();
   auto path = locator->getPath();
 
   if (!path.empty() &&
       path.back().getKind() == ConstraintLocator::FunctionArgument) {
-    if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
+    if (auto argApplyInfo = getFunctionArgApplyInfo(locator)) {
       emitDiagnostic(anchor->getLoc(), diag::cannot_convert_argument_value,
           argApplyInfo->getArgType(), argApplyInfo->getParamType());
     } else {
