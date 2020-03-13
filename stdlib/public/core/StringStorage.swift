@@ -183,12 +183,14 @@ internal func _allocate<T: AnyObject>(
 ) -> (T, realNumTailBytes: Int) {
   _internalInvariant(getSwiftClassInstanceExtents(T.self).1 == numHeaderBytes)
 
+  func roundUp(_ x: Int) -> Int { (x+15) & ~15 }
+
   let numBytes = numHeaderBytes + numTailBytes
 
   let linearBucketThreshold = 128
   if _fastPath(numBytes < linearBucketThreshold) {
     // Allocate up to the nearest bucket of 16
-    let realNumBytes = (numBytes+15) & ~15
+    let realNumBytes = roundUp(numBytes)
     let realNumTailBytes = realNumBytes - numHeaderBytes
     _internalInvariant(realNumTailBytes >= numTailBytes)
     let object = tailAllocator(realNumTailBytes)
@@ -202,9 +204,14 @@ internal func _allocate<T: AnyObject>(
     growTailBytes = numTailBytes
   }
 
-  let object = tailAllocator(growTailBytes)
+  let total = roundUp(numHeaderBytes + growTailBytes)
+  let totalTailBytes = total - numHeaderBytes
+
+  let object = tailAllocator(totalTailBytes)
   let mallocSize = _swift_stdlib_malloc_size(
     UnsafeRawPointer(Builtin.bridgeToRawPointer(object)))
+  _internalInvariant(mallocSize % MemoryLayout<Int>.stride == 0)
+
   let realNumTailBytes = mallocSize - numHeaderBytes
   _internalInvariant(realNumTailBytes >= numTailBytes)
   return (object, realNumTailBytes)
@@ -449,6 +456,8 @@ extension __StringStorage {
   // required nul-terminator.
   //
   // NOTE: Callers who wish to mutate this storage should enfore nul-termination
+  //
+  // TODO: Refactoring or removing. Excluding the last byte is awkward.
   @inline(__always)
   private var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
     UnsafeMutableBufferPointer(
@@ -487,8 +496,8 @@ extension __StringStorage {
 
     // Check that capacity end matches our notion of unused storage, and also
     // checks that breadcrumbs were dutifully aligned.
-    // _internalInvariant(UnsafeMutablePointer<UInt8>(_realCapacityEnd)
-    //   == unusedStorage.baseAddress! + (unusedStorage.count + 1))
+    _internalInvariant(UnsafeMutablePointer<UInt8>(_realCapacityEnd)
+      == unusedStorage.baseAddress! + (unusedStorage.count + 1))
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
