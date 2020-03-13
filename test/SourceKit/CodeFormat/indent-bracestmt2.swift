@@ -24,7 +24,16 @@ class Foo
 // CHECK: key.sourcetext: "    func foo()"
 // CHECK: key.sourcetext: "    {"
 // CHECK: key.sourcetext: "        bar()"
-// CHECK: key.sourcetext: "        {"
-// CHECK: key.sourcetext: "        }"
+
+//                             bar()"
+// CHECK: key.sourcetext: "    {"
 // CHECK: key.sourcetext: "    }"
+
+//                             func foo()"
+//                             {"
+//                                 ..."
+// CHECK: key.sourcetext: "    }"
+
+//                         class Foo"
+//                             ..."
 // CHECK: key.sourcetext: "}"

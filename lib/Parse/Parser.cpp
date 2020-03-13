@@ -1118,8 +1118,14 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
-    RightLoc =
-        Tok.is(RightK) ? consumeToken() : getLocForMissingMatchingToken();
+    if (Tok.is(RightK)) {
+      RightLoc = consumeToken();
+      // Don't propagate the error because we have recovered.
+      if (!Status.hasCodeCompletion())
+        Status = makeParserSuccess();
+    } else {
+      RightLoc = getLocForMissingMatchingToken();
+    }
   } else if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
   }

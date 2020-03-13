@@ -1839,6 +1839,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       PlatformAndVersions;
 
     StringRef AttrName = "@_originalDefinedIn";
+    bool SuppressLaterDiags = false;
     if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
                   diag::originally_defined_in_missing_rparen,
                   SyntaxKind::Unknown, [&]() -> ParserStatus {
@@ -1854,6 +1855,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         if (!Tok.is(tok::identifier) || Tok.getText() != "module" ||
             !peekToken().is(tok::colon)) {
           diagnose(Tok, diag::originally_defined_in_need_original_module_name);
+          SuppressLaterDiags = true;
           return makeParserError();
         }
         consumeToken(tok::identifier);
@@ -1870,6 +1872,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         if (OriginalModuleName.empty()) {
           diagnose(ModuleNameLoc,
                    diag::originally_defined_in_need_nonempty_module_name);
+          SuppressLaterDiags = true;
           return makeParserError();
         }
         return makeParserSuccess();
@@ -1885,6 +1888,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           if (!Plat.hasValue()) {
             diagnose(Tok.getLoc(),
                      diag::originally_defined_in_unrecognized_platform);
+            SuppressLaterDiags = true;
             return makeParserError();
           } else {
             consumeToken();
@@ -1895,6 +1899,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           SourceRange VersionRange;
           if (parseVersionTuple(VerTuple, VersionRange,
               Diagnostic(diag::attr_availability_expected_version, AttrName))) {
+            SuppressLaterDiags = true;
             return makeParserError();
           } else {
             if (VerTuple.getSubminor().hasValue() ||
@@ -1911,10 +1916,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           }
         }
         diagnose(AtLoc, diag::originally_defined_in_need_platform_version);
+        SuppressLaterDiags = true;
         return makeParserError();
       }
       }
-    }).isError()) {
+    }).isError() || SuppressLaterDiags) {
       return false;
     }
     if (OriginalModuleName.empty()) {
