@@ -3256,6 +3256,9 @@ ParserStatus Parser::parseMultipleTrailingClosures(
                          diag::expected_multiple_closures_block_rbrace,
                          LBrace)) {
     Status.setIsParseError();
+  } else {
+    if (!Status.hasCodeCompletion())
+      Status = makeParserSuccess();
   }
 
   return Status;
