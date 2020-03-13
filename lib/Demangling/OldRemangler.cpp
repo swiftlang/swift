@@ -1267,11 +1267,11 @@ void Remangler::mangleImplEscaping(Node *node) {
   // The old mangler does not encode escaping.
 }
 
-void Remangler::mangleImplSubstitutions(Node *node) {
+void Remangler::mangleImplPatternSubstitutions(Node *node) {
   // The old mangler does not encode substituted function types.
 }
 
-void Remangler::mangleImplImpliedSubstitutions(Node *node) {
+void Remangler::mangleImplInvocationSubstitutions(Node *node) {
   // The old mangler does not encode substituted function types.
 }
 

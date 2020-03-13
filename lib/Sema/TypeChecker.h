@@ -90,8 +90,6 @@ class LookupTypeResult {
   /// The set of results found.
   SmallVector<LookupTypeResultEntry, 4> Results;
 
-  friend class TypeChecker;
-
 public:
   using iterator = SmallVectorImpl<LookupTypeResultEntry>::iterator;
   iterator begin() { return Results.begin(); }
@@ -988,49 +986,6 @@ public:
   /// \returns true if any closures were found
   static bool contextualizeInitializer(Initializer *DC, Expr *init);
   static void contextualizeTopLevelCode(TopLevelCodeDecl *TLCD);
-
-  /// Return the type-of-reference of the given value.
-  ///
-  /// \param baseType if non-null, return the type of a member reference to
-  ///   this value when the base has the given type
-  ///
-  /// \param UseDC The context of the access.  Some variables have different
-  ///   types depending on where they are used.
-  ///
-  /// \param base The optional base expression of this value reference
-  ///
-  /// \param wantInterfaceType Whether we want the interface type, if available.
-  ///
-  /// \param getType Optional callback to extract a type for given declaration.
-  static Type
-  getUnopenedTypeOfReference(VarDecl *value, Type baseType, DeclContext *UseDC,
-                             llvm::function_ref<Type(VarDecl *)> getType,
-                             const DeclRefExpr *base = nullptr,
-                             bool wantInterfaceType = false);
-
-  /// Return the type-of-reference of the given value.
-  ///
-  /// \param baseType if non-null, return the type of a member reference to
-  ///   this value when the base has the given type
-  ///
-  /// \param UseDC The context of the access.  Some variables have different
-  ///   types depending on where they are used.
-  ///
-  /// \param base The optional base expression of this value reference
-  ///
-  /// \param wantInterfaceType Whether we want the interface type, if available.
-  static Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                         DeclContext *UseDC,
-                                         const DeclRefExpr *base = nullptr,
-                                         bool wantInterfaceType = false) {
-    return getUnopenedTypeOfReference(
-        value, baseType, UseDC,
-        [&](VarDecl *var) -> Type {
-          return wantInterfaceType ? value->getInterfaceType()
-                                   : value->getType();
-        },
-        base, wantInterfaceType);
-  }
 
   /// Retrieve the default type for the given protocol.
   ///

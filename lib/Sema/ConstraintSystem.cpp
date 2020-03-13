@@ -504,6 +504,12 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
                                   {LocatorPathElt::ApplyFunction(),
                                    LocatorPathElt::ImplicitCallAsFunction()});
     }
+
+    // Handling an apply for a nominal type that supports @dynamicCallable.
+    if (fnTy->hasDynamicCallableAttribute()) {
+      return getConstraintLocator(anchor, LocatorPathElt::ApplyFunction());
+    }
+
     return nullptr;
   };
 
@@ -919,7 +925,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                                   DeclContext *UseDC,
                                                   const DeclRefExpr *base,
                                                   bool wantInterfaceType) {
-  return TypeChecker::getUnopenedTypeOfReference(
+  return ConstraintSystem::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
         if (Type type = getTypeIfAvailable(var))
@@ -934,7 +940,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
       base, wantInterfaceType);
 }
 
-Type TypeChecker::getUnopenedTypeOfReference(
+Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     llvm::function_ref<Type(VarDecl *)> getType, const DeclRefExpr *base,
     bool wantInterfaceType) {
@@ -1399,9 +1405,9 @@ ConstraintSystem::getTypeOfMemberReference(
                               ->castTo<AnyFunctionType>()->getParams();
       refType = FunctionType::get(indices, elementTy);
     } else {
-      refType = TypeChecker::getUnopenedTypeOfReference(
-          cast<VarDecl>(value), baseTy, useDC, base,
-          /*wantInterfaceType=*/true);
+      refType =
+          getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC, base,
+                                     /*wantInterfaceType=*/true);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();

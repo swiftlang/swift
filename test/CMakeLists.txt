@@ -66,6 +66,7 @@ function(get_test_dependencies SDK result_var_name)
       dsymutil
       FileCheck
       llc
+      llvm-ar
       llvm-as
       llvm-bcanalyzer
       llvm-cov
@@ -241,11 +242,11 @@ foreach(SDK ${SWIFT_SDKS})
     set(test_dependencies)
     get_test_dependencies("${SDK}" test_dependencies)
 
-    # NOTE create a stub BlocksRuntime library that can be used for the
-    # reflection tests
-    if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin AND (SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT))
+    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+      # NOTE create a stub BlocksRuntime library that can be used for the
+      # reflection tests
       file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
-      "void
+        "void
 #if defined(_WIN32)
 __declspec(dllexport)
 #endif
@@ -264,9 +265,7 @@ _Block_release(void) { }\n")
         RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
         OUTPUT_NAME BlocksRuntime)
       list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
-    endif()
 
-    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
       list(APPEND test_dependencies
           "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 

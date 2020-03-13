@@ -1520,8 +1520,8 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   RuntimeErrorDetails::FixIt fixit = {
     .filename = nullTerminatedFilename,
     .startLine = line,
-    .endLine = line,
     .startColumn = column,
+    .endLine = line,
     .endColumn = column,
     .replacementText = "@objc "
   };

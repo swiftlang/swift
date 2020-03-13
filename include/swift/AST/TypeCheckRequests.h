@@ -1999,6 +1999,29 @@ public:
   }
 };
 
+/// Computes whether the specified type or a super-class/super-protocol has the
+/// @dynamicCallable attribute on it.
+class HasDynamicCallableAttributeRequest
+    : public SimpleRequest<HasDynamicCallableAttributeRequest,
+                           bool(CanType), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, CanType ty) const;
+
+public:
+  bool isCached() const {
+    // Don't cache types containing type variables, as they must not outlive
+    // the constraint system that created them.
+    auto ty = std::get<0>(getStorage());
+    return !ty->hasTypeVariable();
+  }
+};
+
 /// Determines the type of a given pattern.
 ///
 /// Note that this returns the "raw" pattern type, which can involve

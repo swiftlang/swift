@@ -103,7 +103,7 @@ _ = A<String, Int>(a: "foo", // expected-error {{cannot convert value of type 'S
   b: 42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 _ = B(a: 12, b: 42)
 _ = B(a: 12, b: 42 as Float)
-_ = B(a: "foo", b: 42) // expected-error {{conflicting arguments to generic parameter 'T1' ('String' vs. 'Int')}}
+_ = B(a: "foo", b: 42)     // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 _ = C(a: "foo", b: 42)
 _ = C(a: 42,        // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
   b: 42)

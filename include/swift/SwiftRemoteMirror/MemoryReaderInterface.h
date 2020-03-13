@@ -86,6 +86,11 @@ typedef enum {
   /// bytes.
   DLQ_GetSizeSize,
 
+  /// The query should ignore inBuffer, and treat outBuffer as pointer-sized
+  /// buffer (the size of a target pointer, not a swift_addr_t) which should be
+  /// populated with the mask of pointer addressable bits.
+  DLQ_GetPtrAuthMask,
+
   /// The query should ignore inBuffer, and treat outBuffer as uint8_t* which
   /// should be populated with the number of low-order bits in each pointer
   /// reserved by Obj-C in the remote process.  This is generally zero except

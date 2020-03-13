@@ -351,6 +351,14 @@ static void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Expr *baseExpr, DeclNameRef name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   ConcreteDeclRef ref = nullptr;
+
+  // Re-typecheck TypeExpr so it's typechecked without the arguments which may
+  // affects the inference of the generic arguments.
+  if (TypeExpr *tyExpr = dyn_cast<TypeExpr>(baseExpr)) {
+    tyExpr->setType(nullptr);
+    tyExpr->getTypeLoc().setType(nullptr);
+  }
+
   auto baseTyOpt = getTypeOfCompletionContextExpr(
       DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr, ref);
   if (!baseTyOpt)
@@ -435,8 +443,13 @@ static bool collectPossibleCalleesForApply(
     auto baseTy = AMT->getInstanceType();
     if (isa<TypeExpr>(fnExpr) && baseTy->mayHaveMembers()) {
       collectPossibleCalleesByQualifiedLookup(
-          DC, AMT, DeclNameRef::createConstructor(), candidates);
+          DC, fnExpr, DeclNameRef::createConstructor(), candidates);
     }
+  } else {
+    // Otherwise, look for `callAsFunction` (SE-0253).
+    collectPossibleCalleesByQualifiedLookup(
+        DC, fnExpr, DeclNameRef(DC.getASTContext().Id_callAsFunction),
+        candidates);
   }
 
   return !candidates.empty();
@@ -524,7 +537,7 @@ class ExprContextAnalyzer {
 
   // Results populated by Analyze()
   SmallVectorImpl<Type> &PossibleTypes;
-  SmallVectorImpl<StringRef> &PossibleNames;
+  SmallVectorImpl<const AnyFunctionType::Param *> &PossibleParams;
   SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees;
   bool &singleExpressionBody;
 
@@ -535,7 +548,9 @@ class ExprContextAnalyzer {
     PossibleTypes.push_back(ty->getRValueType());
   }
 
-  void recordPossibleName(StringRef name) { PossibleNames.push_back(name); }
+  void recordPossibleParam(const AnyFunctionType::Param &arg) {
+    PossibleParams.push_back(&arg);
+  }
 
   /// Collect context information at call argument position.
   bool analyzeApplyExpr(Expr *E) {
@@ -572,7 +587,7 @@ class ExprContextAnalyzer {
                          (isa<CallExpr>(E) | isa<SubscriptExpr>(E) ||
                           isa<UnresolvedMemberExpr>(E));
       SmallPtrSet<TypeBase *, 4> seenTypes;
-      SmallPtrSet<Identifier, 4> seenNames;
+      llvm::SmallSet<std::pair<Identifier, TypeBase *>, 4> seenArgs;
       for (auto &typeAndDecl : Candidates) {
         DeclContext *memberDC = nullptr;
         if (typeAndDecl.Decl)
@@ -590,23 +605,27 @@ class ExprContextAnalyzer {
         }
         for (auto Pos = Position; Pos < Params.size(); ++Pos) {
           const auto &Param = Params[Pos];
+          Type ty = Param.getPlainType();
+          if (memberDC && ty->hasTypeParameter())
+            ty = memberDC->mapTypeIntoContext(ty);
+
           if (Param.hasLabel() && MayNeedName) {
-            if (seenNames.insert(Param.getLabel()).second)
-              recordPossibleName(Param.getLabel().str());
+            if (seenArgs.insert({Param.getLabel(), ty.getPointer()}).second)
+              recordPossibleParam(Param);
             if (paramList && paramList->get(Position)->isDefaultArgument())
               continue;
           } else {
-            Type ty = Param.getOldType();
-            if (memberDC && ty->hasTypeParameter())
-              ty = memberDC->mapTypeIntoContext(ty);
-            if (seenTypes.insert(ty.getPointer()).second)
-              recordPossibleType(ty);
+            auto argTy = ty;
+            if (Param.isInOut())
+              argTy = InOutType::get(argTy);
+            if (seenTypes.insert(argTy.getPointer()).second)
+              recordPossibleType(argTy);
           }
           break;
         }
       }
     }
-    return !PossibleTypes.empty() || !PossibleNames.empty();
+    return !PossibleTypes.empty() || !PossibleParams.empty();
   }
 
   void analyzeExpr(Expr *Parent) {
@@ -866,14 +885,14 @@ class ExprContextAnalyzer {
   }
 
 public:
-  ExprContextAnalyzer(DeclContext *DC, Expr *ParsedExpr,
-                      SmallVectorImpl<Type> &PossibleTypes,
-                      SmallVectorImpl<StringRef> &PossibleNames,
-                      SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees,
-                      bool &singleExpressionBody)
+  ExprContextAnalyzer(
+      DeclContext *DC, Expr *ParsedExpr, SmallVectorImpl<Type> &PossibleTypes,
+      SmallVectorImpl<const AnyFunctionType::Param *> &PossibleArgs,
+      SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees,
+      bool &singleExpressionBody)
       : DC(DC), ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
         Context(DC->getASTContext()), PossibleTypes(PossibleTypes),
-        PossibleNames(PossibleNames), PossibleCallees(PossibleCallees),
+        PossibleParams(PossibleArgs), PossibleCallees(PossibleCallees),
         singleExpressionBody(singleExpressionBody) {}
 
   void Analyze() {
@@ -977,7 +996,7 @@ public:
 } // end anonymous namespace
 
 ExprContextInfo::ExprContextInfo(DeclContext *DC, Expr *TargetExpr) {
-  ExprContextAnalyzer Analyzer(DC, TargetExpr, PossibleTypes, PossibleNames,
+  ExprContextAnalyzer Analyzer(DC, TargetExpr, PossibleTypes, PossibleParams,
                                PossibleCallees, singleExpressionBody);
   Analyzer.Analyze();
 }

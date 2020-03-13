@@ -5,7 +5,8 @@
 // performs compile-time analysis and optimization of the new os log prototype
 // APIs. The tests here check whether bad user inputs are diagnosed correctly.
 // The tests here model the possible invalid inputs to the os log methods.
-// TODO: diagnostics will be improved.
+// TODO: diagnostics will be improved. globalStringTablePointer builtin error
+// must be suppressed.
 
 import OSLogPrototype
 
@@ -43,10 +44,91 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     let logMessage: OSLogMessage = "Maximum integer value: \(Int.max)"
       // expected-error @-1 {{OSLogMessage instance must not be explicitly created and must be deletable}}
     if !b {
-      return;
+      return
     }
     h.log(level: .debug, logMessage)
       // expected-error @-1 {{globalStringTablePointer builtin must used only on string literals}}
   }
+
+  func testNoninlinedFormatOptions(h: Logger) {
+    let formatOption: OSLogIntegerFormatting = .hex(includePrefix: true)
+    h.debug("Minimum integer value: \(Int.min, format: formatOption)")
+      // expected-error @-1 {{interpolation arguments like format and privacy options must be constants}}
+      // expected-error @-2 {{globalStringTablePointer builtin must used only on string literals}}
+  }
+
+  func testNoninlinedFormatOptionsComplex(h: Logger, b: Bool) {
+    let formatOption: OSLogIntegerFormatting = .hex(includePrefix: true)
+    if !b {
+      return
+    }
+    h.debug("Minimum integer value: \(Int.min, format: formatOption)")
+      // expected-error @-1 {{interpolation arguments like format and privacy options must be constants}}
+      // expected-error @-2 {{globalStringTablePointer builtin must used only on string literals}}
+  }
 }
 
+internal enum Color {
+  case red
+  case blue
+}
+
+if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+
+  // Invoking the log calls in unreachable code should not crash the compiler.
+  func testUnreachableLogCall(h: Logger, c: Color)  {
+    let arg = 10
+    switch c {
+    case .red:
+      return
+    case .blue:
+      return
+    default: // expected-warning {{default will never be executed}}
+      h.debug("Unreachable log call")
+      h.info("Unreachable log call with argument \(arg)")
+      h.log(
+        """
+        Unreachable log call with argument and formatting \
+        \(arg, align: .right(columns: 10))
+        """)
+    }
+  }
+
+  // Passing InOut values to the logger should not crash the compiler.
+  func foo(_ logger: Logger, _ mutableValue: inout String) {
+     logger.log("FMFLabelledLocation: initialized with coder \(mutableValue)")
+      // expected-error@-1 {{escaping closure captures 'inout' parameter 'mutableValue'}}
+      // expected-note@-3 {{parameter 'mutableValue' is declared 'inout'}}
+      // expected-note@-3 {{captured here}}
+  }
+}
+
+// This is an extension used only for testing a diagnostic that doesn't arise
+// normally but may be triggered by changes to the library.
+extension OSLogInterpolation {
+  @_transparent
+  mutating func appendInterpolation(_ c: Color) {
+    switch c {
+    case .red:
+      appendInterpolation(1)
+    case .blue:
+      appendInterpolation(0)
+    }
+  }
+}
+
+if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+
+  func testUnreachableLogCallComplex(h: Logger, c: Color)  {
+    switch c {
+    case .red:
+      return
+    case .blue:
+      return
+    default: // expected-warning {{default will never be executed}}
+      h.info("Some call \(c)")
+        // expected-warning@-1 {{os log call will never be executed and may have undiagnosed errors}}
+        // expected-error@-2 {{globalStringTablePointer builtin must used only on string literals}}
+    }
+  }
+}

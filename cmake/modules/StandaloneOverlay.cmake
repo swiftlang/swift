@@ -112,7 +112,6 @@ include(SwiftSharedCMakeConfig)
 include(AddSwift)
 include(SwiftHandleGybSources)
 include(SwiftConfigureSDK)
-include(SwiftSource)
 include(SwiftComponents)
 include(DarwinSDKs)
 

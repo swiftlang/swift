@@ -328,11 +328,11 @@ bb1:
   %6 = alloc_stack $UnfoldSequence<Element, State>
   copy_addr %1 to [initialization] %6 : $*UnfoldSequence<Element, State>
   %8 = struct_element_addr %6 : $*UnfoldSequence<Element, State>, #UnfoldSequence._next
-  %9 = load [copy] %8 : $*@callee_guaranteed <τ_0_0, τ_0_1> in (@inout τ_0_0) -> @out Optional<τ_0_1> for <State, Element>
+  %9 = load [copy] %8 : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @out Optional<τ_0_1> for <State, Element>
   %10 = alloc_stack $Optional<Element>
   %11 = struct_element_addr %1 : $*UnfoldSequence<Element, State>, #UnfoldSequence._state
-  %13 = apply %9(%10, %11) : $@callee_guaranteed <τ_0_0, τ_0_1> in (@inout τ_0_0) -> @out Optional<τ_0_1> for <State, Element>
-  destroy_value %9 : $@callee_guaranteed <τ_0_0, τ_0_1> in (@inout τ_0_0) -> @out Optional<τ_0_1> for <State, Element>
+  %13 = apply %9(%10, %11) : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @out Optional<τ_0_1> for <State, Element>
+  destroy_value %9 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @out Optional<τ_0_1> for <State, Element>
   switch_enum_addr %10 : $*Optional<Element>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb2
 
 bb2:
@@ -1074,4 +1074,88 @@ bb0(%0 : @owned $GS<Builtin.NativeObject>):
   dealloc_stack %stk : $*GS<Builtin.NativeObject>
   %v = tuple ()
   return %v : $()
+}
+
+////////////////////////////////////////
+// Unchecked Take Enum Data Addr Inst //
+////////////////////////////////////////
+
+// Make sure we only handle this in the copy_addr case. With time, we should
+// also handle the store case.
+//
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_rvalue_simple : $@convention(thin) <B> (@in_guaranteed Optional<GS<B>>, @inout Optional<GS<B>>) -> () {
+// CHECK-NOT: alloc_stack
+// CHECK: } // end sil function 'unchecked_take_enum_data_addr_rvalue_simple'
+sil [ossa] @unchecked_take_enum_data_addr_rvalue_simple : $@convention(thin) <B> (@in_guaranteed Optional<GS<B>>, @inout Optional<GS<B>>) -> () {
+bb0(%0 : $*Optional<GS<B>>, %1 : $*Optional<GS<B>>):
+  %0a = unchecked_take_enum_data_addr %0 : $*Optional<GS<B>>, #Optional.some!enumelt.1
+  %2 = struct_element_addr %0a : $*GS<B>, #GS._value
+  %3 = load [trivial] %2 : $*Builtin.Int64
+  %4 = alloc_stack $Optional<GS<B>>
+  copy_addr %1 to [initialization] %4 : $*Optional<GS<B>>
+  %4a = unchecked_take_enum_data_addr %4 : $*Optional<GS<B>>, #Optional.some!enumelt.1
+  %6 = struct_element_addr %4a : $*GS<B>, #GS._value
+  %7 = load [trivial] %6 : $*Builtin.Int64
+  %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  destroy_addr %4 : $*Optional<GS<B>>
+  dealloc_stack %4 : $*Optional<GS<B>>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not support this today, since I am still bringing up store support.
+//
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_store_rvalue_simple : $@convention(thin) (@in_guaranteed Optional<GS<Klass>>, @owned Optional<GS<Klass>>) -> () {
+// CHECK: alloc_stack
+// CHECK: } // end sil function 'unchecked_take_enum_data_addr_store_rvalue_simple'
+sil [ossa] @unchecked_take_enum_data_addr_store_rvalue_simple : $@convention(thin) (@in_guaranteed Optional<GS<Klass>>, @owned Optional<GS<Klass>>) -> () {
+bb0(%0 : $*Optional<GS<Klass>>, %1 : @owned $Optional<GS<Klass>>):
+  %0a = unchecked_take_enum_data_addr %0 : $*Optional<GS<Klass>>, #Optional.some!enumelt.1
+  %2 = struct_element_addr %0a : $*GS<Klass>, #GS._value
+  %3 = load [trivial] %2 : $*Builtin.Int64
+  %4 = alloc_stack $Optional<GS<Klass>>
+  store %1 to [init] %4 : $*Optional<GS<Klass>>
+  %4a = unchecked_take_enum_data_addr %4 : $*Optional<GS<Klass>>, #Optional.some!enumelt.1
+  %6 = struct_element_addr %4a : $*GS<Klass>, #GS._value
+  %7 = load [trivial] %6 : $*Builtin.Int64
+  %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  destroy_addr %4 : $*Optional<GS<Klass>>
+  dealloc_stack %4 : $*Optional<GS<Klass>>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @eliminate_fix_lifetime_on_dest_copyaddr : $@convention(thin) (@inout Klass) -> () {
+// CHECK-NOT: alloc_stack
+// CHECK: fix_lifetime %0
+// CHECK-NOT: alloc_stack
+// CHECK: } // end sil function 'eliminate_fix_lifetime_on_dest_copyaddr'
+sil [ossa] @eliminate_fix_lifetime_on_dest_copyaddr : $@convention(thin) (@inout Klass) -> () {
+bb0(%0 : $*Klass):
+  %3 = alloc_stack $Klass
+  copy_addr %0 to [initialization] %3 : $*Klass
+  fix_lifetime %3 : $*Klass
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @eliminate_fix_lifetime_on_dest_store : $@convention(thin) (@inout Klass) -> () {
+// CHECK-NOT: alloc_stack
+// CHECK:  [[VALUE:%.*]] = load [copy] %0
+// CHECK-NEXT: fix_lifetime [[VALUE]]
+// CHECK-NEXT: destroy_value [[VALUE]]
+// CHECK-NOT: alloc_stack
+// CHECK: } // end sil function 'eliminate_fix_lifetime_on_dest_store'
+sil [ossa] @eliminate_fix_lifetime_on_dest_store : $@convention(thin) (@inout Klass) -> () {
+bb0(%0 : $*Klass):
+  %2 = load [copy] %0 : $*Klass
+  %3 = alloc_stack $Klass
+  store %2 to [init] %3 : $*Klass
+  fix_lifetime %3 : $*Klass
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
 }

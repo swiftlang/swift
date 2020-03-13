@@ -2366,10 +2366,11 @@ namespace {
         // Remove an optional from the object type.
         if (externalPatternType) {
           Type objVar = CS.createTypeVariable(
-              CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
+              CS.getConstraintLocator(
+                  locator.withPathElement(ConstraintLocator::OptionalPayload)),
+              TVO_CanBindToNoEscape);
           CS.addConstraint(
-              ConstraintKind::OptionalObject, externalPatternType,
-              objVar,
+              ConstraintKind::OptionalObject, externalPatternType, objVar,
               locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           externalPatternType = objVar;
@@ -2392,9 +2393,11 @@ namespace {
             castType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
-        Type subPatternType =
-            getTypeForPattern(isPattern->getSubPattern(), locator, castType,
-                              bindPatternVarsOneWay);
+        auto *subPattern = isPattern->getSubPattern();
+        Type subPatternType = getTypeForPattern(
+            subPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+            castType, bindPatternVarsOneWay);
 
         // Make sure we can cast from the subpattern type to the type we're
         // checking; if it's impossible, fail.
@@ -2427,16 +2430,20 @@ namespace {
           // Resolve the parent type.
           Type parentType =
             resolveTypeReferenceInExpression(enumPattern->getParentType());
+
           parentType = CS.openUnboundGenericType(
-              parentType,
-              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+              parentType, CS.getConstraintLocator(
+                              locator, {LocatorPathElt::PatternMatch(pattern),
+                                        ConstraintLocator::ParentType}));
 
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
           CS.addValueMemberConstraint(
               parentMetaType, enumPattern->getName(), memberType, CurDC,
-              functionRefKind, { },
-              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+              functionRefKind, {},
+              CS.getConstraintLocator(locator,
+                                      {LocatorPathElt::PatternMatch(pattern),
+                                       ConstraintLocator::Member}));
 
           // Parent type needs to be convertible to the pattern type; this
           // accounts for cases where the pattern type is existential.

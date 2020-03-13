@@ -2725,7 +2725,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, {}, result, None,
-      SubstitutionMap(), false,
+      SubstitutionMap(), SubstitutionMap(),
       SGM.getASTContext());
   }();
   
@@ -2885,7 +2885,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, {}, {}, None,
-      SubstitutionMap(), false,
+      SubstitutionMap(), SubstitutionMap(),
       SGM.getASTContext());
   }();
   
@@ -3077,7 +3077,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None,
-      SubstitutionMap(), false,
+      SubstitutionMap(), SubstitutionMap(),
       C);
     
     // Mangle the name of the thunk to see if we already created it.
@@ -3251,7 +3251,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None,
-      SubstitutionMap(), false, C);
+      SubstitutionMap(), SubstitutionMap(), C);
     
     // Mangle the name of the thunk to see if we already created it.
     SmallString<64> nameBuf;

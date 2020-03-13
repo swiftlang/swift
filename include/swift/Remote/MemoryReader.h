@@ -64,44 +64,20 @@ public:
   /// Attempts to read an integer of the specified size from the given
   /// address in the remote process.
   ///
-  /// Returns false if the operation failed, the request size is not
-  /// 1, 2, 4, or 8, or the request size is larger than the provided destination.
+  /// Returns false if the operation failed, or the request size is
+  /// larger than the provided destination.
   template <typename IntegerType>
   bool readInteger(RemoteAddress address, size_t bytes, IntegerType *dest) {
-    if (bytes > sizeof(IntegerType))
-      return false;
-    switch (bytes) {
-    case 1: {
-      uint8_t n;
-      if (!readInteger(address, &n))
-        return false;
-      *dest = n;
-      break;
-    }
-    case 2: {
-      uint16_t n;
-      if (!readInteger(address, &n))
-        return false;
-      *dest = n;
-      break;
-    }
-    case 4: {
-      uint32_t n;
-      if (!readInteger(address, &n))
-        return false;
-      *dest = n;
-      break;
-    }
-    case 8: {
-      uint64_t n;
-      if (!readInteger(address, &n))
-        return false;
-      *dest = n;
-      break;
-    }
-    default:
+    *dest = 0;
+    if ((bytes > sizeof(IntegerType))
+        || !readBytes(address, (uint8_t *)dest, bytes)) {
       return false;
     }
+    // FIXME: Assumes host and target have the same endianness.
+    // TODO: Query DLQ for endianness of target, compare to endianness of host.
+#if defined(__BIG_ENDIAN__)
+    *dest >>= (sizeof(IntegerType) - bytes);
+#endif
     return true;
   }
 

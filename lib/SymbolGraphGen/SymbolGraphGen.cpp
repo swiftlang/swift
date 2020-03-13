@@ -66,12 +66,12 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   }
 
   llvm::errs()
-    << "Found " << Walker.Graph.Nodes.size() << " symbols and "
-    << Walker.Graph.Edges.size() << " relationships.\n";
+    << "Found " << Walker.MainGraph.Nodes.size() << " symbols and "
+    << Walker.MainGraph.Edges.size() << " relationships.\n";
 
   int Success = EXIT_SUCCESS;
 
-  Success |= serializeSymbolGraph(Walker.Graph, Options);
+  Success |= serializeSymbolGraph(Walker.MainGraph, Options);
 
   for (auto Pair : Walker.ExtendedModuleGraphs) {
     Success |= serializeSymbolGraph(*Pair.getSecond(), Options);

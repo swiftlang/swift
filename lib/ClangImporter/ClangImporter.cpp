@@ -722,9 +722,12 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   } else if (triple.isOSDarwin()) {
     // Special case: arm64 defaults to the "cyclone" CPU for Darwin,
+    // and arm64e defaults to the "vortex" CPU for Darwin,
     // but Clang only detects this if we use -arch.
-    if (triple.getArch() == llvm::Triple::aarch64 ||
-        triple.getArch() == llvm::Triple::aarch64_be) {
+    if (triple.getArchName() == "arm64e")
+      invocationArgStrs.push_back("-mcpu=vortex");
+    else if (triple.getArch() == llvm::Triple::aarch64 ||
+             triple.getArch() == llvm::Triple::aarch64_be) {
       invocationArgStrs.push_back("-mcpu=cyclone");
     }
   } else if (triple.getArch() == llvm::Triple::systemz) {

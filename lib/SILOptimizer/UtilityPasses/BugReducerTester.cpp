@@ -90,7 +90,7 @@ class BugReducerTester : public SILFunctionTransform {
                                  nullptr /*clangFunctionType*/),
         SILCoroutineKind::None, ParameterConvention::Direct_Unowned,
         ArrayRef<SILParameterInfo>(), ArrayRef<SILYieldInfo>(), ResultInfoArray,
-        None, SubstitutionMap(), false,
+        None, SubstitutionMap(), SubstitutionMap(),
         getFunction()->getModule().getASTContext());
 
     SILOptFunctionBuilder FunctionBuilder(*this);
