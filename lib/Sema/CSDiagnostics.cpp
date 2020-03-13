@@ -4193,28 +4193,30 @@ bool MissingArgumentsFailure::isPropertyWrapperInitialization() const {
 
 bool MissingArgumentsFailure::isMisplacedMissingArgument(
     const Solution &solution, ConstraintLocator *locator) {
-  auto *calleeLocator = cs.getCalleeLocator(locator);
-  auto overloadChoice = cs.findSelectedOverloadFor(calleeLocator);
+  auto *calleeLocator = solution.getCalleeLocator(locator);
+  auto overloadChoice = solution.getOverloadChoiceIfAvailable(calleeLocator);
   if (!overloadChoice)
     return false;
 
-  auto *fnType = resolveType(overloadChoice->openedType)->getAs<FunctionType>();
+  auto *fnType =
+      solution.simplifyType(overloadChoice->openedType)->getAs<FunctionType>();
   if (!(fnType && fnType->getNumParams() == 2))
     return false;
 
   auto *anchor = locator->getAnchor();
 
   auto hasFixFor = [&](FixKind kind, ConstraintLocator *locator) -> bool {
-    auto fix = llvm::find_if(cs.getFixes(), [&](const ConstraintFix *fix) {
+    auto fix = llvm::find_if(solution.Fixes, [&](const ConstraintFix *fix) {
       return fix->getLocator() == locator;
     });
 
-    if (fix == cs.getFixes().end())
+    if (fix == solution.Fixes.end())
       return false;
 
     return (*fix)->getKind() == kind;
   };
 
+  auto &cs = solution.getConstraintSystem();
   auto *callLocator =
       cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument);
 
@@ -4245,7 +4247,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
     argument = tuple->getElement(0);
   }
 
-  auto argType = cs.simplifyType(cs.getType(argument));
+  auto argType = solution.simplifyType(solution.getType(argument));
   auto paramType = fnType->getParams()[1].getPlainType();
 
   return TypeChecker::isConvertibleTo(argType, paramType, cs.DC);
@@ -5602,7 +5604,8 @@ bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
   auto &cs = getConstraintSystem();
   auto *locator = getLocator();
 
-  if (!MissingArgumentsFailure::isMisplacedMissingArgument(cs, locator))
+  if (!MissingArgumentsFailure::isMisplacedMissingArgument(getSolution(),
+                                                           locator))
     return false;
 
   auto *argType = cs.createTypeVariable(
