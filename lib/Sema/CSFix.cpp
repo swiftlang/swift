@@ -188,6 +188,7 @@ bool MissingConformance::diagnose(const Solution &solution, bool asNote) const {
   auto *locator = getLocator();
 
   if (IsContextual) {
+    auto &cs = solution.getConstraintSystem();
     auto context = cs.getContextualTypePurpose(locator->getAnchor());
     MissingContextualConformanceFailure failure(
         solution, context, NonConformingType, ProtocolType, locator);

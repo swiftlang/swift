@@ -975,14 +975,13 @@ public:
   ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
                                       bool lookThroughApply = true) const;
 
+  ConstraintLocator *
+  getConstraintLocator(Expr *anchor, ArrayRef<LocatorPathElt> path = {}) const;
+
   void setExprTypes(Expr *expr) const;
 
   /// Retrieve the type of the given node, as recorded in this solution.
-  Type getType(TypedNode node) const {
-    auto known = nodeTypes.find(node);
-    assert(known != nodeTypes.end());
-    return known->second;
-  }
+  Type getType(TypedNode node) const;
 
   /// Resolve type variables present in the raw type, using generic parameter
   /// types where possible.

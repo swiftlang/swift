@@ -165,6 +165,13 @@ ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
       });
 }
 
+ConstraintLocator *
+Solution::getConstraintLocator(Expr *anchor,
+                               ArrayRef<LocatorPathElt> path) const {
+  auto &cs = getConstraintSystem();
+  return cs.getConstraintLocator(anchor, path);
+}
+
 /// Return the implicit access kind for a MemberRefExpr with the
 /// specified base and member in the specified DeclContext.
 static AccessSemantics
@@ -7700,6 +7707,15 @@ ProtocolConformanceRef Solution::resolveConformance(
   }
 
   return ProtocolConformanceRef::forInvalid();
+}
+
+Type Solution::getType(TypedNode node) const {
+  auto result = nodeTypes.find(node);
+  if (result != nodeTypes.end())
+    return result->second;
+
+  auto &cs = getConstraintSystem();
+  return cs.getType(node);
 }
 
 void Solution::setExprTypes(Expr *expr) const {

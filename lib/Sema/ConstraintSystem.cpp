@@ -2982,8 +2982,6 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // If we didn't find an ambiguous overload, diagnose the common fixes.
   if (ambiguousOverload == solutionDiff.overloads.end()) {
     bool diagnosed = false;
-    ConstraintSystem::SolverScope scope(*this);
-    applySolution(solutions.front());
     for (auto fixes: aggregatedFixes) {
       // A common fix must appear in all solutions
       if (fixes.second.size() < solutions.size()) continue;
@@ -3042,11 +3040,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
         continue;
 
       if (solution.Fixes.size() == 1) {
-        // Create scope so each applied solution is rolled back.
-        ConstraintSystem::SolverScope scope(*this);
-        applySolution(solution);
-        // All of the solutions supposed to produce a "candidate" note.
-        diagnosed &= solution.Fixes.front()->diagnose(/*asNote*/ true);
+        diagnosed &=
+            solution.Fixes.front()->diagnose(solution, /*asNote*/ true);
       } else if (llvm::all_of(solution.Fixes,
                               [&](ConstraintFix *fix) {
                                 return fix->getLocator()
@@ -3217,7 +3212,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
                                   : diag::ambiguous_decl_ref,
                 name);
 
-    TrailingClosureAmbiguityFailure failure(*this, anchor,
+    TrailingClosureAmbiguityFailure failure(solutions, anchor,
                                             overload.choices);
     if (failure.diagnoseAsNote())
       return true;

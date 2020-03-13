@@ -55,6 +55,9 @@ public:
     std::tie(Anchor, HasComplexLocator) = computeAnchor();
   }
 
+  FailureDiagnostic(const Solution &solution, Expr *anchor)
+      : FailureDiagnostic(solution, solution.getConstraintLocator(anchor)) {}
+
   virtual ~FailureDiagnostic();
 
   /// Try to diagnose a problem given affected expression,
@@ -155,8 +158,7 @@ protected:
   }
 
   ValueDecl *getResolvedMemberRef(UnresolvedDotExpr *member) const {
-    auto &cs = getConstraintSystem();
-    auto locator = cs.getConstraintLocator(member, ConstraintLocator::Member);
+    auto *locator = getConstraintLocator(member, ConstraintLocator::Member);
     if (auto overload = getOverloadChoiceIfAvailable(locator))
       return overload->choice.getDeclOrNull();
     return nullptr;
@@ -169,13 +171,17 @@ protected:
     return S.getOverloadChoiceIfAvailable(locator);
   }
 
-  /// Retrive the constraint locator for the given anchor and
-  /// path, uniqued and automatically calculate the summary flags
   ConstraintLocator *
   getConstraintLocator(Expr *anchor,
-                       ArrayRef<ConstraintLocator::PathElement> path) {
-    auto &cs = getConstraintSystem();
-    return cs.getConstraintLocator(anchor, path);
+                       ConstraintLocator::PathElement element) const {
+    return S.getConstraintLocator(anchor, {element});
+  }
+
+  /// Retrive the constraint locator for the given anchor and
+  /// path, uniqued and automatically calculate the summary flags
+  ConstraintLocator *getConstraintLocator(
+      Expr *anchor, ArrayRef<ConstraintLocator::PathElement> path = {}) const {
+    return S.getConstraintLocator(anchor, path);
   }
 
   Optional<FunctionArgApplyInfo>
@@ -503,10 +509,9 @@ class TrailingClosureAmbiguityFailure final : public FailureDiagnostic {
   ArrayRef<OverloadChoice> Choices;
 
 public:
-  TrailingClosureAmbiguityFailure(const Solution &solution, Expr *anchor,
+  TrailingClosureAmbiguityFailure(ArrayRef<Solution> solutions, Expr *anchor,
                                   ArrayRef<OverloadChoice> choices)
-      : FailureDiagnostic(solution, cs.getConstraintLocator(anchor)),
-        Choices(choices) {}
+      : FailureDiagnostic(solutions.front(), anchor), Choices(choices) {}
 
   bool diagnoseAsError() override { return false; }
 
@@ -529,9 +534,9 @@ public:
   AssignmentFailure(Expr *destExpr, const Solution &solution,
                     SourceLoc diagnosticLoc, Diag<StringRef> declDiag,
                     Diag<Type> typeDiag)
-      : FailureDiagnostic(solution, cs.getConstraintLocator(destExpr)),
-        DestExpr(destExpr), Loc(diagnosticLoc), DeclDiagnostic(declDiag),
-        TypeDiagnostic(typeDiag) {}
+      : FailureDiagnostic(solution, destExpr), DestExpr(destExpr),
+        Loc(diagnosticLoc), DeclDiagnostic(declDiag), TypeDiagnostic(typeDiag) {
+  }
 
   bool diagnoseAsError() override;
 

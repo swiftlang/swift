@@ -80,7 +80,7 @@ Type FailureDiagnostic::getType(Expr *expr, bool wantRValue) const {
 }
 
 Type FailureDiagnostic::getType(const TypeLoc &loc, bool wantRValue) const {
-  return resolveType(S.getType(loc), /*reconstituteSugar=*/false, wantRValue);
+  return resolveType(S.getType(&loc), /*reconstituteSugar=*/false, wantRValue);
 }
 
 template <typename... ArgTypes>
@@ -132,8 +132,7 @@ Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
 
 Optional<SelectedOverload>
 FailureDiagnostic::getChoiceFor(ConstraintLocator *locator) const {
-  auto &cs = getConstraintSystem();
-  return getOverloadChoiceIfAvailable(cs.getCalleeLocator(locator));
+  return getOverloadChoiceIfAvailable(S.getCalleeLocator(locator));
 }
 
 Type FailureDiagnostic::restoreGenericParameters(
@@ -1421,8 +1420,8 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
 
 AssignmentFailure::AssignmentFailure(Expr *destExpr, const Solution &solution,
                                      SourceLoc diagnosticLoc)
-    : FailureDiagnostic(solution, cs.getConstraintLocator(destExpr)),
-      DestExpr(destExpr), Loc(diagnosticLoc),
+    : FailureDiagnostic(solution, destExpr), DestExpr(destExpr),
+      Loc(diagnosticLoc),
       DeclDiagnostic(findDeclDiagonstic(getASTContext(), destExpr)),
       TypeDiagnostic(diag::assignment_lhs_not_lvalue) {}
 
@@ -3782,7 +3781,6 @@ bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
 }
 
 bool MissingArgumentsFailure::diagnoseAsError() {
-  auto &cs = getConstraintSystem();
   auto *locator = getLocator();
 
   if (!(locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
@@ -6021,8 +6019,6 @@ bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
 
 bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
-  auto &cs = getConstraintSystem();
-
   // Member reference could be wrapped into a number of parens
   // e.g. `((.foo))`.
   auto *parentExpr = findParentExpr(anchor);
