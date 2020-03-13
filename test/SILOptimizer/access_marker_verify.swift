@@ -1080,3 +1080,27 @@ public func getStaticProp() -> HasStaticProp {
 // CHECK: [[ADR:%.*]] = pointer_to_address [[RP]] : $Builtin.RawPointer to [strict] $*HasStaticProp
 // CHECK: load [copy] [[ADR]] : $*HasStaticProp
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify13getStaticPropAA03HaseF0CyF'
+
+// ===-----------------------------------------------------------------------===
+// Test computeMemBehavior with a non-address value. In this case, the
+// address for an access of StreamClass.buffer is compared with the
+// ContiguousArrayStorageBase value.
+//
+// <rdar://60046018> assert: (v->getType().isAddress()) in getAccessedAddress.
+
+public final class StreamClass {
+    private var buffer: [UInt8]
+
+    public init() {
+        self.buffer = []
+    }
+}
+
+// CHECK-LABEL: sil [ossa] @$s20access_marker_verify25testNonAddressMemBehavioryySiF : $@convention(thin) (Int) -> () {
+// The relevant SIL instructions for this test don't appear until the string interpolation is inlined.
+// Just make sure it does not assert.
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify25testNonAddressMemBehavioryySiF'
+public func testNonAddressMemBehavior(_ N: Int) {
+  let listOfStrings: [String] = (0..<10).map { "This is the number: \($0)!\n" }
+  let stream = StreamClass()
+}

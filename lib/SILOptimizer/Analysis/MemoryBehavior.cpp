@@ -56,6 +56,11 @@ class MemoryBehaviorVisitor
   /// The value we are attempting to discover memory behavior relative to.
   SILValue V;
 
+  /// Cache either the address of the access corresponding to memory at 'V', or
+  /// 'V' itself if it isn't recognized as part of an access. The cached value
+  /// is always a valid SILValue.
+  SILValue cachedValueAddress;
+
   Optional<bool> cachedIsLetValue;
 
   /// The SILType of the value.
@@ -77,11 +82,21 @@ public:
     return *TypedAccessTy;
   }
 
+  /// If 'V' is an address projection within a formal access, return the
+  /// canonical address of the formal access. Otherwise, return 'V' itself,
+  /// which is either a reference or unknown pointer or address.
+  SILValue getValueAddress() {
+    if (!cachedValueAddress) {
+      cachedValueAddress = V->getType().isAddress() ? getAccessedAddress(V) : V;
+    }
+    return cachedValueAddress;
+  }
+
   /// Return true if 'V's accessed address is that of a let variables.
   bool isLetValue() {
     if (!cachedIsLetValue) {
       cachedIsLetValue =
-          V->getType().isAddress() && isLetAddress(getAccessedAddress(V));
+          V->getType().isAddress() && isLetAddress(getValueAddress());
     }
     return cachedIsLetValue.getValue();
   }
@@ -124,15 +139,11 @@ public:
 
   MemBehavior visitBeginAccessInst(BeginAccessInst *beginAccess) {
     switch (beginAccess->getAccessKind()) {
-    case SILAccessKind::Init:
     case SILAccessKind::Deinit:
-      // No address aliasing is expected for variable initialization or
-      // deinitialization.
-      if (stripAccessMarkers(beginAccess) != getAccessedAddress(V))
-        return MemBehavior::None;
-
-      return MemBehavior::MayWrite;
-
+      // A [deinit] only directly reads from the object. The fact that it frees
+      // memory is modeled more precisely by the release operations within the
+      // deinit scope. Therefore, handle it like a [read] here...
+      LLVM_FALLTHROUGH;
     case SILAccessKind::Read:
       if (!mayAlias(beginAccess->getSource()))
         return MemBehavior::None;
@@ -141,10 +152,14 @@ public:
 
     case SILAccessKind::Modify:
       if (isLetValue()) {
-        assert(stripAccessMarkers(beginAccess) != getAccessedAddress(V)
+        assert(stripAccessMarkers(beginAccess) != getValueAddress()
                && "let modification not allowed");
         return MemBehavior::None;
       }
+      // [modify] has a special case for ignoring 'let's, but otherwise is
+      // identical to an [init]...
+      LLVM_FALLTHROUGH;
+    case SILAccessKind::Init:
       if (!mayAlias(beginAccess->getSource()))
         return MemBehavior::None;
 
@@ -229,7 +244,7 @@ MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
     return MemBehavior::None;
 
   LLVM_DEBUG(llvm::dbgs() << "  Could not prove that load inst does not alias "
-                             "pointer. Returning may read.");
+                             "pointer. Returning may read.\n");
   return MemBehavior::MayRead;
 }
 
@@ -237,7 +252,7 @@ MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
   // No store besides the initialization of a "let"-variable
   // can have any effect on the value of this "let" variable.
   if (isLetValue()
-      && (getAccessedAddress(SI->getDest()) != getAccessedAddress(V))) {
+      && (getAccessedAddress(SI->getDest()) != getValueAddress())) {
     return MemBehavior::None;
   }
   // If the store dest cannot alias the pointer in question, then the
