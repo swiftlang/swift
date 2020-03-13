@@ -3850,15 +3850,13 @@ bool MissingArgumentsFailure::diagnoseAsError() {
 
   interleave(
       SynthesizedArgs,
-      [&](const AnyFunctionType::Param &arg) {
+      [&](const std::pair<unsigned, AnyFunctionType::Param> &e) {
+        const auto paramIdx = e.first;
+        const auto &arg = e.second;
+
         if (arg.hasLabel()) {
           arguments << "'" << arg.getLabel().str() << "'";
         } else {
-          auto *typeVar = arg.getPlainType()->castTo<TypeVariableType>();
-          auto *locator = typeVar->getImpl().getLocator();
-          auto paramIdx = locator->findLast<LocatorPathElt::ApplyArgToParam>()
-                              ->getParamIdx();
-
           arguments << "#" << (paramIdx + 1);
         }
       },
@@ -3882,7 +3880,9 @@ bool MissingArgumentsFailure::diagnoseAsError() {
     llvm::raw_svector_ostream fixIt(scratch);
     interleave(
         SynthesizedArgs,
-        [&](const AnyFunctionType::Param &arg) { forFixIt(fixIt, arg); },
+        [&](const std::pair<unsigned, AnyFunctionType::Param> &arg) {
+          forFixIt(fixIt, arg.second);
+        },
         [&] { fixIt << ", "; });
 
     auto *tuple = cast<TupleExpr>(argExpr);
@@ -3927,11 +3927,8 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
     return false;
 
   const auto &argument = SynthesizedArgs.front();
-  auto *argType = argument.getPlainType()->castTo<TypeVariableType>();
-  auto *argLocator = argType->getImpl().getLocator();
-  auto position =
-      argLocator->findLast<LocatorPathElt::ApplyArgToParam>()->getParamIdx();
-  auto label = argument.getLabel();
+  auto position = argument.first;
+  auto label = argument.second.getLabel();
 
   SmallString<32> insertBuf;
   llvm::raw_svector_ostream insertText(insertBuf);
@@ -3939,7 +3936,7 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   if (position != 0)
     insertText << ", ";
 
-  forFixIt(insertText, argument);
+  forFixIt(insertText, argument.second);
 
   Expr *fnExpr = nullptr;
   Expr *argExpr = nullptr;
@@ -5599,26 +5596,20 @@ bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {
 }
 
 bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
-  auto &cs = getConstraintSystem();
+  const auto &solution = getSolution();
   auto *locator = getLocator();
 
-  if (!MissingArgumentsFailure::isMisplacedMissingArgument(getSolution(),
-                                                           locator))
+  if (!MissingArgumentsFailure::isMisplacedMissingArgument(solution, locator))
     return false;
-
-  auto *argType = cs.createTypeVariable(
-      cs.getConstraintLocator(locator, LocatorPathElt::SynthesizedArgument(1)),
-      /*flags=*/0);
 
   // Assign new type variable to a type of a parameter.
   auto *fnType = getFnType();
   const auto &param = fnType->getParams()[0];
-  cs.assignFixedType(argType, param.getOldType());
 
   auto *anchor = getRawAnchor();
 
   MissingArgumentsFailure failure(
-      getSolution(), {param.withType(argType)},
+      solution, {std::make_pair(0, param)},
       getConstraintLocator(anchor, ConstraintLocator::ApplyArgument));
 
   return failure.diagnoseSingleMissingArgument();

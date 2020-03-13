@@ -1223,13 +1223,13 @@ public:
 };
 
 class MissingArgumentsFailure final : public FailureDiagnostic {
-  using Param = AnyFunctionType::Param;
+  using SynthesizedParam = std::pair<unsigned, AnyFunctionType::Param>;
 
-  SmallVector<Param, 4> SynthesizedArgs;
+  SmallVector<SynthesizedParam, 4> SynthesizedArgs;
 
 public:
   MissingArgumentsFailure(const Solution &solution,
-                          ArrayRef<Param> synthesizedArgs,
+                          ArrayRef<SynthesizedParam> synthesizedArgs,
                           ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator),
         SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {

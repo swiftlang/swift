@@ -636,9 +636,9 @@ bool AddMissingArguments::diagnose(const Solution &solution,
 
 AddMissingArguments *
 AddMissingArguments::create(ConstraintSystem &cs,
-                            llvm::ArrayRef<Param> synthesizedArgs,
+                            ArrayRef<SynthesizedParam> synthesizedArgs,
                             ConstraintLocator *locator) {
-  unsigned size = totalSizeToAlloc<Param>(synthesizedArgs.size());
+  unsigned size = totalSizeToAlloc<SynthesizedParam>(synthesizedArgs.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(AddMissingArguments));
   return new (mem) AddMissingArguments(cs, synthesizedArgs, locator);
 }

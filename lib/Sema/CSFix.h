@@ -1091,16 +1091,16 @@ public:
 
 class AddMissingArguments final
     : public ConstraintFix,
-      private llvm::TrailingObjects<AddMissingArguments,
-                                    AnyFunctionType::Param> {
+      private llvm::TrailingObjects<
+          AddMissingArguments, std::pair<unsigned, AnyFunctionType::Param>> {
   friend TrailingObjects;
 
-  using Param = AnyFunctionType::Param;
+  using SynthesizedParam = std::pair<unsigned, AnyFunctionType::Param>;
 
   unsigned NumSynthesized;
 
   AddMissingArguments(ConstraintSystem &cs,
-                      llvm::ArrayRef<Param> synthesizedArgs,
+                      ArrayRef<SynthesizedParam> synthesizedArgs,
                       ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AddMissingArguments, locator),
         NumSynthesized(synthesizedArgs.size()) {
@@ -1111,8 +1111,8 @@ class AddMissingArguments final
 public:
   std::string getName() const override { return "synthesize missing argument(s)"; }
 
-  ArrayRef<Param> getSynthesizedArguments() const {
-    return {getTrailingObjects<Param>(), NumSynthesized};
+  ArrayRef<SynthesizedParam> getSynthesizedArguments() const {
+    return {getTrailingObjects<SynthesizedParam>(), NumSynthesized};
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
@@ -1122,12 +1122,12 @@ public:
   }
 
   static AddMissingArguments *create(ConstraintSystem &cs,
-                                     llvm::ArrayRef<Param> synthesizedArgs,
+                                     ArrayRef<SynthesizedParam> synthesizedArgs,
                                      ConstraintLocator *locator);
 
 private:
-  MutableArrayRef<Param> getSynthesizedArgumentsBuf() {
-    return {getTrailingObjects<Param>(), NumSynthesized};
+  MutableArrayRef<SynthesizedParam> getSynthesizedArgumentsBuf() {
+    return {getTrailingObjects<SynthesizedParam>(), NumSynthesized};
   }
 };
 
