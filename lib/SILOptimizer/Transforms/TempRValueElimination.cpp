@@ -152,9 +152,13 @@ bool TempRValueOptPass::collectLoads(
 
   case SILInstructionKind::MarkDependenceInst: {
     auto mdi = cast<MarkDependenceInst>(user);
+    // If the user is the base operand of the MarkDependenceInst we can return
+    // true, because this would be the end of this dataflow chain
     if (mdi->getBase() == address) {
       return true;
     }
+    // If the user is the value operand of the MarkDependenceInst we have to
+    // transitively explore its uses until we reach a load or return false
     for (auto *mdiUseOper : mdi->getUses()) {
       if (!collectLoads(mdiUseOper, mdiUseOper->getUser(), mdi, srcAddr,
                         loadInsts))

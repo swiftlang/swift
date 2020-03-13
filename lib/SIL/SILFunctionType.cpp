@@ -1499,8 +1499,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       break;
     }
     case CaptureKind::Immutable: {
-      // 'let' constants that are address-only are captured as the address of the value
-      //  and will be consumed by the closure.
+      // 'let' constants that are address-only are captured as the address of
+      // the value and will be consumed by the closure.
       SILType ty = loweredTy.getAddressType();
       auto param =
           SILParameterInfo(ty.getASTType(),

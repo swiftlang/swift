@@ -1319,10 +1319,17 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
 
- // Go over the params and check if any of them can cause the HeapLayout to be non-fixed
- // This is needed because we should not consider parameters of kind ClassPointer and Metadata sources
- // If not, we may end up with missing TypeMetadata for a type dependent generic parameter
- // while generating code for destructor of HeapLayout.
+  // A context's HeapLayout stores all of the partially applied args.
+  // A HeapLayout is "fixed" if all of its fields have a fixed layout.
+  // Otherwise the HeapLayout is "non-fixed".
+  // Only a non-fixed HeapLayout needs TypeMetadata of the non-fixed fields
+  // during IRGen of the HeapLayout's destructor function.
+  // We should not consider partially applied args as TypeMetadata sources,
+  // because they are available only in the caller and the partial application
+  // forwarder, but not in the destructor function.
+  // It is safe to consider partially applied args as TypeMetadata sources for
+  // "fixed" HeapLayout, because they are not accessed during the IRGen of the
+  // destructor function.
   bool considerParameterSources = true;
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(param, origType);
@@ -1336,8 +1343,8 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   }
 
   // Reserve space for polymorphic bindings.
-  auto bindings =
-      NecessaryBindings::forPartialApplyForwarder(IGF.IGM, origType, subs, considerParameterSources);
+  auto bindings = NecessaryBindings::forPartialApplyForwarder(
+      IGF.IGM, origType, subs, considerParameterSources);
 
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;

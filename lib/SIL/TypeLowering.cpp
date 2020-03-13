@@ -103,12 +103,10 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   // by value.  If it is address-only, then we can't load it, so capture it
   // by its address (like a var) instead.
   if (!var->supportsMutation() &&
-      (Context.LangOpts.EnableSILOpaqueValues ||
-       !getTypeLowering(
-            var->getType(),
-            TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
-                expansion.getResilienceExpansion()))
-            .isAddressOnly()))
+      !getTypeLowering(var->getType(),
+                       TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                           expansion.getResilienceExpansion()))
+           .isAddressOnly())
     return CaptureKind::Constant;
 
   // In-out parameters are captured by address.
@@ -128,6 +126,11 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
 
   // For 'let' constants
   if (!var->supportsMutation()) {
+    assert(getTypeLowering(
+               var->getType(),
+               TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                   expansion.getResilienceExpansion()))
+               .isAddressOnly());
     return CaptureKind::Immutable;
   }
 
