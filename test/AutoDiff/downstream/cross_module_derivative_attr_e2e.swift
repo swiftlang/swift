@@ -3,6 +3,3 @@
 // RUN: %target-build-swift -I%t -L%t %S/Inputs/cross_module_derivative_attr_e2e/main/main.swift -o %t/a.out -lm -lmodule1 -Xfrontend -enable-experimental-cross-file-derivative-registration -Xfrontend -validate-tbd-against-ir=none
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
-
-// TODO(TF-1104): Fix.
-// XFAIL: swift_test_mode_optimize
