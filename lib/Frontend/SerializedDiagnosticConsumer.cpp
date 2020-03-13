@@ -58,8 +58,13 @@ enum RecordIDs {
   RECORD_CATEGORY,
   RECORD_FILENAME,
   RECORD_FIXIT,
-  RECORD_FIRST = RECORD_VERSION,
-  RECORD_LAST = RECORD_FIXIT
+  CLANG_RECORD_FIRST = RECORD_VERSION,
+  CLANG_RECORD_LAST = RECORD_FIXIT,
+
+  // Swift Record IDs. These start at 32 to avoid future conflicts with Clang.
+  RECORD_EDUCATIONAL_NOTE_PATH = 32,
+  SWIFT_RECORD_FIRST = RECORD_EDUCATIONAL_NOTE_PATH,
+  SWIFT_RECORD_LAST = RECORD_EDUCATIONAL_NOTE_PATH,
 };
 
 //===----------------------------------------------------------------------===//
@@ -420,6 +425,7 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
   emitRecordID(RECORD_DIAG_FLAG, "DiagFlag", Stream, Record);
   emitRecordID(RECORD_FILENAME, "FileName", Stream, Record);
   emitRecordID(RECORD_FIXIT, "FixIt", Stream, Record);
+  emitRecordID(RECORD_EDUCATIONAL_NOTE_PATH, "EduNotePath", Stream, Record);
 
   // Emit abbreviation for RECORD_DIAG.
   Abbrev = std::make_shared<BitCodeAbbrev>();
@@ -475,6 +481,14 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob));      // FixIt text.
   Abbrevs.set(RECORD_FIXIT, Stream.EmitBlockInfoAbbrev(BLOCK_DIAG,
                                                        Abbrev));
+
+  // Emit the abbreviation for RECORD_EDUCATIONAL_NOTE_PATH.
+  Abbrev = std::make_shared<BitCodeAbbrev>();
+  Abbrev->Add(BitCodeAbbrevOp(RECORD_EDUCATIONAL_NOTE_PATH));
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 16)); // Path size.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob));      // Path text.
+  Abbrevs.set(RECORD_EDUCATIONAL_NOTE_PATH,
+              Stream.EmitBlockInfoAbbrev(BLOCK_DIAG, Abbrev));
 
   Stream.ExitBlock();
 }
@@ -535,6 +549,15 @@ emitDiagnosticMessage(SourceManager &SM,
       State->Record.push_back(F.getText().size());
       Stream.EmitRecordWithBlob(FixItAbbrev, Record, F.getText());
     }
+  }
+
+  // Emit documentation paths.
+  auto EduNotePathAbbrev = State->Abbrevs.get(RECORD_EDUCATIONAL_NOTE_PATH);
+  for (const auto &path : Info.EducationalNotePaths) {
+    State->Record.clear();
+    State->Record.push_back(RECORD_EDUCATIONAL_NOTE_PATH);
+    State->Record.push_back(path.size());
+    Stream.EmitRecordWithBlob(EduNotePathAbbrev, Record, path);
   }
 }
 
