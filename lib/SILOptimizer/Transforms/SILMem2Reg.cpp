@@ -383,11 +383,22 @@ static SILValue replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   op = LI->getOperand();
   while (!LI->use_empty()) {
     Operand *userOp = *LI->use_begin();
+    
     // We'll handle destorys later.
     // Otherwise, make sure we copy and consume that.
     if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy &&
         userOp->isConsumingUse() && !isa<DestroyValueInst>(userOp->getUser()))
       userOp->set(builder.createCopyValue(LI->getLoc(), val));
+    else if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy &&
+             !userOp->getOwnershipKindMap().canAcceptKind(val.getOwnershipKind()) &&
+             !isa<DestroyValueInst>(userOp->getUser())) {
+      auto copyVal = builder.createCopyValue(LI->getLoc(), val);
+      userOp->set(copyVal);
+      // Using a different builder here so we don't mess with the insertion
+      // point of 'builder'.
+      SILBuilderWithScope(std::next(userOp->getUser()->getIterator()))
+        .emitDestroyValueAndFold(userOp->getUser()->getLoc(), copyVal);
+    }
     else
       userOp->set(val);
   }
@@ -764,7 +775,8 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
 
       LLVM_DEBUG(llvm::dbgs() << "*** Replacing " << *LI
                               << " with Def " << *Def);
-      if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Trivial)
+      if (LI->getOwnershipQualifier() != LoadOwnershipQualifier::Trivial &&
+          LI->getOwnershipQualifier() != LoadOwnershipQualifier::Unqualified)
         // TODO: support load [copy]
         continue;
       // Replace the load with the definition that we found.
@@ -1107,10 +1119,6 @@ class SILMem2Reg : public SILFunctionTransform {
 
   void run() override {
     SILFunction *F = getFunction();
-    
-    if (F->getName() == "$ss13DecodingErrorO9_userInfoyXlSgvg") {
-      F->dump();
-    }
 
     LLVM_DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F->getName()
                             << " **\n");
