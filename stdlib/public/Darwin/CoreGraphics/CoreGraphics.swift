@@ -102,7 +102,7 @@ extension CGColorSpace {
     let components = self.baseColorSpace?.numberOfComponents ?? 1
     let count = self.__colorTableCount * components
     return [UInt8](unsafeUninitializedCapacity: count) { buf, initializedCount in
-        self.__unsafeGetColorTable(buf)
+        self.__unsafeGetColorTable(buf.baseAddress!)
         initializedCount = count
     }
   }
