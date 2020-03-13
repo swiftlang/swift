@@ -108,7 +108,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
                                            Info.FormatArgs);
   }
-  SKInfo.Description = std::string(Text);
+  SKInfo.Description = std::string(Text.str());
 
   for (auto notePath : Info.EducationalNotePaths)
     SKInfo.EducationalNotePaths.push_back(notePath);

@@ -524,7 +524,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
 
       std::string outRecordFile;
       failed =
-          failed || writeRecord(tracker, std::string(fileNameWithGroup),
+          failed || writeRecord(tracker, std::string(fileNameWithGroup.str()),
                                 indexStorePath.str(), &diags, outRecordFile);
       if (failed)
         return false;

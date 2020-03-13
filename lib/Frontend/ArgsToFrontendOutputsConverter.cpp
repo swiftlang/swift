@@ -222,7 +222,7 @@ OutputFilesComputer::deriveOutputFileFromParts(StringRef dir,
   llvm::SmallString<128> path(dir);
   llvm::sys::path::append(path, base);
   llvm::sys::path::replace_extension(path, Suffix);
-  return std::string(path);
+  return std::string(path.str());
 }
 
 SupplementaryOutputPathsComputer::SupplementaryOutputPathsComputer(

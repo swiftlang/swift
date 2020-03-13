@@ -272,7 +272,7 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
     }
     Data += Step;
   }
-  return std::string(Builder);
+  return std::string(Builder.str());
 }
 
 void ASTPrinter::anchor() {}

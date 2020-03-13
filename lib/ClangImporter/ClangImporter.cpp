@@ -482,7 +482,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     shimsPath = searchPathOpts.SDKPath;
     llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
     invocationArgStrs.insert(invocationArgStrs.end(),
-                             {"-isystem", std::string(shimsPath)});
+                             {"-isystem", std::string(shimsPath.str())});
   }
 
   // Construct the invocation arguments for the current target.
@@ -637,7 +637,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       llvm::sys::path::native(path);
 
       invocationArgStrs.push_back("-isystem");
-      invocationArgStrs.push_back(std::string(path));
+      invocationArgStrs.push_back(std::string(path.str()));
     } else {
       // On Darwin, Clang uses -isysroot to specify the include
       // system root. On other targets, it seems to use --sysroot.
@@ -749,7 +749,7 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     // Set the Clang resource directory to the path we computed.
     invocationArgStrs.push_back("-resource-dir");
-    invocationArgStrs.push_back(std::string(resourceDir));
+    invocationArgStrs.push_back(std::string(resourceDir.str()));
   } else {
     invocationArgStrs.push_back("-resource-dir");
     invocationArgStrs.push_back(overrideResourceDir);
