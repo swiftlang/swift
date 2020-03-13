@@ -332,7 +332,7 @@
                 "PythonKit": "master",
                 "swift-format": "master",
                 "tensorflow": "v2.2.0-rc0",
-                "tensorflow-swift-apis": "322979efbe50fee39d9b1d686b7625e89ffc5986",
+                "tensorflow-swift-apis": "master",
                 "tensorflow-swift-quote": "46c3d2996541d0ea902630eda11be5a9ccdeaba3"
             }
         }
