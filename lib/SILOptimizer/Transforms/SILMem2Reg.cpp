@@ -734,13 +734,6 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
   LLVM_DEBUG(llvm::dbgs() << "*** Fixing the terminator " << TI << ".\n");
 
   SILValue Def = getLiveOutValue(PhiBlocks, Pred);
-  if (!isa<SILUndef>(Def) &&
-      Def->getFunction()->hasOwnership() &&
-      !Def->getType().isTrivial(*Def->getFunction()))
-    Def = SILBuilderWithScope(
-              std::next(Def.getDefiningInstruction()->getIterator()))
-              .createCopyValue(Def.getLoc(), Def);
-
   LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: " << *Def);
 
   addArgumentToBranch(Def, Dest, TI);
@@ -771,8 +764,9 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
 
       LLVM_DEBUG(llvm::dbgs() << "*** Replacing " << *LI
                               << " with Def " << *Def);
-      if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
-        replacedCopyLoads[LI->getOperand()] = replaceLoad(LI, Def, ASI);
+      if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Trivial)
+        // TODO: support load [copy]
+        continue;
       // Replace the load with the definition that we found.
       else if (Def && !isa<SILUndef>(Def))
         replaceLoad(LI, Def, ASI);
@@ -1113,6 +1107,10 @@ class SILMem2Reg : public SILFunctionTransform {
 
   void run() override {
     SILFunction *F = getFunction();
+    
+    if (F->getName() == "$ss13DecodingErrorO9_userInfoyXlSgvg") {
+      F->dump();
+    }
 
     LLVM_DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F->getName()
                             << " **\n");
