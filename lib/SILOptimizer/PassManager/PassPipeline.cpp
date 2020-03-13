@@ -401,6 +401,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addSemanticARCOpts();
 
   P.addMem2Reg();
+  P.addSemanticARCOpts();
 
   // Strip ownership from non-transparent functions.
   if (P.getOptions().StripOwnershipAfterSerialization)
