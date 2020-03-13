@@ -344,7 +344,10 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       }
       else {
         auto entryValue = getAddressValue(Entry.value);
-        auto addr = emitTemporaryAllocation(vd, entryValue->getType());
+        // We cannot pass a valid SILDebugVariable while creating the temp here
+        // See rdar://60425582
+        auto addr = B.createAllocStack(loc, entryValue->getType().getObjectType());
+        enterDeallocStackCleanup(addr);
         B.createCopyAddr(loc, entryValue, addr, IsNotTake, IsInitialization);
         capturedArgs.push_back(ManagedValue::forLValue(addr));
       }
