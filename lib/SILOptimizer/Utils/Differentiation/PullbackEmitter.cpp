@@ -159,8 +159,12 @@ const Lowering::TypeLowering &PullbackEmitter::getTypeLowering(Type type) {
 /// Remap any archetypes into the current function's context.
 SILType PullbackEmitter::remapType(SILType ty) {
   if (ty.hasArchetype())
-    return getPullback().mapTypeIntoContext(ty.mapTypeOutOfContext());
-  return getPullback().mapTypeIntoContext(ty);
+    ty = ty.mapTypeOutOfContext();
+  auto remappedType = ty.getASTType()->getCanonicalType(
+      getPullback().getLoweredFunctionType()->getSubstGenericSignature());
+  auto remappedSILType =
+      SILType::getPrimitiveType(remappedType, ty.getCategory());
+  return getPullback().mapTypeIntoContext(remappedSILType);
 }
 
 Optional<TangentSpace> PullbackEmitter::getTangentSpace(CanType type) {

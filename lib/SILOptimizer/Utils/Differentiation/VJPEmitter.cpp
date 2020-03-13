@@ -564,10 +564,24 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
         return;
       }
     }
+    auto origFnType = original->getType().castTo<SILFunctionType>();
+    auto origFnUnsubstType = origFnType->getUnsubstitutedType(getModule());
+    if (origFnType != origFnUnsubstType) {
+      original = builder.createConvertFunction(
+          loc, original, SILType::getPrimitiveObjectType(origFnUnsubstType),
+          /*withoutActuallyEscaping*/ false);
+    }
     auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, original);
     vjpValue = builder.createDifferentiableFunctionExtract(
         loc, NormalDifferentiableFunctionTypeComponent::VJP, borrowedDiffFunc);
     vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
+    auto vjpFnType = vjpValue->getType().castTo<SILFunctionType>();
+    auto vjpFnUnsubstType = vjpFnType->getUnsubstitutedType(getModule());
+    if (vjpFnType != vjpFnUnsubstType) {
+      vjpValue = builder.createConvertFunction(
+          loc, vjpValue, SILType::getPrimitiveObjectType(vjpFnUnsubstType),
+          /*withoutActuallyEscaping*/ false);
+    }
   }
 
   // Check and diagnose non-differentiable original function type.
@@ -693,6 +707,16 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
   SILValue originalDirectResult =
       joinElements(originalDirectResults, getBuilder(), vjpCall->getLoc());
   SILValue pullback = vjpDirectResults.back();
+  {
+    auto pullbackFnType = pullback->getType().castTo<SILFunctionType>();
+    auto pullbackUnsubstFnType =
+        pullbackFnType->getUnsubstitutedType(getModule());
+    if (pullbackFnType != pullbackUnsubstFnType) {
+      pullback = builder.createConvertFunction(
+          loc, pullback, SILType::getPrimitiveObjectType(pullbackUnsubstFnType),
+          /*withoutActuallyEscaping*/ false);
+    }
+  }
 
   // Store the original result to the value map.
   mapValue(ai, originalDirectResult);

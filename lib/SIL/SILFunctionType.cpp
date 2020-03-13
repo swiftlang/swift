@@ -1465,17 +1465,10 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
       constrainedOriginalFnTy->getCalleeConvention(), newParameters,
       constrainedOriginalFnTy->getYields(), newResults,
       constrainedOriginalFnTy->getOptionalErrorResult(),
-#if 0
-      constrainedOriginalFnTy->getPatternSubstitutions(),
-      constrainedOriginalFnTy->getInvocationSubstitutions(),
-#endif
-      // constrainedOriginalFnTy->getCombinedSubstitutions(),
       SubstitutionMap(),
       SubstitutionMap(),
       constrainedOriginalFnTy->getASTContext(),
       constrainedOriginalFnTy->getWitnessMethodConformanceOrInvalid());
-  llvm::errs() << "SILFunctionType::getAutoDiffDerivativeFunctionType: " << (kind == AutoDiffDerivativeFunctionKind::JVP ? "JVP" : "VJP") << "\n";
-  cachedResult->dump();
   return cachedResult;
 }
 
