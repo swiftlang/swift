@@ -184,6 +184,13 @@ namespace {
     /// often enormous.
     SmallSetVector<ImportedModuleDesc, 64> crossImportableModules;
 
+    /// The subset of \c crossImportableModules which may declare cross-imports.
+    ///
+    /// This is a performance optimization. Since most modules do not register
+    /// any cross-imports, we can usually compare against this list, which is
+    /// much, much smaller than \c crossImportableModules.
+    SmallVector<ImportedModuleDesc, 16> crossImportDeclaringModules;
+
     /// The index of the next module in \c visibleModules that should be
     /// cross-imported.
     size_t nextModuleToCrossImport = 0;
@@ -231,13 +238,21 @@ namespace {
     ///   then adds them to \c unboundImports using source locations from \p I.
     void crossImport(ModuleDecl *M, UnboundImport &I);
 
+    /// Discovers any cross-imports between \p newImport and
+    /// \p oldImports and adds them to \c unboundImports, using source
+    /// locations from \p I.
+    void findCrossImportsInLists(UnboundImport &I,
+                                 ArrayRef<ImportedModuleDesc> declaring,
+                                 ArrayRef<ImportedModuleDesc> bystanding,
+                                 bool shouldDiagnoseRedundantCrossImports);
+
     /// Discovers any cross-imports between \p declaringImport and
     /// \p bystandingImport and adds them to \c unboundImports, using source
     /// locations from \p I.
     void findCrossImports(UnboundImport &I,
                           const ImportedModuleDesc &declaringImport,
                           const ImportedModuleDesc &bystandingImport,
-                          SmallVectorImpl<Identifier> &overlayNames);
+                          bool shouldDiagnoseRedundantCrossImports);
 
     /// Load a module referenced by an import statement.
     ///
@@ -853,55 +868,72 @@ void NameBinder::crossImport(ModuleDecl *M, UnboundImport &I) {
     // FIXME: Should we warn if M doesn't reexport underlyingModule?
     SF.addSeparatelyImportedOverlay(M, I.getUnderlyingModule().get());
 
-  // FIXME: Most of the comparisons we do here are probably unnecessary. We
-  // only need to findCrossImports() on pairs where at least one of the two
-  // modules declares cross-imports, and most modules don't. This is low-hanging
-  // performance fruit.
-
   auto newImports = crossImportableModules.getArrayRef()
-                        .slice(nextModuleToCrossImport);
+                        .drop_front(nextModuleToCrossImport);
+
+  if (newImports.empty())
+    // Nothing to do except crash when we read past the end of
+    // crossImportableModules in that assert at the bottom.
+    return;
+
   for (auto &newImport : newImports) {
     if (!canCrossImport(newImport))
       continue;
 
-    // Search imports up to, but not including or after, `newImport`.
+    // First we check if any of the imports of modules that have declared
+    // cross-imports have declared one with this module.
+    findCrossImportsInLists(I, crossImportDeclaringModules, {newImport},
+                            /*shouldDiagnoseRedundantCrossImports=*/false);
+
+    // If this module doesn't declare any cross-imports, we're done with this
+    // import.
+    if (!newImport.module.second->mightDeclareCrossImportOverlays())
+      continue;
+
+    // Fine, we need to do the slow-but-rare thing: check if this import
+    // declares a cross-import with any previous one.
     auto oldImports =
-        make_range(crossImportableModules.getArrayRef().data(), &newImport);
-    for (auto &oldImport : oldImports) {
-      if (!canCrossImport(oldImport))
-        continue;
+        // Slice from the start of crossImportableModules up to newImport.
+        llvm::makeArrayRef(crossImportableModules.getArrayRef().data(),
+                           &newImport);
+    findCrossImportsInLists(I, {newImport}, oldImports,
+                            /*shouldDiagnoseRedundantCrossImports=*/true);
 
-      SmallVector<Identifier, 2> newImportOverlays;
-      findCrossImports(I, newImport, oldImport, newImportOverlays);
-
-      SmallVector<Identifier, 2> oldImportOverlays;
-      findCrossImports(I, oldImport, newImport, oldImportOverlays);
-
-      // If both sides of the cross-import declare some of the same overlays,
-      // this will cause some strange name lookup behavior; let's warn about it.
-      for (auto name : newImportOverlays) {
-        if (llvm::is_contained(oldImportOverlays, name)) {
-          ctx.Diags.diagnose(I.importLoc, diag::cross_imported_by_both_modules,
-                             newImport.module.second->getName(),
-                             oldImport.module.second->getName(), name);
-        }
-      }
-
-      // If findCrossImports() ever changed the visibleModules list, we'd see
-      // memory smashers here.
-      assert(newImports.data() ==
-                 &crossImportableModules[nextModuleToCrossImport] &&
-             "findCrossImports() should never mutate visibleModules");
-    }
+    // Add this to the list of imports everyone needs to check against.
+    crossImportDeclaringModules.push_back(newImport);
   }
 
+  // Catch potential memory smashers
+  assert(newImports.data() ==
+             &crossImportableModules[nextModuleToCrossImport] &&
+         "findCrossImports() should never mutate visibleModules");
+
   nextModuleToCrossImport = crossImportableModules.size();
+}
+
+void
+NameBinder::findCrossImportsInLists(UnboundImport &I,
+                                    ArrayRef<ImportedModuleDesc> declaring,
+                                    ArrayRef<ImportedModuleDesc> bystanding,
+                                    bool shouldDiagnoseRedundantCrossImports) {
+  for (auto &declaringImport : declaring) {
+    if (!canCrossImport(declaringImport))
+      continue;
+
+    for (auto &bystandingImport : bystanding) {
+      if (!canCrossImport(bystandingImport))
+        continue;
+
+      findCrossImports(I, declaringImport, bystandingImport,
+                       shouldDiagnoseRedundantCrossImports);
+    }
+  }
 }
 
 void NameBinder::findCrossImports(UnboundImport &I,
                                   const ImportedModuleDesc &declaringImport,
                                   const ImportedModuleDesc &bystandingImport,
-                                  SmallVectorImpl<Identifier> &names) {
+                                  bool shouldDiagnoseRedundantCrossImports) {
   assert(&declaringImport != &bystandingImport);
 
   LLVM_DEBUG(
@@ -913,8 +945,16 @@ void NameBinder::findCrossImports(UnboundImport &I,
     ctx.Stats->getFrontendCounters().NumCrossImportsChecked++;
 
   // Find modules we need to import.
+  SmallVector<Identifier, 4> names;
   declaringImport.module.second->findDeclaredCrossImportOverlays(
       bystandingImport.module.second->getName(), names, I.importLoc);
+
+  // If we're diagnosing cases where we cross-import in both directions, get the
+  // inverse list. Otherwise, leave the list empty.
+  SmallVector<Identifier, 4> oppositeNames;
+  if (shouldDiagnoseRedundantCrossImports)
+    bystandingImport.module.second->findDeclaredCrossImportOverlays(
+        declaringImport.module.second->getName(), oppositeNames, I.importLoc);
 
   if (ctx.Stats && !names.empty())
     ctx.Stats->getFrontendCounters().NumCrossImportsFound++;
@@ -928,6 +968,11 @@ void NameBinder::findCrossImports(UnboundImport &I,
 
     unboundImports.emplace_back(declaringImport.module.second->getASTContext(),
                                 I, name, declaringImport, bystandingImport);
+
+    if (llvm::is_contained(oppositeNames, name))
+      ctx.Diags.diagnose(I.importLoc, diag::cross_imported_by_both_modules,
+                         declaringImport.module.second->getName(),
+                         bystandingImport.module.second->getName(), name);
 
     LLVM_DEBUG({
       auto &crossImportOptions = unboundImports.back().options;
