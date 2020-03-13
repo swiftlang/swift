@@ -1964,7 +1964,7 @@ SourceFile::getInfoForUsedFilePaths() const {
         getASTContext().SourceMgr.getLocForBufferStart(BufferID);
   }
 
-  for (auto &vpath : VirtualFilenames) {
+  for (auto &vpath : VirtualFilePaths) {
     result[vpath.Item].virtualFileLocs.insert(vpath.Loc);
   }
 

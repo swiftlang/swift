@@ -4827,7 +4827,7 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       if (!Filename.hasValue())
         return makeParserError();
       SourceLoc filenameLoc = consumeToken(tok::string_literal);
-      SF.VirtualFilenames.emplace_back(*Filename, filenameLoc);
+      SF.VirtualFilePaths.emplace_back(*Filename, filenameLoc);
 
       if (parseToken(tok::comma, diag::sourceLocation_expected, ",") ||
           parseSpecificIdentifier("line", diag::sourceLocation_expected,
