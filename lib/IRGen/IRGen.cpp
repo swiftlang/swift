@@ -670,45 +670,53 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
     return;
 
   using Discrimination = PointerAuthSchema::Discrimination;
-  auto key = clangOpts.FunctionPointers.getARM8_3Key();
-  auto nonABIKey = PointerAuthSchema::ARM8_3Key::ASIB;
+
+  // A key suitable for code pointers that might be used anywhere in the ABI.
+  auto codeKey = clangOpts.FunctionPointers.getARM8_3Key();
+
+  // A key suitable for data pointers that might be used anywhere in the ABI.
+  // Using a data key for data pointers and vice-versa is important for
+  // ABI future-proofing.
+  auto dataKey = PointerAuthSchema::ARM8_3Key::ASDA;
+
+  // A key suitable for code pointers that are only used in private
+  // situations.  Do not use this key for any sort of signature that
+  // might end up on a global constant initializer.
+  auto nonABICodeKey = PointerAuthSchema::ARM8_3Key::ASIB;
 
   // If you change anything here, be sure to update <ptrauth.h>.
   opts.SwiftFunctionPointers =
-    PointerAuthSchema(key, /*address*/ false, Discrimination::Type);
+    PointerAuthSchema(codeKey, /*address*/ false, Discrimination::Type);
   opts.KeyPaths =
-    PointerAuthSchema(key, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.ValueWitnesses =
-    PointerAuthSchema(key, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.ProtocolWitnesses =
-    PointerAuthSchema(key, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.ProtocolAssociatedTypeAccessFunctions =
-    PointerAuthSchema(key, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.ProtocolAssociatedTypeWitnessTableAccessFunctions =
-    PointerAuthSchema(key, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.SwiftClassMethods =
-    PointerAuthSchema(key, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.SwiftClassMethodPointers =
-    PointerAuthSchema(key, /*address*/ false, Discrimination::Decl);
+    PointerAuthSchema(codeKey, /*address*/ false, Discrimination::Decl);
   opts.HeapDestructors =
-    PointerAuthSchema(key, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
 
   // Partial-apply captures are not ABI and can use a more aggressive key.
   opts.PartialApplyCapture =
-    PointerAuthSchema(nonABIKey, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(nonABICodeKey, /*address*/ true, Discrimination::Decl);
 
   opts.TypeDescriptors =
-    PointerAuthSchema(PointerAuthSchema::ARM8_3Key::ASDA, /*address*/ true,
-                      Discrimination::Decl);
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
   opts.TypeDescriptorsAsArguments =
-    PointerAuthSchema(PointerAuthSchema::ARM8_3Key::ASDA, /*address*/ false,
-                      Discrimination::Decl);
+    PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);
 
   opts.SwiftDynamicReplacements =
-    PointerAuthSchema(key, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.SwiftDynamicReplacementKeys =
-      PointerAuthSchema(PointerAuthSchema::ARM8_3Key::ASDA, /*address*/ true,
-                        Discrimination::Decl);
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
 
   // Coroutine resumption functions are never stored globally in the ABI,
   // so we can do some things that aren't normally okay to do.  However,
@@ -716,9 +724,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   // The address used in the discrimination is not the address where the
   // function pointer is signed, but the address of the coroutine buffer.
   opts.YieldManyResumeFunctions =
-      PointerAuthSchema(key, /*address*/ true, Discrimination::Type);
+      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
   opts.YieldOnceResumeFunctions =
-      PointerAuthSchema(key, /*address*/ true, Discrimination::Type);
+      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
 }
 
 std::unique_ptr<llvm::TargetMachine>
