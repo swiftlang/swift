@@ -242,7 +242,7 @@ foreach(SDK ${SWIFT_SDKS})
     set(test_dependencies)
     get_test_dependencies("${SDK}" test_dependencies)
 
-    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS AND NOT ${SDK} STREQUAL "WASI")
       # NOTE create a stub BlocksRuntime library that can be used for the
       # reflection tests
       file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
