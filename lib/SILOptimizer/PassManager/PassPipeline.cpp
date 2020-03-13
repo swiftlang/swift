@@ -279,8 +279,6 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // Promote stack allocations to values.
   P.addMem2Reg();
 
-  P.addNonTransparentFunctionOwnershipModelEliminator();
-  
   // Run the existential specializer Pass.
   P.addExistentialSpecializer();
 
@@ -403,8 +401,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addSemanticARCOpts();
 
   // Strip ownership from non-transparent functions.
-//  if (P.getOptions().StripOwnershipAfterSerialization)
-//    P.addNonTransparentFunctionOwnershipModelEliminator();
+  if (P.getOptions().StripOwnershipAfterSerialization)
+    P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Start by linking in referenced functions from other modules.
   P.addPerformanceSILLinker();

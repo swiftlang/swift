@@ -747,6 +747,7 @@ namespace {
     void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
                                 SILValue aggValue,
                                 const T &operation) const {
+      // In ownership we can use destructure to lower destruction of aggValue.
       MultipleValueInstruction *destructured = nullptr;
       if (aggValue->getFunction()->hasOwnership()) {
         if (aggValue->getType().is<TupleType>()) {

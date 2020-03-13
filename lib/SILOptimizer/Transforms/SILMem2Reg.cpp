@@ -292,7 +292,7 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
     // DebugValueAddr uses.
     if (isa<DebugValueAddrInst>(II))
       continue;
-    
+
     // Destroying the address is a write only instruction so, it's OK.
     if (isa<DestroyAddrInst>(II))
       continue;
@@ -359,7 +359,6 @@ static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) 
   }
 }
 
-
 static SILValue replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   ProjectionPath projections(val->getType());
   SILValue op = LI->getOperand();
@@ -383,26 +382,28 @@ static SILValue replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   op = LI->getOperand();
   while (!LI->use_empty()) {
     Operand *userOp = *LI->use_begin();
-    
+
     // We'll handle destorys later.
     // Otherwise, make sure we copy and consume that.
     if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy &&
         userOp->isConsumingUse() && !isa<DestroyValueInst>(userOp->getUser()))
       userOp->set(builder.createCopyValue(LI->getLoc(), val));
+    // If the user can't accept the projection, create a copy/destroy and hope
+    // that fixes it. Currently, the only time that this would happen is if
+    // we're replacing a guarenteed object with an owned one.
     else if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy &&
-             !userOp->getOwnershipKindMap().canAcceptKind(val.getOwnershipKind()) &&
+             !userOp->getOwnershipKindMap().canAcceptKind(
+                 val.getOwnershipKind()) &&
              !isa<DestroyValueInst>(userOp->getUser())) {
       auto copyVal = builder.createCopyValue(LI->getLoc(), val);
       userOp->set(copyVal);
       // Using a different builder here so we don't mess with the insertion
       // point of 'builder'.
       SILBuilderWithScope(std::next(userOp->getUser()->getIterator()))
-        .emitDestroyValueAndFold(userOp->getUser()->getLoc(), copyVal);
-    }
-    else
+          .emitDestroyValueAndFold(userOp->getUser()->getLoc(), copyVal);
+    } else
       userOp->set(val);
   }
-  assert(LI->use_empty());
   LI->eraseFromParent();
   while (op != ASI && op->use_empty()) {
     assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
@@ -412,7 +413,7 @@ static SILValue replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
     Inst->eraseFromParent();
     op = next;
   }
-  
+
   return val;
 }
 
@@ -478,7 +479,8 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
         LLVM_DEBUG(llvm::dbgs() << "*** Promoting load: " << *Load);
 
         if (Load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
-          replacedCopyLoads[Load->getOperand()] = replaceLoad(Load, RunningVal, ASI);
+          replacedCopyLoads[Load->getOperand()] =
+              replaceLoad(Load, RunningVal, ASI);
         else if (!isa<SILUndef>(RunningVal))
           replaceLoad(Load, RunningVal, ASI);
         NumInstRemoved++;
@@ -526,8 +528,8 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
 
     // Replace destroys with a release of the value.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
-      if (DAI->getOperand() == ASI &&
-          RunningVal && !isa<SILUndef>(RunningVal)) {
+      if (DAI->getOperand() == ASI && RunningVal &&
+          !isa<SILUndef>(RunningVal)) {
         if (replacedCopyLoads.count(DAI->getOperand())) {
           // If we know that we've removed a load and that load was a copy of
           // this address. We can omit the destroy.
@@ -543,7 +545,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
       continue;
     }
   }
-  
+
   // Destroys could live in any block. We need to cleanup the remaining
   // destroy_values.
   for (auto loadAndVal : replacedCopyLoads) {
@@ -576,7 +578,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
   llvm::MapVector<SILValue, SILValue> replacedCopyLoads;
 
   // For all instructions in the block.
-  SmallVector<SILInstruction*, 64> instructions;
+  SmallVector<SILInstruction *, 64> instructions;
   for (auto BBI = BB->begin(), E = BB->end(); BBI != E; ++BBI)
     instructions.push_back(&*BBI);
   for (SILInstruction *Inst : instructions) {
@@ -590,7 +592,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       }
       auto load = cast<LoadInst>(Inst);
       if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
-        replacedCopyLoads[load->getOperand()] = replaceLoad(load, RunningVal, ASI);
+        replacedCopyLoads[load->getOperand()] =
+            replaceLoad(load, RunningVal, ASI);
       else
         replaceLoad(load, RunningVal, ASI);
       NumInstRemoved++;
@@ -654,8 +657,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     SILNode *Node = Inst;
     while (isa<StructElementAddrInst>(Node) ||
            isa<TupleElementAddrInst>(Node) ||
-           isa<UncheckedAddrCastInst>(Node) ||
-           isa<BeginAccessInst>(Node)) {
+           isa<UncheckedAddrCastInst>(Node) || isa<BeginAccessInst>(Node)) {
       auto *I = cast<SingleValueInstruction>(Node);
       if (!I->use_empty()) break;
       Node = I->getOperand(0);
@@ -663,7 +665,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       NumInstRemoved++;
     }
   }
-  
+
   // Destroys could live in any block. We need to cleanup the remaining
   // destroy_values.
   for (auto loadAndVal : replacedCopyLoads) {
@@ -672,7 +674,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
         use->getUser()->eraseFromParent();
     }
   }
-  
+
   // In ossa we need to consume `x` after removing the stack_alloc/store:
   //   sa = stack_alloc
   //   x = apply
@@ -686,8 +688,9 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       !RunningVal->getType().isTrivial(*RunningVal->getFunction()) &&
       std::all_of(RunningVal->use_begin(), RunningVal->use_end(),
                   [](Operand *use) { return use->isConsumingUse(); }))
-    SILBuilderWithScope(std::next(RunningVal.getDefiningInstruction()->getIterator()))
-      .emitDestroyValueAndFold(RunningVal.getLoc(), RunningVal);
+    SILBuilderWithScope(
+        std::next(RunningVal.getDefiningInstruction()->getIterator()))
+        .emitDestroyValueAndFold(RunningVal.getLoc(), RunningVal);
 }
 
 void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
@@ -767,16 +770,14 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
   if (!isa<SILUndef>(Def) && Def->getFunction()->hasOwnership() &&
       !Def->getType().isTrivial(*Def->getFunction()) &&
       !(Def.getOwnershipKind() == ValueOwnershipKind::Guaranteed) &&
-      std::any_of(Def->use_begin(),
-                      Def->use_end(),
-                      [](Operand *use) {
-        return use->isConsumingUse();
-      })) {
-        auto builder = SILBuilderWithScope(Def->getParentBlock());
-        if (Def.getDefiningInstruction()) {
-          builder.setInsertionPoint(std::next(Def.getDefiningInstruction()->getIterator()));
-        }
-        Def = builder.createCopyValue(Def.getLoc(), Def);
+      std::any_of(Def->use_begin(), Def->use_end(),
+                  [](Operand *use) { return use->isConsumingUse(); })) {
+    auto builder = SILBuilderWithScope(Def->getParentBlock());
+    if (Def.getDefiningInstruction()) {
+      builder.setInsertionPoint(
+          std::next(Def.getDefiningInstruction()->getIterator()));
+    }
+    Def = builder.createCopyValue(Def.getLoc(), Def);
   }
 
   addArgumentToBranch(Def, Dest, TI);
@@ -786,9 +787,6 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
 void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
   // First update uses of the value.
   SmallVector<LoadInst *, 4> collectedLoads;
-  // Keep track of the sources of the [copy] loads we have replaced and what we
-  // replaced them with.
-  llvm::MapVector<SILValue, SILValue> replacedCopyLoads;
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E;) {
     auto *Inst = UI->getUser();
     UI++;
@@ -836,31 +834,13 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
 
     // Replace destroys with a release of the value.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
-      if (replacedCopyLoads.count(DAI->getOperand())) {
-        // If we know that we've removed a load and that load was a copy of
-        // this address. We can omit the destroy.
-        tryRemoveDestroyAddr(DAI);
+      SILValue Def = getLiveInValue(PhiBlocks, BB);
+      if (isa<SILUndef>(Def))
         continue;
-      } else {
-        // If we have an ownership load that wans't optimized we can't safely
-        // replace the destroy.
-        SILValue Def = getLiveInValue(PhiBlocks, BB);
-        if (isa<SILUndef>(Def))
-          continue;
-        if (!Def->getFunction()->hasOwnership() || !isa<LoadInst>(Def)) {
-          tryReplaceDestroy(DAI, Def);
-        }
+      if (!Def->getFunction()->hasOwnership() || !isa<LoadInst>(Def)) {
+        tryReplaceDestroy(DAI, Def);
       }
       continue;
-    }
-  }
-
-  // Destroys could live in any block. We need to cleanup the remaining
-  // destroy_values.
-  for (auto loadAndVal : replacedCopyLoads) {
-    for (auto *use : loadAndVal.second->getUses()) {
-      if (isa<DestroyValueInst>(use->getUser()))
-        use->getUser()->eraseFromParent();
     }
   }
 
@@ -944,8 +924,10 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
       // If the block is in the dom tree (dominated by the entry block).
       if (DomTreeNode *Node = DT->getNode(II->getParent()))
         // TODO: these are currently unsupported in alloc to phi.
-        if (store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial ||
-            store->getOwnershipQualifier() == StoreOwnershipQualifier::Unqualified)
+        if (store->getOwnershipQualifier() ==
+                StoreOwnershipQualifier::Trivial ||
+            store->getOwnershipQualifier() ==
+                StoreOwnershipQualifier::Unqualified)
           PQ.push(std::make_pair(Node, DomTreeLevels[Node]));
     }
   }
@@ -1072,13 +1054,13 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
           store->getSrc()->getType().isTrivial(*store->getFunction()))
         return;
 
-      if (std::all_of(store->getSrc()->use_begin(),
-                      store->getSrc()->use_end(),
+      if (std::all_of(store->getSrc()->use_begin(), store->getSrc()->use_end(),
                       [&store](Operand *use) {
-        return !use->isConsumingUse() || use->getUser() == store;
-      })) {
-        SILBuilderWithScope(store)
-          .emitDestroyValueAndFold(store->getSrc().getLoc(), store->getSrc());
+                        return !use->isConsumingUse() ||
+                               use->getUser() == store;
+                      })) {
+        SILBuilderWithScope(store).emitDestroyValueAndFold(
+            store->getSrc().getLoc(), store->getSrc());
       }
     }
   };

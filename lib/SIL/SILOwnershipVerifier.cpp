@@ -841,7 +841,6 @@ void SILInstruction::verifyOperandOwnership() const {
 
     assert(errorBehavior.shouldAssert() &&
            "At this point, we are expected to assert");
-    opValue->getFunction()->dump();
     llvm_unreachable("triggering standard assertion failure routine");
   }
 }
