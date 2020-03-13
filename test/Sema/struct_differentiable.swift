@@ -31,7 +31,7 @@ struct EmptyAdditiveArithmeticEuclidean : AdditiveArithmetic, EuclideanDifferent
 struct ImmutableStoredProperties : Differentiable {
   var okay: Float
 
-  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic'}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because 'Int' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic'}} {{3-3=@noDerivative }}
   let nondiff: Int
 
   // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'ImmutableStoredProperties' requires all stored properties to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic'}} {{3-3=@noDerivative }}
@@ -353,12 +353,12 @@ struct StaticMembersShouldNotAffectAnything : AdditiveArithmetic, Differentiable
 
 struct ImplicitNoDerivative : Differentiable {
   var a: Float
-  var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var b: Bool// expected-warning {{stored property 'b' has no derivative because 'Bool' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
 }
 
 struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
   var x: DifferentiableSubset
-  var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
+  var b: Bool // expected-warning {{stored property 'b' has no derivative because 'Bool' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
 }
 
 // TF-1018: verify that `@noDerivative` warnings are always silenceable, even
@@ -366,10 +366,10 @@ struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
 // declaration.
 
 struct ExtensionDifferentiableNoDerivative<T> {
-  // expected-warning @+2 {{stored property 'x' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
-  // expected-warning @+1 {{stored property 'y' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+2 {{stored property 'x' has no derivative because 'T' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+1 {{stored property 'y' has no derivative because 'T' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
   var x, y: T
-  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because 'Bool' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
   var nondiff: Bool
 }
 extension ExtensionDifferentiableNoDerivative: Differentiable {}
@@ -382,7 +382,7 @@ extension ExtensionDifferentiableNoDerivativeFixed: Differentiable {}
 
 struct ConditionalDifferentiableNoDerivative<T> {
   var x, y: T
-  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because 'Bool' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
   var nondiff: Bool
 }
 extension ConditionalDifferentiableNoDerivative: Differentiable where T: Differentiable {}
@@ -413,6 +413,22 @@ extension NoMemberwiseInitializerExtended: Differentiable
 // expected-error @+1 {{type 'NoMemberwiseInitializerExtended<T>' does not conform to protocol 'EuclideanDifferentiable'}}
 extension NoMemberwiseInitializerExtended: EuclideanDifferentiable
   where T : Differentiable & AdditiveArithmetic {}
+
+// TF-1190: Test `@noDerivative` warning for property wrapper backing storage properties.
+
+@propertyWrapper
+struct Wrapper<Value> {
+  private var value: Value
+  var wrappedValue: Value {
+    value
+  }
+}
+struct TF_1190<T> {}
+struct TF_1190_Outer: Differentiable {
+  // expected-warning @+1 {{stored property '_x' has no derivative because 'Wrapper<TF_1190<Float>>' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  @Wrapper var x: TF_1190<Float>
+  @noDerivative @Wrapper var y: TF_1190<Float>
+}
 
 // Verify that cross-file derived conformances are disallowed.
 

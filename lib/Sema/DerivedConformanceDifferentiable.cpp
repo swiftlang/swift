@@ -55,8 +55,16 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal, DeclContext *DC,
   auto &C = nominal->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   for (auto *vd : nominal->getStoredProperties()) {
+    // Skip stored properties with `@noDerivative` attribute.
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
+    // For property wrapper backing storage properties, skip if original
+    // property has `@noDerivative` attribute.
+    if (auto *originalProperty = vd->getOriginalWrappedProperty())
+      if (originalProperty->getAttrs().hasAttribute<NoDerivativeAttr>())
+        continue;
+    // Skip `let` stored properties. `mutating func move(along:)` cannot be
+    // synthesized to update these properties.
     if (vd->isLet())
       continue;
     if (vd->getInterfaceType()->hasError())
@@ -198,7 +206,7 @@ bool DerivedConformance::canDeriveEuclideanDifferentiable(
   auto *eucDiffProto =
       C.getProtocol(KnownProtocolKind::EuclideanDifferentiable);
   // Return true if all differentiation stored properties conform to
-  // `AdditiveArithmetic` and their `TangentVector` equals themselves.
+  // `EuclideanDifferentiable`.
   SmallVector<VarDecl *, 16> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, DC, diffProperties);
   return llvm::all_of(diffProperties, [&](VarDecl *member) {
@@ -699,10 +707,16 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
   for (auto *vd : nominal->getStoredProperties()) {
     if (vd->getInterfaceType()->hasError())
       continue;
-    auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
+    // Skip stored properties with `@noDerivative` attribute.
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
+    // For property wrapper backing storage properties, skip if original
+    // property has `@noDerivative` attribute.
+    if (auto *originalProperty = vd->getOriginalWrappedProperty())
+      if (originalProperty->getAttrs().hasAttribute<NoDerivativeAttr>())
+        continue;
     // Check whether to diagnose stored property.
+    auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     bool conformsToDifferentiable =
         !TypeChecker::conformsToProtocol(varType, diffableProto, nominal, None)
              .isInvalid();
@@ -712,6 +726,8 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
     // Otherwise, add an implicit `@noDerivative` attribute.
     vd->getAttrs().add(new (Context) NoDerivativeAttr(/*Implicit*/ true));
     auto loc = vd->getAttributeInsertionLoc(/*forModifier*/ false);
+    if (auto *originalProperty = vd->getOriginalWrappedProperty())
+      loc = originalProperty->getAttributeInsertionLoc(/*forModifier*/ false);
     assert(loc.isValid() && "Expected valid source location");
     // If nominal type can conform to `AdditiveArithmetic`, suggest conforming
     // adding a conformance to `AdditiveArithmetic`.
@@ -723,7 +739,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
           .diagnose(
               loc,
               diag::differentiable_nondiff_type_implicit_noderivative_fixit,
-              vd->getName(), nominal->getName(),
+              vd->getName(), vd->getType(), nominal->getName(),
               nominalCanDeriveAdditiveArithmetic)
           .fixItInsert(loc, "@noDerivative ");
       continue;

@@ -1105,6 +1105,9 @@ def create_argument_parser():
     option('--enable-tensorflow-gpu', toggle_true,
            default=False,
            help='If true, build Swift with TensorFlow GPU support.')
+    option('--enable-x10', toggle_true,
+           default=False,
+           help='If true, build Swift with X10 support.')
     option('--tensorflow-host-lib-dir', store_path,
            default=None,
            help='Path to a directory containing TensorFlow libraries '

@@ -236,6 +236,7 @@ EXPECTED_DEFAULTS = {
     # SWIFT_ENABLE_TENSORFLOW
     'enable_tensorflow': False,
     'enable_tensorflow_gpu': False,
+    'enable_x10': False,
     'build_tensorflow': False,
     'tensorflow_host_lib_dir': None,
     'tensorflow_host_include_dir': None,
@@ -678,6 +679,7 @@ EXPECTED_OPTIONS = [
     # SWIFT_ENABLE_TENSORFLOW
     EnableOption('--enable-tensorflow'),
     EnableOption('--enable-tensorflow-gpu'),
+    EnableOption('--enable-x10'),
     EnableOption('--build-tensorflow'),
     PathOption('--tensorflow-host-lib-dir'),
     PathOption('--tensorflow-host-include-dir'),
