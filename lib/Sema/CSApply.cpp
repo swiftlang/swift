@@ -165,6 +165,13 @@ ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
       });
 }
 
+ConstraintLocator *
+Solution::getConstraintLocator(Expr *anchor,
+                               ArrayRef<LocatorPathElt> path) const {
+  auto &cs = getConstraintSystem();
+  return cs.getConstraintLocator(anchor, path);
+}
+
 /// Return the implicit access kind for a MemberRefExpr with the
 /// specified base and member in the specified DeclContext.
 static AccessSemantics
@@ -7325,7 +7332,8 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
         auto *primaryFix = fixes[0];
         ArrayRef<ConstraintFix *> secondaryFixes{fixes.begin() + 1, fixes.end()};
 
-        auto diagnosed = primaryFix->coalesceAndDiagnose(secondaryFixes);
+        auto diagnosed =
+            primaryFix->coalesceAndDiagnose(solution, secondaryFixes);
         if (primaryFix->isWarning()) {
           assert(diagnosed && "warnings should always be diagnosed");
           (void)diagnosed;
@@ -7700,13 +7708,13 @@ ProtocolConformanceRef Solution::resolveConformance(
   return ProtocolConformanceRef::forInvalid();
 }
 
-Type Solution::getType(const Expr *expr) const {
-  auto result = nodeTypes.find(expr);
+Type Solution::getType(TypedNode node) const {
+  auto result = nodeTypes.find(node);
   if (result != nodeTypes.end())
     return result->second;
 
   auto &cs = getConstraintSystem();
-  return cs.getType(expr);
+  return cs.getType(node);
 }
 
 void Solution::setExprTypes(Expr *expr) const {
