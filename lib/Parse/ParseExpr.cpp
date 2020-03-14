@@ -3225,12 +3225,21 @@ ParserStatus Parser::parseMultipleTrailingClosures(
 
     consumeToken(); // Consume ':'
 
-    auto closure = parseExprClosure();
-    if (closure.isNull())
-      return makeParserError();
+    SourceLoc closureLoc = Tok.getLoc();
+    auto closure = parseExpr(diag::expected_closure_literal);
+    if (closure.isNull()) {
+      Status.setIsParseError();
+      skipUntilDeclStmtRBrace(tok::r_brace);
+      break;
+    }
+
+    // Allow any expression, but diagnose if not a closure literal.
+    if (!isa<ClosureExpr>(closure.get()) &&
+        !isa<CaptureListExpr>(closure.get())) {
+      diagnose(closureLoc, diag::expected_closure_literal);
+    }
 
     Status |= closure;
-
     closures.push_back({label, labelLoc, closure.get()});
 
     // Recover if blocks are separated by comma instead of newline.
