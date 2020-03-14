@@ -135,7 +135,6 @@ static bool areConservativelyCompatibleArgumentLabels(
     decl = choice.getDecl();
     break;
 
-  case OverloadChoiceKind::BaseType:
   // KeyPath application is not filtered in `performMemberLookup`.
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::DynamicMemberLookup:

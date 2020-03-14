@@ -40,10 +40,6 @@ enum class OverloadChoiceKind : int {
   /// found via dynamic lookup and, therefore, might not actually be
   /// available at runtime.
   DeclViaDynamic,
-  /// The overload choice equates the member type with the
-  /// base type. Used for unresolved member expressions like ".none" that
-  /// refer to enum members with unit type.
-  BaseType,
   /// The overload choice selects a key path subscripting operation.
   KeyPathApplication,
   /// The member is looked up using @dynamicMemberLookup.
