@@ -2988,8 +2988,6 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // If we didn't find an ambiguous overload, diagnose the common fixes.
   if (ambiguousOverload == solutionDiff.overloads.end()) {
     bool diagnosed = false;
-    ConstraintSystem::SolverScope scope(*this);
-    applySolution(solutions.front());
     for (auto fixes: aggregatedFixes) {
       // A common fix must appear in all solutions
       if (fixes.second.size() < solutions.size()) continue;
@@ -3048,11 +3046,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
         continue;
 
       if (solution.Fixes.size() == 1) {
-        // Create scope so each applied solution is rolled back.
-        ConstraintSystem::SolverScope scope(*this);
-        applySolution(solution);
-        // All of the solutions supposed to produce a "candidate" note.
-        diagnosed &= solution.Fixes.front()->diagnose(/*asNote*/ true);
+        diagnosed &=
+            solution.Fixes.front()->diagnose(solution, /*asNote*/ true);
       } else if (llvm::all_of(solution.Fixes,
                               [&](ConstraintFix *fix) {
                                 return fix->getLocator()
@@ -3223,7 +3218,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
                                   : diag::ambiguous_decl_ref,
                 name);
 
-    TrailingClosureAmbiguityFailure failure(*this, anchor,
+    TrailingClosureAmbiguityFailure failure(solutions, anchor,
                                             overload.choices);
     if (failure.diagnoseAsNote())
       return true;
@@ -3553,13 +3548,20 @@ bool constraints::isAutoClosureArgument(Expr *argExpr) {
 
 bool constraints::hasAppliedSelf(ConstraintSystem &cs,
                                  const OverloadChoice &choice) {
+  return hasAppliedSelf(choice, [&cs](Type type) -> Type {
+    return cs.getFixedTypeRecursive(type, /*wantRValue=*/true);
+  });
+}
+
+bool constraints::hasAppliedSelf(const OverloadChoice &choice,
+                                 llvm::function_ref<Type(Type)> getFixedType) {
   auto *decl = choice.getDeclOrNull();
   if (!decl)
     return false;
 
   auto baseType = choice.getBaseType();
   if (baseType)
-    baseType = cs.getFixedTypeRecursive(baseType, /*wantRValue=*/true);
+    baseType = getFixedType(baseType)->getRValueType();
 
   // In most cases where we reference a declaration with a curried self
   // parameter, it gets dropped from the type of the reference.
@@ -3721,7 +3723,7 @@ static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
   return true;
 }
 
-Type ConstraintSystem::resolveInterfaceType(Type type) const {
+Type Solution::resolveInterfaceType(Type type) const {
   auto resolvedType = type.transform([&](Type type) -> Type {
     if (auto *tvt = type->getAs<TypeVariableType>()) {
       // If this type variable is for a generic parameter, return that.
@@ -3729,10 +3731,8 @@ Type ConstraintSystem::resolveInterfaceType(Type type) const {
         return gp;
 
       // Otherwise resolve its fixed type, mapped out of context.
-      if (auto fixed = getFixedType(tvt))
-        return resolveInterfaceType(fixed->mapTypeOutOfContext());
-
-      return getRepresentative(tvt);
+      auto fixed = simplifyType(tvt);
+      return resolveInterfaceType(fixed->mapTypeOutOfContext());
     }
     if (auto *dmt = type->getAs<DependentMemberType>()) {
       // For a dependent member, first resolve the base.
@@ -3750,7 +3750,7 @@ Type ConstraintSystem::resolveInterfaceType(Type type) const {
 }
 
 Optional<FunctionArgApplyInfo>
-ConstraintSystem::getFunctionArgApplyInfo(ConstraintLocator *locator) {
+Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto *anchor = locator->getAnchor();
   auto path = locator->getPath();
 
@@ -3770,8 +3770,7 @@ ConstraintSystem::getFunctionArgApplyInfo(ConstraintLocator *locator) {
   // Form a new locator that ends at the apply-arg-to-param element, and
   // simplify it to get the full argument expression.
   auto argPath = path.drop_back(iter - path.rbegin());
-  auto *argLocator = getConstraintLocator(
-      anchor, argPath, ConstraintLocator::getSummaryFlagsForPath(argPath));
+  auto *argLocator = getConstraintLocator(anchor, argPath);
 
   auto *argExpr = simplifyLocatorToAnchor(argLocator);
 
@@ -3783,7 +3782,7 @@ ConstraintSystem::getFunctionArgApplyInfo(ConstraintLocator *locator) {
   Optional<OverloadChoice> choice;
   Type rawFnType;
   auto *calleeLocator = getCalleeLocator(argLocator);
-  if (auto overload = findSelectedOverloadFor(calleeLocator)) {
+  if (auto overload = getOverloadChoiceIfAvailable(calleeLocator)) {
     // If we have resolved an overload for the callee, then use that to get the
     // function type and callee.
     choice = overload->choice;
@@ -3822,7 +3821,8 @@ ConstraintSystem::getFunctionArgApplyInfo(ConstraintLocator *locator) {
     fnInterfaceType = callee->getInterfaceType();
 
     // Strip off the curried self parameter if necessary.
-    if (hasAppliedSelf(*this, *choice))
+    if (hasAppliedSelf(
+            *choice, [this](Type type) -> Type { return simplifyType(type); }))
       fnInterfaceType = fnInterfaceType->castTo<AnyFunctionType>()->getResult();
 
     if (auto *fn = fnInterfaceType->getAs<AnyFunctionType>()) {
@@ -3837,9 +3837,10 @@ ConstraintSystem::getFunctionArgApplyInfo(ConstraintLocator *locator) {
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
 
-  return FunctionArgApplyInfo(getParentExpr(argExpr), argExpr, argIdx,
-                              simplifyType(getType(argExpr)),
-                              paramIdx, fnInterfaceType, fnType, callee);
+  auto &cs = getConstraintSystem();
+  return FunctionArgApplyInfo(cs.getParentExpr(argExpr), argExpr, argIdx,
+                              simplifyType(getType(argExpr)), paramIdx,
+                              fnInterfaceType, fnType, callee);
 }
 
 bool constraints::isKnownKeyPathType(Type type) {
