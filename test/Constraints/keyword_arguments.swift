@@ -264,8 +264,8 @@ struct Variadics7 {
     // typo B
     f(bravox: 0) // expected-error {{incorrect argument label in call (have 'bravox:', expected 'bravo:')}}
     f(alpha: 0, bravox: 3) // expected-error {{incorrect argument label in call (have 'alpha:bravox:', expected 'alpha:bravo:')}}
-    f(alpha: 0, 1, bravox: 3) // expected-error {{incorrect argument label in call (have 'alpha:_:bravox:', expected 'alpha:_:bravo:')}}
-    f(alpha: 0, 1, 2, bravox: 3) // expected-error {{incorrect argument label in call (have 'alpha:_:_:bravox:', expected 'alpha:_:_:bravo:')}}
+    f(alpha: 0, 1, bravox: 3) // expected-error {{incorrect argument labels in call (have 'alpha:_:bravox:', expected 'alpha:bravo:')}}
+    f(alpha: 0, 1, 2, bravox: 3) // expected-error {{incorrect argument labels in call (have 'alpha:_:_:bravox:', expected 'alpha:bravo:')}}
 
     // OoO + typo A B
     f(bravox: 0, alphax: 1) // expected-error {{incorrect argument labels in call (have 'bravox:alphax:', expected 'alpha:bravo:')}}
@@ -305,13 +305,13 @@ struct Variadics8 {
     // typo B
     f(bravox: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'bravox:charlie:', expected 'bravo:charlie:')}}
     f(alpha: 0, bravox: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'alpha:bravox:charlie:', expected 'alpha:bravo:charlie:')}}
-    f(alpha: 0, 1, bravox: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'alpha:_:bravox:charlie:', expected 'alpha:_:bravo:charlie:')}}
-    f(alpha: 0, 1, 2, bravox: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'alpha:_:_:bravox:charlie:', expected 'alpha:_:_:bravo:charlie:')}}
+    f(alpha: 0, 1, bravox: 3, charlie: 4) // expected-error {{incorrect argument labels in call (have 'alpha:_:bravox:charlie:', expected 'alpha:bravo:charlie:')}}
+    f(alpha: 0, 1, 2, bravox: 3, charlie: 4) // expected-error {{incorrect argument labels in call (have 'alpha:_:_:bravox:charlie:', expected 'alpha:bravo:charlie:')}}
     // typo C
     f(bravo: 3, charliex: 4) // expected-error {{incorrect argument label in call (have 'bravo:charliex:', expected 'bravo:charlie:')}}
     f(alpha: 0, bravo: 3, charliex: 4) // expected-error {{incorrect argument label in call (have 'alpha:bravo:charliex:', expected 'alpha:bravo:charlie:')}}
-    f(alpha: 0, 1, bravo: 3, charliex: 4) // expected-error {{incorrect argument label in call (have 'alpha:_:bravo:charliex:', expected 'alpha:_:bravo:charlie:')}}
-    f(alpha: 0, 1, 2, bravo: 3, charliex: 4) // expected-error {{incorrect argument label in call (have 'alpha:_:_:bravo:charliex:', expected 'alpha:_:_:bravo:charlie:')}}
+    f(alpha: 0, 1, bravo: 3, charliex: 4) // expected-error {{incorrect argument labels in call (have 'alpha:_:bravo:charliex:', expected 'alpha:bravo:charlie:')}}
+    f(alpha: 0, 1, 2, bravo: 3, charliex: 4) // expected-error {{incorrect argument labels in call (have 'alpha:_:_:bravo:charliex:', expected 'alpha:bravo:charlie:')}}
 
     // OoO ACB + typo B
     f(alpha: 0, charlie: 3, bravox: 4) // expected-error {{incorrect argument labels in call (have 'alpha:charlie:bravox:', expected 'alpha:bravo:charlie:')}}

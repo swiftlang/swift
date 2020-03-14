@@ -4643,6 +4643,69 @@ static inline bool computeTupleShuffle(TupleType *fromTuple,
 /// TinyPtrVector for unsigned values.
 using ParamBinding = SmallVector<unsigned, 1>;
 
+/// It holds all interested computation result of \c matchCallArguments
+struct CallArgumentMatchResult {
+  struct Binding {
+    unsigned argIdx;
+    unsigned paramIdx;
+
+    unsigned variadicArgLength;
+
+    bool isLabelWrong;
+    bool isLabelMissing;
+    bool isLabelExtraneous;
+
+    Binding(unsigned argIdx, unsigned paramIdx);
+  };
+
+  struct Reordering {
+    unsigned fromArgIdx;
+    unsigned toArgIdx;
+
+    Reordering(unsigned fromArgIdx, unsigned toArgIdx);
+  };
+
+  SmallVector<Binding, 4> bindings;
+  Optional<unsigned> trailingClosureArgIdx;
+  Optional<unsigned> trailingClosureParamIdx;
+  SmallVector<unsigned, 2> extraArgs;
+  SmallVector<unsigned, 2> missingArgParams;
+  
+  bool isTrailingClosureMismatch;
+  Optional<Reordering> reordering;
+
+  CallArgumentMatchResult();
+
+  void assertUnresolvedArgument(unsigned argIdx) const;
+  void assertUnresolvedParameter(unsigned paramIdx) const;
+
+  Binding *findBindingByArgumentIndex(unsigned argIdx);
+  const Binding *findBindingByArgumentIndex(unsigned argIdx) const;
+
+  Binding *findBindingByParameterIndex(unsigned paramIdx);
+  const Binding *findBindingByParameterIndex(unsigned paramIdx) const;
+
+  SmallVector<unsigned, 4> bindingIndicesOrderedByArgumentIndex() const;
+  SmallVector<unsigned, 4> bindingIndicesOrderedByParameterIndex() const;
+
+  bool isExtraArgument(unsigned argIdx) const;
+  bool isTrailingClosureArgument(unsigned argIdx) const;
+  bool isMissingArgumentParameter(unsigned paramIdx) const;
+
+  /// \returns index of \c bindings;
+  unsigned bind(unsigned argIdx, unsigned paramIdx);
+
+  void markExtraArgument(unsigned argIdx);
+  void markMissingArgumentParameter(unsigned paramIdx);
+
+  bool needsRelabeling() const;
+
+  SmallVector<Identifier, 8>
+  buildRelabelingLabels(unsigned numArgs,
+                        ArrayRef<AnyFunctionType::Param> params,
+                        const ParameterListInfo &paramsInfo) const;
+};
+
 /// Class used as the base for listeners to the \c matchCallArguments process.
 ///
 /// By default, none of the callbacks do anything.
@@ -4712,6 +4775,21 @@ public:
   /// otherwise.
   virtual bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx);
 };
+
+/// Match the call arguments (as described by the given argument type) to
+/// the parameters (as described by the given parameter type).
+///
+/// \param args The arguments.
+/// \param params The parameters.
+/// \param paramInfo Declaration-level information about the parameters.
+/// \param hasTrailingClosure Whether the last argument is a trailing closure.
+/// \param allowFixes Whether to allow fixes when matching arguments.
+/// \returns Matching results.
+CallArgumentMatchResult
+matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
+                   ArrayRef<AnyFunctionType::Param> params,
+                   const ParameterListInfo &paramInfo, bool hasTrailingClosure,
+                   bool allowFixes);
 
 /// Match the call arguments (as described by the given argument type) to
 /// the parameters (as described by the given parameter type).

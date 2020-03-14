@@ -213,23 +213,221 @@ static bool acceptsTrailingClosure(const AnyFunctionType::Param &param) {
       paramTy->isAny();
 }
 
-// FIXME: This should return ConstraintSystem::TypeMatchResult instead
-//        to give more information to the solver about the failure.
-bool constraints::
-matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
-                   ArrayRef<AnyFunctionType::Param> params,
-                   const ParameterListInfo &paramInfo,
-                   bool hasTrailingClosure,
-                   bool allowFixes,
-                   MatchCallArgumentListener &listener,
-                   SmallVectorImpl<ParamBinding> &parameterBindings) {
+CallArgumentMatchResult::Binding::Binding(unsigned argIdx, unsigned paramIdx)
+    : argIdx(argIdx), paramIdx(paramIdx), variadicArgLength(1),
+      isLabelWrong(false), isLabelMissing(false), isLabelExtraneous(false) {}
+
+CallArgumentMatchResult::Reordering::Reordering(unsigned fromArgIdx,
+                                                unsigned toArgIdx)
+    : fromArgIdx(fromArgIdx), toArgIdx(toArgIdx) {}
+
+CallArgumentMatchResult::CallArgumentMatchResult():
+isTrailingClosureMismatch(false) {}
+
+void CallArgumentMatchResult::assertUnresolvedArgument(unsigned argIdx) const {
+  for (auto i : extraArgs) {
+    assert(i != argIdx && "already marked as extra argument");
+  }
+}
+
+void CallArgumentMatchResult::assertUnresolvedParameter(
+    unsigned paramIdx) const {
+  for (const auto &binding : bindings) {
+    assert(binding.paramIdx != paramIdx && "already bound parameter");
+  }
+  for (auto i : missingArgParams) {
+    assert(i != paramIdx && "already marked as missing argument parameter");
+  }
+}
+
+CallArgumentMatchResult::Binding *
+CallArgumentMatchResult::findBindingByArgumentIndex(unsigned argIdx) {
+  for (auto i : indices(bindings)) {
+    if (bindings[i].argIdx == argIdx) {
+      return &bindings[i];
+    }
+  }
+  return nullptr;
+}
+
+const CallArgumentMatchResult::Binding *
+CallArgumentMatchResult::findBindingByArgumentIndex(unsigned argIdx) const {
+  return const_cast<CallArgumentMatchResult *>(this)
+      ->findBindingByArgumentIndex(argIdx);
+}
+
+CallArgumentMatchResult::Binding *
+CallArgumentMatchResult::findBindingByParameterIndex(unsigned paramIdx) {
+  for (auto i : indices(bindings)) {
+    if (bindings[i].paramIdx == paramIdx) {
+      return &bindings[i];
+    }
+  }
+  return nullptr;
+}
+
+const CallArgumentMatchResult::Binding *
+CallArgumentMatchResult::findBindingByParameterIndex(unsigned paramIdx) const {
+  return const_cast<CallArgumentMatchResult *>(this)
+      ->findBindingByParameterIndex(paramIdx);
+}
+
+SmallVector<unsigned, 4>
+CallArgumentMatchResult::bindingIndicesOrderedByArgumentIndex() const {
+  SmallVector<unsigned, 4> idxs;
+  for (auto i : indices(bindings)) {
+    idxs.push_back(i);
+  }
+  std::sort(idxs.begin(), idxs.end(), [this](auto a, auto b) {
+    return bindings[a].argIdx < bindings[b].argIdx;
+  });
+  return idxs;
+}
+
+SmallVector<unsigned, 4>
+CallArgumentMatchResult::bindingIndicesOrderedByParameterIndex() const {
+  SmallVector<unsigned, 4> idxs;
+  for (auto i : indices(bindings)) {
+    idxs.push_back(i);
+  }
+  std::sort(idxs.begin(), idxs.end(), [this](auto a, auto b) {
+    return bindings[a].paramIdx < bindings[b].paramIdx;
+  });
+  return idxs;
+}
+
+bool CallArgumentMatchResult::isExtraArgument(unsigned argIdx) const {
+  for (auto i : extraArgs) {
+    if (i == argIdx) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool CallArgumentMatchResult::isTrailingClosureArgument(unsigned argIdx) const {
+  return argIdx == trailingClosureArgIdx;
+}
+
+bool CallArgumentMatchResult::isMissingArgumentParameter(
+    unsigned paramIdx) const {
+  for (auto i : missingArgParams) {
+    if (i == paramIdx) {
+      return true;
+    }
+  }
+  return false;
+}
+
+unsigned CallArgumentMatchResult::bind(unsigned argIdx, unsigned paramIdx) {
+  assertUnresolvedArgument(argIdx);
+  assertUnresolvedParameter(paramIdx);
+
+  unsigned bindIdx = bindings.size();
+  bindings.push_back(CallArgumentMatchResult::Binding(argIdx, paramIdx));
+  return bindIdx;
+}
+
+void CallArgumentMatchResult::markExtraArgument(unsigned argIdx) {
+  assertUnresolvedArgument(argIdx);
+  extraArgs.push_back(argIdx);
+}
+
+void CallArgumentMatchResult::markMissingArgumentParameter(unsigned paramIdx) {
+  assertUnresolvedParameter(paramIdx);
+  missingArgParams.push_back(paramIdx);
+}
+
+bool CallArgumentMatchResult::needsRelabeling() const {
+  for (const auto &binding : bindings) {
+    if (binding.isLabelWrong || binding.isLabelMissing ||
+        binding.isLabelExtraneous)
+      return true;
+  }
+  return false;
+}
+
+SmallVector<Identifier, 8> CallArgumentMatchResult::buildRelabelingLabels(
+    unsigned numArgs, ArrayRef<AnyFunctionType::Param> params,
+    const ParameterListInfo &paramsInfo) const {
+  // If all arguments are ordered correctly and no extra arguments,
+  // it build least labels.
+  // Otherwise, it build full labels.
+
+  SmallVector<Identifier, 8> labels;
+
+  auto buildLeastLabels = [&]() -> bool {
+    if (extraArgs.size() > 0)
+      return false;
+
+    unsigned prevArgIdx = 0;
+    bool isFirstArg = true;
+    bool sawMissing = false;
+    for (auto paramIdx : indices(params)) {
+      if (isMissingArgumentParameter(paramIdx)) {
+        sawMissing = true;
+        continue;
+      }
+
+      auto *binding = findBindingByParameterIndex(paramIdx);
+      if (!binding) {
+        if (paramsInfo.hasDefaultArgument(paramIdx))
+          continue;
+
+        if (params[paramIdx].isVariadic())
+          continue;
+
+        return false;
+      }
+
+      // argument after missing
+      if (sawMissing)
+        return false;
+
+      // check if it is ordered
+      if (!isFirstArg && binding->argIdx <= prevArgIdx)
+        return false;
+      isFirstArg = false;
+      prevArgIdx = binding->argIdx;
+
+      labels.push_back(params[paramIdx].getLabel());
+    }
+
+    return true;
+  };
+
+  if (buildLeastLabels())
+    return labels;
+
+  labels.clear();
+  llvm::transform(
+      params, std::back_inserter(labels),
+      [](const AnyFunctionType::Param &param) { return param.getLabel(); });
+  return labels;
+}
+
+CallArgumentMatchResult
+constraints::matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
+                                ArrayRef<AnyFunctionType::Param> params,
+                                const ParameterListInfo &paramInfo,
+                                bool hasTrailingClosure, bool allowFixes) {
   assert(params.size() == paramInfo.size() && "Default map does not match");
+
+  CallArgumentMatchResult result;
 
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
   unsigned numParams = params.size();
+  SmallVector<ParamBinding, 4> parameterBindings;
   parameterBindings.clear();
   parameterBindings.resize(numParams);
+
+  auto bindParameter = [&](unsigned paramIdx, unsigned argIdx) -> unsigned {
+    parameterBindings[paramIdx].push_back(argIdx);
+
+    const auto bindIdx = result.bind(argIdx, paramIdx);
+    return bindIdx;
+  };
 
   // Keep track of which arguments we have claimed from the argument tuple.
   unsigned numArgs = args.size();
@@ -397,7 +595,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       }
 
       // Record the first argument for the variadic.
-      parameterBindings[paramIdx].push_back(*claimed);
+      auto bindIdx = bindParameter(paramIdx, *claimed);
+      auto &binding = result.bindings[bindIdx];
 
       // If the argument is itself variadic, we're forwarding varargs
       // with a VarargExpansionExpr; don't collect any more arguments.
@@ -412,6 +611,10 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         while (
             (claimed = claimNextNamed(nextArgIdx, Identifier(), false, true))) {
           parameterBindings[paramIdx].push_back(*claimed);
+
+          assert(*claimed == binding.argIdx + binding.variadicArgLength &&
+                 "variadic tail is not contiguous");
+          binding.variadicArgLength += 1;
         }
       }
 
@@ -422,13 +625,17 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     // Try to claim an argument for this parameter.
     if (auto claimed =
             claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch)) {
-      parameterBindings[paramIdx].push_back(*claimed);
+      bindParameter(paramIdx, *claimed);
       return;
     }
 
     // There was no argument to claim. Leave the argument unfulfilled.
     haveUnfulfilledParams = true;
   };
+
+  if (hasTrailingClosure) {
+    result.trailingClosureArgIdx = numArgs - 1;
+  }
 
   // If we have a trailing closure, it maps to the last parameter.
   if (hasTrailingClosure && numParams > 0) {
@@ -452,6 +659,10 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       break;
     }
 
+    if (lastAcceptsTrailingClosure) {
+      result.trailingClosureParamIdx = lastParamIdx;
+    }
+
     bool isExtraClosure = false;
     // If there is no suitable last parameter to accept the trailing closure,
     // notify the listener and bail if we need to.
@@ -466,22 +677,22 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         const auto param = params[numParams - 1];
         if (param.hasLabel() && param.getLabel() == arg.getLabel()) {
           isExtraClosure = true;
-          if (listener.extraArgument(numArgs - 1))
-            return true;
+          result.markExtraArgument(numArgs - 1);
         }
       }
 
-      if (!isExtraClosure &&
-          listener.trailingClosureMismatch(lastParamIdx, numArgs - 1))
-        return true;
+      if (!isExtraClosure) {
+        bindParameter(lastParamIdx, numArgs - 1);
+        result.isTrailingClosureMismatch = true;
+      }
     }
 
     // Claim the parameter/argument pair.
     claim(params[lastParamIdx].getLabel(), numArgs - 1,
           /*ignoreNameClash=*/true);
     // Let's claim the trailing closure unless it's an extra argument.
-    if (!isExtraClosure)
-      parameterBindings[lastParamIdx].push_back(numArgs - 1);
+    if (!isExtraClosure && !result.isTrailingClosureMismatch)
+      bindParameter(lastParamIdx, numArgs - 1);
   }
 
   {
@@ -546,7 +757,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
             auto paramIdx = unfulfilledNamedParams[best];
             auto paramLabel = params[paramIdx].getLabel();
 
-            parameterBindings[paramIdx].push_back(claim(paramLabel, argIdx));
+            bindParameter(paramIdx, claim(paramLabel, argIdx));
 
             // Erase this parameter from the list of unfulfilled named
             // parameters, so we don't try to fulfill it again.
@@ -597,7 +808,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         // Looks like there was no parameter claimed at the same
         // position, it could only mean that label is completely
         // different, because typo correction has been attempted already.
-        parameterBindings[i].push_back(claim(params[i].getLabel(), i));
+        bindParameter(i, claim(params[i].getLabel(), i));
       }
     }
 
@@ -608,8 +819,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         if (claimedArgs[index])
           continue;
 
-        if (listener.extraArgument(index))
-          return true;
+        result.markExtraArgument(index);
       }
     }
 
@@ -635,12 +845,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       if (paramInfo.hasDefaultArgument(paramIdx))
         continue;
 
-      if (auto newArgIdx = listener.missingArgument(paramIdx)) {
-        parameterBindings[paramIdx].push_back(*newArgIdx);
-        continue;
-      }
-
-      return true;
+      result.markMissingArgumentParameter(paramIdx);
     }
   }
 
@@ -701,17 +906,26 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     bool hadLabelMismatch = false;
     for (const auto paramIdx : indices(params)) {
       const auto toArgIdx = paramToArgMap[paramIdx];
-      const auto &binding = parameterBindings[paramIdx];
-      for (const auto paramBindIdx : indices(binding)) {
+      const auto &parameterBinding = parameterBindings[paramIdx];
+      for (const auto paramBindIdx : indices(parameterBinding)) {
         // We've found the parameter that has an out of order
         // argument, and know the indices of the argument that
         // needs to move (fromArgIdx) and the argument location
         // it should move to (toArgIdx).
-        const auto fromArgIdx = binding[paramBindIdx];
+        const auto fromArgIdx = parameterBinding[paramBindIdx];
 
         // Does nothing for variadic tail.
         if (params[paramIdx].isVariadic() && paramBindIdx > 0) {
           assert(args[fromArgIdx].getLabel().empty());
+          continue;
+        }
+
+        auto *binding = result.findBindingByParameterIndex(paramIdx);
+        assert(binding && binding->argIdx == fromArgIdx &&
+               "parameterBindings is broken");
+
+        if (result.isTrailingClosureArgument(binding->argIdx)) {
+          // trailing closure has empty label but its always ok.
           continue;
         }
 
@@ -720,27 +934,18 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         // one argument requires label and another one doesn't, but caller
         // doesn't provide either, problem is going to be identified as
         // out-of-order argument instead of label mismatch.
-        const auto expectedLabel = params[paramIdx].getLabel();
-        const auto argumentLabel = args[fromArgIdx].getLabel();
+
+        const auto expectedLabel = params[binding->paramIdx].getLabel();
+        const auto argumentLabel = args[binding->argIdx].getLabel();
 
         if (argumentLabel != expectedLabel) {
-          // - The parameter is unnamed, in which case we try to fix the
-          //   problem by removing the name.
+          hadLabelMismatch = true;
           if (expectedLabel.empty()) {
-            hadLabelMismatch = true;
-            if (listener.extraneousLabel(paramIdx))
-              return true;
-          // - The argument is unnamed, in which case we try to fix the
-          //   problem by adding the name.
+            binding->isLabelExtraneous = true;
           } else if (argumentLabel.empty()) {
-            hadLabelMismatch = true;
-            if (listener.missingLabel(paramIdx))
-              return true;
-          // - The argument label has a typo at the same position.
-          } else if (fromArgIdx == toArgIdx) {
-            hadLabelMismatch = true;
-            if (listener.incorrectLabel(paramIdx))
-              return true;
+            binding->isLabelMissing = true;
+          } else {
+            binding->isLabelWrong = true;
           }
         }
 
@@ -753,26 +958,100 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         // to say exactly without considering other factors, because it
         // could be invalid labeling too.
         if (!hadLabelMismatch &&
-            isOutOfOrderArgument(paramIdx, fromArgIdx, toArgIdx))
-          return listener.outOfOrderArgument(fromArgIdx, toArgIdx);
+            isOutOfOrderArgument(paramIdx, fromArgIdx, toArgIdx)) {
+          result.reordering =
+              CallArgumentMatchResult::Reordering(fromArgIdx, toArgIdx);
+          continue;
+        }
 
-        SmallVector<Identifier, 8> expectedLabels;
-        llvm::transform(params, std::back_inserter(expectedLabels),
-                        [](const AnyFunctionType::Param &param) {
-                          return param.getLabel();
-                        });
-        return listener.relabelArguments(expectedLabels);
+        hadLabelMismatch = true;
+        binding->isLabelWrong = true;
       }
     }
   }
 
-  // If no arguments were renamed, the call arguments match up with the
-  // parameters.
-  if (actualArgNames.empty())
-    return false;
+  return result;
+}
 
-  // The arguments were relabeled; notify the listener.
-  return listener.relabelArguments(actualArgNames);
+// FIXME: This should return ConstraintSystem::TypeMatchResult instead
+//        to give more information to the solver about the failure.
+bool constraints::matchCallArguments(
+    SmallVectorImpl<AnyFunctionType::Param> &args,
+    ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
+    bool hasTrailingClosure, bool allowFixes,
+    MatchCallArgumentListener &listener,
+    SmallVectorImpl<ParamBinding> &parameterBindings) {
+
+  CallArgumentMatchResult matchResult = matchCallArguments(
+      args, params, paramInfo, hasTrailingClosure, allowFixes);
+
+  parameterBindings.resize(params.size());
+  for (auto paramIdx : indices(params)) {
+    if (auto binding = matchResult.findBindingByParameterIndex(paramIdx)) {
+      for (unsigned i = 0; i < binding->variadicArgLength; i++) {
+        parameterBindings[paramIdx].push_back(binding->argIdx + i);
+      }
+    }
+  }
+  
+  if (matchResult.isTrailingClosureMismatch) {
+    if (auto argIdx = matchResult.trailingClosureArgIdx) {
+      const auto *binding = matchResult.findBindingByArgumentIndex(*argIdx);
+      if (listener.trailingClosureMismatch(binding->paramIdx,
+                                           binding->argIdx))
+        return true;
+    }
+  }
+
+  for (auto argIdx : matchResult.extraArgs) {
+    if (listener.extraArgument(argIdx))
+      return true;
+  }
+
+  // listener may add dummy argument here.
+  const auto originalNumArgs = args.size();
+  for (auto paramIdx : matchResult.missingArgParams) {
+    auto newArgIdx = listener.missingArgument(paramIdx);
+    if (!newArgIdx)
+      return true;
+
+    assert(*newArgIdx == (args.size() - 1) &&
+           "synthesized argument must be added at last");
+    parameterBindings[paramIdx].push_back(*newArgIdx);
+  }
+
+  if (auto reordering = matchResult.reordering) {
+    if (listener.outOfOrderArgument(reordering->fromArgIdx,
+                                    reordering->toArgIdx))
+      return true;
+    return false;
+  }
+
+  auto bindIdxs = matchResult.bindingIndicesOrderedByParameterIndex();
+  for (auto bindIdx : bindIdxs) {
+    const auto &binding = matchResult.bindings[bindIdx];
+
+    if (binding.isLabelExtraneous) {
+      if (listener.extraneousLabel(binding.paramIdx))
+        return true;
+    } else if (binding.isLabelMissing) {
+      if (listener.missingLabel(binding.paramIdx))
+        return true;
+    } else if (binding.isLabelWrong) {
+      if (listener.incorrectLabel(binding.paramIdx))
+        return true;
+    }
+  }
+
+  if (matchResult.needsRelabeling()) {
+    auto labels =
+        matchResult.buildRelabelingLabels(originalNumArgs, params, paramInfo);
+    if (listener.relabelArguments(labels))
+      return true;
+    return false;
+  }
+
+  return false;
 }
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
