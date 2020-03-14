@@ -561,6 +561,8 @@ enum class CaptureKind {
   StorageAddress,
   /// A local value captured as a constant.
   Constant,
+  /// A let constant captured as a pointer to storage
+  Immutable
 };
 
 

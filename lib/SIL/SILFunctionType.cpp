@@ -1464,9 +1464,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
     case CaptureKind::Constant: {
       // Constants are captured by value.
       ParameterConvention convention;
-      if (loweredTL.isAddressOnly()) {
-        convention = ParameterConvention::Indirect_In_Guaranteed;
-      } else if (loweredTL.isTrivial()) {
+      assert (!loweredTL.isAddressOnly());
+      if (loweredTL.isTrivial()) {
         convention = ParameterConvention::Direct_Unowned;
       } else {
         convention = ParameterConvention::Direct_Guaranteed;
@@ -1496,6 +1495,16 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       auto param =
           SILParameterInfo(ty.getASTType(),
                            ParameterConvention::Indirect_InoutAliasable);
+      inputs.push_back(param);
+      break;
+    }
+    case CaptureKind::Immutable: {
+      // 'let' constants that are address-only are captured as the address of
+      // the value and will be consumed by the closure.
+      SILType ty = loweredTy.getAddressType();
+      auto param =
+          SILParameterInfo(ty.getASTType(),
+                           ParameterConvention::Indirect_In_Guaranteed);
       inputs.push_back(param);
       break;
     }
