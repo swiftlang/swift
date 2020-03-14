@@ -5589,56 +5589,56 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
                                                   ValueDecl *Requirement) {
   // Note: whenever you update this function, also update
   // DerivedConformance::getDerivableRequirement.
-  auto *protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
+  const auto protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
 
-  auto knownKind = protocol->getKnownProtocolKind();
-  
-  if (!knownKind)
+  const auto derivableKind = protocol->getKnownDerivableProtocolKind();
+  if (!derivableKind)
     return nullptr;
 
-  auto Decl = DC->getInnermostDeclarationDeclContext();
+  const auto Decl = DC->getInnermostDeclarationDeclContext();
   if (Decl->isInvalid())
     return nullptr;
 
   DerivedConformance derived(TypeDecl->getASTContext(), Decl, TypeDecl,
                              protocol);
 
-  switch (*knownKind) {
-  case KnownProtocolKind::RawRepresentable:
+  switch (*derivableKind) {
+  case KnownDerivableProtocolKind::RawRepresentable:
     return derived.deriveRawRepresentable(Requirement);
 
-  case KnownProtocolKind::CaseIterable:
+  case KnownDerivableProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(Requirement);
 
-  case KnownProtocolKind::Comparable:
+  case KnownDerivableProtocolKind::Comparable:
     return derived.deriveComparable(Requirement);
 
-  case KnownProtocolKind::Equatable:
+  case KnownDerivableProtocolKind::Equatable:
     return derived.deriveEquatable(Requirement);
 
-  case KnownProtocolKind::Hashable:
+  case KnownDerivableProtocolKind::Hashable:
     return derived.deriveHashable(Requirement);
 
-  case KnownProtocolKind::BridgedNSError:
+  case KnownDerivableProtocolKind::BridgedNSError:
     return derived.deriveBridgedNSError(Requirement);
 
-  case KnownProtocolKind::CodingKey:
+  case KnownDerivableProtocolKind::CodingKey:
     return derived.deriveCodingKey(Requirement);
 
-  case KnownProtocolKind::Encodable:
+  case KnownDerivableProtocolKind::Encodable:
     return derived.deriveEncodable(Requirement);
 
-  case KnownProtocolKind::Decodable:
+  case KnownDerivableProtocolKind::Decodable:
     return derived.deriveDecodable(Requirement);
 
-  case KnownProtocolKind::AdditiveArithmetic:
+  case KnownDerivableProtocolKind::AdditiveArithmetic:
     return derived.deriveAdditiveArithmetic(Requirement);
 
-  case KnownProtocolKind::Differentiable:
+  case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
 
-  default:
-    return nullptr;
+  case KnownDerivableProtocolKind::OptionSet:
+      llvm_unreachable(
+          "When possible, OptionSet is derived via memberwise init synthesis");
   }
 }
 

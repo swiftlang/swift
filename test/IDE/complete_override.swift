@@ -150,6 +150,10 @@
 
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MISSING_ASSOC_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=MISSING_ASSOC_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_2 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_3 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_4 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_4
 
 @objc
 class TagPA {}
@@ -861,3 +865,47 @@ struct MissingAssoc: AssocAndMethod {
 // MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f2(_: U) {|};
 // MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f3(_: V) {|};
 // MISSING_ASSOC_1: End completions
+
+// Test that we don't skip out on synthesized conformance members.
+
+struct SynthesizedConformance1: Codable {
+  let foo: Int
+  #^OVERRIDE_SYNTHESIZED_1^#
+// OVERRIDE_SYNTHESIZED_1: Begin completions,  2 items
+// OVERRIDE_SYNTHESIZED_1-DAG: Decl[Constructor]/Super:       init(from decoder: Decoder) throws {|};
+// OVERRIDE_SYNTHESIZED_1-DAG: Decl[InstanceMethod]/Super:    func encode(to encoder: Encoder) throws {|};
+}
+
+open class SynthesizedConformance2: Codable {
+  let foo: Int
+  func encode(to encoder: Encoder) throws {}
+  #^OVERRIDE_SYNTHESIZED_2^#
+// OVERRIDE_SYNTHESIZED_2: Begin completions, 1 items
+// OVERRIDE_SYNTHESIZED_2: Decl[Constructor]/Super:           public required init(from decoder: Decoder) throws {|};
+}
+
+struct SynthesizedConformance3: Hashable {
+  let foo: Int
+  #^OVERRIDE_SYNTHESIZED_3^#
+// FIXME: Where did Equatable.(==) go?
+// OVERRIDE_SYNTHESIZED_3: Begin completions, 2 items
+// OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceVar]/Super:       var hashValue: Int; name=hashValue: Int
+// OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceMethod]/Super:    func hash(into hasher: inout Hasher) {|}
+}
+
+enum SynthesizedConformance4: CaseIterable {
+  case a, b, c, d
+  #^OVERRIDE_SYNTHESIZED_4^#
+// OVERRIDE_SYNTHESIZED_4: Begin completions, 4 items
+// OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceVar]/Super:       var hashValue: Int
+// OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceMethod]/Super:    func hash(into hasher: inout Hasher) {|};
+// OVERRIDE_SYNTHESIZED_4-DAG: Decl[StaticVar]/Super:         static var allCases: [SynthesizedConformance4];
+// OVERRIDE_SYNTHESIZED_4-DAG: Decl[AssociatedType]/Super:    typealias AllCases = {#(Type)#};
+}
+
+class SynthesizedConformance5: SynthesizedConformance2 {
+  #^OVERRIDE_SYNTHESIZED_5^#
+// OVERRIDE_SYNTHESIZED_5: Begin completions, 2 items
+// OVERRIDE_SYNTHESIZED_5-DAG: Decl[InstanceMethod]/Super:    override func encode(to encoder: Encoder) throws {|};
+// OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super:       required init(from decoder: Decoder) throws {|};
+}
