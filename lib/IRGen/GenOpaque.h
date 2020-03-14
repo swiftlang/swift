@@ -45,7 +45,8 @@ namespace irgen {
   /// the referenced witness table is still undergoing initialization.
   llvm::Value *emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
                                                 llvm::Value *table,
-                                                WitnessIndex index);
+                                                WitnessIndex index,
+                                                llvm::Value **slot = nullptr);
 
   /// Given a witness table (protocol or value), load one of the
   /// witnesses.
@@ -54,7 +55,8 @@ namespace irgen {
   /// the referenced witness table is still undergoing initialization.
   llvm::Value *emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
                                                 llvm::Value *table,
-                                                llvm::Value *index);
+                                                llvm::Value *index,
+                                                llvm::Value **slot = nullptr);
 
   /// Emit a call to do an 'initializeBufferWithCopyOfBuffer' operation.
   llvm::Value *emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,

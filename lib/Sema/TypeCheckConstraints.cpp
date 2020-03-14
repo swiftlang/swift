@@ -1774,30 +1774,15 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
   auto traversePath = [&](Expr *expr, bool isInParsedPath,
                           bool emitErrors = true) {
     Expr *outermostExpr = expr;
-    // We can end up in scenarios where the key path has contextual type,
-    // but is missing a leading dot. This can happen when we have an
-    // implicit TypeExpr or an implicit DeclRefExpr.
-    auto diagnoseMissingDot = [&]() {
-      DE.diagnose(expr->getLoc(),
-                  diag::expr_swift_keypath_not_starting_with_dot)
-          .fixItInsert(expr->getStartLoc(), ".");
-    };
     while (1) {
       // Base cases: we've reached the top.
       if (auto TE = dyn_cast<TypeExpr>(expr)) {
         assert(!isInParsedPath);
         rootType = TE->getTypeRepr();
-        if (TE->isImplicit()) {
-          diagnoseMissingDot();
-        }
         return;
       } else if (isa<KeyPathDotExpr>(expr)) {
         assert(isInParsedPath);
         // Nothing here: the type is either the root, or is inferred.
-        return;
-      } else if (expr->isImplicit() && isa<DeclRefExpr>(expr)) {
-        assert(!isInParsedPath);
-        diagnoseMissingDot();
         return;
       }
 
@@ -4233,18 +4218,18 @@ IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
   });
 }
 
-llvm::Expected<bool>
-HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
-                                                 CanType ty) const {
+template <class DynamicAttribute>
+static bool checkForDynamicAttribute(CanType ty,
+                                     llvm::function_ref<bool (Type)> hasAttribute) {
   // If this is an archetype type, check if any types it conforms to
   // (superclass or protocols) have the attribute.
   if (auto archetype = dyn_cast<ArchetypeType>(ty)) {
     for (auto proto : archetype->getConformsTo()) {
-      if (proto->getDeclaredType()->hasDynamicMemberLookupAttribute())
+      if (hasAttribute(proto->getDeclaredType()))
         return true;
     }
     if (auto superclass = archetype->getSuperclass()) {
-      if (superclass->hasDynamicMemberLookupAttribute())
+      if (hasAttribute(superclass))
         return true;
     }
   }
@@ -4253,33 +4238,50 @@ HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
   // attribute.
   if (auto protocolComp = dyn_cast<ProtocolCompositionType>(ty)) {
     for (auto member : protocolComp->getMembers()) {
-      if (member->hasDynamicMemberLookupAttribute())
+      if (hasAttribute(member))
         return true;
     }
   }
 
   // Otherwise, this must be a nominal type.
-  // Dynamic member lookup doesn't work for tuples, etc.
+  // Neither Dynamic member lookup nor Dynamic Callable doesn't
+  // work for tuples, etc.
   auto nominal = ty->getAnyNominal();
   if (!nominal)
     return false;
 
   // If this type has the attribute on it, then yes!
-  if (nominal->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
+  if (nominal->getAttrs().hasAttribute<DynamicAttribute>())
     return true;
 
   // Check the protocols the type conforms to.
   for (auto proto : nominal->getAllProtocols()) {
-    if (proto->getDeclaredType()->hasDynamicMemberLookupAttribute())
+    if (hasAttribute(proto->getDeclaredType()))
       return true;
   }
 
   // Check the superclass if present.
   if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
     if (auto superclass = classDecl->getSuperclass()) {
-      if (superclass->hasDynamicMemberLookupAttribute())
+      if (hasAttribute(superclass))
         return true;
     }
   }
   return false;
+}
+
+llvm::Expected<bool>
+HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
+                                                 CanType ty) const {
+  return checkForDynamicAttribute<DynamicMemberLookupAttr>(ty, [](Type type) {
+    return type->hasDynamicMemberLookupAttribute();
+  });
+}
+
+llvm::Expected<bool>
+HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
+                                             CanType ty) const {
+  return checkForDynamicAttribute<DynamicCallableAttr>(ty, [](Type type) {
+    return type->hasDynamicCallableAttribute();
+  });
 }

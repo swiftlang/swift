@@ -4219,7 +4219,7 @@ namespace {
       Type baseTy, leafTy;
       Type exprType = cs.getType(E);
       if (auto fnTy = exprType->getAs<FunctionType>()) {
-        baseTy = fnTy->getParams()[0].getPlainType();
+        baseTy = fnTy->getParams()[0].getParameterType();
         leafTy = fnTy->getResult();
         isFunctionType = true;
       } else {
@@ -4228,12 +4228,15 @@ namespace {
         leafTy = keyPathTy->getGenericArgs()[1];
       }
 
+      // Track the type of the current component. Once we finish projecting
+      // through each component of the key path, we should reach the leafTy.
+      auto componentTy = baseTy;
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getMutableComponents()[i];
         
         // If there were unresolved types, we may end up with a null base for
         // following components.
-        if (!baseTy) {
+        if (!componentTy) {
           resolvedComponents.push_back(origComponent);
           continue;
         }
@@ -4255,7 +4258,7 @@ namespace {
           if (!foundDecl) {
             // If we couldn't resolve the component, leave it alone.
             resolvedComponents.push_back(origComponent);
-            baseTy = origComponent.getComponentType();
+            componentTy = origComponent.getComponentType();
             continue;
           }
 
@@ -4294,9 +4297,9 @@ namespace {
           didOptionalChain = true;
           // Chaining always forces the element to be an rvalue.
           auto objectTy =
-              baseTy->getWithoutSpecifierType()->getOptionalObjectType();
-          if (baseTy->hasUnresolvedType() && !objectTy) {
-            objectTy = baseTy;
+              componentTy->getWithoutSpecifierType()->getOptionalObjectType();
+          if (componentTy->hasUnresolvedType() && !objectTy) {
+            objectTy = componentTy;
           }
           assert(objectTy);
           
@@ -4316,7 +4319,7 @@ namespace {
         }
         case KeyPathExpr::Component::Kind::Identity: {
           auto component = origComponent;
-          component.setComponentType(baseTy);
+          component.setComponentType(componentTy);
           resolvedComponents.push_back(component);
           break;
         }
@@ -4327,21 +4330,20 @@ namespace {
           llvm_unreachable("already resolved");
         }
 
-        // Update "baseTy" with the result type of the last component.
+        // Update "componentTy" with the result type of the last component.
         assert(!resolvedComponents.empty());
-        baseTy = resolvedComponents.back().getComponentType();
+        componentTy = resolvedComponents.back().getComponentType();
       }
       
       // Wrap a non-optional result if there was chaining involved.
-      if (didOptionalChain &&
-          baseTy &&
-          !baseTy->hasUnresolvedType() &&
-          !baseTy->getWithoutSpecifierType()->isEqual(leafTy)) {
+      if (didOptionalChain && componentTy &&
+          !componentTy->hasUnresolvedType() &&
+          !componentTy->getWithoutSpecifierType()->isEqual(leafTy)) {
         assert(leafTy->getOptionalObjectType()->isEqual(
-            baseTy->getWithoutSpecifierType()));
+            componentTy->getWithoutSpecifierType()));
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
-        baseTy = leafTy;
+        componentTy = leafTy;
       }
 
       // Set the resolved components, and cache their types.
@@ -4367,8 +4369,8 @@ namespace {
       
       // The final component type ought to line up with the leaf type of the
       // key path.
-      assert(!baseTy || baseTy->hasUnresolvedType()
-             || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
+      assert(!componentTy || componentTy->hasUnresolvedType()
+             || componentTy->getWithoutSpecifierType()->isEqual(leafTy));
 
       if (!isFunctionType)
         return E;
@@ -4377,9 +4379,6 @@ namespace {
       // a closure. The type checker has given E a function type to indicate
       // this; we're going to change E's type to KeyPath<baseTy, leafTy> and
       // then wrap it in a larger closure expression with the appropriate type.
-
-      // baseTy has been overwritten by the loop above; restore it.
-      baseTy = exprType->getAs<FunctionType>()->getParams()[0].getPlainType();
 
       // Compute KeyPath<baseTy, leafTy> and set E's type back to it.
       auto kpDecl = cs.getASTContext().getKeyPathDecl();

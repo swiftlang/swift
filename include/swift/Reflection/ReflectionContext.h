@@ -751,50 +751,100 @@ public:
         return false;
       unsigned long NonPayloadCaseCount = FieldCount - 1;
       unsigned long PayloadExtraInhabitants = PayloadCase.TI.getNumExtraInhabitants();
-      unsigned discriminator = 0;
+      unsigned Discriminator = 0;
       auto PayloadSize = PayloadCase.TI.getSize();
       if (NonPayloadCaseCount >= PayloadExtraInhabitants) {
         // There are more cases than inhabitants, we need a separate discriminator.
         auto TagInfo = getEnumTagCounts(PayloadSize, NonPayloadCaseCount, 1);
         auto TagSize = TagInfo.numTagBytes;
         auto TagAddress = RemoteAddress(EnumAddress.getAddressData() + PayloadSize);
-        if (!getReader().readInteger(TagAddress, TagSize, &discriminator))
-          return false;
-      }
-
-      if (PayloadExtraInhabitants == 0) {
-        // Payload has no XI, so discriminator fully determines the case
-        *CaseIndex = discriminator;
-        return true;
-      } else if (discriminator == 0) {
-        // The value overlays the payload ... ask the payload to decode it.
-        int t;
-        if (!PayloadCase.TI.readExtraInhabitantIndex(getReader(), EnumAddress, &t)) {
+        if (!getReader().readInteger(TagAddress, TagSize, &Discriminator)) {
+          printf(">>>> readXI failed to read discriminator\n\n");
           return false;
         }
-        if (t < 0) {
+      }
+
+      if (PayloadSize == 0) {
+        // Payload carries no information, so discriminator fully determines the case
+        *CaseIndex = Discriminator;
+        return true;
+      } else if (Discriminator == 0) {
+        // The payload area carries all the information...
+        if (PayloadExtraInhabitants == 0) {
           *CaseIndex = 0;
           return true;
-        } else if ((unsigned long)t <= NonPayloadCaseCount) {
-          *CaseIndex = t + 1;
+        }
+        int XITag = 0;
+        if (!PayloadCase.TI.readExtraInhabitantIndex(getReader(), EnumAddress, &XITag)) {
+          return false;
+        }
+        if (XITag < 0) { // Valid (not extra) inhabitant
+          *CaseIndex = 0; // Payload case is always #0
+          return true;
+        } else if ((unsigned)XITag <= NonPayloadCaseCount) {
+          *CaseIndex = XITag + 1;
           return true;
         }
         return false;
       } else {
-        // The entire payload area is available for additional cases:
-        auto TagSize = std::max(PayloadSize, 4U); // XXX TODO XXX CHECK THIS
-        auto offset = 1 + PayloadExtraInhabitants; // Cases coded with discriminator = 0
-        unsigned casesInPayload = 1 << (TagSize * 8U);
-        unsigned payloadCode;
-        if (!getReader().readInteger(EnumAddress, TagSize, &payloadCode))
+        // No payload: Payload area is reused for more cases
+        uint32_t PayloadTag = 0;
+        auto PayloadTagSize = std::min(PayloadSize, decltype(PayloadSize)(sizeof(PayloadTag)));
+        if (!getReader().readInteger(EnumAddress, PayloadTagSize, &PayloadTag)) {
           return false;
-        *CaseIndex = offset + (discriminator - 1) * casesInPayload + payloadCode;
+        }
+        auto XICases = 1U + PayloadExtraInhabitants; // Cases coded with XIs when discriminator = 0
+        auto PayloadCases = 1U << (PayloadTagSize * 8U);
+        *CaseIndex = XICases + (Discriminator - 1) * PayloadCases + PayloadTag;
         return true;
       }
     }
 
     case RecordKind::MultiPayloadEnum: {
-      // TODO: Support multipayload enums
+      // Collect basic statistics about the enum
+      unsigned long PayloadCaseCount = 0;
+      unsigned long NonPayloadCaseCount = 0;
+      unsigned long PayloadSize = 0;
+      for (auto Field : Fields) {
+        if (Field.TR != 0) {
+          PayloadCaseCount += 1;
+          if (Field.TI.getSize() > PayloadSize) {
+            PayloadSize = Field.TI.getSize();
+          }
+        } else {
+          NonPayloadCaseCount += 1;
+        }
+      }
+      if (EnumSize > PayloadSize) {
+        // If the compiler laid this out with a separate tag, use that.
+        unsigned tag = 0;
+        auto TagSize = EnumSize - PayloadSize;
+        auto TagAddress = remote::RemoteAddress(EnumAddress.getAddressData() + PayloadSize);
+        if (!getReader().readInteger(TagAddress, TagSize, &tag)
+           || tag >= Fields.size()) {
+          return false;
+        }
+        if (tag < PayloadCaseCount) {
+          *CaseIndex = tag;
+          return true;
+        }
+        auto PayloadTagSize = std::min(PayloadSize, 4UL);
+        // Treat the tag as a page selector; payload carries the offset within the page
+        auto Page = tag - PayloadCaseCount;
+        // Zero for 32-bit because we'll never have more than one page
+        auto PageSize = PayloadTagSize >= 4 ? 0 : 1 << (PayloadSize * 8U);
+        auto PageStart = Page * PageSize;
+        unsigned PayloadTag;
+        if (!getReader().readInteger(EnumAddress, PayloadTagSize, &PayloadTag)) {
+          return false;
+        }
+        *CaseIndex = PageStart + PayloadTag + PayloadCaseCount;
+        return true;
+      } else {
+        // XXX TODO: If the payloads have common spare bits (e.g., all pointers)
+        // then use those to decode the case.
+        return false;
+      }
       break;
     }
 

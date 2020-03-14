@@ -665,13 +665,13 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   auto ClonedTy = SILFunctionType::get(
-      ClosureUserFunTy->getSubstGenericSignature(), ExtInfo,
+      ClosureUserFunTy->getInvocationGenericSignature(), ExtInfo,
       ClosureUserFunTy->getCoroutineKind(),
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
       ClosureUserFunTy->getYields(), ClosureUserFunTy->getResults(),
       ClosureUserFunTy->getOptionalErrorResult(),
-      ClosureUserFunTy->getSubstitutions(),
-      ClosureUserFunTy->isGenericSignatureImplied(),
+      ClosureUserFunTy->getPatternSubstitutions(),
+      ClosureUserFunTy->getInvocationSubstitutions(),
       M.getASTContext());
 
   // We make this function bare so we don't have to worry about decls in the

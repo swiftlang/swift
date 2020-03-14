@@ -6,6 +6,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 import Foundation
 import SwiftReflectionTest
@@ -60,8 +61,9 @@ var a: Int
 
 enum OneStructPayload {
 case payloadA(StructInt)
-case otherA
-case otherB
+case cowboyAlice
+case cowboyBob
+case cowboyCharlie
 }
 
 reflect(enumValue: OneStructPayload.payloadA(StructInt(a: 0)))
@@ -71,12 +73,12 @@ reflect(enumValue: OneStructPayload.payloadA(StructInt(a: 0)))
 // CHECK-NEXT: (enum reflect_Enum_value.OneStructPayload)
 // CHECK-NEXT: Value: .payloadA(_)
 
-reflect(enumValue: OneStructPayload.otherA)
+reflect(enumValue: OneStructPayload.cowboyCharlie)
 
 // CHECK: Reflecting an enum value.
 // CHECK-NEXT: Type reference:
 // CHECK-NEXT: (enum reflect_Enum_value.OneStructPayload)
-// CHECK-NEXT: Value: .otherA
+// CHECK-NEXT: Value: .cowboyCharlie
 
 @objc class ObjCClass : NSObject {
 var a: Int = 0
@@ -172,14 +174,14 @@ reflect(enumValue: Optional<Optional<OneSwiftClassPayload>>.some(.none))
 // CHECK-NEXT:     (enum reflect_Enum_value.OneSwiftClassPayload)))
 // CHECK-NEXT: Value: .some(.none)
 
-reflect(enumValue: Optional<Optional<OneSwiftClassPayload>>.some(.some(.otherA)))
+reflect(enumValue: Optional<Optional<OneSwiftClassPayload>>.some(.some(.otherC)))
 
 // CHECK: Reflecting an enum value.
 // CHECK-NEXT: Type reference:
 // CHECK-NEXT: (bound_generic_enum Swift.Optional
 // CHECK-NEXT:   (bound_generic_enum Swift.Optional
 // CHECK-NEXT:     (enum reflect_Enum_value.OneSwiftClassPayload)))
-// CHECK-NEXT: Value: .some(.some(.otherA))
+// CHECK-NEXT: Value: .some(.some(.otherC))
 
 reflect(enumValue: Optional<Optional<OneSwiftClassPayload>>.some(.some(.otherE)))
 
@@ -210,12 +212,12 @@ case otherB
 case payloadA(MixedStruct)
 }
 
-reflect(enumValue: OneMixedStructPayload.otherA)
+reflect(enumValue: OneMixedStructPayload.otherB)
 
 // CHECK: Reflecting an enum value.
 // CHECK-NEXT: Type reference:
 // CHECK-NEXT: (enum reflect_Enum_value.OneMixedStructPayload)
-// CHECK-NEXT: Value: .otherA
+// CHECK-NEXT: Value: .otherB
 
 reflect(enumValue: OneMixedStructPayload.payloadA(MixedStruct()))
 
@@ -246,7 +248,239 @@ reflect(enumValue: OneNestedPayload.alternateB)
 // CHECK-NEXT: (enum reflect_Enum_value.OneNestedPayload)
 // CHECK-NEXT: Value: .alternateB
 
-// XXX TODO: enum with tuple payload, enum with optional payload, indirect enum, enum with closure/function payload XXX
+
+enum OneTuplePayload {
+case holderA((i: Int, c: SwiftClass))
+case emptyA
+case emptyB
+case emptyC
+}
+
+reflect(enumValue: OneTuplePayload.holderA((i: 7, c: SwiftClass())))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.OneTuplePayload)
+// CHECK-NEXT: Value: .holderA(_)
+
+reflect(enumValue: OneTuplePayload.emptyB)
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.OneTuplePayload)
+// CHECK-NEXT: Value: .emptyB
+
+func foo() -> Int { return 7; }
+
+enum OneFunctionPayload {
+case cargoA(() -> Int)
+case alternateA
+case alternateB
+case alternateC
+}
+
+reflect(enumValue: OneFunctionPayload.cargoA(foo))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.OneFunctionPayload)
+// CHECK-NEXT: Value: .cargoA(_)
+
+reflect(enumValue: OneFunctionPayload.alternateC)
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.OneFunctionPayload)
+// CHECK-NEXT: Value: .alternateC
+
+func tester1() {
+  let a = 7
+
+  func foo() -> Int { return a; }
+
+  enum OneClosurePayload {
+  case cargoA(() -> Int)
+  case alternateA
+  case alternateB
+  case alternateC
+  }
+
+  reflect(enumValue: OneClosurePayload.cargoA(foo))
+
+  // CHECK: Reflecting an enum value.
+  // CHECK-NEXT: Type reference:
+
+  // XXX TODO: Figure out why the type reference is dumped differently sometimes:
+  // XXXX-NEXT: (nominal with unmangled suffix
+  // XXXX-NEXT: (enum OneClosurePayload #1 in reflect_Enum_value.tester1() -> ())
+
+  // CHECK: Value: .cargoA(_)
+
+  reflect(enumValue: OneClosurePayload.alternateB)
+
+  // CHECK: Reflecting an enum value.
+  // CHECK-NEXT: Type reference:
+
+  // XXX TODO: Figure out why the type reference is dumped differently sometimes:
+  // XXXX-NEXT: (nominal with unmangled suffix
+  // XXXX-NEXT: (enum OneClosurePayload #1 in reflect_Enum_value.tester1() -> ())
+
+  // CHECK: Value: .alternateB
+}
+
+tester1()
+
+
+enum OneOptionalPayload {
+case boxA(Optional<Int>)
+case unboxA
+case unboxB
+case unboxC
+case unboxD
+case unboxE
+}
+
+reflect(enumValue: OneOptionalPayload.boxA(7))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.OneOptionalPayload)
+// CHECK-NEXT: Value: .boxA(.some(_))
+
+reflect(enumValue: OneOptionalPayload.unboxE)
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.OneOptionalPayload)
+// CHECK-NEXT: Value: .unboxE
+
+indirect enum OneIndirectPayload {
+case child(OneIndirectPayload)
+case leafA
+case leafB
+case leafC
+case leafD
+case leafE
+case leafF
+}
+
+reflect(enumValue: OneIndirectPayload.child(.leafF))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.OneIndirectPayload)
+// CHECK-NEXT: Value: .child(_)
+
+reflect(enumValue: OneIndirectPayload.leafF)
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.OneIndirectPayload)
+// CHECK-NEXT: Value: .leafF
+
+enum MultiPayload {
+case stampA
+case envelopeA(Int64)
+case stampB
+case envelopeB(Double)
+case stampC
+case envelopeC((Int32, Int32))
+case stampD
+case stampE
+}
+
+enum SinglePayloadEnumWithMultiPayloadEnumPayload {
+case payloadA(MultiPayload)
+case alsoA
+case alsoB
+case alsoC
+case alsoD
+}
+
+reflect(enumValue: SinglePayloadEnumWithMultiPayloadEnumPayload.payloadA(.stampB))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithMultiPayloadEnumPayload)
+// CHECK-NEXT: Value: .payloadA(.stampB)
+
+reflect(enumValue: SinglePayloadEnumWithMultiPayloadEnumPayload.payloadA(.envelopeC((1,2))))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithMultiPayloadEnumPayload)
+// CHECK-NEXT: Value: .payloadA(.envelopeC(_))
+
+reflect(enumValue: SinglePayloadEnumWithMultiPayloadEnumPayload.alsoC)
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithMultiPayloadEnumPayload)
+// CHECK-NEXT: Value: .alsoC
+
+reflect(enumValue: Optional<Optional<SinglePayloadEnumWithMultiPayloadEnumPayload>>.some(.none))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (bound_generic_enum Swift.Optional
+// CHECK-NEXT:  (bound_generic_enum Swift.Optional
+// CHECK-NEXT:   (enum reflect_Enum_value.SinglePayloadEnumWithMultiPayloadEnumPayload)))
+// CHECK-NEXT: Value: .some(.none)
+
+enum SmallMultiPayload {
+case stampA
+case envelopeA(Int8)
+case stampB
+case envelopeB(Int16)
+case stampC
+case envelopeC((UInt8, Int8))
+case stampD
+case stampE
+}
+
+enum SinglePayloadEnumWithSmallMultiPayloadEnumPayload {
+case payloadA(SmallMultiPayload)
+case alsoA
+case alsoB
+case alsoC
+case alsoD
+}
+
+reflect(enumValue: SinglePayloadEnumWithSmallMultiPayloadEnumPayload.payloadA(.stampB))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithSmallMultiPayloadEnumPayload)
+// CHECK-NEXT: Value: .payloadA(.stampB)
+
+reflect(enumValue: SinglePayloadEnumWithSmallMultiPayloadEnumPayload.payloadA(.envelopeC((1,2))))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithSmallMultiPayloadEnumPayload)
+// CHECK-NEXT: Value: .payloadA(.envelopeC(_))
+
+reflect(enumValue: SinglePayloadEnumWithSmallMultiPayloadEnumPayload.alsoC)
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithSmallMultiPayloadEnumPayload)
+// CHECK-NEXT: Value: .alsoC
+
+reflect(enumValue: Optional<Optional<SinglePayloadEnumWithSmallMultiPayloadEnumPayload>>.some(.none))
+
+// CHECK: Reflecting an enum value.
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (bound_generic_enum Swift.Optional
+// CHECK-NEXT:  (bound_generic_enum Swift.Optional
+// CHECK-NEXT:   (enum reflect_Enum_value.SinglePayloadEnumWithSmallMultiPayloadEnumPayload)))
+// CHECK-NEXT: Value: .some(.none)
+
+
+// XXX TODO: Multipayload enums with pointer payloads
+
+
+// XXX TODO: test enum with thin function payload XXX
 
 doneReflecting()
 // CHECK: Done.

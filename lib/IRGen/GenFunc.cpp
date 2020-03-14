@@ -100,6 +100,7 @@
 #include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
+#include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -1018,6 +1019,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       SILFunctionTypeRepresentation::WitnessMethod;
   Explosion witnessMethodSelfValue;
 
+  llvm::Value *lastCapturedFieldPtr = nullptr;
+
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
   if (!layout) {
@@ -1111,6 +1114,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       auto &fieldTI = fieldLayout.getType();
       auto fieldSchema = fieldTI.getSchema();
+      lastCapturedFieldPtr = fieldAddr.getAddress();
       
       Explosion param;
       switch (fieldConvention) {
@@ -1229,7 +1233,13 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // It comes out of the context as an i8*. Cast to the function type.
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
 
-    return FunctionPointer(fnPtr, origSig);
+    assert(lastCapturedFieldPtr);
+    auto authInfo = PointerAuthInfo::emit(subIGF,
+                            IGM.getOptions().PointerAuth.PartialApplyCapture,
+                            lastCapturedFieldPtr,
+                            PointerAuthEntity::Special::PartialApplyCapture);
+
+    return FunctionPointer(fnPtr, authInfo, origSig);
   }();
 
   // Derive the context argument if needed.  This is either:
@@ -1472,6 +1482,8 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       singleRefcountedConvention = origType->getCalleeConvention();
     }
   }
+
+  auto outAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, outType);
   
   // If we have a single refcounted pointer context (and no polymorphic args
   // to capture), and the dest ownership semantics match the parameter's,
@@ -1486,7 +1498,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       hasSingleSwiftRefcountedContext == Yes &&
       outType->getCalleeConvention() == *singleRefcountedConvention) {
     assert(args.size() == 1);
-    auto fnPtr = fn.getPointer();
+    auto fnPtr = emitPointerAuthResign(IGF, fn, outAuthInfo).getPointer();
     fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     out.add(fnPtr);
     llvm::Value *ctx = args.claimNext();
@@ -1525,6 +1537,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       emitPartialApplicationForwarder(IGF.IGM, staticFn, fnContext != nullptr,
                                       origSig, origType, substType,
                                       outType, subs, nullptr, argConventions);
+    forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
     forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
     out.add(forwarder);
 
@@ -1599,7 +1612,15 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       // We don't add non-constant function pointers to the explosion above,
       // so we need to handle them specially now.
       if (i == nonStaticFnIndex) {
-        llvm::Value *fnPtr = fn.getPointer();
+        llvm::Value *fnPtr;
+        if (auto &schema = IGF.getOptions().PointerAuth.PartialApplyCapture) {
+          auto schemaAuthInfo =
+            PointerAuthInfo::emit(IGF, schema, fieldAddr.getAddress(),
+                           PointerAuthEntity::Special::PartialApplyCapture);
+          fnPtr = emitPointerAuthResign(IGF, fn, schemaAuthInfo).getPointer();
+        } else {
+          fnPtr = fn.getPointer();
+        }
         fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
         IGF.Builder.CreateStore(fnPtr, fieldAddr);
         continue;
@@ -1642,6 +1663,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
                                                               subs,
                                                               &layout,
                                                               argConventions);
+  forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
   forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
   out.add(forwarder);
   out.add(data);
@@ -1762,8 +1784,8 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   
   // Collect the reserved and invoke pointer fields.
   auto reserved = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
-  auto invokeVal = llvm::ConstantExpr::getBitCast(invokeFunction,
-                                                  IGF.IGM.FunctionPtrTy);
+  llvm::Value *invokeVal = llvm::ConstantExpr::getBitCast(invokeFunction,
+                                                      IGF.IGM.FunctionPtrTy);
   
   // Build the block descriptor.
   ConstantInitBuilder builder(IGF.IGM);
@@ -1779,8 +1801,14 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   
   if (!isPOD) {
     // Define the copy and dispose helpers.
-    descriptorFields.add(emitBlockCopyHelper(IGF.IGM, blockTy, storageTL));
-    descriptorFields.add(emitBlockDisposeHelper(IGF.IGM, blockTy, storageTL));
+    descriptorFields.addSignedPointer(
+                       emitBlockCopyHelper(IGF.IGM, blockTy, storageTL),
+                       IGF.getOptions().PointerAuth.BlockHelperFunctionPointers,
+                       PointerAuthEntity::Special::BlockCopyHelper);
+    descriptorFields.addSignedPointer(
+                       emitBlockDisposeHelper(IGF.IGM, blockTy, storageTL),
+                       IGF.getOptions().PointerAuth.BlockHelperFunctionPointers,
+                       PointerAuthEntity::Special::BlockDisposeHelper);
   }
   
   // Build the descriptor signature.
@@ -1803,8 +1831,17 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
                           IGF.Builder.CreateStructGEP(headerAddr, 1, layout));
   IGF.Builder.CreateStore(reserved,
                           IGF.Builder.CreateStructGEP(headerAddr, 2, layout));
-  IGF.Builder.CreateStore(invokeVal,
-                          IGF.Builder.CreateStructGEP(headerAddr, 3, layout));
+
+  auto invokeAddr = IGF.Builder.CreateStructGEP(headerAddr, 3, layout);
+  if (auto &schema =
+        IGF.getOptions().PointerAuth.BlockInvocationFunctionPointers) {
+    auto invokeAuthInfo = PointerAuthInfo::emit(IGF, schema,
+                                                invokeAddr.getAddress(),
+                                                invokeTy);
+    invokeVal = emitPointerAuthSign(IGF, invokeVal, invokeAuthInfo);
+  }
+  IGF.Builder.CreateStore(invokeVal, invokeAddr);
+
   IGF.Builder.CreateStore(descriptorVal,
                           IGF.Builder.CreateStructGEP(headerAddr, 4, layout));
 }

@@ -1,0 +1,44 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -always-inline | %FileCheck %s
+
+sil @doSomething1 : $@convention(thin) () -> ()
+sil @doSomething2 : $@convention(thin) () -> ()
+sil @doSomething3 : $@convention(thin) () -> ()
+
+sil [ossa] [always_inline] @do_inline_this : $@convention(thin) () -> () {
+bb0:
+  %d1 = function_ref @doSomething1 : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @donot_inline_this : $@convention(thin) () -> () {
+bb0:
+  %d1 = function_ref @doSomething2 : $@convention(thin) () -> ()
+  apply %d1() : $@convention(thin) () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @empty_function : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref @do_inline_this : $@convention(thin) () -> ()
+// CHECK: function_ref @donot_inline_this : $@convention(thin) () -> ()
+// CHECK: function_ref @empty_function : $@convention(thin) () -> ()
+// CHECK: } // end sil function 'caller'
+sil [ossa] @caller : $@convention(thin) () -> () {
+bb0:
+  %c1 = function_ref @do_inline_this : $@convention(thin) () -> ()
+  apply %c1() : $@convention(thin) () -> ()
+  %c2 = function_ref @donot_inline_this : $@convention(thin) () -> ()
+  apply %c2() : $@convention(thin) () -> ()
+  %c3 = function_ref @empty_function : $@convention(thin) () -> ()
+  apply %c3() : $@convention(thin) () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}

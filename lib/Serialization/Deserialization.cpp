@@ -5190,9 +5190,9 @@ public:
     unsigned numParams;
     unsigned numYields;
     unsigned numResults;
-    bool isGenericSignatureImplied;
-    GenericSignatureID rawGenericSig;
-    SubstitutionMapID rawSubs;
+    GenericSignatureID rawInvocationGenericSig;
+    SubstitutionMapID rawInvocationSubs;
+    SubstitutionMapID rawPatternSubs;
     ArrayRef<uint64_t> variableData;
     ClangTypeID clangFunctionTypeID;
 
@@ -5207,9 +5207,9 @@ public:
                                              numParams,
                                              numYields,
                                              numResults,
-                                             isGenericSignatureImplied,
-                                             rawGenericSig,
-                                             rawSubs,
+                                             rawInvocationGenericSig,
+                                             rawInvocationSubs,
+                                             rawPatternSubs,
                                              clangFunctionTypeID,
                                              variableData);
 
@@ -5355,14 +5355,18 @@ public:
       witnessMethodConformance = MF.readConformance(MF.DeclTypeCursor);
     }
 
-    GenericSignature genericSig = MF.getGenericSignature(rawGenericSig);
-    SubstitutionMap subs = MF.getSubstitutionMap(rawSubs).getCanonical();
-    
-    return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
+    GenericSignature invocationSig =
+      MF.getGenericSignature(rawInvocationGenericSig);
+    SubstitutionMap invocationSubs =
+      MF.getSubstitutionMap(rawInvocationSubs).getCanonical();
+    SubstitutionMap patternSubs =
+      MF.getSubstitutionMap(rawPatternSubs).getCanonical();
+
+    return SILFunctionType::get(invocationSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
                                 errorResult,
-                                subs, isGenericSignatureImplied,
+                                patternSubs, invocationSubs,
                                 ctx, witnessMethodConformance);
   }
 

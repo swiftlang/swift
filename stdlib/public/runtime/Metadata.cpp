@@ -49,6 +49,11 @@
 #include <dlfcn.h>
 #endif // !defined(__wasi__)
 #endif
+#if SWIFT_PTRAUTH
+#include <ptrauth.h>
+extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
+    (Class _Nonnull oldClass, Class _Nonnull newClass));
+#endif
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "CompatibilityOverride.h"
@@ -76,6 +81,10 @@
 using namespace swift;
 using namespace metadataimpl;
 
+static ClassMetadata *
+_swift_relocateClassMetadata(const ClassDescriptor *description,
+                             const ResilientClassMetadataPattern *pattern);
+
 template<>
 Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
     const TypeContextDescriptor *description) const {
@@ -91,7 +100,7 @@ Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
 
     // Otherwise, use the default behavior.
     auto *classDescription = cast<ClassDescriptor>(description);
-    return swift_relocateClassMetadata(classDescription, pattern);
+    return _swift_relocateClassMetadata(classDescription, pattern);
   }
 
   // Otherwise, we have a static template that we can initialize in-place.
@@ -153,7 +162,7 @@ computeMetadataBoundsForSuperclass(const void *ref,
                                    TypeReferenceKind refKind) {
   switch (refKind) {
   case TypeReferenceKind::IndirectTypeDescriptor: {
-    auto description = *reinterpret_cast<const ClassDescriptor * const *>(ref);
+    auto description = *reinterpret_cast<const ClassDescriptor * const __ptrauth_swift_type_descriptor *>(ref);
     if (!description) {
       swift::fatalError(0, "instantiating class metadata for class with "
                            "missing weak-linked ancestor");
@@ -381,6 +390,48 @@ static GenericMetadataCache &unsafeGetInitializedCache(
   return lazyCache->unsafeGetAlreadyInitialized();
 }
 
+#if SWIFT_PTRAUTH
+static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
+  auto oldClassMetadata = reinterpret_cast<const ClassMetadata *>(oldClass);
+
+  // Bail out if this isn't a Swift.
+  if (!oldClassMetadata->isTypeMetadata())
+   return;
+
+ // Otherwise, re-sign v-table entries using the extra discriminators stored
+ // in the v-table descriptor.
+
+  auto *srcWords = reinterpret_cast<void **>(oldClass);
+  auto *dstWords = reinterpret_cast<void **>(newClass);
+
+  while (oldClassMetadata && oldClassMetadata->isTypeMetadata()) {
+    const auto *description = oldClassMetadata->getDescription();
+
+    // Copy the vtable entries.
+    if (description && description->hasVTable()) {
+      auto *vtable = description->getVTableDescriptor();
+      auto descriptors = description->getMethodDescriptors();
+      auto src = srcWords + vtable->getVTableOffset(description);
+      auto dest = dstWords + vtable->getVTableOffset(description);
+      for (size_t i = 0, e = vtable->VTableSize; i != e; ++i) {
+        swift_ptrauth_copy(reinterpret_cast<void **>(&dest[i]),
+                           reinterpret_cast<void *const *>(&src[i]),
+                           descriptors[i].Flags.getExtraDiscriminator());
+      }
+    }
+
+    oldClassMetadata = oldClassMetadata->Superclass;
+  }
+}
+
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
+static bool fixupHandlerInstaller = [] {
+  _objc_setClassCopyFixupHandler(&swift_objc_classCopyFixupHandler);
+  return true;
+}();
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
+#endif
+
 #if SWIFT_OBJC_INTEROP
 extern "C" void *_objc_empty_cache;
 #endif
@@ -507,6 +558,9 @@ ClassMetadata *
 swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
                                           const void *arguments,
                                     const GenericClassMetadataPattern *pattern){
+  description = swift_auth_data_non_address(
+    description, SpecialPointerAuthDiscriminators::TypeDescriptor);
+
   auto &generics = description->getFullGenericContextHeader();
   auto &cache = unsafeGetInitializedCache(generics);
 
@@ -574,6 +628,8 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
                                           const void *arguments,
                                     const GenericValueMetadataPattern *pattern,
                                           size_t extraDataSize) {
+  description = swift_auth_data_non_address(description, SpecialPointerAuthDiscriminators::TypeDescriptor);
+
   auto &generics = description->getFullGenericContextHeader();
   auto &cache = unsafeGetInitializedCache(generics);
 
@@ -608,6 +664,7 @@ MetadataResponse
 swift::swift_getGenericMetadata(MetadataRequest request,
                                 const void * const *arguments,
                                 const TypeContextDescriptor *description) {
+  description = swift_auth_data_non_address(description, SpecialPointerAuthDiscriminators::TypeDescriptor);
   auto &cache = getCache(*description);
   assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
          cache.NumKeyParameters + cache.NumWitnessTables);
@@ -1219,7 +1276,7 @@ static void tuple_destroy(OpaqueValue *tuple, const Metadata *_metadata) {
 
 // The operation doesn't have to be initializeWithCopy, but they all
 // have basically the same type.
-typedef ValueWitnessTypes::initializeWithCopy forEachOperation;
+typedef ValueWitnessTypes::initializeWithCopyUnsigned forEachOperation;
 
 /// Perform an operation for each field of two tuples.
 static OpaqueValue *tuple_forEachField(OpaqueValue *destTuple,
@@ -1488,7 +1545,6 @@ static void performBasicLayout(TypeLayout &layout,
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
 }
 
-
 size_t swift::swift_getTupleTypeLayout2(TypeLayout *result,
                                         const TypeLayout *elt0,
                                         const TypeLayout *elt1) {
@@ -1547,7 +1603,7 @@ swift::swift_getTupleTypeMetadata(MetadataRequest request,
   // Bypass the cache for the empty tuple. We might reasonably get called
   // by generic code, like a demangler that produces type objects.
   if (numElements == 0)
-    return { &METADATA_SYM(EMPTY_TUPLE_MANGLING), MetadataState::Complete };
+    return MetadataResponse{ &METADATA_SYM(EMPTY_TUPLE_MANGLING), MetadataState::Complete };
 
   // Search the cache.
   TupleCacheEntry::Key key = { numElements, elements, labels };
@@ -1625,7 +1681,7 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
     auto request = MetadataRequest(MetadataState::LayoutComplete,
                                    /*non-blocking*/ true);
     auto eltType = Data.getElement(i).Type;
-    auto response = swift_checkMetadataState(request, eltType);
+    MetadataResponse response = swift_checkMetadataState(request, eltType);
 
     // Immediately continue in the most common scenario, which is that
     // the element is transitively complete.
@@ -2064,6 +2120,15 @@ static MetadataAllocator &getResilientMetadataAllocator() {
 ClassMetadata *
 swift::swift_relocateClassMetadata(const ClassDescriptor *description,
                                    const ResilientClassMetadataPattern *pattern) {
+  description = swift_auth_data_non_address(
+    description, SpecialPointerAuthDiscriminators::TypeDescriptor);
+
+  return _swift_relocateClassMetadata(description, pattern);
+}
+
+static ClassMetadata *
+_swift_relocateClassMetadata(const ClassDescriptor *description,
+                             const ResilientClassMetadataPattern *pattern) {
   auto bounds = description->getMetadataBounds();
 
   auto metadata = reinterpret_cast<ClassMetadata *>(
@@ -2320,9 +2385,18 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
     if (description->hasVTable() && !hasStaticVTable(layoutFlags)) {
       auto *vtable = description->getVTableDescriptor();
       auto vtableOffset = vtable->getVTableOffset(description);
-      memcpy(classWords + vtableOffset,
-             superWords + vtableOffset,
-             vtable->VTableSize * sizeof(uintptr_t));
+      auto dest = classWords + vtableOffset;
+      auto src = superWords + vtableOffset;
+#if SWIFT_PTRAUTH
+      auto descriptors = description->getMethodDescriptors();
+      for (size_t i = 0, e = vtable->VTableSize; i != e; ++i) {
+        swift_ptrauth_copy(reinterpret_cast<void**>(&dest[i]),
+                           reinterpret_cast<void*const*>(&src[i]),
+                           descriptors[i].Flags.getExtraDiscriminator());
+      }
+#else
+      memcpy(dest, src, vtable->VTableSize * sizeof(uintptr_t));
+#endif
     }
 
     // Copy the field offsets.
@@ -2360,8 +2434,13 @@ static void initClassVTable(ClassMetadata *self) {
   if (description->hasVTable()) {
     auto *vtable = description->getVTableDescriptor();
     auto vtableOffset = vtable->getVTableOffset(description);
-    for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i)
-      classWords[vtableOffset + i] = description->getMethod(i);
+    auto descriptors = description->getMethodDescriptors();
+    for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
+      auto &methodDescription = descriptors[i];
+      swift_ptrauth_init(&classWords[vtableOffset + i],
+                         methodDescription.Impl.get(),
+                         methodDescription.Flags.getExtraDiscriminator());
+    }
   }
 
   if (description->hasOverrideTable()) {
@@ -2396,9 +2475,12 @@ static void initClassVTable(ClassMetadata *self) {
 
       // Install the method override in our vtable.
       auto baseVTable = baseClass->getVTableDescriptor();
-      auto offset = baseMethod - baseClassMethods.data();
-      classWords[baseVTable->getVTableOffset(baseClass) + offset]
-        = descriptor.Impl.get();
+      auto offset = (baseVTable->getVTableOffset(baseClass) +
+                     (baseMethod - baseClassMethods.data()));
+
+      swift_ptrauth_init(&classWords[offset],
+                         descriptor.Impl.get(),
+                         baseMethod->Flags.getExtraDiscriminator());
     }
   }
 }
@@ -2949,7 +3031,19 @@ swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
   auto vtableOffset = vtable->getVTableOffset(description) + index;
   auto *words = reinterpret_cast<void * const *>(metadata);
 
-  return *(words + vtableOffset);
+  auto *const *methodPtr = (words + vtableOffset);
+
+#if SWIFT_PTRAUTH
+  // Re-sign the return value without the address.
+  unsigned extra = method->Flags.getExtraDiscriminator();
+  return ptrauth_auth_and_resign(*methodPtr,
+                                 ptrauth_key_function_pointer,
+                                 ptrauth_blend_discriminator(methodPtr, extra),
+                                 ptrauth_key_function_pointer,
+                                 extra);
+#else
+  return *methodPtr;
+#endif
 }
 
 /***************************************************************************/
@@ -4207,6 +4301,112 @@ static bool doesNotRequireInstantiation(
   return true;
 }
 
+#if SWIFT_PTRAUTH
+static const unsigned swift_ptrauth_key_associated_type =
+  ptrauth_key_process_independent_code;
+#endif
+
+/// Given an unsigned pointer to an associated-type protocol witness,
+/// fill in the appropriate slot in the witness table we're building.
+static void initAssociatedTypeProtocolWitness(const Metadata **slot,
+                                              const Metadata *witness,
+                                              const ProtocolRequirement &reqt) {
+  assert(reqt.Flags.getKind() ==
+           ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
+  // FIXME: this should use ptrauth_key_process_independent_data
+  // now that it no longer stores a function pointer.
+  swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
+}
+
+#if SWIFT_PTRAUTH
+static const unsigned swift_ptrauth_key_associated_conformance =
+  ptrauth_key_process_independent_code;
+
+/// Given an unsigned pointer to an associated-conformance protocol witness,
+/// fill in the appropriate slot in the witness table we're building.
+static void initAssociatedConformanceProtocolWitness(void **slot, void *witness,
+                                              const ProtocolRequirement &reqt) {
+  assert(reqt.Flags.getKind() ==
+           ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction);
+  // FIXME: this should use ptrauth_key_process_independent_data
+  // now that it no longer stores a function pointer.
+  swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
+}
+#endif
+
+/// Given an unsigned pointer to an arbitrary protocol witness, fill
+/// in a slot in the witness table we're building.
+static void initProtocolWitness(void **slot, void *witness,
+                                const ProtocolRequirement &reqt) {
+#if SWIFT_PTRAUTH
+  switch (reqt.Flags.getKind()) {
+  // Base protocols use no signing at all right now.
+  case ProtocolRequirementFlags::Kind::BaseProtocol:
+    *slot = witness;
+    return;
+
+  // Method requirements use address-discriminated signing with the
+  // function-pointer key.
+  case ProtocolRequirementFlags::Kind::Method:
+  case ProtocolRequirementFlags::Kind::Init:
+  case ProtocolRequirementFlags::Kind::Getter:
+  case ProtocolRequirementFlags::Kind::Setter:
+  case ProtocolRequirementFlags::Kind::ReadCoroutine:
+  case ProtocolRequirementFlags::Kind::ModifyCoroutine:
+    swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
+    return;
+
+  case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
+    initAssociatedConformanceProtocolWitness(slot, witness, reqt);
+    return;
+
+  case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
+    initAssociatedTypeProtocolWitness(reinterpret_cast<const Metadata **>(
+                                        const_cast<const void**>(slot)),
+                                      reinterpret_cast<const Metadata *>(
+                                        witness),
+                                      reqt);
+    return;
+  }
+  swift_runtime_unreachable("bad witness kind");
+#else
+  *slot = witness;
+#endif
+}
+
+/// Copy an arbitrary protocol witness from another table.
+static void copyProtocolWitness(void **dest, void * const *src,
+                                const ProtocolRequirement &reqt) {
+#if SWIFT_PTRAUTH
+  switch (reqt.Flags.getKind()) {
+  // Base protocols use no signing at all right now.
+  case ProtocolRequirementFlags::Kind::BaseProtocol:
+    *dest = *src;
+    return;
+
+  // Method requirements use address-discriminated signing with the
+  // function-pointer key.
+  case ProtocolRequirementFlags::Kind::Method:
+  case ProtocolRequirementFlags::Kind::Init:
+  case ProtocolRequirementFlags::Kind::Getter:
+  case ProtocolRequirementFlags::Kind::Setter:
+  case ProtocolRequirementFlags::Kind::ReadCoroutine:
+  case ProtocolRequirementFlags::Kind::ModifyCoroutine:
+    swift_ptrauth_copy(dest, src, reqt.Flags.getExtraDiscriminator());
+    return;
+
+  // FIXME: these should both use ptrauth_key_process_independent_data now.
+  case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
+  case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
+    swift_ptrauth_copy(dest, src, reqt.Flags.getExtraDiscriminator());
+    return;
+  }
+  swift_runtime_unreachable("bad witness kind");
+#else
+  *dest = *src;
+#endif
+}
+
 /// Initialize witness table entries from order independent resilient
 /// witnesses stored in the generic witness table structure itself.
 static void initializeResilientWitnessTable(
@@ -4240,7 +4440,10 @@ static void initializeResilientWitnessTable(
     unsigned witnessIndex = (reqDescriptor - requirements.data()) +
       WitnessTableFirstRequirementOffset;
 
-    table[witnessIndex] = witness.Witness.get();
+    auto &reqt = requirements[reqDescriptor - requirements.begin()];
+    // This is an unsigned pointer formed from a relative address.
+    void *impl = witness.Witness.get();
+    initProtocolWitness(&table[witnessIndex], impl, reqt);
   }
 
   // Loop over the requirements, filling in default implementations where
@@ -4252,19 +4455,21 @@ static void initializeResilientWitnessTable(
     // If we already have a witness, there's nothing to do.
     auto &reqt = requirements[i];
     if (!table[witnessIndex]) {
+      // This is an unsigned pointer formed from a relative address.
       void *impl = reqt.DefaultImplementation.get();
-      table[witnessIndex] = impl;
+      initProtocolWitness(&table[witnessIndex], impl, reqt);
     }
 
     // Realize base protocol witnesses.
     if (reqt.Flags.getKind() == ProtocolRequirementFlags::Kind::BaseProtocol &&
         table[witnessIndex]) {
-      // Realize the base protocol witness table.
+      // Realize the base protocol witness table.  We call the slow function
+      // because the fast function doesn't allow base protocol requirements.
       auto baseReq = protocol->getRequirementBaseDescriptor();
-      (void)swift_getAssociatedConformanceWitness((WitnessTable *)table,
-                                                  conformingType,
-                                                  conformingType,
-                                                  baseReq, &reqt);
+      (void)swift_getAssociatedConformanceWitnessSlow((WitnessTable *)table,
+                                                      conformingType,
+                                                      conformingType,
+                                                      baseReq, &reqt);
     }
   }
 }
@@ -4302,9 +4507,16 @@ WitnessTableCacheEntry::allocate(
   if (auto pattern =
           reinterpret_cast<void * const *>(
             &*conformance->getWitnessTablePattern())) {
+    auto requirements = protocol->getRequirements();
+
     // Fill in the provided part of the requirements from the pattern.
     for (size_t i = 0, e = numPatternWitnesses; i < e; ++i) {
-      table[i] = pattern[i];
+      size_t requirementIndex = i - WitnessTableFirstRequirementOffset;
+      if (i < WitnessTableFirstRequirementOffset)
+        table[i] = pattern[i];
+      else
+        copyProtocolWitness(&table[i], &pattern[i],
+                            requirements[requirementIndex]);
     }
   } else {
     // Put the conformance descriptor in place. Instantiation will fill in the
@@ -4414,7 +4626,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
                                       const ProtocolRequirement *assocType) {
 #ifndef NDEBUG
   {
-    const ProtocolConformanceDescriptor *conformance = wtable->Description;
+    const ProtocolConformanceDescriptor *conformance = wtable->getDescription();
     const ProtocolDescriptor *protocol = conformance->getProtocol();
     auto requirements = protocol->getRequirements();
     assert(assocType >= requirements.begin() &&
@@ -4425,9 +4637,19 @@ swift_getAssociatedTypeWitnessSlowImpl(
   }
 #endif
 
-  // If the low bit of the witness is clear, it's already a metadata pointer.
+  // Retrieve the witness.
   unsigned witnessIndex = assocType - reqBase;
-  auto witness = ((const void* const *)wtable)[witnessIndex];
+  auto *witnessAddr = &((const Metadata **)wtable)[witnessIndex];
+  auto witness = *witnessAddr;
+
+#if SWIFT_PTRAUTH
+  uint16_t extraDiscriminator = assocType->Flags.getExtraDiscriminator();
+  witness = ptrauth_auth_data(witness, swift_ptrauth_key_associated_type,
+                              ptrauth_blend_discriminator(witnessAddr,
+                                                          extraDiscriminator));
+#endif
+  
+  // If the low bit of the witness is clear, it's already a metadata pointer.
   if (LLVM_LIKELY((uintptr_t(witness) &
         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
     // Cached metadata pointers are always complete.
@@ -4449,7 +4671,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
   }
 
   // Dig out the protocol.
-  const ProtocolConformanceDescriptor *conformance = wtable->Description;
+  const ProtocolConformanceDescriptor *conformance = wtable->getDescription();
   const ProtocolDescriptor *protocol = conformance->getProtocol();
 
   // Extract the mangled name itself.
@@ -4519,7 +4741,10 @@ swift_getAssociatedTypeWitnessSlowImpl(
 
   // If the metadata was completed, record it in the witness table.
   if (response.State == MetadataState::Complete) {
-    reinterpret_cast<const void**>(wtable)[witnessIndex] = assocTypeMetadata;
+    // We pass type metadata around as unsigned pointers, but we sign them
+    // in witness tables, which doesn't provide all that much extra security.
+    initAssociatedTypeProtocolWitness(witnessAddr, assocTypeMetadata,
+                                      *assocType);
   }
 
   return response;
@@ -4531,9 +4756,21 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                       const Metadata *conformingType,
                                       const ProtocolRequirement *reqBase,
                                       const ProtocolRequirement *assocType) {
+  assert(assocType->Flags.getKind() ==
+           ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
+
   // If the low bit of the witness is clear, it's already a metadata pointer.
   unsigned witnessIndex = assocType - reqBase;
-  auto witness = ((const void* const *)wtable)[witnessIndex];
+  auto *witnessAddr = &((const void* *)wtable)[witnessIndex];
+  auto witness = *witnessAddr;
+
+#if SWIFT_PTRAUTH
+  uint16_t extraDiscriminator = assocType->Flags.getExtraDiscriminator();
+  witness = ptrauth_auth_data(witness, swift_ptrauth_key_associated_type,
+                              ptrauth_blend_discriminator(witnessAddr,
+                                                          extraDiscriminator));
+#endif
+
   if (LLVM_LIKELY((uintptr_t(witness) &
         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
     // Cached metadata pointers are always complete.
@@ -4553,7 +4790,7 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
                                   const ProtocolRequirement *assocConformance) {
 #ifndef NDEBUG
   {
-    const ProtocolConformanceDescriptor *conformance = wtable->Description;
+    const ProtocolConformanceDescriptor *conformance = wtable->getDescription();
     const ProtocolDescriptor *protocol = conformance->getProtocol();
     auto requirements = protocol->getRequirements();
     assert(assocConformance >= requirements.begin() &&
@@ -4569,7 +4806,22 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
 
   // Retrieve the witness.
   unsigned witnessIndex = assocConformance - reqBase;
-  auto witness = ((const void* const *)wtable)[witnessIndex];
+  auto *witnessAddr = &((void**)wtable)[witnessIndex];
+  auto witness = *witnessAddr;
+
+#if SWIFT_PTRAUTH
+  // For associated protocols, the witness is signed with address
+  // discrimination.
+  // For base protocols, the witness isn't signed at all.
+  if (assocConformance->Flags.isSignedWithAddress()) {
+    uint16_t extraDiscriminator =
+      assocConformance->Flags.getExtraDiscriminator();
+    witness = ptrauth_auth_data(
+                witness, swift_ptrauth_key_associated_conformance,
+                ptrauth_blend_discriminator(witnessAddr, extraDiscriminator));
+  }
+#endif
+
   // Fast path: we've already resolved this to a witness table, so return it.
   if (LLVM_LIKELY((uintptr_t(witness) &
          ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
@@ -4601,13 +4853,21 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
 
     // Call the witness function.
     auto witnessFn = (AssociatedWitnessTableAccessFunction *)ptr;
-    auto assocWitnessTable = witnessFn(assocType, conformingType, wtable);
+#if SWIFT_PTRAUTH
+    witnessFn = ptrauth_sign_unauthenticated(witnessFn,
+                                             ptrauth_key_function_pointer,
+                                             0);
+#endif
 
+    auto assocWitnessTable = witnessFn(assocType, conformingType, wtable);
     assert((uintptr_t(assocWitnessTable) &
             ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0);
 
-    // Update the cache.
-    reinterpret_cast<const void**>(wtable)[witnessIndex] = assocWitnessTable;
+    // The access function returns an unsigned pointer for now.
+
+    // We can't just use initAssociatedConformanceProtocolWitness because we
+    // also use this function for base protocols.
+    initProtocolWitness(witnessAddr, assocWitnessTable, *assocConformance);
 
     return assocWitnessTable;
   }
@@ -4621,9 +4881,23 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
                                   const Metadata *assocType,
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance) {
+  // We avoid using this function for initializing base protocol conformances
+  // so that we can have a better fast-path.
+  assert(assocConformance->Flags.getKind() ==
+           ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction);
+
   // Retrieve the witness.
   unsigned witnessIndex = assocConformance - reqBase;
-  auto witness = ((const void* const *)wtable)[witnessIndex];
+  auto *witnessAddr = &((const void* *)wtable)[witnessIndex];
+  auto witness = *witnessAddr;
+
+#if SWIFT_PTRAUTH
+  uint16_t extraDiscriminator = assocConformance->Flags.getExtraDiscriminator();
+  witness = ptrauth_auth_data(witness, swift_ptrauth_key_associated_conformance,
+                              ptrauth_blend_discriminator(witnessAddr,
+                                                          extraDiscriminator));
+#endif
+
   // Fast path: we've already resolved this to a witness table, so return it.
   if (LLVM_LIKELY((uintptr_t(witness) &
          ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
@@ -4955,7 +5229,8 @@ checkTransitiveCompleteness(const Metadata *initialType) {
     // Check the metadata's current state with a non-blocking request.
     auto request = MetadataRequest(MetadataState::Complete,
                                    /*non-blocking*/ true);
-    auto state = swift_checkMetadataState(request, type).State;
+    auto state =
+        MetadataResponse(swift_checkMetadataState(request, type)).State;
 
     // If it's transitively complete, we're done.
     // This is the most likely result.

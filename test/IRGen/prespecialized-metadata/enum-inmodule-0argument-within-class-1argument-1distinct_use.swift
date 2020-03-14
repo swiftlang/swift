@@ -18,7 +18,7 @@
 //                  i32 0
 //                ),
 // CHECK-SAME:    [[INT]] 513,
-// CHECK-SAME:    %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main9NamespaceC5ValueOMn" to %swift.type_descriptor*),
+// CHECK-SAME:    %swift.type_descriptor* bitcast ({{.*}}$s4main9NamespaceC5ValueOMn{{.*}} to %swift.type_descriptor*),
 // CHECK-SAME:    %swift.type* @"$sSiN",
 // CHECK-SAME:    i64 3
 // CHECK-SAME: }>, align [[ALIGNMENT]]
@@ -90,6 +90,14 @@ doit()
 // CHECK-SAME:   [[INT]] 0 
 // CHECK-SAME:   }
 // CHECK: [[EXIT_NORMAL]]:
-// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[ERASED_TYPE_1]], i8* undef, i8* undef, %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main9NamespaceC5ValueOMn" to %swift.type_descriptor*)) #{{[0-9]+}}
+// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
+// CHECK-SAME:     [[INT]] %0, 
+// CHECK-SAME:     i8* [[ERASED_TYPE_1]], 
+// CHECK-SAME:     i8* undef, 
+// CHECK-SAME:     i8* undef, 
+// CHECK-SAME:     %swift.type_descriptor* bitcast (
+// CHECK-SAME:       {{.*}}$s4main9NamespaceC5ValueOMn{{.*}} to %swift.type_descriptor*
+// CHECK-SAME:     )
+// CHECK-SAME:   ) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

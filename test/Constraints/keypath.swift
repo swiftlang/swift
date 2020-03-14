@@ -59,6 +59,24 @@ public extension Array {
         let sortedA = self.sorted(by: { $0[keyPath: keyPath] < $1[keyPath: keyPath] })
         return sortedA
     }
+
+  var i: Int { 0 }
+}
+
+func takesVariadicFnWithGenericRet<T>(_ fn: (S...) -> T) {}
+
+// rdar://problem/59445486
+func testVariadicKeypathAsFunc() {
+  // These are okay, the base type of the KeyPath is inferred to be [S].
+  let _: (S...) -> Int = \.i
+  let _: (S...) -> Int = \Array.i
+  takesVariadicFnWithGenericRet(\.i)
+  takesVariadicFnWithGenericRet(\Array.i)
+
+  // These are not okay, the KeyPath should have a base that matches the
+  // internal parameter type of the function, i.e [S].
+  let _: (S...) -> Int = \S.i // expected-error {{key path value type 'S' cannot be converted to contextual type '[S]'}}
+  takesVariadicFnWithGenericRet(\S.i) // expected-error {{key path value type 'S' cannot be converted to contextual type '[S]'}}
 }
 
 // rdar://problem/54322807

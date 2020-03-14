@@ -4201,8 +4201,12 @@ public:
       variableData.push_back(TypeID(conv));
     }
 
-    auto sigID = S.addGenericSignatureRef(fnTy->getSubstGenericSignature());
-    auto substMapID = S.addSubstitutionMapRef(fnTy->getSubstitutions());
+    auto invocationSigID =
+      S.addGenericSignatureRef(fnTy->getInvocationGenericSignature());
+    auto invocationSubstMapID =
+      S.addSubstitutionMapRef(fnTy->getInvocationSubstitutions());
+    auto patternSubstMapID =
+      S.addSubstitutionMapRef(fnTy->getPatternSubstitutions());
     auto clangTypeID = S.addClangTypeRef(fnTy->getClangFunctionType());
 
     auto stableCoroutineKind =
@@ -4221,8 +4225,8 @@ public:
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
-        fnTy->isGenericSignatureImplied(),
-        sigID, substMapID, clangTypeID, variableData);
+        invocationSigID, invocationSubstMapID, patternSubstMapID,
+        clangTypeID, variableData);
 
     if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
       S.writeConformance(conformance, S.DeclTypeAbbrCodes);

@@ -3,13 +3,13 @@
 // RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -swift-version 4.2 %t/main.swift
 
 func testUnaryMinusInUnsigned() {
-  var a: UInt8 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt8'}} expected-note * {{}} expected-warning * {{}}
+  var a: UInt8 = -(1) // expected-error {{no '-' candidates produce the expected contextual result type 'UInt8'}} expected-note * {{}} expected-warning * {{}}
 
-  var b: UInt16 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt16'}} expected-note * {{}} expected-warning * {{}}
+  var b: UInt16 = -(1) // expected-error {{no '-' candidates produce the expected contextual result type 'UInt16'}} expected-note * {{}} expected-warning * {{}}
 
-  var c: UInt32 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt32'}} expected-note * {{}} expected-warning * {{}}
+  var c: UInt32 = -(1) // expected-error {{no '-' candidates produce the expected contextual result type 'UInt32'}} expected-note * {{}} expected-warning * {{}}
 
-  var d: UInt64 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt64'}} expected-note * {{}} expected-warning * {{}}
+  var d: UInt64 = -(1) // expected-error {{no '-' candidates produce the expected contextual result type 'UInt64'}} expected-note * {{}} expected-warning * {{}}
 }
 
 // Int and UInt are not identical to any fixed-size integer type

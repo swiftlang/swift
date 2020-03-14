@@ -20,9 +20,12 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: ../build-cache
-          key: ${{ runner.os }}-sccache-v2
+          key: ${{ runner.os }}-sccache-v3
       - name: Build Linux installable archive
-        run: ./utils/webassembly/ci.sh
+        run: |
+          ./utils/webassembly/ci.sh
+          echo "Cleanup build directory to free disk space"
+          rm -rf ../build
       - name: Upload Linux installable archive
         uses: actions/upload-artifact@v1
         with:
@@ -47,7 +50,7 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: ../build-cache
-          key: ${{ runner.os }}-sccache-v2
+          key: ${{ runner.os }}-sccache-v3
       - name: Build macOS installable archive
         run: ./utils/webassembly/ci.sh
       - name: Upload macOS installable archive

@@ -389,9 +389,12 @@ SILType::canUseExistentialRepresentation(ExistentialRepresentation repr,
 }
 
 SILType SILType::mapTypeOutOfContext() const {
-  return SILType::getPrimitiveType(getASTType()->mapTypeOutOfContext()
-                                               ->getCanonicalType(),
+  return SILType::getPrimitiveType(mapTypeOutOfContext(getASTType()),
                                    getCategory());
+}
+
+CanType SILType::mapTypeOutOfContext(CanType type) {
+  return type->mapTypeOutOfContext()->getCanonicalType();
 }
 
 CanType swift::getSILBoxFieldLoweredType(TypeExpansionContext context,
@@ -661,11 +664,13 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
       if (!didChange)
         return sft;
       
-      return SILFunctionType::get(sft->getSubstGenericSignature(),
+      return SILFunctionType::get(sft->getInvocationGenericSignature(),
                                   sft->getExtInfo(), sft->getCoroutineKind(),
                                   sft->getCalleeConvention(),
                                   newParams, newYields, newResults,
-                                  newErrorResult, SubstitutionMap(), false,
+                                  newErrorResult,
+                                  SubstitutionMap(),
+                                  SubstitutionMap(),
                                   M.getASTContext());
     }
     return t;

@@ -81,6 +81,11 @@ static const SupportedConditionalValue SupportedConditionalCompilationTargetEnvi
   "macCatalyst", // A synonym for "macabi" when compiling for iOS
 };
 
+static const SupportedConditionalValue SupportedConditionalCompilationPtrAuthSchemes[] = {
+  "_none",
+  "_arm64e",
+};
+
 static const PlatformConditionKind AllPublicPlatformConditionKinds[] = {
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) PlatformConditionKind::LABEL,
 #define PLATFORM_CONDITION_(LABEL, IDENTIFIER)
@@ -101,6 +106,8 @@ ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(con
     return { };
   case PlatformConditionKind::TargetEnvironment:
     return SupportedConditionalCompilationTargetEnvironments;
+  case PlatformConditionKind::PtrAuth:
+    return SupportedConditionalCompilationPtrAuthSchemes;
   }
   llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
@@ -162,6 +169,7 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
   case PlatformConditionKind::Endianness:
   case PlatformConditionKind::Runtime:
   case PlatformConditionKind::TargetEnvironment:
+  case PlatformConditionKind::PtrAuth:
     return isMatching(Kind, Value, suggestedKind, suggestedValues);
   case PlatformConditionKind::CanImport:
     // All importable names are valid.
@@ -342,6 +350,13 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // Set the "runtime" platform condition.
   addPlatformConditionValue(PlatformConditionKind::Runtime,
                             EnableObjCInterop ? "_ObjC" : "_Native");
+
+  // Set the pointer authentication scheme.
+  if (Target.getArchName() == "arm64e") {
+    addPlatformConditionValue(PlatformConditionKind::PtrAuth, "_arm64e");
+  } else {
+    addPlatformConditionValue(PlatformConditionKind::PtrAuth, "_none");
+  }
 
   // Set the "targetEnvironment" platform condition if targeting a simulator
   // environment. Otherwise _no_ value is present for targetEnvironment; it's

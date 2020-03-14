@@ -1,5 +1,6 @@
 
 include(AddSwift)
+include(SwiftSource)
 
 # Add a universal binary target created from the output of the given
 # set of targets by running 'lipo'.

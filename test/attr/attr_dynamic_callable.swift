@@ -487,3 +487,37 @@ struct B {
 
 B()("hello") // ok
 B()("\(1)") // ok
+
+// SR-12019
+@dynamicCallable 
+struct SR12019_S {
+  func dynamicallyCall<T: StringProtocol>(withArguments: [T]) { // expected-note {{where 'T' = 'Int'}}
+    print("hi")	
+  }
+}
+
+@dynamicCallable
+protocol SR12019 {
+  func dynamicallyCall<T: StringProtocol>(withArguments: [T])  // expected-note 2{{where 'T' = 'Int'}}
+}
+
+class SR12019Class: SR12019 {
+  func dynamicallyCall<T: StringProtocol>(withArguments: [T]) {} // expected-note {{where 'T' = 'Int'}}
+}
+
+class SR12019SubClass: SR12019Class {}
+
+let sr12019s = SR12019_S()
+sr12019s(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+
+// Protocol composition
+let sr12019: SR12019&AnyObject = SR12019Class()
+sr12019(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+
+// Protocol
+let sr12019c: SR12019 = SR12019Class()
+sr12019c(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}
+
+// Subclass
+let sr12019sub = SR12019SubClass()
+sr12019sub(1) // expected-error {{instance method 'dynamicallyCall(withArguments:)' requires that 'Int' conform to 'StringProtocol'}}

@@ -14,6 +14,7 @@
 #define SWIFT_IDE_EXPRCONTEXTANALYSIS_H
 
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 
@@ -21,7 +22,6 @@ namespace swift {
 class DeclContext;
 class Expr;
 class ValueDecl;
-class AnyFunctionType;
 
 namespace ide {
 enum class SemanticContextKind;
@@ -54,7 +54,7 @@ struct FunctionTypeAndDecl {
 /// the expected type of the expression by analyzing its context.
 class ExprContextInfo {
   SmallVector<Type, 2> PossibleTypes;
-  SmallVector<StringRef, 2> PossibleNames;
+  SmallVector<const AnyFunctionType::Param *, 2> PossibleParams;
   SmallVector<FunctionTypeAndDecl, 2> PossibleCallees;
   bool singleExpressionBody = false;
 
@@ -73,7 +73,9 @@ public:
 
   // Returns a list of possible argument label names.
   // Valid only if \c getKind() is \c CallArgument.
-  ArrayRef<StringRef> getPossibleNames() const { return PossibleNames; }
+  ArrayRef<const AnyFunctionType::Param *> getPossibleParams() const {
+    return PossibleParams;
+  }
 
   // Returns a list of possible callee
   // Valid only if \c getKind() is \c CallArgument.

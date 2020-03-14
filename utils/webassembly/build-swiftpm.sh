@@ -12,9 +12,9 @@ SWIFT_BUILD=${NIGHTLY_TOOLCHAIN}/usr/bin/swift-build
 build_swiftpm() {
   local build_flags=$SWIFT_BUILD_FLAGS
   if [[ "$(uname)" == "Darwin" ]]; then
-    rpath_prefix='@executable_path/../'
+    rpath_prefix='@executable_path/../lib/swift/macosx'
   else
-    rpath_prefix='$ORIGIN/../'
+    rpath_prefix='$ORIGIN/../lib/swift/linux'
   fi
   build_flags="${build_flags} -Xlinker -rpath -Xlinker ${rpath_prefix}"
   cd ${SOURCE_PATH}/swiftpm

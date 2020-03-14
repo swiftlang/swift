@@ -204,15 +204,26 @@ static bool usesGenerics(SILFunction *F,
                          ArrayRef<SILParameterInfo> InterfaceParams,
                          ArrayRef<SILResultInfo> InterfaceResults) {
   CanSILFunctionType FTy = F->getLoweredFunctionType();
-  auto HasGenericSignature = FTy->getSubstGenericSignature() != nullptr;
+  auto HasGenericSignature = FTy->getInvocationGenericSignature() != nullptr;
   if (!HasGenericSignature)
     return false;
 
   bool UsesGenerics = false;
 
-  auto FindArchetypesAndGenericTypes = [&UsesGenerics](Type Ty) {
-    if (Ty.findIf([](Type Ty) -> bool {
-          return (Ty->hasTypeParameter() || Ty->hasArchetype());
+  auto FindArchetypesAndGenericTypes = [FTy, &UsesGenerics](Type Ty) {
+    if (Ty.findIf([FTy](Type Ty) -> bool {
+          // Assume archetypes are always a problem.
+          // TODO: This can ignore non-contextual archetypes.
+          if (Ty->hasArchetype()) return true;
+
+          // Assume type parameters are always a problem.  However, this
+          // can ignore types that would substitute to concrete types.
+          if (Ty->isTypeParameter()) {
+            auto subs = FTy->getPatternSubstitutions();
+            return (!subs || Ty.subst(subs)->isTypeParameter());
+          }
+
+          return false;
         }))
       UsesGenerics = true;
   };
@@ -394,12 +405,12 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
   mapInterfaceTypes(F, InterfaceParams, InterfaceResults, InterfaceErrorResult);
 
   GenericSignature GenericSig =
-      UsesGenerics ? FTy->getSubstGenericSignature() : nullptr;
+      UsesGenerics ? FTy->getInvocationGenericSignature() : nullptr;
 
   return SILFunctionType::get(
       GenericSig, ExtInfo, FTy->getCoroutineKind(), FTy->getCalleeConvention(),
       InterfaceParams, InterfaceYields, InterfaceResults, InterfaceErrorResult,
-      FTy->getSubstitutions(), FTy->isGenericSignatureImplied(),
+      FTy->getPatternSubstitutions(), SubstitutionMap(),
       F->getModule().getASTContext(), witnessMethodConformance);
 }
 
@@ -499,7 +510,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 
   auto NewFTy = TransformDescriptor.createOptimizedSILFunctionType();
   GenericEnvironment *NewFGenericEnv;
-  if (NewFTy->getSubstGenericSignature()) {
+  if (NewFTy->getInvocationGenericSignature()) {
     NewFGenericEnv = F->getGenericEnvironment();
   } else {
     NewFGenericEnv = nullptr;

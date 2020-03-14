@@ -354,6 +354,11 @@ public:
     return SILFunctionConventions(LoweredType, getModule());
   }
 
+  SILFunctionConventions getConventionsInContext() const {
+    auto fnType = getLoweredFunctionTypeInContext(getTypeExpansionContext());
+    return SILFunctionConventions(fnType, getModule());
+  }
+
   SILProfiler *getProfiler() const { return Profiler; }
 
   SILFunction *getDynamicallyReplacedFunction() const {

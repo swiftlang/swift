@@ -35,7 +35,7 @@ extension ClassWithBlockProperty : ProtocolWithBlockProperty {}
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[FN:%.*]] = function_ref @$sSo22ClassWithBlockPropertyC09dependentC0ySSSgcSgvM
 // CHECK-NEXT: ([[YIELD_ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[FN]]([[SELF]])
-// CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Optional<@callee_guaranteed <τ_0_0> in (@in_guaranteed τ_0_0) -> () for <Optional<String>>>
+// CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <Optional<String>>>
 // CHECK-NEXT: [[IN_FUNCTION:%.*]] = load [take] [[YIELD_ADDR]]
 // CHECK:    {{^}}bb3([[OUT_FUNCTION:%.*]] :
 // CHECK-NEXT: store [[OUT_FUNCTION]] to [init] [[TEMP]] :
