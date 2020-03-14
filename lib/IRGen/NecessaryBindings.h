@@ -59,7 +59,8 @@ public:
                                                   SubstitutionMap subs);
   static NecessaryBindings forPartialApplyForwarder(IRGenModule &IGM,
                                                     CanSILFunctionType origType,
-                                                    SubstitutionMap subs);
+                                                    SubstitutionMap subs,
+                                                    bool considerParameterSources = true);
 
   /// Add whatever information is necessary to reconstruct type metadata
   /// for the given type.
@@ -98,7 +99,8 @@ private:
   static NecessaryBindings computeBindings(IRGenModule &IGM,
                                            CanSILFunctionType origType,
                                            SubstitutionMap subs,
-                                           bool forPartialApplyForwarder);
+                                           bool forPartialApplyForwarder,
+                                           bool considerParameterSources = true);
 };
 
 } // end namespace irgen

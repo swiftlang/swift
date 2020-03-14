@@ -459,6 +459,29 @@ static bool tryRewriteToPartialApplyStack(
     saveDeleteInst(convertOrPartialApply);
   saveDeleteInst(origPA);
 
+  ApplySite site(newPA);
+  SILFunctionConventions calleeConv(site.getSubstCalleeType(),
+                                      newPA->getModule());
+
+  // Since we create temporary allocation for in_guaranteed captures during SILGen,
+  // the dealloc_stack of it can occur before the apply due to conversion scopes.
+  // When we insert destroy_addr of the in_guaranteed capture after the apply,
+  // we may end up with a situation when the dealloc_stack occurs before the destroy_addr.
+  // The code below proactively removes the dealloc_stack of in_guaranteed capture,
+  // so that it can be reinserted at the correct place after the destroy_addr below.
+  for (auto &arg : newPA->getArgumentOperands()) {
+    unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
+    assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
+    auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
+    if (paramInfo.getConvention() == ParameterConvention::Indirect_In_Guaranteed) {
+      // go over all the dealloc_stack, remove it
+      SmallVector<Operand*, 16> Uses(arg.get()->getUses());
+      for (auto use : Uses)
+        if (auto *deallocInst = dyn_cast<DeallocStackInst>(use->getUser()))
+          deallocInst->eraseFromParent();
+    }
+  }
+
   // Insert destroys of arguments after the apply and the dealloc_stack.
   if (auto *apply = dyn_cast<ApplyInst>(singleApplyUser)) {
     auto insertPt = std::next(SILBasicBlock::iterator(apply));
@@ -468,11 +491,15 @@ static bool tryRewriteToPartialApplyStack(
     SILBuilderWithScope b3(insertPt);
     b3.createDeallocStack(loc, newPA);
     insertDestroyOfCapturedArguments(newPA, b3);
+    // dealloc_stack of the in_guaranteed capture is inserted
+    insertDeallocOfCapturedArguments(newPA, b3);
   } else if (auto *tai = dyn_cast<TryApplyInst>(singleApplyUser)) {
     for (auto *succBB : tai->getSuccessorBlocks()) {
       SILBuilderWithScope b3(succBB->begin());
       b3.createDeallocStack(loc, newPA);
       insertDestroyOfCapturedArguments(newPA, b3);
+      // dealloc_stack of the in_guaranteed capture is inserted
+      insertDeallocOfCapturedArguments(newPA, b3);
     }
   } else {
     llvm_unreachable("Unknown FullApplySite instruction kind");

@@ -1319,9 +1319,32 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
 
+  // A context's HeapLayout stores all of the partially applied args.
+  // A HeapLayout is "fixed" if all of its fields have a fixed layout.
+  // Otherwise the HeapLayout is "non-fixed".
+  // Only a non-fixed HeapLayout needs TypeMetadata of the non-fixed fields
+  // during IRGen of the HeapLayout's destructor function.
+  // We should not consider partially applied args as TypeMetadata sources,
+  // because they are available only in the caller and the partial application
+  // forwarder, but not in the destructor function.
+  // It is safe to consider partially applied args as TypeMetadata sources for
+  // "fixed" HeapLayout, because they are not accessed during the IRGen of the
+  // destructor function.
+  bool considerParameterSources = true;
+  for (auto param : params) {
+    SILType argType = IGF.IGM.silConv.getSILType(param, origType);
+    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
+    auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
+
+    if (!isa<FixedTypeInfo>(ti)) {
+      considerParameterSources = false;
+      break;
+    }
+  }
+
   // Reserve space for polymorphic bindings.
-  auto bindings =
-      NecessaryBindings::forPartialApplyForwarder(IGF.IGM, origType, subs);
+  auto bindings = NecessaryBindings::forPartialApplyForwarder(
+      IGF.IGM, origType, subs, considerParameterSources);
 
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
@@ -1524,7 +1547,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
     HeapNonFixedOffsets offsets(IGF, layout);
     if (outType->isNoEscape()) {
       stackAddr = IGF.emitDynamicAlloca(
-          IGF.IGM.Int8Ty, layout.emitSize(IGF.IGM), Alignment(16));
+          IGF.IGM.Int8Ty, layout.isFixedLayout() ? layout.emitSize(IGF.IGM) : offsets.getSize() , Alignment(16));
       stackAddr = stackAddr->withAddress(IGF.Builder.CreateBitCast(
           stackAddr->getAddress(), IGF.IGM.OpaquePtrTy));
       data = stackAddr->getAddress().getAddress();

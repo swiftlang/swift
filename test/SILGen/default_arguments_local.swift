@@ -22,25 +22,13 @@ func outer<T>(x: Int, y: AnyObject, z: Any, w: T) {
   // CHECK: destroy_value [[ARG]] : $AnyObject
   local2()
 
-  // CHECK: [[BOX:%.*]] = alloc_box ${ var Any }
-  // CHECK: [[BOX_ADDR:%.*]] = project_box [[BOX]] : ${ var Any }, 0
-  // CHECK: copy_addr %2 to [initialization] [[BOX_ADDR]] : $*Any
-  // CHECK: [[BOX_BORROW:%.*]] = begin_borrow [[BOX]] : ${ var Any }
-  // CHECK: [[FN:%.*]] = function_ref @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local3L_AEyyp_tlFfA_ : $@convention(thin) (@guaranteed { var Any }) -> @out Any
+  // CHECK: [[FN1:%.*]] = function_ref @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local3L_AEyyp_tlFfA_ : $@convention(thin) (@in_guaranteed Any) -> @out Any
   // CHECK: [[STACK:%.*]] = alloc_stack $Any
-  // CHECK: [[BOX2:%.*]] = alloc_box ${ var Any }
-  // CHECK: [[BOX2_ADDR:%.*]] = project_box [[BOX2]] : ${ var Any }, 0
-  // CHECK: copy_addr %2 to [initialization] [[BOX2_ADDR]] : $*Any
-  // CHECK: [[BOX2_BORROW:%.*]] = begin_borrow [[BOX2]] : ${ var Any }
-  // CHECK: apply [[FN]]([[STACK]], [[BOX2_BORROW]]) : $@convention(thin) (@guaranteed { var Any }) -> @out Any
-  // CHECK: end_borrow [[BOX2_BORROW]] : ${ var Any }
-  // CHECK: destroy_value [[BOX2]] : ${ var Any }
-  // CHECK: %30 = function_ref @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local3L_AEyyp_tlF : $@convention(thin) (@in_guaranteed Any, @guaranteed { var Any }) -> ()
-  // CHECK: apply %30([[STACK]], [[BOX_BORROW]]) : $@convention(thin) (@in_guaranteed Any, @guaranteed { var Any }) -> ()
+  // CHECK: apply [[FN1]]([[STACK]], %2) : $@convention(thin) (@in_guaranteed Any) -> @out Any
+  // CHECK: [[FN2:%.*]] = function_ref @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local3L_AEyyp_tlF : $@convention(thin) (@in_guaranteed Any, @in_guaranteed Any) -> ()
+  // CHECK: apply [[FN2]]([[STACK]], %2) : $@convention(thin) (@in_guaranteed Any, @in_guaranteed Any) -> ()
   // CHECK: destroy_addr [[STACK]] : $*Any
   // CHECK: dealloc_stack [[STACK]] : $*Any
-  // CHECK: end_borrow [[BOX_BORROW]] : ${ var Any }
-  // CHECK: destroy_value [[BOX]] : ${ var Any }
   local3()
 
   local4()
@@ -52,10 +40,10 @@ func outer<T>(x: Int, y: AnyObject, z: Any, w: T) {
 // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local1L_ACySi_tlF : $@convention(thin) (Int, Int) -> ()
 // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local2L_ADyyXl_tlFfA_ : $@convention(thin) (@guaranteed AnyObject) -> @owned AnyObject
 // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local2L_ADyyXl_tlF : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject) -> ()
-// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local3L_AEyyp_tlFfA_ : $@convention(thin) (@guaranteed { var Any }) -> @out Any
-// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local3L_AEyyp_tlF : $@convention(thin) (@in_guaranteed Any, @guaranteed { var Any }) -> ()
-// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local4L_AFyx_tlF : $@convention(thin) <T> (@in_guaranteed T, @guaranteed <τ_0_0> { var τ_0_0 } <T>) -> ()
-// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local5L_1uAFyqd___xtr__lFfA0_ : $@convention(thin) <T><U> (@guaranteed <τ_0_0> { var τ_0_0 } <T>) -> @out T
+// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local3L_AEyyp_tlFfA_ : $@convention(thin) (@in_guaranteed Any) -> @out Any
+// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local3L_AEyyp_tlF : $@convention(thin) (@in_guaranteed Any, @in_guaranteed Any) -> ()
+// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local4L_AFyx_tlF : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> ()
+// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local5L_1uAFyqd___xtr__lFfA0_ : $@convention(thin) <T><U> (@in_guaranteed T) -> @out T
 
 class ArtClass<T> {
   // CHECK-LABEL: sil hidden [ossa] @$s23default_arguments_local8ArtClassC10selfMethod1uyqd___tlF : $@convention(method) <T><U> (@in_guaranteed U, @guaranteed ArtClass<T>) -> ()
