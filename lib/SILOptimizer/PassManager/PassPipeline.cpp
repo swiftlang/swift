@@ -400,9 +400,6 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Cleanup after SILGen: remove unneeded borrows/copies.
   P.addSemanticARCOpts();
 
-  P.addMem2Reg();
-  P.addSemanticARCOpts();
-
   // Strip ownership from non-transparent functions.
   if (P.getOptions().StripOwnershipAfterSerialization)
     P.addNonTransparentFunctionOwnershipModelEliminator();
