@@ -5,8 +5,6 @@
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
 
-// UNSUPPORTED: CPU=arm64e
-
 // Skipping one accessor: Value -> C
 
 // CHECK:       [[PROTOTYPE_HOLDER_INOUT_VALUE:@"\$s29ptrauth_generalized_accessors6HolderVAA5ValueVIetMAlYl_TC.ptrauth"]] =
@@ -23,19 +21,19 @@
 
 // Other stuff...
 
-// CHECK:       [[PROTOTYPE_OPAQUEOWNER_OPAQUE_INOUT_HOLDER:@"\$s29ptrauth_generalized_accessors11OpaqueOwnerVAA6HolderVIetWAlYl_TC.ptrauth"]] =
-// CHECK-SAME:     private constant { i8*, i32, i64, i64 } { i8* bitcast (void (i8*, i1)* @"$s29ptrauth_generalized_accessors11OpaqueOwnerVAA6HolderVIetWAlYl_TC" to i8*), i32 0, i64 1, i64 [[PTRAUTH_INOUT]] }, section "llvm.ptrauth"
-// CHECK:       [[PROTOTYPE_OPAQUEOWNER_OPAQUE_BORROWED_HOLDER:@"\$s29ptrauth_generalized_accessors11OpaqueOwnerVAA6HolderVIetWAnYn_TC.ptrauth"]] =
-// CHECK-SAME:     private constant { i8*, i32, i64, i64 } { i8* bitcast (void (i8*, i1)* @"$s29ptrauth_generalized_accessors11OpaqueOwnerVAA6HolderVIetWAnYn_TC" to i8*), i32 0, i64 1, i64 [[PTRAUTH_OPAQUE:56769]] }, section "llvm.ptrauth"
+// CHECK:       [[PROTOTYPE_OPAQUEOWNER_OPAQUE_INOUT_HOLDER:@"\$sxq_r0_ly29ptrauth_generalized_accessors11OpaqueOwnerVAA6HolderVIsetWAlYl_TC.ptrauth"]] =
+// CHECK-SAME:     private constant { i8*, i32, i64, i64 } { i8* bitcast (void (i8*, i1)* @"$sxq_r0_ly29ptrauth_generalized_accessors11OpaqueOwnerVAA6HolderVIsetWAlYl_TC" to i8*), i32 0, i64 1, i64 [[PTRAUTH_INOUT]] }, section "llvm.ptrauth"
+// CHECK:       [[PROTOTYPE_OPAQUEOWNER_OPAQUE_BORROWED_HOLDER:@"\$sxq_r0_ly29ptrauth_generalized_accessors11OpaqueOwnerVAA6HolderVIsetWAnYn_TC.ptrauth"]] =
+// CHECK-SAME:     private constant { i8*, i32, i64, i64 } { i8* bitcast (void (i8*, i1)* @"$sxq_r0_ly29ptrauth_generalized_accessors11OpaqueOwnerVAA6HolderVIsetWAnYn_TC" to i8*), i32 0, i64 1, i64 [[PTRAUTH_OPAQUE:56769]] }, section "llvm.ptrauth"
 // CHECK:       [[PROTOTYPE_OPAQUEOWNER_BORROWED_HOLDER:@"\$s29ptrauth_generalized_accessors11OpaqueOwnerVAA6HolderVIetMAgYg_TC.ptrauth"]] =
 // CHECK-SAME:     private constant { i8*, i32, i64, i64 } { i8* bitcast (void (i8*, i1)* @"$s29ptrauth_generalized_accessors11OpaqueOwnerVAA6HolderVIetMAgYg_TC" to i8*), i32 0, i64 1, i64 [[PTRAUTH_BORROWED_HOLDER:11564]] }, section "llvm.ptrauth"
-// CHECK:       [[PROTOTYPE_OWNER_INOUT_HOLDER:@"\$s29ptrauth_generalized_accessors5OwnerVAA6HolderVIetWAlYl_TC.ptrauth"]] =
-// CHECK-SAME:     private constant { i8*, i32, i64, i64 } { i8* bitcast (void (i8*, i1)* @"$s29ptrauth_generalized_accessors5OwnerVAA6HolderVIetWAlYl_TC" to i8*), i32 0, i64 1, i64 [[PTRAUTH_INOUT]] }, section "llvm.ptrauth"
+// CHECK:       [[PROTOTYPE_OWNER_INOUT_HOLDER:@"\$sx29ptrauth_generalized_accessors6HolderVlyAA5OwnerVIsetWAlYl_TC.ptrauth"]] =
+// CHECK-SAME:     private constant { i8*, i32, i64, i64 } { i8* bitcast (void (i8*, i1)* @"$sx29ptrauth_generalized_accessors6HolderVlyAA5OwnerVIsetWAlYl_TC" to i8*), i32 0, i64 1, i64 [[PTRAUTH_INOUT]] }, section "llvm.ptrauth"
 
 // Note: This one is slightly different from most of the other checks as `self` has to be taken indirectly but the yield value doesn't, so the param is @in_guaranteed but the return is @guaranteed.
 
-// CHECK:       [[PROTOTYPE_OWNER_BORROWED_HOLDER:@"\$s29ptrauth_generalized_accessors5OwnerVAA6HolderVIetWAnYg_TC.ptrauth"]] =
-// CHECK-SAME:     private constant { i8*, i32, i64, i64 } { i8* bitcast (void (i8*, i1)* @"$s29ptrauth_generalized_accessors5OwnerVAA6HolderVIetWAnYg_TC" to i8*), i32 0, i64 1, i64 [[PTRAUTH_BORROWED_HOLDER]] }, section "llvm.ptrauth"
+// CHECK:       [[PROTOTYPE_OWNER_BORROWED_HOLDER:@"\$sx29ptrauth_generalized_accessors6HolderVlyAA5OwnerVIsetWAnYg_TC.ptrauth"]] =
+// CHECK-SAME:     private constant { i8*, i32, i64, i64 } { i8* bitcast (void (i8*, i1)* @"$sx29ptrauth_generalized_accessors6HolderVlyAA5OwnerVIsetWAnYg_TC" to i8*), i32 0, i64 1, i64 [[PTRAUTH_BORROWED_HOLDER]] }, section "llvm.ptrauth"
 
 public class C {}
 
