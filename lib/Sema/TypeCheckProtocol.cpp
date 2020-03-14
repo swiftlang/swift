@@ -3456,7 +3456,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       break;
 
     case CheckKind::RequiresConcreteImplementation:
-      diagnoseOrDefer(requirement, false,
+      diagnoseOrDefer(requirement, /*isError=*/true,
         [witness, requirement](NormalProtocolConformance *conformance) {
           auto &diags = witness->getASTContext().Diags;
           SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
