@@ -1012,7 +1012,8 @@ swift::packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
 
   // If we have no other arguments, represent the a single trailing closure as a
   // parenthesized expression.
-  if (args.empty() && trailingClosures.size() == 1) {
+  if (args.empty() && trailingClosures.size() == 1 &&
+      trailingClosures.front().LabelLoc.isInvalid()) {
     auto &trailingClosure = trailingClosures.front();
     auto arg =
         new (ctx) ParenExpr(lParenLoc, trailingClosure.ClosureExpr, rParenLoc,

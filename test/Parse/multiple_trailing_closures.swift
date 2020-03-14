@@ -79,6 +79,19 @@ foo {
   // expected-error@-1 {{expected an argument label followed by a closure literal}}
 }
 
+foo {
+  a: { 42 }
+  b: { 45 }
+  c:
+} // expected-error {{expected a closure literal}}
+
+foo {
+  a: { 42 }
+  b: { 45 }
+  c: 67 // expected-error {{expected a closure literal}}
+  // expected-error@-1 {{extra argument 'c' in call}}
+}
+
 foo { // expected-note {{to match this opening '{'}}
   a: { 42 }
   b: { "" }
