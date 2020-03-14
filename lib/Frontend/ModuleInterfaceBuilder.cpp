@@ -135,8 +135,8 @@ void ModuleInterfaceBuilder::configureSubInvocation(
 }
 
 bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
-    swift::version::Version &Vers, llvm::StringSaver &SubArgSaver,
-    SmallVectorImpl<const char *> &SubArgs) {
+    swift::version::Version &Vers, StringRef &CompilerVersion,
+    llvm::StringSaver &SubArgSaver, SmallVectorImpl<const char *> &SubArgs) {
   auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
   if (!FileOrError) {
     diags.diagnose(diagnosticLoc, diag::error_open_input_file,
@@ -145,8 +145,9 @@ bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
   }
   auto SB = FileOrError.get()->getBuffer();
   auto VersRe = getSwiftInterfaceFormatVersionRegex();
+  auto CompRe = getSwiftInterfaceCompilerVersionRegex();
   auto FlagRe = getSwiftInterfaceModuleFlagsRegex();
-  SmallVector<StringRef, 1> VersMatches, FlagMatches;
+  SmallVector<StringRef, 1> VersMatches, FlagMatches, CompMatches;
   if (!VersRe.match(SB, &VersMatches)) {
     diags.diagnose(diagnosticLoc,
                    diag::error_extracting_version_from_module_interface);
@@ -161,6 +162,16 @@ bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
   assert(FlagMatches.size() == 2);
   Vers = swift::version::Version(VersMatches[1], SourceLoc(), &diags);
   llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], SubArgSaver, SubArgs);
+
+  if (CompRe.match(SB, &CompMatches)) {
+    assert(CompMatches.size() == 2);
+    CompilerVersion = SubArgSaver.save(CompMatches[1]);
+  }
+  else {
+    // Don't diagnose; handwritten module interfaces don't include this field.
+    CompilerVersion = "(unspecified, file possibly handwritten)";
+  }
+
   return false;
 }
 
@@ -274,7 +285,9 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     llvm::StringSaver SubArgSaver(SubArgsAlloc);
     SmallVector<const char *, 16> SubArgs;
     swift::version::Version Vers;
-    if (extractSwiftInterfaceVersionAndArgs(Vers, SubArgSaver, SubArgs)) {
+    StringRef emittedByCompiler;
+    if (extractSwiftInterfaceVersionAndArgs(Vers, emittedByCompiler,
+                                            SubArgSaver, SubArgs)) {
       SubError = true;
       return;
     }
@@ -325,8 +338,12 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
       // emitted an error in the parent diagnostic engine, which is what
       // determines whether the process exits with a proper failure status.
       if (SubInstance.getASTContext().hadError()) {
-        diags.diagnose(diagnosticLoc, diag::serialization_load_failed,
-                       moduleName);
+        auto builtByCompiler =
+            getSwiftInterfaceCompilerVersionForCurrentCompiler(
+                SubInstance.getASTContext());
+        diags.diagnose(diagnosticLoc, diag::module_interface_build_failed,
+                       moduleName, emittedByCompiler == builtByCompiler,
+                       emittedByCompiler, builtByCompiler);
       }
     };
 
