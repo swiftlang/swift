@@ -427,3 +427,16 @@ func invalidOptionalChaining(a: Any) {
   // expected-error@-1 {{value of protocol type 'Any' cannot conform to 'Equatable'; only struct/enum/class types can conform to protocols}}
   // expected-note@-2 {{requirement from conditional conformance of 'Any?' to 'Equatable'}}
 }
+
+// SR-12309 - Force unwrapping 'nil' compiles without warning
+func sr_12309() {
+  struct S {
+    var foo: Int
+  }
+
+  _ = S(foo: nil!) // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = nil! // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = nil? // expected-error {{value of optional type 'Optional<_>' must be unwrapped to a value of type '_'}}
+           // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+           // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}
