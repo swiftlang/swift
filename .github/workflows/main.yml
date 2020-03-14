@@ -22,9 +22,7 @@ jobs:
           path: ../build-cache
           key: ${{ runner.os }}-sccache-v3
       - name: Build Linux installable archive
-        run: |
-          ./utils/webassembly/ci.sh
-          df -h
+        run: ./utils/webassembly/ci.sh
       - name: Upload Linux installable archive
         uses: actions/upload-artifact@v1
         with:
