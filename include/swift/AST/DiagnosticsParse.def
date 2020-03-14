@@ -1755,6 +1755,8 @@ ERROR(unknown_syntax_entity, PointsToFirstBadToken,
 //------------------------------------------------------------------------------
 ERROR(expected_argument_label_followed_by_closure_literal,none,
       "expected an argument label followed by a closure literal", ())
+ERROR(expected_closure_literal,none,
+      "expected a closure literal", ())
 
 ERROR(expected_multiple_closures_block_rbrace,none,
       "expected '}' at the end of a trailing closures block", ())
