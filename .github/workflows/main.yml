@@ -22,7 +22,10 @@ jobs:
           path: ../build-cache
           key: ${{ runner.os }}-sccache-v3
       - name: Build Linux installable archive
-        run: ./utils/webassembly/ci.sh
+        run: |
+          ./utils/webassembly/ci.sh
+          echo "Cleanup build directory to free disk space"
+          rm -rf ../build
       - name: Upload Linux installable archive
         uses: actions/upload-artifact@v1
         with:
