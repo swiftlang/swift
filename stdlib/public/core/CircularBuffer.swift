@@ -456,10 +456,15 @@ public extension CircularBuffer {
 
   mutating func reserveCapacity(_ n: Int) {
     precondition(n > 0)
+    let additionalCapacity = n - capacity
+    guard additionalCapacity > 0 else {
+      return
+    }
+
     if isUnique {
-      _buffer.reserveCapacity(n)
+      _buffer.resize(newCapacity: capacity + additionalCapacity)
     } else {
-      let bufferCopy = _buffer.copy(additionalCapacity: n)
+      let bufferCopy = _buffer.copy(additionalCapacity: additionalCapacity)
       self._buffer = bufferCopy
     }
   }
@@ -980,11 +985,6 @@ extension CircularBufferBuffer {
         _tail = leftElementsCount + rightElementsCount
       }
     }
-  }
-
-  @inline(__always)
-  func reserveCapacity(_ n: Int) {
-    self.resize(newCapacity: grow(minCapacity: capacity + n))
   }
 
   @inline(__always)

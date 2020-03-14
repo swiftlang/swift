@@ -494,7 +494,9 @@ CircularBufferTests.test("ReserveCapacity") {
   var circularBuffer = makeCircularBuffer(frontSequence: [1], backSequence: [2, 3], capacity: 3)
   circularBuffer.pushFront(4)
   expectEqual(circularBuffer, [4, 1, 2])
-  circularBuffer.reserveCapacity(2)
+  circularBuffer.reserveCapacity(1)
+  expectEqual(circularBuffer.capacity, 3)
+  circularBuffer.reserveCapacity(5)
   circularBuffer.pushBack(5)
   circularBuffer.pushFront(6)
   expectEqual(circularBuffer, [6, 4, 1, 2, 5])
@@ -511,7 +513,7 @@ CircularBufferTests.test("ReserveCapacityCOW") {
   var copy = circularBuffer
   expectEqual(copy.capacity, 3)
 
-  copy.reserveCapacity(1)
+  copy.reserveCapacity(4)
   expectEqual(circularBuffer.capacity, 3)
   expectEqual(copy.capacity, 4)
 }
