@@ -33,6 +33,9 @@ namespace swift {
   class TopLevelCodeDecl;
   class TypeChecker;
   class ValueDecl;
+  namespace constraints {
+  struct RelabelingMapping;
+  }
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
 void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
@@ -63,9 +66,12 @@ void fixItAccess(InFlightDiagnostic &diag,
 /// error diagnostic.
 ///
 /// \returns true if the issue was diagnosed
-bool diagnoseArgumentLabelError(ASTContext &ctx,
-                                Expr *expr,
-                                ArrayRef<Identifier> newNames,
+bool diagnoseArgumentLabelError(ASTContext &ctx, Expr *expr,
+                                ArrayRef<Identifier> newNames, bool isSubscript,
+                                InFlightDiagnostic *existingDiag = nullptr);
+
+bool diagnoseArgumentLabelError(ASTContext &ctx, Expr *expr,
+                                const constraints::RelabelingMapping &mapping,
                                 bool isSubscript,
                                 InFlightDiagnostic *existingDiag = nullptr);
 

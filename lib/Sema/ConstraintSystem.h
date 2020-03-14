@@ -4700,10 +4700,10 @@ struct CallArgumentMatchResult {
 
   bool needsRelabeling() const;
 
-  SmallVector<Identifier, 8>
-  buildRelabelingLabels(unsigned numArgs,
-                        ArrayRef<AnyFunctionType::Param> params,
-                        const ParameterListInfo &paramsInfo) const;
+  RelabelingMapping
+  buildRelabelingMapping(ArrayRef<AnyFunctionType::Param> args,
+                         ArrayRef<AnyFunctionType::Param> params,
+                         const ParameterListInfo &paramsInfo) const;
 };
 
 /// Class used as the base for listeners to the \c matchCallArguments process.
@@ -4766,7 +4766,7 @@ public:
   ///
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
-  virtual bool relabelArguments(ArrayRef<Identifier> newNames);
+  virtual bool relabelArguments(const RelabelingMapping &mapping);
 
   /// Indicates that the trailing closure argument at the given \c argIdx
   /// cannot be passed to the last parameter at \c paramIdx.
@@ -4856,6 +4856,12 @@ ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
 void simplifyLocator(Expr *&anchor,
                      ArrayRef<LocatorPathElt> &path,
                      SourceRange &range);
+
+/// For a given locator describing an argument application, or a constraint
+/// within an argument application, returns the argument list for that
+/// application. If the locator is not for an argument application, or
+/// the argument list cannot be found, returns \c nullptr.
+Expr *getArgumentListExprFor(ConstraintSystem &cs, ConstraintLocator *locator);
 
 /// Simplify the given locator down to a specific anchor expression,
 /// if possible.

@@ -347,41 +347,47 @@ public:
                                      ConstraintLocator *locator);
 };
 
+/// It represents mapping for relabeling
+struct RelabelingMapping {
+  struct Item {
+    Optional<unsigned> argIdx;
+    Optional<Identifier> argLabel;
+
+    Optional<unsigned> paramIdx;
+    Optional<Identifier> paramLabel;
+
+    bool isLabelOutOfOrder;
+    bool isLabelWrong;
+    bool isLabelMissing;
+    bool isLabelExtraneous;
+
+    Item(Optional<unsigned> argIdx, Optional<Identifier> argLabel,
+         Optional<unsigned> paramIdx, Optional<Identifier> paramLabel);
+  };
+
+  SmallVector<Item, 4> items;
+
+  static RelabelingMapping build(Expr *expr, ArrayRef<Identifier> newNames);
+};
+
 /// Arguments have labeling failures - missing/extraneous or incorrect
 /// labels attached to the, fix it by suggesting proper labels.
-class RelabelArguments final
-    : public ConstraintFix,
-      private llvm::TrailingObjects<RelabelArguments, Identifier> {
-  friend TrailingObjects;
+class RelabelArguments final : public ConstraintFix {
+  RelabelingMapping Mapping;
 
-  unsigned NumLabels;
-
-  RelabelArguments(ConstraintSystem &cs,
-                   llvm::ArrayRef<Identifier> correctLabels,
+  RelabelArguments(ConstraintSystem &cs, const RelabelingMapping &mapping,
                    ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::RelabelArguments, locator),
-        NumLabels(correctLabels.size()) {
-    std::uninitialized_copy(correctLabels.begin(), correctLabels.end(),
-                            getLabelsBuffer().begin());
-  }
+        Mapping(mapping) {}
 
 public:
   std::string getName() const override { return "re-label argument(s)"; }
 
-  ArrayRef<Identifier> getLabels() const {
-    return {getTrailingObjects<Identifier>(), NumLabels};
-  }
-
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static RelabelArguments *create(ConstraintSystem &cs,
-                                  llvm::ArrayRef<Identifier> correctLabels,
+                                  const RelabelingMapping &mapping,
                                   ConstraintLocator *locator);
-
-private:
-  MutableArrayRef<Identifier> getLabelsBuffer() {
-    return {getTrailingObjects<Identifier>(), NumLabels};
-  }
 };
 
 /// Add a new conformance to the type to satisfy a requirement.

@@ -465,12 +465,12 @@ protected:
 /// Call to `foo` is going to be diagnosed as missing `q:`
 /// and having extraneous `a:` labels, with appropriate fix-its added.
 class LabelingFailure final : public FailureDiagnostic {
-  ArrayRef<Identifier> CorrectLabels;
+  RelabelingMapping Mapping;
 
 public:
   LabelingFailure(const Solution &solution, ConstraintLocator *locator,
-                  ArrayRef<Identifier> labels)
-      : FailureDiagnostic(solution, locator), CorrectLabels(labels) {}
+                  const RelabelingMapping &mapping)
+      : FailureDiagnostic(solution, locator), Mapping(mapping) {}
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;

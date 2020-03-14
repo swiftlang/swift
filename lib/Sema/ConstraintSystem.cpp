@@ -3493,6 +3493,20 @@ void constraints::simplifyLocator(Expr *&anchor,
   }
 }
 
+Expr *constraints::getArgumentListExprFor(ConstraintSystem &cs,
+                                          ConstraintLocator *locator) {
+  auto path = locator->getPath();
+  auto iter = path.begin();
+  if (!locator->findFirst<LocatorPathElt::ApplyArgument>(iter))
+    return nullptr;
+
+  // Form a new locator that ends at the ApplyArgument element, then simplify
+  // to get the argument list.
+  auto newPath = ArrayRef<LocatorPathElt>(path.begin(), iter + 1);
+  auto argListLoc = cs.getConstraintLocator(locator->getAnchor(), newPath);
+  return simplifyLocatorToAnchor(argListLoc);
+}
+
 Expr *constraints::simplifyLocatorToAnchor(ConstraintLocator *locator) {
   if (!locator)
     return nullptr;

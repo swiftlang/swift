@@ -17,6 +17,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "ConstraintSystem.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -1762,6 +1763,15 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
                                        ArrayRef<Identifier> newNames,
                                        bool isSubscript,
                                        InFlightDiagnostic *existingDiag) {
+  const auto mapping = constraints::RelabelingMapping::build(expr, newNames);
+
+  return diagnoseArgumentLabelError(ctx, expr, mapping, isSubscript,
+                                    existingDiag);
+}
+
+bool swift::diagnoseArgumentLabelError(
+    ASTContext &ctx, Expr *expr, const constraints::RelabelingMapping &mapping,
+    bool isSubscript, InFlightDiagnostic *existingDiag) {
   Optional<InFlightDiagnostic> diagOpt;
   auto getDiag = [&]() -> InFlightDiagnostic & {
     if (existingDiag)
@@ -1776,32 +1786,21 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   // Figure out how many extraneous, missing, and wrong labels are in
   // the call.
   unsigned numExtra = 0, numMissing = 0, numWrong = 0;
-  unsigned n = std::max(argList.args.size(), newNames.size());
 
   llvm::SmallString<16> missingBuffer;
   llvm::SmallString<16> extraBuffer;
-  for (unsigned i = 0; i != n; ++i) {
-    Identifier oldName;
-    if (i < argList.args.size())
-      oldName = argList.labels[i];
-    Identifier newName;
-    if (i < newNames.size())
-      newName = newNames[i];
-
-    if (oldName == newName ||
-        (argList.hasTrailingClosure && i == argList.args.size()-1))
-      continue;
-
-    if (oldName.empty()) {
+  for (const auto &item : mapping.items) {
+    if (item.isLabelMissing) {
       ++numMissing;
-      missingBuffer += newName.str();
-      missingBuffer += ":";
-    } else if (newName.empty()) {
+      missingBuffer += item.paramLabel->str();
+      missingBuffer += ':';
+    } else if (item.isLabelExtraneous) {
       ++numExtra;
-      extraBuffer += oldName.str();
+      extraBuffer += item.argLabel->str();
       extraBuffer += ':';
-    } else
+    } else if (item.isLabelWrong) {
       ++numWrong;
+    }
   }
 
   // Emit the diagnostic.
@@ -1814,21 +1813,26 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   if (!existingDiag) {
     bool plural = (numMissing + numExtra + numWrong) > 1;
     if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
-      for (unsigned i = 0, n = argList.args.size(); i != n; ++i) {
-        auto haveName = argList.labels[i];
-        if (haveName.empty())
-          haveBuffer += '_';
-        else
-          haveBuffer += haveName.str();
-        haveBuffer += ':';
-      }
+      for (const auto &item : mapping.items) {
+        if (auto argLabel = item.argLabel) {
+          if (argLabel->empty()) {
+            haveBuffer += '_';
+          } else {
+            haveBuffer += argLabel->str();
+          }
 
-      for (auto expected : newNames) {
-        if (expected.empty())
-          expectedBuffer += '_';
-        else
-          expectedBuffer += expected.str();
-        expectedBuffer += ':';
+          haveBuffer += ':';
+        }
+
+        if (auto paramLabel = item.paramLabel) {
+          if (paramLabel->empty()) {
+            expectedBuffer += '_';
+          } else {
+            expectedBuffer += paramLabel->str();
+          }
+
+          expectedBuffer += ':';
+        }
       }
 
       StringRef haveStr = haveBuffer;
@@ -1853,39 +1857,39 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
 
   // Emit Fix-Its to correct the names.
   auto &diag = getDiag();
-  for (unsigned i = 0, n = argList.args.size(); i != n; ++i) {
-    Identifier oldName = argList.labels[i];
-    Identifier newName;
-    if (i < newNames.size())
-      newName = newNames[i];
-
-    if (oldName == newName || (i == n-1 && argList.hasTrailingClosure))
+  for (const auto &item : mapping.items) {
+    if (!item.argIdx || !item.paramIdx)
       continue;
 
-    if (newName.empty()) {
+    const auto argIdx = *item.argIdx;
+    const auto paramLabel = *item.paramLabel;
+
+    if (item.isLabelExtraneous) {
       // Delete the old name.
-      diag.fixItRemoveChars(argList.labelLocs[i],
-                            argList.args[i]->getStartLoc());
+      diag.fixItRemoveChars(argList.labelLocs[argIdx],
+                            argList.args[argIdx]->getStartLoc());
       continue;
     }
 
-    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
+    bool newNameIsReserved = !canBeArgumentLabel(paramLabel.str());
     llvm::SmallString<16> newStr;
     if (newNameIsReserved)
       newStr += "`";
-    newStr += newName.str();
+    newStr += paramLabel.str();
     if (newNameIsReserved)
       newStr += "`";
 
-    if (oldName.empty()) {
+    if (item.isLabelMissing) {
       // Insert the name.
       newStr += ": ";
-      diag.fixItInsert(argList.args[i]->getStartLoc(), newStr);
+      diag.fixItInsert(argList.args[argIdx]->getStartLoc(), newStr);
       continue;
     }
 
-    // Change the name.
-    diag.fixItReplace(argList.labelLocs[i], newStr);
+    if (item.isLabelWrong) {
+      // Change the name.
+      diag.fixItReplace(argList.labelLocs[argIdx], newStr);
+    }
   }
 
   // If the diagnostic is local, flush it before returning.

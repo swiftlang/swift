@@ -25,6 +25,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
@@ -170,18 +171,59 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
   return new (cs.getAllocator()) MarkExplicitlyEscaping(cs, lhs, rhs, locator);
 }
 
+RelabelingMapping::Item::Item(Optional<unsigned> argIdx,
+                              Optional<Identifier> argLabel,
+                              Optional<unsigned> paramIdx,
+                              Optional<Identifier> paramLabel)
+    : argIdx(argIdx), argLabel(argLabel), paramIdx(paramIdx),
+      paramLabel(paramLabel), isLabelOutOfOrder(false), isLabelWrong(false),
+      isLabelMissing(false), isLabelExtraneous(false) {}
+
+RelabelingMapping RelabelingMapping::build(Expr *expr,
+                                           ArrayRef<Identifier> newNames) {
+  RelabelingMapping mapping;
+
+  OriginalArgumentList argList = getOriginalArgumentList(expr);
+
+  // Figure out how many extraneous, missing, and wrong labels are in
+  // the call.
+  unsigned n = std::max(argList.args.size(), newNames.size());
+
+  for (unsigned i = 0; i != n; ++i) {
+    Identifier oldName;
+    if (i < argList.args.size())
+      oldName = argList.labels[i];
+    Identifier newName;
+    if (i < newNames.size())
+      newName = newNames[i];
+
+    if (oldName == newName ||
+        (argList.hasTrailingClosure && i == argList.args.size() - 1))
+      continue;
+
+    auto item = RelabelingMapping::Item(i, oldName, i, newName);
+    if (oldName.empty()) {
+      item.isLabelMissing = true;
+    } else if (newName.empty()) {
+      item.isLabelExtraneous = true;
+    } else {
+      item.isLabelWrong = true;
+    }
+    mapping.items.push_back(item);
+  }
+
+  return mapping;
+}
+
 bool RelabelArguments::diagnose(const Solution &solution, bool asNote) const {
-  LabelingFailure failure(solution, getLocator(), getLabels());
+  LabelingFailure failure(solution, getLocator(), Mapping);
   return failure.diagnose(asNote);
 }
 
-RelabelArguments *
-RelabelArguments::create(ConstraintSystem &cs,
-                         llvm::ArrayRef<Identifier> correctLabels,
-                         ConstraintLocator *locator) {
-  unsigned size = totalSizeToAlloc<Identifier>(correctLabels.size());
-  void *mem = cs.getAllocator().Allocate(size, alignof(RelabelArguments));
-  return new (mem) RelabelArguments(cs, correctLabels, locator);
+RelabelArguments *RelabelArguments::create(ConstraintSystem &cs,
+                                           const RelabelingMapping &mapping,
+                                           ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RelabelArguments(cs, mapping, locator);
 }
 
 bool MissingConformance::diagnose(const Solution &solution, bool asNote) const {

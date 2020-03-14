@@ -55,7 +55,8 @@ bool MatchCallArgumentListener::outOfOrderArgument(unsigned argIdx,
   return true;
 }
 
-bool MatchCallArgumentListener::relabelArguments(ArrayRef<Identifier> newNames){
+bool MatchCallArgumentListener::relabelArguments(
+    const RelabelingMapping &mapping) {
   return true;
 }
 
@@ -347,63 +348,70 @@ bool CallArgumentMatchResult::needsRelabeling() const {
   return false;
 }
 
-SmallVector<Identifier, 8> CallArgumentMatchResult::buildRelabelingLabels(
-    unsigned numArgs, ArrayRef<AnyFunctionType::Param> params,
+RelabelingMapping CallArgumentMatchResult::buildRelabelingMapping(
+    ArrayRef<AnyFunctionType::Param> args,
+    ArrayRef<AnyFunctionType::Param> params,
     const ParameterListInfo &paramsInfo) const {
-  // If all arguments are ordered correctly and no extra arguments,
-  // it build least labels.
-  // Otherwise, it build full labels.
+  RelabelingMapping mapping;
 
-  SmallVector<Identifier, 8> labels;
+  unsigned nextParamIdx = 0;
 
-  auto buildLeastLabels = [&]() -> bool {
-    if (extraArgs.size() > 0)
-      return false;
+  const auto argBoundIdxs = bindingIndicesOrderedByArgumentIndex();
+  const auto paramBoundIdxs = bindingIndicesOrderedByParameterIndex();
 
-    unsigned prevArgIdx = 0;
-    bool isFirstArg = true;
-    bool sawMissing = false;
-    for (auto paramIdx : indices(params)) {
-      if (isMissingArgumentParameter(paramIdx)) {
-        sawMissing = true;
-        continue;
+  for (const auto boundIdxIdx : indices(argBoundIdxs)) {
+    const auto &argBinding = bindings[argBoundIdxs[boundIdxIdx]];
+    const auto &paramBinding = bindings[paramBoundIdxs[boundIdxIdx]];
+
+    while (nextParamIdx < paramBinding.paramIdx) {
+      if (isMissingArgumentParameter(nextParamIdx)) {
+        RelabelingMapping::Item item(None, None, nextParamIdx,
+                                     params[nextParamIdx].getLabel());
+        item.isLabelMissing = true;
+        mapping.items.push_back(item);
       }
-
-      auto *binding = findBindingByParameterIndex(paramIdx);
-      if (!binding) {
-        if (paramsInfo.hasDefaultArgument(paramIdx))
-          continue;
-
-        if (params[paramIdx].isVariadic())
-          continue;
-
-        return false;
-      }
-
-      // argument after missing
-      if (sawMissing)
-        return false;
-
-      // check if it is ordered
-      if (!isFirstArg && binding->argIdx <= prevArgIdx)
-        return false;
-      isFirstArg = false;
-      prevArgIdx = binding->argIdx;
-
-      labels.push_back(params[paramIdx].getLabel());
+      nextParamIdx += 1;
     }
 
-    return true;
-  };
+    const auto argIdx = argBinding.argIdx;
+    const auto argLabel = args[argBinding.argIdx].getLabel();
+    const auto paramIdx = paramBinding.paramIdx;
+    const auto paramLabel = params[paramBinding.paramIdx].getLabel();
+    RelabelingMapping::Item item(argIdx, argLabel, paramIdx, paramLabel);
 
-  if (buildLeastLabels())
-    return labels;
+    if (!isTrailingClosureArgument(argBinding.argIdx) &&
+        argLabel != paramLabel) {
+      if (argLabel.empty()) {
+        item.isLabelMissing = true;
+      } else if (paramLabel.empty()) {
+        item.isLabelExtraneous = true;
+      } else {
+        item.isLabelWrong = true;
+      }
 
-  labels.clear();
-  llvm::transform(
-      params, std::back_inserter(labels),
-      [](const AnyFunctionType::Param &param) { return param.getLabel(); });
-  return labels;
+      // reordering is considered based on binding to avoid problem
+      // such like double claiming.
+      // reordering is allowed when label is not empty.
+      if (!argLabel.empty() &&
+          argLabel == params[argBinding.paramIdx].getLabel()) {
+        item.isLabelOutOfOrder = true;
+      }
+    }
+
+    mapping.items.push_back(item);
+    nextParamIdx += 1;
+  }
+
+  while (nextParamIdx < params.size()) {
+    if (isMissingArgumentParameter(nextParamIdx)) {
+      RelabelingMapping::Item item(None, None, nextParamIdx,
+                                   params[nextParamIdx].getLabel());
+      mapping.items.push_back(item);
+    }
+    nextParamIdx += 1;
+  }
+
+  return mapping;
 }
 
 CallArgumentMatchResult
@@ -939,7 +947,6 @@ constraints::matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         const auto argumentLabel = args[binding->argIdx].getLabel();
 
         if (argumentLabel != expectedLabel) {
-          hadLabelMismatch = true;
           if (expectedLabel.empty()) {
             binding->isLabelExtraneous = true;
           } else if (argumentLabel.empty()) {
@@ -947,6 +954,8 @@ constraints::matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
           } else {
             binding->isLabelWrong = true;
           }
+
+          continue;
         }
 
         if (fromArgIdx == toArgIdx) {
@@ -1009,7 +1018,6 @@ bool constraints::matchCallArguments(
   }
 
   // listener may add dummy argument here.
-  const auto originalNumArgs = args.size();
   for (auto paramIdx : matchResult.missingArgParams) {
     auto newArgIdx = listener.missingArgument(paramIdx);
     if (!newArgIdx)
@@ -1044,9 +1052,9 @@ bool constraints::matchCallArguments(
   }
 
   if (matchResult.needsRelabeling()) {
-    auto labels =
-        matchResult.buildRelabelingLabels(originalNumArgs, params, paramInfo);
-    if (listener.relabelArguments(labels))
+    const auto mapping =
+        matchResult.buildRelabelingMapping(args, params, paramInfo);
+    if (listener.relabelArguments(mapping))
       return true;
     return false;
   }
@@ -1058,6 +1066,7 @@ class ArgumentFailureTracker : public MatchCallArgumentListener {
   ConstraintSystem &CS;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
   ArrayRef<AnyFunctionType::Param> Parameters;
+  ParameterListInfo ParamsInfo;
   SmallVectorImpl<ParamBinding> &Bindings;
   ConstraintLocatorBuilder Locator;
 
@@ -1068,10 +1077,11 @@ public:
   ArgumentFailureTracker(ConstraintSystem &cs,
                          SmallVectorImpl<AnyFunctionType::Param> &args,
                          ArrayRef<AnyFunctionType::Param> params,
+                         const ParameterListInfo &paramsInfo,
                          SmallVectorImpl<ParamBinding> &bindings,
                          ConstraintLocatorBuilder locator)
-      : CS(cs), Arguments(args), Parameters(params), Bindings(bindings),
-        Locator(locator) {}
+      : CS(cs), Arguments(args), Parameters(params), ParamsInfo(paramsInfo),
+        Bindings(bindings), Locator(locator) {}
 
   ~ArgumentFailureTracker() override {
     if (!MissingArguments.empty()) {
@@ -1146,7 +1156,7 @@ public:
     return true;
   }
 
-  bool relabelArguments(ArrayRef<Identifier> newLabels) override {
+  bool relabelArguments(const RelabelingMapping &mapping) override {
     if (!CS.shouldAttemptFixes())
       return true;
 
@@ -1167,34 +1177,21 @@ public:
     unsigned numRenames = 0;
     unsigned numOutOfOrder = 0;
 
-    for (unsigned i : indices(newLabels)) {
-      // It's already known how many arguments are missing,
-      // it would be accounted for in the impact.
-      if (i >= Arguments.size())
-        continue;
-
-      auto argLabel = Arguments[i].getLabel();
-      auto paramLabel = newLabels[i];
-
-      if (argLabel == paramLabel)
-        continue;
-
-      if (!argLabel.empty()) {
+    for (const auto &item : mapping.items) {
+      if (item.isLabelOutOfOrder) {
         // Instead of this being a label mismatch which requires
         // re-labeling, this could be an out-of-order argument
         // instead which has a completely different impact.
-        if (llvm::count(newLabels, argLabel) == 1) {
-          ++numOutOfOrder;
-        } else if (paramLabel.empty()) {
-          ++numExtraneous;
-        } else {
-          ++numRenames;
-        }
+        ++numOutOfOrder;
+      } else if (item.isLabelExtraneous) {
+        ++numExtraneous;
+      } else if (item.isLabelWrong) {
+        ++numRenames;
       }
     }
 
     auto *locator = CS.getConstraintLocator(Locator);
-    auto *fix = RelabelArguments::create(CS, newLabels, locator);
+    auto *fix = RelabelArguments::create(CS, mapping, locator);
     // Re-labeling fixes with extraneous/incorrect labels should be
     // lower priority vs. other fixes on same/different overload(s)
     // where labels did line up correctly.
@@ -1314,7 +1311,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   // Match up the call arguments to the parameters.
   SmallVector<ParamBinding, 4> parameterBindings;
   {
-    ArgumentFailureTracker listener(cs, argsWithLabels, params,
+    ArgumentFailureTracker listener(cs, argsWithLabels, params, paramInfo,
                                     parameterBindings, locator);
     if (constraints::matchCallArguments(
             argsWithLabels, params, paramInfo, argInfo->HasTrailingClosure,
@@ -2169,8 +2166,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     for (const auto &param : func2Params)
       correctLabels.push_back(param.getLabel());
 
-    auto *fix = RelabelArguments::create(*this, correctLabels,
-                                         getConstraintLocator(argumentLocator));
+    const auto constraintLocator = getConstraintLocator(argumentLocator);
+
+    auto *argExpr = getArgumentListExprFor(*this, constraintLocator);
+    if (!argExpr)
+      return getTypeMatchFailure(argumentLocator);
+
+    const auto mapping = RelabelingMapping::build(argExpr, correctLabels);
+
+    auto *fix = RelabelArguments::create(*this, mapping, constraintLocator);
     if (recordFix(fix))
       return getTypeMatchFailure(argumentLocator);
   }

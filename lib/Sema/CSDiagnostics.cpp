@@ -97,17 +97,8 @@ Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
 
 Expr *
 FailureDiagnostic::getArgumentListExprFor(ConstraintLocator *locator) const {
-  auto path = locator->getPath();
-  auto iter = path.begin();
-  if (!locator->findFirst<LocatorPathElt::ApplyArgument>(iter))
-    return nullptr;
-
-  // Form a new locator that ends at the ApplyArgument element, then simplify
-  // to get the argument list.
-  auto newPath = ArrayRef<LocatorPathElt>(path.begin(), iter + 1);
   auto &cs = getConstraintSystem();
-  auto argListLoc = cs.getConstraintLocator(locator->getAnchor(), newPath);
-  return simplifyLocatorToAnchor(argListLoc);
+  return constraints::getArgumentListExprFor(cs, locator);
 }
 
 Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
@@ -707,7 +698,7 @@ bool LabelingFailure::diagnoseAsError() {
 
   auto &cs = getConstraintSystem();
   auto *anchor = getRawAnchor();
-  return diagnoseArgumentLabelError(cs.getASTContext(), argExpr, CorrectLabels,
+  return diagnoseArgumentLabelError(cs.getASTContext(), argExpr, Mapping,
                                     isa<SubscriptExpr>(anchor));
 }
 
@@ -741,6 +732,12 @@ bool LabelingFailure::diagnoseAsNote() {
 
   const auto &choice = selectedOverload->choice;
   if (auto *decl = choice.getDeclOrNull()) {
+    SmallVector<Identifier, 4> CorrectLabels;
+    for (const auto &item : Mapping.items) {
+      if (item.paramLabel) {
+        CorrectLabels.push_back(*item.paramLabel);
+      }
+    }
     emitDiagnostic(decl, diag::candidate_expected_different_labels,
                    stringifyLabels(argLabels), stringifyLabels(CorrectLabels));
     return true;
