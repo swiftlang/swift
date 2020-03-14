@@ -138,22 +138,14 @@ func run_QueueConcrete(_ scale: Int) {
 
 struct CircularBufferQueue<Element> {
 
-    var capacity: Int
-
     private var circularArray: CircularBuffer<Element>
 
     init() {
         circularArray = CircularBuffer<Element>(capacity: 20)
-        self.capacity = 20
     }
 
     mutating func enqueue(_ newElement: Element) {
-        if circularArray.isFull {
-            let newCapacity = (capacity * 2)+1
-            circularArray.resize(newCapacity: newCapacity)
-            self.capacity = newCapacity
-        }
-        circularArray.pushBack(newElement)
+        circularArray.append(newElement)
     }
 
     mutating func dequeue() -> Element? {

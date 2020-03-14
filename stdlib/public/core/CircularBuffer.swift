@@ -415,8 +415,8 @@ public extension CircularBuffer {
   }
 
   mutating func replaceSubrange<C>(_ subrange: Range<Int>, with newElements: C) where C : Collection, Element == C.Element {
-    precondition(subrange.lowerBound >= startIndex, "CircularBuffer replace: subrange start is negative")
-    precondition(subrange.upperBound <= endIndex, "CircularBuffer replace: subrange extends past the end")
+    precondition(subrange.lowerBound >= startIndex, "CircularBuffer replaceSubrange: subrange start is negative")
+    precondition(subrange.upperBound <= endIndex, "CircularBuffer replaceSubrange: subrange extends past the end")
     makeUnique()
 
     _buffer.replaceSubrange(subrange, with: newElements)
@@ -559,36 +559,6 @@ extension CircularBuffer: CustomStringConvertible, CustomDebugStringConvertible 
   }
 }
 
-private extension CircularBuffer {
-
-  mutating func makeUnique(additionalCapacity: Int = 0) {
-    guard !isUnique else {
-      return
-    }
-
-    let bufferCopy = _buffer.copy(additionalCapacity: additionalCapacity)
-    self._buffer = bufferCopy
-  }
-
-  @inline(__always)
-  private var isUnique: Bool {
-    mutating get {
-      isKnownUniquelyReferenced(&_buffer)
-    }
-  }
-
-
-  @inline(__always)
-  func checkSubscript(index: Int) {
-    precondition(index >= 0 && index < count)
-  }
-
-  @inline(__always)
-  func checkSubscriptIncludingCount(index: Int) {
-    precondition(index >= 0 && index <= count)
-  }
-}
-
 extension CircularBuffer: Equatable where Element: Equatable {
 
   public static func == (lhs: CircularBuffer<Element>, rhs: CircularBuffer<Element>) -> Bool {
@@ -615,9 +585,40 @@ extension CircularBuffer: Equatable where Element: Equatable {
 extension CircularBuffer: Hashable where Element: Hashable {
 
   public func hash(into hasher: inout Hasher) {
+    hasher.combine(count)
+
     for element in self {
       hasher.combine(element)
     }
+  }
+}
+
+private extension CircularBuffer {
+
+  mutating func makeUnique(additionalCapacity: Int = 0) {
+    guard !isUnique else {
+      return
+    }
+
+    let bufferCopy = _buffer.copy(additionalCapacity: additionalCapacity)
+    self._buffer = bufferCopy
+  }
+
+  @inline(__always)
+  private var isUnique: Bool {
+    mutating get {
+      isKnownUniquelyReferenced(&_buffer)
+    }
+  }
+
+  @inline(__always)
+  func checkSubscript(index: Int) {
+    precondition(index >= 0 && index < count)
+  }
+
+  @inline(__always)
+  func checkSubscriptIncludingCount(index: Int) {
+    precondition(index >= 0 && index <= count)
   }
 }
 
@@ -720,7 +721,7 @@ private final class CircularBufferBuffer<Element> {
           newElements.advanced(by: rightElementsToMoveCount).moveInitialize(from: _elements, count: leftElementsToMoveCount)
 
           let elementsToDeinitializeCount = _elementsCount - elementsToMoveCount
-          _elements.advanced(by: _head + leftElementsToMoveCount).deinitialize(count: elementsToDeinitializeCount)
+          _elements.advanced(by: leftElementsToMoveCount).deinitialize(count: elementsToDeinitializeCount)
         }
       } else {
         let elementsToDeinitializeCount = _elementsCount - elementsToMoveCount
@@ -873,8 +874,10 @@ extension CircularBufferBuffer {
       for index in subrange.lowerBound + newElementsCount..<subrange.upperBound {
         _elements.advanced(by: index).deinitialize(count: 1)
       }
-      let startOffset = subrange.lowerBound + subrange.count - elementsToRemoveCount
+
+      let startOffset = subrange.upperBound - elementsToRemoveCount
       let elementsToMoveCount = _elementsCount - subrange.upperBound
+
       let moveToPointer = _elements.advanced(by: startOffset)
       let moveFromPointer = _elements.advanced(by: subrange.upperBound)
       moveToPointer.moveInitialize(from: moveFromPointer, count: elementsToMoveCount)
@@ -887,7 +890,7 @@ extension CircularBufferBuffer {
       let leftCount = capacity - _elementsCount
       let additionalCapacityCount = elementsInsertCount - leftCount
       if additionalCapacityCount > 0 {
-        resize(newCapacity: capacity + additionalCapacityCount)
+        resize(newCapacity: grow(minCapacity: capacity + additionalCapacityCount))
       } else {
         rotateBuffer()
       }
@@ -981,7 +984,7 @@ extension CircularBufferBuffer {
 
   @inline(__always)
   func reserveCapacity(_ n: Int) {
-    self.resize(newCapacity: capacity + n)
+    self.resize(newCapacity: grow(minCapacity: capacity + n))
   }
 
   @inline(__always)
@@ -989,7 +992,7 @@ extension CircularBufferBuffer {
     if capacity - _elementsCount > 0 {
       pushBack(newElement)
     } else {
-      resize(newCapacity: capacity + 1)
+      resize(newCapacity: grow(minCapacity: capacity + 1))
       pushBack(newElement)
     }
   }
@@ -1000,7 +1003,7 @@ extension CircularBufferBuffer {
     let leftCount = capacity - _elementsCount
     if leftCount < newElementsCount {
       let additionalCapacityRequired = newElementsCount - leftCount
-      self.resize(newCapacity: capacity + additionalCapacityRequired)
+      self.resize(newCapacity: grow(minCapacity: capacity + additionalCapacityRequired))
     }
 
     for newElement in newElements {
@@ -1114,6 +1117,12 @@ private extension CircularBufferBuffer {
     }
 
     return index-1
+  }
+
+  @inline(__always)
+  func grow(minCapacity: Int) -> Int {
+    let newCapacity = self.capacity + self.capacity >> 1
+    return Swift.max(minCapacity, newCapacity)
   }
 
   func reverseBuffer(from: Int, to: Int) {
