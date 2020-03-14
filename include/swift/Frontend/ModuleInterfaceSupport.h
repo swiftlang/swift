@@ -23,6 +23,7 @@
 
 namespace swift {
 
+class ASTContext;
 class ModuleDecl;
 
 /// Options for controlling the generation of the .swiftinterface output.
@@ -45,8 +46,10 @@ struct ModuleInterfaceOptions {
 };
 
 extern version::Version InterfaceFormatVersion;
+std::string getSwiftInterfaceCompilerVersionForCurrentCompiler(ASTContext &ctx);
 
 llvm::Regex getSwiftInterfaceFormatVersionRegex();
+llvm::Regex getSwiftInterfaceCompilerVersionRegex();
 llvm::Regex getSwiftInterfaceModuleFlagsRegex();
 
 /// Emit a stable module interface for \p M, which can be used by a client

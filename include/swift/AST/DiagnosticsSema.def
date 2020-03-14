@@ -686,6 +686,13 @@ ERROR(sema_opening_import,Fatal,
 
 ERROR(serialization_load_failed,Fatal,
       "failed to load module '%0'", (StringRef))
+ERROR(module_interface_build_failed,Fatal,
+      "failed to build module '%0' from its module interface; "
+      "%select{the compiler that produced it, '%2', may have used features "
+      "that aren't supported by this compiler, '%3'"
+      "|it may have been damaged or it may have triggered a bug in the Swift "
+      "compiler when it was produced}1",
+      (StringRef, bool, StringRef, StringRef))
 ERROR(serialization_malformed_module,Fatal,
       "malformed compiled module: %0", (StringRef))
 ERROR(serialization_module_too_new,Fatal,
@@ -3197,6 +3204,8 @@ ERROR(cannot_infer_base_of_unresolved_member,none,
       "cannot infer contextual base in reference to member %0", (DeclNameRef))
 ERROR(unresolved_nil_literal,none,
       "'nil' requires a contextual type", ())
+ERROR(cannot_force_unwrap_nil_literal,none,
+      "'nil' literal cannot be force unwrapped", ())
 
 ERROR(type_of_expression_is_ambiguous,none,
       "type of expression is ambiguous without more context", ())

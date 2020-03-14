@@ -3245,7 +3245,6 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
   mutating func pushDest<T>(_ value: T) {
     _internalInvariant(_isPOD(T.self))
     let size = MemoryLayout<T>.size
-    let alignment = MemoryLayout<T>.alignment
     let (baseAddress, misalign) = adjustDestForAlignment(of: T.self)
     withUnsafeBytes(of: value) {
       _memcpy(dest: baseAddress, src: $0.baseAddress.unsafelyUnwrapped,

@@ -1152,6 +1152,22 @@ namespace {
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
       auto *parentExpr = CS.getParentExpr(expr);
+      if (parentExpr && isa<ParenExpr>(parentExpr))
+        parentExpr = CS.getParentExpr(parentExpr);
+
+      if (parentExpr) {
+        // `_ = nil!`
+        if (isa<ForceValueExpr>(parentExpr)) {
+          DE.diagnose(expr->getLoc(), diag::cannot_force_unwrap_nil_literal);
+          return Type();
+        }
+
+        // `_ = nil?`
+        if (isa<OptionalEvaluationExpr>(parentExpr)) {
+          DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
+          return Type();
+        }
+      }
 
       // `_ = nil`
       if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {

@@ -499,7 +499,8 @@ LinearLifetimeError LinearLifetimeChecker::checkValue(
     SILValue value, ArrayRef<Operand *> consumingUses,
     ArrayRef<Operand *> nonConsumingUses, ErrorBehaviorKind errorBehavior,
     SmallVectorImpl<SILBasicBlock *> *leakingBlocks) {
-  assert(!consumingUses.empty() && "Must have at least one consuming user?!");
+  assert((!consumingUses.empty() || !deadEndBlocks.empty()) &&
+         "Must have at least one consuming user?!");
 
   State state(value, visitedBlocks, errorBehavior, leakingBlocks, consumingUses,
               nonConsumingUses);

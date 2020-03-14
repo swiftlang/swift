@@ -1594,6 +1594,7 @@ bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args,
     SourceLoc LParenLoc = P.consumeToken(tok::l_paren);
     SourceLoc RParenLoc;
 
+    bool HasError = false;
     if (P.parseList(tok::r_paren, LParenLoc, RParenLoc,
                     /*AllowSepAfterLast=*/false,
                     diag::sil_basicblock_arg_rparen,
@@ -1601,11 +1602,13 @@ bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args,
                     [&]() -> ParserStatus {
                       SILValue Arg;
                       SourceLoc ArgLoc;
-                      if (parseTypedValueRef(Arg, ArgLoc, B))
+                      if (parseTypedValueRef(Arg, ArgLoc, B)) {
+                        HasError = true;
                         return makeParserError();
+                      }
                       Args.push_back(Arg);
                       return makeParserSuccess();
-                    }).isError())
+                    }).isError() || HasError)
       return true;
   }
   return false;

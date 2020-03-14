@@ -2371,21 +2371,31 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${BUILD_JOBS} '{ print (N < $2) ? N : $2 }')"
                 fi
 
+                FILTER_SWIFT_OPTION="--filter=[sS]wift"
+                LLVM_LIT_FILTER_ARG=""
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
-                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --filter=[sS]wift"
+                    LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
                 fi
 
                 # Record the times test took and report the slowest.
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
 
+                echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
+                echo "--- Running LLDB tests (Swift tests using ClangImporter) ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS}
+                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
+                echo "--- Rerun LLDB Swift tests (using only DWARFImporter) ---"
+                with_pushd ${results_dir} \
+                    call "${llvm_build_dir}/bin/llvm-lit" \
+                         "${lldb_build_dir}/test" \
+                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_OPTION} \
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=false"
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                     echo "Running LLDB swift compatibility tests against" \

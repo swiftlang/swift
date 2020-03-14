@@ -61,14 +61,20 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
                                             ModuleInterfaceOptions const &Opts,
                                             ModuleDecl *M) {
   auto &Ctx = M->getASTContext();
-  auto ToolsVersion = swift::version::getSwiftFullVersion(
-      Ctx.LangOpts.EffectiveLanguageVersion);
+  auto ToolsVersion =
+      getSwiftInterfaceCompilerVersionForCurrentCompiler(Ctx);
   out << "// " SWIFT_INTERFACE_FORMAT_VERSION_KEY ": "
       << InterfaceFormatVersion << "\n";
   out << "// " SWIFT_COMPILER_VERSION_KEY ": "
       << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
       << Opts.Flags << "\n";
+}
+
+std::string
+swift::getSwiftInterfaceCompilerVersionForCurrentCompiler(ASTContext &ctx) {
+  return swift::version::getSwiftFullVersion(
+             ctx.LangOpts.EffectiveLanguageVersion);
 }
 
 llvm::Regex swift::getSwiftInterfaceFormatVersionRegex() {
@@ -79,6 +85,11 @@ llvm::Regex swift::getSwiftInterfaceFormatVersionRegex() {
 llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
   return llvm::Regex("^// " SWIFT_MODULE_FLAGS_KEY ":(.*)$",
                      llvm::Regex::Newline);
+}
+
+llvm::Regex swift::getSwiftInterfaceCompilerVersionRegex() {
+  return llvm::Regex("^// " SWIFT_COMPILER_VERSION_KEY
+                     ": (.+)$", llvm::Regex::Newline);
 }
 
 /// Prints the imported modules in \p M to \p out in the form of \c import
