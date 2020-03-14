@@ -1152,6 +1152,19 @@ namespace {
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
       auto *parentExpr = CS.getParentExpr(expr);
+      if (auto *PE = dyn_cast<ParenExpr>(parentExpr))
+        parentExpr = CS.getParentExpr(parentExpr);
+
+      if (isa<ForceValueExpr>(parentExpr)) {
+        DE.diagnose(expr->getLoc(), diag::cannot_force_unwrap_nil_literal);
+        return Type();
+      }
+
+      if (isa<NilLiteralExpr>(parentExpr)
+          || isa<OptionalEvaluationExpr>(parentExpr)) {
+        DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
+        return Type();
+      }
 
       // `_ = nil`
       if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
@@ -3207,14 +3220,6 @@ namespace {
     }
 
     Type visitForceValueExpr(ForceValueExpr *expr) {
-      // Diagnose force-unwrapping a 'nil' literal
-      auto subExpr = expr->getSubExpr();
-      if (isa<NilLiteralExpr>(subExpr)) {
-        auto &DE = CS.getASTContext().Diags;
-        DE.diagnose(subExpr->getLoc(), diag::cannot_force_unwrap_nil_literal);
-        return Type();
-      }
-
       // Force-unwrap an optional of type T? to produce a T.
       auto locator = CS.getConstraintLocator(expr);
 
