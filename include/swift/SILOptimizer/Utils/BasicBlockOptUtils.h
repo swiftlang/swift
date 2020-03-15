@@ -33,6 +33,24 @@ class BasicBlockCloner;
 class SILLoop;
 class SILLoopInfo;
 
+/// Compute the set of reachable blocks.
+class ReachableBlocks {
+  SmallPtrSet<SILBasicBlock *, 32> visited;
+
+public:
+  /// Invoke \p visitor for each reachable block in \p f in worklist order (at
+  /// least one predecessor has been visited--defs are always visited before
+  /// uses except for phi-type block args). The \p visitor takes a block
+  /// argument, which is already marked visited, and must return true to
+  /// continue visiting blocks.
+  ///
+  /// Returns true if all reachable blocks were visited.
+  bool visit(SILFunction *f, function_ref<bool(SILBasicBlock *)> visitor);
+
+  /// Return true if \p bb has been visited.
+  bool isVisited(SILBasicBlock *bb) const { return visited.count(bb); }
+};
+
 /// Remove all instructions in the body of \p bb in safe manner by using
 /// undef.
 void clearBlockBody(SILBasicBlock *bb);
