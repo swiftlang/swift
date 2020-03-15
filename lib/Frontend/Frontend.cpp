@@ -410,9 +410,6 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
     Diagnostics.setPrintDiagnosticNames(true);
   }
-  if (Invocation.getDiagnosticOptions().EnableEducationalNotes) {
-    Diagnostics.setUseEducationalNotes(true);
-  }
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
 }

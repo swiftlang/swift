@@ -55,9 +55,9 @@ public:
   // When printing diagnostics, include the diagnostic name at the end
   bool PrintDiagnosticNames = false;
 
-  /// If set to true, display educational note content to the user if available.
+  /// If set to true, include educational notes in printed output if available.
   /// Educational notes are documentation which supplement diagnostics.
-  bool EnableEducationalNotes = false;
+  bool PrintEducationalNotes = false;
 
   // If set to true, use the more descriptive experimental formatting style for
   // diagnostics.

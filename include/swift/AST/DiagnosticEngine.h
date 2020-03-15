@@ -676,9 +676,6 @@ namespace swift {
     /// Print diagnostic names after their messages
     bool printDiagnosticNames = false;
 
-    /// Use educational notes when available.
-    bool useEducationalNotes = false;
-
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
 
@@ -729,9 +726,6 @@ namespace swift {
     bool getPrintDiagnosticNames() const {
       return printDiagnosticNames;
     }
-
-    void setUseEducationalNotes(bool val) { useEducationalNotes = val; }
-    bool getUseEducationalNotes() const { return useEducationalNotes; }
 
     void setDiagnosticDocumentationPath(std::string path) {
       diagnosticDocumentationPath = path;
