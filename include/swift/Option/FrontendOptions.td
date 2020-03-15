@@ -130,9 +130,6 @@ def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
   HelpText<"Automatically import declared cross-import overlays.">;
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
-
-def print_educational_notes : Flag<["-"], "print-educational-notes">,
-  HelpText<"Include educational notes in printed output, if available.">;
   
 def enable_experimental_diagnostic_formatting :
   Flag<["-"], "enable-experimental-diagnostic-formatting">,

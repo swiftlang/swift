@@ -372,6 +372,9 @@ def no_color_diagnostics : Flag<["-"], "no-color-diagnostics">,
 def debug_diagnostic_names : Flag<["-"], "debug-diagnostic-names">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
   HelpText<"Include diagnostic names when printing">;
+def print_educational_notes : Flag<["-"], "print-educational-notes">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Include educational notes in printed diagnostic output, if available">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
