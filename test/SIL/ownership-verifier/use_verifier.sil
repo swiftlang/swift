@@ -238,8 +238,10 @@ bb0(%0 : @owned $SomeError):
   %1 = alloc_existential_box $Error, $SomeError
   %2 = project_existential_box $SomeError in %1 : $Error
   store %0 to [init] %2 : $*SomeError
-  %4 = open_existential_box %1 : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  %1a = begin_borrow %1 : $Error
+  %4 = open_existential_box %1a : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
   destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  end_borrow %1a : $Error
   dealloc_existential_box %1 : $Error, $SomeError
   %9999 = tuple()
   return %9999 : $()
