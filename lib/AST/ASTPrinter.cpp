@@ -3586,7 +3586,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   template <typename T>
   void printModuleContext(T *Ty) {
     FileUnit *File = cast<FileUnit>(Ty->getDecl()->getModuleScopeContext());
-    ModuleDecl *Mod = File->getParentModule();
+    const ModuleDecl *Mod =
+        Options.mapModuleToUnderlying(File->getParentModule());
 
     Identifier Name = Mod->getName();
     if (Options.UseExportedModuleNames)

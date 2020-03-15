@@ -238,6 +238,199 @@ swift::ide::findGroupNameForUSR(ModuleDecl *M, StringRef USR) {
   return None;
 }
 
+/// Sorts import declarations for display.
+static bool compareImports(ImportDecl *LHS, ImportDecl *RHS) {
+  auto LHSPath = LHS->getFullAccessPath();
+  auto RHSPath = RHS->getFullAccessPath();
+  for (unsigned i: range(std::min(LHSPath.size(), RHSPath.size()))) {
+    if (int Ret = LHSPath[i].Item.str().compare(RHSPath[i].Item.str()))
+      return Ret < 0;
+  }
+  return false;
+};
+
+/// Sorts Swift declarations for display.
+static bool compareSwiftDecls(Decl *LHS, Decl *RHS) {
+  auto *LHSValue = dyn_cast<ValueDecl>(LHS);
+  auto *RHSValue = dyn_cast<ValueDecl>(RHS);
+
+  if (LHSValue && RHSValue) {
+    auto LHSName = LHSValue->getBaseName();
+    auto RHSName = RHSValue->getBaseName();
+    if (int Ret = LHSName.compare(RHSName))
+      return Ret < 0;
+    // FIXME: not sufficient to establish a total order for overloaded decls.
+  }
+  return LHS->getKind() < RHS->getKind();
+};
+
+/// Represents a single cross-import overlay of the target module whose
+/// declarations are conditionally available when a bystander module is
+/// imported alongside the target module.
+class OverlayItem {
+  friend class OverlayCollector;
+private:
+  ModuleDecl *Module; ///< The overlay module.
+  StringRef BystanderName; ///< The name of the required bystander module.
+  OverlayItem *Underlying; ///< The underlying overlay, or target module.
+
+public:
+  OverlayItem(ModuleDecl *Overlay, StringRef BystanderName,
+              OverlayItem *Underlying)
+  : Module(Overlay), BystanderName(BystanderName), Underlying(Underlying) {}
+
+  /// Gets the set of bystander modules that need to be imported along with the
+  /// target module for this overlay to be applied.
+  void getBystanders(SmallVectorImpl<StringRef> &Bystanders) const {
+    if (Underlying)
+      Underlying->getBystanders(Bystanders);
+    if (!BystanderName.empty())
+      Bystanders.push_back(BystanderName);
+  }
+
+  /// Gets the set of accessible declarations specified in this overlay, divided
+  /// into two groups: the import decls, and everything else.
+  std::pair<ArrayRef<Decl*>, ArrayRef<Decl*>>
+  getDecls(SmallVectorImpl<Decl *> &Decls, AccessLevel AccessFilter) const {
+    Module->getDisplayDecls(Decls);
+
+    // Filter out parent imports and inaccessible decls.
+    SmallPtrSet<ModuleDecl *, 8> PrevImported;
+    getUnderlyingImports(PrevImported);
+    auto NewEnd = std::partition(Decls.begin(), Decls.end(), [&](Decl *D) {
+      if (auto *ID = dyn_cast<ImportDecl>(D)) {
+        if (isUnderlying(ID->getModule()))
+          return false;
+        if (PrevImported.find(ID->getModule()) != PrevImported.end())
+          return false;
+      }
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        if (AccessFilter > AccessLevel::Private &&
+            VD->getFormalAccess() < AccessFilter)
+          return false;
+      }
+      return true;
+    });
+    if (NewEnd != Decls.end())
+      Decls.erase(NewEnd, Decls.end());
+
+    // Separate out the import declarations and sort
+    MutableArrayRef<Decl*> Imports, Remainder;
+    auto ImportsEnd = std::partition(Decls.begin(), Decls.end(), [](Decl *D) {
+      return isa<ImportDecl>(D);
+    });
+    if (ImportsEnd != Decls.begin()) {
+      Imports = {Decls.begin(), ImportsEnd};
+      Remainder = {ImportsEnd, Decls.end()};
+      std::sort(Imports.begin(), Imports.end(), [](Decl *LHS, Decl *RHS) {
+        return compareImports(cast<ImportDecl>(LHS), cast<ImportDecl>(RHS));
+      });
+    } else {
+      Remainder = Decls;
+    }
+    std::sort(Remainder.begin(), Remainder.end(), compareSwiftDecls);
+    return {Imports, Remainder};
+  }
+
+private:
+  /// Checks whether the given module is an underlying module of this overlay,
+  /// transitively.
+  bool isUnderlying(ModuleDecl *M) const {
+    if (M == Module)
+      return true;
+    return Underlying && Underlying->isUnderlying(M);
+  }
+
+  /// Populates \p Imported with all ModuleDecls directly imported by the base
+  /// underlying module (ignoring those of any intermediate underlying modules).
+  void getUnderlyingImports(SmallPtrSet<ModuleDecl *, 8> &Imported) const {
+    if (Underlying) {
+      Underlying->getUnderlyingImports(Imported);
+    } else {
+      SmallVector<Decl*, 1> Decls;
+      Module->getDisplayDecls(Decls);
+      for (auto *D: Decls) {
+        if (auto *ID = dyn_cast<ImportDecl>(D))
+          Imported.insert(ID->getModule());
+      }
+    }
+  }
+};
+
+//  Collects the set of underscored cross-import overlay modules of a given
+//  target module, transitively, reporting the set of bystander modules
+//  necessary for their inclusion (on top of the target module).
+//
+// E.g. if module A has a cross-import overlay _ABAdditions that is imported if
+// a bystander module B is also imported, and _ABAdditions has a cross-import
+// overlay __ABAdditionsCAdditions imported when a bystander module C is
+// imported, the collected overlays will include _ABAdditions with bystanders B,
+// and __ABAdditionsCAdditions with bystanders B and C.
+class OverlayCollector {
+  ASTContext &Ctx; ///< ASTContext to use for module lookups.
+  SmallVector<OverlayItem, 1> Overlays; ///< The collected overlays.
+  OverlayItem TargetModuleItem; /// < The initial worklist item.
+
+public:
+  OverlayCollector(ModuleDecl *Target, ASTContext &Ctx)
+  : Ctx(Ctx), TargetModuleItem(Target, StringRef(), nullptr) {
+    SmallVector<OverlayItem *, 1> Worklist;
+    SmallPtrSet<ModuleDecl *, 1> Seen;
+
+    Worklist.push_back(&TargetModuleItem);
+    while(!Worklist.empty()) {
+      OverlayItem &Item = *Worklist.back();
+      Worklist.pop_back();
+      if (!Seen.insert(Item.Module).second)
+        continue;
+      processItem(Item, Worklist);
+    }
+    std::sort(Overlays.begin(), Overlays.end(),
+              [](OverlayItem &LHS, OverlayItem &RHS) {
+      return LHS.Module->getNameStr() < RHS.Module->getNameStr();
+    });
+  }
+
+  /// Gets the underscored cross-import overlays.
+  ArrayRef<OverlayItem> getOverlays() {
+    return Overlays;
+  }
+
+  /// Maps the given module to the target module if it's one of its underscored
+  /// cross-import overlays.
+  const ModuleDecl *mapToUnderlyingModule(const ModuleDecl *M) {
+    auto i = std::find_if(Overlays.begin(), Overlays.end(),
+                          [M](OverlayItem &Item) {
+      return Item.Module == M;
+    });
+    return i == Overlays.end() ? M : TargetModuleItem.Module;
+  }
+
+private:
+  void processItem(OverlayItem &Current,
+                   SmallVectorImpl<OverlayItem*> &Worklist) {
+    SmallVector<Identifier, 1> BystanderNames, OverlayNames;
+    Current.Module->getDeclaredCrossImportBystanders(BystanderNames);
+
+    for (Identifier BystanderName: BystanderNames) {
+      OverlayNames.clear();
+      Current.Module->findDeclaredCrossImportOverlays(BystanderName,
+                                                      OverlayNames,
+                                                      SourceLoc());
+      for (Identifier OverlayName: OverlayNames) {
+        StringRef OverlayNameStr = OverlayName.str();
+        if (!OverlayNameStr.startswith("_"))
+          continue;
+        ModuleDecl *Overlay = Ctx.getModuleByName(OverlayNameStr);
+        if (!Overlay)
+          continue;
+        Overlays.emplace_back(Overlay, BystanderName.str(), &Current);
+        Worklist.push_back(&Overlays.back());
+      }
+    }
+  }
+};
+
 void swift::ide::printSubmoduleInterface(
        ModuleDecl *M,
        ArrayRef<StringRef> FullModuleName,
@@ -246,18 +439,26 @@ void swift::ide::printSubmoduleInterface(
        ASTPrinter &Printer,
        const PrintOptions &Options,
        const bool PrintSynthesizedExtensions) {
-  auto AdjustedOptions = Options;
-  adjustPrintOptions(AdjustedOptions);
-
-  SmallVector<Decl *, 1> Decls;
-  M->getDisplayDecls(Decls);
-
   auto &SwiftContext = M->getASTContext();
   auto &Importer =
       static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
 
-  const clang::Module *InterestingClangModule = nullptr;
+  auto AdjustedOptions = Options;
+  adjustPrintOptions(AdjustedOptions);
 
+  // If we end up printing decls from any cross-import overlay modules, make
+  // sure we map any qualifying module references to the underlying module.
+  Optional<OverlayCollector> OverlayCollector;
+  AdjustedOptions.mapModuleToUnderlying = [&](const ModuleDecl *M) {
+    return OverlayCollector
+      ? OverlayCollector->mapToUnderlyingModule(M)
+      : M;
+  };
+
+  SmallVector<Decl *, 1> Decls;
+  M->getDisplayDecls(Decls);
+
+  const clang::Module *InterestingClangModule = nullptr;
   SmallVector<ImportDecl *, 1> ImportDecls;
   llvm::DenseSet<const clang::Module *> ClangModulesForImports;
   SmallVector<Decl *, 1> SwiftDecls;
@@ -429,9 +630,8 @@ void swift::ide::printSubmoduleInterface(
     ImportDecls.push_back(createImportDecl(M->getASTContext(), M, SM, {}));
   }
 
+  // Sort imported clang declarations in source order *within a submodule*.
   auto &ClangSourceManager = Importer.getClangASTContext().getSourceManager();
-
-  // Sort imported declarations in source order *within a submodule*.
   for (auto &P : ClangDecls) {
     std::stable_sort(P.second.begin(), P.second.end(),
                      [&](std::pair<Decl *, clang::SourceLocation> LHS,
@@ -442,39 +642,12 @@ void swift::ide::printSubmoduleInterface(
   }
 
   // Sort Swift declarations so that we print them in a consistent order.
-  std::sort(ImportDecls.begin(), ImportDecls.end(),
-            [](ImportDecl *LHS, ImportDecl *RHS) -> bool {
-    auto LHSPath = LHS->getFullAccessPath();
-    auto RHSPath = RHS->getFullAccessPath();
-    for (unsigned i = 0, e = std::min(LHSPath.size(), RHSPath.size()); i != e;
-         i++) {
-      if (int Ret = LHSPath[i].Item.str().compare(RHSPath[i].Item.str()))
-        return Ret < 0;
-    }
-    return false;
-  });
+  std::sort(ImportDecls.begin(), ImportDecls.end(), compareImports);
 
   // If the group name is specified, we sort them according to their source order,
   // which is the order preserved by getTopLevelDecls.
-  if (GroupNames.empty()) {
-    std::stable_sort(SwiftDecls.begin(), SwiftDecls.end(),
-      [&](Decl *LHS, Decl *RHS) -> bool {
-        auto *LHSValue = dyn_cast<ValueDecl>(LHS);
-        auto *RHSValue = dyn_cast<ValueDecl>(RHS);
-
-        if (LHSValue && RHSValue) {
-          auto LHSName = LHSValue->getBaseName();
-          auto RHSName = RHSValue->getBaseName();
-          if (int Ret = LHSName.compare(RHSName))
-            return Ret < 0;
-          // FIXME: this is not sufficient to establish a total order for overloaded
-          // decls.
-          return LHS->getKind() < RHS->getKind();
-        }
-
-        return LHS->getKind() < RHS->getKind();
-      });
-  }
+  if (GroupNames.empty())
+    std::stable_sort(SwiftDecls.begin(), SwiftDecls.end(), compareSwiftDecls);
 
   ASTPrinter *PrinterToUse = &Printer;
 
@@ -645,6 +818,56 @@ void swift::ide::printSubmoduleInterface(
     for (auto *D : SwiftDecls) {
       if (PrintDecl(D))
         Printer << "\n";
+    }
+
+    // If we're printing the entire target module (not specific sub-groups),
+    // also print the decls from any underscored Swift cross-import overlays it
+    // is the underlying module of, transitively.
+    if (GroupNames.empty()) {
+      OverlayCollector.emplace(M, SwiftContext);
+
+      SmallVector<Decl *, 1> OverlayDecls;
+      SmallVector<StringRef, 1> Bystanders;
+
+      for (auto &Overlay: OverlayCollector->getOverlays()) {
+        OverlayDecls.clear();
+        auto DeclLists = Overlay.getDecls(OverlayDecls, Options.AccessFilter);
+
+        // Ignore overlays without any decls
+        if (OverlayDecls.empty())
+          continue;
+
+        Bystanders.clear();
+        Overlay.getBystanders(Bystanders);
+        assert(!Bystanders.empty() && "Overlay with no bystanders?");
+
+        std::string BystanderList;
+        for (size_t I: range(Bystanders.size())) {
+          if (I == Bystanders.size() - 1) {
+            if (I != 0)
+              BystanderList += " and ";
+          } else if (I != 0) {
+            BystanderList += ", ";
+          }
+          BystanderList += Bystanders[I].str();
+        }
+
+        Printer << "\n// MARK: - " << BystanderList << " Additions\n\n";
+        for (auto *Import : DeclLists.first)
+          PrintDecl(Import);
+        Printer << "\n";
+
+        std::string PerDeclComment = "// Available when " + BystanderList;
+        PerDeclComment += Bystanders.size() == 1 ? " is" : " are";
+        PerDeclComment += " imported with " + M->getNameStr().str();
+
+        for (auto *D : DeclLists.second) {
+          // FIXME: only print this comment if the decl is actually printed.
+          Printer << PerDeclComment << "\n";
+          if (PrintDecl(D))
+            Printer << "\n";
+        }
+      }
     }
   }
 }
