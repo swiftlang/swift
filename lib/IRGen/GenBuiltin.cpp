@@ -400,7 +400,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
     // Remove swiftself and swifterror attribute to match signature generated from
     // RuntimeFunctions.def. These two parameters are passed using swifterror and swiftself,
-    // but the definition of swift_willThrow generated from the def file doesn't has those
+    // but the definition of swift_willThrow generated from the def file doesn't have those
     // attributes due to the def file limitation. In WebAssembly context, these attributes are
     // lowered as usual parameters, so this doesn't have any side effects.
     if (IGF.IGM.TargetInfo.OutputObjectFormat != llvm::Triple::Wasm) {

@@ -210,7 +210,7 @@ void swift_errorRelease(SwiftError *object);
 // Notes:
 // Remove swiftself and swifterror attribute to match signature generated from
 // RuntimeFunctions.def. These two parameters are passed using swifterror and swiftself,
-// but the definition of swift_willThrow generated from the def file doesn't has those
+// but the definition of swift_willThrow generated from the def file doesn't have those
 // attributes due to the def file limitation. In WebAssembly context, these attributes are
 // lowered as usual parameters, so this doesn't have any side effects.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
