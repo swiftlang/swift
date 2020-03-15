@@ -418,12 +418,10 @@ parseFreestandingGenericWhereClause(GenericContext *genCtx,
 
     genericParams->addTrailingWhereClause(Context, WhereLoc, Requirements);
 
-  // A where clause that references only outer generic parameters?
-  } else if (flags.contains(PD_HasContainerType)) {
+  } else {
+    // A where clause against outer generic parameters.
     genCtx->setTrailingWhereClause(
         TrailingWhereClause::create(Context, WhereLoc, Requirements));
-  } else {
-    diagnose(WhereLoc, diag::where_toplevel_nongeneric);
   }
 
   return ParserStatus();
