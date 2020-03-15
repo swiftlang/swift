@@ -206,9 +206,21 @@ SWIFT_RUNTIME_STDLIB_API
 void swift_errorRelease(SwiftError *object);
 
 /// Breakpoint hook for debuggers.
+#ifdef __wasm__
+// Notes:
+// Remove swiftself and swifterror attribute to match signature generated from
+// RuntimeFunctions.def. These two parameters are passed using swifterror and swiftself,
+// but the definition of swift_willThrow generated from the def file doesn't have those
+// attributes due to the def file limitation. In WebAssembly context, these attributes are
+// lowered as usual parameters, so this doesn't have any side effects.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+void swift_willThrow(void *unused,
+                     SwiftError **object);
+#else
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void swift_willThrow(SWIFT_CONTEXT void *unused,
                      SWIFT_ERROR_RESULT SwiftError **object);
+#endif
 
 /// Halt in response to an error.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API LLVM_ATTRIBUTE_NORETURN
