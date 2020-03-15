@@ -931,10 +931,10 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
 
       // Register a callback to record potentially unused function values after
       // inlining.
-//      ClosureCleanup closureCleanup;
-//      Inliner.setDeletionCallback([&closureCleanup](SILInstruction *I) {
-//        closureCleanup.recordDeadFunction(I);
-//      });
+      ClosureCleanup closureCleanup;
+      Inliner.setDeletionCallback([&closureCleanup](SILInstruction *I) {
+        closureCleanup.recordDeadFunction(I);
+      });
 
       invalidatedStackNesting |= Inliner.invalidatesStackNesting(InnerAI);
 
@@ -949,8 +949,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
       // The IR is now valid, and trivial dead arguments are removed. However,
       // we may be able to remove dead callee computations (e.g. dead
       // partial_apply closures).
-//      closureCleanup.cleanupDeadClosures(F);
-//      invalidatedStackNesting |= closureCleanup.invalidatedStackNesting;
+      closureCleanup.cleanupDeadClosures(F);
+      invalidatedStackNesting |= closureCleanup.invalidatedStackNesting;
 
       // Resume inlining within nextBB, which contains only the inlined
       // instructions and possibly instructions in the original call block that

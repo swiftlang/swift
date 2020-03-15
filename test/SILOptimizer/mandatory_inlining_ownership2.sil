@@ -1,7 +1,5 @@
 // RUN: %target-sil-opt -enable-objc-interop -module-name mandatory_inlining -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
-// RUN: %target-sil-opt -enable-objc-interop -module-name mandatory_inlining -enable-sil-verify-all %s -mandatory-inlining -mandatory-combine | %FileCheck %s -check-prefix=BOTH-CHECK
-
 import Builtin
 import Swift
 
@@ -553,6 +551,143 @@ bb3:
 // Autoclosure Tests //
 ///////////////////////
 
+sil @true_getter : $@convention(thin) () -> Bool
+
+sil [transparent] [ossa] @short_circuit_or : $@convention(thin) (Bool, @owned @callee_owned () -> Bool) -> Bool {
+bb0(%0 : $Bool, %1 : @owned $@callee_owned () -> Bool):
+  %2 = alloc_box ${ var Bool }
+  %2a = project_box %2 : ${ var Bool }, 0
+  %3 = alloc_box ${ var @callee_owned () -> Bool }
+  %3a = project_box %3 : ${ var @callee_owned () -> Bool }, 0
+  store %0 to [trivial] %2a : $*Bool
+  store %1 to [init] %3a : $*@callee_owned () -> Bool
+  %6 = function_ref @get_logic_value : $@convention(method) (@inout Bool) -> Builtin.Int1
+  %7 = apply %6(%2a) : $@convention(method) (@inout Bool) -> Builtin.Int1
+  cond_br %7, bb1, bb2
+
+bb1:
+
+  %9 = function_ref @true_getter : $@convention(thin) () -> Bool
+  %10 = apply %9() : $@convention(thin) () -> Bool
+  br bb3(%10 : $Bool)
+
+bb2:
+  %m2 = integer_literal $Builtin.Int32, 2 // Marker
+  %12 = load [copy] %3a : $*@callee_owned () -> Bool
+  %m3 = integer_literal $Builtin.Int32, 3 // Marker
+  %14 = apply %12() : $@callee_owned () -> Bool
+  br bb3(%14 : $Bool)
+
+bb3(%16 : $Bool):
+  destroy_value %3 : ${ var @callee_owned () -> Bool } 
+  destroy_value %2 : ${ var Bool }
+  return %16 : $Bool
+}
+
+sil private [transparent] [ossa] @closure0 : $@convention(thin) (@owned { var Bool }) -> Bool {
+bb0(%0 : @owned ${ var Bool }):
+  %1 = project_box %0 : ${ var Bool }, 0
+  %2 = tuple ()
+  %3 = load [trivial] %1 : $*Bool
+  destroy_value %0 : ${ var Bool }
+  return %3 : $Bool
+}
+
+// CHECK-LABEL: sil [ossa] @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK: [[BOX1:%.*]] = alloc_box
+// CHECK: [[BOX2:%.*]] = alloc_box
+// CHECK: [[BOX2_COPY:%.*]] = copy_value [[BOX2]]
+// CHECK: [[BOX2_COPY_COPY:%.*]] = copy_value [[BOX2_COPY]]
+// CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
+
+// CHECK: bb1:
+// CHECK:   destroy_value [[BOX2_COPY_COPY]]
+// CHECK:   br [[BB3:.*]](
+
+// CHECK: bb2:
+// Separation marker
+// CHECK:   integer_literal $Builtin.Int32, 3
+// CHECK:   [[ADDR4:%.*]] = project_box [[BOX2_COPY_COPY]]
+// CHECK:   {{%.*}} = tuple ()
+// CHECK:   {{%.*}} = load [trivial] [[ADDR4]]
+// CHECK:   destroy_value [[BOX2_COPY_COPY]]
+// CHECK:   br [[BB3]](
+//
+// CHECK: [[BB3]](
+// CHECK:   destroy_value [[BOX2_COPY]]
+// CHECK:   destroy_value [[BOX2]]
+// CHECK:   destroy_value [[BOX1]]
+// CHECK:   return {{.*}}
+// CHECK: } // end sil function 'test_short_circuit'
+sil [ossa] @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
+bb0(%0 : $Bool, %1 : $Bool):
+  %2 = alloc_box ${ var Bool }
+  %2a = project_box %2 : ${ var Bool }, 0
+  %3 = alloc_box ${ var Bool }
+  %3a = project_box %3 : ${ var Bool }, 0
+  store %0 to [trivial] %2a : $*Bool
+  store %1 to [trivial] %3a : $*Bool
+  %6 = function_ref @short_circuit_or : $@convention(thin) (Bool, @owned @callee_owned () -> Bool) -> Bool
+  %7 = load [trivial] %2a : $*Bool
+  %8 = function_ref @closure0 : $@convention(thin) (@owned { var Bool }) -> Bool
+  %3copy = copy_value %3 : ${ var Bool }
+  %10 = partial_apply %8(%3copy) : $@convention(thin) (@owned { var Bool }) -> Bool
+  %12 = integer_literal $Builtin.Int32, 1 // Marker
+  %11 = apply %6(%7, %10) : $@convention(thin) (Bool, @owned @callee_owned () -> Bool) -> Bool
+  destroy_value %3 : ${ var Bool }
+  destroy_value %2 : ${ var Bool }
+  return %11 : $Bool
+}
+
+// CHECK-LABEL: sil [ossa] @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK: bb0(
+// CHECK:   [[BOX1:%.*]] = alloc_box
+// CHECK:   [[BOX2:%.*]] = alloc_box
+// CHECK:   [[BOX2_COPY:%.*]] = copy_value [[BOX2]]
+// CHECK:   [[BOX2_COPY_COPY:%.*]] = copy_value [[BOX2_COPY]]
+// CHECK:   cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
+//
+// CHECK: [[BB1]]:
+// CHECK:   destroy_value [[BOX2_COPY_COPY]]
+// CHECK:   br [[BB3:.*]](
+//
+// CHECK: [[BB2]]:
+// Marker -
+// CHECK:   integer_literal $Builtin.Int32, 2
+// Marker -
+// CHECK:   integer_literal $Builtin.Int32, 3
+// CHECK:   [[ADDR4:%.*]] = project_box [[BOX2_COPY_COPY]]
+// CHECK:   {{%.*}} = tuple ()
+// CHECK:   {{%.*}} = load [trivial] [[ADDR4]]
+// CHECK:   destroy_value [[BOX2_COPY_COPY]]
+// CHECK:   br [[BB3]](
+//
+// CHECK: [[BB3]](
+// CHECK:   destroy_value [[BOX2]]
+// CHECK:   destroy_value [[BOX1]]
+// CHECK:   return {{.*}}
+// CHECK: } // end sil function 'test_short_circuit2'
+sil [ossa] @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
+bb0(%0 : $Bool, %1 : $Bool):
+  %2 = alloc_box ${ var Bool }
+  %2a = project_box %2 : ${ var Bool }, 0
+  %3 = alloc_box ${ var Bool }
+  %3a = project_box %3 : ${ var Bool }, 0
+  store %0 to [trivial] %2a : $*Bool
+  store %1 to [trivial] %3a : $*Bool
+  %6 = function_ref @short_circuit_or : $@convention(thin) (Bool, @owned @callee_owned () -> Bool) -> Bool
+  %7 = load [trivial] %2a : $*Bool
+  %8 = function_ref @closure0 : $@convention(thin) (@owned { var Bool }) -> Bool
+  %3copy = copy_value %3 : ${ var Bool }
+  %10 = partial_apply %8(%3copy) : $@convention(thin) (@owned { var Bool }) -> Bool
+  %10copy = copy_value %10 : $@callee_owned () -> Bool
+  %11 = apply %6(%7, %10copy) : $@convention(thin) (Bool, @owned @callee_owned () -> Bool) -> Bool
+  destroy_value %10 : $@callee_owned () -> Bool
+  destroy_value %3 : ${ var Bool }
+  destroy_value %2 : ${ var Bool }
+  return %11 : $Bool
+}
+
 sil [transparent] [ossa] @convertFromBuiltinIntegerLiteral : $@convention(thin) (Builtin.IntLiteral, @thin Int64.Type) -> Int64 {
 bb0(%0 : $Builtin.IntLiteral, %1 : $@thin Int64.Type):
   %3 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
@@ -756,6 +891,52 @@ bb0(%0 : $*T, %1 : $*T):
   return %9 : $()
 }
 
+// CHECK-LABEL: sil [transparent] [ossa] @partial : $@convention(thin) <T, U> (@in T, @owned @callee_owned (@in T) -> @out U) -> @out U {
+// CHECK: bb0({{.*}}, {{.*}}, [[ARG2:%.*]] :
+// CHECK:   [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+// CHECK:   apply [[ARG2_COPY]](
+// CHECK: } // end sil function 'partial'
+sil [transparent] [ossa] @partial : $@convention(thin) <T, U> (@in T, @owned @callee_owned (@in T) -> @out U) -> @out U {
+bb0(%0 : $*U, %1 : $*T, %2 : @owned $@callee_owned (@in T) -> @out U):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $@callee_owned (@in T) -> @out U
+  %2copy = copy_value %2 : $@callee_owned (@in T) -> @out U
+  %6 = alloc_stack $T
+  copy_addr %1 to [initialization] %6 : $*T
+  %8 = apply %2copy(%0, %6) : $@callee_owned (@in T) -> @out U
+  dealloc_stack %6 : $*T
+  destroy_value %2 : $@callee_owned (@in T) -> @out U
+  destroy_addr %1 : $*T
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @applyPartial :
+// CHECK: bb0({{.*}}, {{.*}}, [[ARG2:%.*]] :
+// CHECK:   [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+// CHECK:   [[ARG2_COPY_COPY:%.*]] = copy_value [[ARG2_COPY]]
+// CHECK-NOT: function_ref @reabstractionThunk
+// CHECK-NOT: partial_apply
+// CHECK-NOT: apply
+// CHECK:   apply [[ARG2_COPY_COPY]](
+// CHECK: } // end sil function 'applyPartial'
+sil [ossa] @applyPartial : $@convention(thin) <U> (Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> @out U) -> @out U {
+bb0(%0 : $*U, %1 : $Builtin.Int32, %2 : @owned $@callee_owned (Builtin.Int32) -> @out U):
+  debug_value %1 : $Builtin.Int32
+  debug_value %2 : $@callee_owned (Builtin.Int32) -> @out U
+  %5 = function_ref @partial : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @owned @callee_owned (@in τ_0_0) -> @out τ_0_1) -> @out τ_0_1
+  %6 = alloc_stack $Builtin.Int32
+  store %1 to [trivial] %6 : $*Builtin.Int32
+  %2copy = copy_value %2 : $@callee_owned (Builtin.Int32) -> @out U
+  %9 = function_ref @reabstractionThunk : $@convention(thin) <τ_0_0> (@in Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> @out τ_0_0) -> @out τ_0_0
+  %10 = partial_apply %9<U>(%2copy) : $@convention(thin) <τ_0_0> (@in Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> @out τ_0_0) -> @out τ_0_0
+  %11 = apply %5<Builtin.Int32, U>(%0, %6, %10) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @owned @callee_owned (@in τ_0_0) -> @out τ_0_1) -> @out τ_0_1
+  dealloc_stack %6 : $*Builtin.Int32
+  destroy_value %2 : $@callee_owned (Builtin.Int32) -> @out U
+  %14 = tuple ()
+  return %14 : $()
+}
+
 // CHECK-LABEL: sil [transparent] [ossa] @reabstractionThunk
 sil [transparent] [ossa] @reabstractionThunk : $@convention(thin) <U> (@in Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> @out U) -> @out U {
 bb0(%0 : $*U, %1 : $*Builtin.Int32, %2 : @owned $@callee_owned (Builtin.Int32) -> @out U):
@@ -786,6 +967,19 @@ bb0(%0 : @owned $@callee_owned () -> Builtin.Int8):
   destroy_value %0 : $@callee_owned () -> Builtin.Int8
   // CHECK: return
   return %4 : $Builtin.Int8
+}
+
+// We remove everything here now.
+// CHECK-LABEL: sil [ossa] @testouter_transparent
+sil [ossa] @testouter_transparent : $@convention(thin) (Builtin.Int8) -> Builtin.Int8 {
+// CHECK: bb0
+// CHECK-NEXT: return
+bb0(%0 : $Builtin.Int8):
+  %2 = function_ref @outer_transparent : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
+  %3 = function_ref @identity_closure : $@convention(thin) (Builtin.Int8) -> Builtin.Int8
+  %4 = partial_apply %3(%0) : $@convention(thin) (Builtin.Int8) -> Builtin.Int8
+  %5 = apply %2(%4) : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
+  return %5 : $Builtin.Int8
 }
 
 // We delete this now.
@@ -1019,4 +1213,38 @@ bb0:
   %2 = thin_to_thick_function %1 : $@convention(thin) @noescape () -> Builtin.Int32 to $@callee_owned () -> Builtin.Int32
   %3 = apply %2() : $@callee_owned () -> Builtin.Int32
   return %3 : $Builtin.Int32
+}
+
+// CHECK: sil [ossa] @test_no_copies_for_stack_pa : $@convention(thin) (@guaranteed C) -> () {
+// CHECK-NOT: apply
+// CHECK-NOT: copy_value
+// CHECK: [[FUNC:%.*]] = function_ref @use_c :
+// CHECK-NEXT: apply [[FUNC]]
+// CHECK-NOT: apply
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'test_no_copies_for_stack_pa'
+sil [ossa] @test_no_copies_for_stack_pa : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0 : @guaranteed $C):
+  br bb1
+
+bb1:
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [on_stack] [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  %closure2 = mark_dependence %closure : $@noescape @callee_guaranteed () -> () on %0 : $C
+  cond_br undef, bb2, bb3
+
+bb2:
+  apply %closure2() : $@noescape @callee_guaranteed () -> ()
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  dealloc_stack %closure : $@noescape @callee_guaranteed () -> ()
+  cond_br undef, bb1, bb5
+
+bb5:
+  %tuple = tuple()
+  return %tuple : $()
 }
