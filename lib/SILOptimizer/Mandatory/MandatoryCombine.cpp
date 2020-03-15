@@ -27,6 +27,8 @@
 #define DEBUG_TYPE "sil-mandatory-combiner"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -79,6 +81,7 @@ class MandatoryCombiner final
 
   InstModCallbacks instModCallbacks;
   SmallVectorImpl<SILInstruction *> &createdInstructions;
+  SmallVector<SILInstruction *, 16> instructionsPendingDeletion;
 
 public:
   MandatoryCombiner(SmallVectorImpl<SILInstruction *> &createdInstructions)
@@ -86,7 +89,7 @@ public:
         instModCallbacks(
             [&](SILInstruction *instruction) {
               worklist.erase(instruction);
-              worklist.eraseInstFromFunction(*instruction);
+              instructionsPendingDeletion.push_back(instruction);
             },
             [&](SILInstruction *instruction) { worklist.add(instruction); },
             [this](SILValue oldValue, SILValue newValue) {
@@ -131,6 +134,8 @@ public:
   SILInstruction *visitPartialApplyInst(PartialApplyInst *i);
   SILInstruction *visitLoadInst(LoadInst *i);
   SILInstruction *visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
+  SILInstruction *visitStoreInst(StoreInst *i);
+  SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *i);
 };
 
 } // end anonymous namespace
@@ -158,6 +163,7 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
       ++iterator;
 
       if (isInstructionTriviallyDead(instruction)) {
+        instModCallbacks.deleteInst(instruction);
         continue;
       }
 
@@ -201,7 +207,14 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
                                                  instructionDescription
 #endif
       );
+      madeChange = true;
     }
+
+    for (SILInstruction *instruction : instructionsPendingDeletion) {
+      worklist.eraseInstFromFunction(*instruction);
+      madeChange = true;
+    }
+    instructionsPendingDeletion.clear();
 
     // Our tracking list has been accumulating instructions created by the
     // SILBuilder during this iteration. Go through the tracking list and add
@@ -292,45 +305,106 @@ template <class InstT> static FunctionRefInst *getRemovableRef(InstT *i) {
   return nullptr;
 }
 
-SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
-  auto val = cleanupLoadedCalleeValue(i, instModCallbacks.deleteInst);
-  if (!val)
-    return nullptr;
+SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
+  // First optimization: try to promote store src to loads.
+  LoadInst *load = nullptr;
+  for (auto *use : getNonDebugUses(store->getDest())) {
+    if (use->getUser() == store)
+      continue;
 
-  val = stripCopiesAndBorrows(val);
-  auto src = val;
-
-  // Try to get from a convert_function/convert_escape_to_noescape to a
-  // partial_apply/thin_to_thick to a convert_function.
-  if (auto *cfi = dyn_cast<ConvertFunctionInst>(val))
-    src = stripCopiesAndBorrows(cfi->getOperand());
-
-  if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(val))
-    src = stripCopiesAndBorrows(cvt->getOperand());
-
-  if (auto *pa = dyn_cast<PartialApplyInst>(src)) {
-    if (tryDeleteDeadClosure(pa, instModCallbacks)) {
-      val = pa->getCallee();
-      if (auto *ref = getRemovableRef(pa)) {
-        instModCallbacks.deleteInst(ref);
-        return nullptr;
+    if (auto loadUse = dyn_cast<LoadInst>(use->getUser())) {
+      if (load) {
+        load = nullptr;
+        break;
       }
-    }
-  } else if (auto *tttf = dyn_cast<ThinToThickFunctionInst>(src)) {
-    if (tryDeleteDeadClosure(tttf, instModCallbacks)) {
-      val = tttf->getCallee();
-      if (auto *ref = getRemovableRef(tttf)) {
-        instModCallbacks.deleteInst(ref);
-        return nullptr;
-      }
+      load = loadUse;
     }
   }
 
-  if (auto *convFunc = dyn_cast<ConvertFunctionInst>(val)) {
-    if (isInstructionTriviallyDead(convFunc)) {
-      // We'll let dead code elimination do the rest
-      instModCallbacks.deleteInst(convFunc);
+  // If we can promote the load, do so.
+  if (load && std::find(instructionsPendingDeletion.begin(),
+                        instructionsPendingDeletion.end(), load) == instructionsPendingDeletion.end()) {
+    if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+      auto copy = SILBuilderWithScope(load)
+        .createCopyValue(load->getLoc(), store->getSrc());
+      load->replaceAllUsesWith(copy);
+    } else if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+      SILBuilderWithScope(load)
+        .createDestroyAddr(load->getLoc(), load->getOperand());
+      load->replaceAllUsesWith(store->getSrc());
+    } else
+        load->replaceAllUsesWith(store->getSrc());
+    instModCallbacks.deleteInst(load);
+  }
+
+  // Now try to promote alloc_box/project_box.
+  auto pbi = dyn_cast<ProjectBoxInst>(store->getDest());
+  if (!pbi)
+    return nullptr;
+  
+  for (auto *use : getNonDebugUses(pbi)) {
+    if (use->getUser() != store)
+      return nullptr;
+  }
+
+  auto abi = dyn_cast<AllocBoxInst>(pbi->getOperand());
+  if (!abi)
+    return nullptr;
+
+  SmallVector<SILInstruction*, 2> instToDestroy;
+  for (auto *use : abi->getUses()) {
+    auto user = use->getUser();
+
+    if (user == pbi)
+      continue;
+
+    if (!isa<DestroyValueInst>(user) && !isa<StrongReleaseInst>(user))
+      return nullptr;
+
+    instToDestroy.push_back(user);
+  }
+  
+  // We know all we're replacing is destroy instructions so if it's trivial just
+  // remove the uses.
+  if (store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial) {
+    // We need to collect store and pbi first.
+    instModCallbacks.deleteInst(store);
+    instModCallbacks.deleteInst(pbi);
+    for (auto *use : abi->getUses()) {
+      auto user = use->getUser();
+      if (user == store || user == pbi)
+        continue;
+      instModCallbacks.deleteInst(user);
     }
+  } else {
+    abi->replaceAllUsesWith(store->getSrc());
+    instModCallbacks.deleteInst(store);
+    instModCallbacks.deleteInst(pbi);
+  }
+
+  instModCallbacks.deleteInst(abi);
+  return nullptr;
+}
+
+SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
+  // Remove trivially dead loads. We can remove loads where the only use is
+  // destroy_values.
+  SmallVector<SILInstruction*, 2> destroysToDestroy;
+  for (auto *use : i->getUses()) {
+    if (!isa<DestroyValueInst>(use->getUser()))
+      return nullptr;
+    destroysToDestroy.push_back(use->getUser());
+  }
+  std::for_each(destroysToDestroy.begin(), destroysToDestroy.end(),
+                instModCallbacks.deleteInst);
+  instModCallbacks.deleteInst(i);
+  return nullptr;
+}
+
+SILInstruction *MandatoryCombiner::visitConvertFunctionInst(ConvertFunctionInst *convFunc) {
+  if (isInstructionTriviallyDead(convFunc)) {
+    // We'll let dead code elimination do the rest
+    instModCallbacks.deleteInst(convFunc);
   }
 
   return nullptr;

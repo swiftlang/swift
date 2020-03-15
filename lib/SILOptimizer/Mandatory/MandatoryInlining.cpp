@@ -46,6 +46,13 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
+static SILValue stripCopiesAndBorrows(SILValue v) {
+  while (isa<CopyValueInst>(v) || isa<BeginBorrowInst>(v)) {
+    v = cast<SingleValueInstruction>(v)->getOperand(0);
+  }
+  return v;
+}
+
 /// Fixup reference counts after inlining a function call (which is a no-op
 /// unless the function is a thick function).
 ///
@@ -244,6 +251,242 @@ static void fixupReferenceCounts(
     });
   }
 }
+
+static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
+  auto *pbi = dyn_cast<ProjectBoxInst>(li->getOperand());
+  if (!pbi)
+    return SILValue();
+  auto *abi = dyn_cast<AllocBoxInst>(pbi->getOperand());
+  if (!abi)
+    return SILValue();
+
+  // The load instruction must have no more uses or a single destroy left to
+  // erase it.
+  if (li->getFunction()->hasOwnership()) {
+    // TODO: What if we have multiple destroy_value? That should be ok as well.
+    auto *dvi = li->getSingleUserOfType<DestroyValueInst>();
+    if (!dvi)
+      return SILValue();
+    dvi->eraseFromParent();
+  } else if (!li->use_empty()) {
+    return SILValue();
+  }
+  li->eraseFromParent();
+
+  // Look through uses of the alloc box the load is loading from to find up to
+  // one store and up to one strong release.
+  PointerUnion<StrongReleaseInst *, DestroyValueInst *> destroy;
+  destroy = nullptr;
+  for (Operand *use : abi->getUses()) {
+    auto *user = use->getUser();
+
+    if (destroy.isNull()) {
+      if (auto *sri = dyn_cast<StrongReleaseInst>(user)) {
+        destroy = sri;
+        continue;
+      }
+
+      if (auto *dvi = dyn_cast<DestroyValueInst>(user)) {
+        destroy = dvi;
+        continue;
+      }
+    }
+
+    if (user == pbi)
+      continue;
+
+    return SILValue();
+  }
+
+  StoreInst *si = nullptr;
+  for (Operand *use : pbi->getUses()) {
+    if (auto *useSI = dyn_cast_or_null<StoreInst>(use->getUser())) {
+      si = useSI;
+      continue;
+    }
+    return SILValue();
+  }
+
+  // If we found a store, record its source and erase it.
+  if (si) {
+    calleeValue = si->getSrc();
+    si->eraseFromParent();
+  } else {
+    calleeValue = SILValue();
+  }
+
+  // If we found a strong release, replace it with a strong release of the
+  // source of the store and erase it.
+  if (destroy) {
+    if (calleeValue) {
+      if (auto *sri = destroy.dyn_cast<StrongReleaseInst *>()) {
+        SILBuilderWithScope(sri).emitStrongReleaseAndFold(sri->getLoc(),
+                                                          calleeValue);
+        sri->eraseFromParent();
+      } else {
+        auto *dvi = destroy.get<DestroyValueInst *>();
+        SILBuilderWithScope(dvi).emitDestroyValueAndFold(dvi->getLoc(),
+                                                         calleeValue);
+        dvi->eraseFromParent();
+      }
+    }
+  }
+
+  assert(pbi->use_empty());
+  pbi->eraseFromParent();
+  assert(abi->use_empty());
+  abi->eraseFromParent();
+
+  return calleeValue;
+}
+
+/// Removes instructions that create the callee value if they are no
+/// longer necessary after inlining.
+static void cleanupCalleeValue(SILValue calleeValue,
+                               bool &invalidatedStackNesting) {
+  // Handle the case where the callee of the apply is a load instruction. If we
+  // fail to optimize, return. Otherwise, see if we can look through other
+  // abstractions on our callee.
+  if (auto *li = dyn_cast<LoadInst>(calleeValue)) {
+    calleeValue = cleanupLoadedCalleeValue(calleeValue, li);
+    if (!calleeValue) {
+      return;
+    }
+  }
+
+  calleeValue = stripCopiesAndBorrows(calleeValue);
+
+  // Inline constructor
+  auto calleeSource = ([&]() -> SILValue {
+    // Handle partial_apply/thin_to_thick -> convert_function:
+    // tryDeleteDeadClosure must run before deleting a ConvertFunction that uses
+    // the PartialApplyInst or ThinToThickFunctionInst. tryDeleteDeadClosure
+    // will delete any uses of the closure, including a
+    // convert_escape_to_noescape conversion.
+    if (auto *cfi = dyn_cast<ConvertFunctionInst>(calleeValue))
+      return stripCopiesAndBorrows(cfi->getOperand());
+
+    if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(calleeValue))
+      return stripCopiesAndBorrows(cvt->getOperand());
+
+    return stripCopiesAndBorrows(calleeValue);
+  })();
+
+  if (auto *pai = dyn_cast<PartialApplyInst>(calleeSource)) {
+    SILValue callee = pai->getCallee();
+    if (!tryDeleteDeadClosure(pai))
+      return;
+    calleeValue = callee;
+  } else if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(calleeSource)) {
+    SILValue callee = tttfi->getCallee();
+    if (!tryDeleteDeadClosure(tttfi))
+      return;
+    calleeValue = callee;
+  }
+  invalidatedStackNesting = true;
+
+  calleeValue = stripCopiesAndBorrows(calleeValue);
+
+  // Handle function_ref -> convert_function -> partial_apply/thin_to_thick.
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(calleeValue)) {
+    if (isInstructionTriviallyDead(cfi)) {
+      recursivelyDeleteTriviallyDeadInstructions(cfi, true);
+      return;
+    }
+  }
+
+  if (auto *fri = dyn_cast<FunctionRefInst>(calleeValue)) {
+    if (!fri->use_empty())
+      return;
+    fri->eraseFromParent();
+  }
+}
+
+namespace {
+/// Cleanup dead closures after inlining.
+class ClosureCleanup {
+  using DeadInstSet = SmallBlotSetVector<SILInstruction *, 4>;
+
+  /// A helper class to update the set of dead instructions.
+  ///
+  /// Since this is called by the SILModule callback, the instruction may longer
+  /// be well-formed. Do not visit its operands. However, it's position in the
+  /// basic block is still valid.
+  ///
+  /// FIXME: Using the Module's callback mechanism for this is terrible.
+  /// Instead, cleanupCalleeValue could be easily rewritten to use its own
+  /// instruction deletion helper and pass a callback to tryDeleteDeadClosure
+  /// and recursivelyDeleteTriviallyDeadInstructions.
+  class DeleteUpdateHandler : public DeleteNotificationHandler {
+    SILModule &Module;
+    DeadInstSet &DeadInsts;
+
+  public:
+    DeleteUpdateHandler(SILModule &M, DeadInstSet &DeadInsts)
+        : Module(M), DeadInsts(DeadInsts) {
+      Module.registerDeleteNotificationHandler(this);
+    }
+
+    ~DeleteUpdateHandler() override {
+      // Unregister the handler.
+      Module.removeDeleteNotificationHandler(this);
+    }
+
+    // Handling of instruction removal notifications.
+    bool needsNotifications() override { return true; }
+
+    // Handle notifications about removals of instructions.
+    void handleDeleteNotification(SILNode *node) override {
+      auto deletedI = dyn_cast<SILInstruction>(node);
+      if (!deletedI)
+        return;
+
+      DeadInsts.erase(deletedI);
+    }
+  };
+
+  SmallBlotSetVector<SILInstruction *, 4> deadFunctionVals;
+
+public:
+  /// Set to true if some alloc/dealloc_stack instruction are inserted and at
+  /// the end of the run stack nesting needs to be corrected.
+  bool invalidatedStackNesting = false;
+
+  /// This regular instruction deletion callback checks for any function-type
+  /// values that may be unused after deleting the given instruction.
+  void recordDeadFunction(SILInstruction *deletedInst) {
+    // If the deleted instruction was already recorded as a function producer,
+    // delete it from the map and record its operands instead.
+    deadFunctionVals.erase(deletedInst);
+    for (auto &operand : deletedInst->getAllOperands()) {
+      SILValue operandVal = operand.get();
+      if (!operandVal->getType().is<SILFunctionType>())
+        continue;
+
+      // Simply record all function-producing instructions used by dead
+      // code. Checking for a single use would not be precise because
+      // `deletedInst` could itself use `deadInst` multiple times.
+      if (auto *deadInst = operandVal->getDefiningInstruction())
+        deadFunctionVals.insert(deadInst);
+    }
+  }
+
+  // Note: instructions in the `deadFunctionVals` set may use each other, so the
+  // set needs to continue to be updated (by this handler) when deleting
+  // instructions. This assumes that DeadFunctionValSet::erase() is stable.
+  void cleanupDeadClosures(SILFunction *F) {
+    DeleteUpdateHandler deleteUpdate(F->getModule(), deadFunctionVals);
+    for (Optional<SILInstruction *> I : deadFunctionVals) {
+      if (!I.hasValue())
+        continue;
+
+      if (auto *SVI = dyn_cast<SingleValueInstruction>(I.getValue()))
+        cleanupCalleeValue(SVI, invalidatedStackNesting);
+    }
+  }
+};
+
+} // end of namespace
 
 static void collectPartiallyAppliedArguments(
     PartialApplyInst *PAI,
@@ -686,6 +929,13 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
                              CapturedArgs, IsCalleeGuaranteed);
       }
 
+      // Register a callback to record potentially unused function values after
+      // inlining.
+//      ClosureCleanup closureCleanup;
+//      Inliner.setDeletionCallback([&closureCleanup](SILInstruction *I) {
+//        closureCleanup.recordDeadFunction(I);
+//      });
+
       invalidatedStackNesting |= Inliner.invalidatesStackNesting(InnerAI);
 
       // Inlining deletes the apply, and can introduce multiple new basic
@@ -698,7 +948,9 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
 
       // The IR is now valid, and trivial dead arguments are removed. However,
       // we may be able to remove dead callee computations (e.g. dead
-      // partial_apply closures). Those will be removed with mandatory combine.
+      // partial_apply closures).
+//      closureCleanup.cleanupDeadClosures(F);
+//      invalidatedStackNesting |= closureCleanup.invalidatedStackNesting;
 
       // Resume inlining within nextBB, which contains only the inlined
       // instructions and possibly instructions in the original call block that
