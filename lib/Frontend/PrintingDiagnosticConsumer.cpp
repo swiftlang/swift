@@ -905,10 +905,12 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
   } else {
     printDiagnostic(SM, Info);
 
-    for (auto path : Info.EducationalNotePaths) {
-      if (auto buffer = SM.getFileSystem()->getBufferForFile(path)) {
-        printMarkdown(buffer->get()->getBuffer(), Stream, ForceColors);
-        Stream << "\n";
+    if (PrintEducationalNotes) {
+      for (auto path : Info.EducationalNotePaths) {
+        if (auto buffer = SM.getFileSystem()->getBufferForFile(path)) {
+          printMarkdown(buffer->get()->getBuffer(), Stream, ForceColors);
+          Stream << "\n";
+        }
       }
     }
 

@@ -31,6 +31,7 @@ class AnnotatedSourceSnippet;
 class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   llvm::raw_ostream &Stream;
   bool ForceColors = false;
+  bool PrintEducationalNotes = false;
   bool DidErrorOccur = false;
   bool ExperimentalFormattingEnabled = false;
   // The current snippet used to display an error/warning/remark and the notes
@@ -57,6 +58,10 @@ public:
   void forceColors() {
     ForceColors = true;
     llvm::sys::Process::UseANSIEscapeCodes(true);
+  }
+
+  void setPrintEducationalNotes(bool ShouldPrint) {
+    PrintEducationalNotes = ShouldPrint;
   }
 
   void enableExperimentalFormatting() { ExperimentalFormattingEnabled = true; }
