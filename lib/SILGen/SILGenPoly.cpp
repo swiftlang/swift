@@ -4141,6 +4141,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
     break;
   }
 
+  formalEvalScope.pop();
   scope.pop();
   B.createReturn(loc, reqtResultValue);
 }
