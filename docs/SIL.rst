@@ -938,6 +938,19 @@ function itself does not need this attribute. It is private and only
 called within the addressor.
 ::
 
+  sil-function-purpose ::= 'lazy_getter'
+
+The function is a getter of a lazy property for which the backing storage is
+an ``Optional`` of the property's type. The getter contains a top-level
+``switch_enum`` (or ``switch_enum_addr``), which tests if the lazy property
+is already computed. In the ``None``-case, the property is computed and stored
+to the backing storage of the property.
+
+After the first call of a lazy property getter, it is guaranteed that the
+property is computed and consecutive calls always execute the ``Some``-case of
+the top-level ``switch_enum``.
+::
+
   sil-function-attribute ::= '[weak_imported]'
 
 Cross-module references to this function should always use weak linking.

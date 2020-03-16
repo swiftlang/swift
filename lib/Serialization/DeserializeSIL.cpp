@@ -511,14 +511,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   IdentifierID replacedFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass,
@@ -630,7 +630,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setThunk(IsThunk_t(isThunk));
     fn->setWithoutActuallyEscapingThunk(bool(isWithoutactuallyEscapingThunk));
     fn->setInlineStrategy(Inline_t(inlineStrategy));
-    fn->setGlobalInit(isGlobal == 1);
+    fn->setSpecialPurpose(SILFunction::Purpose(specialPurpose));
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setAlwaysWeakImported(isWeakImported);
