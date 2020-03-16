@@ -1323,17 +1323,22 @@ static void emitObjCDescriptor(IRGenModule &IGM,
 /// };
 void irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
                                      ConstantArrayBuilder &descriptors,
-                                     AbstractFunctionDecl *method) {
+                                     AbstractFunctionDecl *method,
+                                     llvm::StringSet<> &uniqueSelectors) {
+  // Don't emit a selector twice.
+  Selector selector(method);
+  if (!uniqueSelectors.insert(selector.str()).second)
+    return;
+
   ObjCMethodDescriptor descriptor(
     emitObjCMethodDescriptorParts(IGM, method, /*concrete*/ true));
   emitObjCDescriptor(IGM, descriptors, descriptor);
 }
 
-void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
-                                              ConstantArrayBuilder &descriptors,
-                                              ClassDecl *cd,
-                                              llvm::Function *objcImpl,
-                                              bool isDestroyer) {
+void irgen::emitObjCIVarInitDestroyDescriptor(
+    IRGenModule &IGM, ConstantArrayBuilder &descriptors, ClassDecl *cd,
+    llvm::Function *objcImpl, bool isDestroyer,
+    llvm::StringSet<> &uniqueSelectors) {
   /// The first element is the selector.
   SILDeclRef declRef = SILDeclRef(cd, 
                                   isDestroyer? SILDeclRef::Kind::IVarDestroyer
@@ -1341,6 +1346,11 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
                                   1, 
                                   /*foreign*/ true);
   Selector selector(declRef);
+
+  // Don't emit a selector twice.
+  if (!uniqueSelectors.insert(selector.str()).second)
+    return;
+
   ObjCMethodDescriptor descriptor{};
   descriptor.selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
