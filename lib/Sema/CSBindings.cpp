@@ -1032,15 +1032,6 @@ bool TypeVarBindingProducer::computeNext() {
       }
     }
 
-    if (binding.Kind != BindingKind::Supertypes)
-      continue;
-
-    for (auto supertype : enumerateDirectSupertypes(type)) {
-      // If we're not allowed to try this binding, skip it.
-      if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
-        addNewBinding(binding.withType(*simplifiedSuper));
-    }
-
     auto srcLocator = binding.getLocator();
     if (srcLocator &&
         srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
@@ -1058,6 +1049,14 @@ bool TypeVarBindingProducer::computeNext() {
       auto newType = CS.openUnboundGenericType(UGT, dstLocator)
                          ->reconstituteSugar(/*recursive=*/false);
       addNewBinding(binding.withType(newType));
+    }
+
+    if (binding.Kind == BindingKind::Supertypes) {
+      for (auto supertype : enumerateDirectSupertypes(type)) {
+        // If we're not allowed to try this binding, skip it.
+        if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
+          addNewBinding(binding.withType(*simplifiedSuper));
+      }
     }
   }
 
