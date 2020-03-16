@@ -374,3 +374,12 @@ func bridgeTupleToAnyObject() {
 func rdar54274245(_ arr: [Any]?) {
   _ = (arr ?? []) as [NSObject]
 }
+
+// rdar://problem/60501780 - failed to infer NSString as a value type of a dictionary
+func rdar60501780() {
+  func foo(_: [String: NSObject]) {}
+
+  func bar(_ v: String) {
+    foo(["": "", "": v as NSString])
+  }
+}
