@@ -35,16 +35,16 @@ Swift Next
     func boxes() -> [Box<Wrapped.Element>] where Wrapped: Sequence { ... }
   }
   ```
-  Because contextual `where` clauses are effectively visibility constraints, overrides adopting this feature must be at least as visible as the overridden method:
+  Because contextual `where` clauses are effectively visibility constraints, overrides adopting this feature must be at least as visible as the overridden method. In practice this implies any instance of `Derived` that can access `Base.foo` must also be able to access `Derived.foo`.
   
   ```swift
   class Base<T> {
     func foo() where T == Int { ... }
   }
   
-  class Derived<T>: Base<T> {
-    // OK, <T where T: Equatable> has broader visibility than <T where T == Int>
-    override func foo() where T: Equatable { ... } 
+  class Derived<U>: Base<U> {
+    // OK, <U where U: Equatable> has broader visibility than <T where T == Int>
+    override func foo() where U: Equatable { ... } 
   }
   ```
 
