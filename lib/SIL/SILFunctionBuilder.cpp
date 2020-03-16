@@ -157,7 +157,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
                                 inlineStrategy, EK);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
 
-  F->setGlobalInit(constant.isGlobal());
+  if (constant.isGlobal())
+    F->setSpecialPurpose(SILFunction::Purpose::GlobalInit);
+
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
 
@@ -172,6 +174,21 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       // Add attributes for e.g. computed properties.
       addFunctionAttributes(F, storage->getAttrs(), mod,
                             getOrCreateDeclaration);
+                            
+      auto *varDecl = dyn_cast<VarDecl>(storage);
+      if (varDecl && varDecl->getAttrs().hasAttribute<LazyAttr>() &&
+          accessor->getAccessorKind() == AccessorKind::Get) {
+        F->setSpecialPurpose(SILFunction::Purpose::LazyPropertyGetter);
+        
+        // Lazy property getters should not get inlined because they are usually
+        // non-tivial functions (otherwise the user would not implement it as
+        // lazy property). Inlining such getters would most likely not benefit
+        // other optimizations because the top-level switch_enum cannot be
+        // constant folded in most cases.
+        // Also, not inlining lazy property getters enables optimizing them in
+        // CSE.
+        F->setInlineStrategy(NoInline);
+      }
     }
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
                           constant);
