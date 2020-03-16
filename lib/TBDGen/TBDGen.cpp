@@ -277,12 +277,24 @@ getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
   return getLinkerPlatformName((uint8_t)getLinkerPlatformId(Ver));
 }
 
+/// Find the most relevant introducing version of the decl stack we have visted
+/// so far.
+static Optional<llvm::VersionTuple>
+getInnermostIntroVersion(ArrayRef<Decl*> DeclStack, PlatformKind Platform) {
+  for (auto It = DeclStack.rbegin(); It != DeclStack.rend(); ++ It) {
+    if (auto Result = (*It)->getIntroducedOSVersion(Platform))
+      return Result;
+  }
+  return None;
+}
+
 void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
                                                 llvm::MachO::SymbolKind kind) {
   if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
     return;
-  if (!TopLevelDecl)
+  if(DeclStack.empty())
     return;
+  auto TopLevelDecl = DeclStack.front();
   auto MovedVers = getAllMovedPlatformVersions(TopLevelDecl);
   if (MovedVers.empty())
     return;
@@ -290,9 +302,13 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
   assert(previousInstallNameMap);
   auto &Ctx = TopLevelDecl->getASTContext();
   for (auto &Ver: MovedVers) {
-    auto IntroVer = TopLevelDecl->getIntroducedOSVersion(Ver.Platform);
+    auto IntroVer = getInnermostIntroVersion(DeclStack, Ver.Platform);
     assert(IntroVer && "cannot find OS intro version");
     if (!IntroVer.hasValue())
+      continue;
+    // This decl is available after the top-level symbol has been moved here,
+    // so we don't need the linker directives.
+    if (*IntroVer >= Ver.Version)
       continue;
     auto PlatformNumber = getLinkerPlatformId(Ver);
     auto It = previousInstallNameMap->find(Ver.ModuleName.str());
@@ -330,8 +346,9 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
                                                     llvm::MachO::SymbolKind kind) {
   if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
     return;
-  if (!TopLevelDecl)
+  if (DeclStack.empty())
     return;
+  auto TopLevelDecl = DeclStack.front();
   auto MovedVers = getAllMovedPlatformVersions(TopLevelDecl);
   if (MovedVers.empty())
     return;
@@ -346,11 +363,12 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
   unsigned Minor[2];
   Major[1] = MovedVer.getMajor();
   Minor[1] = MovedVer.getMinor().hasValue() ? *MovedVer.getMinor(): 0;
-  auto IntroVer = TopLevelDecl->getIntroducedOSVersion(Platform);
+  auto IntroVer = getInnermostIntroVersion(DeclStack, Platform);
   assert(IntroVer && "cannot find the start point of availability");
   if (!IntroVer.hasValue())
     return;
-  assert(*IntroVer < MovedVer);
+  // This decl is available after the top-level symbol has been moved here,
+  // so we don't need the linker directives.
   if (*IntroVer >= MovedVer)
     return;
   Major[0] = IntroVer->getMajor();
@@ -911,6 +929,12 @@ void TBDGenVisitor::addFirstFileSymbols() {
   }
 }
 
+void TBDGenVisitor::visit(Decl *D) {
+  DeclStack.push_back(D);
+  SWIFT_DEFER { DeclStack.pop_back(); };
+  ASTVisitor::visit(D);
+}
+
 /// The kind of version being parsed, used for diagnostics.
 /// Note: Must match the order in DiagnosticsFrontend.def
 enum DylibVersionKind_t: unsigned {
@@ -1018,8 +1042,6 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
     for (auto d : decls) {
       if (opts.LinkerDirectivesOnly && !hasLinkerDirective(d))
         continue;
-      visitor.TopLevelDecl = d;
-      SWIFT_DEFER { visitor.TopLevelDecl = nullptr; };
       visitor.visit(d);
     }
   };
