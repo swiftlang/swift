@@ -140,12 +140,6 @@ namespace swift {
   /// lib/Sema/PCMacro.cpp for a description of the calls inserted.
   void performPCMacro(SourceFile &SF);
 
-  /// Creates a type checker instance on the given AST context, if it
-  /// doesn't already have one.
-  ///
-  /// \returns a reference to the type checker instance.
-  void createTypeChecker(ASTContext &Ctx);
-
   /// Bind all 'extension' visible from \p SF to the extended nominal.
   void bindExtensions(SourceFile &SF);
 

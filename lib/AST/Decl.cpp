@@ -2998,6 +2998,8 @@ bool ValueDecl::isRecursiveValidation() const {
 Type ValueDecl::getInterfaceType() const {
   auto &ctx = getASTContext();
 
+  assert(ctx.areLegacySemanticQueriesEnabled());
+
   if (auto type =
           evaluateOrDefault(ctx.evaluator,
                             InterfaceTypeRequest{const_cast<ValueDecl *>(this)},
