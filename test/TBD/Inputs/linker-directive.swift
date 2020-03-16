@@ -6,4 +6,6 @@ public func toast() {}
 @_originallyDefinedIn(module: "ToasterKit", macOS 10.15, iOS 13)
 public struct Vehicle {
   public func move() {}
+  @available(macOS 10.15, iOS 13, *)
+  public func originallyDefinedInCurrentModule() {}
 }
