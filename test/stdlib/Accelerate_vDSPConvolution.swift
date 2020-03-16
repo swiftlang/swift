@@ -2,7 +2,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// REQUIRES: rdar50301438
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
 
