@@ -1054,8 +1054,7 @@ public:
                      SourceLoc ComplainLoc = SourceLoc());
 
   /// Functor class suitable for use as a \c LookupConformanceFn to look up a
-  /// conformance through a particular declaration context using the given
-  /// type checker.
+  /// conformance through a particular declaration context.
   class LookUpConformance {
     DeclContext *dc;
 
