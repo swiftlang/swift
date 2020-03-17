@@ -132,7 +132,7 @@ public:
   ASTContext &getASTContext() { return M.getASTContext(); }
 
   llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>
-  MagicFileStringsByFilePath;
+    MagicFileStringsByFilePath;
 
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
