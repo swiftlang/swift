@@ -371,12 +371,12 @@ public:
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
                         Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
-                        bool isAutoClosure);
+                        bool isAutoClosure, bool useUnderscoreLabel);
 
   void addCallParameter(Identifier Name, Type Ty, Type ContextTy = Type()) {
     addCallParameter(Name, Identifier(), Ty, ContextTy,
                      /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
-                     /*isAutoClosure=*/false);
+                     /*isAutoClosure=*/false, /*useUnderscoreLabel=*/false);
   }
 
   void addGenericParameter(StringRef Name) {
