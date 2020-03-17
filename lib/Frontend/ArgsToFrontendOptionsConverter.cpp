@@ -63,7 +63,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_prebuilt_module_cache_path)) {
     Opts.PrebuiltModuleCachePath = A->getValue();
   }
-
+  if (const Arg *A = Args.getLastArg(OPT_bridging_header_directory_for_print)) {
+    Opts.BridgingHeaderDirForPrint = A->getValue();
+  }
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
 
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);

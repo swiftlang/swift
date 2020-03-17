@@ -183,7 +183,7 @@ internal func _allocate<T: AnyObject>(
 ) -> (T, realNumTailBytes: Int) {
   _internalInvariant(getSwiftClassInstanceExtents(T.self).1 == numHeaderBytes)
 
-  func roundUp(_ x: Int) -> Int { (x+15) & ~15 }
+  func roundUp(_ x: Int) -> Int { (x + 15) & ~15 }
 
   let numBytes = numHeaderBytes + numTailBytes
 

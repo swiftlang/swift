@@ -59,30 +59,24 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   DiagnosticOpts.DiagnosticDocumentationPath = DiagnosticDocsPath.str();
 }
 
-/// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
-/// the default value of <resource-dir>/<platform>/prebuilt-modules.
-/// @note This should be called once, after search path options and frontend
-///       options have been parsed.
-static void setDefaultPrebuiltCacheIfNecessary(
-  FrontendOptions &frontendOpts, const SearchPathOptions &searchPathOpts,
-  const llvm::Triple &triple) {
+void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
 
-  if (!frontendOpts.PrebuiltModuleCachePath.empty())
+  if (!FrontendOpts.PrebuiltModuleCachePath.empty())
     return;
-  if (searchPathOpts.RuntimeResourcePath.empty())
+  if (SearchPathOpts.RuntimeResourcePath.empty())
     return;
 
-  SmallString<64> defaultPrebuiltPath{searchPathOpts.RuntimeResourcePath};
+  SmallString<64> defaultPrebuiltPath{SearchPathOpts.RuntimeResourcePath};
   StringRef platform;
-  if (tripleIsMacCatalystEnvironment(triple)) {
+  if (tripleIsMacCatalystEnvironment(LangOpts.Target)) {
     // The prebuilt cache for macCatalyst is the same as the one for macOS, not iOS
     // or a separate location of its own.
     platform = "macosx";
   } else {
-    platform = getPlatformNameForTriple(triple);
+    platform = getPlatformNameForTriple(LangOpts.Target);
   }
   llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
-  frontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
+  FrontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -565,6 +559,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
+  Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
+
   Opts.UseDarwinPreStableABIBit =
     (Target.isMacOSX() && Target.isMacOSXVersionLT(10, 14, 4)) ||
     (Target.isiOS() && Target.isOSVersionLT(12, 2)) ||
@@ -795,7 +791,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   // Assumes exactly one of setMainExecutablePath() or setRuntimeIncludePath() 
   // is called before setTargetTriple() and parseArgs().
   // TODO: improve the handling of RuntimeIncludePath.
-
+  
   return false;
 }
 
@@ -1597,8 +1593,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
-  setDefaultPrebuiltCacheIfNecessary(FrontendOpts, SearchPathOpts,
-                                     LangOpts.Target);
+  setDefaultPrebuiltCacheIfNecessary();
 
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);

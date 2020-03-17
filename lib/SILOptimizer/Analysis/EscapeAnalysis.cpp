@@ -18,6 +18,7 @@
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -1585,17 +1586,19 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
   verifyStructure();
 
   // Verify that all pointer nodes are still mapped, otherwise the process of
-  // merging nodes may have lost information.
-  for (SILBasicBlock &BB : *F) {
-    for (auto &I : BB) {
-      if (isNonWritableMemoryAddress(&I))
+  // merging nodes may have lost information. Only visit reachable blocks,
+  // because the graph builder only mapped values from reachable blocks.
+  ReachableBlocks reachable;
+  reachable.visit(F, [this](SILBasicBlock *bb) {
+    for (auto &i : *bb) {
+      if (isNonWritableMemoryAddress(&i))
         continue;
 
-      if (auto ai = dyn_cast<ApplyInst>(&I)) {
+      if (auto ai = dyn_cast<ApplyInst>(&i)) {
         if (EA->canOptimizeArrayUninitializedCall(ai, this).isValid())
           continue;
       }
-      for (auto result : I.getResults()) {
+      for (auto result : i.getResults()) {
         if (EA->getPointerBase(result))
           continue;
 
@@ -1611,7 +1614,8 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
         }
       }
     }
-  }
+    return true;
+  });
 #endif
 }
 
@@ -1705,27 +1709,21 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
   ConnectionGraph *ConGraph = &FInfo->Graph;
   assert(ConGraph->isEmpty());
 
-  // We use a worklist for iteration to visit the blocks in dominance order.
-  llvm::SmallPtrSet<SILBasicBlock*, 32> VisitedBlocks;
-  llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  VisitedBlocks.insert(&*ConGraph->F->begin());
-  WorkList.push_back(&*ConGraph->F->begin());
-
-  while (!WorkList.empty()) {
-    SILBasicBlock *BB = WorkList.pop_back_val();
-
+  // Visit the blocks in dominance order.
+  ReachableBlocks reachable;
+  reachable.visit(ConGraph->F, [&](SILBasicBlock *bb) {
     // Create edges for the instructions.
-    for (auto &I : *BB) {
-      analyzeInstruction(&I, FInfo, BottomUpOrder, RecursionDepth);
+    for (auto &i : *bb) {
+      analyzeInstruction(&i, FInfo, BottomUpOrder, RecursionDepth);
     }
-    for (auto &Succ : BB->getSuccessors()) {
-      if (VisitedBlocks.insert(Succ.getBB()).second)
-        WorkList.push_back(Succ.getBB());
-    }
-  }
+    return true;
+  });
 
   // Second step: create defer-edges for block arguments.
   for (SILBasicBlock &BB : *ConGraph->F) {
+    if (!reachable.isVisited(&BB))
+      continue;
+
     if (!linkBBArgs(&BB))
       continue;
 

@@ -150,7 +150,7 @@ bool LargeSILTypeMapper::shouldTransformFunctionType(GenericEnvironment *env,
                                                      irgen::IRGenModule &IGM) {
   // Map substituted function types according to their substituted generic
   // signature.
-  if (fnType->getSubstitutions()) {
+  if (fnType->getPatternSubstitutions()) {
     env = getSubstGenericEnvironment(fnType);
   }
 
@@ -287,7 +287,7 @@ LargeSILTypeMapper::getNewSILFunctionType(GenericEnvironment *env,
   
   // Map substituted function types according to their substituted generic
   // signature.
-  if (fnType->getSubstitutions()) {
+  if (fnType->getPatternSubstitutions()) {
     env = getSubstGenericEnvironment(fnType);
   }
   
@@ -295,7 +295,7 @@ LargeSILTypeMapper::getNewSILFunctionType(GenericEnvironment *env,
   auto newYields = getNewYields(env, fnType, IGM);
   auto newResults = getNewResults(env, fnType, IGM);
   auto newFnType = SILFunctionType::get(
-      fnType->getSubstGenericSignature(),
+      fnType->getInvocationGenericSignature(),
       fnType->getExtInfo(),
       fnType->getCoroutineKind(),
       fnType->getCalleeConvention(),
@@ -303,8 +303,8 @@ LargeSILTypeMapper::getNewSILFunctionType(GenericEnvironment *env,
       newYields,
       newResults,
       fnType->getOptionalErrorResult(),
-      fnType->getSubstitutions(),
-      fnType->isGenericSignatureImplied(),
+      fnType->getPatternSubstitutions(),
+      fnType->getInvocationSubstitutions(),
       fnType->getASTContext(),
       fnType->getWitnessMethodConformanceOrInvalid());
   return newFnType;
@@ -2359,7 +2359,8 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
         loweredTy->getParameters(),
         loweredTy->getYields(),
         newSILResultInfo, loweredTy->getOptionalErrorResult(),
-        loweredTy->getSubstitutions(), loweredTy->isGenericSignatureImplied(),
+        loweredTy->getPatternSubstitutions(),
+        loweredTy->getInvocationSubstitutions(),
         F->getModule().getASTContext(),
         loweredTy->getWitnessMethodConformanceOrInvalid());
     F->rewriteLoweredTypeUnsafe(NewTy);

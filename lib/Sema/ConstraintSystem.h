@@ -975,16 +975,24 @@ public:
   ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
                                       bool lookThroughApply = true) const;
 
-  Type getType(const Expr *E) const;
+  ConstraintLocator *
+  getConstraintLocator(Expr *anchor, ArrayRef<LocatorPathElt> path = {}) const;
 
   void setExprTypes(Expr *expr) const;
 
   /// Retrieve the type of the given node, as recorded in this solution.
-  Type getType(TypedNode node) const {
-    auto known = nodeTypes.find(node);
-    assert(known != nodeTypes.end());
-    return known->second;
-  }
+  Type getType(TypedNode node) const;
+
+  /// Resolve type variables present in the raw type, using generic parameter
+  /// types where possible.
+  Type resolveInterfaceType(Type type) const;
+
+  /// For a given locator describing a function argument conversion, or a
+  /// constraint within an argument conversion, returns information about the
+  /// application of the argument to its parameter. If the locator is not
+  /// for an argument conversion, returns \c None.
+  Optional<FunctionArgApplyInfo>
+  getFunctionArgApplyInfo(ConstraintLocator *) const;
 
   SWIFT_DEBUG_DUMP;
 
@@ -1516,9 +1524,6 @@ public:
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
 
-  /// The original CS if this CS was created as a simplification of another CS
-  ConstraintSystem *baseCS = nullptr;
-
   /// The total number of disjunctions created.
   unsigned CountDisjunctions = 0;
 
@@ -1696,8 +1701,6 @@ private:
     DeclContext *DC;
     llvm::BumpPtrAllocator &Allocator;
 
-    ConstraintSystem &BaseCS;
-
     // Contextual Information.
     Type CT;
     ContextualTypePurpose CTP;
@@ -1705,8 +1708,7 @@ private:
   public:
     Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), DC(cs.DC), Allocator(cs.Allocator), BaseCS(cs),
-          CT(ct), CTP(ctp) {}
+        : E(expr), DC(cs.DC), Allocator(cs.Allocator), CT(ct), CTP(ctp) {}
 
     /// Return underlying expression.
     Expr *getExpr() const { return E; }
@@ -2110,16 +2112,6 @@ public:
     auto *calleeLoc = getCalleeLocator(loc, /*lookThroughApply*/ false);
     return findSelectedOverloadFor(calleeLoc);
   }
-
-  /// Resolve type variables present in the raw type, using generic parameter
-  /// types where possible.
-  Type resolveInterfaceType(Type type) const;
-
-  /// For a given locator describing a function argument conversion, or a
-  /// constraint within an argument conversion, returns information about the
-  /// application of the argument to its parameter. If the locator is not
-  /// for an argument conversion, returns \c None.
-  Optional<FunctionArgApplyInfo> getFunctionArgApplyInfo(ConstraintLocator *);
 
 private:
   unsigned assignTypeVariableID() {
@@ -3265,6 +3257,25 @@ public:
                                   DeclContext *UseDC,
                                   const DeclRefExpr *base = nullptr,
                                   bool wantInterfaceType = false);
+
+  /// Return the type-of-reference of the given value.
+  ///
+  /// \param baseType if non-null, return the type of a member reference to
+  ///   this value when the base has the given type
+  ///
+  /// \param UseDC The context of the access.  Some variables have different
+  ///   types depending on where they are used.
+  ///
+  /// \param base The optional base expression of this value reference
+  ///
+  /// \param wantInterfaceType Whether we want the interface type, if available.
+  ///
+  /// \param getType Optional callback to extract a type for given declaration.
+  static Type
+  getUnopenedTypeOfReference(VarDecl *value, Type baseType, DeclContext *UseDC,
+                             llvm::function_ref<Type(VarDecl *)> getType,
+                             const DeclRefExpr *base = nullptr,
+                             bool wantInterfaceType = false);
 
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
@@ -4475,14 +4486,11 @@ public:
   /// Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   bool isExpressionAlreadyTooComplex = false;
-  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+  bool getExpressionTooComplex(size_t solutionMemory) {
     if (isExpressionAlreadyTooComplex)
       return true;
 
-    auto used = getASTContext().getSolverMemory();
-    for (auto const& s : solutions) {
-      used += s.getTotalMemory();
-    }
+    auto used = getASTContext().getSolverMemory() + solutionMemory;
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
@@ -4507,6 +4515,14 @@ public:
     }
 
     return false;
+  }
+
+  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    size_t solutionMemory = 0;
+    for (auto const& s : solutions) {
+      solutionMemory += s.getTotalMemory();
+    }
+    return getExpressionTooComplex(solutionMemory);
   }
 
   // Utility class that can collect information about the type of an
@@ -4814,6 +4830,8 @@ bool isAutoClosureArgument(Expr *argExpr);
 /// parameter being applied, meaning that it's dropped from the type of the
 /// reference.
 bool hasAppliedSelf(ConstraintSystem &cs, const OverloadChoice &choice);
+bool hasAppliedSelf(const OverloadChoice &choice,
+                    llvm::function_ref<Type(Type)> getFixedType);
 
 /// Check whether type conforms to a given known protocol.
 bool conformsToKnownProtocol(ConstraintSystem &cs, Type type,

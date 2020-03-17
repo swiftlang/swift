@@ -78,6 +78,9 @@ source code and up to 70 GB of disk space for the build artifacts with full
 debugging. Depending on your machine, a clean build can take a few minutes to
 several hours. Naturally, incremental builds are much faster.
 
+Once you are able to build things successfully and have a compile-test-debug
+loop going, check out the [development tips](docs/DevelopmentTips.md) for
+better productivity while working on the compiler.
 
 ### System Requirements
 

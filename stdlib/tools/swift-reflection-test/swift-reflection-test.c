@@ -34,6 +34,14 @@
 #include <fcntl.h>
 #endif
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#endif
+
+#if __has_feature(ptrauth_calls)
+#include <ptrauth.h>
+#endif
+
 #if defined(__clang__) || defined(__GNUC__)
 #define NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)
@@ -134,6 +142,17 @@ void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
 static int PipeMemoryReader_queryDataLayout(void *Context,
                                              DataLayoutQueryType type,
                                              void *inBuffer, void *outBuffer) {
+#if defined(__APPLE__) && __APPLE__
+  int applePlatform = 1;
+#else
+  int applePlatform = 0;
+#endif
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+  int iosDerivedPlatform = 1;
+#else
+  int iosDerivedPlatform = 0;
+#endif
+
   switch (type) {
     case DLQ_GetPointerSize: {
       uint8_t *result = (uint8_t *)outBuffer;
@@ -143,6 +162,37 @@ static int PipeMemoryReader_queryDataLayout(void *Context,
     case DLQ_GetSizeSize: {
       uint8_t *result = (uint8_t *)outBuffer;
       *result = sizeof(size_t);
+      return 1;
+    }
+    case DLQ_GetPtrAuthMask: {
+      uintptr_t *result = (uintptr_t *)outBuffer;
+#if __has_feature(ptrauth_calls)
+      *result = (uintptr_t)ptrauth_strip((void*)0x0007ffffffffffff, 0);
+#else
+      *result = (uintptr_t)~0ull;
+#endif
+      return 1;
+    }
+    case DLQ_GetObjCReservedLowBits: {
+      uint8_t *result = (uint8_t *)outBuffer;
+      if (applePlatform && !iosDerivedPlatform && (sizeof(void *) == 8)) {
+        // Only for 64-bit macOS (not iOS, not even when simulated on x86_64)
+        *result = 1;
+      } else {
+        *result = 0;
+      }
+      return 1;
+    }
+    case DLQ_GetLeastValidPointerValue: {
+      uint64_t *result = (uint64_t *)outBuffer;
+      if (applePlatform && (sizeof(void *) == 8)) {
+        // Swift reserves the first 4GiB on Apple 64-bit platforms
+        *result = 0x100000000;
+        return 1;
+      } else {
+        // Swift reserves the first 4KiB everywhere else
+        *result = 0x1000;
+      }
       return 1;
     }
   }
@@ -478,6 +528,162 @@ int reflectExistential(SwiftReflectionContextRef RC,
   return 1;
 }
 
+int reflectEnum(SwiftReflectionContextRef RC,
+                const PipeMemoryReader Pipe) {
+  static const char Name[] = MANGLING_PREFIX_STR "ypD";
+  swift_typeref_t AnyTR
+    = swift_reflection_typeRefForMangledTypeName(
+      RC, Name, sizeof(Name)-1);
+
+  uintptr_t AnyInstance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
+  if (AnyInstance == 0) {
+    // Child has no more instances to examine
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 0;
+  }
+  swift_typeref_t EnumTypeRef;
+  swift_addr_t EnumInstance = 0;
+  if (!swift_reflection_projectExistential(RC, AnyInstance, AnyTR,
+                                           &EnumTypeRef,
+                                           &EnumInstance)) {
+    printf("swift_reflection_projectExistential failed.\n");
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 0;
+  }
+
+  printf("Instance pointer in child address space: 0x%lx\n",
+         (uintptr_t)EnumInstance);
+
+  printf("Type reference:\n");
+  swift_reflection_dumpTypeRef(EnumTypeRef);
+  printf("\n");
+
+  printf("Type info:\n");
+  swift_reflection_dumpInfoForTypeRef(RC, EnumTypeRef);
+  printf("\n");
+
+  printf("Enum value:\n");
+  swift_typeinfo_t InstanceTypeInfo = swift_reflection_infoForTypeRef(RC, EnumTypeRef);
+  if (InstanceTypeInfo.Kind != SWIFT_NO_PAYLOAD_ENUM
+      && InstanceTypeInfo.Kind != SWIFT_SINGLE_PAYLOAD_ENUM
+      && InstanceTypeInfo.Kind != SWIFT_MULTI_PAYLOAD_ENUM) {
+    // Enums with a single payload case and no non-payload cases
+    // can get rewritten by the compiler to just the payload
+    // type.
+    swift_reflection_dumpInfoForTypeRef(RC, EnumTypeRef);
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 1;
+  }
+
+  int CaseIndex;
+  if (!swift_reflection_projectEnumValue(RC, EnumInstance, EnumTypeRef, &CaseIndex)) {
+    printf("swift_reflection_projectEnumValue failed.\n\n");
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 1; // <<< Test cases also verify failures, so this must "succeed"
+  }
+
+  char *CaseName = NULL;
+  swift_typeref_t PayloadTypeRef = 0;
+  if (!swift_reflection_getEnumCaseTypeRef(RC, EnumTypeRef, CaseIndex, &CaseName, &PayloadTypeRef)) {
+    printf("swift_reflection_getEnumCaseTypeRef failed.\n");
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 0;
+  }
+
+  if (PayloadTypeRef == 0) {
+    // Enum case has no payload
+    printf("(enum_value name=%s index=%llu)\n",
+           CaseName, (unsigned long long)CaseIndex);
+  } else {
+    printf("(enum_value name=%s index=%llu\n",
+           CaseName, (unsigned long long)CaseIndex);
+    swift_reflection_dumpTypeRef(PayloadTypeRef);
+    printf(")\n");
+  }
+  printf("\n");
+  // FIXME: Is there a better idiom for handling the returned case name?
+  free(CaseName);
+  PipeMemoryReader_sendDoneMessage(&Pipe);
+  return 1;
+}
+
+int reflectEnumValue(SwiftReflectionContextRef RC,
+                     const PipeMemoryReader Pipe) {
+  static const char Name[] = MANGLING_PREFIX_STR "ypD";
+  swift_typeref_t AnyTR
+    = swift_reflection_typeRefForMangledTypeName(
+      RC, Name, sizeof(Name)-1);
+
+  uintptr_t AnyInstance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
+  if (AnyInstance == 0) {
+    // Child has no more instances to examine
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 0;
+  }
+  swift_typeref_t EnumTypeRef;
+  swift_addr_t EnumInstance = 0;
+  if (!swift_reflection_projectExistential(RC, AnyInstance, AnyTR,
+                                           &EnumTypeRef,
+                                           &EnumInstance)) {
+    printf("swift_reflection_projectExistential failed.\n");
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 0;
+  }
+
+  printf("Type reference:\n");
+  swift_reflection_dumpTypeRef(EnumTypeRef);
+
+  printf("Value: ");
+  int parens = 0;
+  while (EnumTypeRef != 0) {
+    swift_typeinfo_t EnumTypeInfo = swift_reflection_infoForTypeRef(RC, EnumTypeRef);
+    if (EnumTypeInfo.Kind != SWIFT_NO_PAYLOAD_ENUM
+        && EnumTypeInfo.Kind != SWIFT_SINGLE_PAYLOAD_ENUM
+        && EnumTypeInfo.Kind != SWIFT_MULTI_PAYLOAD_ENUM) {
+      if (parens == 0) {
+        printf(".??"); // Enum was optimized away, print "something"
+      } else {
+        printf("_");
+      }
+      break;
+    }
+
+    int CaseIndex;
+    if (!swift_reflection_projectEnumValue(RC, EnumInstance, EnumTypeRef, &CaseIndex)) {
+      printf("swift_reflection_projectEnumValue failed.\n\n");
+      PipeMemoryReader_sendDoneMessage(&Pipe);
+      return 1; // <<< Test cases rely on detecting this, so must "succeed"
+    }
+
+    char *CaseName = NULL;
+    swift_typeref_t PayloadTypeRef = 0;
+    if (!swift_reflection_getEnumCaseTypeRef(RC, EnumTypeRef, CaseIndex,
+                                             &CaseName, &PayloadTypeRef)) {
+      printf("swift_reflection_getEnumCaseTypeRef failed.\n");
+      PipeMemoryReader_sendDoneMessage(&Pipe);
+      return 0;
+    }
+
+    printf(".%s", CaseName);
+    // FIXME: Is there a better idiom for handling the returned case name?
+    free(CaseName);
+
+    EnumTypeRef = PayloadTypeRef;
+    if (EnumTypeRef != 0) {
+      printf("(");
+      parens += 1;
+    }
+  }
+  for (int i = 0; i < parens; ++i) {
+    printf(")");
+  }
+  printf("\n\n");
+  PipeMemoryReader_sendDoneMessage(&Pipe);
+  return 1;
+
+}
+
+
 int doDumpHeapInstance(const char *BinaryFilename) {
   PipeMemoryReader Pipe = createPipeMemoryReader();
 
@@ -549,6 +755,18 @@ int doDumpHeapInstance(const char *BinaryFilename) {
           if (!reflectHeapObject(RC, Pipe))
             return EXIT_SUCCESS;
           break;
+        case Enum: {
+          printf("Reflecting an enum.\n");
+          if (!reflectEnum(RC, Pipe))
+            return EXIT_SUCCESS;
+          break;
+        }
+        case EnumValue: {
+          printf("Reflecting an enum value.\n");
+          if (!reflectEnumValue(RC, Pipe))
+            return EXIT_SUCCESS;
+          break;
+        }
         case None:
           swift_reflection_destroyReflectionContext(RC);
           printf("Done.\n");

@@ -659,10 +659,8 @@ private:
       }
     }
 
-    StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
     llvm::DIModule *M =
-        DBuilder.createModule(Parent, Name, ConfigMacros, RemappedIncludePath,
-                              Sysroot);
+        DBuilder.createModule(Parent, Name, ConfigMacros, RemappedIncludePath);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
@@ -1697,13 +1695,27 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       DBuilder.createFile(DebugPrefixMap.remapPath(SourcePath),
                           DebugPrefixMap.remapPath(Opts.DebugCompilationDir));
 
+  StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
+  StringRef SDK;
+  {
+    auto B = llvm::sys::path::rbegin(Sysroot);
+    auto E = llvm::sys::path::rend(Sysroot);
+    auto It = std::find_if(B, E, [](auto SDK) { return SDK.endswith(".sdk"); });
+    if (It != E)
+      SDK = *It;
+  }
+
   TheCU = DBuilder.createCompileUnit(
       Lang, MainFile,
       Producer, Opts.shouldOptimize(), Opts.getDebugFlags(PD),
       MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
-          : llvm::DICompileUnit::LineTablesOnly);
+      : llvm::DICompileUnit::LineTablesOnly,
+      /* DWOId */ 0, /* SplitDebugInlining */ true,
+      /* DebugInfoForProfiling */ false,
+      llvm::DICompileUnit::DebugNameTableKind::Default,
+      /* RangesBaseAddress */ false, Sysroot, SDK);
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading

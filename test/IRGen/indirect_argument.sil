@@ -66,7 +66,7 @@ entry(%o : $*Huge, %x : $Huge):
 // CHECK-NOT:     alloca
 // CHECK:         [[CLOSURE:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK:         bitcast %swift.refcounted* [[CLOSURE]] to <{ %swift.refcounted, %T17indirect_argument4HugeV }>*
-// CHECK:         call swiftcc void @"$s24huge_partial_applicationTA"(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %0, %swift.refcounted* swiftself [[CLOSURE]])
+// CHECK:         call swiftcc {{.*}} @"$s24huge_partial_applicationTA{{(\.ptrauth)?}}"{{.*}}(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %0, %swift.refcounted* swiftself [[CLOSURE]])
 // CHECK:       define internal swiftcc void @"$s24huge_partial_applicationTA"(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %0, %swift.refcounted* swiftself %1)
 // CHECK:         [[TMP_ARG:%.*]] = alloca
 // CHECK-NOT:     tail
@@ -83,7 +83,7 @@ entry(%x : $Huge, %y : $Huge):
 // CHECK:         [[TMP_RET:%.*]] = alloca
 // CHECK:         [[CLOSURE:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK:         bitcast %swift.refcounted* [[CLOSURE]] to <{ %swift.refcounted, %T17indirect_argument4HugeV }>*
-// CHECK:         call swiftcc void @"$s30huge_partial_application_stretTA"(%T17indirect_argument4HugeV* noalias nocapture sret [[TMP_RET]], %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %1, %swift.refcounted* swiftself [[CLOSURE]])
+// CHECK:         call swiftcc {{.*}} @"$s30huge_partial_application_stretTA{{(\.ptrauth)?}}"{{.*}}(%T17indirect_argument4HugeV* noalias nocapture sret [[TMP_RET]], %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %1, %swift.refcounted* swiftself [[CLOSURE]])
 // CHECK:       define internal swiftcc void @"$s30huge_partial_application_stretTA"(%T17indirect_argument4HugeV* noalias nocapture sret %0, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %1, %swift.refcounted* swiftself %2)
 // CHECK:         [[TMP_ARG:%.*]] = alloca
 // CHECK-NOT:     tail

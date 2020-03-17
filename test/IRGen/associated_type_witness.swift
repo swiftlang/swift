@@ -41,7 +41,7 @@ protocol HasThreeAssocTypes {
 // GLOBAL-SAME:    @"$s23associated_type_witness13WithUniversalVAA8AssockedAAMc"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness13WithUniversalVAA8AssockedAA5AssocAaDP_AA1P",
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness13WithUniversalVAA8AssockedAA5AssocAaDP_AA1Q"
-// GLOBAL-SAME:    i64 add (i64 ptrtoint (<{ {{.*}} }>* @"symbolic{{.*}}23associated_type_witness9UniversalV" to i64), i64 1) to i8*)
+// GLOBAL-SAME:    @"symbolic{{.*}}23associated_type_witness9UniversalV"
 // GLOBAL-SAME:  ]
 struct WithUniversal : Assocked {
   typealias Assoc = Universal

@@ -194,8 +194,8 @@ bool ASTScopeImpl::doesContextMatchStartingContext(
 // For a SubscriptDecl with generic parameters, the call tries to do lookups
 // with startingContext equal to either the get or set subscript
 // AbstractFunctionDecls. Since the generic parameters are in the
-// SubScriptDeclScope, and not the AbstractFunctionDecl scopes (after all how
-// could one parameter be in two scopes?), GenericParamScoped intercepts the
+// SubscriptDeclScope, and not the AbstractFunctionDecl scopes (after all how
+// could one parameter be in two scopes?), GenericParamScope intercepts the
 // match query here and tests against the accessor DeclContexts.
 bool GenericParamScope::doesContextMatchStartingContext(
     const DeclContext *context) const {

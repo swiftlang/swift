@@ -637,6 +637,13 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   if (!SILInliner::canInlineApplySite(AI))
     return nullptr;
 
+  // If our inline selection is only always inline, do a quick check if we have
+  // an always inline function and bail otherwise.
+  if (WhatToInline == InlineSelection::OnlyInlineAlways &&
+      Callee->getInlineStrategy() != AlwaysInline) {
+    return nullptr;
+  }
+
   ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();
   bool IsInStdlib = (SwiftModule->isStdlibModule() ||
                      SwiftModule->isOnoneSupportModule());
@@ -644,7 +651,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   // Don't inline functions that are marked with the @_semantics or @_effects
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
-    if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
+    if (WhatToInline >= InlineSelection::NoSemanticsAndGlobalInit) {
       if (shouldSkipApplyDuringEarlyInlining(AI))
         return nullptr;
       if (Callee->hasSemanticsAttr("inline_late"))
@@ -692,13 +699,14 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     // Check if passed Self is the same as the Self of the caller.
     // In this case, it is safe to inline because both functions
     // use the same Self.
-    if (AI.hasSelfArgument() && Caller->hasSelfMetadataParam()) {
-      auto CalleeSelf = stripCasts(AI.getSelfArgument());
-      auto CallerSelf = Caller->getSelfMetadataArgument();
-      if (CalleeSelf != SILValue(CallerSelf))
-        return nullptr;
-    } else
+    if (!AI.hasSelfArgument() || !Caller->hasSelfMetadataParam()) {
       return nullptr;
+    }
+    auto CalleeSelf = stripCasts(AI.getSelfArgument());
+    auto CallerSelf = Caller->getSelfMetadataArgument();
+    if (CalleeSelf != SILValue(CallerSelf)) {
+      return nullptr;
+    }
   }
 
   // Detect self-recursive calls.

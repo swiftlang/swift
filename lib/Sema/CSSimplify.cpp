@@ -651,58 +651,67 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     // parameter (or even worse - OoO parameter with label re-naming),
     // we most likely have no idea what would be the best
     // diagnostic for this situation, so let's just try to re-label.
-    auto isOutOfOrderArgument = [&](bool hadLabelMismatch, unsigned argIdx,
-                                    unsigned prevArgIdx) {
-      if (hadLabelMismatch)
+    auto isOutOfOrderArgument = [&](unsigned toParamIdx, unsigned fromArgIdx,
+                                    unsigned toArgIdx) {
+      if (fromArgIdx <= toArgIdx) {
         return false;
+      }
 
-      auto newLabel = args[argIdx].getLabel();
-      auto oldLabel = args[prevArgIdx].getLabel();
+      auto newLabel = args[fromArgIdx].getLabel();
+      auto oldLabel = args[toArgIdx].getLabel();
 
-      unsigned actualIndex = prevArgIdx;
-      for (; actualIndex != argIdx; ++actualIndex) {
+      if (newLabel != params[toParamIdx].getLabel()) {
+        return false;
+      }
+
+      auto paramIdx = toParamIdx + 1;
+      for (; paramIdx < params.size(); ++paramIdx) {
         // Looks like new position (excluding defaulted parameters),
         // has a valid label.
-        if (newLabel == params[actualIndex].getLabel())
+        if (oldLabel == params[paramIdx].getLabel())
           break;
 
         // If we are moving the the position with a different label
         // and there is no default value for it, can't diagnose the
         // problem as a simple re-ordering.
-        if (!paramInfo.hasDefaultArgument(actualIndex))
+        if (!paramInfo.hasDefaultArgument(paramIdx))
           return false;
       }
 
-      for (unsigned i = actualIndex + 1, n = params.size(); i != n; ++i) {
-        if (oldLabel == params[i].getLabel())
-          break;
-
-        if (!paramInfo.hasDefaultArgument(i))
-          return false;
+      // label was not found
+      if (paramIdx == params.size()) {
+        return false;
       }
 
       return true;
     };
 
-    unsigned argIdx = 0;
+    SmallVector<unsigned, 4> paramToArgMap;
+    paramToArgMap.reserve(params.size());
+    {
+      unsigned argIdx = 0;
+      for (const auto &binding : parameterBindings) {
+        paramToArgMap.push_back(argIdx);
+        argIdx += binding.size();
+      }
+    }
+
     // Enumerate the parameters and their bindings to see if any arguments are
     // our of order
     bool hadLabelMismatch = false;
-    for (auto binding : parameterBindings) {
-      for (auto boundArgIdx : binding) {
+    for (const auto paramIdx : indices(params)) {
+      const auto toArgIdx = paramToArgMap[paramIdx];
+      const auto &binding = parameterBindings[paramIdx];
+      for (const auto paramBindIdx : indices(binding)) {
         // We've found the parameter that has an out of order
         // argument, and know the indices of the argument that
         // needs to move (fromArgIdx) and the argument location
         // it should move to (toArgIdx).
-        auto fromArgIdx = boundArgIdx;
-        auto toArgIdx = argIdx;
+        const auto fromArgIdx = binding[paramBindIdx];
 
-        // If there is no re-ordering going on, and index is past
-        // the number of parameters, it could only mean that this
-        // is variadic parameter, so let's just move on.
-        if (fromArgIdx == toArgIdx && toArgIdx >= params.size()) {
+        // Does nothing for variadic tail.
+        if (params[paramIdx].isVariadic() && paramBindIdx > 0) {
           assert(args[fromArgIdx].getLabel().empty());
-          argIdx++;
           continue;
         }
 
@@ -711,40 +720,40 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         // one argument requires label and another one doesn't, but caller
         // doesn't provide either, problem is going to be identified as
         // out-of-order argument instead of label mismatch.
-        auto expectedLabel = params[toArgIdx].getLabel();
-        auto argumentLabel = args[fromArgIdx].getLabel();
+        const auto expectedLabel = params[paramIdx].getLabel();
+        const auto argumentLabel = args[fromArgIdx].getLabel();
 
         if (argumentLabel != expectedLabel) {
           // - The parameter is unnamed, in which case we try to fix the
           //   problem by removing the name.
           if (expectedLabel.empty()) {
             hadLabelMismatch = true;
-            if (listener.extraneousLabel(toArgIdx))
+            if (listener.extraneousLabel(paramIdx))
               return true;
           // - The argument is unnamed, in which case we try to fix the
           //   problem by adding the name.
           } else if (argumentLabel.empty()) {
             hadLabelMismatch = true;
-            if (listener.missingLabel(toArgIdx))
+            if (listener.missingLabel(paramIdx))
               return true;
           // - The argument label has a typo at the same position.
           } else if (fromArgIdx == toArgIdx) {
             hadLabelMismatch = true;
-            if (listener.incorrectLabel(toArgIdx))
-                return true;
+            if (listener.incorrectLabel(paramIdx))
+              return true;
           }
         }
 
-        if (boundArgIdx == argIdx) {
+        if (fromArgIdx == toArgIdx) {
           // If the argument is in the right location, just continue
-          argIdx++;
           continue;
         }
 
         // This situation looks like out-of-order argument but it's hard
         // to say exactly without considering other factors, because it
         // could be invalid labeling too.
-        if (isOutOfOrderArgument(hadLabelMismatch, fromArgIdx, toArgIdx))
+        if (!hadLabelMismatch &&
+            isOutOfOrderArgument(paramIdx, fromArgIdx, toArgIdx))
           return listener.outOfOrderArgument(fromArgIdx, toArgIdx);
 
         SmallVector<Identifier, 8> expectedLabels;
@@ -773,7 +782,7 @@ class ArgumentFailureTracker : public MatchCallArgumentListener {
   SmallVectorImpl<ParamBinding> &Bindings;
   ConstraintLocatorBuilder Locator;
 
-  unsigned NumSynthesizedArgs = 0;
+  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> MissingArguments;
   SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArguments;
 
 public:
@@ -786,15 +795,12 @@ public:
         Locator(locator) {}
 
   ~ArgumentFailureTracker() override {
-    if (NumSynthesizedArgs > 0) {
-      ArrayRef<AnyFunctionType::Param> argRef(Arguments);
-
-      auto *fix =
-          AddMissingArguments::create(CS, argRef.take_back(NumSynthesizedArgs),
-                                      CS.getConstraintLocator(Locator));
+    if (!MissingArguments.empty()) {
+      auto *fix = AddMissingArguments::create(CS, MissingArguments,
+                                              CS.getConstraintLocator(Locator));
 
       // Not having an argument is the same impact as having a type mismatch.
-      (void)CS.recordFix(fix, /*impact=*/NumSynthesizedArgs * 2);
+      (void)CS.recordFix(fix, /*impact=*/MissingArguments.size() * 2);
     }
   }
 
@@ -814,8 +820,10 @@ public:
         CS.createTypeVariable(argLoc, TVO_CanBindToInOut | TVO_CanBindToLValue |
                                       TVO_CanBindToNoEscape | TVO_CanBindToHole);
 
-    Arguments.push_back(param.withType(argType));
-    ++NumSynthesizedArgs;
+    auto synthesizedArg = param.withType(argType);
+
+    MissingArguments.push_back(std::make_pair(paramIdx, synthesizedArg));
+    Arguments.push_back(synthesizedArg);
 
     return newArgIdx;
   }
@@ -846,7 +854,7 @@ public:
       // record a fix for this, increase the score so there is a way
       // to identify that there is something going on besides just missing
       // arguments.
-      if (NumSynthesizedArgs || !ExtraArguments.empty()) {
+      if (!MissingArguments.empty() || !ExtraArguments.empty()) {
         CS.increaseScore(SK_Fix);
         return false;
       }
@@ -915,7 +923,7 @@ public:
     // If there are not only labeling problems but also some of the
     // arguments are missing, let's account of that in the impact.
     auto impact = 1 + numOutOfOrder + numExtraneous * 2 + numRenames * 3 +
-                  NumSynthesizedArgs * 2;
+                  MissingArguments.size() * 2;
     return CS.recordFix(fix, impact);
   }
 
@@ -1008,15 +1016,19 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       argsWithLabels.pop_back();
       // Let's make sure that labels associated with tuple elements
       // line up with what is expected by argument list.
-      for (const auto &arg : argTuple->getElements()) {
-        argsWithLabels.push_back(
-            AnyFunctionType::Param(arg.getType(), arg.getName()));
+      SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4>
+          synthesizedArgs;
+      for (unsigned i = 0, n = argTuple->getNumElements(); i != n; ++i) {
+        const auto &elt = argTuple->getElement(i);
+        AnyFunctionType::Param argument(elt.getType(), elt.getName());
+        synthesizedArgs.push_back(std::make_pair(i, argument));
+        argsWithLabels.push_back(argument);
       }
 
       (void)cs.recordFix(
-          AddMissingArguments::create(cs, argsWithLabels,
+          AddMissingArguments::create(cs, synthesizedArgs,
                                       cs.getConstraintLocator(locator)),
-          /*impact=*/argsWithLabels.size() * 2);
+          /*impact=*/synthesizedArgs.size() * 2);
     }
   }
 
@@ -1476,12 +1488,17 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
   for (unsigned i = args.size(), n = params.size(); i != n; ++i) {
     auto *argLoc = cs.getConstraintLocator(
         anchor, LocatorPathElt::SynthesizedArgument(i));
-    args.push_back(params[i].withType(cs.createTypeVariable(argLoc,
-                                                      TVO_CanBindToNoEscape)));
+    args.push_back(params[i].withType(
+        cs.createTypeVariable(argLoc, TVO_CanBindToNoEscape)));
   }
 
-  ArrayRef<AnyFunctionType::Param> argsRef(args);
-  auto *fix = AddMissingArguments::create(cs, argsRef.take_back(numMissing),
+  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> synthesizedArgs;
+  synthesizedArgs.reserve(numMissing);
+  for (unsigned i = args.size() - numMissing, n = args.size(); i != n; ++i) {
+    synthesizedArgs.push_back(std::make_pair(i, args[i]));
+  }
+
+  auto *fix = AddMissingArguments::create(cs, synthesizedArgs,
                                           cs.getConstraintLocator(locator));
 
   if (cs.recordFix(fix))
@@ -3564,9 +3581,9 @@ bool ConstraintSystem::repairFailures(
     // But if `T.Element` didn't get resolved to `Void` we'd like
     // to diagnose this as a missing argument which can't be ignored.
     if (arg != getTypeVariables().end()) {
-      conversionsOrFixes.push_back(
-          AddMissingArguments::create(*this, {FunctionType::Param(*arg)},
-                                      getConstraintLocator(anchor, path)));
+      conversionsOrFixes.push_back(AddMissingArguments::create(
+          *this, {std::make_pair(0, AnyFunctionType::Param(*arg))},
+          getConstraintLocator(anchor, path)));
       break;
     }
 
@@ -7419,7 +7436,11 @@ ConstraintSystem::simplifyKeyPathConstraint(
       if (fnTy->getParams().size() != 1)
         return false;
 
-      boundRoot = fnTy->getParams()[0].getPlainType();
+      // Match up the root and value types to the function's param and return
+      // types. Note that we're using the type of the parameter as referenced
+      // from inside the function body as we'll be transforming the code into:
+      // { root in root[keyPath: kp] }.
+      boundRoot = fnTy->getParams()[0].getParameterType();
       boundValue = fnTy->getResult();
     }
 
@@ -9221,8 +9242,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // subscript, which requires changes to declaration to become mutable.
     if (auto last = locator.last()) {
       impact += (last->is<LocatorPathElt::FunctionResult>() ||
-                 last->is<LocatorPathElt::SubscriptMember>() ||
-                 last->is<LocatorPathElt::KeyPathDynamicMember>())
+                 last->is<LocatorPathElt::SubscriptMember>())
                     ? 1
                     : 0;
     }

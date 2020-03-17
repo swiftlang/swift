@@ -3,6 +3,7 @@
 // RUN: %target-run %target-swift-reflection-test %t/reflect_nested 2>&1 | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 import SwiftReflectionTest
 

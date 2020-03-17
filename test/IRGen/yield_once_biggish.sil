@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-ptrsize-%target-ptrauth -DINT=i%target-ptrsize
 
 // i386 uses a scalar result count of 3 instead of 4, so this test would need
 // to be substantially different to test the functionality there.  It's easier
@@ -134,6 +134,8 @@ entry(%flag : $Builtin.Int1):
 
 yes:
   // CHECK:         [[T0:%.*]] = bitcast i8* [[CONTINUATION]] to void (i8*, i1)*
+  // CHECK-64-ptrauth-NEXT: ptrtoint
+  // CHECK-64-ptrauth-NEXT: ptrauth.blend
   // CHECK-NEXT:    call swiftcc void [[T0]](i8* noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 false)
   // CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 [[BUFFER_SIZE]], i8* [[BUFFER]])
   end_apply %token
@@ -143,6 +145,8 @@ yes:
 
 no:
   // CHECK:         [[T0:%.*]] = bitcast i8* [[CONTINUATION]] to void (i8*, i1)*
+  // CHECK-64-ptrauth-NEXT: ptrtoint
+  // CHECK-64-ptrauth-NEXT: ptrauth.blend
   // CHECK-NEXT:    call swiftcc void [[T0]](i8* noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 true)
   // CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 [[BUFFER_SIZE]], i8* [[BUFFER]])
   abort_apply %token

@@ -39,6 +39,7 @@
 #include "swift/Subsystems.h"
 #include "../Serialization/ModuleFormat.h"
 #include "clang/Basic/TargetInfo.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -659,6 +660,75 @@ bool swift::performLLVM(const IRGenOptions &Opts,
   return false;
 }
 
+static void setPointerAuthOptions(PointerAuthOptions &opts,
+                                  const clang::PointerAuthOptions &clangOpts){
+  // Intentionally do a slice-assignment to copy over the clang options.
+  static_cast<clang::PointerAuthOptions&>(opts) = clangOpts;
+
+  assert(clangOpts.FunctionPointers);
+  if (clangOpts.FunctionPointers.getKind() != PointerAuthSchema::Kind::ARM8_3)
+    return;
+
+  using Discrimination = PointerAuthSchema::Discrimination;
+
+  // A key suitable for code pointers that might be used anywhere in the ABI.
+  auto codeKey = clangOpts.FunctionPointers.getARM8_3Key();
+
+  // A key suitable for data pointers that might be used anywhere in the ABI.
+  // Using a data key for data pointers and vice-versa is important for
+  // ABI future-proofing.
+  auto dataKey = PointerAuthSchema::ARM8_3Key::ASDA;
+
+  // A key suitable for code pointers that are only used in private
+  // situations.  Do not use this key for any sort of signature that
+  // might end up on a global constant initializer.
+  auto nonABICodeKey = PointerAuthSchema::ARM8_3Key::ASIB;
+
+  // If you change anything here, be sure to update <ptrauth.h>.
+  opts.SwiftFunctionPointers =
+    PointerAuthSchema(codeKey, /*address*/ false, Discrimination::Type);
+  opts.KeyPaths =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.ValueWitnesses =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.ProtocolWitnesses =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.ProtocolAssociatedTypeAccessFunctions =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.ProtocolAssociatedTypeWitnessTableAccessFunctions =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.SwiftClassMethods =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.SwiftClassMethodPointers =
+    PointerAuthSchema(codeKey, /*address*/ false, Discrimination::Decl);
+  opts.HeapDestructors =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+
+  // Partial-apply captures are not ABI and can use a more aggressive key.
+  opts.PartialApplyCapture =
+    PointerAuthSchema(nonABICodeKey, /*address*/ true, Discrimination::Decl);
+
+  opts.TypeDescriptors =
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+  opts.TypeDescriptorsAsArguments =
+    PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);
+
+  opts.SwiftDynamicReplacements =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.SwiftDynamicReplacementKeys =
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
+  // Coroutine resumption functions are never stored globally in the ABI,
+  // so we can do some things that aren't normally okay to do.  However,
+  // we can't use ASIB because that would break ARM64 interoperation.
+  // The address used in the discrimination is not the address where the
+  // function pointer is signed, but the address of the coroutine buffer.
+  opts.YieldManyResumeFunctions =
+      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
+  opts.YieldOnceResumeFunctions =
+      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
+}
+
 std::unique_ptr<llvm::TargetMachine>
 swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
   CodeGenOpt::Level OptLevel = Opts.shouldOptimize()
@@ -681,6 +751,18 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
         features.AddFeature(feature);
       }
     targetFeatures = features.getString();
+  }
+
+  // Set up pointer-authentication.
+  if (auto loader = Ctx.getClangModuleLoader()) {
+    auto &clangInstance = loader->getClangInstance();
+    if (clangInstance.getLangOpts().PointerAuthCalls) {
+      // FIXME: This is gross. This needs to be done in the Frontend
+      // after the module loaders are set up, and where these options are
+      // formally not const.
+      setPointerAuthOptions(const_cast<IRGenOptions &>(Opts).PointerAuth,
+                            clangInstance.getCodeGenOpts().PointerAuth);
+    }
   }
 
   std::string Error;

@@ -128,8 +128,10 @@ func testInterpolationWithMultipleArguments(h: Logger) {
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 func testNSObjectInterpolation(h: Logger, nsArray: NSArray) {
   h.log("NSArray: \(nsArray, privacy: .public)")
+    // TODO: check why the ARC optimizer cannot eliminate the many retain/release pairs here.
     // CHECK: entry:
     // CHECK-NEXT: bitcast %TSo7NSArrayC* %1 to i8*
+    // CHECK-NEXT: tail call i8* @llvm.objc.retain
     // CHECK-NEXT: [[NSARRAY_ARG:%.+]] = tail call i8* @llvm.objc.retain
     // CHECK-NEXT: [[LOGLEVEL:%.+]] = tail call swiftcc i8 @"$sSo13os_log_type_ta0A0E7defaultABvgZ"()
     // CHECK-NEXT: tail call swiftcc %TSo9OS_os_logC* @"$s14OSLogPrototype6LoggerV9logObjectSo06OS_os_D0Cvg"
@@ -154,18 +156,22 @@ func testNSObjectInterpolation(h: Logger, nsArray: NSArray) {
     // CHECK-NEXT: [[OFFSET3:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 3
     // CHECK-64-NEXT: store i8 8, i8* [[OFFSET3]], align 1
     // CHECK-32-NEXT: store i8 4, i8* [[OFFSET3]], align 1
+    // CHECK-NEXT: tail call void @llvm.objc.release
     // CHECK-NEXT: [[OFFSET4:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 4
     // CHECK-NEXT: [[BITCASTED_DEST:%.+]] = bitcast i8* [[OFFSET4]] to %TSo7NSArrayC**
     // CHECK-NEXT: [[BITCASTED_SRC:%.+]] = bitcast i8* [[NSARRAY_ARG]] to %TSo7NSArrayC*
     // CHECK-NEXT: store %TSo7NSArrayC*  [[BITCASTED_SRC]], %TSo7NSArrayC** [[BITCASTED_DEST]], align 1
 
-    // TODO: check why the ARC optimizer cannot eliminate this retain/release pair
     // CHECK-64-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i64 0, i64 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
     // CHECK-32-NEXT: tail call void @_os_log_impl({{.*}}, {{.*}} [[LOGOBJ]], i8 zeroext [[LOGLEVEL]], i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
-    // CHECK-NEXT: br label %[[NOT_ENABLED]]
+    // CHECK-NEXT: br label %[[EXIT:[0-9]+]]
 
     // CHECK: [[NOT_ENABLED]]:
+    // CHECK-NEXT: tail call void @llvm.objc.release
+    // CHECK-NEXT: br label %[[EXIT]]
+
+    // CHECK: [[EXIT]]:
     // CHECK-NEXT: tail call void @llvm.objc.release(i8* [[NSARRAY_ARG]])
     // CHECK-NEXT: bitcast
     // CHECK-NEXT: tail call void @llvm.objc.release

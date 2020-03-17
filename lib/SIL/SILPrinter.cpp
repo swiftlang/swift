@@ -445,7 +445,8 @@ static void printSILFunctionNameAndType(
     llvm::DenseMap<CanType, Identifier> &sugaredTypeNames) {
   function->printName(OS);
   OS << " : $";
-  auto genSig = function->getLoweredFunctionType()->getSubstGenericSignature();
+  auto genSig =
+    function->getLoweredFunctionType()->getInvocationGenericSignature();
   auto *genEnv = function->getGenericEnvironment();
   // If `genSig` and `genEnv` are both defined, get sugared names of generic
   // parameter types for printing.
@@ -2443,8 +2444,16 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isWithoutActuallyEscapingThunk())
     OS << "[without_actually_escaping] ";
 
-  if (isGlobalInit())
+  switch (getSpecialPurpose()) {
+  case SILFunction::Purpose::None:
+    break;
+  case SILFunction::Purpose::GlobalInit:
     OS << "[global_init] ";
+    break;
+  case SILFunction::Purpose::LazyPropertyGetter:
+    OS << "[lazy_getter] ";
+    break;
+  }
   if (isAlwaysWeakImported())
     OS << "[weak_imported] ";
   auto availability = getAvailabilityForLinkage();

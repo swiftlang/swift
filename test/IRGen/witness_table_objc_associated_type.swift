@@ -20,9 +20,8 @@ struct SB: B {
   func foo() {}
 }
 // CHECK-LABEL: @"$s34witness_table_objc_associated_type2SBVAA1BAAWP" = hidden global [4 x i8*] [
-// CHECK:         @"associated conformance 34witness_table_objc_associated_type2SBVAA1BAA2AAAaDP_AA1A"
-// CHECK:         @"symbolic{{.*}}34witness_table_objc_associated_type2SAV"
-// CHECK:         i8* bitcast {{.*}} @"$s34witness_table_objc_associated_type2SBVAA1BA2aDP3fooyyFTW"
+// CHECK:         {{(associated conformance 34witness_table_objc_associated_type2SBVAA1BAA2AAAaDP_AA1A|.ptrauth)}}
+// CHECK:         i8* bitcast {{.*}} @"$s34witness_table_objc_associated_type2SBVAA1BA2aDP3fooyyFTW{{(\.ptrauth)?}}"
 // CHECK:       ]
 
 class CO: O {}
@@ -31,8 +30,7 @@ struct SO: C {
   func foo() {}
 }
 // CHECK-LABEL: @"$s34witness_table_objc_associated_type2SOVAA1CAAWP" = hidden global [3 x i8*] [
-// CHECK:         @"symbolic{{.*}}34witness_table_objc_associated_type2COC"
-// CHECK:         i8* bitcast {{.*}} @"$s34witness_table_objc_associated_type2SOVAA1CA2aDP3fooyyFTW"
+// CHECK:         i8* bitcast {{.*}} @"$s34witness_table_objc_associated_type2SOVAA1CA2aDP3fooyyFTW{{(\.ptrauth)?}}"
 // CHECK:       ]
 
 // CHECK-LABEL: define hidden swiftcc void @"$s34witness_table_objc_associated_type0A25OffsetAfterAssociatedTypeyyxAA1BRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T, i8** %T.B)

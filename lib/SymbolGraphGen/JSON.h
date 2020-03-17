@@ -38,6 +38,8 @@ struct AttributeRAII {
 
 void serialize(const llvm::VersionTuple &VT, llvm::json::OStream &OS);
 void serialize(const llvm::Triple &T, llvm::json::OStream &OS);
+void serialize(const ExtensionDecl *Extension, llvm::json::OStream &OS);
+void serialize(const Requirement &Req, llvm::json::OStream &OS);
 
 } // end namespace symbolgraphgen
 } // end namespace swift

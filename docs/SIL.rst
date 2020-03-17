@@ -592,6 +592,46 @@ autorelease in the callee.
     importer only imports non-native methods and types as ``throws``
     when it is possible to do this automatically.
 
+- SIL function types may provide a pattern signature and substitutions
+  to express that values of the type use a particular generic abstraction
+  pattern.  Both must be provided together.  If a pattern signature is
+  present, the component types (parameters, yields, and results) must be
+  expressed in terms of the generic parameters of that signature.
+  The pattern substitutions should be expressed in terms of the generic
+  parameters of the overall generic signature, if any, or else
+  the enclosing generic context, if any.
+
+  A pattern signature follows the ``@substituted`` attribute, which
+  must be the final attribute preceding the function type.  Pattern
+  substitutions follow the function type, preceded by the ``for``
+  keyword.  For example::
+
+    @substituted <T: Collection> (@in T) -> @out T.Element for Array<Int>
+
+  The low-level representation of a value of this type may not match
+  the representation of a value of the substituted-through version of it::
+
+    (@in Array<Int>) -> @out Int
+
+  Substitution differences at the outermost level of a function value
+  may be adjusted using the ``convert_function`` instruction.  Note that
+  this only works at the outermost level and not in nested positions.
+  For example, a function which takes a parameter of the first type above
+  cannot be converted by ``convert_function`` to a function which takes
+  a parameter of the second type; such a conversion must be done with a
+  thunk.
+
+  Type substitution on a function type with a pattern signature and
+  substitutions only substitutes into the substitutions; the component
+  types are preserved with their exact original structure.
+
+- In the implementation, a SIL function type may also carry substitutions
+  for its generic signature.  This is a convenience for working with
+  applied generic types and is not generally a formal part of the SIL
+  language; in particular, values should not have such types.  Such a
+  type behaves like a non-generic type, as if the substitutions were
+  actually applied to the underlying function type.
+
 Coroutine Types
 ```````````````
 
@@ -815,7 +855,8 @@ Functions
 ::
 
   decl ::= sil-function
-  sil-function ::= 'sil' sil-linkage? sil-function-name ':' sil-type
+  sil-function ::= 'sil' sil-linkage? sil-function-attribute+
+                     sil-function-name ':' sil-type
                      '{' sil-basic-block+ '}'
   sil-function-name ::= '@' [A-Za-z_0-9]+
 
@@ -826,6 +867,147 @@ and is usually the mangled name of the originating Swift declaration.
 The ``sil`` syntax declares the function's name and SIL type, and
 defines the body of the function inside braces. The declared type must
 be a function type, which may be generic.
+
+
+Function Attributes
+```````````````````
+::
+
+  sil-function-attribute ::= '[canonical]'
+
+The function is in canonical SIL even if the module is still in raw SIL.
+::
+
+  sil-function-attribute ::= '[ossa]'
+
+The function is in OSSA (ownership SSA) form.
+::
+
+  sil-function-attribute ::= '[transparent]'
+
+Transparent functions are always inlined and don't keep their source
+information when inlined.
+::
+
+  sil-function-attribute ::= '[' sil-function-thunk ']'
+  sil-function-thunk ::= 'thunk'
+  sil-function-thunk ::= 'signature_optimized_thunk'
+  sil-function-thunk ::= 'reabstraction_thunk'
+
+The function is a compiler generated thunk.
+::
+
+  sil-function-attribute ::= '[dynamically_replacable]'
+
+The function can be replaced at runtime with a different implementation.
+Optimizations must not assume anything about such a function, even if the SIL
+of the function body is available.
+::
+
+  sil-function-attribute ::= '[dynamic_replacement_for' identifier ']'
+  sil-function-attribute ::= '[objc_replacement_for' identifier ']'
+
+Specifies for which function this function is a replacement.
+::
+
+  sil-function-attribute ::= '[exact_self_class]'
+
+The function is a designated initializers, where it is known that the static
+type being allocated is the type of the class that defines the designated
+initializer.
+::
+
+  sil-function-attribute ::= '[without_actually_escaping]'
+
+The function is a thunk for closures which are not actually escaping.
+::
+
+  sil-function-attribute ::= '[' sil-function-purpose ']'
+  sil-function-purpose ::= 'global_init'
+
+The implied semantics are:
+
+ - side-effects can occur any time before the first invocation.
+ - all calls to the same ``global_init`` function have the same side-effects.
+ - any operation that may observe the initializer's side-effects must be
+   preceded by a call to the initializer.
+
+This is currently true if the function is an addressor that was lazily
+generated from a global variable access. Note that the initialization
+function itself does not need this attribute. It is private and only
+called within the addressor.
+::
+
+  sil-function-purpose ::= 'lazy_getter'
+
+The function is a getter of a lazy property for which the backing storage is
+an ``Optional`` of the property's type. The getter contains a top-level
+``switch_enum`` (or ``switch_enum_addr``), which tests if the lazy property
+is already computed. In the ``None``-case, the property is computed and stored
+to the backing storage of the property.
+
+After the first call of a lazy property getter, it is guaranteed that the
+property is computed and consecutive calls always execute the ``Some``-case of
+the top-level ``switch_enum``.
+::
+
+  sil-function-attribute ::= '[weak_imported]'
+
+Cross-module references to this function should always use weak linking.
+::
+
+  sil-function-attribute ::= '[available' sil-version-tuple ']'
+  sil-version-tuple ::= [0-9]+ ('.' [0-9]+)*
+
+The minimal OS-version where the function is available.
+::
+
+  sil-function-attribute ::= '[' sil-function-inlining ']'
+  sil-function-inlining ::= 'never'
+
+The function is never inlined.
+::
+
+  sil-function-inlining ::= 'always'
+
+The function is always inlined, even in a ``Onone`` build.
+::
+
+  sil-function-attribute ::= '[' sil-function-optimization ']'
+  sil-function-inlining ::= 'Onone'
+  sil-function-inlining ::= 'Ospeed'
+  sil-function-inlining ::= 'Osize'
+
+The function is optimized according to this attribute, overriding the setting
+from the command line.
+::
+
+  sil-function-attribute ::= '[' sil-function-effects ']'
+  sil-function-effects ::= 'readonly'
+  sil-function-effects ::= 'readnone'
+  sil-function-effects ::= 'readwrite'
+  sil-function-effects ::= 'releasenone'
+
+The specified memory effects of the function.
+::
+
+  sil-function-attribute ::= '[_semantics "' [A-Za-z._0-9]+ '"]'
+
+The specified high-level semantics of the function. The optimizer can use this
+information to perform high-level optimizations before such functions are
+inlined. For example, ``Array`` operations are annotated with semantic
+attributes to let the optimizer perform redundant bounds check elimination and
+similar optimizations.
+::
+
+  sil-function-attribute ::= '[_specialize "' [A-Za-z._0-9]+ '"]'
+
+Specifies for which types specialized code should be generated.
+::
+
+  sil-function-attribute ::= '[clang "' identifier '"]'
+
+The clang node owner.
 
 Basic Blocks
 ~~~~~~~~~~~~

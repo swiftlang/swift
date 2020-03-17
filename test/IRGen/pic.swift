@@ -80,6 +80,12 @@ public func use_global() -> Int {
 // aarch64:         bl swift_endAccess
 // aarch64:         ldr x0, [sp]
 
+// arm64e-LABEL: _$s4main10use_globalSiyF:
+// arm64e:         adrp [[REG1:x[0-9]+]], _$s4main6globalSivp@PAGE
+// arm64e:         add [[REG1]], [[REG1]], _$s4main6globalSivp@PAGEOFF
+// arm64e:         bl _swift_beginAccess
+// arm64e:         ldr {{x[0-9]+}}, {{\[}}[[REG1]]{{\]}}
+
 // powerpc64le-LABEL: {{_?}}$s4main10use_globalSiyF:
 // powerpc64le:        bl swift_beginAccess
 // powerpc64le:       addi 3, 3, ($s4main6globalSivp)@toc@l

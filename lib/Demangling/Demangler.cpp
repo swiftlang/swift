@@ -1738,12 +1738,27 @@ NodePointer Demangler::demangleImplFunctionType() {
     NodePointer SubstitutionRetroConformances;
     if (!demangleBoundGenerics(Substitutions, SubstitutionRetroConformances))
       return nullptr;
-    
-    bool isImplied = !nextIf('i');
-    
-    auto subsNode = createNode(isImplied
-                               ? Node::Kind::ImplImpliedSubstitutions
-                               : Node::Kind::ImplSubstitutions);
+
+    NodePointer sig = popNode(Node::Kind::DependentGenericSignature);
+    if (!sig)
+      return nullptr;
+
+    auto subsNode = createNode(Node::Kind::ImplPatternSubstitutions);
+    subsNode->addChild(sig, *this);
+    assert(Substitutions.size() == 1);
+    subsNode->addChild(Substitutions[0], *this);
+    if (SubstitutionRetroConformances)
+      subsNode->addChild(SubstitutionRetroConformances, *this);
+    type->addChild(subsNode, *this);
+  }
+
+  if (nextIf('I')) {
+    Vector<NodePointer> Substitutions;
+    NodePointer SubstitutionRetroConformances;
+    if (!demangleBoundGenerics(Substitutions, SubstitutionRetroConformances))
+      return nullptr;
+
+    auto subsNode = createNode(Node::Kind::ImplInvocationSubstitutions);
     assert(Substitutions.size() == 1);
     subsNode->addChild(Substitutions[0], *this);
     if (SubstitutionRetroConformances)

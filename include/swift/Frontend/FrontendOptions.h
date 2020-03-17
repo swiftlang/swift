@@ -266,6 +266,10 @@ public:
   /// Should we enable the dependency verifier for all primary files known to this frontend?
   bool EnableIncrementalDependencyVerifier = false;
 
+  /// The directory path we should use when print #include for the bridging header.
+  /// By default, we include ImplicitObjCHeaderPath directly.
+  llvm::Optional<std::string> BridgingHeaderDirForPrint;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.

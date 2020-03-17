@@ -1909,3 +1909,32 @@ bb0(%0 : $*SomeData):
   %5 = tuple ()
   return %5 : $()
 }
+
+// -----------------------------------------------------------------------------
+// Unreachable blocks are not mapped to the connection graph. Test
+// that verification does not assert with "Missing escape connection
+// graph mapping". <rdar://problem/60373501> EscapeAnalysis crashes
+// with CFG with unreachable
+sil_global hidden @globalInt: $Int
+
+// CHECK-LABEL: CG of testUnreachable
+// CHECK-LABEL: End
+sil hidden [noinline] @testUnreachable : $@convention(thin) () -> () {
+bb0:
+  %g1 = global_addr @globalInt : $*Int
+  %a1 = begin_access [read] [dynamic] [no_nested_conflict] %g1 : $*Int // users: %18, %17
+  %v1 = load %a1 : $*Int
+  end_access %a1 : $*Int
+  br bb4
+
+bb2:
+  %g2 = global_addr @globalInt : $*Int
+  %a2 = begin_access [read] [dynamic] [no_nested_conflict] %g2 : $*Int // users: %18, %17
+  %v2 = load %a2 : $*Int
+  end_access %a2 : $*Int
+  br bb4
+
+bb4:
+  %z = tuple ()
+  return %z : $()
+}
