@@ -1638,7 +1638,7 @@ public:
         Importer(static_cast<ClangImporter *>(CurrDeclContext->getASTContext().
           getClangModuleLoader())),
         CompletionContext(CompletionContext) {
-    (void)swift::createTypeChecker(Ctx);
+    Ctx.setLegacySemanticQueriesEnabled();
 
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext) {
@@ -4186,7 +4186,7 @@ public:
                            SourceLoc introducerLoc)
       : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
         ParsedKeywords(ParsedKeywords), introducerLoc(introducerLoc) {
-    (void)createTypeChecker(Ctx);
+    Ctx.setLegacySemanticQueriesEnabled();
 
     hasFuncIntroducer = isKeywordSpecified("func");
     hasVarIntroducer = isKeywordSpecified("var") ||
