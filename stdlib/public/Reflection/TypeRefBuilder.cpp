@@ -221,8 +221,7 @@ bool TypeRefBuilder::getFieldTypeRefs(
 
     // Empty cases of enums do not have a type
     if (FD->isEnum() && !Field->hasMangledTypeName()) {
-      Fields.push_back(
-          FieldTypeInfo::forEmptyCase(FieldName.str(), FieldValue));
+      Fields.push_back(FieldTypeInfo::forEmptyCase(FieldName.str(), FieldValue));
       continue;
     }
 
@@ -234,13 +233,11 @@ bool TypeRefBuilder::getFieldTypeRefs(
     auto Substituted = Unsubstituted->subst(*this, *Subs);
 
     if (FD->isEnum() && Field->isIndirectCase()) {
-      Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName.str(),
-                                                      FieldValue, Substituted));
+      Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName.str(), FieldValue, Substituted));
       continue;
     }
 
-    Fields.push_back(
-        FieldTypeInfo::forField(FieldName.str(), FieldValue, Substituted));
+    Fields.push_back(FieldTypeInfo::forField(FieldName.str(), FieldValue, Substituted));
   }
   return true;
 }
