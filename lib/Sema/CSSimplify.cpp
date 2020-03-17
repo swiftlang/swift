@@ -1722,6 +1722,21 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         }
       }
     }
+    
+    // If we have an anonymous closure e.g. { return }
+    // trying an ArgumentConversion to generic function param
+    // let's disfavor an attempt to match a function type with
+    // a generic parameter e.g. (A) -> B. This should ideally
+    // only matches types with no param like () -> B otherwise
+    // closure should have an explicity type e.g. { _ in return }
+    if (kind == ConstraintKind::ArgumentConversion &&
+        func1->getParams().empty() && func2->getParams().size() >= 1) {
+      auto *anchor = locator.trySimplifyToExpr();
+      auto closureExpr = dyn_cast_or_null<ClosureExpr>(anchor);
+      if (closureExpr && closureExpr->hasAnonymousClosureVars()) {
+        increaseScore(SK_DisfavoredOverload);
+      }
+    }
 
     if (shouldAttemptFixes()) {
       auto *anchor = locator.trySimplifyToExpr();
