@@ -346,8 +346,7 @@ extension Array {
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      _createNewBuffer(bufferIsUnique: false, minimumCapacity: count,
-                       growForAppend: false)
+      _createNewBufferNonUnique(minimumCapacity: count)
     }
   }
 
@@ -1080,6 +1079,30 @@ extension Array: RangeReplaceableCollection {
     }
     _buffer = _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
+  
+  @_alwaysEmitIntoClient
+  @inline(never)
+  internal mutating func _createNewBufferForAppend(
+    bufferIsUnique: Bool, minimumCapacity: Int
+  ) {
+    _createNewBuffer(
+      bufferIsUnique: bufferIsUnique,
+      minimumCapacity: minimumCapacity,
+      growForAppend: true
+    )
+  }
+  
+  @_alwaysEmitIntoClient
+  @inline(never)
+  internal mutating func _createNewBufferNonUnique(
+    minimumCapacity: Int
+  ) {
+    _createNewBuffer(
+      bufferIsUnique: false,
+      minimumCapacity: minimumCapacity,
+      growForAppend: false
+    )
+  }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
   /// The count of the new buffer is set to `oldCount`, the capacity of the
@@ -1097,9 +1120,8 @@ extension Array: RangeReplaceableCollection {
   @_semantics("array.make_mutable")
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      _createNewBuffer(bufferIsUnique: false,
-                       minimumCapacity: count + 1,
-                       growForAppend: true)
+      _createNewBufferForAppend(bufferIsUnique: false,
+                       minimumCapacity: count + 1)
     }
   }
 
@@ -1128,9 +1150,8 @@ extension Array: RangeReplaceableCollection {
                  _buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
-      _createNewBuffer(bufferIsUnique: true,
-                       minimumCapacity: oldCount + 1,
-                       growForAppend: true)
+      _createNewBufferForAppend(bufferIsUnique: true,
+                       minimumCapacity: oldCount + 1)
     }
   }
 
