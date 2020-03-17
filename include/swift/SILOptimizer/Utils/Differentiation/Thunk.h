@@ -109,9 +109,9 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForLinearMap(
     SILOptFunctionBuilder &fb, SILFunction *assocFn,
-    CanSILFunctionType linearMapType, CanSILFunctionType targetType,
-    AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
-    SILAutoDiffIndices actualIndices);
+    CanSILFunctionType origFnType, CanSILFunctionType linearMapType,
+    CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
+    SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
 
 } // end namespace autodiff
 
