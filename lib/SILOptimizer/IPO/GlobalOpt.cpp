@@ -275,6 +275,25 @@ void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
     InitializerCount[Callee]++;
 }
 
+static bool isPotentialStore(SILInstruction *inst) {
+  switch (inst->getKind()) {
+    case SILInstructionKind::LoadInst:
+      return false;
+    case SILInstructionKind::PointerToAddressInst:
+    case SILInstructionKind::StructElementAddrInst:
+    case SILInstructionKind::TupleElementAddrInst:
+      for (Operand *op : cast<SingleValueInstruction>(inst)->getUses()) {
+        if (isPotentialStore(op->getUser()))
+          return true;
+      }
+      return false;
+    case SILInstructionKind::BeginAccessInst:
+      return cast<BeginAccessInst>(inst)->getAccessKind() != SILAccessKind::Read;
+    default:
+      return true;
+  }
+}
+
 /// return true if this block is inside a loop.
 bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
   SILFunction *F = CurBB->getParent();
@@ -440,15 +459,17 @@ bool SILGlobalOpt::isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG,
 
   // If we should skip this, it is probably because there are multiple stores.
   // Return false if there are multiple stores or no stores.
-  if (GlobalVarSkipProcessing.count(SILG) || !GlobalVarStore.count(SILG) ||
-      // Check if there is more than one use the global addr function. If there
-      // is only one use, it must be the use that we are trying to optimize, so
-      // that is OK. If there is more than one use, one of the other uses may
-      // have a store attached to it which means there may be more than one
-      // assignment, so return false.
-      (GlobalInitCallMap.count(globalAddrF) &&
-       GlobalInitCallMap[globalAddrF].size() != 1))
+  if (GlobalVarSkipProcessing.count(SILG) || !GlobalVarStore.count(SILG))
     return false;
+
+  if (GlobalInitCallMap.count(globalAddrF)) {
+    for (ApplyInst *initCall : GlobalInitCallMap[globalAddrF]) {
+      for (auto *Op : getNonDebugUses(initCall)) {
+        if (isPotentialStore(Op->getUser()))
+          return false;
+      }
+    }
+  }
 
   // Otherwise, return true if this can't be used externally (false, otherwise).
   return !isPossiblyUsedExternally(SILG->getLinkage(),
@@ -725,24 +746,6 @@ bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
 
   GlobalsToRemove.push_back(global);
   return true;
-}
-
-static bool isPotentialStore(SILInstruction *inst) {
-  switch (inst->getKind()) {
-    case SILInstructionKind::LoadInst:
-    case SILInstructionKind::EndAccessInst:
-      return false;
-    case SILInstructionKind::StructElementAddrInst:
-    case SILInstructionKind::TupleElementAddrInst:
-    case SILInstructionKind::BeginAccessInst:
-      for (Operand *op : cast<SingleValueInstruction>(inst)->getUses()) {
-        if (isPotentialStore(op->getUser()))
-          return true;
-      }
-      return false;
-    default:
-      return true;
-  }
 }
 
 /// If this is a read from a global let variable, map it.
