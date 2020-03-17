@@ -33,7 +33,7 @@ static bool emitFileWithContents(StringRef path, StringRef contents,
   if (llvm::sys::fs::openFileForWrite(path, fd))
     return true;
   if (pathOut)
-    *pathOut = path;
+    *pathOut = path.str();
   llvm::raw_fd_ostream file(fd, /*shouldClose=*/true);
   file << contents;
   return false;

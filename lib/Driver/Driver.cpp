@@ -1649,7 +1649,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     // REPL mode should always use the REPL module.
     OI.ModuleName = "REPL";
   } else if (const Arg *A = Args.getLastArg(options::OPT_o)) {
-    OI.ModuleName = llvm::sys::path::stem(A->getValue());
+    OI.ModuleName = llvm::sys::path::stem(A->getValue()).str();
     if ((OI.LinkAction == LinkKind::DynamicLibrary ||
          OI.LinkAction == LinkKind::StaticLibrary) &&
         !llvm::sys::path::extension(A->getValue()).empty() &&
@@ -1658,7 +1658,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.ModuleName.erase(0, strlen("lib"));
     }
   } else if (Inputs.size() == 1) {
-    OI.ModuleName = llvm::sys::path::stem(Inputs.front().second->getValue());
+    OI.ModuleName =
+        llvm::sys::path::stem(Inputs.front().second->getValue()).str();
   }
 
   if (!Lexer::isIdentifier(OI.ModuleName) ||
@@ -2187,10 +2188,10 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   if (const Arg *A = Args.getLastArg(options::OPT_driver_use_frontend_path)) {
     DriverExecutable = A->getValue();
     std::string commandString =
-        Args.getLastArgValue(options::OPT_driver_use_frontend_path);
+        Args.getLastArgValue(options::OPT_driver_use_frontend_path).str();
     SmallVector<StringRef, 10> commandArgs;
     StringRef(commandString).split(commandArgs, ';', -1, false);
-    DriverExecutable = commandArgs[0];
+    DriverExecutable = commandArgs[0].str();
     DriverExecutableArgs.assign(std::begin(commandArgs) + 1,
                                 std::end(commandArgs));
   }
@@ -2837,26 +2838,29 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                [] { llvm::outs() << ", "; });
     if (!InputActions.empty() && !J->getInputs().empty())
       llvm::outs() << ", ";
-    interleave(J->getInputs().begin(), J->getInputs().end(),
-               [](const Job *Input) {
-                 auto FileNames = Input->getOutput().getPrimaryOutputFilenames();
-                 interleave(FileNames.begin(), FileNames.end(),
-                            [](const std::string &FileName) {
-                              llvm::outs() << '"' << FileName << '"';
-                            },
-                            [] { llvm::outs() << ", "; });
-               },
-               [] { llvm::outs() << ", "; });
+    interleave(
+        J->getInputs().begin(), J->getInputs().end(),
+        [](const Job *Input) {
+          auto FileNames = Input->getOutput().getPrimaryOutputFilenames();
+          interleave(
+              FileNames.begin(), FileNames.end(),
+              [](StringRef FileName) {
+                llvm::outs() << '"' << FileName << '"';
+              },
+              [] { llvm::outs() << ", "; });
+        },
+        [] { llvm::outs() << ", "; });
 
     llvm::outs() << "], output: {";
     auto OutputFileNames = J->getOutput().getPrimaryOutputFilenames();
     StringRef TypeName =
         file_types::getTypeName(J->getOutput().getPrimaryOutputType());
-    interleave(OutputFileNames.begin(), OutputFileNames.end(),
-               [TypeName](const std::string &FileName) {
-                 llvm::outs() << TypeName << ": \"" << FileName << '"';
-               },
-               [] { llvm::outs() << ", "; });
+    interleave(
+        OutputFileNames.begin(), OutputFileNames.end(),
+        [TypeName](StringRef FileName) {
+          llvm::outs() << TypeName << ": \"" << FileName << '"';
+        },
+        [] { llvm::outs() << ", "; });
 
     file_types::forAllTypes([&J](file_types::ID Ty) {
       StringRef AdditionalOutput =

@@ -5486,7 +5486,7 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
   // comparison with nil is illegal, albeit for different reasons spelled
   // out by the diagnosis.
   if (isa<NilLiteralExpr>(lhs) || isa<NilLiteralExpr>(rhs)) {
-    std::string revisedName = name.str();
+    std::string revisedName = std::string(name);
     revisedName.pop_back();
 
     auto loc = binaryOp->getLoc();

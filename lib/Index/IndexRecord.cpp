@@ -337,8 +337,9 @@ recordSourceFile(SourceFile *SF, StringRef indexStorePath,
                  llvm::function_ref<void(StringRef, StringRef)> callback) {
   std::string recordFile;
   bool failed = false;
-  auto consumer = makeRecordingConsumer(SF->getFilename(), indexStorePath,
-                                        &diags, &recordFile, &failed);
+  auto consumer =
+      makeRecordingConsumer(SF->getFilename().str(), indexStorePath.str(),
+                            &diags, &recordFile, &failed);
   indexSourceFile(SF, *consumer);
 
   if (!failed && !recordFile.empty())
@@ -407,13 +408,13 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
       case FileUnitKind::ClangModule: {
         auto *LFU = cast<LoadedFile>(FU);
         if (auto F = fileMgr.getFile(LFU->getFilename())) {
-          std::string moduleName = mod->getNameStr();
+          std::string moduleName = mod->getNameStr().str();
           bool withoutUnitName = true;
           if (FU->getKind() == FileUnitKind::ClangModule) {
             withoutUnitName = false;
             auto clangModUnit = cast<ClangModuleUnit>(LFU);
             if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {
-              moduleName = clangMod->getTopLevelModuleName();
+              moduleName = clangMod->getTopLevelModuleName().str();
               // FIXME: clang's -Rremarks do not seem to go through Swift's
               // diagnostic emitter.
               clang::index::emitIndexDataForModuleFile(clangMod,
@@ -455,7 +456,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  DiagnosticEngine &diags,
                                  IndexUnitWriter &parentUnitWriter) {
   StringRef filename = module->getModuleFilename();
-  std::string moduleName = module->getNameStr();
+  std::string moduleName = module->getNameStr().str();
 
   std::string error;
   auto isUptodateOpt = parentUnitWriter.isUnitUpToDateForOutputFile(/*FilePath=*/filename,
@@ -477,7 +478,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   if (!module->isStdlibModule()) {
     std::string recordFile;
     bool failed = false;
-    auto consumer = makeRecordingConsumer(filename, indexStorePath,
+    auto consumer = makeRecordingConsumer(filename.str(), indexStorePath.str(),
                                           &diags, &recordFile, &failed);
     indexModule(module, *consumer);
 
@@ -522,7 +523,9 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       appendGroupNameForFilename(groupName, fileNameWithGroup);
 
       std::string outRecordFile;
-      failed = failed || writeRecord(tracker, fileNameWithGroup.str(), indexStorePath, &diags, outRecordFile);
+      failed =
+          failed || writeRecord(tracker, std::string(fileNameWithGroup.str()),
+                                indexStorePath.str(), &diags, outRecordFile);
       if (failed)
         return false;
       records.emplace_back(outRecordFile, moduleName.str());
@@ -538,7 +541,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   // FIXME: Get real values for the following.
   StringRef swiftVersion;
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
-  std::string indexUnitToken = module->getModuleFilename();
+  std::string indexUnitToken = module->getModuleFilename().str();
   // For indexing serialized modules 'debug compilation' is irrelevant, so
   // set it to true by default.
   bool isDebugCompilation = true;

@@ -87,7 +87,7 @@ CommonDiffItem(SDKNodeKind NodeKind, NodeAnnotation DiffKind,
   ChildIndex.split(Pieces, ":");
   std::transform(Pieces.begin(), Pieces.end(),
                  std::back_inserter(ChildIndexPieces),
-                 [](StringRef Piece) { return std::stoi(Piece); });
+                 [](StringRef Piece) { return std::stoi(Piece.str()); });
 }
 
 StringRef swift::ide::api::CommonDiffItem::head() {
@@ -319,7 +319,7 @@ static StringRef getScalarString(llvm::yaml::Node *N) {
 };
 
 static int getScalarInt(llvm::yaml::Node *N) {
-  return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
+  return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue().str());
 };
 
 static APIDiffItem*

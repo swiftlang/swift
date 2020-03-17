@@ -272,7 +272,7 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
     }
     Data += Step;
   }
-  return Builder.str();
+  return std::string(Builder.str());
 }
 
 void ASTPrinter::anchor() {}
@@ -4543,7 +4543,7 @@ AnyFunctionType::getParamListAsString(ArrayRef<AnyFunctionType::Param> Params,
   SmallString<16> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
   AnyFunctionType::printParams(Params, OS);
-  return OS.str();
+  return std::string(OS.str());
 }
 
 void LayoutConstraintInfo::print(raw_ostream &OS,
