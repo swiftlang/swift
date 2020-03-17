@@ -83,7 +83,7 @@ class TensorFlowSwiftAPIs(product.Product):
                 # SWIFT_ENABLE_TENSORFLOW
                 target,
                 '-D', 'BUILD_TESTING={}'.format(
-                    'NO' if host_Target.startswith('macosx') else 'YES'
+                    'NO' if host_target.startswith('macosx') else 'YES'
                 ),
                 '-D', 'USE_BUNDLED_CTENSORFLOW=YES',
                 '-D', 'TensorFlow_INCLUDE_DIR={}'.format(tensorflow_source_dir),
