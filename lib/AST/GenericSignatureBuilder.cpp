@@ -3783,8 +3783,8 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericP
            Key.Index == 0)));
 
   // Create a potential archetype for this type parameter.
-  void *mem = Impl->Allocator.Allocate<PotentialArchetype>();
-  auto PA = new (mem) PotentialArchetype(getASTContext(), GenericParam);
+  auto PA =
+      new (Impl->Allocator) PotentialArchetype(getASTContext(), GenericParam);
   Impl->GenericParams.push_back(GenericParam);
   Impl->PotentialArchetypes.push_back(PA);
 }
