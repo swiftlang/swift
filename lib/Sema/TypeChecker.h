@@ -401,8 +401,6 @@ enum class CheckedCastContextKind {
   EnumElementPattern,
 };
 
-/// The Swift type checker, which takes a parsed AST and performs name binding,
-/// type checking, and semantic analysis to produce a type-annotated AST.
 namespace TypeChecker {
 Type getArraySliceType(SourceLoc loc, Type elementType);
 Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
