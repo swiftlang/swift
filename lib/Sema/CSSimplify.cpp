@@ -1677,6 +1677,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         if (isSingleTupleParam(ctx, func2Params) &&
             canImplodeParams(func1Params)) {
           implodeParams(func1Params);
+          increaseScore(SK_FunctionConversion);
         } else if (!ctx.isSwiftVersionAtLeast(5) &&
                    isSingleTupleParam(ctx, func1Params) &&
                    canImplodeParams(func2Params)) {
@@ -1689,6 +1690,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                isa<OverloadedDeclRefExpr>(simplified) ||
                isa<UnresolvedDeclRefExpr>(simplified))) {
             implodeParams(func2Params);
+            increaseScore(SK_FunctionConversion);
           }
         }
       } else if (last->getKind() == ConstraintLocator::PatternMatch &&
@@ -1716,25 +1718,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         if (isSingleTupleParam(ctx, func1Params) &&
             canImplodeParams(func2Params)) {
           implodeParams(func2Params);
+          increaseScore(SK_FunctionConversion);
         } else if (isSingleTupleParam(ctx, func2Params) &&
                    canImplodeParams(func1Params)) {
           implodeParams(func1Params);
+          increaseScore(SK_FunctionConversion);
         }
-      }
-    }
-    
-    // If we have an anonymous closure e.g. { return }
-    // trying an ArgumentConversion to generic function param
-    // let's disfavor an attempt to match a function type with
-    // a generic parameter e.g. (A) -> B. This should ideally
-    // only matches types with no param like () -> B otherwise
-    // closure should have an explicity type e.g. { _ in return }
-    if (kind == ConstraintKind::ArgumentConversion &&
-        func1->getParams().empty() && func2->getParams().size() >= 1) {
-      auto *anchor = locator.trySimplifyToExpr();
-      auto closureExpr = dyn_cast_or_null<ClosureExpr>(anchor);
-      if (closureExpr && closureExpr->hasAnonymousClosureVars()) {
-        increaseScore(SK_DisfavoredOverload);
       }
     }
 
