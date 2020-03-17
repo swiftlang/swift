@@ -33,13 +33,6 @@ public:
   class Impl;
   struct SourceFileSyntaxInfo;
 
-  /// The implicit module import that the SourceFile should get.
-  enum class ImplicitModuleImportKind {
-    None,
-    Builtin,
-    Stdlib
-  };
-
   /// Possible attributes for imports in source files.
   enum class ImportFlags {
     /// The imported module is exposed to anyone who imports the parent module.
@@ -335,8 +328,8 @@ public:
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
-             bool KeepSyntaxTree = false, ParsingOptions parsingOpts = {});
+             bool KeepParsedTokens = false, bool KeepSyntaxTree = false,
+             ParsingOptions parsingOpts = {});
 
   ~SourceFile();
 

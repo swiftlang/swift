@@ -464,15 +464,24 @@ void SourceLookupCache::invalidate() {
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
-ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
-  : DeclContext(DeclContextKind::Module, nullptr),
-    TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }) {
+ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
+                       ImplicitImportInfo importInfo)
+    : DeclContext(DeclContextKind::Module, nullptr),
+      TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), {}),
+      ImportInfo(importInfo) {
 
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
 
   setAccess(AccessLevel::Public);
+}
+
+ArrayRef<ImplicitImport> ModuleDecl::getImplicitImports() const {
+  auto &evaluator = getASTContext().evaluator;
+  auto *mutableThis = const_cast<ModuleDecl *>(this);
+  return evaluateOrDefault(evaluator, ModuleImplicitImportsRequest{mutableThis},
+                           {});
 }
 
 bool ModuleDecl::isClangModule() const {
@@ -2245,36 +2254,6 @@ SourceFile::getCachedVisibleDecls() const {
   return getCache().AllVisibleValues;
 }
 
-static void performAutoImport(
-    SourceFile &SF,
-    SourceFile::ImplicitModuleImportKind implicitModuleImportKind) {
-  if (SF.Kind == SourceFileKind::SIL)
-    assert(implicitModuleImportKind ==
-           SourceFile::ImplicitModuleImportKind::None);
-
-  ASTContext &Ctx = SF.getASTContext();
-  ModuleDecl *M = nullptr;
-
-  switch (implicitModuleImportKind) {
-  case SourceFile::ImplicitModuleImportKind::None:
-    return;
-  case SourceFile::ImplicitModuleImportKind::Builtin:
-    M = Ctx.TheBuiltinModule;
-    break;
-  case SourceFile::ImplicitModuleImportKind::Stdlib:
-    M = Ctx.getStdlibModule(true);
-    break;
-  }
-
-  assert(M && "unable to auto-import module");
-
-  // FIXME: These will be the same for most source files, but we copy them
-  // over and over again.
-  auto Imports = SourceFile::ImportedModuleDesc(
-      ModuleDecl::ImportedModule({}, M), SourceFile::ImportOptions());
-  SF.addImports(Imports);
-}
-
 llvm::StringMap<SourceFilePathInfo>
 SourceFile::getInfoForUsedFilePaths() const {
   llvm::StringMap<SourceFilePathInfo> result;
@@ -2415,14 +2394,12 @@ ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
-                       ImplicitModuleImportKind ModImpKind,
                        bool KeepParsedTokens, bool BuildSyntaxTree,
                        ParsingOptions parsingOpts)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
       ParsingOpts(parsingOpts), Kind(K),
       SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
   M.getASTContext().addDestructorCleanup(*this);
-  performAutoImport(*this, ModImpKind);
 
   if (isScriptMode()) {
     bool problem = M.registerEntryPointFile(this, SourceLoc(), None);

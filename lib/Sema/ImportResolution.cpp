@@ -193,7 +193,19 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
   size_t nextModuleToCrossImport = 0;
 
 public:
-  ImportResolver(SourceFile &SF) : SF(SF), ctx(SF.getASTContext()) {}
+  ImportResolver(SourceFile &SF) : SF(SF), ctx(SF.getASTContext()) {
+    addImplicitImports();
+  }
+
+  void addImplicitImports() {
+    // TODO: Support cross-module imports.
+    for (auto &import : SF.getParentModule()->getImplicitImports()) {
+      assert(!(SF.Kind == SourceFileKind::SIL &&
+               import.Module->isStdlibModule()));
+      ImportedModule importedMod(/*accessPath*/ {}, import.Module);
+      boundImports.emplace_back(importedMod, import.Options);
+    }
+  }
 
   /// Retrieve the finalized imports.
   ArrayRef<ImportedModuleDesc> getFinishedImports() const {
@@ -397,6 +409,81 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
     return nullptr;
 
   return topLevelModule;
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Implicit imports
+//===----------------------------------------------------------------------===//
+
+ArrayRef<ImplicitImport>
+ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
+                                       ModuleDecl *module) const {
+  SmallVector<ImplicitImport, 4> imports;
+
+  auto &ctx = module->getASTContext();
+  auto &importInfo = module->getImplicitImportInfo();
+
+  // Add an implicit stdlib if needed.
+  switch (importInfo.StdlibKind) {
+  case ImplicitStdlibKind::None:
+    break;
+  case ImplicitStdlibKind::Builtin:
+    imports.emplace_back(ctx.TheBuiltinModule);
+    break;
+  case ImplicitStdlibKind::Stdlib: {
+    auto *stdlib = ctx.getStdlibModule(/*loadIfAbsent*/ true);
+    assert(stdlib && "Missing stdlib?");
+    imports.emplace_back(stdlib);
+    break;
+  }
+  }
+
+  // Add any modules we were asked to implicitly import.
+  for (auto moduleName : importInfo.ModuleNames) {
+    auto *importModule = ctx.getModule({{moduleName, SourceLoc()}});
+    if (!importModule) {
+      ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import, moduleName.str());
+      if (ctx.SearchPathOpts.SDKPath.empty() &&
+          llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
+        ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
+        ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
+      }
+      continue;
+    }
+    imports.emplace_back(importModule);
+  }
+
+  // Add any pre-loaded modules.
+  for (auto &module : importInfo.AdditionalModules) {
+    imports.emplace_back(module.first, module.second ? ImportFlags::Exported
+                                                     : ImportOptions());
+  }
+
+  auto *clangImporter =
+      static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+
+  // Implicitly import the bridging header module if needed.
+  auto bridgingHeaderPath = importInfo.BridgingHeaderPath;
+  if (!bridgingHeaderPath.empty() &&
+      !clangImporter->importBridgingHeader(bridgingHeaderPath, module)) {
+    auto *headerModule = clangImporter->getImportedHeaderModule();
+    assert(headerModule && "Didn't load bridging header?");
+    imports.emplace_back(headerModule, ImportFlags::Exported);
+  }
+
+  // Implicitly import the underlying Clang half of this module if needed.
+  if (importInfo.ShouldImportUnderlyingModule) {
+    auto *underlyingMod = clangImporter->loadModule(
+        SourceLoc(), {Located<Identifier>(module->getName(), SourceLoc())});
+    if (underlyingMod) {
+      imports.emplace_back(underlyingMod, ImportFlags::Exported);
+    } else {
+      ctx.Diags.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
+                         module->getName());
+    }
+  }
+
+  return ctx.AllocateCopy(imports);
 }
 
 //===----------------------------------------------------------------------===//
