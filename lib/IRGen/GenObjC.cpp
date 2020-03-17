@@ -1100,22 +1100,6 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
   return IGM.getAddrOfGlobalString(encodingString);
 }
 
-static llvm::Constant *getObjCEncodingForMethodType(IRGenModule &IGM,
-                                                    CanSILFunctionType fnType,
-                                                    bool useExtendedEncoding) {
-  // Get the inputs without 'self'.
-  auto inputs = fnType->getParameters().drop_back();
-
-  // Include the encoding for 'self' and '_cmd'.
-  llvm::SmallString<8> specialParams;
-  specialParams += "@0:";
-  auto ptrSize = IGM.getPointerSize().getValue();
-  specialParams += llvm::itostr(ptrSize);
-  GenericContextScope scope(IGM, fnType->getInvocationGenericSignature());
-  return getObjCEncodingForTypes(IGM, fnType, inputs, specialParams,
-                                 ptrSize * 2, useExtendedEncoding);
-}
-
 static llvm::Constant *
 getObjectEncodingFromClangNode(IRGenModule &IGM, Decl *d,
                                bool useExtendedEncoding) {
@@ -1139,6 +1123,31 @@ getObjectEncodingFromClangNode(IRGenModule &IGM, Decl *d,
   return nullptr;
 }
 
+static llvm::Constant *getObjCEncodingForMethod(IRGenModule &IGM,
+                                                CanSILFunctionType fnType,
+                                                bool useExtendedEncoding,
+                                                Decl *optionalDecl) {
+  // Use the decl's ClangNode to get the encoding if possible.
+  if (optionalDecl) {
+    if (auto *enc = getObjectEncodingFromClangNode(IGM, optionalDecl,
+                                                   useExtendedEncoding)) {
+      return enc;
+    }
+  }
+
+  // Get the inputs without 'self'.
+  auto inputs = fnType->getParameters().drop_back();
+
+  // Include the encoding for 'self' and '_cmd'.
+  llvm::SmallString<8> specialParams;
+  specialParams += "@0:";
+  auto ptrSize = IGM.getPointerSize().getValue();
+  specialParams += llvm::itostr(ptrSize);
+  GenericContextScope scope(IGM, fnType->getInvocationGenericSignature());
+  return getObjCEncodingForTypes(IGM, fnType, inputs, specialParams,
+                                 ptrSize * 2, useExtendedEncoding);
+}
+
 /// Emit the components of an Objective-C method descriptor: its selector,
 /// type encoding, and IMP pointer.
 ObjCMethodDescriptor
@@ -1151,18 +1160,13 @@ irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// The first element is the selector.
   descriptor.selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
-  if (auto e =
-          getObjectEncodingFromClangNode(IGM, method, false /*extended*/)) {
-    descriptor.typeEncoding = e;
-  } else {
-    /// The second element is the method signature. A method signature is made
-    /// of the return type @encoding and every parameter type @encoding, glued
-    /// with numbers that used to represent stack offsets for each of these
-    /// elements.
-    CanSILFunctionType methodType = getObjCMethodType(IGM, method);
-    descriptor.typeEncoding =
-        getObjCEncodingForMethodType(IGM, methodType, /*extended*/ false);
-  }
+  /// The second element is the method signature. A method signature is made
+  /// of the return type @encoding and every parameter type @encoding, glued
+  /// with numbers that used to represent stack offsets for each of these
+  /// elements.
+  CanSILFunctionType methodType = getObjCMethodType(IGM, method);
+  descriptor.typeEncoding =
+      getObjCEncodingForMethod(IGM, methodType, /*extended*/ false, method);
   
   /// The third element is the method implementation pointer.
   if (!concrete) {
@@ -1222,15 +1226,11 @@ irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
   ObjCMethodDescriptor descriptor{};
   descriptor.selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
 
-  if (auto e =
-          getObjectEncodingFromClangNode(IGM, subscript, false /*extended*/)) {
-    descriptor.typeEncoding = e;
-  } else {
-    auto methodTy =
-        getObjCMethodType(IGM, subscript->getOpaqueAccessor(AccessorKind::Get));
-    descriptor.typeEncoding = getObjCEncodingForMethodType(IGM, methodTy,
-                                                           /*extended*/ false);
-  }
+  auto methodTy =
+      getObjCMethodType(IGM, subscript->getOpaqueAccessor(AccessorKind::Get));
+  descriptor.typeEncoding =
+      getObjCEncodingForMethod(IGM, methodTy,
+                               /*extended*/ false, subscript);
 
   descriptor.silFunction = nullptr;
   descriptor.impl = getObjCGetterPointer(IGM, subscript,
@@ -1303,13 +1303,9 @@ irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   descriptor.selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
   auto methodTy = getObjCMethodType(IGM,
                               subscript->getOpaqueAccessor(AccessorKind::Set));
-  if (auto e =
-          getObjectEncodingFromClangNode(IGM, subscript, false /*extended*/)) {
-    descriptor.typeEncoding = e;
-  } else {
-    descriptor.typeEncoding = getObjCEncodingForMethodType(IGM, methodTy,
-                                                           /*extended*/ false);
-  }
+  descriptor.typeEncoding =
+      getObjCEncodingForMethod(IGM, methodTy,
+                               /*extended*/ false, subscript);
   descriptor.silFunction = nullptr;
   descriptor.impl = getObjCSetterPointer(IGM, subscript,
                                          descriptor.silFunction);
@@ -1415,13 +1411,8 @@ void irgen::emitObjCIVarInitDestroyDescriptor(
 llvm::Constant *
 irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
                                      AbstractFunctionDecl *method) {
-  // Use the clang node's encoding if there is a clang node.
-  if (auto e = getObjectEncodingFromClangNode(IGM, method, true /*extended*/)) {
-    return e;
-  }
-
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
-  return getObjCEncodingForMethodType(IGM, methodType, true/*Extended*/);
+  return getObjCEncodingForMethod(IGM, methodType, true /*Extended*/, method);
 }
 
 llvm::Constant *
