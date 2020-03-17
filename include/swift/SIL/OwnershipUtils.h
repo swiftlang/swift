@@ -388,11 +388,10 @@ Optional<BorrowScopeIntroducingValue>
 getSingleBorrowIntroducingValue(SILValue inputValue);
 
 struct InteriorPointerOperandKind {
-  using UnderlyingKindTy = std::underlying_type<SILInstructionKind>::type;
-
-  enum Kind : UnderlyingKindTy {
-    RefElementAddr = UnderlyingKindTy(SILInstructionKind::RefElementAddrInst),
-    RefTailAddr = UnderlyingKindTy(SILInstructionKind::RefTailAddrInst),
+  enum Kind : uint8_t {
+    RefElementAddr,
+    RefTailAddr,
+    OpenExistentialBox,
   };
 
   Kind value;
@@ -410,6 +409,8 @@ struct InteriorPointerOperandKind {
       return InteriorPointerOperandKind(RefElementAddr);
     case SILInstructionKind::RefTailAddrInst:
       return InteriorPointerOperandKind(RefTailAddr);
+    case SILInstructionKind::OpenExistentialBoxInst:
+      return InteriorPointerOperandKind(OpenExistentialBox);
     }
   }
 
@@ -457,6 +458,8 @@ struct InteriorPointerOperand {
       return cast<RefElementAddrInst>(operand->getUser());
     case InteriorPointerOperandKind::RefTailAddr:
       return cast<RefTailAddrInst>(operand->getUser());
+    case InteriorPointerOperandKind::OpenExistentialBox:
+      return cast<OpenExistentialBoxInst>(operand->getUser());
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }

@@ -42,6 +42,7 @@ add_swift_host_library(swiftIRGen STATIC
   IRGenMangler.cpp
   IRGenModule.cpp
   IRGenSILPasses.cpp
+  IRGenRequests.cpp
   IRGenSIL.cpp
   Linking.cpp
   LoadableByAddress.cpp

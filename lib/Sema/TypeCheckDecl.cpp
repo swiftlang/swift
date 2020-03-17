@@ -981,6 +981,10 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     return true;
   }
 
+  if (!computeAutomaticEnumValueKind(ED)) {
+    return true;
+  }
+
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ED->mapTypeIntoContext(rawTy);
   if (rawTy->hasError())

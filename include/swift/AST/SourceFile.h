@@ -267,6 +267,14 @@ public:
   /// A set of synthesized declarations that need to be type checked.
   llvm::SmallVector<Decl *, 8> SynthesizedDecls;
 
+  /// The list of functions defined in this file whose bodies have yet to be
+  /// typechecked. They must be held in this list instead of eagerly validated
+  /// because their bodies may force us to perform semantic checks of arbitrary
+  /// complexity, and we currently cannot handle those checks in isolation. E.g.
+  /// we cannot, in general, perform witness matching on singular requirements
+  /// unless the entire conformance has been evaluated.
+  std::vector<AbstractFunctionDecl *> DelayedFunctions;
+
   /// We might perform type checking on the same source file more than once,
   /// if its the main file or a REPL instance, so keep track of the last
   /// checked synthesized declaration to avoid duplicating work.

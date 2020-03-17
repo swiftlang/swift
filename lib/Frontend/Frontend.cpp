@@ -223,7 +223,8 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   registerSILGenRequestFunctions(Context->evaluator);
   registerSILOptimizerRequestFunctions(Context->evaluator);
   registerTBDGenRequestFunctions(Context->evaluator);
-
+  registerIRGenRequestFunctions(Context->evaluator);
+  
   // Migrator, indexing and typo correction need some IDE requests.
   // The integrated REPL needs IDE requests for completion.
   if (Invocation.getMigratorOptions().shouldRunMigrator() ||
@@ -239,7 +240,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   if (setUpModuleLoaders())
     return true;
 
-  createTypeChecker(*Context);
+  Context->setLegacySemanticQueriesEnabled();
   return false;
 }
 

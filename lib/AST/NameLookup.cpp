@@ -1622,7 +1622,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
     // Make sure we've resolved property wrappers, if we need them.
-    if (ctx.areSemanticQueriesEnabled()) {
+    if (ctx.areLegacySemanticQueriesEnabled()) {
       installPropertyWrapperMembersIfNeeded(current, member);
     }
 

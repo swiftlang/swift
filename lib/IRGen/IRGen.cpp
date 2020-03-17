@@ -18,6 +18,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/IRGenRequests.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
@@ -975,7 +976,7 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
 
   // Run SIL level IRGen preparation passes.
   runIRGenPreparePasses(*SILMod, IGM);
-  
+
   {
     FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
 
@@ -1360,25 +1361,36 @@ static void performParallelIRGeneration(
 }
 
 std::unique_ptr<llvm::Module> swift::performIRGeneration(
-    const IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
-    StringRef ModuleName, const PrimarySpecificPaths &PSPs,
-    llvm::LLVMContext &LLVMContext,
+    const IRGenOptions &Opts, swift::ModuleDecl *M,
+    std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
+    const PrimarySpecificPaths &PSPs, llvm::LLVMContext &LLVMContext,
     ArrayRef<std::string> parallelOutputFilenames,
-    llvm::GlobalVariable **outModuleHash,
-    llvm::StringSet<> *LinkerDirectives) {
-  if (SILMod->getOptions().shouldPerformIRGenerationInParallel() &&
-      !parallelOutputFilenames.empty()) {
-    auto NumThreads = SILMod->getOptions().NumThreads;
-    ::performParallelIRGeneration(Opts, M, std::move(SILMod), ModuleName,
-                                  NumThreads, parallelOutputFilenames,
-                                  LinkerDirectives);
+    llvm::GlobalVariable **outModuleHash, llvm::StringSet<> *LinkerDirectives) {
+  auto desc = IRGenDescriptor::forWholeModule(
+      Opts, M, std::move(SILMod), ModuleName, PSPs, LLVMContext,
+      parallelOutputFilenames, outModuleHash, LinkerDirectives);
+  return llvm::cantFail(
+      M->getASTContext().evaluator(IRGenWholeModuleRequest{desc}));
+}
+
+llvm::Expected<std::unique_ptr<llvm::Module>>
+IRGenWholeModuleRequest::evaluate(Evaluator &evaluator,
+                                  IRGenDescriptor desc) const {
+  auto *M = desc.Ctx.get<ModuleDecl *>();
+  if (desc.SILMod->getOptions().shouldPerformIRGenerationInParallel() &&
+      !desc.parallelOutputFilenames.empty()) {
+    const auto NumThreads = desc.SILMod->getOptions().NumThreads;
+    ::performParallelIRGeneration(
+        desc.Opts, M, std::unique_ptr<SILModule>(desc.SILMod), desc.ModuleName,
+        NumThreads, desc.parallelOutputFilenames, desc.LinkerDirectives);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.
     return nullptr;
   }
-  return ::performIRGeneration(Opts, M, std::move(SILMod), ModuleName, PSPs,
-                               "", LLVMContext, nullptr,
-                               outModuleHash, LinkerDirectives);
+  return ::performIRGeneration(
+      desc.Opts, M, std::unique_ptr<SILModule>(desc.SILMod), desc.ModuleName,
+      desc.PSPs, "", desc.LLVMContext, nullptr, desc.outModuleHash,
+      desc.LinkerDirectives);
 }
 
 std::unique_ptr<llvm::Module> swift::
@@ -1389,10 +1401,21 @@ performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
                     llvm::LLVMContext &LLVMContext,
                     llvm::GlobalVariable **outModuleHash,
                     llvm::StringSet<> *LinkerDirectives) {
-  return ::performIRGeneration(Opts, SF.getParentModule(), std::move(SILMod),
-                               ModuleName, PSPs, PrivateDiscriminator,
-                               LLVMContext, &SF,
-                               outModuleHash, LinkerDirectives);
+  auto desc = IRGenDescriptor::forFile(Opts, SF, std::move(SILMod), ModuleName,
+                                       PSPs, PrivateDiscriminator, LLVMContext,
+                                       outModuleHash, LinkerDirectives);
+  return llvm::cantFail(
+      SF.getASTContext().evaluator(IRGenSourceFileRequest{desc}));
+}
+
+llvm::Expected<std::unique_ptr<llvm::Module>>
+IRGenSourceFileRequest::evaluate(Evaluator &evaluator,
+                                 IRGenDescriptor desc) const {
+  auto *SF = desc.Ctx.get<SourceFile *>();
+  return ::performIRGeneration(
+      desc.Opts, SF->getParentModule(), std::unique_ptr<SILModule>(desc.SILMod),
+      desc.ModuleName, desc.PSPs, desc.PrivateDiscriminator, desc.LLVMContext,
+      SF, desc.outModuleHash, desc.LinkerDirectives);
 }
 
 void

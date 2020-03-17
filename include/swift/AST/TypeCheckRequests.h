@@ -498,7 +498,6 @@ public:
 };
 
 void simple_display(llvm::raw_ostream &out, const KnownProtocolKind);
-class TypeChecker;
 
 // Find the type in the cache or look it up
 class DefaultTypeRequest
