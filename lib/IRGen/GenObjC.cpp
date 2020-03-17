@@ -1116,6 +1116,29 @@ static llvm::Constant *getObjCEncodingForMethodType(IRGenModule &IGM,
                                  ptrSize * 2, useExtendedEncoding);
 }
 
+static llvm::Constant *
+getObjectEncodingFromClangNode(IRGenModule &IGM, Decl *d,
+                               bool useExtendedEncoding) {
+  // Use the clang node's encoding if there is a clang node.
+  if (d->getClangNode()) {
+    auto clangDecl = d->getClangNode().castAsDecl();
+    auto &clangASTContext = IGM.getClangASTContext();
+    std::string typeStr;
+    if (auto objcMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+      typeStr = clangASTContext.getObjCEncodingForMethodDecl(
+          objcMethodDecl, useExtendedEncoding /*extended*/);
+    }
+    if (auto objcPropertyDecl = dyn_cast<clang::ObjCPropertyDecl>(clangDecl)) {
+      typeStr = clangASTContext.getObjCEncodingForPropertyDecl(objcPropertyDecl,
+                                                               nullptr);
+    }
+    if (!typeStr.empty()) {
+      return IGM.getAddrOfGlobalString(typeStr.c_str());
+    }
+  }
+  return nullptr;
+}
+
 /// Emit the components of an Objective-C method descriptor: its selector,
 /// type encoding, and IMP pointer.
 ObjCMethodDescriptor
@@ -1128,11 +1151,18 @@ irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// The first element is the selector.
   descriptor.selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
-  /// The second element is the method signature. A method signature is made of
-  /// the return type @encoding and every parameter type @encoding, glued with
-  /// numbers that used to represent stack offsets for each of these elements.
-  CanSILFunctionType methodType = getObjCMethodType(IGM, method);
-  descriptor.typeEncoding = getObjCEncodingForMethodType(IGM, methodType, /*extended*/false);
+  if (auto e =
+          getObjectEncodingFromClangNode(IGM, method, false /*extended*/)) {
+    descriptor.typeEncoding = e;
+  } else {
+    /// The second element is the method signature. A method signature is made
+    /// of the return type @encoding and every parameter type @encoding, glued
+    /// with numbers that used to represent stack offsets for each of these
+    /// elements.
+    CanSILFunctionType methodType = getObjCMethodType(IGM, method);
+    descriptor.typeEncoding =
+        getObjCEncodingForMethodType(IGM, methodType, /*extended*/ false);
+  }
   
   /// The third element is the method implementation pointer.
   if (!concrete) {
@@ -1191,10 +1221,17 @@ irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
   Selector getterSel(subscript, Selector::ForGetter);
   ObjCMethodDescriptor descriptor{};
   descriptor.selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
-  auto methodTy = getObjCMethodType(IGM,
-                              subscript->getOpaqueAccessor(AccessorKind::Get));
-  descriptor.typeEncoding = getObjCEncodingForMethodType(IGM, methodTy,
-                                                         /*extended*/false);
+
+  if (auto e =
+          getObjectEncodingFromClangNode(IGM, subscript, false /*extended*/)) {
+    descriptor.typeEncoding = e;
+  } else {
+    auto methodTy =
+        getObjCMethodType(IGM, subscript->getOpaqueAccessor(AccessorKind::Get));
+    descriptor.typeEncoding = getObjCEncodingForMethodType(IGM, methodTy,
+                                                           /*extended*/ false);
+  }
+
   descriptor.silFunction = nullptr;
   descriptor.impl = getObjCGetterPointer(IGM, subscript,
                                          descriptor.silFunction);
@@ -1266,8 +1303,13 @@ irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   descriptor.selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
   auto methodTy = getObjCMethodType(IGM,
                               subscript->getOpaqueAccessor(AccessorKind::Set));
-  descriptor.typeEncoding = getObjCEncodingForMethodType(IGM, methodTy,
-                                                         /*extended*/false);
+  if (auto e =
+          getObjectEncodingFromClangNode(IGM, subscript, false /*extended*/)) {
+    descriptor.typeEncoding = e;
+  } else {
+    descriptor.typeEncoding = getObjCEncodingForMethodType(IGM, methodTy,
+                                                           /*extended*/ false);
+  }
   descriptor.silFunction = nullptr;
   descriptor.impl = getObjCSetterPointer(IGM, subscript,
                                          descriptor.silFunction);
@@ -1369,9 +1411,15 @@ void irgen::emitObjCIVarInitDestroyDescriptor(
   buildMethodDescriptor(IGM, descriptors, descriptor);
 }
 
+
 llvm::Constant *
 irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
                                      AbstractFunctionDecl *method) {
+  // Use the clang node's encoding if there is a clang node.
+  if (auto e = getObjectEncodingFromClangNode(IGM, method, true /*extended*/)) {
+    return e;
+  }
+
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
   return getObjCEncodingForMethodType(IGM, methodType, true/*Extended*/);
 }
