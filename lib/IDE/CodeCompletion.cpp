@@ -869,7 +869,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
                                                    bool IsVarArg,
                                                    bool IsInOut,
                                                    bool IsIUO,
-                                                   bool isAutoClosure) {
+                                                   bool isAutoClosure,
+                                                   bool useUnderscoreLabel) {
   CurrentNestingLevel++;
   using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
@@ -908,6 +909,11 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterName,
           escapeKeyword(Name.str(), false, EscapedKeyword));
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
+    } else if (useUnderscoreLabel) {
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterName, "_");
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     } else if (!LocalName.empty()) {
@@ -2498,7 +2504,8 @@ public:
         contextTy = typeContext->getDeclaredTypeInContext();
 
       Builder.addCallParameter(argName, bodyName, paramTy, contextTy,
-                               isVariadic, isInOut, isIUO, isAutoclosure);
+                               isVariadic, isInOut, isIUO, isAutoclosure,
+                               /*useUnderscoreLabel=*/false);
 
       modifiedBuilder = true;
       NeedComma = true;
@@ -4136,7 +4143,8 @@ public:
       Builder.addCallParameter(Arg->getLabel(), Identifier(),
                                Arg->getPlainType(), ContextType,
                                Arg->isVariadic(), Arg->isInOut(),
-                               /*isIUO=*/false, Arg->isAutoClosure());
+                               /*isIUO=*/false, Arg->isAutoClosure(),
+                               /*useUnderscoreLabel=*/true);
       auto Ty = Arg->getPlainType();
       if (Arg->isInOut()) {
         Ty = InOutType::get(Ty);

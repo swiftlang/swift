@@ -547,6 +547,47 @@ static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
   return false;
 }
 
+enum class ArgPositionKind {
+  /// The argument is in normal calling parenthesis.
+  /// i.e. foo(args..., <HERE>) { ... }
+  NormalArgument,
+  /// The argument is inside multiple trailing closure block.
+  /// i.e. foo(args...) { arg2: { ... } <HERE> }
+  InClosureBlock,
+  /// The argument is inside multiple trailing closure block, also it is the
+  /// sole element.
+  /// foo(args...) { <HERE> }
+  InEmptyClosureBlock,
+};
+
+static ArgPositionKind getArgPositionKind(DeclContext &DC, Expr *Args,
+                                          unsigned Position) {
+  SourceManager &SM = DC.getASTContext().SourceMgr;
+
+  if (auto tuple = dyn_cast<TupleExpr>(Args)) {
+    SourceLoc argPos = tuple->getElement(Position)->getStartLoc();
+    SourceLoc rParenLoc = tuple->getRParenLoc();
+    if (rParenLoc.isInvalid() || SM.isBeforeInBuffer(rParenLoc, argPos)) {
+      // Invariant: If the token is at the label position, the label location is
+      // invalid, and the value is a CodeCompletionExpr.
+      if (Position == tuple->getNumElements() - 1 &&
+          tuple->getNumTrailingElements() == 1 &&
+          tuple->getElementNameLoc(Position).isInvalid()) {
+        return ArgPositionKind::InEmptyClosureBlock;
+      }
+      return ArgPositionKind::InClosureBlock;
+    }
+  } else if (auto paren = dyn_cast<ParenExpr>(Args)) {
+    SourceLoc argLoc = paren->getSubExpr()->getStartLoc();
+    SourceLoc rParenLoc = paren->getRParenLoc();
+    // We don't have a way to distingish between 'foo { _: <here> }' and
+    // 'foo { <here> }'. For now, consider it latter one.
+    if (rParenLoc.isInvalid() || SM.isBeforeInBuffer(rParenLoc, argLoc))
+      return ArgPositionKind::InEmptyClosureBlock;
+  }
+  return ArgPositionKind::NormalArgument;
+}
+
 /// Given an expression and its context, the analyzer tries to figure out the
 /// expected type of the expression by analyzing its context.
 class ExprContextAnalyzer {
@@ -593,6 +634,7 @@ class ExprContextAnalyzer {
     } else {
       llvm_unreachable("unexpected expression kind");
     }
+    assert(!Candidates.empty());
     PossibleCallees.assign(Candidates.begin(), Candidates.end());
 
     // Determine the position of code completion token in call argument.
@@ -600,6 +642,8 @@ class ExprContextAnalyzer {
     bool HasName;
     if (!getPositionInArgs(*DC, Arg, ParsedExpr, Position, HasName))
       return false;
+
+    ArgPositionKind positionKind = getArgPositionKind(*DC, Arg, Position);
 
     // Collect possible types (or labels) at the position.
     {
@@ -623,20 +667,52 @@ class ExprContextAnalyzer {
           if (paramList && paramList->size() != Params.size())
             paramList = nullptr;
         }
+
+        // Determine the index of the parameter that can be a single trailing
+        // closure.
+        unsigned singleTrailingClosureIdx = Params.size();
+        for (int idx = Params.size() - 1; idx >= 0; --idx) {
+          if (Params[idx].getPlainType()->is<AnyFunctionType>()) {
+            singleTrailingClosureIdx = idx;
+            break;
+          }
+          if (!paramList || !paramList->get(idx)->isDefaultArgument())
+            break;
+        }
+
         for (auto Pos = Position; Pos < Params.size(); ++Pos) {
-          const auto &Param = Params[Pos];
-          Type ty = Param.getPlainType();
+          const auto &paramType = Params[Pos];
+          Type ty = paramType.getPlainType();
           if (memberDC && ty->hasTypeParameter())
             ty = memberDC->mapTypeIntoContext(ty);
 
-          if (Param.hasLabel() && MayNeedName) {
-            if (seenArgs.insert({Param.getLabel(), ty.getPointer()}).second)
-              recordPossibleParam(Param);
+          if (paramType.hasLabel() && MayNeedName) {
+            // In trailing closure block, don't suggest non-closure arguments.
+            if (positionKind >= ArgPositionKind::InClosureBlock) {
+              Type argTy = ty;
+              if (paramType.isAutoClosure() && ty->is<AnyFunctionType>())
+                argTy = ty->castTo<AnyFunctionType>()->getResult();
+              if (!argTy->is<AnyFunctionType>())
+                continue;
+
+              // If the token is the only element in the closure block. It might
+              // be a single trailing closure. We should perform global
+              // completion as well.
+              if (positionKind == ArgPositionKind::InEmptyClosureBlock &&
+                  Pos == singleTrailingClosureIdx) {
+                auto resultTy = argTy->castTo<AnyFunctionType>()->getResult();
+                if (seenTypes.insert(resultTy.getPointer()).second)
+                  recordPossibleType(resultTy);
+              }
+            }
+
+            if (seenArgs.insert({paramType.getLabel(), ty.getPointer()}).second)
+              recordPossibleParam(paramType);
             if (paramList && paramList->get(Position)->isDefaultArgument())
               continue;
           } else {
             auto argTy = ty;
-            if (Param.isInOut())
+            if (paramType.isInOut())
               argTy = InOutType::get(argTy);
             if (seenTypes.insert(argTy.getPointer()).second)
               recordPossibleType(argTy);
@@ -926,8 +1002,12 @@ public:
         switch (E->getKind()) {
         case ExprKind::Call: {
           // Iff the cursor is in argument position.
-          auto argsRange = cast<CallExpr>(E)->getArg()->getSourceRange();
-          return SM.rangeContains(argsRange, ParsedExpr->getSourceRange());
+          auto call = cast<CallExpr>(E);
+          auto fnRange = call->getFn()->getSourceRange();
+          auto argsRange = call->getArg()->getSourceRange();
+          auto exprRange = ParsedExpr->getSourceRange();
+          return !SM.rangeContains(fnRange, exprRange) &&
+                 SM.rangeContains(argsRange, exprRange);
         }
         case ExprKind::Subscript: {
           // Iff the cursor is in index position.
