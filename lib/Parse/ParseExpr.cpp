@@ -3174,13 +3174,26 @@ static bool isBlockOfMultipleTrailingClosures(bool isExprBasic, Parser &P) {
   // If closure doesn't start from a label there is no reason
   // to look any farther.
   {
-    const auto nextTok = P.peekToken();
-    if (!nextTok.canBeArgumentLabel() || nextTok.getText()[0] == '$')
+    const auto &nextTok = P.peekToken();
+    if (!(nextTok.canBeArgumentLabel() || nextTok.is(tok::code_complete)) ||
+        nextTok.getText()[0] == '$')
       return false;
   }
 
   Parser::BacktrackingScope backtrack(P);
   P.consumeToken(tok::l_brace);
+
+  if (P.Tok.is(tok::code_complete)) {
+    // Parse '{ <token> }' as a multiple trailing closure block.
+    if (P.peekToken().is(tok::r_brace))
+      return true;
+
+    // Otherwise, look through the code completion token.
+    P.consumeToken(tok::code_complete);
+    if (!P.Tok.canBeArgumentLabel() || P.Tok.getText()[0] == '$')
+      return false;
+  }
+
   P.consumeToken(); // Consume Label text.
 
   if (!P.consumeIf(tok::colon)) // Consume `:`
@@ -3208,6 +3221,18 @@ ParserStatus Parser::parseMultipleTrailingClosures(
   // There could N labeled closures depending on the number of arguments.
   do {
     if (!(Tok.canBeArgumentLabel() && peekToken().is(tok::colon))) {
+
+      if (Tok.is(tok::code_complete)) {
+        auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+        closures.emplace_back(Identifier(), SourceLoc(), CCE);
+        if (CodeCompletion)
+          CodeCompletion->completeCallArg(CCE, /*isFirst=*/false);
+
+        consumeToken(tok::code_complete);
+        Status.setHasCodeCompletion();
+        continue;
+      }
+
       Status.setIsParseError();
       diagnose(Tok.getLoc(),
                diag::expected_argument_label_followed_by_closure_literal);
@@ -3469,19 +3494,25 @@ ParserResult<Expr>
 Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   assert(Tok.isFollowingLParen() && "Not a call suffix?");
 
-  // Parse the first argument.
+  SourceLoc lParenLoc, rParenLoc;
+  SmallVector<Expr *, 2> args;
+  SmallVector<Identifier, 2> argLabels;
+  SmallVector<SourceLoc, 2> argLabelLocs;
+  SourceLoc trailingLBrace, trailingRBrace;
+  SmallVector<TrailingClosure, 2> trailingClosures;
 
   // If there is a code completion token right after the '(', do a special case
   // callback.
   if (peekToken().is(tok::code_complete) && CodeCompletion) {
-    consumeToken(tok::l_paren);
+    lParenLoc = consumeToken(tok::l_paren);
     auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+    rParenLoc = Tok.getLoc();
     auto Result = makeParserResult(fn,
-      CallExpr::create(Context, fn.get(), SourceLoc(),
+      CallExpr::create(Context, fn.get(), lParenLoc,
                        { CCE },
                        { Identifier() },
                        { },
-                       SourceLoc(),
+                       rParenLoc,
                        SourceLoc(), SourceLoc(),
                        /*trailingClosures=*/{},
                        /*implicit=*/false));
@@ -3493,13 +3524,6 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   }
 
   // Parse the argument list.
-  SourceLoc lParenLoc, rParenLoc;
-  SmallVector<Expr *, 2> args;
-  SmallVector<Identifier, 2> argLabels;
-  SmallVector<SourceLoc, 2> argLabelLocs;
-  SourceLoc trailingLBrace, trailingRBrace;
-  SmallVector<TrailingClosure, 2> trailingClosures;
-
   ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
                                       /*isPostfix=*/true, isExprBasic,
                                       lParenLoc, args, argLabels,
