@@ -16,3 +16,18 @@ var gg: Int = {
 public func cse() -> Int {
   return gg + gg
 }
+
+// CHECK-LABEL: sil @$s4test4licmSiyF
+// CHECK: bb0:
+// CHECK:   builtin "once"
+// CHECK: bb1:
+// CHECK-NOT:   builtin "once"
+// CHECK: } // end sil function '$s4test4licmSiyF'
+public func licm() -> Int {
+  var s = 0
+  for _ in 0..<100 {
+    s += gg
+  }
+  return s
+}
+
