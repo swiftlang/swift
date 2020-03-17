@@ -1653,12 +1653,12 @@ std::string GenericSignatureBuilder::PotentialArchetype::getDebugName() const {
   if (proto) {
     result.push_back('[');
     result.push_back('.');
-    result.append(proto->getName().str().begin(), proto->getName().str().end());
+    result.append(proto->getName().str());
     result.push_back(']');
   }
 
   result.push_back('.');
-  result.append(getNestedName().str().begin(), getNestedName().str().end());
+  result.append(getNestedName().str());
 
   return result.str().str();
 }
