@@ -3,7 +3,6 @@
 -lswiftImageInspectionShared
 -lswiftSwiftOnoneSupport
 -lswiftWasiPthread
--licui18n
 -licuuc
 -licudata
 -ldl

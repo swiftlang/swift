@@ -4,7 +4,6 @@
 -lswiftCore
 -latomic
 -lswiftImageInspectionShared
--licui18n
 -licuuc
 -licudata
 -lstdc++
