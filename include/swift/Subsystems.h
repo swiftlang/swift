@@ -373,6 +373,12 @@ namespace swift {
   /// should call this functions after forming the ASTContext.
   void registerTBDGenRequestFunctions(Evaluator &evaluator);
 
+  /// Register IRGen-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any IR generation
+  /// should call this functions after forming the ASTContext.
+  void registerIRGenRequestFunctions(Evaluator &evaluator);
+
   /// Register IDE-level request functions with the evaluator.
   ///
   /// The ASTContext will automatically call these upon construction.
