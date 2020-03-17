@@ -276,17 +276,12 @@ private:
 ///
 /// Import resolution operates on a parsed but otherwise unvalidated AST.
 void swift::performImportResolution(SourceFile &SF) {
+  // If we've already performed import resolution, bail.
+  if (SF.ASTStage == SourceFile::ImportsResolved)
+    return;
+
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "Import resolution");
-
-  // Make sure we skip adding the standard library imports if the
-  // source file is empty.
-  if (SF.ASTStage == SourceFile::ImportsResolved ||
-      SF.getTopLevelDecls().empty()) {
-    SF.ASTStage = SourceFile::ImportsResolved;
-    return;
-  }
-
   ImportResolver resolver(SF);
 
   // Resolve each import declaration.
