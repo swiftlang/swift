@@ -28,6 +28,24 @@ def _silenced(op):
         except OSError:
             pass
     return inner
+
+
+def _tensorflow_include_directory(host_target, tensorflow_source_dir):
+    return tensorflow_source_dir
+
+
+def _tensorflow_library(host_target, tensorflow_source_dir):
+    library = None
+    if host_target.startswith('macosx'):
+        library = 'libtensorflow.dylib'
+    elif host_target.startswith('linux'):
+        library = 'libtensorflow.so'
+
+    if not library:
+        raise RuntimeError("Unknown host target %s" % host_target)
+
+    return os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow',
+                        library)
 # SWIFT_ENABLE_TENSORFLOW END
 
 
@@ -52,12 +70,6 @@ class TensorFlowSwiftAPIs(product.Product):
                                              'tensorflow')
         tensorflow_source_dir = os.path.realpath(tensorflow_source_dir)
 
-        if host_target.startswith('macosx'):
-            lib_name = 'libtensorflow.dylib'
-        elif host_target.startswith('linux'):
-            lib_name = 'libtensorflow.so'
-        else:
-            raise RuntimeError("Unknown host target %s" % host_target)
 
         # FIXME: this is a workaround for CMake <3.16 which does not correctly
         # generate the build rules if you are not in the build directory.  As a
@@ -90,12 +102,12 @@ class TensorFlowSwiftAPIs(product.Product):
                     'NO' if host_target.startswith('macosx') else 'YES'
                 ),
                 '-D', 'USE_BUNDLED_CTENSORFLOW=YES',
-                '-D', 'TensorFlow_INCLUDE_DIR={}'.format(tensorflow_source_dir),
+                '-D', 'TensorFlow_INCLUDE_DIR={}'.format(
+                    _tensorflow_include_directory(host_target,
+                                                  tensorflow_source_dir)
+                ),
                 '-D', 'TensorFlow_LIBRARY={}'.format(
-                    os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow',
-                                 lib_name)),
-                '-D', 'CMAKE_Swift_FLAGS={}'.format('-L{}'.format(
-                    os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow'))
+                    _tensorflow_library(host_target, tensorflow_source_dir)
                 ),
                 '-D', 'BUILD_X10={}'.format(
                     'YES' if self.args.enable_x10 else 'NO'
