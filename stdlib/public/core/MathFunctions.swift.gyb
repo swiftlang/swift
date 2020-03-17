@@ -29,10 +29,6 @@ import SwiftShims
 /// let y = Float.sin(x) // 0.84147096
 /// ```
 ///
-/// Additional operations, such as `atan2(y:x:)`, `hypot(_:_:)` and some
-/// special functions, are provided on the Real protocol, which refines both
-/// ElementaryFunctions and FloatingPoint.
-///
 /// [elfn]: http://en.wikipedia.org/wiki/Elementary_function
 // SWIFT_ENABLE_TENSORFLOW
 // NOTE(TF-796): Make `ElementaryFunctions` available on macOS.
