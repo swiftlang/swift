@@ -20,6 +20,17 @@ from .. import shell
 from .. import targets
 
 
+# SWIFT_ENABLE_TENSORFLOW
+def _silenced(op):
+    def inner(*args, **kwargs):
+        try:
+            return op(*args, **kwargs)
+        except OSError:
+            pass
+    return inner
+# SWIFT_ENABLE_TENSORFLOW END
+
+
 class TensorFlowSwiftAPIs(product.Product):
     @classmethod
     def product_source_name(cls):
@@ -52,14 +63,7 @@ class TensorFlowSwiftAPIs(product.Product):
         # generate the build rules if you are not in the build directory.  As a
         # result, we need to create the build tree before we can use it and
         # change into it.
-        #
-        # NOTE: unfortunately, we do not know if the build is using Python
-        # 2.7 or Python 3.2+.  In the latter, the `exist_ok` named parameter
-        # would alleviate some of this issue.
-        try:
-            os.makedirs(self.build_dir)
-        except OSError:
-            pass
+        _silenced(os.makedirs)(self.build_dir)
 
         # SWIFT_ENABLE_TENSORFLOW
         target = ''
@@ -132,15 +136,6 @@ def _get_tensorflow_library(host):
         return ('libtensorflow.so.2.2.0', 'libtensorflow.so')
 
     raise RuntimeError('unknown host target {}'.format(host))
-
-
-def _silenced(op):
-    def inner(*args, **kwargs):
-        try:
-            return op(*args, **kwargs)
-        except OSError:
-            pass
-    return inner
 
 
 def _symlink(dest, src):
