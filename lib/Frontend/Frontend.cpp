@@ -882,7 +882,7 @@ void CompilerInstance::getImplicitlyImportedModules(
     SmallVectorImpl<ModuleDecl *> &importModules) {
   FrontendStatsTracer tracer(getStatsReporter(), "get-implicitly-imported-modules");
   for (auto &ImplicitImportModuleName :
-       Invocation.getFrontendOptions().ImplicitImportModuleNames) {
+       Invocation.getFrontendOptions().getImplicitImportModuleNames()) {
     if (Lexer::isIdentifier(ImplicitImportModuleName)) {
       auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
       ModuleDecl *importModule =
