@@ -895,22 +895,22 @@ bb0:
 sil [ossa] @multi_block_load_promotion : $@convention(thin) () -> MyInt {
 bb0:
   %3 = alloc_stack $MyInt
-  cond_br undef bb1, bb2
+  cond_br undef, bb1, bb2
   
 bb1:
   %0 = integer_literal $Builtin.Int64, 5
   %1 = struct $MyInt (%0 : $Builtin.Int64)
   store %1 to [trivial] %3 : $*MyInt
-  cond_br undef bb2, bb3
+  cond_br undef, bb2, bb3
 
 bb2:
   %4 = load [trivial] %3 : $*MyInt
   store %4 to [trivial] %3 : $*MyInt
-  bb3
+  br bb3
 
 bb3:
-  destroy_addr %3 : $*Proto
-  dealloc_stack %3 : $*Proto
+  destroy_addr %3 : $*MyInt
+  dealloc_stack %3 : $*MyInt
   
   %5 = load [trivial] %3 : $*MyInt
   return %5 : $MyInt
