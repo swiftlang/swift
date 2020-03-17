@@ -27,6 +27,7 @@
 #define DEBUG_TYPE "sil-mandatory-combiner"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -129,6 +130,7 @@ public:
   /// Base visitor that does not do anything.
   SILInstruction *visitSILInstruction(SILInstruction *) { return nullptr; }
   SILInstruction *visitApplyInst(ApplyInst *instruction);
+  SILInstruction *visitStoreInst(StoreInst *instruction);
 };
 
 } // end anonymous namespace
@@ -281,6 +283,94 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
   if (tryDeleteDeadClosure(partialApply, instModCallbacks)) {
     invalidatedStackNesting = true;
   }
+  return nullptr;
+}
+
+/// Checks that "a" dominates all uses of "b".
+/// \param a the instruction who's expected to dominate.
+/// \param b the instruction who's uses are expected to be dominated.
+/// \returns true if all uses of "b" are dominated by "a". Otherwise, false.
+static bool dominatesAllUses(SILInstruction *a, SILValue b) {
+  DominanceInfo dominanceInfo(a->getFunction());
+  return std::all_of(b->use_begin(), b->use_end(),
+                     [&a, &dominanceInfo](Operand *use) {
+    return dominanceInfo.dominates(a, use->getUser());
+  });
+}
+
+static void replaceUsesAndEraseDestoys(SILValue v, SILValue newVal) {
+  for (auto *use : v->getUses()) {
+    if (isa<DestroyValueInst>(use->getUser())) {
+      use->getUser()->eraseFromParent();
+      continue;
+    }
+    
+    use->set(newVal);
+  }
+}
+
+SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
+  // Try to promote store src to loads.
+  DominanceInfo dominanceInfo(store->getFunction());
+  LoadInst *load = nullptr;
+  for (auto *use : getNonDebugUses(store->getDest())) {
+    auto user = use->getUser();
+    if (user == store)
+      continue;
+    
+    if (isa<DeallocStackInst>(user) || isa<DestroyAddrInst>(user))
+      continue;
+
+     if (auto loadUse = dyn_cast<LoadInst>(user)) {
+       // If the load comes before the store, we don't want update it but, it
+       // also can't effect our otpimization (in the same way two loads
+       // otherwise could).
+       if (dominanceInfo.dominates(loadUse, store))
+         continue;
+       if (load) {
+         load = nullptr;
+         break;
+       }
+      load = loadUse;
+     } else {
+       // Otherwise, bail.
+       load = nullptr;
+       break;
+     }
+  }
+
+  // If we can promote the load, do so.
+  if (load && std::find(instructionsPendingDeletion.begin(),
+                        instructionsPendingDeletion.end(), load) == instructionsPendingDeletion.end()) {
+    bool loadDominatesAllUses;
+    if (auto srcInst = store->getSrc().getDefiningInstruction()) {
+      loadDominatesAllUses = dominatesAllUses(srcInst, load);
+    } else {
+      // Otherwise it's an argument so, check all uses are in blocks that dominate
+      // that argument.
+      loadDominatesAllUses = std::all_of(load->use_begin(), load->use_end(),
+                                         [&store, &dominanceInfo](Operand *use) {
+        return dominanceInfo.dominates(store->getSrc()->getParentBlock(),
+                                       use->getUser()->getParentBlock());
+      });
+    }
+
+    if (!loadDominatesAllUses)
+      return nullptr;
+
+    if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+      auto copy = SILBuilderWithScope(store)
+        .createCopyValue(load->getLoc(), store->getSrc());
+      replaceUsesAndEraseDestoys(load, copy);
+    } else if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+      SILBuilderWithScope(load)
+        .createDestroyAddr(load->getLoc(), load->getOperand());
+      replaceUsesAndEraseDestoys(load, store->getSrc());
+    } else
+        load->replaceAllUsesWith(store->getSrc());
+    instModCallbacks.deleteInst(load);
+  }
+
   return nullptr;
 }
 
