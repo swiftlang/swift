@@ -2998,7 +2998,7 @@ bool ValueDecl::isRecursiveValidation() const {
 Type ValueDecl::getInterfaceType() const {
   auto &ctx = getASTContext();
 
-  assert(ctx.areSemanticQueriesEnabled());
+  assert(ctx.areLegacySemanticQueriesEnabled());
 
   if (auto type =
           evaluateOrDefault(ctx.evaluator,
@@ -5813,7 +5813,7 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
 
 llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
   auto &ctx = getASTContext();
-  if (!ctx.areSemanticQueriesEnabled()) {
+  if (!ctx.areLegacySemanticQueriesEnabled()) {
     return { };
   }
 
@@ -6786,7 +6786,7 @@ ObjCSelector
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
                                       bool skipIsObjCResolution) const {
   // FIXME: Forces computation of the Objective-C selector.
-  if (getASTContext().areSemanticQueriesEnabled() && !skipIsObjCResolution)
+  if (getASTContext().areLegacySemanticQueriesEnabled() && !skipIsObjCResolution)
     (void)isObjC();
 
   // If there is an @objc attribute with a name, use that name.

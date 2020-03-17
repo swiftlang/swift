@@ -43,7 +43,6 @@ namespace swift {
   class SubscriptDecl;
   class TopLevelCodeDecl;
   class Type;
-  class TypeChecker;
   class ValueDecl;
   struct PrintOptions;
 

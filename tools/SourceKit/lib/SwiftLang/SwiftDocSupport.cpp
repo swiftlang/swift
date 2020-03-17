@@ -978,7 +978,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
 
   ASTContext &Ctx = CI.getASTContext();
   registerIDERequestFunctions(Ctx.evaluator);
-  (void)createTypeChecker(Ctx);
+  Ctx.setLegacySemanticQueriesEnabled();
 
   SourceTextInfo IFaceInfo;
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))
@@ -1107,7 +1107,7 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   CI.performSema();
 
   // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(Ctx);
+  Ctx.setLegacySemanticQueriesEnabled();
 
   SourceTextInfo SourceInfo;
   if (getSourceTextInfo(CI, SourceInfo))
@@ -1458,7 +1458,7 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
 
   ASTContext &Ctx = CI.getASTContext();
   // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(Ctx);
+  Ctx.setLegacySemanticQueriesEnabled();
 
   // Load standard library so that Clang importer can use it.
   auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);

@@ -39,7 +39,6 @@ class DeclContext;
 class FuncDecl;
 class NormalProtocolConformance;
 class ProtocolDecl;
-class TypeChecker;
 class TypeRepr;
 class ValueDecl;
 

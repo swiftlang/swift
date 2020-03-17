@@ -240,7 +240,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   if (setUpModuleLoaders())
     return true;
 
-  createTypeChecker(*Context);
+  Context->setLegacySemanticQueriesEnabled();
   return false;
 }
 
