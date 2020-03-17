@@ -90,6 +90,9 @@ class TensorFlowSwiftAPIs(product.Product):
                 '-D', 'CMAKE_Swift_FLAGS={}'.format('-L{}'.format(
                     os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow'))
                 ),
+                '-D', 'BUILD_X10={}'.format(
+                    'YES' if self.args.enable_x10 else 'NO'
+                ),
                 '-D', 'X10_INCLUDE_DIR={}'.format(x10_inc),
                 # SWIFT_ENABLE_TENSORFLOW END
                 '-B', self.build_dir,
