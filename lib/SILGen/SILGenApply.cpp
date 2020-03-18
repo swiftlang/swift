@@ -556,43 +556,12 @@ public:
     return result;
   }
 
-  SILDeclRef getCurriedConstant(bool isCurried) const {
-    if (isCurried) {
-      auto constant = Constant.asCurried();
-
-      // If we're currying a direct reference to a class-dispatched method,
-      // make sure we emit the right set of thunks.
-      if (kind == Kind::StandaloneFunction) {
-        if (auto func = Constant.getAbstractFunctionDecl()) {
-          if (getMethodDispatch(func) == MethodDispatch::Class) {
-            return constant.asDirectReference(true);
-          }
-        }
-      }
-
-      return constant;
-    }
-
-    return Constant;
-  }
-
-  ManagedValue getFnValue(SILGenFunction &SGF, bool isCurried,
+  ManagedValue getFnValue(SILGenFunction &SGF,
                           Optional<ManagedValue> borrowedSelf) const & {
     Optional<SILDeclRef> constant = None;
 
-    if (!Constant) {
-      assert(!isCurried && "can't curry indirect function");
-    } else {
-      constant = getCurriedConstant(isCurried);
-
-      // If the call is curried, emit a direct call to the curry thunk.
-      if (constant->isCurried) {
-        auto constantInfo =
-            SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
-        SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
-        return ManagedValue::forUnmanaged(ref);
-      }
-    }
+    if (Constant)
+      constant = Constant;
 
     switch (kind) {
     case Kind::IndirectValue:
@@ -692,21 +661,11 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
-  CalleeTypeInfo getTypeInfo(SILGenFunction &SGF, bool isCurried) const & {
+  CalleeTypeInfo getTypeInfo(SILGenFunction &SGF) const & {
     Optional<SILDeclRef> constant = None;
 
-    if (!Constant) {
-      assert(!isCurried && "can't curry indirect function");
-    } else {
-      constant = getCurriedConstant(isCurried);
-
-      // If the call is curried, emit a direct call to the curry thunk.
-      if (constant->isCurried) {
-        auto constantInfo =
-            SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
-        return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
-      }
-    }
+    if (Constant)
+      constant = Constant;
 
     switch (kind) {
     case Kind::IndirectValue:
@@ -3579,14 +3538,7 @@ public:
 
   /// Is this a fully-applied enum element constructor call?
   bool isEnumElementConstructor() {
-    return (callee.kind == Callee::Kind::EnumElement &&
-            uncurriedSites.size() == expectedSiteCount);
-  }
-
-  /// True if this is a completely unapplied super method call
-  bool isPartiallyAppliedSuperMethod() {
-    return (callee.kind == Callee::Kind::SuperMethod &&
-            uncurriedSites.size() == 1);
+    return (callee.kind == Callee::Kind::EnumElement);
   }
 
   CleanupHandle applyCoroutine(SmallVectorImpl<ManagedValue> &yields);
@@ -3684,8 +3636,6 @@ private:
   FirstLevelApplicationResult
   applySpecializedEmitter(SpecializedEmitter &specializedEmitter, SGFContext C);
 
-  FirstLevelApplicationResult applyPartiallyAppliedSuperMethod(SGFContext C);
-
   FirstLevelApplicationResult applyEnumElementConstructor(SGFContext C);
 
   FirstLevelApplicationResult applyNormalCall(SGFContext C);
@@ -3743,10 +3693,8 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
   auto origFormalType = callee.getOrigFormalType();
   CanFunctionType formalType = callee.getSubstFormalType();
 
-  const bool isCurried = false;
-
   // Get the callee type information.
-  auto calleeTypeInfo = callee.getTypeInfo(SGF, isCurried);
+  auto calleeTypeInfo = callee.getTypeInfo(SGF);
 
   SmallVector<ManagedValue, 4> uncurriedArgs;
   Optional<SILLocation> uncurriedLoc;
@@ -3764,7 +3712,7 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
     borrowedSelf = uncurriedArgs.back();
   }
 
-  auto fnValue = callee.getFnValue(SGF, isCurried, borrowedSelf);
+  auto fnValue = callee.getFnValue(SGF, borrowedSelf);
 
   return SGF.emitBeginApply(uncurriedLoc.getValue(), fnValue,
                             callee.getSubstitutions(), uncurriedArgs,
@@ -3813,15 +3761,11 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
 
 CallEmission::FirstLevelApplicationResult
 CallEmission::applyFirstLevelCallee(SGFContext C) {
-  // Check for a specialized emitter.
-  if (uncurriedSites.size() == expectedSiteCount) {
-    if (auto emitter = callee.getSpecializedEmitter(SGF.SGM)) {
-      return applySpecializedEmitter(emitter.getValue(), C);
-    }
-  }
+  assert(uncurriedSites.size() == expectedSiteCount);
 
-  if (isPartiallyAppliedSuperMethod()) {
-    return applyPartiallyAppliedSuperMethod(C);
+  // Check for a specialized emitter.
+  if (auto emitter = callee.getSpecializedEmitter(SGF.SGM)) {
+    return applySpecializedEmitter(emitter.getValue(), C);
   }
 
   if (isEnumElementConstructor()) {
@@ -3843,9 +3787,10 @@ CallEmission::applyNormalCall(SGFContext C) {
   auto origFormalType = callee.getOrigFormalType();
 
   bool isCurried = (uncurriedSites.size() < callee.getParameterListCount());
+  assert(!isCurried);
 
   // Get the callee type information.
-  auto calleeTypeInfo = callee.getTypeInfo(SGF, isCurried);
+  auto calleeTypeInfo = callee.getTypeInfo(SGF);
 
   // In C language modes, substitute the type of the AbstractionPattern
   // so that we won't see type parameters down when we try to form bridging
@@ -3887,7 +3832,7 @@ CallEmission::applyNormalCall(SGFContext C) {
     borrowedSelf = uncurriedArgs.back();
   }
 
-  auto mv = callee.getFnValue(SGF, isCurried, borrowedSelf);
+  auto mv = callee.getFnValue(SGF, borrowedSelf);
 
   // Emit the uncurried call.
   firstLevelResult.value = SGF.emitApply(
@@ -3972,67 +3917,6 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
 }
 
 CallEmission::FirstLevelApplicationResult
-CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
-  FirstLevelApplicationResult firstLevelResult;
-
-  // We want to emit the arguments as fully-substituted values
-  // because that's what the partially applied super method expects;
-  firstLevelResult.formalType = callee.getSubstFormalType();
-  auto origFormalType = AbstractionPattern(firstLevelResult.formalType);
-  auto substFnType = SGF.getSILFunctionType(
-      SGF.getTypeExpansionContext(), origFormalType, firstLevelResult.formalType);
-
-  // Emit the arguments.
-  SmallVector<ManagedValue, 4> uncurriedArgs;
-  Optional<SILLocation> uncurriedLoc;
-  CanFunctionType formalApplyType;
-  ApplyOptions options = emitArgumentsForNormalApply(
-      firstLevelResult.formalType, origFormalType, substFnType,
-      Optional<ForeignErrorConvention>(), firstLevelResult.foreignSelf,
-      uncurriedArgs, uncurriedLoc, formalApplyType);
-  (void)options;
-
-  // Emit the uncurried call.
-  assert(uncurriedArgs.size() == 1 && "Can only partially apply the "
-                                      "self parameter of a super "
-                                      "method call");
-
-  auto constant = callee.getMethodName();
-  auto loc = uncurriedLoc.getValue();
-  auto subs = callee.getSubstitutions();
-  auto upcastedSelf = uncurriedArgs.back();
-
-  // Make sure that upcasted self is at +1 since we are going to place it into a
-  // partial_apply.
-  upcastedSelf = upcastedSelf.ensurePlusOne(SGF, loc);
-
-  auto constantInfo =
-      SGF.getConstantInfo(SGF.getTypeExpansionContext(), callee.getMethodName());
-  auto functionTy = constantInfo.getSILType();
-  ManagedValue superMethod;
-  {
-    ArgumentScope S(SGF, loc);
-    ManagedValue castValue =
-        borrowedCastToOriginalSelfType(SGF, loc, upcastedSelf);
-    if (!constant.isForeign) {
-      superMethod = SGF.B.createSuperMethod(loc, castValue, constant,
-                                            functionTy);
-    } else {
-      superMethod = SGF.B.createObjCSuperMethod(loc, castValue, constant,
-                                                functionTy);
-    }
-    S.pop();
-  }
-  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
-
-  ManagedValue pa = SGF.B.createPartialApply(loc, superMethod,
-                                             subs, {upcastedSelf},
-                                             calleeConvention);
-  firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(), pa);
-  return firstLevelResult;
-}
-
-CallEmission::FirstLevelApplicationResult
 CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
                                       SGFContext C) {
   FirstLevelApplicationResult firstLevelResult;
@@ -4086,7 +3970,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   // result plan/arg scope before we prepare arguments.
   if (!specializedEmitter.isLateEmitter() &&
       substConv.hasIndirectSILResults()) {
-    calleeTypeInfo.emplace(callee.getTypeInfo(SGF, false /*isCurried*/));
+    calleeTypeInfo.emplace(callee.getTypeInfo(SGF));
 
     calleeTypeInfo->origResultType = origFormalType.getFunctionResultType();
     calleeTypeInfo->substResultType = callee.getSubstFormalType().getResult();
@@ -4849,13 +4733,12 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   auto origFormalType = callee.getOrigFormalType();
   auto substFormalType = callee.getSubstFormalType();
 
-  auto calleeTypeInfo = callee.getTypeInfo(*this, /*isCurried=*/false);
+  auto calleeTypeInfo = callee.getTypeInfo(*this);
 
   Optional<ManagedValue> borrowedSelf;
   if (callee.requiresSelfValueForDispatch())
     borrowedSelf = args.back();
-  auto mv = callee.getFnValue(*this, /*isCurried=*/false,
-                              borrowedSelf);
+  auto mv = callee.getFnValue(*this, borrowedSelf);
 
   assert(!calleeTypeInfo.foreignError);
   assert(!calleeTypeInfo.foreignSelf.isImportAsMember());
