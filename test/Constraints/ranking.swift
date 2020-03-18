@@ -36,7 +36,7 @@ func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
   let _ = p.p
   // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
   let _: P = p.p
-  // CHECK: function_ref @$s7ranking1PP1pyyAaB_pFTc
+  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcAaC_pcfu_ : $@convention(thin) (@in_guaranteed P) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
   let _: (P) -> () = p.p
   // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
   let _: P? = p.p
@@ -68,7 +68,7 @@ func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
   let _ = t.p
   // CHECK: witness_method $T, #P.p!getter.1
   let _: P = t.p
-  // CHECK: function_ref @$s7ranking1PP1pyyAaB_pFTc
+  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcxcfu1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
   let _: (P) -> () = t.p
   // CHECK: witness_method $T, #P.p!getter.1
   let _: P? = t.p
@@ -103,7 +103,7 @@ extension P {
     let _ = self.p
     // CHECK: witness_method $Self, #P.p!getter.1
     let _: P = self.p
-    // CHECK: function_ref @$s7ranking1PP1pyyAaB_pFTc
+    // CHECK: function_ref @$s7ranking1PPAAE22propertyVersusFunctionyyFyAaB_pcxcfu_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
     let _: (P) -> () = self.p
     // CHECK: witness_method $Self, #P.p!getter.1
     let _: P? = self.p

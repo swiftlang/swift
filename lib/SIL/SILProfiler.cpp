@@ -68,6 +68,12 @@ static bool isUnmapped(ASTNode N) {
         LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit closure expr\n");
         return true;
       }
+
+      if (isa<AutoClosureExpr>(CE) &&
+          cast<AutoClosureExpr>(CE)->getThunkKind() != AutoClosureExpr::Kind::None) {
+        LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: curry thunk expr\n");
+        return true;
+      }
     }
 
     // Map all other kinds of expressions.

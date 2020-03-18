@@ -178,7 +178,7 @@ std::vector<const Job *> ModuleDepGraph::jobsContaining(
 void ModuleDepGraph::registerJob(const Job *job) {
   // No need to create any nodes; that will happen when the swiftdeps file is
   // read. Just record the correspondence.
-  jobsBySwiftDeps.insert(std::make_pair(getSwiftDeps(job), job));
+  jobsBySwiftDeps.insert(std::make_pair(getSwiftDeps(job).str(), job));
 }
 
 std::vector<const Job *> ModuleDepGraph::getAllJobs() const {

@@ -450,8 +450,11 @@ bool SILDeclRef::isTransparent() const {
   if (isStoredPropertyInitializer())
     return true;
 
-  if (hasAutoClosureExpr())
-    return true;
+  if (hasAutoClosureExpr()) {
+    auto *ace = getAutoClosureExpr();
+    if (ace->getThunkKind() == AutoClosureExpr::Kind::None)
+      return true;
+  }
 
   if (hasDecl()) {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(getDecl()))

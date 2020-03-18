@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_var_init %s | %FileCheck %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 final class VarInit {
   // CHECK: sil_coverage_map {{.*}} "$s17coverage_var_init7VarInitC018initializedWrapperE0SivpfP"

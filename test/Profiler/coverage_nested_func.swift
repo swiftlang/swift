@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sil -module-name coverage_autoclosure %s | %FileCheck %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_autoclosure.call_auto_closure()
 // CHECK-NEXT: [[@LINE+3]]:26 -> [[@LINE+10]]:2 : 0

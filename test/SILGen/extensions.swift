@@ -37,9 +37,6 @@ func extensionMethodCurrying(_ x: Foo) {
   _ = x.zang
 }
 
-// CHECK-LABEL: sil shared [thunk] [ossa] @$s10extensions3FooC4zang{{[_0-9a-zA-Z]*}}F
-// CHECK:         function_ref @$s10extensions3FooC4zang{{[_0-9a-zA-Z]*}}F
-
 // Extensions of generic types with stored property initializers
 
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s10extensions3BoxV1txSgvpfi : $@convention(thin) <T> () -> @out Optional<T>

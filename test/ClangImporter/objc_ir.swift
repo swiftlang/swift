@@ -351,7 +351,7 @@ func testConstrGenericCompatibilityAliasMangling(constr_generic_obj: SwiftConstr
 
 // CHECK-LABEL: s7objc_ir22testBlocksWithGenerics3hbaypSo13HasBlockArrayC_tF
 func testBlocksWithGenerics(hba: HasBlockArray) -> Any {
-  // CHECK: {{call swiftcc.*sSo13HasBlockArrayC05blockC0SayyyXBGyFTcTO}}
+  // CHECK: s7objc_ir22testBlocksWithGenerics3hbaypSo13HasBlockArrayC_tFSayyyXBGycAEcfu_AFycfu0_TA
   let _ = hba.blockPointerType()
   return hba.blockArray
 }
