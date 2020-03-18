@@ -46,6 +46,19 @@ Swift Next
     // OK, <U where U: Equatable> has broader visibility than <T where T == Int>
     override func foo() where U: Equatable { ... } 
   }
+
+* [SR-75][]:
+
+  Unapplied references to protocol methods methods are now supported. Previously this
+  only worked for methods defined in structs, enums and classes.
+
+  ```swift
+  protocol Cat {
+    func play(catToy: Toy)
+  }
+
+  let fn = Cat.play
+  fn(myCat)(myToy)
   ```
 
 * [SE-0266][]:
@@ -7939,6 +7952,7 @@ Swift 1.0
 [SE-0267]: <https://github.com/apple/swift-evolution/blob/master/proposals/0267-where-on-contextually-generic.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
 
+[SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
 [SR-631]: <https://bugs.swift.org/browse/SR-631>

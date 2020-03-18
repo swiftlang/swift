@@ -148,15 +148,15 @@ extension NSObject {
 }
 
 let fn = ErrorProne.fail
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo10ErrorProneC4failyyKFZTcTO : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_guaranteed () -> @error Error
-// CHECK:      [[T0:%.*]] = function_ref @$sSo10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error
+// CHECK-LABEL: sil private [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_ : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_guaranteed () -> @error Error {
+// CHECK:      [[T0:%.*]] = function_ref @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_yyKcfu0_ : $@convention(thin) (@thick ErrorProne.Type) -> @error Error
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[T0]](%0)
 // CHECK-NEXT: return [[T1]]
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error {
-// CHECK:      [[SELF:%.*]] = thick_to_objc_metatype %0 : $@thick ErrorProne.Type to $@objc_metatype ErrorProne.Type
-// CHECK:      [[METHOD:%.*]] = objc_method [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!1.foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
+// CHECK-LABEL: sil private [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_yyKcfu0_ : $@convention(thin) (@thick ErrorProne.Type) -> @error Error {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $Optional<NSError>
+// CHECK:      [[SELF:%.*]] = thick_to_objc_metatype %0 : $@thick ErrorProne.Type to $@objc_metatype ErrorProne.Type
+// CHECK:      [[METHOD:%.*]] = objc_method [[SELF]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!1.foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
 // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]({{%.*}}, [[SELF]])
 // CHECK:      cond_br
 // CHECK:      return
