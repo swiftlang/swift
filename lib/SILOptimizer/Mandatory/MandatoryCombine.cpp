@@ -286,46 +286,8 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
   return nullptr;
 }
 
-/// Checks that "a" dominates all uses of "b".
-/// \param a the instruction who's expected to dominate.
-/// \param b the instruction who's uses are expected to be dominated.
-/// \returns true if all uses of "b" are dominated by "a". Otherwise, false.
-static bool dominatesAllUses(SILInstruction *a, SILValue b) {
-  DominanceInfo dominanceInfo(a->getFunction());
-  return std::all_of(b->use_begin(), b->use_end(),
-                     [&a, &dominanceInfo](Operand *use) {
-                       return dominanceInfo.dominates(a, use->getUser());
-                     });
-}
-
-/// Replace all uses of \prama load with \param store src unless the use is a destroy_value. If the use is a
-/// destroy_value, erase it.
-void replaceUsesAndEraseDestoys(LoadInst *load, StoreInst *store,
-                                InstModCallbacks instModCallbacks) {
-  bool consumed = false;
-  for (auto first = load->use_begin(), last = load->use_end(); first != last; ++first) {
-    Operand *use = *first;
-    if (isa<DestroyValueInst>(use->getUser())) {
-      instModCallbacks.deleteInst(use->getUser());
-    } else {
-      if (use->isConsumingUse()) {
-        if (!consumed) {
-          consumed = true;
-          use->set(store->getSrc());
-          continue;
-        }
-        auto copy = SILBuilderWithScope(store).createCopyValue(load->getLoc(),
-                                                               store->getSrc());
-        use->set(copy);
-      } else
-        use->set(store->getSrc());
-    }
-  }
-  assert(consumed && "The source of store was never consumed");
-}
-
 SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
-  // Avoid things such as global_addrs.
+  // Avoid destinations such as global_addrs.
   if (store->getOwnershipQualifier() != StoreOwnershipQualifier::Trivial &&
       store->getOwnershipQualifier() != StoreOwnershipQualifier::Unqualified &&
       !isa<AllocStackInst>(store->getDest()) &&
@@ -345,8 +307,8 @@ SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
 
     if (auto loadUse = dyn_cast<LoadInst>(user)) {
       // If the load comes before the store, we don't want update it but, it
-      // also can't effect our otpimization (in the same way two loads
-      // otherwise could).
+      // also can't effect our optimization (unlike two loads after the store
+      // could).
       if (dominanceInfo.dominates(loadUse, store))
         continue;
       if (load) {
@@ -363,9 +325,12 @@ SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
 
   // If we can promote the load, do so.
   if (load &&
+      // Make sure we haven't already tried to delete this instruction.
       std::find(instructionsPendingDeletion.begin(),
                 instructionsPendingDeletion.end(),
                 load) == instructionsPendingDeletion.end()) {
+    // Check that all uses of the load are dominated by the store src.
+    // Otherwise, we can't optimize this load.
     bool loadDominatesAllUses;
     if (auto srcInst = store->getSrc().getDefiningInstruction()) {
       loadDominatesAllUses = dominatesAllUses(srcInst, load);
@@ -384,10 +349,15 @@ SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
       return nullptr;
 
     if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+      // load [copy] is just adding a copy.
       auto copy = SILBuilderWithScope(load).createCopyValue(load->getLoc(),
                                                             store->getSrc());
       load->replaceAllUsesWith(copy);
     } else if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+      // load [take] is both a copy and a destroy. It's important that the copy
+      // comes before the destroy even though they are unrelated because the
+      // destroy_addr will be used below to figure out where we need to insert a
+      // destroy_value.
       SILBuilderWithScope loadBuilder(load);
       auto copy = loadBuilder.createCopyValue(load->getLoc(), store->getSrc());
       loadBuilder.createDestroyAddr(load->getLoc(), load->getOperand());
@@ -395,12 +365,12 @@ SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
     } else
       load->replaceAllUsesWith(store->getSrc());
     instModCallbacks.deleteInst(load);
-    
+
     // Finally, for copy/takes we need to make sure the store doesn't consume
     // the new value that we've just used. We can't move the copy above the
     // store because the two instructions may not be in the same block so, we
     // copy the value, replace the store, and destroy the value.
-    // 
+    //
     // To destroy the value we look for the destroy_addrs for the destination of
     // the store and insert a destroy value next to those. Above we ensure that
     // the only uses of the dest are either replaced or destroy_addrs so, we can
@@ -410,13 +380,14 @@ SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
       for (auto *use : store->getDest()->getUses()) {
         if (isa<DestroyAddrInst>(use->getUser()))
           SILBuilderWithScope(use->getUser())
-            .createDestroyValue(use->getUser()->getLoc(), store->getSrc());
+              .createDestroyValue(use->getUser()->getLoc(), store->getSrc());
       }
 
       SILBuilderWithScope storeBuilder(store);
-      auto copy = storeBuilder.createCopyValue(store->getLoc(), store->getSrc());
+      auto copy =
+          storeBuilder.createCopyValue(store->getLoc(), store->getSrc());
       return storeBuilder.createStore(store->getLoc(), copy, store->getDest(),
-                                               store->getOwnershipQualifier());
+                                      store->getOwnershipQualifier());
     }
   }
 

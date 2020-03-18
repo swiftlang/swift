@@ -547,6 +547,8 @@ bool tryOptimizeApplyOfPartialApply(
     PartialApplyInst *pai, SILBuilderContext &builderCtxt,
     InstModCallbacks callbacks = InstModCallbacks());
 
+bool dominatesAllUses(SILInstruction *a, SILValue b);
+
 } // end namespace swift
 
 #endif
