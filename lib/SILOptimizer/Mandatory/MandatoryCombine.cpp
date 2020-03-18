@@ -126,6 +126,8 @@ public:
 
     return changed;
   }
+      
+  StoreInst *tryPromoteLoadsOf(StoreInst *store);
 
   /// Base visitor that does not do anything.
   SILInstruction *visitSILInstruction(SILInstruction *) { return nullptr; }
@@ -286,7 +288,7 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
   return nullptr;
 }
 
-SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
+StoreInst *MandatoryCombiner::tryPromoteLoadsOf(StoreInst *store) {
   // Avoid destinations such as global_addrs.
   if (store->getOwnershipQualifier() != StoreOwnershipQualifier::Trivial &&
       store->getOwnershipQualifier() != StoreOwnershipQualifier::Unqualified &&
@@ -390,6 +392,13 @@ SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
                                       store->getOwnershipQualifier());
     }
   }
+  
+  return nullptr;
+}
+
+SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
+  if (auto newStore = tryPromoteLoadsOf(store))
+    return newStore;
 
   return nullptr;
 }
