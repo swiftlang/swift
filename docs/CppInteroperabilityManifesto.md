@@ -1103,7 +1103,7 @@ public:
 // C++ header imported in Swift.
 
 struct Employee {
-  func mutable_name() -> UnsafeMutablePointer<std.string>
+  func mutable_company() -> UnsafeMutablePointer<std.string>
 }
 ```
 
