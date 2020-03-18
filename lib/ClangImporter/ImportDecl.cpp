@@ -112,11 +112,6 @@ static AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
   return (dc->getSelfClassDecl() ? AccessLevel::Open : AccessLevel::Public);
 }
 
-static bool privateOrProtected(const clang::Decl *decl) {
-  clang::AccessSpecifier access = decl->getAccess();
-  return access == clang::AS_protected || access == clang::AS_private;
-}
-
 /// Create a typedpattern(namedpattern(decl))
 static Pattern *createTypedNamedPattern(VarDecl *decl) {
   ASTContext &Ctx = decl->getASTContext();
@@ -2569,10 +2564,6 @@ namespace {
                              DeclContext *dc, Identifier name);
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
-      if (privateOrProtected(Decl)) {
-        return nullptr;
-      }
-
       Optional<ImportedName> correctSwiftName;
       auto importedName = importFullName(Decl, correctSwiftName);
       auto Name = importedName.getDeclName().getBaseIdentifier();
@@ -2781,10 +2772,6 @@ namespace {
       decl = decl->getDefinition();
       if (!decl) {
         forwardDeclaration = true;
-        return nullptr;
-      }
-
-      if (privateOrProtected(decl)) {
         return nullptr;
       }
 
@@ -3254,10 +3241,6 @@ namespace {
       if (decl->isInterface())
         return nullptr;
 
-      if (privateOrProtected(decl)) {
-        return nullptr;
-      }
-
       // FIXME: Figure out how to deal with incomplete types, since that
       // notion doesn't exist in Swift.
       decl = decl->getDefinition();
@@ -3721,10 +3704,6 @@ namespace {
       if (!dc)
         return nullptr;
 
-      if (privateOrProtected(decl)) {
-        return nullptr;
-      }
-
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
       auto selfIdx = importedName.getSelfIndex();
 
@@ -3895,10 +3874,6 @@ namespace {
     }
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
-      if (privateOrProtected(decl)) {
-        return nullptr;
-      }
-
       // Fields are imported as variables.
       Optional<ImportedName> correctSwiftName;
       ImportedName importedName;
@@ -7754,6 +7729,10 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
                                               bool &TypedefIsSuperfluous,
                                               bool &HadForwardDeclaration) {
   assert(ClangDecl);
+
+  clang::AccessSpecifier access = ClangDecl->getAccess();
+  if (access == clang::AS_protected || access == clang::AS_private)
+    return nullptr;
 
   bool SkippedOverTypedef = false;
   Decl *Result = nullptr;
