@@ -27,6 +27,7 @@
 #define DEBUG_TYPE "sil-mandatory-combiner"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -129,6 +130,7 @@ public:
   /// Base visitor that does not do anything.
   SILInstruction *visitSILInstruction(SILInstruction *) { return nullptr; }
   SILInstruction *visitApplyInst(ApplyInst *instruction);
+  SILInstruction *visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
 };
 
 } // end anonymous namespace
@@ -225,6 +227,17 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
   return madeChange;
 }
 
+template <class InstT> static FunctionRefInst *getRemovableRef(InstT *i) {
+  // If the only use of the function_ref is us, then remove it.
+  auto funcRef = dyn_cast<FunctionRefInst>(i->getCallee());
+  if (funcRef &&
+      (funcRef->use_empty() ||
+       (funcRef->getSingleUse() && funcRef->getSingleUse()->getUser() == i))) {
+    return funcRef;
+  }
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 //                     MandatoryCombiner Visitor Methods
 //===----------------------------------------------------------------------===//
@@ -284,6 +297,19 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
   if (tryDeleteDeadClosure(partialApply, instModCallbacks)) {
     invalidatedStackNesting = true;
   }
+  return nullptr;
+}
+
+/// Try to remove thing to thick instructions that are no longer used
+SILInstruction *
+MandatoryCombiner::visitThinToThickFunctionInst(ThinToThickFunctionInst *i) {
+  auto *ref = getRemovableRef(i);
+  if (tryDeleteDeadClosure(i, instModCallbacks, /*needKeepArgsAlive=*/false)) {
+    if (ref) {
+      instModCallbacks.deleteInst(ref);
+    }
+  }
+
   return nullptr;
 }
 

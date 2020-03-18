@@ -1,0 +1,32 @@
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -mandatory-combine | %FileCheck %s
+
+import Builtin
+
+func test()
+
+sil [ossa] @closure : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+
+// CHECK-LABEL: remove_dead_thin_to_thick
+// CHECK: bb0
+// TODO: one of these will be removed by #30429.
+// CHECK-NEXT: tuple
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end sil function 'remove_dead_thin_to_thick'
+sil hidden [ossa] @remove_dead_thin_to_thick : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @closure : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+  %1 = thin_to_thick_function %0 : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 to $@callee_guaranteed (Builtin.Int32) -> Builtin.Int32
+  debug_value %1 : $@callee_guaranteed (Builtin.Int32) -> Builtin.Int32, let, name "c"
+  
+  %3 = begin_borrow %1 : $@callee_guaranteed (Builtin.Int32) -> Builtin.Int32
+  %4 = copy_value %3 : $@callee_guaranteed (Builtin.Int32) -> Builtin.Int32
+  // This is all we got from the closure so we should be able to remove *everything* in this function.
+  %5 = tuple ()
+  destroy_value %4 : $@callee_guaranteed (Builtin.Int32) -> Builtin.Int32
+  end_borrow %3 : $@callee_guaranteed (Builtin.Int32) -> Builtin.Int32
+  destroy_value %1 : $@callee_guaranteed (Builtin.Int32) -> Builtin.Int32
+  
+  %9 = tuple ()
+  return %9 : $()
+} // end sil function 'remove_dead_thin_to_thick'
