@@ -46,7 +46,26 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(ModuleDecl *M) {
   return SG;
 }
 
+namespace {
+bool isUnavailableOrObsoleted(const Decl *D) {
+  if (const auto *Avail =
+        D->getAttrs().getUnavailable(D->getASTContext())) {
+    switch (Avail->getVersionAvailability(D->getASTContext())) {
+      case AvailableVersionComparison::Unavailable:
+      case AvailableVersionComparison::Obsoleted:
+        return true;
+      default:
+        break;
+    }
+  }
+  return false;
+}
+} // end anonymous namespace
+
 bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
+    if (isUnavailableOrObsoleted(D)) {
+      return false;
+    }
 
     switch (D->getKind()) {
     // We'll record nodes for the following kinds of declarations.
@@ -77,6 +96,10 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     const auto *ExtendedNominal = Extension->getExtendedNominal();
     // Ignore effecively private decls.
     if (ExtendedNominal->hasUnderscoredNaming()) {
+      return false;
+    }
+
+    if (isUnavailableOrObsoleted(ExtendedNominal)) {
       return false;
     }
 
