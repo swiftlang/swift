@@ -1,68 +1,122 @@
 {
   key.offset: 0,
-  key.length: 82,
+  key.length: 166,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.name: "Worker",
+      key.offset: 0,
+      key.length: 82,
+      key.nameoffset: 10,
+      key.namelength: 6,
+      key.bodyoffset: 18,
+      key.bodylength: 63,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.protocol,
+          key.accessibility: source.lang.swift.accessibility.public,
+          key.name: "BasicWorker",
+          key.offset: 28,
+          key.length: 52,
+          key.nameoffset: 37,
+          key.namelength: 11,
+          key.bodyoffset: 58,
+          key.bodylength: 21,
+          key.inheritedtypes: [
+            {
+              key.name: "Worker"
+            }
+          ],
+          key.attributes: [
+            {
+              key.offset: 21,
+              key.length: 6,
+              key.attribute: source.decl.attribute.public
+            }
+          ],
+          key.elements: [
+            {
+              key.kind: source.lang.swift.structure.elem.typeref,
+              key.offset: 50,
+              key.length: 6
+            }
+          ],
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.var.instance,
+              key.accessibility: source.lang.swift.accessibility.public,
+              key.setter_accessibility: source.lang.swift.accessibility.public,
+              key.name: "eventLoop",
+              key.offset: 63,
+              key.length: 13,
+              key.nameoffset: 67,
+              key.namelength: 9
+            }
+          ]
+        }
+      ]
+    },
     {
       key.kind: source.lang.swift.decl.class,
       key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "3",
-      key.offset: 0,
+      key.offset: 84,
       key.length: 10,
-      key.nameoffset: 6,
+      key.nameoffset: 90,
       key.namelength: 1,
-      key.bodyoffset: 9,
+      key.bodyoffset: 93,
       key.bodylength: 0
     },
     {
       key.kind: source.lang.swift.decl.extension,
       key.name: "OuterCls",
-      key.offset: 12,
+      key.offset: 96,
       key.length: 43,
-      key.nameoffset: 22,
+      key.nameoffset: 106,
       key.namelength: 8,
-      key.bodyoffset: 32,
+      key.bodyoffset: 116,
       key.bodylength: 22,
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.class,
           key.name: "InnerCls1",
-          key.offset: 35,
+          key.offset: 119,
           key.length: 18,
-          key.nameoffset: 41,
+          key.nameoffset: 125,
           key.namelength: 9,
-          key.bodyoffset: 52,
+          key.bodyoffset: 136,
           key.bodylength: 0
         }
       ]
     },
     {
       key.kind: source.lang.swift.expr.closure,
-      key.offset: 57,
+      key.offset: 141,
       key.length: 24,
       key.nameoffset: 0,
       key.namelength: 0,
-      key.bodyoffset: 58,
+      key.bodyoffset: 142,
       key.bodylength: 22,
       key.substructure: [
         {
           key.kind: source.lang.swift.stmt.brace,
-          key.offset: 57,
+          key.offset: 141,
           key.length: 24,
           key.nameoffset: 0,
           key.namelength: 0,
-          key.bodyoffset: 58,
+          key.bodyoffset: 142,
           key.bodylength: 22,
           key.substructure: [
             {
               key.kind: source.lang.swift.decl.class,
               key.accessibility: source.lang.swift.accessibility.private,
               key.name: "MyCoolClass",
-              key.offset: 59,
+              key.offset: 143,
               key.length: 22,
-              key.nameoffset: 65,
+              key.nameoffset: 149,
               key.namelength: 11,
-              key.bodyoffset: 78,
+              key.bodyoffset: 162,
               key.bodylength: 2
             }
           ]
@@ -72,7 +126,7 @@
   ],
   key.diagnostics: [
     {
-      key.line: 1,
+      key.line: 7,
       key.column: 7,
       key.filepath: invalid.swift,
       key.severity: source.diagnostic.severity.error,
@@ -80,7 +134,7 @@
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     },
     {
-      key.line: 7,
+      key.line: 13,
       key.column: 1,
       key.filepath: invalid.swift,
       key.severity: source.diagnostic.severity.error,
@@ -88,7 +142,7 @@
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     },
     {
-      key.line: 11,
+      key.line: 17,
       key.column: 1,
       key.filepath: invalid.swift,
       key.severity: source.diagnostic.severity.error,
@@ -96,7 +150,7 @@
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
       key.diagnostics: [
         {
-          key.line: 7,
+          key.line: 13,
           key.column: 1,
           key.filepath: invalid.swift,
           key.severity: source.diagnostic.severity.note,
