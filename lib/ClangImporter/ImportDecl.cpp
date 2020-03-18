@@ -7680,7 +7680,7 @@ void ClangImporter::Implementation::importAttributes(
   // Ban CFRelease|CFRetain|CFAutorelease(CFTypeRef) as well as custom ones
   // such as CGColorRelease(CGColorRef).
   if (auto FD = dyn_cast<clang::FunctionDecl>(ClangDecl)) {
-    if (FD->getNumParams() == 1 &&
+    if (FD->getNumParams() == 1 && FD->getDeclName().isIdentifier() &&
          (FD->getName().endswith("Release") ||
           FD->getName().endswith("Retain") ||
           FD->getName().endswith("Autorelease")) &&
