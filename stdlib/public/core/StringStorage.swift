@@ -174,13 +174,22 @@ fileprivate struct _CapacityAndFlags {
 // TODO: Migrate this to somewhere it can be shared with Array
 import SwiftShims
 
+@usableFromInline
+@_silgen_name("swift_allocObject")
+internal func swift_allocObject(
+  _ theClass: AnyClass,
+  _ byteCount: Int,
+  _ alignment: Int
+) -> AnyObject
+
+@inline(never)
 @_alwaysEmitIntoClient
 internal func _allocate2(
   numHeaderBytes: Int,        // The size of the class header
   numTailBytes: Int,          // The desired number of tail bytes
-  growthFactor: Float? = nil, // Exponential growth factor for large allocs
-  tailAllocator: (_ numTailBytes: Int) -> UnsafeRawPointer // Do the actual tail allocation
-) -> (UnsafeRawPointer, realNumTailBytes: Int) {
+  objectType: AnyClass,
+  growthFactor: Float? = nil // Exponential growth factor for large allocs
+) -> (AnyObject, realNumTailBytes: Int) {
  // _internalInvariant(getSwiftClassInstanceExtents(T.self).1 == numHeaderBytes)
 
   func roundUp(_ x: Int) -> Int { (x + 15) & ~15 }
@@ -193,7 +202,11 @@ internal func _allocate2(
     let realNumBytes = roundUp(numBytes)
     let realNumTailBytes = realNumBytes - numHeaderBytes
     _internalInvariant(realNumTailBytes >= numTailBytes)
-    let object = tailAllocator(realNumTailBytes)
+    let object = swift_allocObject(
+      objectType,
+      realNumBytes,
+      8
+    )
     return (object, realNumTailBytes)
   }
 
@@ -205,10 +218,14 @@ internal func _allocate2(
   }
 
   let total = roundUp(numHeaderBytes + growTailBytes)
-  let totalTailBytes = total - numHeaderBytes
 
-  let object = tailAllocator(totalTailBytes)
-  let mallocSize = _swift_stdlib_malloc_size(object)
+  let object = swift_allocObject(
+    objectType,
+    total,
+    8
+  )
+  let mallocSize = _swift_stdlib_malloc_size(
+    UnsafeRawPointer(Builtin.bridgeToRawPointer(object)))
   _internalInvariant(mallocSize % MemoryLayout<Int>.stride == 0)
 
   let realNumTailBytes = mallocSize - numHeaderBytes

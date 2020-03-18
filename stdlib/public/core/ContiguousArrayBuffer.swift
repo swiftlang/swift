@@ -282,17 +282,11 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       let (storage, realTailAllocationSize) = _allocate2(
         numHeaderBytes: headerSize,
         numTailBytes: MemoryLayout<Element>.stride &* realMinimumCapacity,
+        objectType: _ContiguousArrayStorage<Element>.self,
         growthFactor: growForAppend ? 1.6 : nil
-      ) { tailBytes in
-        let object = Builtin.allocWithTailElems_1(
-           _ContiguousArrayStorage<Element>.self,
-           (tailBytes / MemoryLayout<Element>.stride)._builtinWordValue,
-           Element.self
-        )
-        return UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
-      }
+      )
       
-      _storage = Builtin.bridgeFromRawPointer(storage._rawValue)
+      _storage = unsafeDowncast(storage, to: _ContiguousArrayStorage<Element>.self)
 
       let realCapacity = realTailAllocationSize / MemoryLayout<Element>.stride
       _initStorageHeader(
