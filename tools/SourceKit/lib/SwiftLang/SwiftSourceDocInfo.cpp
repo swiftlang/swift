@@ -621,7 +621,7 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
                                     SwiftInterfaceGenMap &IFaceGenContexts,
                                     const CompilerInvocation &Invok,
                        std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
-  std::string Name = Mod.getName();
+  std::string Name = Mod.getName().str();
   std::string FullName = Mod.getFullName();
   CursorInfoData Info;
   Info.Kind = SwiftLangSupport::getUIDForModuleRef();
@@ -906,7 +906,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     if (ClangMod)
       ModuleName = ClangMod->getFullModuleName();
   } else if (VD->getModuleContext() != MainModule) {
-    ModuleName = VD->getModuleContext()->getName().str();
+    ModuleName = VD->getModuleContext()->getName().str().str();
   }
   StringRef ModuleInterfaceName;
   if (auto IFaceGenRef = Lang.getIFaceGenContexts().find(ModuleName, Invok))
@@ -2155,7 +2155,7 @@ semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
       Opts.Range.Line = Info.Line;
       Opts.Range.Column = Info.Column;
       Opts.Range.Length = Info.Length;
-      Opts.PreferredName = Info.PreferredName;
+      Opts.PreferredName = Info.PreferredName.str();
 
       RequestRefactoringEditConsumer EditConsumer(Receiver);
       refactorSwiftModule(MainModule, Opts, EditConsumer, EditConsumer);

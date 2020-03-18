@@ -143,7 +143,7 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
     GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
     bool isTranspose) {
   if (!derivativeGenSig)
-    derivativeGenSig = originalFnTy->getSubstGenericSignature();
+    derivativeGenSig = originalFnTy->getInvocationGenericSignature();
   if (!derivativeGenSig)
     return nullptr;
   auto &ctx = originalFnTy->getASTContext();

@@ -498,7 +498,7 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
     return Type();
 
   ASTContext &ctx = var->getASTContext();
-  if (!ctx.areSemanticQueriesEnabled())
+  if (!ctx.areLegacySemanticQueriesEnabled())
     return nullptr;
 
   auto resolution =
@@ -534,7 +534,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     return Type();
 
   ASTContext &ctx = var->getASTContext();
-  if (!ctx.areSemanticQueriesEnabled())
+  if (!ctx.areLegacySemanticQueriesEnabled())
     return Type();
 
   // If there's an initializer of some sort, checking it will determine the

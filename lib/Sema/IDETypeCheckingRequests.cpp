@@ -56,7 +56,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   if (!ED->isConstrainedExtension())
     return true;
 
-  (void)swift::createTypeChecker(DC->getASTContext());
+  DC->getASTContext().setLegacySemanticQueriesEnabled();
   GenericSignature genericSig = ED->getGenericSignature();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       DC->getParentModule(), ED->getExtendedNominal());

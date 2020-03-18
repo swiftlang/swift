@@ -203,6 +203,12 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
+  /// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
+  /// the default value of <resource-dir>/<platform>/prebuilt-modules.
+  /// @note This should be called once, after search path options and frontend
+  ///       options have been parsed.
+  void setDefaultPrebuiltCacheIfNecessary();
+
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
   static void computeRuntimeResourcePathFromExecutablePath(
@@ -400,8 +406,6 @@ class CompilerInstance {
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<SILModule> TheSILModule;
 
-  std::unique_ptr<PersistentParserState> PersistentState;
-
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
   /// If there is no stats output directory by the time the
@@ -430,6 +434,9 @@ class CompilerInstance {
   /// invariant is that any SourceFile in this set with an associated
   /// buffer will also have its buffer ID in PrimaryBufferIDs.
   std::vector<SourceFile *> PrimarySourceFiles;
+
+  /// The file that has been registered for code completion.
+  NullablePtr<SourceFile> CodeCompletionFile;
 
   /// Return whether there is an entry in PrimaryInputs for buffer \p BufID.
   bool isPrimaryInput(unsigned BufID) const {
@@ -550,12 +557,13 @@ public:
     return Invocation;
   }
 
-  bool hasPersistentParserState() const {
-    return bool(PersistentState);
-  }
+  /// If a code completion buffer has been set, returns the corresponding source
+  /// file.
+  NullablePtr<SourceFile> getCodeCompletionFile() { return CodeCompletionFile; }
 
-  PersistentParserState &getPersistentParserState() {
-    return *PersistentState.get();
+  /// Set a new file that we're performing code completion on.
+  void setCodeCompletionFile(SourceFile *file) {
+    CodeCompletionFile = file;
   }
 
 private:
@@ -630,7 +638,8 @@ private:
   SourceFile *
   createSourceFileForMainModule(SourceFileKind FileKind,
                                 SourceFile::ImplicitModuleImportKind ImportKind,
-                                Optional<unsigned> BufferID);
+                                Optional<unsigned> BufferID,
+                                SourceFile::ParsingOptions options = {});
 
 public:
   void freeASTContext();

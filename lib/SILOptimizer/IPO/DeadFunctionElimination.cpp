@@ -736,8 +736,8 @@ SILTransform *swift::createLateDeadFunctionElimination() {
 }
 
 void swift::performSILDeadFunctionElimination(SILModule *M) {
-  SILPassManager PM(M);
   llvm::SmallVector<PassKind, 1> Pass = {PassKind::DeadFunctionElimination};
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getPassPipelineForKinds(M->getOptions(), Pass));
+  auto &opts = M->getOptions();
+  auto plan = SILPassPipelinePlan::getPassPipelineForKinds(opts, Pass);
+  executePassPipelinePlan(M, plan);
 }

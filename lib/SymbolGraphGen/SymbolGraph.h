@@ -18,14 +18,21 @@
 #include "llvm/Support/VersionTuple.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Markup/Markup.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "Edge.h"
 #include "JSON.h"
+#include "Symbol.h"
 
 namespace swift {
 namespace symbolgraphgen {
 
 /// A graph of symbols and the relationships between them.
 struct SymbolGraph {
+  /**
+   The options to use while building the graph.
+   */
+  SymbolGraphASTWalker &Walker;
+
   /**
    The module this symbol graph represents.
   */
@@ -35,11 +42,6 @@ struct SymbolGraph {
    The module whose types were extended in `M`.
    */
   Optional<ModuleDecl *> ExtendedModule;
-  
-  /**
-   The module's target triple.
-  */
-  llvm::Triple Target;
 
   /**
    A context for allocations.
@@ -55,30 +57,20 @@ struct SymbolGraph {
   /**
    The symbols in a module: the nodes in the graph.
    */
-  llvm::SmallPtrSet<const ValueDecl *, 32> Nodes;
+  llvm::DenseSet<Symbol> Nodes;
 
   /**
    The relationships between symbols: the edges in the graph.
    */
   llvm::DenseSet<Edge> Edges;
 
-  /// A cache of USRs for declarations.
-  llvm::DenseMap<const ValueDecl *, StringRef> USRCache;
-
-  SymbolGraph(ModuleDecl &M,
+  SymbolGraph(SymbolGraphASTWalker &Walker,
+              ModuleDecl &M,
               Optional<ModuleDecl *> ExtendedModule,
-              llvm::Triple Target,
               markup::MarkupContext &Ctx,
               Optional<llvm::VersionTuple> ModuleVersion = None);
 
   // MARK: - Utilities
-
-  /// Get the USR of a declaration and add it to the local allocator.
-  StringRef getUSR(const ValueDecl *VD);
-
-  /// Returns an array of path components for a declaration.
-  void getPathComponents(const ValueDecl *VD,
-                         SmallVectorImpl<SmallString<32>> &Components);
 
   /// Get the base print options for declaration fragments.
   PrintOptions getDeclarationFragmentsPrintOptions() const;
@@ -88,7 +80,7 @@ struct SymbolGraph {
   /**
    Record a symbol as a node in the graph.
    */
-  void recordNode(const ValueDecl *VD);
+  void recordNode(Symbol S);
 
   // MARK: - Relationships (Edges)
 
@@ -101,52 +93,85 @@ struct SymbolGraph {
    directed graph.
    \param Kind The kind of relationship the edge represents.
    */
-  void recordEdge(const ValueDecl *Source, const ValueDecl *Target,
-                  RelationshipKind Kind);
+  void recordEdge(Symbol Source, Symbol Target, RelationshipKind Kind,
+                  const ExtensionDecl *ConformanceExtension = nullptr);
 
   /**
    Record a MemberOf relationship, if the given declaration is nested
    in another.
    */
-  void recordMemberRelationship(const ValueDecl *VD);
+  void recordMemberRelationship(Symbol S);
+
+  /**
+   If a declaration has members by conforming to a protocol, such as default
+   implementations, record a symbol with a "synthesized" USR to disambiguate
+   from the protocol's real implementation.
+
+   This makes it more convenient to curate symbols on
+   a conformer's documentation.
+
+   The reason these "virtual" members are recorded is to show documentation
+   under a conforming type for members with the concrete types substituted.
+
+   For example, if `Array` takes on a function from a collection protocol,
+   `subscript(index: Self.Index) -> Element`, the documentation for Array may
+   wish to show this function as `subscript(index: Int) -> Element` instead,
+   and show unique documentation for it.
+   */
+  void recordConformanceSynthesizedMemberRelationships(Symbol S);
+
+  /**
+   If a declaration has members by subclassing, record a symbol with a
+   "synthesized" USR to disambiguate from the superclass's real implementation.
+
+   This makes it more convenient
+   to curate symbols on a subclass's documentation.
+   */
+  void recordSuperclassSynthesizedMemberRelationships(Symbol S);
 
   /**
    Record InheritsFrom relationships for every class from which the
    declaration inherits.
    */
-  void recordInheritanceRelationships(const ValueDecl *VD);
+  void recordInheritanceRelationships(Symbol S);
 
   /**
    If the declaration is a default implementation in a protocol extension,
    record a DefaultImplementationOf relationship between the declaration and
    the requirement.
    */
-  void recordDefaultImplementationRelationships(const ValueDecl *VD);
+  void recordDefaultImplementationRelationships(Symbol S);
 
   /**
    Record a RequirementOf relationship if the declaration is a requirement
    of a protocol.
    */
-  void recordRequirementRelationships(const ValueDecl *VD);
+  void recordRequirementRelationships(Symbol S);
 
   /**
    If the declaration is an Objective-C-based optional protocol requirement,
    record an OptionalRequirementOf relationship between the declaration
    and its containing protocol.
    */
-  void recordOptionalRequirementRelationships(const ValueDecl *VD);
+  void recordOptionalRequirementRelationships(Symbol S);
 
   /**
    Record ConformsTo relationships for each protocol conformance of
    the declaration.
    */
-  void recordConformanceRelationships(const ValueDecl *VD);
+  void recordConformanceRelationships(Symbol S);
+
+  /**
+   Record ConformsTo relationships for each protocol conformance of
+   a declaration through via an extension.
+   */
+  void recordExtensionConformanceRelationships(Symbol S);
 
   /**
    Records an Overrides relationship if the given declaration
    overrides another.
    */
-  void recordOverrideRelationship(const ValueDecl *VD);
+  void recordOverrideRelationship(Symbol S);
 
   // MARK: - Serialization
 
@@ -155,19 +180,28 @@ struct SymbolGraph {
 
   /// Serialize the overall declaration fragments for a `ValueDecl`.
   void
-  serializeDeclarationFragments(StringRef Key, const ValueDecl *VD,
+  serializeDeclarationFragments(StringRef Key, const Symbol &S,
                                 llvm::json::OStream &OS);
 
   /// Get the overall declaration fragments for a `ValueDecl` when it is viewed
   /// as a subheading and/or part of a larger group of symbol listings.
   void
-  serializeSubheadingDeclarationFragments(StringRef Key, const ValueDecl *VD,
+  serializeSubheadingDeclarationFragments(StringRef Key, const Symbol &S,
                                           llvm::json::OStream &OS);
 
   /// Get the overall declaration for a type declaration.
   void
   serializeDeclarationFragments(StringRef Key, Type T,
                                 llvm::json::OStream &OS);
+
+  /// Returns `true` if the declaration has a name that makes it
+  /// implicitly internal/private, such as underscore prefixes,
+  /// and checking every named parent context as well.
+  bool isImplicitlyPrivate(const ValueDecl *VD) const;
+
+  /// Returns `true` if the declaration should be included as a node
+  /// in the graph.
+  bool canIncludeDeclAsNode(const Decl *D) const;
 };
 
 } // end namespace symbolgraphgen

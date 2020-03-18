@@ -243,11 +243,12 @@ genericInheritsA(C_GI())
 //===----------------------------------------------------------------------===//
 // Deduction for member operators
 //===----------------------------------------------------------------------===//
-protocol Addable { // expected-note {{where 'Self' = 'U'}}
+protocol Addable {
   static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
-  u + u // expected-error{{referencing operator function '+' on 'Addable' requires that 'U' conform to 'Addable'}}
+  // FIXME(diagnostics): This should report the "no exact matches" diagnostic.
+  u + u // expected-error{{referencing operator function '+' on 'RangeReplaceableCollection' requires that 'U' conform to 'RangeReplaceableCollection'}}
   return x+y
 }
 
@@ -318,9 +319,8 @@ func foo() {
     let j = min(Int(3), Float(2.5)) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. 'Float')}}
     let k = min(A(), A()) // expected-error{{global function 'min' requires that 'A' conform to 'Comparable'}}
     let oi : Int? = 5
-    let l = min(3, oi) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-    // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
-    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    let l = min(3, oi) // expected-error{{global function 'min' requires that 'Int?' conform to 'Comparable'}}
+  // expected-note@-1{{wrapped type 'Int' satisfies this requirement}}
 }
 
 infix operator +&

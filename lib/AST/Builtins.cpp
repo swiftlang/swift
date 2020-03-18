@@ -892,6 +892,15 @@ static ValueDecl *getUnsafeGuaranteedEnd(ASTContext &C, Identifier Id) {
   return getBuiltinFunction(Id, { Int8Ty }, TupleType::getEmpty(C));
 }
 
+static ValueDecl *getTypePtrAuthDiscriminator(ASTContext &C, Identifier Id) {
+  // <T : AnyObject> (T.Type) -> Int64
+  BuiltinFunctionBuilder builder(C);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  Type Int64Ty = BuiltinIntegerType::get(64, C);
+  builder.setResult(makeConcrete(Int64Ty));
+  return builder.build(Id);
+}
+
 static ValueDecl *getOnFastPath(ASTContext &Context, Identifier Id) {
   return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
 }
@@ -1205,7 +1214,7 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
    OverloadedBuiltinKind::Special,
 #define BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(id, name, attrs, overload)  \
   OverloadedBuiltinKind::overload,
-#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name, attrs)                  \
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name)                         \
   OverloadedBuiltinKind::Special,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
    OverloadedBuiltinKind::overload,
@@ -1812,7 +1821,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
 #define BUILTIN(id, name, attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
-#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name, attrs)                  \
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name)                         \
   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
       if (!Types.empty())
@@ -2049,6 +2058,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
                               {},
                               TupleType::getEmpty(Context));
 
+  case BuiltinValueKind::TypePtrAuthDiscriminator:
+    return getTypePtrAuthDiscriminator(Context, Id);
+    
   case BuiltinValueKind::TypeJoin:
     return getTypeJoinOperation(Context, Id);
 
@@ -2084,7 +2096,7 @@ bool swift::isPolymorphicBuiltin(BuiltinValueKind id) {
 #define BUILTIN(Id, Name, Attrs)                                               \
   case BuiltinValueKind::Id:                                                   \
     return false;
-#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name, Attrs)                  \
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
   case BuiltinValueKind::Id:                                                   \
     return true;
 #include "swift/AST/Builtins.def"

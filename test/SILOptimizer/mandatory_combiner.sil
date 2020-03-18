@@ -888,6 +888,36 @@ bb0:
   return %13 : $MyInt
 } // end sil function 'mixed_nocapture_mixedargs_ossa'
 
+// CHECK-LABEL: sil [ossa] @dont_remove_polymorphic_builtin
+// CHECK: builtin "generic_add"
+// CHECK-LABEL: end sil function 'dont_remove_polymorphic_builtin'
+sil [ossa] @dont_remove_polymorphic_builtin : $@convention(thin) (@guaranteed Klass, @guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass, %2 : @guaranteed $Klass):
+  %3 = alloc_stack $Klass
+  %4 = copy_value %0 : $Klass
+  store %4 to [init] %3 : $*Klass
+
+  %6 = alloc_stack $Klass
+  %7 = copy_value %0 : $Klass
+  store %7 to [init] %6 : $*Klass
+
+  %9 = alloc_stack $Klass
+  %10 = copy_value %0 : $Klass
+  store %10 to [init] %9 : $*Klass
+
+  // builtin "add" is maked read none so it could be removed below. However,
+  // builtin "generic_add" does modify memory so, it cannot be removed.
+  // Make sure we don't remove it.
+  %12 = builtin "generic_add"<Klass>(%3 : $*Klass, %6 : $*Klass, %9 : $*Klass) : $()
+
+  dealloc_stack %9 : $*Klass
+  dealloc_stack %6 : $*Klass
+  dealloc_stack %3 : $*Klass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
 ////////////////////
 // Load Promotion //
 ////////////////////

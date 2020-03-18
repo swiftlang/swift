@@ -18,9 +18,7 @@
 //                i8** getelementptr inbounds (%swift.vwtable, %swift.vwtable* @"$s4main9NamespaceO5ValueVySS_SiGWV", i32 0, i32 0)
 // CHECK-SAME:    [[INT]] 512,
 // CHECK-SAME:    %swift.type_descriptor* bitcast (
-// CHECK-SAME:      <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* 
-// CHECK-SAME:      @"$s4main9NamespaceO5ValueVMn" 
-// CHECK-SAME:      to %swift.type_descriptor*
+// CHECK-SAME:      {{.*}}$s4main9NamespaceO5ValueVMn{{.*}} to %swift.type_descriptor*
 // CHECK-SAME:    ),
 // CHECK-SAME:    %swift.type* @"$sSSN",
 // CHECK-SAME:    %swift.type* @"$sSiN",
@@ -107,9 +105,7 @@ doit()
 // CHECK-SAME:     i8* [[ERASED_TYPE_2]], 
 // CHECK-SAME:     i8* undef, 
 // CHECK-SAME:     %swift.type_descriptor* bitcast (
-// CHECK-SAME:       <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* 
-// CHECK-SAME:       @"$s4main9NamespaceO5ValueVMn" 
-// CHECK-SAME:       to %swift.type_descriptor*
+// CHECK-SAME:       {{.+}}$s4main9NamespaceO5ValueVMn{{.+}} to %swift.type_descriptor*
 // CHECK-SAME:     )
 // CHECK-SAME:   ) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}

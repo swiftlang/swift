@@ -47,7 +47,7 @@ bool swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
 
         // Register the memory buffer.
         Loader.registerMemoryBuffer(info.name, std::move(bitstream));
-        foundModules.push_back(info.name);
+        foundModules.push_back(info.name.str());
       }
     } else {
       llvm::dbgs() << "Unable to load module";

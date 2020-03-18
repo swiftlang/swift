@@ -749,7 +749,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
   auto protocolType = protocol->getDeclaredInterfaceType();
   auto reqtSubs = SubstitutionMap::getProtocolSubstitutions(protocol,
                                           protocolType,
-                                          ProtocolConformanceRef(protocol));
+                                          ProtocolConformanceRef(conformance));
 
   // Open the protocol type.
   auto openedType = OpenedArchetypeType::get(protocolType);

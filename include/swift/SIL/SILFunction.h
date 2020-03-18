@@ -118,6 +118,13 @@ class SILFunction
 public:
   using BlockListType = llvm::iplist<SILBasicBlock>;
 
+  // For more information see docs/SIL.rst
+  enum class Purpose : uint8_t {
+    None,
+    GlobalInit,
+    LazyPropertyGetter
+  };
+
 private:
   friend class SILBasicBlock;
   friend class SILModule;
@@ -182,6 +189,8 @@ private:
   /// The availability used to determine if declarations of this function
   /// should use weak linking.
   AvailabilityContext Availability;
+
+  Purpose specialPurpose = Purpose::None;
 
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
@@ -352,6 +361,11 @@ public:
 
   SILFunctionConventions getConventions() const {
     return SILFunctionConventions(LoweredType, getModule());
+  }
+
+  SILFunctionConventions getConventionsInContext() const {
+    auto fnType = getLoweredFunctionTypeInContext(getTypeExpansionContext());
+    return SILFunctionConventions(fnType, getModule());
   }
 
   SILProfiler *getProfiler() const { return Profiler; }
@@ -678,7 +692,7 @@ public:
   void addSemanticsAttr(StringRef Ref) {
     if (hasSemanticsAttr(Ref))
       return;
-    SemanticsAttrSet.push_back(Ref);
+    SemanticsAttrSet.push_back(Ref.str());
     std::sort(SemanticsAttrSet.begin(), SemanticsAttrSet.end());
   }
 
@@ -801,6 +815,8 @@ public:
   void setEffectsKind(EffectsKind E) {
     EffectsKindAttr = unsigned(E);
   }
+  
+  Purpose getSpecialPurpose() const { return specialPurpose; }
 
   /// Get this function's global_init attribute.
   ///
@@ -814,8 +830,13 @@ public:
   /// generated from a global variable access. Note that the initialization
   /// function itself does not need this attribute. It is private and only
   /// called within the addressor.
-  bool isGlobalInit() const { return GlobalInitFlag; }
-  void setGlobalInit(bool isGI) { GlobalInitFlag = isGI; }
+  bool isGlobalInit() const { return specialPurpose == Purpose::GlobalInit; }
+
+  bool isLazyPropertyGetter() const {
+    return specialPurpose == Purpose::LazyPropertyGetter;
+  }
+
+  void setSpecialPurpose(Purpose purpose) { specialPurpose = purpose; }
 
   /// Return whether this function has a foreign implementation which can
   /// be emitted on demand.

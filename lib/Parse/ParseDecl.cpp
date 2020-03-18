@@ -175,7 +175,7 @@ namespace {
       DebuggerClient *debug_client = getDebuggerClient();
       assert (debug_client);
       debug_client->didGlobalize(D);
-      SF->addTopLevelDecl(D);
+      P.ContextSwitchedTopLevelDecls.push_back(D);
       P.markWasHandled(D);
     }
   };
@@ -189,15 +189,13 @@ namespace {
 ///     decl-sil       [[only in SIL mode]
 ///     decl-sil-stage [[only in SIL mode]
 /// \endverbatim
-void Parser::parseTopLevel() {
-  SF.ASTStage = SourceFile::Parsing;
-
+void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
     consumeTokenWithoutFeedingReceiver();
 
   // Parse the body of the file.
-  SmallVector<ASTNode, 128> Items;
+  SmallVector<ASTNode, 128> items;
   while (!Tok.is(tok::eof)) {
     // If we run into a SIL decl, skip over until the next Swift decl. We need
     // to delay parsing these, as SIL parsing currently requires type checking
@@ -208,7 +206,7 @@ void Parser::parseTopLevel() {
       continue;
     }
 
-    parseBraceItems(Items, allowTopLevelCode()
+    parseBraceItems(items, allowTopLevelCode()
                                ? BraceItemListKind::TopLevelCode
                                : BraceItemListKind::TopLevelLibrary);
 
@@ -227,17 +225,16 @@ void Parser::parseTopLevel() {
     }
   }
 
-  // Add newly parsed decls to the module.
-  for (auto Item : Items) {
-    if (auto *D = Item.dyn_cast<Decl*>()) {
-      assert(!isa<AccessorDecl>(D) && "accessors should not be added here");
-      SF.addTopLevelDecl(D);
-    }
-  }
+  // First append any decls that LLDB requires be inserted at the top-level.
+  decls.append(ContextSwitchedTopLevelDecls.begin(),
+               ContextSwitchedTopLevelDecls.end());
 
-  // Note that the source file is fully parsed and verify it.
-  SF.ASTStage = SourceFile::Parsed;
-  verify(SF);
+  // Then append the top-level decls we parsed.
+  for (auto item : items) {
+    auto *decl = item.get<Decl *>();
+    assert(!isa<AccessorDecl>(decl) && "accessors should not be added here");
+    decls.push_back(decl);
+  }
 
   // Finalize the token receiver.
   SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
@@ -1842,6 +1839,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       PlatformAndVersions;
 
     StringRef AttrName = "@_originalDefinedIn";
+    bool SuppressLaterDiags = false;
     if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
                   diag::originally_defined_in_missing_rparen,
                   SyntaxKind::Unknown, [&]() -> ParserStatus {
@@ -1857,6 +1855,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         if (!Tok.is(tok::identifier) || Tok.getText() != "module" ||
             !peekToken().is(tok::colon)) {
           diagnose(Tok, diag::originally_defined_in_need_original_module_name);
+          SuppressLaterDiags = true;
           return makeParserError();
         }
         consumeToken(tok::identifier);
@@ -1873,6 +1872,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         if (OriginalModuleName.empty()) {
           diagnose(ModuleNameLoc,
                    diag::originally_defined_in_need_nonempty_module_name);
+          SuppressLaterDiags = true;
           return makeParserError();
         }
         return makeParserSuccess();
@@ -1888,6 +1888,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           if (!Plat.hasValue()) {
             diagnose(Tok.getLoc(),
                      diag::originally_defined_in_unrecognized_platform);
+            SuppressLaterDiags = true;
             return makeParserError();
           } else {
             consumeToken();
@@ -1898,6 +1899,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           SourceRange VersionRange;
           if (parseVersionTuple(VerTuple, VersionRange,
               Diagnostic(diag::attr_availability_expected_version, AttrName))) {
+            SuppressLaterDiags = true;
             return makeParserError();
           } else {
             if (VerTuple.getSubminor().hasValue() ||
@@ -1914,10 +1916,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           }
         }
         diagnose(AtLoc, diag::originally_defined_in_need_platform_version);
+        SuppressLaterDiags = true;
         return makeParserError();
       }
       }
-    }).isError()) {
+    }).isError() || SuppressLaterDiags) {
       return false;
     }
     if (OriginalModuleName.empty()) {
@@ -3239,6 +3242,10 @@ bool Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
 
   SyntaxParsingContext AttrListCtx(SyntaxContext, SyntaxKind::AttributeList);
   while (Tok.is(tok::at_sign)) {
+    // Ignore @substituted in SIL mode and leave it for the type parser.
+    if (isInSILMode() && peekToken().getText() == "substituted")
+      return false;
+
     if (Attributes.AtLoc.isInvalid())
       Attributes.AtLoc = Tok.getLoc();
     SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
@@ -4424,7 +4431,7 @@ void Parser::diagnoseConsecutiveIDs(StringRef First, SourceLoc FirstLoc,
 
 /// Parse a Decl item in decl list.
 ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
-                                   Parser::ParseDeclOptions Options,
+                                   ParseDeclOptions Options,
                                    llvm::function_ref<void(Decl*)> handler) {
   if (Tok.is(tok::semi)) {
     // Consume ';' without preceding decl.
@@ -4517,13 +4524,13 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
                       bool &hadError) {
 
   // Record the curly braces but nothing inside.
-  if (IDC->areDependenciesUsingTokenHashesForTypeBodies()) {
+  if (IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()) {
     recordTokenHash("{");
     recordTokenHash("}");
   }
   llvm::MD5 tokenHashForThisDeclList;
   llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(
-      CurrentTokenHash, IDC->areDependenciesUsingTokenHashesForTypeBodies()
+      CurrentTokenHash, IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()
                             ? &tokenHashForThisDeclList
                             : CurrentTokenHash);
 
@@ -4569,7 +4576,7 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
 bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
                                        bool &HasNestedClassDeclarations) {
   // If explicitly disabled, respect the flag.
-  if (!DelayBodyParsing)
+  if (!isDelayedParsingEnabled())
     return false;
   // Recovering parser status later for #sourceLocation is not-trivial and
   // it may not worth it.
@@ -4825,7 +4832,8 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
           getStringLiteralIfNotInterpolated(Loc, "'#sourceLocation'");
       if (!Filename.hasValue())
         return makeParserError();
-      consumeToken(tok::string_literal);
+      SourceLoc filenameLoc = consumeToken(tok::string_literal);
+      SF.VirtualFilePaths.emplace_back(*Filename, filenameLoc);
 
       if (parseToken(tok::comma, diag::sourceLocation_expected, ",") ||
           parseSpecificIdentifier("line", diag::sourceLocation_expected,
@@ -5008,7 +5016,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, TAD);
-    Status |= parseFreestandingGenericWhereClause(genericParams);
+    Status |= parseFreestandingGenericWhereClause(TAD, genericParams, Flags);
   }
 
   if (UnderlyingTy.isNull()) {
@@ -6348,7 +6356,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, FD);
 
-    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    Status |= parseFreestandingGenericWhereClause(FD, GenericParams, Flags);
     if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return Status;
@@ -6449,7 +6457,10 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 
   llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(CurrentTokenHash, nullptr);
 
-  if (isDelayedParsingEnabled()) {
+  // If we can delay parsing this body, or this is the first pass of code
+  // completion, skip until the end. If we encounter a code completion token
+  // while skipping, we'll make a note of it.
+  if (isDelayedParsingEnabled() || isCodeCompletionFirstPass()) {
     consumeAbstractFunctionBody(AFD, AFD->getAttrs());
     return;
   }
@@ -6600,12 +6611,13 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    Status |= whereStatus;
+    auto whereStatus =
+        parseFreestandingGenericWhereClause(ED, GenericParams, Flags);
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
+    Status |= whereStatus;
   }
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
@@ -6886,12 +6898,13 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    Status |= whereStatus;
+    auto whereStatus =
+        parseFreestandingGenericWhereClause(SD, GenericParams, Flags);
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
+    Status |= whereStatus;
   }
 
   // Make the entities of the struct as a code block.
@@ -7002,12 +7015,13 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    Status |= whereStatus;
+    auto whereStatus =
+        parseFreestandingGenericWhereClause(CD, GenericParams, Flags);
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
+    Status |= whereStatus;
   }
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
@@ -7254,7 +7268,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, Subscript);
 
-    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    Status |= parseFreestandingGenericWhereClause(Subscript, GenericParams,
+                                                  Flags);
     if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return Status;
@@ -7396,7 +7411,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Tok.is(tok::kw_where)) {
     ContextChange(*this, CD);
 
-    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    Status |= parseFreestandingGenericWhereClause(CD, GenericParams, Flags);
     if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
       return Status;

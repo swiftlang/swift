@@ -1444,7 +1444,18 @@ public:
     }
   }
 
+  /// Set to true that this alloc_stack contains a value whose lifetime can not
+  /// be ascertained from uses.
+  ///
+  /// As an example if an alloc_stack is known to be only conditionally
+  /// initialized.
   void setDynamicLifetime() { dynamicLifetime = true; }
+
+  /// Returns true if the alloc_stack's initialization can not be ascertained
+  /// from uses directly (so should be treated conservatively).
+  ///
+  /// An example of an alloc_stack with dynamic lifetime is an alloc_stack that
+  /// is conditionally initialized.
   bool hasDynamicLifetime() const { return dynamicLifetime; }
 
   /// Return the debug variable information attached to this instruction.
@@ -1875,6 +1886,7 @@ public:
   /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return NumStaticOperands; }
 
+  Operand *getCalleeOperand() { return &getAllOperands()[Callee]; }
   const Operand *getCalleeOperand() const { return &getAllOperands()[Callee]; }
   SILValue getCallee() const { return getCalleeOperand()->get(); }
 
@@ -6180,7 +6192,7 @@ public:
 class InitExistentialRefInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::InitExistentialRefInst, InitExistentialRefInst,
-          SingleValueInstruction> {
+          OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   CanType ConcreteType;
@@ -6191,7 +6203,8 @@ class InitExistentialRefInst final
                          ArrayRef<SILValue> TypeDependentOperands,
                          ArrayRef<ProtocolConformanceRef> Conformances)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Instance, TypeDependentOperands, ExistentialType),
+          DebugLoc, Instance, TypeDependentOperands, ExistentialType,
+          Instance.getOwnershipKind()),
         ConcreteType(FormalConcreteType), Conformances(Conformances) {}
 
   static InitExistentialRefInst *
@@ -7408,15 +7421,35 @@ public:
            OpIndex <= Operands.back().getOperandNumber();
   }
 
+  /// Returns the operand on the cond_br terminator associated with the value
+  /// that will be passed to DestBB in A.
+  Operand *getOperandForDestBB(const SILBasicBlock *DestBB,
+                               const SILArgument *A) const;
+
+  /// Returns the operand on the cond_br terminator associated with the value
+  /// that will be passed as the \p Index argument to DestBB.
+  Operand *getOperandForDestBB(const SILBasicBlock *DestBB,
+                               unsigned ArgIndex) const;
+
   /// Returns the argument on the cond_br terminator that will be passed to
   /// DestBB in A.
   SILValue getArgForDestBB(const SILBasicBlock *DestBB,
-                           const SILArgument *A) const;
+                           const SILArgument *A) const {
+    if (auto *op = getOperandForDestBB(DestBB, A)) {
+      return op->get();
+    }
+    return SILValue();
+  }
 
   /// Returns the argument on the cond_br terminator that will be passed as the
   /// \p Index argument to DestBB.
   SILValue getArgForDestBB(const SILBasicBlock *DestBB,
-                           unsigned ArgIndex) const;
+                           unsigned ArgIndex) const {
+    if (auto *op = getOperandForDestBB(DestBB, ArgIndex)) {
+      return op->get();
+    }
+    return SILValue();
+  }
 
   /// Return the SILPhiArgument from either the true or false destination for
   /// the given operand.

@@ -12,6 +12,7 @@
 
 #include "swift/AST/Module.h"
 #include "Edge.h"
+#include "Symbol.h"
 #include "SymbolGraphASTWalker.h"
 
 using namespace swift;
@@ -20,23 +21,36 @@ using namespace symbolgraphgen;
 void Edge::serialize(llvm::json::OStream &OS) const {
   OS.object([&](){
     OS.attribute("kind", Kind.Name);
-    OS.attribute("source", Graph->getUSR(Source));
-    OS.attribute("target", Graph->getUSR(Target));
+    if (Kind == RelationshipKind::DefaultImplementationOf() && Source.getSynthesizedBaseTypeDecl()) {
+      abort();
+    }
+    SmallString<256> SourceUSR, TargetUSR;
+
+    Source.getUSR(SourceUSR);
+    OS.attribute("source", SourceUSR.str());
+
+    Target.getUSR(TargetUSR);
+    OS.attribute("target", TargetUSR.str());
 
     // In case a dependent module isn't available, serialize a fallback name.
-    auto TargetModuleName = Target->getModuleContext()->getName().str();
+    auto TargetModuleName = Target.getSymbolDecl()
+        ->getModuleContext()->getName().str();
 
     if (TargetModuleName != Graph->M.getName().str()) {
-      SmallVector<SmallString<32>, 8> TargetPathComponents;
-      Graph->getPathComponents(Target, TargetPathComponents);
-
       SmallString<128> Scratch(TargetModuleName);
-      for (auto it = TargetPathComponents.begin();
-           it != TargetPathComponents.end(); ++it) {
-        Scratch.push_back('.');
-        Scratch.append(*it);
-      }
+      llvm::raw_svector_ostream PathOS(Scratch);
+      PathOS << '.';
+      Target.printPath(PathOS);
       OS.attribute("targetFallback", Scratch.str());
+    }
+
+    if (ConformanceExtension &&
+        !ConformanceExtension->getGenericRequirements().empty()) {
+      OS.attributeArray("swiftConstraints", [&](){
+        for (const auto &Req : ConformanceExtension->getGenericRequirements()) {
+          ::serialize(Req, OS);
+        }
+      });
     }
   });
 }

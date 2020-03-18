@@ -566,11 +566,14 @@ public:
 /// typically this will have an ErrorType.
 class ErrorExpr : public Expr {
   SourceRange Range;
+  Expr *OriginalExpr;
 public:
-  ErrorExpr(SourceRange Range, Type Ty = Type())
-    : Expr(ExprKind::Error, /*Implicit=*/true, Ty), Range(Range) {}
+  ErrorExpr(SourceRange Range, Type Ty = Type(), Expr *OriginalExpr = nullptr)
+    : Expr(ExprKind::Error, /*Implicit=*/true, Ty), Range(Range),
+      OriginalExpr(OriginalExpr) {}
 
   SourceRange getSourceRange() const { return Range; }
+  Expr *getOriginalExpr() const { return OriginalExpr; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Error;

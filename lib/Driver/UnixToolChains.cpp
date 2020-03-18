@@ -110,8 +110,30 @@ std::string toolchains::GenericUnix::getTargetForLinker() const {
   return getTriple().str();
 }
 
-bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
-  return true;
+bool toolchains::GenericUnix::addRuntimeRPath(const llvm::Triple &T,
+                                              const llvm::opt::ArgList &Args) const {
+  // If we are building a static executable, do not add a rpath for the runtime
+  // as it is a static binary and the loader will not be invoked.
+  if (Args.hasFlag(options::OPT_static_executable,
+                   options::OPT_no_static_executable, false))
+    return false;
+
+  // If we are building with a static standard library, do not add a rpath for
+  // the runtime because the runtime will be part of the binary and the rpath is
+  // no longer necessary.
+  if (Args.hasFlag(options::OPT_static_stdlib, options::OPT_no_static_stdlib,
+                   false))
+    return false;
+
+  // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
+  // of time the standard library won't be copied.
+
+  // Honour the user's request to add a rpath to the binary.  This defaults to
+  // `true` on non-android and `false` on android since the library must be
+  // copied into the bundle.
+  return Args.hasFlag(options::OPT_toolchain_stdlib_rpath,
+                      options::OPT_no_toolchain_stdlib_rpath,
+                      !T.isAndroid());
 }
 
 ToolChain::InvocationInfo
@@ -209,9 +231,7 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   getRuntimeLibraryPaths(RuntimeLibPaths, context.Args, context.OI.SDKPath,
                          /*Shared=*/!(staticExecutable || staticStdlib));
 
-  if (!(staticExecutable || staticStdlib) && shouldProvideRPathToLinker()) {
-    // FIXME: We probably shouldn't be adding an rpath here unless we know
-    //        ahead of time the standard library won't be copied.
+  if (addRuntimeRPath(getTriple(), context.Args)) {
     for (auto path : RuntimeLibPaths) {
       Arguments.push_back("-Xlinker");
       Arguments.push_back("-rpath");
@@ -380,8 +400,6 @@ std::string toolchains::Android::getTargetForLinker() const {
     return "x86_64-unknown-linux-android";
   }
 }
-
-bool toolchains::Android::shouldProvideRPathToLinker() const { return false; }
 
 std::string toolchains::Cygwin::getDefaultLinker() const {
   // Cygwin uses the default BFD linker, even on ARM.

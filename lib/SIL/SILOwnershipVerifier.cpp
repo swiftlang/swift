@@ -22,9 +22,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/Projection.h"
@@ -164,10 +165,12 @@ private:
   bool isSubobjectProjectionWithLifetimeEndingUses(
       SILValue value,
       const SmallVectorImpl<Operand *> &lifetimeEndingUsers) const;
-  bool
-  discoverImplicitRegularUsers(const BorrowScopeOperand &initialScopedOperand,
-                               SmallVectorImpl<Operand *> &implicitRegularUsers,
-                               bool isGuaranteed);
+  bool discoverBorrowOperandImplicitRegularUsers(
+      const BorrowScopeOperand &initialScopedOperand,
+      SmallVectorImpl<Operand *> &implicitRegularUsers, bool isGuaranteed);
+  bool discoverInteriorPointerOperandImplicitRegularUsers(
+      const InteriorPointerOperand &interiorPointerOperand,
+      SmallVectorImpl<Operand *> &implicitRegularUsers);
 };
 
 } // end anonymous namespace
@@ -181,9 +184,9 @@ bool SILValueOwnershipChecker::check() {
   if (!result.getValue())
     return false;
 
-  SmallVector<BranchPropagatedUser, 32> allLifetimeEndingUsers;
+  SmallVector<Operand *, 32> allLifetimeEndingUsers;
   llvm::copy(lifetimeEndingUsers, std::back_inserter(allLifetimeEndingUsers));
-  SmallVector<BranchPropagatedUser, 32> allRegularUsers;
+  SmallVector<Operand *, 32> allRegularUsers;
   llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
   llvm::copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
 
@@ -240,7 +243,7 @@ bool SILValueOwnershipChecker::isCompatibleDefUse(
 }
 
 /// Returns true if an error was found.
-bool SILValueOwnershipChecker::discoverImplicitRegularUsers(
+bool SILValueOwnershipChecker::discoverBorrowOperandImplicitRegularUsers(
     const BorrowScopeOperand &initialScopedOperand,
     SmallVectorImpl<Operand *> &implicitRegularUsers, bool isGuaranteed) {
   if (!initialScopedOperand.areAnyUserResultsBorrowIntroducers()) {
@@ -285,6 +288,115 @@ bool SILValueOwnershipChecker::discoverImplicitRegularUsers(
         });
   }
 
+  return foundError;
+}
+
+bool SILValueOwnershipChecker::
+    discoverInteriorPointerOperandImplicitRegularUsers(
+        const InteriorPointerOperand &interiorPointerOperand,
+        SmallVectorImpl<Operand *> &implicitRegularUsers) {
+  SILValue projectedAddress = interiorPointerOperand.getProjectedAddress();
+  SmallVector<Operand *, 8> worklist(projectedAddress->getUses());
+
+  bool foundError = false;
+
+  while (!worklist.empty()) {
+    auto *op = worklist.pop_back_val();
+
+    // Skip type dependent operands.
+    if (op->isTypeDependent())
+      continue;
+
+    // Before we do anything, add this operand to our implicit regular user
+    // list.
+    implicitRegularUsers.push_back(op);
+
+    // Then update the worklist with new things to find if we recognize this
+    // inst and then continue. If we fail, we emit an error at the bottom of the
+    // loop that we didn't recognize the user.
+    auto *user = op->getUser();
+
+    // First, eliminate "end point uses" that we just need to check liveness at
+    // and do not need to check transitive uses of.
+    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) ||
+        isIncidentalUse(user) || isa<StoreInst>(user) ||
+        isa<StoreBorrowInst>(user) || isa<PartialApplyInst>(user) ||
+        isa<DestroyAddrInst>(user) || isa<AssignInst>(user) ||
+        isa<AddressToPointerInst>(user) || isa<YieldInst>(user) ||
+        isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user) ||
+        isa<EndApplyInst>(user) || isa<LoadWeakInst>(user) ||
+        isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user) ||
+        isa<BeginUnpairedAccessInst>(user) ||
+        isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
+        isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
+        isa<SelectEnumAddrInst>(user)) {
+      continue;
+    }
+
+    // Then handle users that we need to look at transitive uses of.
+    if (Projection::isAddressProjection(user) ||
+        isa<ProjectBlockStorageInst>(user) ||
+        isa<OpenExistentialAddrInst>(user) ||
+        isa<InitExistentialAddrInst>(user) || isa<BeginAccessInst>(user) ||
+        isa<TailAddrInst>(user) || isa<IndexAddrInst>(user)) {
+      for (SILValue r : user->getResults()) {
+        llvm::copy(r->getUses(), std::back_inserter(worklist));
+      }
+      continue;
+    }
+
+    if (auto *builtin = dyn_cast<BuiltinInst>(user)) {
+      if (auto kind = builtin->getBuiltinKind()) {
+        if (*kind == BuiltinValueKind::TSanInoutAccess) {
+          continue;
+        }
+      }
+    }
+
+    // If we have a load_borrow, add it's end scope to the liveness requirement.
+    if (auto *lbi = dyn_cast<LoadBorrowInst>(user)) {
+      transform(lbi->getEndBorrows(), std::back_inserter(implicitRegularUsers),
+                [](EndBorrowInst *ebi) { return &ebi->getAllOperands()[0]; });
+      continue;
+    }
+
+    // TODO: Merge this into the full apply site code below.
+    if (auto *beginApply = dyn_cast<BeginApplyInst>(user)) {
+      // TODO: Just add this to implicit regular user list?
+      llvm::copy(beginApply->getTokenResult()->getUses(),
+                 std::back_inserter(implicitRegularUsers));
+      continue;
+    }
+
+    if (auto fas = FullApplySite::isa(user)) {
+      continue;
+    }
+
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
+      // If this is the base, just treat it as a liveness use.
+      if (op->get() == mdi->getBase()) {
+        continue;
+      }
+
+      // If we are the value use, look through it.
+      llvm::copy(mdi->getValue()->getUses(), std::back_inserter(worklist));
+      continue;
+    }
+
+    // We were unable to recognize this user, so return true that we failed.
+    handleError([&] {
+      llvm::errs()
+          << "Function: " << op->getUser()->getFunction()->getName() << "\n"
+          << "Could not recognize address user of interior pointer operand!\n"
+          << "Interior Pointer Operand: "
+          << *interiorPointerOperand.operand->getUser()
+          << "Address User: " << *op->getUser();
+    });
+    foundError = true;
+  }
+
+  // We were able to recognize all of the uses of the address, so return false
+  // that we did not find any errors.
   return foundError;
 }
 
@@ -348,8 +460,8 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
     // initial end scope instructions without any further work.
     //
     // Maybe: Is borrow scope non-local?
-    foundError |= discoverImplicitRegularUsers(*initialScopedOperand,
-                                               implicitRegularUsers, false);
+    foundError |= discoverBorrowOperandImplicitRegularUsers(
+        *initialScopedOperand, implicitRegularUsers, false);
   }
 
   return foundError;
@@ -441,11 +553,19 @@ bool SILValueOwnershipChecker::gatherUsers(
       if (auto scopedOperand = BorrowScopeOperand::get(op)) {
         assert(!scopedOperand->consumesGuaranteedValues());
 
-        foundError |= discoverImplicitRegularUsers(*scopedOperand,
-                                                   implicitRegularUsers, true);
+        foundError |= discoverBorrowOperandImplicitRegularUsers(
+            *scopedOperand, implicitRegularUsers, true);
       }
 
-      // And then add the op to the non lifetime ending user list.
+      // Next see if our use is an interior pointer operand. If we have an
+      // interior pointer, we need to add all of its address uses as "implicit
+      // regular users" of our consumed value.
+      if (auto interiorPointerOperand = InteriorPointerOperand::get(op)) {
+        foundError |= discoverInteriorPointerOperandImplicitRegularUsers(
+            *interiorPointerOperand, implicitRegularUsers);
+      }
+
+      // Finally add the op to the non lifetime ending user list.
       LLVM_DEBUG(llvm::dbgs() << "        Regular User: " << *user);
       nonLifetimeEndingUsers.push_back(op);
       continue;
@@ -485,71 +605,28 @@ bool SILValueOwnershipChecker::gatherUsers(
       continue;
     }
 
-    // See if our forwarding terminator is a transformation terminator. If so,
-    // just add all of the uses of its successors to the worklist to visit as
-    // users.
-    if (ti->isTransformationTerminator()) {
-      for (auto &succ : ti->getSuccessors()) {
-        auto *succBlock = succ.getBB();
-
-        // If we do not have any arguments, then continue.
-        if (succBlock->args_empty())
-          continue;
-
-        // Otherwise, make sure that all arguments are trivial or guaranteed.
-        // If we fail, emit an error.
-        //
-        // TODO: We could ignore this error and emit a more specific error on
-        // the actual terminator.
-        for (auto *succArg : succBlock->getSILPhiArguments()) {
-          // *NOTE* We do not emit an error here since we want to allow for
-          // more specific errors to be found during use_verification.
-          //
-          // TODO: Add a flag that associates the terminator instruction with
-          // needing to be verified. If it isn't verified appropriately,
-          // assert when the verifier is destroyed.
-          auto succArgOwnershipKind = succArg->getOwnershipKind();
-          if (!succArgOwnershipKind.isCompatibleWith(
-                  ValueOwnershipKind::Guaranteed)) {
-            // This is where the error would go.
-            continue;
-          }
-
-          // If we have an any value, just continue.
-          if (succArgOwnershipKind == ValueOwnershipKind::None)
-            continue;
-
-          // Otherwise add all users of this BBArg to the worklist to visit
-          // recursively.
-          llvm::copy(succArg->getUses(), std::back_inserter(users));
-        }
-      }
-      continue;
-    }
-
-    // We should not have a true phi here. So validate that our argument has an
-    // end_borrow that acts as a subscope that is compeltely enclosed within the
-    // scopes of all incoming values. We require all of our arguments to be
-    // either trivial or guaranteed.
-    for (auto &succ : ti->getSuccessors()) {
-      auto *succBlock = succ.getBB();
-
+    // At this point, the only type of thing we could have is a transformation
+    // terminator since all forwarding terminators are transformation
+    // terminators.
+    assert(ti->isTransformationTerminator() &&
+           "Out of sync with isTransformationTerminator()");
+    for (auto *succBlock : ti->getSuccessorBlocks()) {
       // If we do not have any arguments, then continue.
       if (succBlock->args_empty())
         continue;
 
-      // Otherwise, make sure that all arguments are trivial or guaranteed. If
-      // we fail, emit an error.
+      // Otherwise, make sure that all arguments are trivial or guaranteed.
+      // If we fail, emit an error.
       //
       // TODO: We could ignore this error and emit a more specific error on
       // the actual terminator.
       for (auto *succArg : succBlock->getSILPhiArguments()) {
-        // *NOTE* We do not emit an error here since we want to allow for more
-        // specific errors to be found during use_verification.
+        // *NOTE* We do not emit an error here since we want to allow for
+        // more specific errors to be found during use_verification.
         //
         // TODO: Add a flag that associates the terminator instruction with
-        // needing to be verified. If it isn't verified appropriately, assert
-        // when the verifier is destroyed.
+        // needing to be verified. If it isn't verified appropriately,
+        // assert when the verifier is destroyed.
         auto succArgOwnershipKind = succArg->getOwnershipKind();
         if (!succArgOwnershipKind.isCompatibleWith(
                 ValueOwnershipKind::Guaranteed)) {
@@ -561,16 +638,9 @@ bool SILValueOwnershipChecker::gatherUsers(
         if (succArgOwnershipKind == ValueOwnershipKind::None)
           continue;
 
-        // Otherwise add all end_borrow users for this BBArg to the
-        // implicit regular user list. We know that BBArg must be
-        // completely joint post-dominated by these users, so we use
-        // them to ensure that all of BBArg's uses are completely
-        // enclosed within the end_borrow of this argument.
-        for (auto *op : succArg->getUses()) {
-          if (isa<EndBorrowInst>(op->getUser())) {
-            implicitRegularUsers.push_back(op);
-          }
-        }
+        // Otherwise add all users of this BBArg to the worklist to visit
+        // recursively.
+        llvm::copy(succArg->getUses(), std::back_inserter(users));
       }
     }
   }

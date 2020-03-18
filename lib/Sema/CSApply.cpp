@@ -165,6 +165,13 @@ ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
       });
 }
 
+ConstraintLocator *
+Solution::getConstraintLocator(Expr *anchor,
+                               ArrayRef<LocatorPathElt> path) const {
+  auto &cs = getConstraintSystem();
+  return cs.getConstraintLocator(anchor, path);
+}
+
 /// Return the implicit access kind for a MemberRefExpr with the
 /// specified base and member in the specified DeclContext.
 static AccessSemantics
@@ -1408,13 +1415,12 @@ namespace {
       // Compute the concrete reference to the subscript.
       auto subscriptRef = resolveConcreteDeclRef(subscript, memberLoc);
 
-      // Figure out the index and result types.
-      auto subscriptTy = simplifyType(selected.openedType);
-      auto *subscriptFnTy = subscriptTy->castTo<FunctionType>();
-      auto resultTy = subscriptFnTy->getResult();
-
       // Coerce the index argument.
-      index = coerceCallArguments(index, subscriptFnTy, subscriptRef, nullptr,
+      auto openedFullFnType = simplifyType(selected.openedFullType)
+                                  ->castTo<FunctionType>();
+      auto fullSubscriptTy = openedFullFnType->getResult()
+                                  ->castTo<FunctionType>();
+      index = coerceCallArguments(index, fullSubscriptTy, subscriptRef, nullptr,
                                   argLabels, hasTrailingClosure,
                                   locator.withPathElement(
                                     ConstraintLocator::ApplyArgument));
@@ -1436,6 +1442,11 @@ namespace {
         // TODO: diagnose if semantics != AccessSemantics::Ordinary?
         auto subscriptExpr = DynamicSubscriptExpr::create(
             ctx, base, index, subscriptRef, isImplicit, getType);
+        auto resultTy = simplifyType(selected.openedType)
+                            ->castTo<FunctionType>()
+                            ->getResult();
+        assert(!selected.openedFullType->hasOpenedExistential()
+               && "open existential archetype in AnyObject subscript type?");
         cs.setType(subscriptExpr, resultTy);
         Expr *result = subscriptExpr;
         closeExistential(result, locator);
@@ -1443,7 +1454,6 @@ namespace {
       }
 
       // Convert the base.
-      auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
       auto openedBaseType =
           getBaseType(openedFullFnType, /*wantsRValue*/ false);
       auto containerTy = solution.simplifyType(openedBaseType);
@@ -1469,7 +1479,7 @@ namespace {
       // Form the subscript expression.
       auto subscriptExpr = SubscriptExpr::create(
           ctx, base, index, subscriptRef, isImplicit, semantics, getType);
-      cs.setType(subscriptExpr, resultTy);
+      cs.setType(subscriptExpr, fullSubscriptTy->getResult());
       subscriptExpr->setIsSuper(isSuper);
 
       Expr *result = subscriptExpr;
@@ -4216,7 +4226,7 @@ namespace {
       Type baseTy, leafTy;
       Type exprType = cs.getType(E);
       if (auto fnTy = exprType->getAs<FunctionType>()) {
-        baseTy = fnTy->getParams()[0].getPlainType();
+        baseTy = fnTy->getParams()[0].getParameterType();
         leafTy = fnTy->getResult();
         isFunctionType = true;
       } else {
@@ -4225,12 +4235,15 @@ namespace {
         leafTy = keyPathTy->getGenericArgs()[1];
       }
 
+      // Track the type of the current component. Once we finish projecting
+      // through each component of the key path, we should reach the leafTy.
+      auto componentTy = baseTy;
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getMutableComponents()[i];
         
         // If there were unresolved types, we may end up with a null base for
         // following components.
-        if (!baseTy) {
+        if (!componentTy) {
           resolvedComponents.push_back(origComponent);
           continue;
         }
@@ -4252,7 +4265,7 @@ namespace {
           if (!foundDecl) {
             // If we couldn't resolve the component, leave it alone.
             resolvedComponents.push_back(origComponent);
-            baseTy = origComponent.getComponentType();
+            componentTy = origComponent.getComponentType();
             continue;
           }
 
@@ -4291,9 +4304,9 @@ namespace {
           didOptionalChain = true;
           // Chaining always forces the element to be an rvalue.
           auto objectTy =
-              baseTy->getWithoutSpecifierType()->getOptionalObjectType();
-          if (baseTy->hasUnresolvedType() && !objectTy) {
-            objectTy = baseTy;
+              componentTy->getWithoutSpecifierType()->getOptionalObjectType();
+          if (componentTy->hasUnresolvedType() && !objectTy) {
+            objectTy = componentTy;
           }
           assert(objectTy);
           
@@ -4313,7 +4326,7 @@ namespace {
         }
         case KeyPathExpr::Component::Kind::Identity: {
           auto component = origComponent;
-          component.setComponentType(baseTy);
+          component.setComponentType(componentTy);
           resolvedComponents.push_back(component);
           break;
         }
@@ -4324,21 +4337,20 @@ namespace {
           llvm_unreachable("already resolved");
         }
 
-        // Update "baseTy" with the result type of the last component.
+        // Update "componentTy" with the result type of the last component.
         assert(!resolvedComponents.empty());
-        baseTy = resolvedComponents.back().getComponentType();
+        componentTy = resolvedComponents.back().getComponentType();
       }
       
       // Wrap a non-optional result if there was chaining involved.
-      if (didOptionalChain &&
-          baseTy &&
-          !baseTy->hasUnresolvedType() &&
-          !baseTy->getWithoutSpecifierType()->isEqual(leafTy)) {
+      if (didOptionalChain && componentTy &&
+          !componentTy->hasUnresolvedType() &&
+          !componentTy->getWithoutSpecifierType()->isEqual(leafTy)) {
         assert(leafTy->getOptionalObjectType()->isEqual(
-            baseTy->getWithoutSpecifierType()));
+            componentTy->getWithoutSpecifierType()));
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
-        baseTy = leafTy;
+        componentTy = leafTy;
       }
 
       // Set the resolved components, and cache their types.
@@ -4364,8 +4376,8 @@ namespace {
       
       // The final component type ought to line up with the leaf type of the
       // key path.
-      assert(!baseTy || baseTy->hasUnresolvedType()
-             || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
+      assert(!componentTy || componentTy->hasUnresolvedType()
+             || componentTy->getWithoutSpecifierType()->isEqual(leafTy));
 
       if (!isFunctionType)
         return E;
@@ -4374,9 +4386,6 @@ namespace {
       // a closure. The type checker has given E a function type to indicate
       // this; we're going to change E's type to KeyPath<baseTy, leafTy> and
       // then wrap it in a larger closure expression with the appropriate type.
-
-      // baseTy has been overwritten by the loop above; restore it.
-      baseTy = exprType->getAs<FunctionType>()->getParams()[0].getPlainType();
 
       // Compute KeyPath<baseTy, leafTy> and set E's type back to it.
       auto kpDecl = cs.getASTContext().getKeyPathDecl();
@@ -7323,7 +7332,8 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
         auto *primaryFix = fixes[0];
         ArrayRef<ConstraintFix *> secondaryFixes{fixes.begin() + 1, fixes.end()};
 
-        auto diagnosed = primaryFix->coalesceAndDiagnose(secondaryFixes);
+        auto diagnosed =
+            primaryFix->coalesceAndDiagnose(solution, secondaryFixes);
         if (primaryFix->isWarning()) {
           assert(diagnosed && "warnings should always be diagnosed");
           (void)diagnosed;
@@ -7461,7 +7471,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
       case StmtConditionElement::CK_PatternBinding: {
         ConstraintSystem &cs = solution.getConstraintSystem();
-        auto target = *cs.getStmtConditionTarget(&condElement);
+        auto target = *cs.getSolutionApplicationTarget(&condElement);
         auto resolvedTarget = rewriteTarget(target);
         if (!resolvedTarget)
           return None;
@@ -7472,6 +7482,45 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
         continue;
       }
       }
+    }
+
+    return target;
+  } else if (auto caseLabelItem = target.getAsCaseLabelItem()) {
+    ConstraintSystem &cs = solution.getConstraintSystem();
+    auto info = *cs.getCaseLabelItemInfo(*caseLabelItem);
+
+    // Figure out the pattern type.
+    Type patternType = solution.simplifyType(solution.getType(info.pattern));
+    patternType = patternType->reconstituteSugar(/*recursive=*/false);
+
+    // Coerce the pattern to its appropriate type.
+    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+    patternOptions |= TypeResolutionFlags::OverrideType;
+    auto contextualPattern =
+        ContextualPattern::forRawPattern(info.pattern,
+                                         target.getDeclContext());
+    if (auto coercedPattern = TypeChecker::coercePatternToType(
+            contextualPattern, patternType, patternOptions)) {
+      (*caseLabelItem)->setPattern(coercedPattern);
+    } else {
+      return None;
+    }
+
+    // If there is a guard expression, coerce that.
+    if (auto guardExpr = info.guardExpr) {
+      guardExpr = guardExpr->walk(*this);
+      if (!guardExpr)
+        return None;
+
+      // FIXME: Feels like we could leverage existing code more.
+      Type boolType = cs.getASTContext().getBoolDecl()->getDeclaredType();
+      guardExpr = solution.coerceToType(
+          guardExpr, boolType, cs.getConstraintLocator(info.guardExpr));
+      if (!guardExpr)
+        return None;
+
+      (*caseLabelItem)->setGuardExpr(guardExpr);
+      solution.setExprTypes(guardExpr);
     }
 
     return target;
@@ -7659,13 +7708,13 @@ ProtocolConformanceRef Solution::resolveConformance(
   return ProtocolConformanceRef::forInvalid();
 }
 
-Type Solution::getType(const Expr *expr) const {
-  auto result = nodeTypes.find(expr);
+Type Solution::getType(TypedNode node) const {
+  auto result = nodeTypes.find(node);
   if (result != nodeTypes.end())
     return result->second;
 
   auto &cs = getConstraintSystem();
-  return cs.getType(expr);
+  return cs.getType(node);
 }
 
 void Solution::setExprTypes(Expr *expr) const {
@@ -7747,6 +7796,18 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
     for (auto &condElement : stmtCondition.stmtCondition) {
       condElement = *condElement.walk(walker);
     }
+    return *this;
+
+  case Kind::caseLabelItem:
+    if (auto newPattern =
+            caseLabelItem.caseLabelItem->getPattern()->walk(walker)) {
+      caseLabelItem.caseLabelItem->setPattern(newPattern);
+    }
+    if (auto guardExpr = caseLabelItem.caseLabelItem->getGuardExpr()) {
+      if (auto newGuardExpr = guardExpr->walk(walker))
+        caseLabelItem.caseLabelItem->setGuardExpr(newGuardExpr);
+    }
+
     return *this;
   }
 }

@@ -12,6 +12,8 @@
 // Adds Symbol Graph JSON serialization to other types.
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "JSON.h"
 
 void swift::symbolgraphgen::serialize(const llvm::VersionTuple &VT,
@@ -54,4 +56,48 @@ void swift::symbolgraphgen::serialize(const llvm::Triple &T,
       OS.attributeEnd();
     });
   });
+}
+
+void swift::symbolgraphgen::serialize(const ExtensionDecl *Extension,
+                                      llvm::json::OStream &OS) {
+  OS.attributeObject("swiftExtension", [&](){
+    if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
+      if (const auto *ExtendedModule = ExtendedNominal->getModuleContext()) {
+        OS.attribute("extendedModule", ExtendedModule->getNameStr());
+      }
+    }
+    auto Generics = Extension->getGenericSignature();
+    if (Generics && !Generics->getRequirements().empty()) {
+      OS.attributeArray("constraints", [&](){
+        for (const auto &Requirement : Generics->getRequirements()) {
+          serialize(Requirement, OS);
+        }
+      }); // end constraints:
+    }
+  }); // end swiftExtension:
+}
+
+void swift::symbolgraphgen::serialize(const Requirement &Req,
+                                      llvm::json::OStream &OS) {
+  StringRef Kind;
+  switch (Req.getKind()) {
+    case swift::RequirementKind::Conformance:
+      Kind = "conformance";
+      break;
+    case swift::RequirementKind::Superclass:
+      Kind = "superclass";
+      break;
+    case swift::RequirementKind::SameType:
+      Kind = "sameType";
+      break;
+    case swift::RequirementKind::Layout:
+      return;
+  }
+
+  OS.object([&](){
+    OS.attribute("kind", Kind);
+    OS.attribute("lhs", Req.getFirstType()->getString());
+    OS.attribute("rhs", Req.getSecondType()->getString());
+  });
+
 }

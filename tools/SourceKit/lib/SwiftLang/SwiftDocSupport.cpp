@@ -274,7 +274,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
     if (GP->getDecl()->isImplicit())
       continue;
     DocGenericParam Param;
-    Param.Name = GP->getName().str();
+    Param.Name = std::string(GP->getName());
     Info.GenericParams.push_back(Param);
   }
 
@@ -959,7 +959,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   AnnotatingPrinter Printer(OS);
   printModuleInterface(M, None, TraversalOptions, Printer, Options,
                        true);
-  Info.Text = OS.str();
+  Info.Text = std::string(OS.str());
   Info.TopEntities = std::move(Printer.TopEntities);
   Info.References = std::move(Printer.References);
   return false;
@@ -978,7 +978,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
 
   ASTContext &Ctx = CI.getASTContext();
   registerIDERequestFunctions(Ctx.evaluator);
-  (void)createTypeChecker(Ctx);
+  Ctx.setLegacySemanticQueriesEnabled();
 
   SourceTextInfo IFaceInfo;
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))
@@ -1080,7 +1080,7 @@ static bool getSourceTextInfo(CompilerInstance &CI,
   Walker.walk(*CI.getMainModule());
 
   CharSourceRange FullRange = SM.getRangeForBuffer(BufID);
-  Info.Text = SM.extractText(FullRange);
+  Info.Text = SM.extractText(FullRange).str();
   Info.TopEntities = std::move(Walker.TopEntities);
   Info.References = std::move(Walker.References);
   return false;
@@ -1107,7 +1107,7 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   CI.performSema();
 
   // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(Ctx);
+  Ctx.setLegacySemanticQueriesEnabled();
 
   SourceTextInfo SourceInfo;
   if (getSourceTextInfo(CI, SourceInfo))
@@ -1168,8 +1168,8 @@ public:
                          R.StartLine, R.StartColumn, R.EndLine, R.EndColumn,
                          R.ArgIndex
                        }; });
-      return {Start.first, Start.second, End.first, End.second, R.Text,
-        std::move(SubRanges)};
+      return {Start.first, Start.second, End.first,
+              End.second,  R.Text.str(), std::move(SubRanges)};
     });
     unsigned End = AllEdits.size();
     StartEnds.emplace_back(Start, End);
@@ -1458,7 +1458,7 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
 
   ASTContext &Ctx = CI.getASTContext();
   // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(Ctx);
+  Ctx.setLegacySemanticQueriesEnabled();
 
   // Load standard library so that Clang importer can use it.
   auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);

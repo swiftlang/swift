@@ -108,7 +108,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
                                            Info.FormatArgs);
   }
-  SKInfo.Description = Text.str();
+  SKInfo.Description = std::string(Text.str());
 
   for (auto notePath : Info.EducationalNotePaths)
     SKInfo.EducationalNotePaths.push_back(notePath);
@@ -151,7 +151,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     SKInfo.Offset = SM.getLocOffsetInBuffer(Info.Loc, BufferID);
     std::tie(SKInfo.Line, SKInfo.Column) =
         SM.getLineAndColumn(Info.Loc, BufferID);
-    SKInfo.Filename = SM.getDisplayNameForLoc(Info.Loc);
+    SKInfo.Filename = SM.getDisplayNameForLoc(Info.Loc).str();
 
     for (auto R : Info.Ranges) {
       if (R.isInvalid() || SM.findBufferContainingLoc(R.getStart()) != BufferID)
@@ -168,7 +168,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
       unsigned Offset =
           SM.getLocOffsetInBuffer(F.getRange().getStart(), BufferID);
       unsigned Length = F.getRange().getByteLength();
-      SKInfo.Fixits.push_back({Offset, Length, F.getText()});
+      SKInfo.Fixits.push_back({Offset, Length, F.getText().str()});
     }
   } else {
     SKInfo.Filename = "<unknown>";
@@ -714,9 +714,6 @@ public:
         Parser->getParser().Context.evaluator);
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
 
-    // Collecting syntactic information shouldn't evaluate # conditions.
-    Parser->getParser().State->PerformConditionEvaluation = false;
-
     // If there is a syntax parsing cache, incremental syntax parsing is
     // performed and thus the generated AST may not be up-to-date.
     HasUpToDateAST = CompInv.getMainFileSyntaxParsingCache() == nullptr;
@@ -1184,9 +1181,25 @@ static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
   llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
+/// Document structure is a purely syntactic request that shouldn't require name lookup
+/// or type-checking, so this is a best-effort computation.
+static bool inferIsSettableSyntactically(const AbstractStorageDecl *D) {
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (VD->isLet())
+      return false;
+  }
+  if (D->hasParsedAccessors()) {
+    return D->getParsedAccessor(AccessorKind::Set) != nullptr ||
+           D->getParsedAccessor(AccessorKind::WillSet) != nullptr ||
+           D->getParsedAccessor(AccessorKind::DidSet) != nullptr;
+  } else {
+    return true;
+  }
+}
+
 static Optional<AccessLevel>
 inferSetterAccessSyntactically(const AbstractStorageDecl *D) {
-  if (!D->isSettable(/*UseDC=*/nullptr))
+  if (!inferIsSettableSyntactically(D))
     return None;
   if (auto *AA = D->getAttrs().getAttribute<SetterAccessAttr>())
     return AA->getAccess();

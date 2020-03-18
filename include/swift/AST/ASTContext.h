@@ -105,11 +105,11 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
-  class TypeChecker;
   class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
   class SILBoxType;
+  class SILTransform;
   class TypeAliasDecl;
   class VarDecl;
   class UnifiedStatsReporter;
@@ -332,6 +332,32 @@ private:
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 
+private:
+  bool SemanticQueriesEnabled = false;
+
+public:
+  /// Returns \c true if legacy semantic AST queries are enabled.
+  ///
+  /// The request evaluator generally subsumes the use of this bit. However,
+  /// there are clients - mostly SourceKit - that rely on the fact that this bit
+  /// being \c false causes some property wrapper requests to return null
+  /// sentinel values. These clients should be migrated off of this interface
+  /// to syntactic requests as soon as possible.
+  ///
+  /// rdar://60516325
+  bool areLegacySemanticQueriesEnabled() const {
+    return SemanticQueriesEnabled;
+  }
+
+  /// Enable "semantic queries".
+  ///
+  /// Setting this bit tells property wrapper requests to return a semantic
+  /// value.  It does not otherwise affect compiler behavior and should be
+  /// removed as soon as possible.
+  void setLegacySemanticQueriesEnabled() {
+    SemanticQueriesEnabled = true;
+  }
+
 public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long bytes, unsigned alignment,
@@ -441,18 +467,7 @@ public:
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);
 
-private:
-  friend class TypeChecker;
-
-  void installGlobalTypeChecker(TypeChecker *TC);
 public:
-  /// Returns if semantic AST queries are enabled. This generally means module
-  /// loading and name lookup can take place.
-  bool areSemanticQueriesEnabled() const;
-
-  /// Retrieve the global \c TypeChecker instance associated with this context.
-  TypeChecker *getLegacyGlobalTypeChecker() const;
-
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
@@ -623,9 +638,26 @@ public:
   void addDestructorCleanup(T &object) {
     addCleanup([&object]{ object.~T(); });
   }
+
+  /// Get the runtime availability of the class metadata update callback
+  /// mechanism for the target platform.
+  AvailabilityContext getObjCMetadataUpdateCallbackAvailability();
+
+  /// Get the runtime availability of the objc_getClass() hook for the target
+  /// platform.
+  AvailabilityContext getObjCGetClassHookAvailability();
   
-  /// Get the runtime availability of the opaque types language feature for the target platform.
+  /// Get the runtime availability of features introduced in the Swift 5.0
+  /// compiler for the target platform.
+  AvailabilityContext getSwift50Availability();
+
+  /// Get the runtime availability of the opaque types language feature for the
+  /// target platform.
   AvailabilityContext getOpaqueTypeAvailability();
+
+  /// Get the runtime availability of the objc_loadClassref() entry point for
+  /// the target platform.
+  AvailabilityContext getObjCClassStubsAvailability();
 
   /// Get the runtime availability of features introduced in the Swift 5.1
   /// compiler for the target platform.
@@ -977,6 +1009,15 @@ public:
 
   /// Each kind and SourceFile has its own cache for a Type.
   Type &getDefaultTypeRequestCache(SourceFile *, KnownProtocolKind);
+
+  using SILTransformCtors = ArrayRef<SILTransform *(*)(void)>;
+
+  /// Register IRGen specific SIL passes such that the SILOptimizer can access
+  /// and execute them without directly depending on IRGen.
+  void registerIRGenSILTransforms(SILTransformCtors fns);
+
+  /// Retrieve the IRGen specific SIL passes.
+  SILTransformCtors getIRGenSILTransforms() const;
 
 private:
   friend Decl;

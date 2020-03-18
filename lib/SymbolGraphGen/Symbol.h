@@ -17,20 +17,20 @@
 #include "swift/AST/Attr.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Markup/Markup.h"
-#include "SymbolGraph.h"
 
 namespace swift {
 namespace symbolgraphgen {
 
 struct AvailabilityDomain;
 struct SymbolGraphASTWalker;
+struct SymbolGraph;
 
 /// A symbol from a module: a node in a graph.
-struct Symbol {
+class Symbol {
   /// The symbol graph in which this symbol resides.
-  SymbolGraph &Graph;
-
+  SymbolGraph *Graph;
   const ValueDecl *VD;
+  const NominalTypeDecl *SynthesizedBaseTypeDecl;
 
   void serializeKind(StringRef Identifier, StringRef DisplayName,
                      llvm::json::OStream &OS) const;
@@ -58,9 +58,6 @@ struct Symbol {
   void serializeGenericParam(const swift::GenericTypeParamType &Param,
                              llvm::json::OStream &OS) const;
 
-  void serializeGenericRequirement(const swift::Requirement &Req,
-                                   llvm::json::OStream &OS) const;
-
   void serializeSwiftGenericMixin(llvm::json::OStream &OS) const;
 
   void serializeSwiftExtensionMixin(llvm::json::OStream &OS) const;
@@ -77,14 +74,77 @@ struct Symbol {
 
   void serializeAvailabilityMixin(llvm::json::OStream &OS) const;
 
+public:
+  Symbol(SymbolGraph *Graph, const ValueDecl *VD,
+         const NominalTypeDecl *SynthesizedBaseTypeDecl);
+
   void serialize(llvm::json::OStream &OS) const;
-  
-  bool operator==(const Symbol &Other) const {
-    return VD == Other.VD;
+
+  const SymbolGraph *getGraph() const {
+    return Graph;
   }
+
+  const ValueDecl *getSymbolDecl() const {
+    return VD;
+  }
+
+  Type getSynthesizedBaseType() const {
+    if (SynthesizedBaseTypeDecl) {
+      return SynthesizedBaseTypeDecl->getDeclaredInterfaceType();
+    } else {
+      return Type();
+    }
+  }
+
+  const NominalTypeDecl *getSynthesizedBaseTypeDecl() const {
+    return SynthesizedBaseTypeDecl;
+  }
+
+  void getPathComponents(SmallVectorImpl<SmallString<32>> &Components) const;
+
+  /// Print the symbol path to an output stream.
+  void printPath(llvm::raw_ostream &OS) const;
+
+  void getUSR(SmallVectorImpl<char> &USR) const;
 };
 
 } // end namespace symbolgraphgen
-} // end namespace swift 
+} // end namespace swift
+
+namespace llvm {
+using Symbol = swift::symbolgraphgen::Symbol;
+using SymbolGraph = swift::symbolgraphgen::SymbolGraph;
+
+template <> struct DenseMapInfo<Symbol> {
+  static inline Symbol getEmptyKey() {
+    return Symbol {
+      DenseMapInfo<SymbolGraph *>::getEmptyKey(),
+      DenseMapInfo<const swift::ValueDecl *>::getEmptyKey(),
+      DenseMapInfo<const swift::NominalTypeDecl *>::getTombstoneKey(),
+    };
+  }
+  static inline Symbol getTombstoneKey() {
+    return Symbol {
+      DenseMapInfo<SymbolGraph *>::getTombstoneKey(),
+      DenseMapInfo<const swift::ValueDecl *>::getTombstoneKey(),
+      DenseMapInfo<const swift::NominalTypeDecl *>::getTombstoneKey(),
+    };
+  }
+  static unsigned getHashValue(const Symbol S) {
+    unsigned H = 0;
+    H ^= DenseMapInfo<SymbolGraph *>::getHashValue(S.getGraph());
+    H ^= DenseMapInfo<const swift::ValueDecl *>::getHashValue(S.getSymbolDecl());
+    H ^= DenseMapInfo<const swift::NominalTypeDecl *>::getHashValue(S.getSynthesizedBaseTypeDecl());
+    return H;
+  }
+  static bool isEqual(const Symbol LHS, const Symbol RHS) {
+    return LHS.getGraph() == RHS.getGraph() &&
+        LHS.getSymbolDecl() == RHS.getSymbolDecl() &&
+        LHS.getSynthesizedBaseTypeDecl() ==
+            RHS.getSynthesizedBaseTypeDecl();
+  }
+};
+} // end namespace llvm
+
 
 #endif // SWIFT_SYMBOLGRAPHGEN_SYMBOL_H

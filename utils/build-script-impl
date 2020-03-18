@@ -420,6 +420,7 @@ function verify_host_is_supported() {
       | iphoneos-armv7          \
       | iphoneos-armv7s         \
       | iphoneos-arm64          \
+      | iphoneos-arm64e         \
       | appletvsimulator-x86_64 \
       | appletvos-arm64         \
       | watchsimulator-i386     \
@@ -517,6 +518,13 @@ function set_build_options_for_host() {
                     ;;
                 iphoneos-arm64)
                     SWIFT_HOST_TRIPLE="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="IOS"
+                    cmake_osx_deployment_target=""
+                    ;;
+                iphoneos-arm64e)
+                    SWIFT_HOST_TRIPLE="arm64e-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     llvm_target_arch="AArch64"
 
                     SWIFT_HOST_VARIANT_SDK="IOS"
@@ -1712,10 +1720,17 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_SDKS:STRING="$(join ";" ${SWIFT_SDKS[@]})"
                     )
                 fi
+
                 if [[ "${SWIFT_PRIMARY_VARIANT_SDK}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_PRIMARY_VARIANT_SDK:STRING="${SWIFT_PRIMARY_VARIANT_SDK}"
+                    )
+                fi
+
+                if [[ "${SWIFT_PRIMARY_VARIANT_ARCH}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
                         -DSWIFT_PRIMARY_VARIANT_ARCH:STRING="${SWIFT_PRIMARY_VARIANT_ARCH}"
                     )
                 fi
@@ -2329,21 +2344,31 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${BUILD_JOBS} '{ print (N < $2) ? N : $2 }')"
                 fi
 
+                FILTER_SWIFT_OPTION="--filter=[sS]wift"
+                LLVM_LIT_FILTER_ARG=""
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
-                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --filter=[sS]wift"
+                    LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
                 fi
 
                 # Record the times test took and report the slowest.
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
 
+                echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
+                echo "--- Running LLDB tests (Swift tests using ClangImporter) ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS}
+                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
+                echo "--- Rerun LLDB Swift tests (using only DWARFImporter) ---"
+                with_pushd ${results_dir} \
+                    call "${llvm_build_dir}/bin/llvm-lit" \
+                         "${lldb_build_dir}/test" \
+                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_OPTION} \
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=false"
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                     echo "Running LLDB swift compatibility tests against" \

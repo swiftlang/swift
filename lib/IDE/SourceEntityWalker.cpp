@@ -78,6 +78,8 @@ private:
 
   bool passSubscriptReference(ValueDecl *D, SourceLoc Loc,
                               ReferenceMetaData Data, bool IsOpenBracket);
+  bool passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
+                                   ReferenceMetaData Data);
 
   bool passCallArgNames(Expr *Fn, TupleExpr *TupleE);
 
@@ -268,6 +270,18 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
         return { true, E };
       }
+    }
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+    auto *FD = dyn_cast<FuncDecl>(DRE->getDecl());
+    // Handle implicit callAsFunction reference. An explicit reference will be
+    // handled by the usual DeclRefExpr case below.
+    if (DRE->isImplicit() && FD && FD->isCallAsFunctionMethod()) {
+      ReferenceMetaData data(SemaReferenceKind::DeclMemberRef, OpAccess);
+      if (!passCallAsFunctionReference(FD, DRE->getLoc(), data))
+        return {false, nullptr};
+      return {true, E};
     }
   }
 
@@ -643,6 +657,17 @@ bool SemaAnnotator::passSubscriptReference(ValueDecl *D, SourceLoc Loc,
   return Continue;
 }
 
+bool SemaAnnotator::passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
+                                                ReferenceMetaData Data) {
+  CharSourceRange Range =
+      Loc.isValid() ? CharSourceRange(Loc, 1) : CharSourceRange();
+
+  bool Continue = SEWalker.visitCallAsFunctionReference(D, Range, Data);
+  if (!Continue)
+    Cancelled = true;
+  return Continue;
+}
+
 bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
   return passReference(D, Ty, Loc.getBaseNameLoc(), Loc.getSourceRange(), Data);
@@ -790,6 +815,12 @@ bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
   return IsOpenBracket
              ? visitDeclReference(D, Range, nullptr, nullptr, Type(), Data)
              : true;
+}
+
+bool SourceEntityWalker::visitCallAsFunctionReference(ValueDecl *D,
+                                                      CharSourceRange Range,
+                                                      ReferenceMetaData Data) {
+  return true;
 }
 
 bool SourceEntityWalker::visitCallArgName(Identifier Name,

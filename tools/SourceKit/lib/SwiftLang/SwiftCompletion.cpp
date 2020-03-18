@@ -137,8 +137,9 @@ static bool swiftCodeCompleteImpl(
 
         SwiftConsumer.setContext(&CI.getASTContext(), &CI.getInvocation(),
                                  &CompletionContext);
-        performCodeCompletionSecondPass(CI.getPersistentParserState(),
-                                        *callbacksFactory);
+
+        auto SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
         SwiftConsumer.clearContext();
       });
 }
@@ -1087,7 +1088,7 @@ static void transformAndForwardResults(
     });
 
     auto *inputBuf = session->getBuffer();
-    std::string str = inputBuf->getBuffer().slice(0, offset);
+    std::string str = inputBuf->getBuffer().slice(0, offset).str();
     {
       llvm::raw_string_ostream OSS(str);
       SwiftToSourceKitCompletionAdapter::getResultSourceText(

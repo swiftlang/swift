@@ -317,6 +317,9 @@ public:
   virtual void validateArguments(DiagnosticEngine &diags,
                                  const llvm::opt::ArgList &args,
                                  StringRef defaultTarget) const {}
+
+  llvm::Expected<file_types::ID>
+  remarkFileTypeFromArgs(const llvm::opt::ArgList &Args) const;
 };
 } // end namespace driver
 } // end namespace swift

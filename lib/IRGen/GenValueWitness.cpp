@@ -37,6 +37,7 @@
 #include "GenEnum.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
+#include "GenPointerAuth.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -800,7 +801,8 @@ static void addValueWitness(IRGenModule &IGM,
                             SILType concreteType,
                             const TypeInfo &concreteTI) {
   auto addFunction = [&](llvm::Constant *fn) {
-    B.addBitCast(fn, IGM.Int8PtrTy);
+    fn = llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
+    B.addSignedPointer(fn, IGM.getOptions().PointerAuth.ValueWitnesses, index);
   };
 
   // Try to use a standard function.
@@ -1243,6 +1245,18 @@ FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
 
   // Otherwise we're stuck and have to separately allocate.
   return FixedPacking::Allocate;
+}
+
+bool TypeInfo::canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                                   unsigned index) const {
+  // If this type is POD, then its value witnesses are trivial, so can handle
+  // any bit pattern.
+  if (isPOD(ResilienceExpansion::Maximal)) {
+    return true;
+  }
+  
+  // By default, assume that extra inhabitants must be branched out on.
+  return false;
 }
 
 Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,

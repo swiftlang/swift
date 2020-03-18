@@ -256,6 +256,8 @@ public:
                                SourceLoc();
   }
 
+  std::string getLineString(unsigned BufferID, unsigned LineNumber);
+
   SourceLoc getLocFromExternalSource(StringRef Path, unsigned Line, unsigned Col);
 private:
   const VirtualFile *getVirtualFile(SourceLoc Loc) const;

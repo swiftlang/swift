@@ -56,8 +56,19 @@ using namespace llvm::yaml;
 using StringSet = llvm::StringSet<>;
 using SymbolKind = llvm::MachO::SymbolKind;
 
+static constexpr StringLiteral ObjC2ClassNamePrefix = "_OBJC_CLASS_$_";
+static constexpr StringLiteral ObjC2MetaClassNamePrefix = "_OBJC_METACLASS_$_";
+
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
+}
+
+// If a symbol is implied, we don't need to emit it explictly into the tbd file.
+// e.g. When a symbol is in the `objc-classes` section in a tbd file, a additional
+// symbol with `_OBJC_CLASS_$_` is implied.
+static bool isSymbolImplied(StringRef name) {
+  return name.startswith(ObjC2ClassNamePrefix) ||
+    name.startswith(ObjC2MetaClassNamePrefix);
 }
 
 void TBDGenVisitor::addSymbolInternal(StringRef name,
@@ -65,7 +76,8 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
                                       bool isLinkerDirective) {
   if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
     return;
-  Symbols.addSymbol(kind, name, Targets);
+  if (!isSymbolImplied(name))
+    Symbols.addSymbol(kind, name, Targets);
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(name).second;
     (void)isNewValue;
@@ -265,12 +277,24 @@ getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
   return getLinkerPlatformName((uint8_t)getLinkerPlatformId(Ver));
 }
 
+/// Find the most relevant introducing version of the decl stack we have visted
+/// so far.
+static Optional<llvm::VersionTuple>
+getInnermostIntroVersion(ArrayRef<Decl*> DeclStack, PlatformKind Platform) {
+  for (auto It = DeclStack.rbegin(); It != DeclStack.rend(); ++ It) {
+    if (auto Result = (*It)->getIntroducedOSVersion(Platform))
+      return Result;
+  }
+  return None;
+}
+
 void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
                                                 llvm::MachO::SymbolKind kind) {
   if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
     return;
-  if (!TopLevelDecl)
+  if(DeclStack.empty())
     return;
+  auto TopLevelDecl = DeclStack.front();
   auto MovedVers = getAllMovedPlatformVersions(TopLevelDecl);
   if (MovedVers.empty())
     return;
@@ -278,12 +302,16 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
   assert(previousInstallNameMap);
   auto &Ctx = TopLevelDecl->getASTContext();
   for (auto &Ver: MovedVers) {
-    auto IntroVer = TopLevelDecl->getIntroducedOSVersion(Ver.Platform);
+    auto IntroVer = getInnermostIntroVersion(DeclStack, Ver.Platform);
     assert(IntroVer && "cannot find OS intro version");
     if (!IntroVer.hasValue())
       continue;
+    // This decl is available after the top-level symbol has been moved here,
+    // so we don't need the linker directives.
+    if (*IntroVer >= Ver.Version)
+      continue;
     auto PlatformNumber = getLinkerPlatformId(Ver);
-    auto It = previousInstallNameMap->find(Ver.ModuleName);
+    auto It = previousInstallNameMap->find(Ver.ModuleName.str());
     if (It == previousInstallNameMap->end()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
                          Ver.ModuleName, getLinkerPlatformName(Ver));
@@ -318,8 +346,9 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
                                                     llvm::MachO::SymbolKind kind) {
   if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
     return;
-  if (!TopLevelDecl)
+  if (DeclStack.empty())
     return;
+  auto TopLevelDecl = DeclStack.front();
   auto MovedVers = getAllMovedPlatformVersions(TopLevelDecl);
   if (MovedVers.empty())
     return;
@@ -334,11 +363,12 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
   unsigned Minor[2];
   Major[1] = MovedVer.getMajor();
   Minor[1] = MovedVer.getMinor().hasValue() ? *MovedVer.getMinor(): 0;
-  auto IntroVer = TopLevelDecl->getIntroducedOSVersion(Platform);
+  auto IntroVer = getInnermostIntroVersion(DeclStack, Platform);
   assert(IntroVer && "cannot find the start point of availability");
   if (!IntroVer.hasValue())
     return;
-  assert(*IntroVer < MovedVer);
+  // This decl is available after the top-level symbol has been moved here,
+  // so we don't need the linker directives.
   if (*IntroVer >= MovedVer)
     return;
   Major[0] = IntroVer->getMajor();
@@ -439,8 +469,12 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     if (!rootConformance) {
       continue;
     }
-
-    addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
+    // We cannot emit the witness table symbol if the protocol is imported from
+    // another module and it's resilient, because initialization of that protocol
+    // is necessary in this case
+    if (!rootConformance->getProtocol()->isResilient(DC->getParentModule(),
+                                                     ResilienceExpansion::Maximal))
+      addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
     addSymbol(LinkEntity::forProtocolConformanceDescriptor(rootConformance));
 
     // FIXME: the logic around visibility in extensions is confusing, and
@@ -895,6 +929,12 @@ void TBDGenVisitor::addFirstFileSymbols() {
   }
 }
 
+void TBDGenVisitor::visit(Decl *D) {
+  DeclStack.push_back(D);
+  SWIFT_DEFER { DeclStack.pop_back(); };
+  ASTVisitor::visit(D);
+}
+
 /// The kind of version being parsed, used for diagnostics.
 /// Note: Must match the order in DiagnosticsFrontend.def
 enum DylibVersionKind_t: unsigned {
@@ -978,7 +1018,11 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
 
   llvm::MachO::Target target(triple);
   file.addTarget(target);
-
+  // Add target variant
+  if (ctx.LangOpts.TargetVariant.hasValue()) {
+    llvm::MachO::Target targetVar(*ctx.LangOpts.TargetVariant);
+    file.addTarget(targetVar);
+  }
   StringSet symbols;
   auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   TBDGenVisitor visitor(file, {target}, &symbols,
@@ -998,8 +1042,6 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
     for (auto d : decls) {
       if (opts.LinkerDirectivesOnly && !hasLinkerDirective(d))
         continue;
-      visitor.TopLevelDecl = d;
-      SWIFT_DEFER { visitor.TopLevelDecl = nullptr; };
       visitor.visit(d);
     }
   };

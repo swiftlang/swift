@@ -349,7 +349,7 @@ func convFuncExistential(_ f1: @escaping (Any) -> (Int) -> Int) {
 // CHECK-NEXT:    partial_apply
 // CHECK-NEXT:    convert_function
 // CHECK-NEXT:    init_existential_addr %0 : $*Any, $(Int) -> Int
-// CHECK-NEXT:    store {{.*}} to {{.*}} : $*@callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Int>
+// CHECK-NEXT:    store {{.*}} to {{.*}} : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Int>
 // CHECK:         return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sS2iIegyd_S2iIegnr_TR : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> Int) -> @out Int
@@ -440,8 +440,8 @@ func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (
   return f
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s19function_conversion27convTupleToOptionalIndirectyx_xtSgxcx_xtxclF : $@convention(thin) <T> (@guaranteed @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <T, T, T>) -> @owned @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (@in_guaranteed τ_0_0) -> @out Optional<(τ_0_1, τ_0_2)> for <T, T, T>
-// CHECK:       bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <T, T, T>):
+// CHECK-LABEL: sil hidden [ossa] @$s19function_conversion27convTupleToOptionalIndirectyx_xtSgxcx_xtxclF : $@convention(thin) <T> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <T, T, T>) -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> @out Optional<(τ_0_1, τ_0_2)> for <T, T, T>
+// CHECK:       bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <T, T, T>):
 // CHECK:          [[FN:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT:     [[FN_CONV:%.*]] = convert_function [[FN]]
 // CHECK:          [[THUNK_FN:%.*]] = function_ref @$sxxxIegnrr_xx_xtSgIegnr_lTR

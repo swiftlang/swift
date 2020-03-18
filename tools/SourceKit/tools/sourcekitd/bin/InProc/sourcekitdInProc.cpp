@@ -93,7 +93,7 @@ std::string sourcekitd::getRuntimeLibPath() {
     llvm_unreachable("call to GetModuleFileNameA failed");
   libPath = llvm::sys::path::parent_path(llvm::sys::path::parent_path(path));
   llvm::sys::path::append(libPath, "lib");
-  return libPath.str();
+  return libPath.str().str();
 #else
   // This silly cast below avoids a C++ warning.
   Dl_info info;
@@ -101,7 +101,7 @@ std::string sourcekitd::getRuntimeLibPath() {
     llvm_unreachable("Call to dladdr() failed");
 
   // We now have the path to the shared lib, move to the parent 'lib' path.
-  return llvm::sys::path::parent_path(info.dli_fname);
+  return llvm::sys::path::parent_path(info.dli_fname).str();
 #endif
 }
 

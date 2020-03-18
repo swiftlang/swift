@@ -135,6 +135,9 @@ public:
   SILValue getCallee() const { return getCalleeOperand()->get(); }
 
   /// Return the callee operand.
+  Operand *getCalleeOperand() { FOREACH_IMPL_RETURN(getCalleeOperand()); }
+
+  /// Return the callee operand.
   const Operand *getCalleeOperand() const {
     FOREACH_IMPL_RETURN(getCalleeOperand());
   }

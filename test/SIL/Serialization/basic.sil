@@ -38,9 +38,9 @@ struct Int32 {
   var x: Builtin.Int32
 }
 
-// CHECK-LABEL: sil [serialized] [ossa] @test_subst_function_type : $@convention(thin) (@guaranteed @callee_guaranteed <τ_0_0, τ_0_1> in (@in τ_0_0, @in τ_0_1) -> () for <Builtin.Int32, Builtin.Int64>) -> ()
-sil [serialized] [ossa] @test_subst_function_type : $@convention(thin) (@guaranteed @callee_guaranteed <A, B> in (@in A, @in B) -> () for <Builtin.Int32, Builtin.Int64>) -> () {
-entry(%0 : @guaranteed $@callee_guaranteed <C, D> in (@in C, @in D) -> () for <Builtin.Int32, Builtin.Int64>):
+// CHECK-LABEL: sil [serialized] [ossa] @test_subst_function_type : $@convention(thin) (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () for <Builtin.Int32, Builtin.Int64>) -> ()
+sil [serialized] [ossa] @test_subst_function_type : $@convention(thin) (@guaranteed @callee_guaranteed @substituted <A, B> (@in A, @in B) -> () for <Builtin.Int32, Builtin.Int64>) -> () {
+entry(%0 : @guaranteed $@callee_guaranteed @substituted <C, D> (@in C, @in D) -> () for <Builtin.Int32, Builtin.Int64>):
   return undef : $()
 }
 
@@ -52,11 +52,19 @@ bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $TestArray2)
   return %7 : $(Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage)
 }
 
-// CHECK-LABEL: sil [serialized] [ossa] @test_subst_function_type_generic_context : $@convention(thin) <X, Y> (@guaranteed @callee_guaranteed <τ_0_0, τ_0_1> in (@in τ_0_0, @in τ_0_1) -> () for <X, Y>) -> ()
-sil [serialized] [ossa] @test_subst_function_type_generic_context : $@convention(thin) <X, Y> (@guaranteed @callee_guaranteed <A, B> in (@in A, @in B) -> () for <X, Y>) -> () {
-entry(%0 : @guaranteed $@callee_guaranteed <C, D> in (@in C, @in D) -> () for <X, Y>):
+// CHECK-LABEL: sil [serialized] [ossa] @test_subst_function_type_generic_context : $@convention(thin) <X, Y> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () for <X, Y>) -> ()
+sil [serialized] [ossa] @test_subst_function_type_generic_context : $@convention(thin) <X, Y> (@guaranteed @callee_guaranteed @substituted <A, B> (@in A, @in B) -> () for <X, Y>) -> () {
+entry(%0 : @guaranteed $@callee_guaranteed @substituted <C, D> (@in C, @in D) -> () for <X, Y>):
   return undef : $()
 }
+
+// CHECK-LABEL: sil [lazy_getter] @test_lazy_getter
+sil [lazy_getter] @test_lazy_getter : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
 
 struct EmptyStruct {}
 

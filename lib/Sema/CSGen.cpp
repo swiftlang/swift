@@ -1152,6 +1152,22 @@ namespace {
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
       auto *parentExpr = CS.getParentExpr(expr);
+      if (parentExpr && isa<ParenExpr>(parentExpr))
+        parentExpr = CS.getParentExpr(parentExpr);
+
+      if (parentExpr) {
+        // `_ = nil!`
+        if (isa<ForceValueExpr>(parentExpr)) {
+          DE.diagnose(expr->getLoc(), diag::cannot_force_unwrap_nil_literal);
+          return Type();
+        }
+
+        // `_ = nil?`
+        if (isa<OptionalEvaluationExpr>(parentExpr)) {
+          DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
+          return Type();
+        }
+      }
 
       // `_ = nil`
       if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
@@ -2315,7 +2331,8 @@ namespace {
                cast<TypedPattern>(pattern)->getSubPattern(), locator,
                Type(), bindPatternVarsOneWay);
         CS.addConstraint(
-            ConstraintKind::Conversion, subPatternType, openedType, locator);
+            ConstraintKind::Conversion, subPatternType, openedType,
+          locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
         return setType(openedType);
       }
 
@@ -2352,7 +2369,7 @@ namespace {
 
           Type eltTy = getTypeForPattern(
               tupleElt.getPattern(),
-              locator.withPathElement(LocatorPathElt::TupleElement(i)),
+              locator,
               externalEltType,
               bindPatternVarsOneWay);
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
@@ -2365,10 +2382,12 @@ namespace {
         // Remove an optional from the object type.
         if (externalPatternType) {
           Type objVar = CS.createTypeVariable(
-              CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
+              CS.getConstraintLocator(
+                  locator.withPathElement(ConstraintLocator::OptionalPayload)),
+              TVO_CanBindToNoEscape);
           CS.addConstraint(
-              ConstraintKind::OptionalObject, externalPatternType,
-              objVar, locator);
+              ConstraintKind::OptionalObject, externalPatternType, objVar,
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           externalPatternType = objVar;
         }
@@ -2386,16 +2405,21 @@ namespace {
 
         Type castType =
             resolveTypeReferenceInExpression(isPattern->getCastTypeLoc());
-        castType = CS.openUnboundGenericType(castType, locator);
+        castType = CS.openUnboundGenericType(
+            castType,
+            locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
-        Type subPatternType =
-            getTypeForPattern(isPattern->getSubPattern(), locator, castType,
-                              bindPatternVarsOneWay);
+        auto *subPattern = isPattern->getSubPattern();
+        Type subPatternType = getTypeForPattern(
+            subPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+            castType, bindPatternVarsOneWay);
 
         // Make sure we can cast from the subpattern type to the type we're
         // checking; if it's impossible, fail.
         CS.addConstraint(
-            ConstraintKind::CheckedCast, subPatternType, castType, locator);
+            ConstraintKind::CheckedCast, subPatternType, castType,
+            locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
         return setType(subPatternType);
       }
@@ -2422,19 +2446,26 @@ namespace {
           // Resolve the parent type.
           Type parentType =
             resolveTypeReferenceInExpression(enumPattern->getParentType());
-          parentType = CS.openUnboundGenericType(parentType, locator);
+
+          parentType = CS.openUnboundGenericType(
+              parentType, CS.getConstraintLocator(
+                              locator, {LocatorPathElt::PatternMatch(pattern),
+                                        ConstraintLocator::ParentType}));
 
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
           CS.addValueMemberConstraint(
               parentMetaType, enumPattern->getName(), memberType, CurDC,
-              functionRefKind, { },
-              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+              functionRefKind, {},
+              CS.getConstraintLocator(locator,
+                                      {LocatorPathElt::PatternMatch(pattern),
+                                       ConstraintLocator::Member}));
 
           // Parent type needs to be convertible to the pattern type; this
           // accounts for cases where the pattern type is existential.
-          CS.addConstraint(ConstraintKind::Conversion, parentType, patternType,
-                           locator);
+          CS.addConstraint(
+              ConstraintKind::Conversion, parentType, patternType,
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           baseType = parentType;
         } else {
@@ -2470,8 +2501,9 @@ namespace {
               ConstraintKind::Equal, functionType, memberType,
               locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
-          CS.addConstraint(ConstraintKind::Conversion, outputType, baseType,
-                           locator);
+          CS.addConstraint(
+              ConstraintKind::Conversion, outputType, baseType,
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
         }
 
         return setType(patternType);
@@ -4218,10 +4250,74 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
         return true;
 
-      setStmtConditionTarget(&condElement, target);
+      setSolutionApplicationTarget(&condElement, target);
       continue;
     }
     }
+  }
+
+  return false;
+}
+
+bool ConstraintSystem::generateConstraints(
+    CaseStmt *caseStmt, DeclContext *dc, Type subjectType,
+    ConstraintLocator *locator) {
+  // Pre-bind all of the pattern variables within the case.
+  bindSwitchCasePatternVars(caseStmt);
+
+  for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
+    // Resolve the pattern.
+    auto *pattern = TypeChecker::resolvePattern(
+        caseLabelItem.getPattern(), dc, /*isStmtCondition=*/false);
+    if (!pattern)
+      return true;
+
+    // Generate constraints for the pattern, including one-way bindings for
+    // any variables that show up in this pattern, because those variables
+    // can be referenced in the guard expressions and the body.
+    Type patternType = generateConstraints(
+        pattern, locator, /* bindPatternVarsOneWay=*/true);
+
+    // Convert the subject type to the pattern, which establishes the
+    // bindings.
+    addConstraint(
+        ConstraintKind::Conversion, subjectType, patternType, locator);
+
+    // Generate constraints for the guard expression, if there is one.
+    Expr *guardExpr = caseLabelItem.getGuardExpr();
+    if (guardExpr) {
+      guardExpr = generateConstraints(guardExpr, dc);
+      if (!guardExpr)
+        return true;
+    }
+
+    // Save this info.
+    setCaseLabelItemInfo(&caseLabelItem, {pattern, guardExpr});
+
+    // For any pattern variable that has a parent variable (i.e., another
+    // pattern variable with the same name in the same case), require that
+    // the types be equivalent.
+    pattern->forEachNode([&](Pattern *pattern) {
+      auto namedPattern = dyn_cast<NamedPattern>(pattern);
+      if (!namedPattern)
+        return;
+
+      auto var = namedPattern->getDecl();
+      if (auto parentVar = var->getParentVarDecl()) {
+        addConstraint(
+            ConstraintKind::Equal, getType(parentVar), getType(var),
+            getConstraintLocator(
+              locator,
+              LocatorPathElt::PatternMatch(namedPattern)));
+      }
+    });
+  }
+
+  // Bind the types of the case body variables.
+  for (auto caseBodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    auto parentVar = caseBodyVar->getParentVarDecl();
+    assert(parentVar && "Case body variables always have parents");
+    setType(caseBodyVar, getType(parentVar));
   }
 
   return false;
@@ -4309,7 +4405,7 @@ getMemberDecls(InterestedMemberKind Kind) {
 ResolvedMemberResult
 swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   ResolvedMemberResult Result;
-  assert(DC.getASTContext().areSemanticQueriesEnabled());
+  assert(DC.getASTContext().areLegacySemanticQueriesEnabled());
   ConstraintSystem CS(&DC, None);
 
   // Look up all members of BaseTy with the given Name.

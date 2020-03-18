@@ -131,7 +131,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   case RK_Closure: {
     SymbolicClosure *clo = getClosure();
     SILFunction *target = clo->getTarget();
-    std::string targetName = target->getName();
+    std::string targetName = target->getName().str();
     os << "closure: target: " << targetName;
     ArrayRef<SymbolicClosureArgument> args = clo->getCaptures();
     os << " captures [\n";
@@ -763,9 +763,23 @@ SymbolicClosure *SymbolicClosure::create(SILFunction *target,
                                          SingleValueInstruction *closureInst,
                                          SymbolicValueAllocator &allocator) {
   // Determine whether there are captured arguments without a symbolic value.
+  // Consider indirectly captured arguments as well, which can happen with
+  // @in_guaranteed convention for captures.
   bool hasNonConstantCapture = false;
   for (SymbolicClosureArgument closureArg : args) {
     if (!closureArg.second) {
+      hasNonConstantCapture = true;
+      break;
+    }
+    SymbolicValue closureValue = closureArg.second.getValue();
+    // Is capture non-constant?
+    if (!closureValue.isConstant()) {
+      hasNonConstantCapture = true;
+      break;
+    }
+    // Is the indirect capture non-constant?
+    if (closureValue.getKind() == SymbolicValue::Address &&
+        !closureValue.getAddressValueMemoryObject()->getValue().isConstant()) {
       hasNonConstantCapture = true;
       break;
     }

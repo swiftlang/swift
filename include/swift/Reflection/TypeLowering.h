@@ -106,6 +106,7 @@ enum class TypeInfoKind : unsigned {
   Builtin,
   Record,
   Reference,
+  Invalid,
 };
 
 class TypeInfo {
@@ -124,6 +125,10 @@ public:
     assert(Alignment > 0);
   }
 
+  TypeInfo(): Kind(TypeInfoKind::Invalid), Size(0), Alignment(0), Stride(0),
+              NumExtraInhabitants(0), BitwiseTakable(true) {
+  }
+
   TypeInfoKind getKind() const { return Kind; }
 
   unsigned getSize() const { return Size; }
@@ -134,11 +139,24 @@ public:
 
   void dump() const;
   void dump(FILE *file, unsigned Indent = 0) const;
+
+  // Using the provided reader, inspect our value.
+  // Return false if we can't inspect value.
+  // Set *inhabitant to <0 if the value is valid (not an XI)
+  // Else set *inhabitant to the XI value (counting from 0)
+  virtual bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                        remote::RemoteAddress address,
+                                        int *index) const {
+    return false;
+  }
+
+  virtual ~TypeInfo() { }
 };
 
 struct FieldInfo {
   std::string Name;
   unsigned Offset;
+  int Value;
   const TypeRef *TR;
   const TypeInfo &TI;
 };
@@ -154,6 +172,10 @@ public:
   const std::string &getMangledTypeName() const {
     return Name;
   }
+
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Builtin;
@@ -177,6 +199,10 @@ public:
   RecordKind getRecordKind() const { return SubKind; }
   unsigned getNumFields() const { return Fields.size(); }
   const std::vector<FieldInfo> &getFields() const { return Fields; }
+
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *index) const;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Record;
@@ -204,6 +230,16 @@ public:
 
   ReferenceCounting getReferenceCounting() const {
     return Refcounting;
+  }
+
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const {
+    if (getNumExtraInhabitants() == 0) {
+      *extraInhabitantIndex = -1;
+      return true;
+    }
+    return reader.readHeapObjectExtraInhabitantIndex(address, extraInhabitantIndex);
   }
 
   static bool classof(const TypeInfo *TI) {

@@ -66,8 +66,8 @@ class ModuleInterfaceBuilder {
       bool IsHashBased);
 
   bool extractSwiftInterfaceVersionAndArgs(
-      version::Version &Vers, llvm::StringSaver &SubArgSaver,
-      SmallVectorImpl<const char *> &SubArgs);
+      version::Version &Vers, StringRef &CompilerVersion,
+      llvm::StringSaver &SubArgSaver, SmallVectorImpl<const char *> &SubArgs);
 
   bool buildSwiftModuleInternal(StringRef OutPath, bool ShouldSerializeDeps,
                                 std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer);

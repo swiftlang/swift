@@ -432,7 +432,7 @@ extension Array: _ArrayProtocol {
   ///
   ///     numbers.append(contentsOf: stride(from: 60, through: 100, by: 10))
   ///     // numbers.count == 10
-  ///     // numbers.capacity == 12
+  ///     // numbers.capacity == 10
   @inlinable
   public var capacity: Int {
     return _getCapacity()

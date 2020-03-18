@@ -47,6 +47,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
+#include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
@@ -179,6 +180,24 @@ static void validateDebugInfoArgs(DiagnosticEngine &diags,
       diags.diagnose(SourceLoc(), diag::error_invalid_debug_prefix_map, A);
 }
 
+static void validateVerifyIncrementalDependencyArgs(DiagnosticEngine &diags,
+                                                    const ArgList &args) {
+  // No option? No problem!
+  if (!args.hasArg(options::OPT_verify_incremental_dependencies)) {
+    return;
+  }
+
+  // Make sure we see -incremental but not -wmo, no matter in what order they're
+  // in - the build systems can pass them both and just hope the last one wins.
+  if (args.hasArg(options::OPT_incremental) &&
+      !args.hasArg(options::OPT_whole_module_optimization)) {
+    return;
+  }
+
+  diags.diagnose(SourceLoc(),
+                 diag::verify_incremental_dependencies_needs_incremental);
+}
+
 static void validateCompilationConditionArgs(DiagnosticEngine &diags,
                                              const ArgList &args) {
   for (const Arg *A : args.filtered(options::OPT_D)) {
@@ -239,6 +258,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
   validateAutolinkingArgs(diags, args, T);
+  validateVerifyIncrementalDependencyArgs(diags, args);
 }
 
 std::unique_ptr<ToolChain>
@@ -1629,7 +1649,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     // REPL mode should always use the REPL module.
     OI.ModuleName = "REPL";
   } else if (const Arg *A = Args.getLastArg(options::OPT_o)) {
-    OI.ModuleName = llvm::sys::path::stem(A->getValue());
+    OI.ModuleName = llvm::sys::path::stem(A->getValue()).str();
     if ((OI.LinkAction == LinkKind::DynamicLibrary ||
          OI.LinkAction == LinkKind::StaticLibrary) &&
         !llvm::sys::path::extension(A->getValue()).empty() &&
@@ -1638,7 +1658,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.ModuleName.erase(0, strlen("lib"));
     }
   } else if (Inputs.size() == 1) {
-    OI.ModuleName = llvm::sys::path::stem(Inputs.front().second->getValue());
+    OI.ModuleName =
+        llvm::sys::path::stem(Inputs.front().second->getValue()).str();
   }
 
   if (!Lexer::isIdentifier(OI.ModuleName) ||
@@ -1943,7 +1964,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_ImportedModules:
       case file_types::TY_TBD:
       case file_types::TY_ModuleTrace:
-      case file_types::TY_OptRecord:
+      case file_types::TY_YAMLOptRecord:
+      case file_types::TY_BitstreamOptRecord:
       case file_types::TY_SwiftModuleInterfaceFile:
       case file_types::TY_PrivateSwiftModuleInterfaceFile:
       case file_types::TY_SwiftCrossImportDir:
@@ -2166,10 +2188,10 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   if (const Arg *A = Args.getLastArg(options::OPT_driver_use_frontend_path)) {
     DriverExecutable = A->getValue();
     std::string commandString =
-        Args.getLastArgValue(options::OPT_driver_use_frontend_path);
+        Args.getLastArgValue(options::OPT_driver_use_frontend_path).str();
     SmallVector<StringRef, 10> commandArgs;
     StringRef(commandString).split(commandArgs, ';', -1, false);
-    DriverExecutable = commandArgs[0];
+    DriverExecutable = commandArgs[0].str();
     DriverExecutableArgs.assign(std::begin(commandArgs) + 1,
                                 std::end(commandArgs));
   }
@@ -2768,6 +2790,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                   Output.get());
 
   if (C.getArgs().hasArg(options::OPT_save_optimization_record,
+                         options::OPT_save_optimization_record_EQ,
                          options::OPT_save_optimization_record_path))
     chooseOptimizationRecordPath(C, workingDirectory, Buf, Output.get());
 
@@ -2815,26 +2838,29 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                [] { llvm::outs() << ", "; });
     if (!InputActions.empty() && !J->getInputs().empty())
       llvm::outs() << ", ";
-    interleave(J->getInputs().begin(), J->getInputs().end(),
-               [](const Job *Input) {
-                 auto FileNames = Input->getOutput().getPrimaryOutputFilenames();
-                 interleave(FileNames.begin(), FileNames.end(),
-                            [](const std::string &FileName) {
-                              llvm::outs() << '"' << FileName << '"';
-                            },
-                            [] { llvm::outs() << ", "; });
-               },
-               [] { llvm::outs() << ", "; });
+    interleave(
+        J->getInputs().begin(), J->getInputs().end(),
+        [](const Job *Input) {
+          auto FileNames = Input->getOutput().getPrimaryOutputFilenames();
+          interleave(
+              FileNames.begin(), FileNames.end(),
+              [](StringRef FileName) {
+                llvm::outs() << '"' << FileName << '"';
+              },
+              [] { llvm::outs() << ", "; });
+        },
+        [] { llvm::outs() << ", "; });
 
     llvm::outs() << "], output: {";
     auto OutputFileNames = J->getOutput().getPrimaryOutputFilenames();
     StringRef TypeName =
         file_types::getTypeName(J->getOutput().getPrimaryOutputType());
-    interleave(OutputFileNames.begin(), OutputFileNames.end(),
-               [TypeName](const std::string &FileName) {
-                 llvm::outs() << TypeName << ": \"" << FileName << '"';
-               },
-               [] { llvm::outs() << ", "; });
+    interleave(
+        OutputFileNames.begin(), OutputFileNames.end(),
+        [TypeName](StringRef FileName) {
+          llvm::outs() << TypeName << ": \"" << FileName << '"';
+        },
+        [] { llvm::outs() << ", "; });
 
     file_types::forAllTypes([&J](file_types::ID Ty) {
       StringRef AdditionalOutput =
@@ -3204,12 +3230,18 @@ void Driver::chooseOptimizationRecordPath(Compilation &C,
                                           CommandOutput *Output) const {
   const OutputInfo &OI = C.getOutputInfo();
   if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+    llvm::Expected<file_types::ID> FileType =
+        C.getToolChain().remarkFileTypeFromArgs(C.getArgs());
+    if (!FileType) {
+      Diags.diagnose({}, diag::error_creating_remark_serializer,
+                     llvm::toString(FileType.takeError()));
+      return;
+    }
     auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
-        OI, C.getArgs(), options::OPT_save_optimization_record_path,
-        file_types::TY_OptRecord, /*TreatAsTopLevelOutput=*/true,
-        workingDirectory, Buf);
+        OI, C.getArgs(), options::OPT_save_optimization_record_path, *FileType,
+        /*TreatAsTopLevelOutput=*/true, workingDirectory, Buf);
 
-    Output->setAdditionalOutputForType(file_types::TY_OptRecord, filename);
+    Output->setAdditionalOutputForType(*FileType, filename);
   } else
     // FIXME: We should use the OutputMap in this case.
     Diags.diagnose({}, diag::warn_opt_remark_disabled);

@@ -47,6 +47,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/FileSystem.h"
+#include <set>
 
 
 using namespace swift;
@@ -444,7 +445,8 @@ static void printSILFunctionNameAndType(
     llvm::DenseMap<CanType, Identifier> &sugaredTypeNames) {
   function->printName(OS);
   OS << " : $";
-  auto genSig = function->getLoweredFunctionType()->getSubstGenericSignature();
+  auto genSig =
+    function->getLoweredFunctionType()->getInvocationGenericSignature();
   auto *genEnv = function->getGenericEnvironment();
   // If `genSig` and `genEnv` are both defined, get sugared names of generic
   // parameter types for printing.
@@ -2442,8 +2444,16 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isWithoutActuallyEscapingThunk())
     OS << "[without_actually_escaping] ";
 
-  if (isGlobalInit())
+  switch (getSpecialPurpose()) {
+  case SILFunction::Purpose::None:
+    break;
+  case SILFunction::Purpose::GlobalInit:
     OS << "[global_init] ";
+    break;
+  case SILFunction::Purpose::LazyPropertyGetter:
+    OS << "[lazy_getter] ";
+    break;
+  }
   if (isAlwaysWeakImported())
     OS << "[weak_imported] ";
   auto availability = getAvailabilityForLinkage();
@@ -2750,6 +2760,57 @@ printSILCoverageMaps(SILPrintContext &Ctx,
     M->print(Ctx);
 }
 
+using MagicFileStringMap =
+    llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>;
+
+static void
+printMagicFileStringMapEntry(SILPrintContext &Ctx,
+                             const MagicFileStringMap::MapEntryTy &entry) {
+  auto &OS = Ctx.OS();
+  OS << "//   '" << std::get<0>(entry.second)
+     << "' => '" << entry.first() << "'";
+
+  if (!std::get<1>(entry.second))
+    OS << " (alternate)";
+
+  OS << "\n";
+}
+
+static void printMagicFileStringMap(SILPrintContext &Ctx,
+                                    const MagicFileStringMap map) {
+  if (map.empty())
+    return;
+
+  Ctx.OS() << "\n\n// Mappings from '#file' to '#filePath':\n";
+
+  if (Ctx.sortSIL()) {
+    llvm::SmallVector<llvm::StringRef, 16> keys;
+    llvm::copy(map.keys(), std::back_inserter(keys));
+
+    llvm::sort(keys, [&](StringRef leftKey, StringRef rightKey) -> bool {
+      const auto &leftValue = map.find(leftKey)->second;
+      const auto &rightValue = map.find(rightKey)->second;
+
+      // Lexicographically earlier #file strings sort earlier.
+      if (std::get<0>(leftValue) != std::get<0>(rightValue))
+        return std::get<0>(leftValue) < std::get<0>(rightValue);
+
+      // Conflict winners sort before losers.
+      if (std::get<1>(leftValue) != std::get<1>(rightValue))
+        return std::get<1>(leftValue);
+
+      // Finally, lexicographically earlier #filePath strings sort earlier.
+      return leftKey < rightKey;
+    });
+
+    for (auto key : keys)
+      printMagicFileStringMapEntry(Ctx, *map.find(key));
+  } else {
+    for (const auto &entry : map)
+      printMagicFileStringMapEntry(Ctx, entry);
+  }
+}
+
 void SILProperty::print(SILPrintContext &Ctx) const {
   PrintOptions Options = PrintOptions::printSIL();
   
@@ -2863,6 +2924,10 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
   printExternallyVisibleDecls(PrintCtx, externallyVisible.getArrayRef());
+
+  if (M)
+    printMagicFileStringMap(
+        PrintCtx, M->computeMagicFileStringMap(/*shouldDiagnose=*/false));
 
   OS << "\n\n";
 }

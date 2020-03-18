@@ -1156,7 +1156,7 @@ public:
     B.addInt32(Layout.getBindings().size());
 
     auto sig =
-        OrigCalleeType->getSubstGenericSignature().getCanonicalSignature();
+      OrigCalleeType->getInvocationGenericSignature().getCanonicalSignature();
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
@@ -1204,7 +1204,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     OS << "__TEXT,__swift5_" << LongName << ", regular, no_dead_strip";
     break;
   }
-  return OS.str();
+  return std::string(OS.str());
 }
 
 const char *IRGenModule::getFieldTypeMetadataSectionName() {

@@ -498,7 +498,6 @@ public:
 };
 
 void simple_display(llvm::raw_ostream &out, const KnownProtocolKind);
-class TypeChecker;
 
 // Find the type in the cache or look it up
 class DefaultTypeRequest
@@ -1108,7 +1107,7 @@ class InferredGenericSignatureRequest :
     public SimpleRequest<InferredGenericSignatureRequest,
                          GenericSignature (ModuleDecl *,
                                             GenericSignatureImpl *,
-                                            GenericParamList *,
+                                            GenericParamSource,
                                             SmallVector<Requirement, 2>,
                                             SmallVector<TypeLoc, 2>,
                                             bool),
@@ -1124,7 +1123,7 @@ private:
   evaluate(Evaluator &evaluator,
            ModuleDecl *module,
            GenericSignatureImpl *baseSignature,
-           GenericParamList *gpl,
+           GenericParamSource paramSource,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,
            bool allowConcreteGenericParams) const;
@@ -1999,6 +1998,29 @@ public:
   }
 };
 
+/// Computes whether the specified type or a super-class/super-protocol has the
+/// @dynamicCallable attribute on it.
+class HasDynamicCallableAttributeRequest
+    : public SimpleRequest<HasDynamicCallableAttributeRequest,
+                           bool(CanType), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, CanType ty) const;
+
+public:
+  bool isCached() const {
+    // Don't cache types containing type variables, as they must not outlive
+    // the constraint system that created them.
+    auto ty = std::get<0>(getStorage());
+    return !ty->hasTypeVariable();
+  }
+};
+
 /// Determines the type of a given pattern.
 ///
 /// Note that this returns the "raw" pattern type, which can involve
@@ -2024,6 +2046,26 @@ public:
     return std::get<0>(getStorage()).getPattern()->getLoc();
   }
 };
+
+/// List SPI group ids declared on a decl.
+class SPIGroupsRequest :
+    public SimpleRequest<SPIGroupsRequest,
+                         llvm::ArrayRef<Identifier>(const Decl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<llvm::ArrayRef<Identifier>>
+  evaluate(Evaluator &evaluator, const Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 
 /// Type-checks a `@differentiable` attribute and returns the resolved parameter
 /// indices on success. On failure, emits diagnostics and returns `nullptr`.

@@ -536,6 +536,9 @@ ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
 ERROR(oslog_message_alive_after_opts, none, "OSLogMessage instance must not "
       "be explicitly created and must be deletable", ())
 
+WARNING(oslog_call_in_unreachable_code, none, "os log call will never be "
+        "executed and may have undiagnosed errors", ())
+
 ERROR(global_string_pointer_on_non_constant, none, "globalStringTablePointer "
       "builtin must used only on string literals", ())
 

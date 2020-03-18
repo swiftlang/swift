@@ -305,17 +305,21 @@ bool CatchStmt::isSyntacticallyExhaustive() const {
 
 PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
                                                SourceLoc PoundLoc,
+                                               SourceLoc LParenLoc,
                                        ArrayRef<AvailabilitySpec *> queries,
                                                      SourceLoc RParenLoc) {
   unsigned size = totalSizeToAlloc<AvailabilitySpec *>(queries.size());
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
-  return ::new (Buffer) PoundAvailableInfo(PoundLoc, queries, RParenLoc);
+  return ::new (Buffer) PoundAvailableInfo(PoundLoc, LParenLoc, queries,
+                                           RParenLoc);
 }
 
 SourceLoc PoundAvailableInfo::getEndLoc() const {
   if (RParenLoc.isInvalid()) {
     if (NumQueries == 0) {
-      return PoundLoc;
+      if (LParenLoc.isInvalid())
+        return PoundLoc;
+      return LParenLoc;
     }
     return getQueries()[NumQueries - 1]->getSourceRange().End;
   }

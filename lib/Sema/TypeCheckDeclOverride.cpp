@@ -1772,7 +1772,11 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     bool baseCanBeObjC = canBeRepresentedInObjC(base);
     diags.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
                    !isa<ExtensionDecl>(base->getDeclContext()));
-    if (baseCanBeObjC) {
+    // If the base and the override come from the same module, try to fix
+    // the base declaration. Otherwise we can wind up diagnosing into e.g. the
+    // SDK overlay modules.
+    if (baseCanBeObjC &&
+        base->getModuleContext() == override->getModuleContext()) {
       SourceLoc insertionLoc =
         override->getAttributeInsertionLoc(/*forModifier=*/false);
       diags.diagnose(base, diag::overridden_here_can_be_objc)

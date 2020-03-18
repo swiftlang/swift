@@ -590,7 +590,7 @@ static Identifier getBinaryFunction(StringRef Name, SILType IntSILTy,
   auto IntTy = IntSILTy.castTo<BuiltinIntegerType>();
   unsigned NumBits = IntTy->getWidth().getFixedWidth();
   // Name is something like: add_Int64
-  std::string NameStr = Name;
+  std::string NameStr(Name);
   NameStr += "_Int" + llvm::utostr(NumBits);
   return C.getIdentifier(NameStr);
 }
