@@ -92,8 +92,12 @@ func _mangledTypeName<T>(_ type: T.Type) -> String? {
     return nil
   }
 
-  return String._fromUTF8Repairing(
-      UnsafeBufferPointer(start: stringPtr, count: count)).0
+  let (result, repairsMade) = String._fromUTF8Repairing(
+      UnsafeBufferPointer(start: stringPtr, count: count))
+
+  precondition(!repairsMade, "repairs made to _mangledTypeName, this is not expected since names should always valid UTF-8")
+
+  return result
 }
 
 /// Lookup a class given a name. Until the demangled encoding of type
