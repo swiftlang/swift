@@ -51,5 +51,21 @@ ErrorHandlingTests.test("blockFailure") {
   }
 }
 
-runAllTests()
+enum MyError : Error {
+  case Ups
+}
 
+extension MyError : LocalizedError {
+  var errorDescription: String? {
+    return NSLocalizedString("something went horribly wrong", comment: "")
+  }
+}
+
+ErrorHandlingTests.test("localizedDescription keypath") {
+  var errors = [Error]()
+  errors.append(MyError.Ups)
+  let str = "Errors: \(errors.map(\.localizedDescription))"
+  expectEqual("Errors: [\"something went horribly wrong\"]", str)
+}
+
+runAllTests()

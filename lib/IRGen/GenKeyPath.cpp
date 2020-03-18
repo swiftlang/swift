@@ -879,7 +879,8 @@ emitKeyPathComponent(IRGenModule &IGM,
                     reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
                 externalSubArgs.push_back(IGM.emitWitnessTableRefString(
                     substType, conformance,
-                    genericEnv ? genericEnv->getGenericSignature() : nullptr,
+                    genericEnv ? genericEnv->getGenericSignature()
+                               : componentCanSig,
                     /*shouldSetLowBit*/ true));
               }
             });
