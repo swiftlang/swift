@@ -3174,9 +3174,8 @@ static bool isBlockOfMultipleTrailingClosures(bool isExprBasic, Parser &P) {
   // If closure doesn't start from a label there is no reason
   // to look any farther.
   {
-    const auto &nextTok = P.peekToken();
-    if (!nextTok.canBeArgumentLabel() || nextTok.is(tok::kw__) ||
-        nextTok.getText()[0] == '$')
+    const auto nextTok = P.peekToken();
+    if (!nextTok.canBeArgumentLabel() || nextTok.getText()[0] == '$')
       return false;
   }
 
