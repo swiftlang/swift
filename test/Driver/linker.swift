@@ -27,7 +27,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -target thumbv7-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-thumbv7 %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target armv7-none-linux-androideabi -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.android.txt
+// RUN: %swiftc_driver_plain -driver-print-jobs -target armv7-none-linux-androideabi -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.android.txt
 // RUN: %FileCheck -check-prefix ANDROID-armv7 %s < %t.android.txt
 // RUN: %FileCheck -check-prefix ANDROID-armv7-NEGATIVE %s < %t.android.txt
 
@@ -62,6 +62,12 @@
 // RUN: %swiftc_driver -driver-print-jobs -target wasm32-unknown-wasi -Xclang-linker -flag -Xclang-linker arg %s 2>&1 | %FileCheck -check-prefix WASI-clang-linker-order %s
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | %FileCheck -check-prefix DEBUG %s
+
+// RUN: %swiftc_driver_plain -driver-print-jobs -target x86_64-unknown-linux-gnu -toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix LINUX-STDLIB-RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -target x86_64-unknown-linux-gnu -no-toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix LINUX-NO-STDLIB-RPATH %s
+
+// RUN: %swiftc_driver_plain -driver-print-jobs -target armv7-unknown-linux-androideabi -toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix ANDROID-STDLIB-RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -target armv7-unknown-linux-androideabi -no-toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix ANDROID-NO-STDLIB-RPATH %s
 
 // RUN: %empty-directory(%t)
 // RUN: touch %t/a.o
@@ -428,6 +434,11 @@
 // RELATIVE_ARCLITE: {{/|\\\\}}DISTINCTIVE-PATH{{/|\\\\}}usr{{/|\\\\}}lib{{/|\\\\}}arc{{/|\\\\}}libarclite_macosx.a
 // RELATIVE_ARCLITE: -o {{[^ ]+}}
 
+// LINUX-STDLIB-RPATH: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)linux]]
+// LINUX-NO-STDLIB-RPATH-NOT: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)linux]]
+
+// ANDROID-STDLIB-RPATH: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)android]]
+// ANDROID-NO-STDLIB-RPATH-NOT: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)android]]
 
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
