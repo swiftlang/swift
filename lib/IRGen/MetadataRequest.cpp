@@ -2213,17 +2213,19 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
   }
   
   // The Swift 5.1 runtime fails to demangle associated types of opaque types.
-  auto hasNestedOpaqueArchetype = type.findIf([](CanType sub) -> bool {
-    if (auto archetype = dyn_cast<NestedArchetypeType>(sub)) {
-      if (isa<OpaqueTypeArchetypeType>(archetype->getRoot())) {
-        return true;
+  if (!IGM.getAvailabilityContext().isContainedIn(IGM.Context.getSwift52Availability())) {
+    auto hasNestedOpaqueArchetype = type.findIf([](CanType sub) -> bool {
+      if (auto archetype = dyn_cast<NestedArchetypeType>(sub)) {
+        if (isa<OpaqueTypeArchetypeType>(archetype->getRoot())) {
+          return true;
+        }
       }
-    }
-    return false;
-  });
-  
-  if (hasNestedOpaqueArchetype)
-    return false;
+      return false;
+    });
+    
+    if (hasNestedOpaqueArchetype)
+      return false;
+  }
   
   return true;
 
