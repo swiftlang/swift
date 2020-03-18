@@ -168,3 +168,7 @@ public extension Outer2 {
 
 @objc(FPBarProto)
 protocol BarProtocol {}
+
+var var_with_didset = 10 {
+  didSet { print(oldValue) }
+}
