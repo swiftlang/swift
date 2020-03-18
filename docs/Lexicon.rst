@@ -299,7 +299,7 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
         }
       }
 
-    `Outer` is the parent type of `Inner`.
+    ``Outer`` is the parent type of ``Inner``.
 
     Note that the terms "parent type" and "superclass" refer to completely
     different concepts.
