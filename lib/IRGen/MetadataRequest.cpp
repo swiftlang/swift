@@ -2202,6 +2202,10 @@ irgen::getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
 }
 
 static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
+  // Never access by mangled name if we've been asked not to.
+  if (IGM.getOptions().DisableConcreteTypeMetadataMangledNameAccessors)
+    return false;
+  
   // A nongeneric nominal type with nontrivial metadata has an accessor
   // already we can just call.
   if (auto nom = dyn_cast<NominalType>(type)) {
