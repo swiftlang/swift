@@ -1,5 +1,4 @@
-Using Protocols with `Self` or Associated Type Requirements
----
+# Using Protocols with `Self` or Associated Type Requirements
 Protocols in Swift may be used as types, as part of a generic constraint, or as part of an opaque result type.
 ```
 // CustomStringConvertible can be used as a type.
