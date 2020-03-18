@@ -1685,6 +1685,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         if (isSingleTupleParam(ctx, func2Params) &&
             canImplodeParams(func1Params)) {
           implodeParams(func1Params);
+          increaseScore(SK_FunctionConversion);
         } else if (!ctx.isSwiftVersionAtLeast(5) &&
                    isSingleTupleParam(ctx, func1Params) &&
                    canImplodeParams(func2Params)) {
@@ -1697,6 +1698,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                isa<OverloadedDeclRefExpr>(simplified) ||
                isa<UnresolvedDeclRefExpr>(simplified))) {
             implodeParams(func2Params);
+            increaseScore(SK_FunctionConversion);
           }
         }
       } else if (last->getKind() == ConstraintLocator::PatternMatch &&
@@ -1724,9 +1726,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         if (isSingleTupleParam(ctx, func1Params) &&
             canImplodeParams(func2Params)) {
           implodeParams(func2Params);
+          increaseScore(SK_FunctionConversion);
         } else if (isSingleTupleParam(ctx, func2Params) &&
                    canImplodeParams(func1Params)) {
           implodeParams(func1Params);
+          increaseScore(SK_FunctionConversion);
         }
       }
     }
