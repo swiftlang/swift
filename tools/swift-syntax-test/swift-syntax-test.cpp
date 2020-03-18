@@ -606,6 +606,7 @@ int parseFile(
   // Set up the compiler invocation
   CompilerInvocation Invocation;
   Invocation.getLangOptions().BuildSyntaxTree = true;
+  Invocation.getLangOptions().ParseForSyntaxTreeOnly = true;
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getLangOptions().RequestEvaluatorGraphVizPath = options::GraphVisPath;
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
