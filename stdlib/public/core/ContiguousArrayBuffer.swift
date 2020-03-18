@@ -267,7 +267,9 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// method, you must either initialize the `count` elements at the
   /// result's `.firstElementAddress` or set the result's `.count`
   /// to zero.
-  @inlinable
+  //@inlinable
+  @_alwaysEmitIntoClient
+  @usableFromInline
   internal init(
     _uninitializedCount uninitializedCount: Int,
     minimumCapacity: Int,
