@@ -1181,9 +1181,25 @@ static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
   llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
+/// Document structure is a purely syntactic request that shouldn't require name lookup
+/// or type-checking, so this is a best-effort computation.
+static bool inferIsSettableSyntactically(const AbstractStorageDecl *D) {
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (VD->isLet())
+      return false;
+  }
+  if (D->hasParsedAccessors()) {
+    return D->getParsedAccessor(AccessorKind::Set) != nullptr ||
+           D->getParsedAccessor(AccessorKind::WillSet) != nullptr ||
+           D->getParsedAccessor(AccessorKind::DidSet) != nullptr;
+  } else {
+    return true;
+  }
+}
+
 static Optional<AccessLevel>
 inferSetterAccessSyntactically(const AbstractStorageDecl *D) {
-  if (!D->isSettable(/*UseDC=*/nullptr))
+  if (!inferIsSettableSyntactically(D))
     return None;
   if (auto *AA = D->getAttrs().getAttribute<SetterAccessAttr>())
     return AA->getAccess();
