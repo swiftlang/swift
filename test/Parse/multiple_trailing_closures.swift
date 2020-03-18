@@ -71,6 +71,60 @@ multiple_trailing_with_defaults(duration: 42) {
   completion: {}
 }
 
+func test_multiple_trailing_syntax_without_labels() {
+  func fn(f: () -> Void) {}
+
+  fn {
+    _: {} // Ok
+  }
+
+  fn {
+    f: {} // Ok
+  }
+
+  func multiple(_: () -> Void, _: () -> Void) {}
+
+  multiple {
+    _: { }
+    _: { }
+  }
+
+  func mixed_args_1(a: () -> Void, _: () -> Void) {}
+  func mixed_args_2(_: () -> Void, a: () -> Void, _: () -> Void) {} // expected-note 2 {{'mixed_args_2(_:a:_:)' declared here}}
+
+  mixed_args_1 {
+    a: {}
+    _: {}
+  }
+
+  mixed_args_1 {
+    _: {}
+    a: {} // expected-error {{argument 'a' must precede unnamed argument #1}}
+  }
+
+  mixed_args_2 {
+    _: {}
+    a: {}
+    _: {}
+  }
+
+  mixed_args_2 {
+    _: {} // expected-error {{missing argument for parameter 'a' in call}}
+    _: {}
+  }
+
+  mixed_args_2 {
+    a: {}
+    _: {}
+    _: {} // expected-error {{unnamed argument #3 must precede argument 'a'}}
+  }
+
+  mixed_args_2 {
+    a: {} // expected-error {{missing argument for parameter #1 in call}}
+    _: {}
+  }
+}
+
 foo {
   a: { 42 }
   b: { 42 }
