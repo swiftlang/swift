@@ -137,8 +137,11 @@ void ModuleInterfaceBuilder::configureSubInvocation(
 bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
     swift::version::Version &Vers, StringRef &CompilerVersion,
     llvm::StringSaver &SubArgSaver, SmallVectorImpl<const char *> &SubArgs) {
+  llvm::vfs::FileSystem &fs = *sourceMgr.getFileSystem();
   auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
   if (!FileOrError) {
+    // Don't use this->diagnose() because it'll just try to re-open
+    // interfacePath.
     diags.diagnose(diagnosticLoc, diag::error_open_input_file,
                    interfacePath, FileOrError.getError().message());
     return true;
@@ -149,17 +152,16 @@ bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
   auto FlagRe = getSwiftInterfaceModuleFlagsRegex();
   SmallVector<StringRef, 1> VersMatches, FlagMatches, CompMatches;
   if (!VersRe.match(SB, &VersMatches)) {
-    diags.diagnose(diagnosticLoc,
-                   diag::error_extracting_version_from_module_interface);
+    diagnose(diag::error_extracting_version_from_module_interface);
     return true;
   }
   if (!FlagRe.match(SB, &FlagMatches)) {
-    diags.diagnose(diagnosticLoc,
-                   diag::error_extracting_flags_from_module_interface);
+    diagnose(diag::error_extracting_flags_from_module_interface);
     return true;
   }
   assert(VersMatches.size() == 2);
   assert(FlagMatches.size() == 2);
+  // FIXME We should diagnose this at a location that makes sense:
   Vers = swift::version::Version(VersMatches[1], SourceLoc(), &diags);
   llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], SubArgSaver, SubArgs);
 
@@ -178,6 +180,8 @@ bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
 bool ModuleInterfaceBuilder::collectDepsForSerialization(
     CompilerInstance &SubInstance, SmallVectorImpl<FileDependency> &Deps,
     bool IsHashBased) {
+  llvm::vfs::FileSystem &fs = *sourceMgr.getFileSystem();
+
   auto &Opts = SubInstance.getASTContext().SearchPathOpts;
   SmallString<128> SDKPath(Opts.SDKPath);
   path::native(SDKPath);
@@ -267,6 +271,8 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
       llvm::RestorePrettyStackState(savedInnerPrettyStackState);
     };
 
+    llvm::vfs::FileSystem &fs = *sourceMgr.getFileSystem();
+    
     // Note that we don't assume cachePath is the same as the Clang
     // module cache path at this point.
     if (!moduleCachePath.empty())
@@ -296,9 +302,8 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     // minor versions might be interesting for debugging, or special-casing a
     // compatible field variant.
     if (Vers.asMajorVersion() != InterfaceFormatVersion.asMajorVersion()) {
-      diags.diagnose(diagnosticLoc,
-                     diag::unsupported_version_of_module_interface,
-                     interfacePath, Vers);
+      diagnose(diag::unsupported_version_of_module_interface, interfacePath,
+               Vers);
       SubError = true;
       return;
     }
@@ -313,8 +318,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
       auto DiagKind = diag::serialization_name_mismatch;
       if (subInvocation.getLangOptions().DebuggerSupport)
         DiagKind = diag::serialization_name_mismatch_repl;
-      diags.diagnose(diagnosticLoc, DiagKind, subInvocation.getModuleName(),
-                     ExpectedModuleName);
+      diagnose(DiagKind, subInvocation.getModuleName(), ExpectedModuleName);
       SubError = true;
       return;
     }
@@ -341,9 +345,9 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
         auto builtByCompiler =
             getSwiftInterfaceCompilerVersionForCurrentCompiler(
                 SubInstance.getASTContext());
-        diags.diagnose(diagnosticLoc, diag::module_interface_build_failed,
-                       moduleName, emittedByCompiler == builtByCompiler,
-                       emittedByCompiler, builtByCompiler);
+        diagnose(diag::module_interface_build_failed, moduleName,
+                 emittedByCompiler == builtByCompiler, emittedByCompiler,
+                 builtByCompiler);
       }
     };
 
@@ -439,8 +443,7 @@ bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
     // necessary for performance. Fallback to building the module in case of any lock
     // related errors.
     if (RemarkRebuild) {
-      diags.diagnose(SourceLoc(), diag::interface_file_lock_failure,
-                     interfacePath);
+      diagnose(diag::interface_file_lock_failure, interfacePath);
     }
     // Clear out any potential leftover.
     Locked.unsafeRemoveLockFile();
@@ -472,8 +475,7 @@ bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
       // another process to complete the build so swift does not do it done
       // twice. If case of timeout, build it ourselves.
       if (RemarkRebuild) {
-        diags.diagnose(SourceLoc(), diag::interface_file_lock_timed_out,
-                       interfacePath);
+        diagnose(diag::interface_file_lock_timed_out, interfacePath);
       }
       // Clear the lock file so that future invocations can make progress.
       Locked.unsafeRemoveLockFile();
