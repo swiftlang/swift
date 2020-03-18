@@ -499,7 +499,7 @@ bool SILPerformanceInliner::isProfitableToInline(
 
   // This is the final inlining decision.
   if (CalleeCost > Benefit) {
-    ORE.emit([&]() {
+    OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
       using namespace OptRemark;
       return RemarkMissed("NoInlinedCost", *AI.getInstruction())
              << "Not profitable to inline function " << NV("Callee", Callee)
@@ -519,7 +519,7 @@ bool SILPerformanceInliner::isProfitableToInline(
                           << ", bb=" << Callee->size()
                           << ", c-bb=" << NumCallerBlocks
                           << "} " << Callee->getName() << '\n');
-  ORE.emit([&]() {
+  OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
     using namespace OptRemark;
     return RemarkPassed("Inlined", *AI.getInstruction())
            << NV("Callee", Callee) << " inlined into "
