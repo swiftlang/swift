@@ -165,3 +165,13 @@ public extension Outer2 {
   }
 }
 #endif
+
+var var_with_didset = 10 {
+  didSet { print(oldValue) }
+}
+
+#if os(iOS)
+@objc protocol MyProtocol: NSObjectProtocol {
+    var thing: NSObject {get}
+}
+#endif
