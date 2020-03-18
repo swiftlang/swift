@@ -1082,7 +1082,14 @@ struct TypeNamePair {
 ///   -> (UnsafePointer<UInt8>, Int)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 TypeNamePair
-swift_getTypeName(const Metadata *type, bool qualified);  
+swift_getTypeName(const Metadata *type, bool qualified);
+
+/// Return the mangled name of a Swift type represented by a metadata object.
+/// func _getMangledTypeName(_ type: Any.Type)
+///   -> (UnsafePointer<UInt8>, Int)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+TypeNamePair
+swift_getMangledTypeName(const Metadata *type);
 
 } // end namespace swift
 

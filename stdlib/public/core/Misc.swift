@@ -78,6 +78,28 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@_silgen_name("swift_getMangledTypeName")
+public func _getMangledTypeName(_ type: Any.Type)
+  -> (UnsafePointer<UInt8>, Int)
+
+/// Returns the mangled name for a given type.
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+public // SPI
+func _mangledTypeName<T>(_ type: T.Type) -> String? {
+  let (stringPtr, count) = _getMangledTypeName(type)
+  guard count > 0 else {
+    return nil
+  }
+
+  let (result, repairsMade) = String._fromUTF8Repairing(
+      UnsafeBufferPointer(start: stringPtr, count: count))
+
+  precondition(!repairsMade, "repairs made to _mangledTypeName, this is not expected since names should always valid UTF-8")
+
+  return result
+}
+
 /// Lookup a class given a name. Until the demangled encoding of type
 /// names is stabilized, this is limited to top-level class names (Foo.bar).
 public // SPI(Foundation)
