@@ -1536,7 +1536,7 @@ public moveonly struct File {
 
 func useArrayOfFiles() {
   var files: [File] = ...
-  consumeFile(files[0].move())
+  consumeFile(files[0].cxxMove())
 }
 ```
 
