@@ -1088,7 +1088,7 @@ static void transformAndForwardResults(
     });
 
     auto *inputBuf = session->getBuffer();
-    std::string str = inputBuf->getBuffer().slice(0, offset);
+    std::string str = inputBuf->getBuffer().slice(0, offset).str();
     {
       llvm::raw_string_ostream OSS(str);
       SwiftToSourceKitCompletionAdapter::getResultSourceText(

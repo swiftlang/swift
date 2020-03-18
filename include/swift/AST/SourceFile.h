@@ -329,10 +329,13 @@ public:
   /// forwarded on to IRGen.
   ASTStage_t ASTStage = Unprocessed;
 
-  /// Virtual filenames declared by #sourceLocation(file:) directives in this
-  /// file.
-  llvm::SmallVector<Located<StringRef>, 0> VirtualFilenames;
+  /// Virtual file paths declared by \c #sourceLocation(file:) declarations in
+  /// this source file.
+  llvm::SmallVector<Located<StringRef>, 0> VirtualFilePaths;
 
+  /// Returns information about the file paths used for diagnostics and magic
+  /// identifiers in this source file, including virtual filenames introduced by
+  /// \c #sourceLocation(file:) declarations.
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,

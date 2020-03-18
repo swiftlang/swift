@@ -5681,7 +5681,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
       std::vector<std::string> AccessPath;
       for (auto Piece : Path) {
-        AccessPath.push_back(Piece.Item.str());
+        AccessPath.push_back(std::string(Piece.Item));
       }
 
       StringRef ModuleFilename = TheModule->getModuleFilename();
@@ -5690,15 +5690,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       if (!ModuleFilename.empty()) {
         auto &Ctx = TheModule->getASTContext();
         CodeCompletionCache::Key K{
-          ModuleFilename, TheModule->getName().str(), AccessPath,
-              Request.NeedLeadingDot,
-              SF.hasTestableOrPrivateImport(
-                  AccessLevel::Internal, TheModule,
-                  SourceFile::ImportQueryKind::TestableOnly),
-              SF.hasTestableOrPrivateImport(
-                  AccessLevel::Internal, TheModule,
-                  SourceFile::ImportQueryKind::PrivateOnly),
-          Ctx.LangOpts.CodeCompleteInitsInPostfixExpr};
+            ModuleFilename.str(),
+            std::string(TheModule->getName()),
+            AccessPath,
+            Request.NeedLeadingDot,
+            SF.hasTestableOrPrivateImport(
+                AccessLevel::Internal, TheModule,
+                SourceFile::ImportQueryKind::TestableOnly),
+            SF.hasTestableOrPrivateImport(
+                AccessLevel::Internal, TheModule,
+                SourceFile::ImportQueryKind::PrivateOnly),
+            Ctx.LangOpts.CodeCompleteInitsInPostfixExpr};
 
         using PairType = llvm::DenseSet<swift::ide::CodeCompletionCache::Key,
             llvm::DenseMapInfo<CodeCompletionCache::Key>>::iterator;

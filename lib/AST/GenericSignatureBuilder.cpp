@@ -1653,12 +1653,12 @@ std::string GenericSignatureBuilder::PotentialArchetype::getDebugName() const {
   if (proto) {
     result.push_back('[');
     result.push_back('.');
-    result.append(proto->getName().str().begin(), proto->getName().str().end());
+    result.append(proto->getName().str());
     result.push_back(']');
   }
 
   result.push_back('.');
-  result.append(getNestedName().str().begin(), getNestedName().str().end());
+  result.append(getNestedName().str());
 
   return result.str().str();
 }
@@ -3783,8 +3783,8 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericP
            Key.Index == 0)));
 
   // Create a potential archetype for this type parameter.
-  void *mem = Impl->Allocator.Allocate<PotentialArchetype>();
-  auto PA = new (mem) PotentialArchetype(getASTContext(), GenericParam);
+  auto PA =
+      new (Impl->Allocator) PotentialArchetype(getASTContext(), GenericParam);
   Impl->GenericParams.push_back(GenericParam);
   Impl->PotentialArchetypes.push_back(PA);
 }

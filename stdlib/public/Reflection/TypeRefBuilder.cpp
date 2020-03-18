@@ -88,7 +88,7 @@ TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
   }
 
   // Fall back to the raw string.
-  return getTypeRefString(reflectionName);
+  return getTypeRefString(reflectionName).str();
 }
 
 /// Determine whether the given reflection protocol name matches.
@@ -106,7 +106,7 @@ lookupTypeWitness(const std::string &MangledTypeName,
   TypeRefID key;
   key.addString(MangledTypeName);
   key.addString(Member);
-  key.addString(Protocol);
+  key.addString(Protocol.str());
   auto found = AssociatedTypeCache.find(key);
   if (found != AssociatedTypeCache.end())
     return found->second;
@@ -128,7 +128,8 @@ lookupTypeWitness(const std::string &MangledTypeName,
       for (auto &AssocTyRef : *AssocTyDescriptor.getLocalBuffer()) {
         auto AssocTy = AssocTyDescriptor.getField(AssocTyRef);
         if (Member.compare(
-                    getTypeRefString(readTypeRef(AssocTy, AssocTy->Name))) != 0)
+                getTypeRefString(readTypeRef(AssocTy, AssocTy->Name)).str()) !=
+            0)
           continue;
 
         auto SubstitutedTypeName = readTypeRef(AssocTy,
@@ -220,7 +221,7 @@ bool TypeRefBuilder::getFieldTypeRefs(
 
     // Empty cases of enums do not have a type
     if (FD->isEnum() && !Field->hasMangledTypeName()) {
-      Fields.push_back(FieldTypeInfo::forEmptyCase(FieldName, FieldValue));
+      Fields.push_back(FieldTypeInfo::forEmptyCase(FieldName.str(), FieldValue));
       continue;
     }
 
@@ -232,11 +233,11 @@ bool TypeRefBuilder::getFieldTypeRefs(
     auto Substituted = Unsubstituted->subst(*this, *Subs);
 
     if (FD->isEnum() && Field->isIndirectCase()) {
-      Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName, FieldValue, Substituted));
+      Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName.str(), FieldValue, Substituted));
       continue;
     }
 
-    Fields.push_back(FieldTypeInfo::forField(FieldName, FieldValue, Substituted));
+    Fields.push_back(FieldTypeInfo::forField(FieldName.str(), FieldValue, Substituted));
   }
   return true;
 }
@@ -322,7 +323,7 @@ TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
     if (MSR->hasMangledMetadataSource()) {
       auto MangledMetadataSource =
         getTypeRefString(readTypeRef(MSR, MSR->MangledMetadataSource));
-      MS = MetadataSource::decode(MSB, MangledMetadataSource);
+      MS = MetadataSource::decode(MSB, MangledMetadataSource.str());
     }
 
     Info.MetadataSources.push_back({TR, MS});
@@ -393,9 +394,10 @@ void TypeRefBuilder::dumpAssociatedTypeSection(FILE *file) {
 
       for (const auto &associatedTypeRef : *descriptor.getLocalBuffer()) {
         auto associatedType = descriptor.getField(associatedTypeRef);
-        
-        std::string name = getTypeRefString(
-                            readTypeRef(associatedType, associatedType->Name));
+
+        std::string name =
+            getTypeRefString(readTypeRef(associatedType, associatedType->Name))
+                .str();
         fprintf(file, "typealias %s = ", name.c_str());
         dumpTypeRef(
           readTypeRef(associatedType, associatedType->SubstitutedTypeName), file);

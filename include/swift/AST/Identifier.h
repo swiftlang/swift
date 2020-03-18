@@ -83,7 +83,9 @@ public:
   const char *get() const { return Pointer; }
   
   StringRef str() const { return Pointer; }
-  
+
+  explicit operator std::string() const { return std::string(Pointer); }
+
   unsigned getLength() const {
     assert(Pointer != nullptr && "Tried getting length of empty identifier");
     return ::strlen(Pointer);

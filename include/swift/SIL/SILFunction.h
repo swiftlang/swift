@@ -692,7 +692,7 @@ public:
   void addSemanticsAttr(StringRef Ref) {
     if (hasSemanticsAttr(Ref))
       return;
-    SemanticsAttrSet.push_back(Ref);
+    SemanticsAttrSet.push_back(Ref.str());
     std::sort(SemanticsAttrSet.begin(), SemanticsAttrSet.end());
   }
 

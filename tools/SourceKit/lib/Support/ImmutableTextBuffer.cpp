@@ -124,7 +124,7 @@ bool ImmutableTextSnapshot::foreachReplaceUntil(
 static std::atomic<uint64_t> Generation{ 0 };
 
 EditableTextBuffer::EditableTextBuffer(StringRef Filename, StringRef Text) {
-  this->Filename = Filename;
+  this->Filename = Filename.str();
   Root = new ImmutableTextBuffer(Filename, Text, ++Generation);
   CurrUpd = Root;
 }

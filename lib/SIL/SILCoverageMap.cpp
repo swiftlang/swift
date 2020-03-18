@@ -34,7 +34,7 @@ SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
   // Store a copy of the names so that we own the lifetime.
   CM->Filename = M.allocateCopy(Filename);
   CM->Name = M.allocateCopy(Name);
-  CM->PGOFuncName = M.allocateCopy(PGOFuncName);
+  CM->PGOFuncName = M.allocateCopy(PGOFuncName).str();
 
   // Since we have two arrays, we need to manually tail allocate each of them,
   // rather than relying on the flexible array trick.
