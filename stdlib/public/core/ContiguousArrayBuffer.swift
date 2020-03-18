@@ -278,20 +278,21 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       self = _ContiguousArrayBuffer<Element>()
     }
     else {
-      let headerSize = MemoryLayout<UnsafeRawPointer>.stride * 4
-      let (storage, realTailAllocationSize) = _allocate(
+      let headerSize = MemoryLayout<UnsafeRawPointer>.stride &* 4
+      let (storage, realTailAllocationSize) = _allocate2(
         numHeaderBytes: headerSize,
-        numTailBytes: MemoryLayout<Element>.stride * realMinimumCapacity,
+        numTailBytes: MemoryLayout<Element>.stride &* realMinimumCapacity,
         growthFactor: growForAppend ? 1.6 : nil
       ) { tailBytes in
-        Builtin.allocWithTailElems_1(
+        let object = Builtin.allocWithTailElems_1(
            _ContiguousArrayStorage<Element>.self,
            (tailBytes / MemoryLayout<Element>.stride)._builtinWordValue,
            Element.self
         )
+        return UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
       }
       
-      _storage = storage
+      _storage = Builtin.bridgeFromRawPointer(storage._rawValue)
 
       let realCapacity = realTailAllocationSize / MemoryLayout<Element>.stride
       _initStorageHeader(

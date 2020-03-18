@@ -175,6 +175,48 @@ fileprivate struct _CapacityAndFlags {
 import SwiftShims
 
 @_alwaysEmitIntoClient
+internal func _allocate2(
+  numHeaderBytes: Int,        // The size of the class header
+  numTailBytes: Int,          // The desired number of tail bytes
+  growthFactor: Float? = nil, // Exponential growth factor for large allocs
+  tailAllocator: (_ numTailBytes: Int) -> UnsafeRawPointer // Do the actual tail allocation
+) -> (UnsafeRawPointer, realNumTailBytes: Int) {
+ // _internalInvariant(getSwiftClassInstanceExtents(T.self).1 == numHeaderBytes)
+
+  func roundUp(_ x: Int) -> Int { (x + 15) & ~15 }
+
+  let numBytes = numHeaderBytes + numTailBytes
+
+  let linearBucketThreshold = 128
+  if _fastPath(numBytes < linearBucketThreshold) {
+    // Allocate up to the nearest bucket of 16
+    let realNumBytes = roundUp(numBytes)
+    let realNumTailBytes = realNumBytes - numHeaderBytes
+    _internalInvariant(realNumTailBytes >= numTailBytes)
+    let object = tailAllocator(realNumTailBytes)
+    return (object, realNumTailBytes)
+  }
+
+  let growTailBytes: Int
+  if let growth = growthFactor {
+    growTailBytes = Swift.max(numTailBytes, Int(Float(numTailBytes) * growth))
+  } else {
+    growTailBytes = numTailBytes
+  }
+
+  let total = roundUp(numHeaderBytes + growTailBytes)
+  let totalTailBytes = total - numHeaderBytes
+
+  let object = tailAllocator(totalTailBytes)
+  let mallocSize = _swift_stdlib_malloc_size(object)
+  _internalInvariant(mallocSize % MemoryLayout<Int>.stride == 0)
+
+  let realNumTailBytes = mallocSize - numHeaderBytes
+  _internalInvariant(realNumTailBytes >= numTailBytes)
+  return (object, realNumTailBytes)
+}
+
+@_alwaysEmitIntoClient
 internal func _allocate<T: AnyObject>(
   numHeaderBytes: Int,        // The size of the class header
   numTailBytes: Int,          // The desired number of tail bytes
