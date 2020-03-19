@@ -1638,8 +1638,6 @@ public:
         Importer(static_cast<ClangImporter *>(CurrDeclContext->getASTContext().
           getClangModuleLoader())),
         CompletionContext(CompletionContext) {
-    Ctx.setLegacySemanticQueriesEnabled();
-
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext) {
       CurrentMethod = CurrDeclContext->getInnermostMethodContext();
@@ -4186,8 +4184,6 @@ public:
                            SourceLoc introducerLoc)
       : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
         ParsedKeywords(ParsedKeywords), introducerLoc(introducerLoc) {
-    Ctx.setLegacySemanticQueriesEnabled();
-
     hasFuncIntroducer = isKeywordSpecified("func");
     hasVarIntroducer = isKeywordSpecified("var") ||
                        isKeywordSpecified("let");
