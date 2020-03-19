@@ -767,17 +767,29 @@ void CodeCompletionResultBuilder::addChunkWithText(
   addChunkWithTextNoCopy(Kind, copyString(*Sink.Allocator, Text));
 }
 
-void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
+void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D,
+                                                    SourceFile *SF) {
   assert(Kind == CodeCompletionResult::ResultKind::Declaration);
   AssociatedDecl = D;
-
   if (auto *ClangD = D->getClangDecl())
     CurrentModule = ClangD->getImportedOwningModule();
   // FIXME: macros
   // FIXME: imported header module
 
-  if (!CurrentModule)
-    CurrentModule = D->getModuleContext();
+  if (!CurrentModule) {
+    ModuleDecl *MD = D->getModuleContext();
+    // If this is an underscored cross-import overlay, map it to its underlying
+    // module instead.
+    if (SF) {
+      while (MD->getNameStr().startswith("_")) {
+        auto *Underlying = SF->getModuleShadowedBySeparatelyImportedOverlay(MD);
+        if (!Underlying)
+          break;
+        MD = Underlying;
+      }
+    }
+    CurrentModule = MD;
+  }
 
   if (D->getAttrs().getDeprecated(D->getASTContext()))
     setNotRecommended(CodeCompletionResult::Deprecated);
@@ -1549,6 +1561,15 @@ private:
     Builder.addDeclDocCommentWords(llvm::makeArrayRef(Pairs));
   }
 
+  /// Sets the given declaration \p D as the associated declaration of the
+  /// completion result being built in \p Builder.
+  void setAssociatedDecl(const Decl *D, CodeCompletionResultBuilder &Builder) {
+    SourceFile *SF = nullptr;
+    if (CurrDeclContext)
+      SF = CurrDeclContext->getParentSourceFile();
+    Builder.setAssociatedDecl(D, SF);
+  }
+
   bool shouldUseFunctionReference(AbstractFunctionDecl *D) {
     if (PreferFunctionReferencesToCalls)
       return true;
@@ -1726,7 +1747,7 @@ public:
                                           SemanticContextKind::None,
                                           expectedTypeContext);
       auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
-      Builder.setAssociatedDecl(MD);
+      setAssociatedDecl(MD, Builder);
       Builder.addTextChunk(MD->getNameStr());
       Builder.addTypeAnnotation("Module");
       if (Pair.second)
@@ -1740,7 +1761,6 @@ public:
     ImportFilter |= ModuleDecl::ImportFilterKind::Public;
     ImportFilter |= ModuleDecl::ImportFilterKind::Private;
     ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
 
     SmallVector<ModuleDecl::ImportedModule, 16> Imported;
     SmallVector<ModuleDecl::ImportedModule, 16> FurtherImported;
@@ -1755,21 +1775,27 @@ public:
       MD->getImportedModules(FurtherImported,
                              ModuleDecl::ImportFilterKind::Public);
       Imported.append(FurtherImported.begin(), FurtherImported.end());
-      for (auto SubMod : FurtherImported) {
-        Imported.push_back(SubMod);
-      }
     }
   }
 
   void addModuleName(
       const ModuleDecl *MD,
       Optional<CodeCompletionResult::NotRecommendedReason> R = None) {
+
+    // Don't add underscored cross-import overlay modules.
+    if (CurrDeclContext && MD->getNameStr().startswith("_")) {
+      if (auto SF = CurrDeclContext->getParentSourceFile()) {
+        if (SF->getModuleShadowedBySeparatelyImportedOverlay(MD))
+          return;
+      }
+    }
+
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::None,
         expectedTypeContext);
-    Builder.setAssociatedDecl(MD);
+    setAssociatedDecl(MD, Builder);
     Builder.addTextChunk(MD->getNameStr());
     Builder.addTypeAnnotation("Module");
     if (R)
@@ -2163,7 +2189,7 @@ public:
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(VD, Reason, dynamicLookupInfo), expectedTypeContext);
-    Builder.setAssociatedDecl(VD);
+    setAssociatedDecl(VD, Builder);
     addLeadingDot(Builder);
     addValueBaseName(Builder, Name);
     setClangDeclKeywords(VD, Pairs, Builder);
@@ -2413,7 +2439,7 @@ public:
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContext ? *SemanticContext : getSemanticContextKind(SD),
         expectedTypeContext);
-    Builder.setAssociatedDecl(SD);
+    setAssociatedDecl(SD, Builder);
     setClangDeclKeywords(SD, Pairs, Builder);
     if (!HaveLParen)
       Builder.addLeftBracket();
@@ -2452,7 +2478,7 @@ public:
           SemanticContext ? *SemanticContext : getSemanticContextKind(AFD),
           expectedTypeContext);
       if (AFD) {
-        Builder.setAssociatedDecl(AFD);
+        setAssociatedDecl(AFD, Builder);
         setClangDeclKeywords(AFD, Pairs, Builder);
       }
 
@@ -2589,7 +2615,7 @@ public:
           getSemanticContext(FD, Reason, dynamicLookupInfo),
           expectedTypeContext);
       setClangDeclKeywords(FD, Pairs, Builder);
-      Builder.setAssociatedDecl(FD);
+      setAssociatedDecl(FD, Builder);
       addLeadingDot(Builder);
       addValueBaseName(Builder, Name);
       if (IsDynamicLookup)
@@ -2702,7 +2728,7 @@ public:
           getSemanticContext(CD, Reason, dynamicLookupInfo),
           expectedTypeContext);
       setClangDeclKeywords(CD, Pairs, Builder);
-      Builder.setAssociatedDecl(CD);
+      setAssociatedDecl(CD, Builder);
       if (needInit) {
         assert(addName.empty());
         addLeadingDot(Builder);
@@ -2793,7 +2819,7 @@ public:
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(SD, Reason, dynamicLookupInfo), expectedTypeContext);
-    Builder.setAssociatedDecl(SD);
+    setAssociatedDecl(SD, Builder);
     setClangDeclKeywords(SD, Pairs, Builder);
 
     // '\TyName#^TOKEN^#' requires leading dot.
@@ -2828,7 +2854,7 @@ public:
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(NTD, Reason, dynamicLookupInfo),
         expectedTypeContext);
-    Builder.setAssociatedDecl(NTD);
+    setAssociatedDecl(NTD, Builder);
     setClangDeclKeywords(NTD, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(NTD->getName().str());
@@ -2844,7 +2870,7 @@ public:
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(TAD, Reason, dynamicLookupInfo),
         expectedTypeContext);
-    Builder.setAssociatedDecl(TAD);
+    setAssociatedDecl(TAD, Builder);
     setClangDeclKeywords(TAD, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(TAD->getName().str());
@@ -2874,7 +2900,7 @@ public:
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(GP, Reason, dynamicLookupInfo), expectedTypeContext);
     setClangDeclKeywords(GP, Pairs, Builder);
-    Builder.setAssociatedDecl(GP);
+    setAssociatedDecl(GP, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(GP->getName().str());
     addTypeAnnotation(Builder, GP->getDeclaredInterfaceType());
@@ -2888,7 +2914,7 @@ public:
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(AT, Reason, dynamicLookupInfo), expectedTypeContext);
     setClangDeclKeywords(AT, Pairs, Builder);
-    Builder.setAssociatedDecl(AT);
+    setAssociatedDecl(AT, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(AT->getName().str());
     if (Type T = getAssociatedTypeType(AT))
@@ -2903,7 +2929,7 @@ public:
       semanticContext, {});
 
     builder.addTextChunk(PGD->getName().str());
-    builder.setAssociatedDecl(PGD);
+    setAssociatedDecl(PGD, builder);
   };
 
   void addEnumElementRef(const EnumElementDecl *EED, DeclVisibilityKind Reason,
@@ -2920,7 +2946,7 @@ public:
         HasTypeContext ? SemanticContextKind::ExpressionSpecific
                        : getSemanticContext(EED, Reason, dynamicLookupInfo),
         expectedTypeContext);
-    Builder.setAssociatedDecl(EED);
+    setAssociatedDecl(EED, Builder);
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
     addValueBaseName(Builder, EED->getName());
@@ -3002,7 +3028,7 @@ public:
         getSemanticContext(AFD, Reason, dynamicLookupInfo),
         expectedTypeContext);
     setClangDeclKeywords(AFD, Pairs, Builder);
-    Builder.setAssociatedDecl(AFD);
+    setAssociatedDecl(AFD, Builder);
 
     // Base name
     addLeadingDot(Builder);
@@ -3475,7 +3501,7 @@ public:
     // FIXME: handle variable amounts of space.
     if (HaveLeadingSpace)
       builder.setNumBytesToErase(1);
-    builder.setAssociatedDecl(op);
+    setAssociatedDecl(op, builder);
     builder.addTextChunk(op->getName().str());
     assert(resultType);
     addTypeAnnotation(builder, resultType);
@@ -3521,7 +3547,7 @@ public:
     CodeCompletionResultBuilder builder(
         Sink, CodeCompletionResult::ResultKind::Declaration, semanticContext,
         {});
-    builder.setAssociatedDecl(op);
+    setAssociatedDecl(op, builder);
 
     if (HaveLeadingSpace)
       builder.addAnnotatedWhitespace(" ");
@@ -4185,6 +4211,15 @@ class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   bool hasOverridabilityModifier = false;
   bool hasStaticOrClass = false;
 
+  /// Sets the given declaration \p D as the associated declaration of the
+  /// completion result being built in \p Builder.
+  void setAssociatedDecl(const Decl *D, CodeCompletionResultBuilder &Builder) {
+    SourceFile *SF = nullptr;
+    if (CurrDeclContext)
+      SF = CurrDeclContext->getParentSourceFile();
+    Builder.setAssociatedDecl(D, SF);
+  }
+
 public:
   CompletionOverrideLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
                            const DeclContext *CurrDeclContext,
@@ -4413,7 +4448,7 @@ public:
         SemanticContextKind::Super, {});
     Builder.setExpectedTypeRelation(
         CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
-    Builder.setAssociatedDecl(FD);
+    setAssociatedDecl(FD, Builder);
     addValueOverride(FD, Reason, dynamicLookupInfo, Builder, hasFuncIntroducer);
     Builder.addBraceStmtWithCursor();
   }
@@ -4431,7 +4466,7 @@ public:
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
-    Builder.setAssociatedDecl(VD);
+    setAssociatedDecl(VD, Builder);
     addValueOverride(VD, Reason, dynamicLookupInfo, Builder, hasVarIntroducer);
   }
 
@@ -4442,7 +4477,7 @@ public:
         SemanticContextKind::Super, {});
     Builder.setExpectedTypeRelation(
         CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
-    Builder.setAssociatedDecl(SD);
+    setAssociatedDecl(SD, Builder);
     addValueOverride(SD, Reason, dynamicLookupInfo, Builder, false);
     Builder.addBraceStmtWithCursor();
   }
@@ -4454,7 +4489,7 @@ public:
       SemanticContextKind::Super, {});
     Builder.setExpectedTypeRelation(
         CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
-    Builder.setAssociatedDecl(ATD);
+    setAssociatedDecl(ATD, Builder);
     if (!hasTypealiasIntroducer && !hasAccessModifier)
       addAccessControl(ATD, Builder);
     if (!hasTypealiasIntroducer)
@@ -4472,7 +4507,7 @@ public:
         SemanticContextKind::Super, {});
     Builder.setExpectedTypeRelation(
         CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
-    Builder.setAssociatedDecl(CD);
+    setAssociatedDecl(CD, Builder);
 
     if (!hasAccessModifier)
       addAccessControl(CD, Builder);
@@ -5738,7 +5773,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       ImportFilter |= ModuleDecl::ImportFilterKind::Public;
       ImportFilter |= ModuleDecl::ImportFilterKind::Private;
       ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-      // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
       SmallVector<ModuleDecl::ImportedModule, 4> Imports;
       auto *SF = CurDeclContext->getParentSourceFile();
       SF->getImportedModules(Imports, ImportFilter);
