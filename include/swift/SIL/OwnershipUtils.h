@@ -66,7 +66,7 @@ bool isOwnedForwardingInstruction(SILInstruction *inst);
 /// previous terminator.
 bool isOwnedForwardingValue(SILValue value);
 
-struct BorrowScopeOperandKind {
+struct BorrowingOperandKind {
   enum Kind {
     BeginBorrow,
     BeginApply,
@@ -75,21 +75,21 @@ struct BorrowScopeOperandKind {
 
   Kind value;
 
-  BorrowScopeOperandKind(Kind newValue) : value(newValue) {}
-  BorrowScopeOperandKind(const BorrowScopeOperandKind &other)
+  BorrowingOperandKind(Kind newValue) : value(newValue) {}
+  BorrowingOperandKind(const BorrowingOperandKind &other)
       : value(other.value) {}
   operator Kind() const { return value; }
 
-  static Optional<BorrowScopeOperandKind> get(SILInstructionKind kind) {
+  static Optional<BorrowingOperandKind> get(SILInstructionKind kind) {
     switch (kind) {
     default:
       return None;
     case SILInstructionKind::BeginBorrowInst:
-      return BorrowScopeOperandKind(BeginBorrow);
+      return BorrowingOperandKind(BeginBorrow);
     case SILInstructionKind::BeginApplyInst:
-      return BorrowScopeOperandKind(BeginApply);
+      return BorrowingOperandKind(BeginApply);
     case SILInstructionKind::BranchInst:
-      return BorrowScopeOperandKind(Branch);
+      return BorrowingOperandKind(Branch);
     }
   }
 
@@ -97,8 +97,7 @@ struct BorrowScopeOperandKind {
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                              BorrowScopeOperandKind kind);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, BorrowingOperandKind kind);
 
 struct BorrowedValue;
 
@@ -111,11 +110,11 @@ struct BorrowedValue;
 /// guaranteed value in the same function: see begin_apply. In such cases, we
 /// require instead an end_* instruction to mark the end of the scope's region.
 struct BorrowingOperand {
-  BorrowScopeOperandKind kind;
+  BorrowingOperandKind kind;
   Operand *op;
 
   BorrowingOperand(Operand *op)
-      : kind(*BorrowScopeOperandKind::get(op->getUser()->getKind())), op(op) {}
+      : kind(*BorrowingOperandKind::get(op->getUser()->getKind())), op(op) {}
   BorrowingOperand(const BorrowingOperand &other)
       : kind(other.kind), op(other.op) {}
   BorrowingOperand &operator=(const BorrowingOperand &other) {
@@ -127,7 +126,7 @@ struct BorrowingOperand {
   /// If value is a borrow introducer return it after doing some checks.
   static Optional<BorrowingOperand> get(Operand *op) {
     auto *user = op->getUser();
-    auto kind = BorrowScopeOperandKind::get(user->getKind());
+    auto kind = BorrowingOperandKind::get(user->getKind());
     if (!kind)
       return None;
     return BorrowingOperand(*kind, op);
@@ -139,10 +138,10 @@ struct BorrowingOperand {
   /// values and produces a new scope afterwards.
   bool consumesGuaranteedValues() const {
     switch (kind) {
-    case BorrowScopeOperandKind::BeginBorrow:
-    case BorrowScopeOperandKind::BeginApply:
+    case BorrowingOperandKind::BeginBorrow:
+    case BorrowingOperandKind::BeginApply:
       return false;
-    case BorrowScopeOperandKind::Branch:
+    case BorrowingOperandKind::Branch:
       return true;
     }
     llvm_unreachable("Covered switch isn't covered?!");
@@ -152,10 +151,10 @@ struct BorrowingOperand {
   /// for owned values.
   bool canAcceptOwnedValues() const {
     switch (kind) {
-    case BorrowScopeOperandKind::BeginBorrow:
-    case BorrowScopeOperandKind::BeginApply:
+    case BorrowingOperandKind::BeginBorrow:
+    case BorrowingOperandKind::BeginApply:
       return true;
-    case BorrowScopeOperandKind::Branch:
+    case BorrowingOperandKind::Branch:
       return false;
     }
     llvm_unreachable("Covered switch isn't covered?!");
@@ -167,10 +166,10 @@ struct BorrowingOperand {
   bool areAnyUserResultsBorrowIntroducers() const {
     // TODO: Can we derive this by running a borrow introducer check ourselves?
     switch (kind) {
-    case BorrowScopeOperandKind::BeginBorrow:
-    case BorrowScopeOperandKind::Branch:
+    case BorrowingOperandKind::BeginBorrow:
+    case BorrowingOperandKind::Branch:
       return true;
-    case BorrowScopeOperandKind::BeginApply:
+    case BorrowingOperandKind::BeginApply:
       return false;
     }
     llvm_unreachable("Covered switch isn't covered?!");
@@ -201,7 +200,7 @@ struct BorrowingOperand {
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
-  BorrowingOperand(BorrowScopeOperandKind kind, Operand *op)
+  BorrowingOperand(BorrowingOperandKind kind, Operand *op)
       : kind(kind), op(op) {}
 };
 
