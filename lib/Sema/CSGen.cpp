@@ -1152,10 +1152,6 @@ namespace {
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
       auto *parentExpr = CS.getParentExpr(expr);
-      
-      // Loop until you have an expr without parentheses 
-      // so if you have (nil), ((nil)), (((nil))), etc...
-      // you get `nil`
       while (parentExpr && isa<ParenExpr>(parentExpr))
         parentExpr = CS.getParentExpr(parentExpr);
 
