@@ -72,16 +72,39 @@ public:
   }
 };
 
+/// Resolve the relative reference in a mangled symbolic reference.
+static uintptr_t resolveSymbolicReferenceOffset(SymbolicReferenceKind kind,
+                                                Directness isIndirect,
+                                                int32_t offset,
+                                                const void *base) {
+  auto ptr = detail::applyRelativeOffset(base, offset);
+
+  // Indirect references may be authenticated in a way appropriate for the
+  // referent.
+  if (isIndirect == Directness::Indirect) {
+    switch (kind) {
+    case SymbolicReferenceKind::Context: {
+      ContextDescriptor *contextPtr =
+        *(const TargetSignedContextPointer<InProcess> *)ptr;
+      return (uintptr_t)contextPtr;
+    }
+    case SymbolicReferenceKind::AccessorFunctionReference: {
+      swift_runtime_unreachable("should not be indirectly referenced");
+    }
+    }
+    swift_runtime_unreachable("unknown symbolic reference kind");
+  } else {
+    return ptr;
+  }
+}
+
 NodePointer
 ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
                                        Directness isIndirect,
                                        int32_t offset,
                                        const void *base) {
   // Resolve the absolute pointer to the entity being referenced.
-  auto ptr = detail::applyRelativeOffset(base, offset);
-  if (isIndirect == Directness::Indirect) {
-    ptr = *(const uintptr_t *)ptr;
-  }
+  auto ptr = resolveSymbolicReferenceOffset(kind, isIndirect, offset, base);
 
   // Figure out this symbolic reference's grammatical role.
   Node::Kind nodeKind;
@@ -118,6 +141,11 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
     // invoke the function to resolve the thing they're trying to access.
     nodeKind = Node::Kind::AccessorFunctionReference;
     isType = false;
+#if SWIFT_PTRAUTH
+    // The pointer refers to an accessor function, which we need to sign.
+    ptr = (uintptr_t)ptrauth_sign_unauthenticated((void*)ptr,
+      ptrauth_key_function_pointer, 0);
+#endif
     break;
   }
   }
@@ -140,6 +168,11 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
     return _buildDemanglingForContext(
       (const ContextDescriptor *)resolvedReference, {}, Dem);
   case SymbolicReferenceKind::AccessorFunctionReference:
+#if SWIFT_PTRAUTH
+    // The pointer refers to an accessor function, which we need to sign.
+    resolvedReference = ptrauth_sign_unauthenticated(resolvedReference,
+      ptrauth_key_function_pointer, 0);
+#endif
     return Dem.createNode(Node::Kind::AccessorFunctionReference,
                           (uintptr_t)resolvedReference);
   }
@@ -152,11 +185,8 @@ ResolveToDemanglingForContext::operator()(SymbolicReferenceKind kind,
                                           Directness isIndirect,
                                           int32_t offset,
                                           const void *base) {
-  auto ptr = detail::applyRelativeOffset(base, offset);
-  if (isIndirect == Directness::Indirect) {
-    ptr = *(const uintptr_t *)ptr;
-  }
-  
+  auto ptr = resolveSymbolicReferenceOffset(kind, isIndirect, offset, base);
+
   return _buildDemanglingForSymbolicReference(kind, (const void *)ptr, Dem);
 }
 
@@ -205,21 +235,10 @@ namespace {
   };
 } // end anonymous namespace
 
-inline llvm::hash_code llvm::hash_value(StringRef S) {
-  return hash_combine_range(S.begin(), S.end());
-}
-
 struct TypeMetadataPrivateState {
   ConcurrentMap<NominalTypeDescriptorCacheEntry> NominalCache;
   ConcurrentReadableArray<TypeMetadataSection> SectionsToScan;
   
-  llvm::DenseMap<llvm::StringRef,
-                 llvm::SmallDenseSet<const ContextDescriptor *, 1>>
-    ContextDescriptorCache;
-  size_t ConformanceDescriptorLastSectionScanned = 0;
-  size_t TypeContextDescriptorLastSectionScanned = 0;
-  Mutex ContextDescriptorCacheLock;
-
   TypeMetadataPrivateState() {
     initializeTypeMetadataRecordLookup();
   }
@@ -233,29 +252,6 @@ _registerTypeMetadataRecords(TypeMetadataPrivateState &T,
                              const TypeMetadataRecord *begin,
                              const TypeMetadataRecord *end) {
   T.SectionsToScan.push_back(TypeMetadataSection{begin, end});
-}
-
-/// Iterate over type metadata sections starting from the given index.
-/// The index is updated to the current number of sections. Passing
-/// the same index to the next call will iterate over any sections that were
-/// added after the previous call.
-///
-/// Takes a function to call for each section found. The two parameters are
-/// the start and end of the section.
-static void _forEachTypeMetadataSectionAfter(
-  TypeMetadataPrivateState &T,
-  size_t *start,
-  const std::function<void(const TypeMetadataRecord *,
-                           const TypeMetadataRecord *)> &f) {
-  auto snapshot = T.SectionsToScan.snapshot();
-  if (snapshot.Count > *start) {
-    auto *begin = snapshot.begin() + *start;
-    auto *end = snapshot.end();
-    for (auto *section = begin; section != end; section++) {
-      f(section->Begin, section->End);
-    }
-    *start = snapshot.Count;
-  }
 }
 
 void swift::addImageTypeMetadataRecordBlockCallbackUnsafe(
@@ -654,70 +650,6 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
   return nullptr;
 }
 
-// Read ContextDescriptors for any loaded images that haven't already been
-// scanned, if any.
-static void
-_scanAdditionalContextDescriptors(TypeMetadataPrivateState &T) {
-  _forEachTypeMetadataSectionAfter(
-    T,
-    &T.TypeContextDescriptorLastSectionScanned,
-    [&T](const TypeMetadataRecord *Begin,
-         const TypeMetadataRecord *End) {
-      for (const auto *record = Begin; record != End; record++) {
-        if (auto ntd = record->getContextDescriptor()) {
-          if (auto type = llvm::dyn_cast<TypeContextDescriptor>(ntd)) {
-            auto identity = ParsedTypeIdentity::parse(type);
-            auto name = identity.getABIName();
-            T.ContextDescriptorCache[name].insert(type);
-          }
-        }
-      }
-    });
-
-  _forEachProtocolConformanceSectionAfter(
-    &T.ConformanceDescriptorLastSectionScanned,
-    [&T](const ProtocolConformanceRecord *Begin,
-       const ProtocolConformanceRecord *End) {
-    for (const auto *record = Begin; record != End; record++) {
-      if (auto ntd = record[0]->getTypeDescriptor()) {
-        if (auto type = llvm::dyn_cast<TypeContextDescriptor>(ntd)) {
-          auto identity = ParsedTypeIdentity::parse(type);
-          auto name = identity.getABIName();
-          T.ContextDescriptorCache[name].insert(type);
-        }
-      }
-    }
-  });
-}
-
-// Search for a ContextDescriptor in the context descriptor cache matching the
-// given demangle node. Returns the found node, or nullptr if no match was
-// found.
-static llvm::SmallDenseSet<const ContextDescriptor *, 1>
-_findContextDescriptorInCache(TypeMetadataPrivateState &T,
-                              Demangle::NodePointer node) {
-  if (node->getNumChildren() < 2)
-    return { };
-
-  auto nameNode = node->getChild(1);
-
-  // Declarations synthesized by the Clang importer get a small tag
-  // string in addition to their name.
-  if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName)
-    nameNode = nameNode->getChild(1);
-
-  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
-    return { };
-
-  auto name = nameNode->getText();
-  
-  auto iter = T.ContextDescriptorCache.find(name);
-  if (iter == T.ContextDescriptorCache.end())
-    return { };
-
-  return iter->getSecond();
-}
-
 #define DESCRIPTOR_MANGLING_SUFFIX_Structure Mn
 #define DESCRIPTOR_MANGLING_SUFFIX_Enum Mn
 #define DESCRIPTOR_MANGLING_SUFFIX_Protocol Mp
@@ -785,50 +717,17 @@ _findContextDescriptor(Demangle::NodePointer node,
   if (auto Value = T.NominalCache.find(mangledName))
     return Value->getDescription();
 
+  // Check type metadata records		   
   // Scan any newly loaded images for context descriptors, then try the context
-  // descriptor cache. This must be done with the cache's lock held.
-  llvm::SmallDenseSet<const ContextDescriptor *, 1> cachedContexts;
-  {
-    ScopedLock guard(T.ContextDescriptorCacheLock);
-    _scanAdditionalContextDescriptors(T);
-    cachedContexts = _findContextDescriptorInCache(T, node);
-  }
-
-  bool foundInCache = false;
-  for (auto cachedContext : cachedContexts) {
-    if (_contextDescriptorMatchesMangling(cachedContext, node)) {
-      foundContext = cachedContext;
-      foundInCache = true;
-      break;
-    }
-  }
-
-  if (!foundContext) {
-    // Slow path, as a fallback if the cache itself isn't capturing everything.
-    (void)foundInCache;
-
-    // Check type metadata records
-    foundContext = _searchTypeMetadataRecords(T, node);
-
-    // Check protocol conformances table. Note that this has no support for
-    // resolving generic types yet.
-    if (!foundContext)
-      foundContext = _searchConformancesByMangledTypeName(node);
-  }
-
-  if (foundContext) {
+  foundContext = _searchTypeMetadataRecords(T, node);
+  
+  // Check protocol conformances table. Note that this has no support for		
+  // resolving generic types yet.
+  if (!foundContext)
+    foundContext = _searchConformancesByMangledTypeName(node);
+  
+  if (foundContext)
     T.NominalCache.getOrInsert(mangledName, foundContext);
-
-#ifndef NDEBUG
-    // If we found something in the slow path but not in the cache, it is a
-    // bug in the cache. Fail in assertions builds.
-    if (!foundInCache) {
-      fatalError(0,
-                 "_findContextDescriptor cache miss for demangled tree:\n%s\n",
-                 getNodeTreeAsString(node).c_str());
-    }
-#endif
-  }
 
   return foundContext;
 }
@@ -1502,10 +1401,11 @@ public:
     auto flags = TupleTypeFlags().withNumElements(elements.size());
     if (!labels.empty())
       flags = flags.withNonConstantLabels(true);
-    return swift_getTupleTypeMetadata(MetadataState::Abstract,
-                                      flags, elements.data(),
-                                      labels.empty() ? nullptr : labels.c_str(),
-                                      /*proposedWitnesses=*/nullptr).Value;
+    return MetadataResponse(swift_getTupleTypeMetadata(
+                                MetadataState::Abstract, flags, elements.data(),
+                                labels.empty() ? nullptr : labels.c_str(),
+                                /*proposedWitnesses=*/nullptr))
+        .Value;
   }
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base) const {
@@ -1590,7 +1490,7 @@ static TypeInfo swift_getTypeByMangledNodeImpl(
     // The accessor function is passed the pointer to the original argument
     // buffer. It's assumed to match the generic context.
     auto accessorFn =
-      (const Metadata *(*)(const void * const *))node->getIndex();
+        (const Metadata *(*)(const void * const *))node->getIndex();
     auto type = accessorFn(origArgumentVector);
     // We don't call checkMetadataState here since the result may not really
     // *be* type metadata. If the accessor returns a type, it is responsible
@@ -1818,6 +1718,13 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
     auto node = demangler.demangleSymbol(typeName);
     if (!node)
       return NO;
+
+    // If we successfully demangled but there is a suffix, then we did NOT use
+    // the entire name, and this is NOT a match. Reject it.
+    if (node->hasChildren() &&
+        node->getLastChild()->getKind() == Node::Kind::Suffix)
+      return NO;
+
     metadata = swift_getTypeByMangledNode(
       MetadataState::Complete, demangler, node,
       nullptr,
@@ -2214,18 +2121,31 @@ void DynamicReplacementDescriptor::enableReplacement() const {
   if (!shouldChain() && chainRoot->next) {
     auto *previous = chainRoot->next;
     chainRoot->next = previous->next;
-    chainRoot->implementationFunction = previous->implementationFunction;
+    //chainRoot->implementationFunction = previous->implementationFunction;
+    swift_ptrauth_copy(
+      reinterpret_cast<void **>(&chainRoot->implementationFunction),
+      reinterpret_cast<void *const *>(&previous->implementationFunction),
+      replacedFunctionKey->getExtraDiscriminator());
   }
 
   // First populate the current replacement's chain entry.
   auto *currentEntry =
       const_cast<DynamicReplacementChainEntry *>(chainEntry.get());
-  currentEntry->implementationFunction = chainRoot->implementationFunction;
+  // currentEntry->implementationFunction = chainRoot->implementationFunction;
+  swift_ptrauth_copy(
+      reinterpret_cast<void **>(&currentEntry->implementationFunction),
+      reinterpret_cast<void *const *>(&chainRoot->implementationFunction),
+      replacedFunctionKey->getExtraDiscriminator());
+
   currentEntry->next = chainRoot->next;
 
   // Link the replacement entry.
   chainRoot->next = chainEntry.get();
-  chainRoot->implementationFunction = replacementFunction.get();
+  // chainRoot->implementationFunction = replacementFunction.get();
+  swift_ptrauth_init(
+      reinterpret_cast<void **>(&chainRoot->implementationFunction),
+      reinterpret_cast<void *>(replacementFunction.get()),
+      replacedFunctionKey->getExtraDiscriminator());
 }
 
 void DynamicReplacementDescriptor::disableReplacement() const {
@@ -2245,7 +2165,11 @@ void DynamicReplacementDescriptor::disableReplacement() const {
   // Unlink this entry.
   auto *previous = const_cast<DynamicReplacementChainEntry *>(prev);
   previous->next = thisEntry->next;
-  previous->implementationFunction = thisEntry->implementationFunction;
+  // previous->implementationFunction = thisEntry->implementationFunction;
+  swift_ptrauth_copy(
+      reinterpret_cast<void **>(&previous->implementationFunction),
+      reinterpret_cast<void *const *>(&thisEntry->implementationFunction),
+      replacedFunctionKey->getExtraDiscriminator());
 }
 
 /// An automatic dymamic replacement entry.
@@ -2290,7 +2214,10 @@ public:
 
 /// A map from original to replaced opaque type descriptor of a some type.
 class DynamicReplacementSomeDescriptor {
-  RelativeIndirectablePointer<const OpaqueTypeDescriptor, false>
+  RelativeIndirectablePointer<
+      const OpaqueTypeDescriptor, false, int32_t,
+      TargetSignedPointer<InProcess, OpaqueTypeDescriptor *
+                                         __ptrauth_swift_type_descriptor>>
       originalOpaqueTypeDesc;
   RelativeDirectPointer<const OpaqueTypeDescriptor, false>
       replacementOpaqueTypeDesc;
@@ -2387,11 +2314,15 @@ void swift::addImageDynamicReplacementBlockCallback(
 
 void swift::swift_enableDynamicReplacementScope(
     const DynamicReplacementScope *scope) {
+  scope = swift_auth_data_non_address(
+      scope, SpecialPointerAuthDiscriminators::DynamicReplacementScope);
   DynamicReplacementLock.get().withLock([=] { scope->enable(); });
 }
 
 void swift::swift_disableDynamicReplacementScope(
     const DynamicReplacementScope *scope) {
+  scope = swift_auth_data_non_address(
+      scope, SpecialPointerAuthDiscriminators::DynamicReplacementScope);
   DynamicReplacementLock.get().withLock([=] { scope->disable(); });
 }
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE

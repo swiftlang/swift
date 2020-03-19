@@ -26,7 +26,18 @@
 
 using namespace swift;
 
-static const StringRef SupportedConditionalCompilationOSs[] = {
+struct SupportedConditionalValue {
+  StringRef value;
+
+  /// If the value has been deprecated, the new value to replace it with.
+  StringRef replacement = "";
+
+  SupportedConditionalValue(const char *value) : value(value) {}
+  SupportedConditionalValue(const char *value, const char *replacement)
+    : value(value), replacement(replacement) {}
+};
+
+static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "OSX",
   "macOS",
   "tvOS",
@@ -34,6 +45,7 @@ static const StringRef SupportedConditionalCompilationOSs[] = {
   "iOS",
   "Linux",
   "FreeBSD",
+  "OpenBSD",
   "Windows",
   "Android",
   "PS4",
@@ -42,7 +54,7 @@ static const StringRef SupportedConditionalCompilationOSs[] = {
   "WASI",
 };
 
-static const StringRef SupportedConditionalCompilationArches[] = {
+static const SupportedConditionalValue SupportedConditionalCompilationArches[] = {
   "arm",
   "arm64",
   "i386",
@@ -53,18 +65,25 @@ static const StringRef SupportedConditionalCompilationArches[] = {
   "wasm32",
 };
 
-static const StringRef SupportedConditionalCompilationEndianness[] = {
+static const SupportedConditionalValue SupportedConditionalCompilationEndianness[] = {
   "little",
   "big"
 };
 
-static const StringRef SupportedConditionalCompilationRuntimes[] = {
+static const SupportedConditionalValue SupportedConditionalCompilationRuntimes[] = {
   "_ObjC",
   "_Native",
 };
 
-static const StringRef SupportedConditionalCompilationTargetEnvironments[] = {
+static const SupportedConditionalValue SupportedConditionalCompilationTargetEnvironments[] = {
   "simulator",
+  { "macabi", "macCatalyst" },
+  "macCatalyst", // A synonym for "macabi" when compiling for iOS
+};
+
+static const SupportedConditionalValue SupportedConditionalCompilationPtrAuthSchemes[] = {
+  "_none",
+  "_arm64e",
 };
 
 static const PlatformConditionKind AllPublicPlatformConditionKinds[] = {
@@ -73,7 +92,7 @@ static const PlatformConditionKind AllPublicPlatformConditionKinds[] = {
 #include "swift/AST/PlatformConditionKinds.def"
 };
 
-ArrayRef<StringRef> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
+ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
   switch (Kind) {
   case PlatformConditionKind::OS:
     return SupportedConditionalCompilationOSs;
@@ -87,6 +106,8 @@ ArrayRef<StringRef> getSupportedConditionalCompilationValues(const PlatformCondi
     return { };
   case PlatformConditionKind::TargetEnvironment:
     return SupportedConditionalCompilationTargetEnvironments;
+  case PlatformConditionKind::PtrAuth:
+    return SupportedConditionalCompilationPtrAuthSchemes;
   }
   llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
@@ -97,11 +118,11 @@ PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind,
   for (const PlatformConditionKind& candidateKind : AllPublicPlatformConditionKinds) {
     if (candidateKind != Kind) {
       auto supportedValues = getSupportedConditionalCompilationValues(candidateKind);
-      for (const StringRef& candidateValue : supportedValues) {
-        if (candidateValue.lower() == lower) {
+      for (const SupportedConditionalValue& candidateValue : supportedValues) {
+        if (candidateValue.value.lower() == lower) {
           suggestedValues.clear();
-          if (candidateValue != V) {
-            suggestedValues.emplace_back(candidateValue);
+          if (candidateValue.value != V) {
+            suggestedValues.emplace_back(candidateValue.value);
           }
           return candidateKind;
         }
@@ -118,19 +139,21 @@ bool isMatching(PlatformConditionKind Kind, const StringRef &V,
   unsigned minDistance = std::numeric_limits<unsigned>::max();
   std::string lower = V.lower();
   auto supportedValues = getSupportedConditionalCompilationValues(Kind);
-  for (const StringRef& candidate : supportedValues) {
-    if (candidate == V) {
+  for (const SupportedConditionalValue& candidate : supportedValues) {
+    if (candidate.value == V) {
       suggestedKind = Kind;
       suggestions.clear();
+      if (!candidate.replacement.empty())
+        suggestions.push_back(candidate.replacement);
       return true;
     }
-    unsigned distance = StringRef(lower).edit_distance(candidate.lower());
+    unsigned distance = StringRef(lower).edit_distance(candidate.value.lower());
     if (distance < minDistance) {
       suggestions.clear();
       minDistance = distance;
     }
     if (distance == minDistance)
-      suggestions.emplace_back(candidate);
+      suggestions.emplace_back(candidate.value);
   }
   suggestedKind = suggestedPlatformConditionKind(Kind, V, suggestions);
   return false;
@@ -146,6 +169,7 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
   case PlatformConditionKind::Endianness:
   case PlatformConditionKind::Runtime:
   case PlatformConditionKind::TargetEnvironment:
+  case PlatformConditionKind::PtrAuth:
     return isMatching(Kind, Value, suggestedKind, suggestedValues);
   case PlatformConditionKind::CanImport:
     // All importable names are valid.
@@ -170,6 +194,16 @@ checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
   // Check a special case that "macOS" is an alias of "OSX".
   if (Kind == PlatformConditionKind::OS && Value == "macOS")
     return checkPlatformCondition(Kind, "OSX");
+
+  // When compiling for iOS we consider "macCatalyst" to be a
+  // synonym of "macabi". This enables the use of
+  // #if targetEnvironment(macCatalyst) as a compilation
+  // condition for macCatalyst.
+
+  if (Kind == PlatformConditionKind::TargetEnvironment &&
+      Value == "macCatalyst" && Target.isiOS()) {
+    return checkPlatformCondition(Kind, "macabi");
+  }
 
   for (auto &Opt : llvm::reverse(PlatformConditionValues)) {
     if (Opt.first == Kind)
@@ -232,6 +266,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::FreeBSD:
     addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
+    break;
+  case llvm::Triple::OpenBSD:
+    addPlatformConditionValue(PlatformConditionKind::OS, "OpenBSD");
     break;
   case llvm::Triple::Win32:
     if (Target.getEnvironment() == llvm::Triple::Cygnus)
@@ -314,6 +351,13 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   addPlatformConditionValue(PlatformConditionKind::Runtime,
                             EnableObjCInterop ? "_ObjC" : "_Native");
 
+  // Set the pointer authentication scheme.
+  if (Target.getArchName() == "arm64e") {
+    addPlatformConditionValue(PlatformConditionKind::PtrAuth, "_arm64e");
+  } else {
+    addPlatformConditionValue(PlatformConditionKind::PtrAuth, "_none");
+  }
+
   // Set the "targetEnvironment" platform condition if targeting a simulator
   // environment. Otherwise _no_ value is present for targetEnvironment; it's
   // an optional disambiguating refinement of the triple.
@@ -321,39 +365,13 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::TargetEnvironment,
                               "simulator");
 
+  if (tripleIsMacCatalystEnvironment(Target))
+    addPlatformConditionValue(PlatformConditionKind::TargetEnvironment,
+                              "macabi");
+
   // If you add anything to this list, change the default size of
   // PlatformConditionValues to not require an extra allocation
   // in the common case.
 
   return { false, false };
-}
-
-bool LangOptions::doesTargetSupportObjCMetadataUpdateCallback() const {
-  if (Target.isMacOSX())
-    return !Target.isMacOSXVersionLT(10, 14, 4);
-  if (Target.isiOS()) // also returns true on tvOS
-    return !Target.isOSVersionLT(12, 2);
-  if (Target.isWatchOS())
-    return !Target.isOSVersionLT(5, 2);
-
-  // Don't assert if we're running on a non-Apple platform; we still
-  // want to allow running tests that -enable-objc-interop.
-  return false;
-}
-
-bool LangOptions::doesTargetSupportObjCGetClassHook() const {
-  return doesTargetSupportObjCMetadataUpdateCallback();
-}
-
-bool LangOptions::doesTargetSupportObjCClassStubs() const {
-  if (Target.isMacOSX())
-    return !Target.isMacOSXVersionLT(10, 15);
-  if (Target.isiOS()) // also returns true on tvOS
-    return !Target.isOSVersionLT(13);
-  if (Target.isWatchOS())
-    return !Target.isOSVersionLT(6);
-
-  // Don't assert if we're running on a non-Apple platform; we still
-  // want to allow running tests that -enable-objc-interop.
-  return false;
 }

@@ -24,12 +24,16 @@ namespace swift {
 /// a particular declaration can be accessed.
 class AccessScope {
   /// The declaration context (if not public) along with a bit saying
-  /// whether this scope is private (or not).
+  /// whether this scope is private, SPI or not.
+  /// If the declaration context is set, the bit means that the scope is
+  /// private or not. If the declaration context is null, the bit means that
+  /// this scope is SPI or not.
   llvm::PointerIntPair<const DeclContext *, 1, bool> Value;
-public:
-  AccessScope(const DeclContext *DC, bool isPrivate = false);
 
-  static AccessScope getPublic() { return AccessScope(nullptr); }
+public:
+  AccessScope(const DeclContext *DC, bool isPrivate = false, bool isSPI = false);
+
+  static AccessScope getPublic(bool isSPI = false) { return AccessScope(nullptr, false, isSPI); }
 
   /// Check if private access is allowed. This is a lexical scope check in Swift
   /// 3 mode. In Swift 4 mode, declarations and extensions of the same type will
@@ -46,9 +50,12 @@ public:
   }
 
   bool isPublic() const { return !Value.getPointer(); }
-  bool isPrivate() const { return Value.getInt(); }
+  bool isPrivate() const { return Value.getPointer() && Value.getInt(); }
   bool isFileScope() const;
   bool isInternal() const;
+
+  // Is this a public scope
+  bool isSPI() const { return !Value.getPointer() && Value.getInt(); }
 
   /// Returns true if this is a child scope of the specified other access scope.
   ///
@@ -56,8 +63,11 @@ public:
   bool isChildOf(AccessScope AS) const {
     if (!isPublic() && !AS.isPublic())
       return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
-    if (isPublic() && AS.isPublic())
+    if (isPublic() && AS.isPublic()) {
+      if (isSPI() != AS.isSPI())
+        return isSPI();
       return false;
+    }
     return AS.isPublic();
   }
 
@@ -76,6 +86,8 @@ public:
   /// have common intersection, or None if scopes don't intersect.
   const Optional<AccessScope> intersectWith(AccessScope accessScope) const {
     if (hasEqualDeclContextWith(accessScope)) {
+      if (isSPI())
+        return *this;
       if (isPrivate())
         return *this;
       return accessScope;

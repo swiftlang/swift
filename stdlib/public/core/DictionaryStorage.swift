@@ -117,6 +117,7 @@ internal class __RawDictionaryStorage: __SwiftNativeNSDictionary {
 // renamed. The old name must not be used in the new runtime.
 @_fixed_layout
 @usableFromInline
+@_objc_non_lazy_realization
 internal class __EmptyDictionarySingleton: __RawDictionaryStorage {
   @nonobjc
   internal override init(_doNotCallMe: ()) {
@@ -195,6 +196,35 @@ extension __RawDictionaryStorage {
   internal static var empty: __EmptyDictionarySingleton {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmptyDictionarySingleton))
+  }
+  
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal final func uncheckedKey<Key: Hashable>(at bucket: _HashTable.Bucket) -> Key {
+    defer { _fixLifetime(self) }
+    _internalInvariant(_hashTable.isOccupied(bucket))
+    let keys = _rawKeys.assumingMemoryBound(to: Key.self)
+    return keys[bucket.offset]
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(never)
+  internal final func find<Key: Hashable>(_ key: Key) -> (bucket: _HashTable.Bucket, found: Bool) {
+    return find(key, hashValue: key._rawHashValue(seed: _seed))
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(never)
+  internal final func find<Key: Hashable>(_ key: Key, hashValue: Int) -> (bucket: _HashTable.Bucket, found: Bool) {
+      let hashTable = _hashTable
+      var bucket = hashTable.idealBucket(forHashValue: hashValue)
+      while hashTable._isOccupied(bucket) {
+        if uncheckedKey(at: bucket) == key {
+          return (bucket, true)
+        }
+        bucket = hashTable.bucket(wrappedAfter: bucket)
+      }
+      return (bucket, false)
   }
 }
 

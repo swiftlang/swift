@@ -177,11 +177,6 @@ public:
   /// entity.
   bool ProfileEntities = false;
 
-  /// If true, serialization encodes an extra lookup table for use in module-
-  /// merging when emitting partial modules (the per-file modules in a non-WMO
-  /// build).
-  bool EnableSerializationNestedTypeLookupTable = true;
-
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
   bool EnableSourceImport = false;
@@ -206,10 +201,6 @@ public:
   ///
   /// \see ResilienceStrategy::Resilient
   bool EnableLibraryEvolution = false;
-
-  /// Indicates that the frontend should emit "verbose" SIL
-  /// (if asked to emit SIL).
-  bool EmitVerboseSIL = false;
 
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.
@@ -251,8 +242,10 @@ public:
   /// exit.
   bool PrintTargetInfo = false;
 
-  /// Should we sort SIL functions, vtables, witness tables, and global
-  /// variables by name when we print it out. This eases diffing of SIL files.
+  /// See the \ref SILOptions.EmitVerboseSIL flag.
+  bool EmitVerboseSIL = false;
+
+  /// See the \ref SILOptions.EmitSortedSIL flag.
   bool EmitSortedSIL = false;
 
   /// Indicates whether the dependency tracker should track system
@@ -266,6 +259,16 @@ public:
   /// Should we warn if an imported module needed to be rebuilt from a
   /// module interface file?
   bool RemarkOnRebuildFromModuleInterface = false;
+
+  /// Should we lock .swiftinterface while generating .swiftmodule from it?
+  bool DisableInterfaceFileLock = false;
+
+  /// Should we enable the dependency verifier for all primary files known to this frontend?
+  bool EnableIncrementalDependencyVerifier = false;
+
+  /// The directory path we should use when print #include for the bridging header.
+  /// By default, we include ImplicitObjCHeaderPath directly.
+  llvm::Optional<std::string> BridgingHeaderDirForPrint;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

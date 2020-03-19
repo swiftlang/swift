@@ -13,12 +13,14 @@
 #define DEBUG_TYPE "sil-module"
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -90,7 +92,7 @@ class SILModule::SerializationCallback final
 };
 
 SILModule::SILModule(ModuleDecl *SwiftModule, TypeConverter &TC,
-                     SILOptions &Options, const DeclContext *associatedDC,
+                     const SILOptions &Options, const DeclContext *associatedDC,
                      bool wholeModule)
     : TheSwiftModule(SwiftModule),
       AssociatedDeclContext(associatedDC),
@@ -120,7 +122,7 @@ SILModule::~SILModule() {
 }
 
 std::unique_ptr<SILModule>
-SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC, SILOptions &Options,
+SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC, const SILOptions &Options,
                              bool WholeModule) {
   return std::unique_ptr<SILModule>(
       new SILModule(M, TC, Options, M, WholeModule));
@@ -576,6 +578,35 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
   return nullptr;
 }
 
+SILDifferentiabilityWitness *
+SILModule::lookUpDifferentiabilityWitness(StringRef name) {
+  auto it = DifferentiabilityWitnessMap.find(name);
+  if (it != DifferentiabilityWitnessMap.end())
+    return it->second;
+  return nullptr;
+}
+
+SILDifferentiabilityWitness *
+SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
+  Mangle::ASTMangler mangler;
+  return lookUpDifferentiabilityWitness(
+      mangler.mangleSILDifferentiabilityWitnessKey(key));
+}
+
+/// Look up the differentiability witness corresponding to the given indices.
+llvm::ArrayRef<SILDifferentiabilityWitness *>
+SILModule::lookUpDifferentiabilityWitnessesForFunction(StringRef name) {
+  return DifferentiabilityWitnessesByFunction[name];
+}
+
+bool SILModule::loadDifferentiabilityWitness(SILDifferentiabilityWitness *dw) {
+  auto *newDW = getSILLoader()->lookupDifferentiabilityWitness(dw->getKey());
+  if (!newDW)
+    return false;
+  assert(dw == newDW);
+  return true;
+}
+
 void SILModule::registerDeserializationNotificationHandler(
     std::unique_ptr<DeserializationNotificationHandler> &&handler) {
   deserializationNotificationHandlers.add(std::move(handler));
@@ -659,11 +690,11 @@ void SILModule::serialize() {
   setSerialized();
 }
 
-void SILModule::setOptRecordStream(
-    std::unique_ptr<llvm::yaml::Output> &&Stream,
-    std::unique_ptr<llvm::raw_ostream> &&RawStream) {
-  OptRecordStream = std::move(Stream);
-  OptRecordRawStream = std::move(RawStream);
+void SILModule::setSILRemarkStreamer(
+    std::unique_ptr<llvm::raw_fd_ostream> &&remarkStream,
+    std::unique_ptr<swift::SILRemarkStreamer> &&remarkStreamer) {
+  silRemarkStream = std::move(remarkStream);
+  silRemarkStreamer = std::move(remarkStreamer);
 }
 
 bool SILModule::isStdlibModule() const {
@@ -697,4 +728,19 @@ SILLinkage swift::getDeclSILLinkage(const ValueDecl *decl) {
     break;
   }
   return linkage;
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const SILModule *M) {
+  if (!M) {
+    out << "(null)";
+    return;
+  }
+  out << "SIL for ";
+  simple_display(out, M->getSwiftModule());
+}
+
+SourceLoc swift::extractNearestSourceLoc(const SILModule *M) {
+  if (!M)
+    return SourceLoc();
+  return extractNearestSourceLoc(M->getSwiftModule());
 }

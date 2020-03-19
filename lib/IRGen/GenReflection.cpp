@@ -322,8 +322,7 @@ std::pair<llvm::Constant *, unsigned>
 IRGenModule::getTypeRef(Type type, GenericSignature genericSig,
                         MangledTypeRefRole role) {
   return getTypeRef(type->getCanonicalType(genericSig),
-      genericSig ? genericSig->getCanonicalSignature() : CanGenericSignature(),
-      role);
+                    genericSig.getCanonicalSignature(), role);
 }
 
 std::pair<llvm::Constant *, unsigned>
@@ -359,7 +358,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
   GenericEnvironment *genericEnv = nullptr;
 
   if (origGenericSig) {
-    genericSig = origGenericSig->getCanonicalSignature();
+    genericSig = origGenericSig.getCanonicalSignature();
     enumerateGenericSignatureRequirements(genericSig,
                 [&](GenericRequirement reqt) { requirements.push_back(reqt); });
     genericEnv = genericSig->getGenericEnvironment();
@@ -470,7 +469,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
                                       nullptr,
                                       symbolName);
   ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
-  var->setAlignment(2);
+  var->setAlignment(llvm::MaybeAlign(2));
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
 
@@ -523,9 +522,7 @@ protected:
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
     addTypeRef(type->getCanonicalType(genericSig),
-               genericSig ? genericSig->getCanonicalSignature()
-                          : CanGenericSignature(),
-               role);
+               genericSig.getCanonicalSignature(), role);
   }
 
   /// Add a 32-bit relative offset to a mangled typeref string
@@ -647,9 +644,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
       auto NameGlobal = IGM.getAddrOfFieldName(AssocTy.first);
       B.addRelativeAddress(NameGlobal);
       addTypeRef(AssocTy.second,
-                 Nominal->getGenericSignature()
-                   ? Nominal->getGenericSignature()->getCanonicalSignature()
-                   : CanGenericSignature());
+                 Nominal->getGenericSignature().getCanonicalSignature());
     }
   }
 
@@ -678,7 +673,7 @@ private:
   const NominalTypeDecl *NTD;
 
   void addFieldDecl(const ValueDecl *value, Type type,
-                    GenericSignature genericSig, bool indirect=false) {
+                    bool indirect=false) {
     reflection::FieldRecordFlags flags;
     flags.setIsIndirectCase(indirect);
     if (auto var = dyn_cast<VarDecl>(value))
@@ -689,6 +684,8 @@ private:
     if (!type) {
       B.addInt32(0);
     } else {
+      auto genericSig = NTD->getGenericSignature();
+
       // The standard library's Mirror demangles metadata from field
       // descriptors, so use MangledTypeRefRole::Metadata to ensure
       // runtime metadata is available.
@@ -722,8 +719,7 @@ private:
     auto properties = NTD->getStoredProperties();
     B.addInt32(properties.size());
     for (auto property : properties)
-      addFieldDecl(property, property->getInterfaceType(),
-                   NTD->getGenericSignature());
+      addFieldDecl(property, property->getInterfaceType());
   }
 
   void layoutEnum() {
@@ -748,12 +744,11 @@ private:
       bool indirect = (enumCase.decl->isIndirect() ||
                        enumDecl->isIndirect());
       addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType(),
-                   enumDecl->getGenericSignature(),
                    indirect);
     }
 
     for (auto enumCase : strategy.getElementsWithNoPayload()) {
-      addFieldDecl(enumCase.decl, CanType(), nullptr);
+      addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType());
     }
   }
 
@@ -987,8 +982,11 @@ public:
                            SubstitutionMap Subs,
                            const HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM),
-      OrigCalleeType(OrigCalleeType),
-      SubstCalleeType(SubstCalleeType), Subs(Subs),
+      // TODO: Preserve substitutions, since they may affect representation in
+      // the box
+      OrigCalleeType(OrigCalleeType->getUnsubstitutedType(IGM.getSILModule())),
+      SubstCalleeType(SubstCalleeType->getUnsubstitutedType(IGM.getSILModule())),
+      Subs(Subs),
       Layout(Layout) {}
 
   using MetadataSourceMap
@@ -1133,9 +1131,17 @@ public:
           return t;
         })->getCanonicalType();
       }
+      
+      // TODO: We should preserve substitutions in SILFunctionType captures
+      // once the runtime MetadataReader can understand them, since they can
+      // affect representation.
+      //
+      // For now, eliminate substitutions from the capture representation.
+      SwiftType =
+        SwiftType->replaceSubstitutedSILFunctionTypesWithUnsubstituted(IGM.getSILModule())
+                 ->getCanonicalType();
 
-      CaptureTypes.push_back(
-          SILType::getPrimitiveObjectType(SwiftType->getCanonicalType()));
+      CaptureTypes.push_back(SILType::getPrimitiveObjectType(SwiftType));
     }
 
     return CaptureTypes;
@@ -1148,12 +1154,10 @@ public:
     B.addInt32(CaptureTypes.size());
     B.addInt32(MetadataSources.size());
     B.addInt32(Layout.getBindings().size());
-    
-    auto sig = OrigCalleeType->getSubstGenericSignature()
-              ? OrigCalleeType->getSubstGenericSignature()
-                              ->getCanonicalSignature()
-              : CanGenericSignature();
-    
+
+    auto sig =
+      OrigCalleeType->getInvocationGenericSignature().getCanonicalSignature();
+
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
       addLoweredTypeRef(CaptureType, sig);
@@ -1200,7 +1204,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     OS << "__TEXT,__swift5_" << LongName << ", regular, no_dead_strip";
     break;
   }
-  return OS.str();
+  return std::string(OS.str());
 }
 
 const char *IRGenModule::getFieldTypeMetadataSectionName() {

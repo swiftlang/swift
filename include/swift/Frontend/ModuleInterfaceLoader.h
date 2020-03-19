@@ -134,23 +134,25 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
       ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
       ArrayRef<std::string> PreferInterfaceForModules,
-      bool RemarkOnRebuildFromInterface, bool IgnoreSwiftSourceInfoFile)
+      bool RemarkOnRebuildFromInterface, bool IgnoreSwiftSourceInfoFile,
+      bool DisableInterfaceFileLock)
   : SerializedModuleLoaderBase(ctx, tracker, loadMode,
                                IgnoreSwiftSourceInfoFile),
   CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
   RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface),
+  DisableInterfaceFileLock(DisableInterfaceFileLock),
   PreferInterfaceForModules(PreferInterfaceForModules)
   {}
 
   std::string CacheDir;
   std::string PrebuiltCacheDir;
   bool RemarkOnRebuildFromInterface;
+  bool DisableInterfaceFileLock;
   ArrayRef<std::string> PreferInterfaceForModules;
 
   std::error_code findModuleFilesInDirectory(
-    AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-    StringRef ModuleDocFilename,
-    StringRef ModuleSourceInfoFilename,
+    AccessPathElem ModuleID,
+    const SerializedModuleBaseName &BaseName,
     SmallVectorImpl<char> *ModuleInterfacePath,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -164,13 +166,15 @@ public:
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          ArrayRef<std::string> PreferInterfaceForModules = {},
          bool RemarkOnRebuildFromInterface = false,
-         bool IgnoreSwiftSourceInfoFile = false) {
+         bool IgnoreSwiftSourceInfoFile = false,
+         bool DisableInterfaceFileLock = false) {
     return std::unique_ptr<ModuleInterfaceLoader>(
       new ModuleInterfaceLoader(ctx, cacheDir, prebuiltCacheDir,
                                          tracker, loadMode,
                                          PreferInterfaceForModules,
                                          RemarkOnRebuildFromInterface,
-                                         IgnoreSwiftSourceInfoFile));
+                                         IgnoreSwiftSourceInfoFile,
+                                         DisableInterfaceFileLock));
   }
 
   /// Append visible module names to \p names. Note that names are possibly
@@ -188,7 +192,7 @@ public:
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
-    bool RemarkOnRebuildFromInterface);
+    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock);
 };
 
 /// Extract the specified-or-defaulted -module-cache-path that winds up in

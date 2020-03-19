@@ -942,7 +942,7 @@ namespace {
         for (auto lhsTypeRep : lhsTypeReps) {
           for (auto rhsTypeRep : rhsTypeReps) {
             if (lhsTypeRep == rhsTypeRep)
-              break;
+              continue;
 
             insertIfUnique(oneWayDigraph[rhsTypeRep].outAdjacencies,lhsTypeRep);
             insertIfUnique(oneWayDigraph[lhsTypeRep].inAdjacencies,rhsTypeRep);
@@ -1312,9 +1312,10 @@ void ConstraintGraph::optimize() {
 void ConstraintGraph::incrementConstraintsPerContractionCounter() {
   SWIFT_FUNC_STAT;
   auto &context = CS.getASTContext();
-  if (context.Stats)
-    context.Stats->getFrontendCounters()
+  if (auto *Stats = context.Stats) {
+    Stats->getFrontendCounters()
         .NumConstraintsConsideredForEdgeContraction++;
+  }
 }
 
 #pragma mark Debugging output

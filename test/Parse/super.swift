@@ -39,7 +39,7 @@ class D : B {
     super.bar        // expected-error {{expression resolves to an unused function}}
     super.bar()
     // FIXME: should also say "'super.init' cannot be referenced outside of an initializer"
-    super.init // expected-error{{no exact matches in call to initializer}}
+    super.init // expected-error{{no exact matches in reference to initializer}}
     super.init() // expected-error{{'super.init' cannot be called outside of an initializer}}
     super.init(0) // expected-error{{'super.init' cannot be called outside of an initializer}} // expected-error {{missing argument label 'x:' in call}}
     super[0]        // expected-error {{expression resolves to an unused subscript}}

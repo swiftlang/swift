@@ -932,6 +932,45 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
   llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
+/// Create a fix-it string for the 'decodable_suggest_overriding_init_here' and
+/// optionally, the 'codable_suggest_overriding_init_here' diagnostics.
+static std::string getFixItStringForDecodable(ClassDecl *CD,
+                                              bool includeEncodeTo) {
+  auto &ctx = CD->getASTContext();
+  SourceLoc indentationLoc = CD->getBraces().End;
+  StringRef extraIndentation;
+  StringRef indentation = Lexer::getIndentationForLine(
+      ctx.SourceMgr, indentationLoc, &extraIndentation);
+  std::string fixItStringToReturn;
+  {
+    llvm::raw_string_ostream out(fixItStringToReturn);
+    ExtraIndentStreamPrinter printer(out, indentation);
+
+    printer.printNewline();
+    printer << "override init(from decoder: Decoder) throws";
+
+    // Add a dummy body.
+    auto printDummyBody = [&]() {
+      printer << " {";
+      printer.printNewline();
+      printer << extraIndentation << getCodePlaceholder();
+      printer.printNewline();
+      printer << "}";
+    };
+
+    printDummyBody();
+
+    if (includeEncodeTo) {
+      printer.printNewline();
+      printer.printNewline();
+      printer << "override func encode(to encoder: Encoder) throws";
+      printDummyBody();
+    }
+  }
+
+  return fixItStringToReturn;
+}
+
 /// Diagnose a class that does not have any initializers.
 static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   ASTContext &C = classDecl->getASTContext();
@@ -950,7 +989,6 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   // It is helpful to suggest here that the user may have forgotten to override
   // init(from:) (and encode(to:), if applicable) in a note, before we start
   // listing the members that prevented initializer synthesis.
-  // TODO: Add a fixit along with this suggestion.
   if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
@@ -975,6 +1013,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
         diagDest = result.front().getValueDecl();
 
       auto diagName = diag::decodable_suggest_overriding_init_here;
+      auto shouldEmitFixItForEncodeTo = false;
 
       // This is also a bit of a hack, but the best place we've got at the
       // moment to suggest this.
@@ -992,11 +1031,18 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
         // The direct lookup here won't see an encode(to:) if it is inherited
         // from the superclass.
         auto encodeTo = DeclName(C, C.Id_encode, C.Id_to);
-        if (classDecl->lookupDirect(encodeTo).empty())
+        if (classDecl->lookupDirect(encodeTo).empty()) {
           diagName = diag::codable_suggest_overriding_init_here;
+          shouldEmitFixItForEncodeTo = true;
+        }
       }
 
-      C.Diags.diagnose(diagDest, diagName);
+      auto insertionLoc =
+          Lexer::getLocForEndOfLine(C.SourceMgr, classDecl->getBraces().Start);
+      auto fixItString =
+          getFixItStringForDecodable(classDecl, shouldEmitFixItForEncodeTo);
+      C.Diags.diagnose(diagDest, diagName)
+          .fixItInsert(insertionLoc, fixItString);
     }
   }
 
@@ -1120,17 +1166,22 @@ namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
   ASTContext &Ctx;
+  SourceFile *SF;
 
-  explicit DeclChecker(ASTContext &ctx) : Ctx(ctx) {}
+  explicit DeclChecker(ASTContext &ctx, SourceFile *SF) : Ctx(ctx), SF(SF) {}
 
   ASTContext &getASTContext() const { return Ctx; }
+  void addDelayedFunction(AbstractFunctionDecl *AFD) {
+    if (!SF) return;
+    SF->DelayedFunctions.push_back(AFD);
+  }
 
   void visit(Decl *decl) {
-    if (getASTContext().Stats)
-      getASTContext().Stats->getFrontendCounters().NumDeclsTypechecked++;
+    if (auto *Stats = getASTContext().Stats)
+      Stats->getFrontendCounters().NumDeclsTypechecked++;
 
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "typecheck-decl",
-                                    decl);
+    FrontendStatsTracer StatsTracer(getASTContext().Stats,
+                                    "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
@@ -1185,6 +1236,10 @@ public:
   
   void visitImportDecl(ImportDecl *ID) {
     TypeChecker::checkDeclAttributes(ID);
+
+    // Force the lookup of decls referenced by a scoped import in case it emits
+    // diagnostics.
+    (void)ID->getDecls();
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
@@ -1290,13 +1345,13 @@ public:
     }
 
     if (VD->getDeclContext()->getSelfClassDecl()) {
-      checkDynamicSelfType(VD, VD->getValueInterfaceType());
-
       if (VD->getValueInterfaceType()->hasDynamicSelfType()) {
         if (VD->hasStorage())
           VD->diagnose(diag::dynamic_self_in_stored_property);
         else if (VD->isSettable(nullptr))
           VD->diagnose(diag::dynamic_self_in_mutable_property);
+        else
+          checkDynamicSelfType(VD, VD->getValueInterfaceType());
       }
     }
     
@@ -1335,7 +1390,7 @@ public:
     TypeChecker::checkDeclAttributes(PBD);
 
     bool isInSILMode = false;
-    if (auto sourceFile = DC->getParentSourceFile())
+    if (auto sourceFile = SF)
       isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
     bool isTypeContext = DC->isTypeContext();
 
@@ -1393,7 +1448,7 @@ public:
         // protocol.
         if (var->isStatic() && !isa<ProtocolDecl>(DC)) {
           // ...but don't enforce this for SIL or module interface files.
-          switch (DC->getParentSourceFile()->Kind) {
+          switch (SF->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
             return;
@@ -1411,7 +1466,7 @@ public:
 
         // Global variables require an initializer in normal source files.
         if (DC->isModuleScopeContext()) {
-          switch (DC->getParentSourceFile()->Kind) {
+          switch (SF->Kind) {
           case SourceFileKind::Main:
           case SourceFileKind::REPL:
           case SourceFileKind::Interface:
@@ -1944,7 +1999,6 @@ public:
     // Check for circular inheritance within the protocol.
     (void)PD->hasCircularInheritedProtocols();
 
-    auto *SF = PD->getParentSourceFile();
     if (SF) {
       if (auto *tracker = SF->getReferencedNameTracker()) {
         bool isNonPrivate = (PD->getFormalAccess() > AccessLevel::FilePrivate);
@@ -2100,15 +2154,16 @@ public:
     } else if (shouldSkipBodyTypechecking(FD)) {
       FD->setBodySkipped(FD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(FD);
+      addDelayedFunction(FD);
     }
 
     checkExplicitAvailability(FD);
 
-    if (FD->getDeclContext()->getSelfClassDecl())
-      checkDynamicSelfType(FD, FD->getResultInterfaceType());
+    // Skip this for accessors, since we should have diagnosed the
+    // storage itself.
+    if (!isa<AccessorDecl>(FD))
+      if (FD->getDeclContext()->getSelfClassDecl())
+        checkDynamicSelfType(FD, FD->getResultInterfaceType());
 
     checkDefaultArguments(FD->getParameters());
 
@@ -2431,9 +2486,7 @@ public:
     } else if (shouldSkipBodyTypechecking(CD)) {
       CD->setBodySkipped(CD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(CD);
+      addDelayedFunction(CD);
     }
 
     checkDefaultArguments(CD->getParameters());
@@ -2448,14 +2501,13 @@ public:
     } else if (shouldSkipBodyTypechecking(DD)) {
       DD->setBodySkipped(DD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(DD);
+      addDelayedFunction(DD);
     }
   }
 };
 } // end anonymous namespace
 
 void TypeChecker::typeCheckDecl(Decl *D) {
-  DeclChecker(D->getASTContext()).visit(D);
+  auto *SF = D->getDeclContext()->getParentSourceFile();
+  DeclChecker(D->getASTContext(), SF).visit(D);
 }

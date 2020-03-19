@@ -24,11 +24,6 @@ set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
 set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "")
 set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
 
-# NOTE(compnerd) save the original compiler for the host swiftReflection that
-# we build
-set(HOST_CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
-set(HOST_CMAKE_C_COMPILER_INITIAL ${CMAKE_C_COMPILER})
-
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
   if(NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
     message(FATAL_ERROR "Building the swift runtime is not supported with ${CMAKE_C_COMPILER_ID}. Use the just-built clang instead.")

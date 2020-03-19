@@ -892,3 +892,68 @@ func testArrayOfClosures(_ byte: @escaping () -> Int) -> [(Int) -> Int] {
 func interpretArrayOfClosures() -> [(Int) -> Int] {
   return testArrayOfClosures({ 10 })
 }
+
+// Test checked casts.
+
+// CHECK-LABEL: @testMetaTypeCast
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testMetaTypeCast<T>(_ x: T.Type) -> Bool {
+  return (x is Int.Type)
+}
+
+@_semantics("test_driver")
+func interpretMetaTypeCast() -> Bool {
+  return testMetaTypeCast(Int.self)
+}
+
+// FIXME: this cast is not found to be false by the classifyDynamicCast utility.
+func interpretMetaTypeCast2() -> Bool {
+  return testMetaTypeCast(((Int) -> Int).self)
+}
+
+// CHECK-LABEL: @testBinaryIntegerDescription
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testBinaryIntegerDescription<T: BinaryInteger>(_ x: T) -> String {
+  return x.description
+}
+
+@_semantics("test_driver")
+func interpretBinaryIntegerDescription() -> String {
+  var str = testBinaryIntegerDescription(-10)
+  str += testBinaryIntegerDescription(UInt(20))
+  return str
+}
+
+// CHECK-LABEL: @testPreconditionFailure
+// CHECK: error: not constant evaluable
+@_semantics("constant_evaluable")
+func testPreconditionFailure(_ x: Int) -> Int {
+  precondition(x > 0, "argument must be positive")
+  return x + 1
+    // CHECK: note: operation traps
+    // Note that the message displayed depends on the assert configuration,
+    // therefore it is not checked here. For debug stdlib, the full message
+    // must be displayed.
+}
+
+@_semantics("test_driver")
+func interpretPreconditionFailure() -> Int {
+  return testPreconditionFailure(-10)
+}
+
+// CHECK-LABEL: @testFatalError
+// CHECK: error: not constant evaluable
+@_semantics("constant_evaluable")
+func testFatalError() -> Int {
+  fatalError("invoked an uncallable function")
+  return 0
+    // CHECK: note: Fatal error: invoked an uncallable function
+    // CHECK: note: operation traps
+}
+
+@_semantics("test_driver")
+func interpretFatalError() -> Int {
+  return testFatalError()
+}

@@ -19,6 +19,7 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
@@ -278,6 +279,9 @@ private:
   /// faster rebuilds.
   const bool EnableFineGrainedDependencies;
 
+  /// Is the parser recording token hashes for each type body?
+  const bool EnableTypeFingerprints;
+
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
   const bool VerifyFineGrainedDependencyGraphAfterEveryImport;
@@ -285,7 +289,7 @@ private:
   /// needed.
   const bool EmitFineGrainedDependencyDotFileAfterEveryImport;
 
-  /// Experiment with inter-file dependencies
+  /// Experiment with intrafile dependencies
   const bool FineGrainedDependenciesIncludeIntrafileOnes;
 
   /// Experiment with source-range-based dependencies
@@ -327,7 +331,10 @@ public:
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
               bool OnlyOneDependencyFile = false,
-              bool EnableFineGrainedDependencies = false,
+              bool EnableFineGrainedDependencies
+                = LangOptions().EnableFineGrainedDependencies,
+              bool EnableTypeFingerprints =
+                LangOptions().EnableTypeFingerprints,
               bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
               bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
               bool FineGrainedDependenciesIncludeIntrafileOnes = false,
@@ -395,6 +402,8 @@ public:
   bool getEnableFineGrainedDependencies() const {
     return EnableFineGrainedDependencies;
   }
+
+  bool getEnableTypeFingerprints() const { return EnableTypeFingerprints; }
 
   bool getVerifyFineGrainedDependencyGraphAfterEveryImport() const {
     return VerifyFineGrainedDependencyGraphAfterEveryImport;
@@ -520,6 +529,19 @@ public:
 
   /// How many .swift input files?
   unsigned countSwiftInputs() const;
+
+  /// Unfortunately the success or failure of a Swift compilation is currently
+  /// sensitive to the order in which files are processed, at least in terms of
+  /// the order of processing extensions (and likely other ways we haven't
+  /// discovered yet). So long as this is true, we need to make sure any batch
+  /// job we build names its inputs in an order that's a subsequence of the
+  /// sequence of inputs the driver was initially invoked with.
+  ///
+  /// Also use to write out information in a consistent order.
+  template <typename JobCollection>
+  void sortJobsToMatchCompilationInputs(
+      const JobCollection &unsortedJobs,
+      SmallVectorImpl<const Job *> &sortedJobs) const;
 
 private:
   /// Perform all jobs.

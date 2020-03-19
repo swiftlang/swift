@@ -62,6 +62,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Combos
     single-source/DataBenchmarks
     single-source/DeadArray
+    single-source/DevirtualizeProtocolComposition
     single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
     single-source/DictTest2
@@ -140,6 +141,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RGBHistogram
     single-source/Radix2CooleyTukey
     single-source/RandomShuffle
+    single-source/RandomTree
     single-source/RandomValues
     single-source/RangeAssignment
     single-source/RangeIteration
@@ -247,6 +249,10 @@ option(SWIFT_BENCHMARK_GENERATE_OPT_VIEW
 
 set(SWIFT_BENCHMARK_OPT_VIEWER "" CACHE FILEPATH
   "Path to opt-viewer")
+
+option(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO
+  "Produce debug info for benchmarks"
+  TRUE)
 
 if(SWIFT_BENCHMARK_OPT_VIEWER)
   # If the path to the opt-viewer was specified manually and we have no access

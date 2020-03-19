@@ -6,6 +6,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 import Foundation
 
@@ -27,6 +28,11 @@ if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
   // CHECK: Type reference:
   // CHECK: (objective_c_class name=__NSCFNumber)
   reflect(object: NSNumber(123))
+
+  // Objective-C protocol:
+  // CHECK: Type info:
+  // CHECK: $sSo9NSCopying_Xl 
+  reflect(any: { () -> NSCopying in NSString("abc") }())
 } else {
   // The Swift 5.0 libraries don't support this test.
   class SkipTheTest {}

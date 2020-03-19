@@ -53,7 +53,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   var b = a.1+a.f
 
   // Tuple expressions with named elements.
-  var i : (y : Int, x : Int) = (x : 42, y : 11)
+  var i : (y : Int, x : Int) = (x : 42, y : 11) // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
   funcdecl1(123, 444)
   
   // Calls.
@@ -140,7 +140,7 @@ func anonymousClosureArgsInClosureWithArgs() {
   }
   var a5 = { (_: [Int], w: [Int]) in
     f($0.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
-    f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}} expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+    f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}}
   }
 }
 

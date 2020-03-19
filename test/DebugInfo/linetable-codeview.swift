@@ -1,4 +1,4 @@
-// RUN: %swiftc_driver %s -g -debug-info-format=codeview -Xllvm -enable-trap-debug-info -emit-ir -o - | %FileCheck %s
+// RUN: %swiftc_driver %s -g -debug-info-format=codeview -emit-ir -o - | %FileCheck %s
 // REQUIRES: optimized_stdlib
 
 func markUsed<T>(_ t: T) {}
@@ -32,7 +32,7 @@ func foo() {
 }
 
 // func arithmetic(_ a: Int64, _ b: Int64)
-  // CHECK: define {{.*}} @"$s4main10arithmeticyys5Int64V_ADtF"(i64, i64)
+  // CHECK: define {{.*}} @"$s4main10arithmeticyys5Int64V_ADtF"(i64 %0, i64 %1)
   // CHECK: call { i64, i1 } @llvm.sadd.with.overflow.i64({{.*}}), !dbg ![[ADD:[0-9]+]]
   // NOTE: The division will emit an ``unreachable`` instruction sandwiched
   //       between other instructions for the division. We want to make sure
@@ -81,7 +81,7 @@ func foo() {
 // FIXME: The location of ``@llvm.trap`` should be in Integers.swift.gyb
 //        instead of being artificial.
 // CHECK: ![[INLINEDADD]] = !DILocation(line: 0, scope: ![[FAILURE_FUNC:[0-9]+]], inlinedAt: ![[INLINELOC:[0-9]+]]
-// CHECK-DAG: !{{.*}} = distinct !DISubprogram(linkageName: "Swift runtime failure: arithmetic overflow", scope: {{.*}}, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, {{.*}})
+// CHECK-DAG: !{{.*}} = distinct !DISubprogram(name: "Swift runtime failure: arithmetic overflow", scope: {{.*}}, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, {{.*}})
 // CHECK-DAG: ![[INLINELOC]] = !DILocation(line: 0, scope: !{{[0-9]+}}, inlinedAt: ![[ADD]]
 
 // NOTE: These prologue instructions are given artificial line locations for

@@ -89,6 +89,7 @@ struct CodeCompletionInfo {
   StringRef DocBrief;
   StringRef AssocUSRs;
   UIdent SemanticContext;
+  UIdent TypeRelation;
   Optional<uint8_t> ModuleImportDepth;
   bool NotRecommended;
   unsigned NumBytesToErase;
@@ -202,6 +203,7 @@ struct DiagnosticEntryInfoBase {
   std::string Filename;
   SmallVector<std::pair<unsigned, unsigned>, 2> Ranges;
   SmallVector<Fixit, 2> Fixits;
+  SmallVector<std::string, 1> EducationalNotePaths;
 };
 
 struct DiagnosticEntryInfo : DiagnosticEntryInfoBase {

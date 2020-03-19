@@ -284,10 +284,10 @@ protected:
     Discriminator : 16
   );
 
-  SWIFT_INLINE_BITFIELD(AutoClosureExpr, AbstractClosureExpr, 1,
-    /// True if this autoclosure was built for a function conversion, and
-    /// not an actual @autoclosure parameter.
-    IsThunk : 1
+  SWIFT_INLINE_BITFIELD(AutoClosureExpr, AbstractClosureExpr, 2,
+    /// If the autoclosure was built for a curry thunk, the thunk kind is
+    /// stored here.
+    Kind : 2
   );
 
   SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1,
@@ -503,7 +503,7 @@ public:
 
   /// Retrieves the declaration that is being referenced by this
   /// expression, if any.
-  ConcreteDeclRef getReferencedDecl() const;
+  ConcreteDeclRef getReferencedDecl(bool stopAtParenExpr = false) const;
 
   /// Determine whether this expression is 'super', possibly converted to
   /// a base class.
@@ -566,11 +566,14 @@ public:
 /// typically this will have an ErrorType.
 class ErrorExpr : public Expr {
   SourceRange Range;
+  Expr *OriginalExpr;
 public:
-  ErrorExpr(SourceRange Range, Type Ty = Type())
-    : Expr(ExprKind::Error, /*Implicit=*/true, Ty), Range(Range) {}
+  ErrorExpr(SourceRange Range, Type Ty = Type(), Expr *OriginalExpr = nullptr)
+    : Expr(ExprKind::Error, /*Implicit=*/true, Ty), Range(Range),
+      OriginalExpr(OriginalExpr) {}
 
   SourceRange getSourceRange() const { return Range; }
+  Expr *getOriginalExpr() const { return OriginalExpr; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Error;
@@ -1049,6 +1052,20 @@ public:
   enum Kind : unsigned {
     File, FilePath, Line, Column, Function, DSOHandle
   };
+
+  static StringRef getKindString(MagicIdentifierLiteralExpr::Kind value) {
+    switch (value) {
+      case File: return "#file";
+      case FilePath: return "#filePath";
+      case Function: return "#function";
+      case Line: return "#line";
+      case Column: return "#column";
+      case DSOHandle: return "#dsohandle";
+    }
+
+    llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in getKindString.");
+  }
+
 private:
   SourceLoc Loc;
   ConcreteDeclRef BuiltinInitializer;
@@ -3599,7 +3616,10 @@ class ClosureExpr : public AbstractClosureExpr {
   /// the CaptureListExpr which would normally maintain this sort of
   /// information about captured variables), we need to have some way to access
   /// this information directly on the ClosureExpr.
-  VarDecl *CapturedSelfDecl;
+  ///
+  /// The bit indicates whether this closure has had a function builder
+  /// applied to it.
+  llvm::PointerIntPair<VarDecl *, 1, bool> CapturedSelfDeclAndAppliedBuilder;
   
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
@@ -3624,7 +3644,8 @@ public:
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      BracketRange(bracketRange), CapturedSelfDecl(capturedSelfDecl),
+      BracketRange(bracketRange),
+      CapturedSelfDeclAndAppliedBuilder(capturedSelfDecl, false),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
       ExplicitResultType(explicitResultType), Body(nullptr) {
     setParameterList(params);
@@ -3726,12 +3747,22 @@ public:
   bool hasEmptyBody() const;
 
   /// VarDecl captured by this closure under the literal name \c self , if any.
-  VarDecl *getCapturedSelfDecl() const { return CapturedSelfDecl; }
+  VarDecl *getCapturedSelfDecl() const {
+    return CapturedSelfDeclAndAppliedBuilder.getPointer();
+  }
   
   /// Whether this closure captures the \c self param in its body in such a
   /// way that implicit \c self is enabled within its body (i.e. \c self is
   /// captured non-weakly).
   bool capturesSelfEnablingImplictSelf() const;
+
+  bool hasAppliedFunctionBuilder() const {
+    return CapturedSelfDeclAndAppliedBuilder.getInt();
+  }
+
+  void setAppliedFunctionBuilder(bool flag = true) {
+    CapturedSelfDeclAndAppliedBuilder.setInt(flag);
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
@@ -3762,6 +3793,20 @@ class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
 
 public:
+  enum class Kind : uint8_t {
+    // An autoclosure with type () -> Result. Formed from type checking an
+    // @autoclosure argument in a function call.
+    None = 0,
+
+    // An autoclosure with type (Args...) -> Result. Formed from type checking a
+    // partial application.
+    SingleCurryThunk = 1,
+
+    // An autoclosure with type (Self) -> (Args...) -> Result. Formed from type
+    // checking a partial application.
+    DoubleCurryThunk = 2
+  };
+
   AutoClosureExpr(Expr *Body, Type ResultTy, unsigned Discriminator,
                   DeclContext *Parent)
       : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, /*Implicit=*/true,
@@ -3769,15 +3814,15 @@ public:
     if (Body != nullptr)
       setBody(Body);
 
-    Bits.AutoClosureExpr.IsThunk = false;
+    Bits.AutoClosureExpr.Kind = 0;
   }
 
-  bool isThunk() const {
-    return Bits.AutoClosureExpr.IsThunk;
+  Kind getThunkKind() const {
+    return Kind(Bits.AutoClosureExpr.Kind);
   }
 
-  void setIsThunk(bool isThunk) {
-    Bits.AutoClosureExpr.IsThunk = isThunk;
+  void setThunkKind(Kind K) {
+    Bits.AutoClosureExpr.Kind = uint8_t(K);
   }
 
   SourceRange getSourceRange() const;
@@ -3795,6 +3840,16 @@ public:
   ///
   /// The body of an autoclosure always consists of a single expression.
   Expr *getSingleExpressionBody() const;
+
+  /// Unwraps a curry thunk. Basically, this gives you what the old AST looked
+  /// like, before Sema started building curry thunks. This is really only
+  /// meant for legacy usages.
+  ///
+  /// The behavior is as follows, based on the kind:
+  /// - for double curry thunks, returns the original DeclRefExpr.
+  /// - for single curry thunks, returns the ApplyExpr for the self call.
+  /// - otherwise, returns nullptr for convenience.
+  Expr *getUnwrappedCurryThunkExpr() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *E) {

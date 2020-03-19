@@ -43,6 +43,10 @@ using namespace swift;
 
 /// Return the version of the operating system currently running for use in
 /// API availability queries.
+///
+/// This is ABI and cannot be removed. Even though _stdlib_isOSVersionAtLeast()
+/// is no longer inlinable, is previously was and so calls to this method
+/// have been inlined into shipped apps.
 _SwiftNSOperatingSystemVersion swift::_swift_stdlib_operatingSystemVersion() {
   os_system_version_s version = SWIFT_LAZY_CONSTANT(getOSVersion());
 

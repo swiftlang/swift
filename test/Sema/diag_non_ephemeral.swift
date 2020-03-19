@@ -489,7 +489,7 @@ func takesPointerOverload(x: Int = 0, @_nonEphemeral _ ptr: UnsafeMutablePointer
 
 func testAmbiguity() {
   var arr = [1, 2, 3]
-  takesPointerOverload(&arr) // expected-error {{no exact matches in call to global function 'takesPointerOverload(x:_:)'}}
+  takesPointerOverload(&arr) // expected-error {{no exact matches in call to global function 'takesPointerOverload'}}
 }
 
 func takesPointerOverload2(@_nonEphemeral _ ptr: UnsafePointer<Int>) {}
@@ -519,4 +519,11 @@ func testArgumentLabelReferencing() {
   // expected-error@-4 {{cannot pass '[Int]' to parameter; argument #2 must be a pointer that outlives the call to 'takesTwoPointers(ptr:ptr:)'}}
   // expected-note@-5 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'takesTwoPointers(ptr:ptr:)'}}
   // expected-note@-6 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+}
+
+func ambiguous_fn(@_nonEphemeral _ ptr: UnsafePointer<Int>) {} // expected-note {{found this candidate}}
+func ambiguous_fn(_ ptr: UnsafeRawPointer) {} // expected-note {{found this candidate}}
+
+func test_ambiguity_with_function_instead_of_argument(_ x: inout Int) {
+  ambiguous_fn(&x) // expected-error {{ambiguous use of 'ambiguous_fn'}}
 }

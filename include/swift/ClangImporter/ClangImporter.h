@@ -40,6 +40,7 @@ namespace clang {
   class NamedDecl;
   class Sema;
   class TargetInfo;
+  class Type;
   class VisibleDeclConsumer;
   class DeclarationName;
 }
@@ -327,6 +328,10 @@ public:
   /// \sa importHeader
   ModuleDecl *getImportedHeaderModule() const override;
 
+  /// Retrieves the Swift wrapper for the given Clang module, creating
+  /// it if necessary.
+  ModuleDecl *getWrapperForModule(const clang::Module *mod) const override;
+
   std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
                                         time_t &fileModTime);
 
@@ -416,6 +421,21 @@ public:
   /// with -import-objc-header option.
   getPCHFilename(const ClangImporterOptions &ImporterOptions,
                  StringRef SwiftPCHHash, bool &isExplicit);
+
+  const clang::Type *parseClangFunctionType(StringRef type,
+                                            SourceLoc loc) const override;
+  void printClangType(const clang::Type *type,
+                      llvm::raw_ostream &os) const override;
+
+  StableSerializationPath
+  findStableSerializationPath(const clang::Decl *decl) const override;
+
+  const clang::Decl *
+  resolveStableSerializationPath(
+                            const StableSerializationPath &path) const override;
+
+  bool isSerializable(const clang::Type *type,
+                      bool checkCanonical) const override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

@@ -26,4 +26,4 @@ func test(obj: C) {
 }
 
 // RUN: %sourcekitd-test -req=typecontextinfo -pos=25:22 %s -- %s > %t.response
-// RUN: diff -u %s.response %t.response
+// RUN: diff --strip-trailing-cr -u %s.response %t.response

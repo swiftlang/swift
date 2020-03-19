@@ -355,7 +355,7 @@ do {
 // rdar://problem/25341015
 extension Sequence {
   func r25341015_1() -> Int {
-    return max(1, 2) // expected-error {{use of 'max' refers to instance method 'max(by:)' rather than global function 'max' in module 'Swift'}} expected-note {{use 'Swift.' to reference the global function in module 'Swift'}}
+    return max(1, 2) // expected-error {{use of 'max' refers to instance method rather than global function 'max' in module 'Swift'}} expected-note {{use 'Swift.' to reference the global function in module 'Swift'}}
   }
 }
 
@@ -381,7 +381,7 @@ func r25341015() {
   class Bar {
     func baz() {}
     func qux() {
-      baz(1, 2) // expected-error {{argument passed to call that takes no arguments}}
+      baz(1, 2) // expected-error {{use of 'baz' refers to instance method rather than local function 'baz'}}
     }
   }
 }
@@ -405,17 +405,17 @@ func bar_32854314() -> Int {
 extension Array where Element == Int {
   func foo() {
     let _ = min(foo_32854314(), bar_32854314()) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
-    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+    // expected-error@-1 {{use of 'min' refers to instance method rather than global function 'min' in module 'Swift'}}
   }
 
   func foo(_ x: Int, _ y: Double) {
     let _ = min(x, y) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
-    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+    // expected-error@-1 {{use of 'min' refers to instance method rather than global function 'min' in module 'Swift'}}
   }
 
   func bar() {
     let _ = min(1.0, 2) // expected-note {{use 'Swift.' to reference the global function in module 'Swift'}} {{13-13=Swift.}}
-    // expected-error@-1 {{use of 'min' nearly matches global function 'min' in module 'Swift' rather than instance method 'min()'}}
+    // expected-error@-1 {{use of 'min' refers to instance method rather than global function 'min' in module 'Swift'}}
   }
 }
 
@@ -615,13 +615,16 @@ func rdar50679161() {
 
 
 func rdar_50467583_and_50909555() {
-  // rdar://problem/50467583
-  let _: Set = [Int][] // expected-error {{no exact matches in call to subscript}}
-  // expected-note@-1 {{found candidate with type '(Int) -> Int'}}
-  // expected-note@-2 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
-  // expected-note@-3 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
-  // expected-note@-4 {{found candidate with type '(Range<Array<Int>.Index>) -> Slice<[Int]>' (aka '(Range<Int>) -> Slice<Array<Int>>')}}
-
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    // rdar://problem/50467583
+    let _: Set = [Int][] // expected-error {{no exact matches in call to subscript}}
+    // expected-note@-1 {{found candidate with type '(Int) -> Int'}}
+    // expected-note@-2 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
+    // expected-note@-3 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
+    // expected-note@-4 {{found candidate with type '(RangeSet<Array<Int>.Index>) -> DiscontiguousSlice<[Int]>' (aka '(RangeSet<Int>) -> DiscontiguousSlice<Array<Int>>')}}
+    // expected-note@-5 {{found candidate with type '(Range<Array<Int>.Index>) -> Slice<[Int]>' (aka '(Range<Int>) -> Slice<Array<Int>>')}}
+  }
+  
   // rdar://problem/50909555
   struct S {
     static subscript(x: Int, y: Int) -> Int { // expected-note {{'subscript(_:_:)' declared here}}

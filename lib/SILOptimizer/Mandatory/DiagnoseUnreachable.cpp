@@ -91,20 +91,14 @@ public:
   llvm::DenseMap<const SILBasicBlock*, UnreachableInfo> MetaMap;
 };
 
-static void deleteEndBorrows(SILValue v) {
-  SmallVector<SILInstruction *, 4> endBorrowList;
-  for (auto *use : v->getUses()) {
-    if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
-      endBorrowList.push_back(ebi);
-    }
-  }
-  while (!endBorrowList.empty()) {
-    endBorrowList.pop_back_val()->eraseFromParent();
-  }
-}
-
 /// Propagate/remove basic block input values when all predecessors
 /// supply the same arguments.
+///
+/// NOTE: Since BranchInst always forwards guaranteed and owned parameters the
+/// same way (like owned parameters), we do not need to add any special handling
+/// for guaranteed parameters here. This is because if all of the incoming
+/// values into my guaranteed phi is the same, then we know that said incoming
+/// value must dominate the phi by definition.
 static void propagateBasicBlockArgs(SILBasicBlock &BB) {
   // This functions would simplify the code as following:
   //
@@ -184,13 +178,6 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
     // FIXME: These could be further propagatable now, we might want to move
     // this to CCP and trigger another round of copy propagation.
     SILArgument *Arg = *AI;
-
-    // If this argument is guaranteed and Args[Idx] is a SILFunctionArgument,
-    // delete the end_borrow.
-    if (Arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
-        isa<SILFunctionArgument>(Args[Idx])) {
-      deleteEndBorrows(Arg);
-    }
 
     // We were able to fold, so all users should use the new folded value.
     Arg->replaceAllUsesWith(Args[Idx]);

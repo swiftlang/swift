@@ -21,6 +21,9 @@ SWIFT_REQUEST(NameLookup, AnyObjectLookupRequest,
 SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest,
               NominalTypeDecl *(CustomAttr *, DeclContext *), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(NameLookup, DirectLookupRequest,
+              TinyPtrVector<ValueDecl *>(DirectLookupDescriptor), Uncached,
+              NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ExpandASTScopeRequest,
               ast_scope::ASTScopeImpl* (ast_scope::ASTScopeImpl*, ast_scope::ScopeCreator*),
               SeparatelyCached,

@@ -27,12 +27,22 @@ template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
+struct FingerprintAndMembers {
+  Optional<std::string> fingerprint = None;
+  ArrayRef<Decl *> members = {};
+  bool operator==(const FingerprintAndMembers &x) const {
+    return fingerprint == x.fingerprint && members == x.members;
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const FingerprintAndMembers &value);
+
 /// Parse the members of a nominal type declaration or extension.
-class ParseMembersRequest :
-    public SimpleRequest<ParseMembersRequest,
-                         ArrayRef<Decl *>(IterableDeclContext *),
-                         CacheKind::Cached>
-{
+/// Return a fingerprint and the members.
+class ParseMembersRequest
+    : public SimpleRequest<ParseMembersRequest,
+                           FingerprintAndMembers(IterableDeclContext *),
+                           CacheKind::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -40,8 +50,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<Decl *> evaluate(Evaluator &evaluator,
-                            IterableDeclContext *idc) const;
+  FingerprintAndMembers evaluate(Evaluator &evaluator,
+                                 IterableDeclContext *idc) const;
 
 public:
   // Caching
@@ -68,6 +78,27 @@ public:
   bool isCached() const { return true; }
   Optional<BraceStmt *> getCachedResult() const;
   void cacheResult(BraceStmt *value) const;
+};
+
+/// Parse the top-level decls of a SourceFile.
+class ParseSourceFileRequest
+    : public SimpleRequest<ParseSourceFileRequest,
+                           ArrayRef<Decl *>(SourceFile *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Decl *> evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+  Optional<ArrayRef<Decl *>> getCachedResult() const;
+  void cacheResult(ArrayRef<Decl *> decls) const;
 };
 
 /// The zone number for the parser.

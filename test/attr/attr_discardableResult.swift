@@ -222,3 +222,23 @@ class Discard {
     bar // expected-error {{expression resolves to an unused function}}
   }
 }
+
+// SR-12271
+
+struct SR_12271_S {
+  @discardableResult
+  func bar1() -> () -> Void {
+    return {}
+  }
+
+  @discardableResult
+  static func bar2() -> () -> Void {
+    return {}
+  }
+}
+
+SR_12271_S().bar1() // Okay
+SR_12271_S.bar2() // Okay
+
+SR_12271_S().bar1 // expected-error {{expression resolves to an unused function}}
+SR_12271_S.bar2 // expected-error {{expression resolves to an unused function}}

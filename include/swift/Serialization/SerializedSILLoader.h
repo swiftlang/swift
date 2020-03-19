@@ -32,6 +32,7 @@ class SILModule;
 class SILVTable;
 class SILWitnessTable;
 class SILDefaultWitnessTable;
+class SILDifferentiabilityWitness;
 
 /// Maintains a list of SILDeserializer, one for each serialized modules
 /// in ASTContext. It provides lookupSILFunction that will perform lookup
@@ -64,6 +65,8 @@ public:
   SILVTable *lookupVTable(const ClassDecl *C);
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
   SILDefaultWitnessTable *lookupDefaultWitnessTable(SILDefaultWitnessTable *C);
+  SILDifferentiabilityWitness *
+  lookupDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
 
   /// Invalidate the cached entries for deserialized SILFunctions.
   void invalidateCaches();

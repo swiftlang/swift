@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-silgen -primary-file %s -o %t/OSLogConstantEvaluableTest_silgen.sil
+// RUN: %target-swift-frontend -swift-version 5 -emit-silgen -primary-file %s -o %t/OSLogConstantEvaluableTest_silgen.sil
 //
 // Run the (mandatory) passes on which constant evaluator depends, and run the
 // constant evaluator on the SIL produced after the dependent passes are run.
 //
-// RUN: %target-sil-opt -silgen-cleanup -raw-sil-inst-lowering -allocbox-to-stack -mandatory-inlining -constexpr-limit 2048 -test-constant-evaluable-subset %t/OSLogConstantEvaluableTest_silgen.sil > %t/OSLogConstantEvaluableTest.sil 2> %t/error-output
+// RUN: %target-sil-opt -silgen-cleanup -raw-sil-inst-lowering -allocbox-to-stack -mandatory-inlining -constexpr-limit 3072 -test-constant-evaluable-subset %t/OSLogConstantEvaluableTest_silgen.sil > %t/OSLogConstantEvaluableTest.sil 2> %t/error-output
 //
 // RUN: %FileCheck %s < %t/error-output
 //
@@ -28,7 +28,7 @@ func osLogMessageStringLiteralInitTest() -> OSLogMessage {
 // CHECK-NOT: error:
 // CHECK-LABEL: @appendLiteral(String) -> ()
 // CHECK-NOT: error:
-// CHECK-LABEL: @appendInterpolation(_: @autoclosure () -> Int, format: IntFormat, privacy: Privacy) -> ()
+// CHECK-LABEL: @appendInterpolation(_: @autoclosure () -> Int, format: OSLogIntegerFormatting, align: OSLogStringAlignment, privacy: OSLogPrivacy) -> ()
 // CHECK-NOT: error:
 // CHECK-LABEL: @appendLiteral(String) -> ()
 // CHECK-NOT: error:
@@ -41,9 +41,18 @@ func intValueInterpolationTest() -> OSLogMessage {
 
 // CHECK-LABEL: @init(literalCapacity: Int, interpolationCount: Int) -> OSLogInterpolation
 // CHECK-NOT: error:
-// CHECK-LABEL: @appendInterpolation(_: @autoclosure () -> String, privacy: Privacy) -> ()
+// CHECK-LABEL: @appendInterpolation(_: @autoclosure () -> String, align: OSLogStringAlignment, privacy: OSLogPrivacy) -> ()
 // CHECK-NOT: error:
 @_semantics("test_driver")
 func stringValueInterpolationTest() -> OSLogMessage {
   return "A string value \("xyz")"
+}
+
+@_semantics("test_driver")
+func intValueWithPrecisionTest() -> OSLogMessage {
+  return
+    """
+     An integer value \
+     \(10, format: .decimal(minDigits: 25), align: .right(columns: 10))
+    """
 }

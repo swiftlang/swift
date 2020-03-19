@@ -561,6 +561,8 @@ enum class CaptureKind {
   StorageAddress,
   /// A local value captured as a constant.
   Constant,
+  /// A let constant captured as a pointer to storage
+  Immutable
 };
 
 
@@ -598,6 +600,8 @@ class TypeConverter {
 
     TypeExpansionContext expansionContext;
 
+    bool IsCacheable;
+
     CachingTypeKey getCachingKey() const {
       assert(isCacheable());
       return { (OrigType.hasGenericSignature()
@@ -609,11 +613,27 @@ class TypeConverter {
     }
 
     bool isCacheable() const {
-      return OrigType.hasCachingKey();
+      return IsCacheable;
     }
     
     TypeKey getKeyForMinimalExpansion() const {
-      return {OrigType, SubstType, TypeExpansionContext::minimal()};
+      return {OrigType, SubstType, TypeExpansionContext::minimal(),
+              IsCacheable};
+    }
+
+    void computeCacheable() {
+      IsCacheable = (OrigType.hasCachingKey() &&
+                     !isTreacherousInterfaceType(SubstType));
+    }
+
+    static bool isTreacherousInterfaceType(CanType type) {
+      // Don't cache lowerings for interface function types that involve
+      // type parameters; we might need a contextual generic signature to
+      // handle them correctly.
+      if (!type->hasTypeParameter()) return false;
+      return type.findIf([](CanType type) {
+        return isa<FunctionType>(type) && type->hasTypeParameter();
+      });
     }
   };
 
@@ -621,7 +641,9 @@ class TypeConverter {
 
   TypeKey getTypeKey(AbstractionPattern origTy, CanType substTy,
                      TypeExpansionContext context) {
-    return {origTy, substTy, context};
+    TypeKey result = {origTy, substTy, context, false};
+    result.computeCacheable();
+    return result;
   }
 
   struct OverrideKey {
@@ -643,13 +665,15 @@ class TypeConverter {
 
   /// Find a cached TypeLowering by TypeKey, or return null if one doesn't
   /// exist.
-  const TypeLowering *find(TypeKey k);
+  const TypeLowering *find(const TypeKey &k);
   /// Insert a mapping into the cache.
-  void insert(TypeKey k, const TypeLowering *tl);
+  void insert(const TypeKey &k, const TypeLowering *tl);
 #ifndef NDEBUG
   /// Remove the nullptr entry from the type map.
-  void removeNullEntry(TypeKey k);
+  void removeNullEntry(const TypeKey &k);
 #endif
+
+  CanGenericSignature CurGenericSignature;
 
   /// Mapping for types independent on contextual generic parameters.
   llvm::DenseMap<CachingTypeKey, const TypeLowering *> LoweredTypes;
@@ -695,6 +719,27 @@ public:
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
+
+  CanGenericSignature getCurGenericSignature() const {
+    return CurGenericSignature;
+  }
+
+  class GenericContextRAII {
+    TypeConverter &TC;
+    CanGenericSignature SavedSig;
+  public:
+    GenericContextRAII(TypeConverter &TC, CanGenericSignature sig)
+        : TC(TC), SavedSig(TC.CurGenericSignature) {
+      TC.CurGenericSignature = sig;
+    }
+
+    GenericContextRAII(const GenericContextRAII &) = delete;
+    GenericContextRAII &operator=(const GenericContextRAII &) = delete;
+
+    ~GenericContextRAII() {
+      TC.CurGenericSignature = SavedSig;
+    }
+  };
 
   /// Return the CaptureKind to use when capturing a decl.
   CaptureKind getDeclCaptureKind(CapturedValue capture,

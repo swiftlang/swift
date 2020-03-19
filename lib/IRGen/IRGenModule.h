@@ -20,6 +20,7 @@
 
 #include "IRGen.h"
 #include "SwiftTargetInfo.h"
+#include "TypeLayout.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -48,6 +49,7 @@
 
 namespace llvm {
   class Constant;
+  class ConstantInt;
   class DataLayout;
   class Function;
   class FunctionType;
@@ -71,6 +73,7 @@ namespace clang {
   class Decl;
   class GlobalDecl;
   class Type;
+  class PointerAuthSchema;
   namespace CodeGen {
     class CGFunctionInfo;
     class CodeGenModule;
@@ -95,6 +98,7 @@ namespace swift {
   class RootProtocolConformance;
   struct SILDeclRef;
   class SILDefaultWitnessTable;
+  class SILDifferentiabilityWitness;
   class SILGlobalVariable;
   class SILModule;
   class SILProperty;
@@ -136,6 +140,7 @@ namespace irgen {
   class NecessaryBindings;
   class NominalMetadataLayout;
   class OutliningMetadataCollector;
+  class PointerAuthEntity;
   class ProtocolInfo;
   enum class ProtocolInfoKind : uint8_t;
   class Signature;
@@ -194,7 +199,7 @@ enum RequireMetadata_t : bool {
 /// IRGenModules - one for each LLVM module (= one for each input/output file).
 class IRGenerator {
 public:
-  IRGenOptions &Opts;
+  const IRGenOptions &Opts;
 
   SILModule &SIL;
 
@@ -204,7 +209,13 @@ private:
   // Stores the IGM from which a function is referenced the first time.
   // It is used if a function has no source-file association.
   llvm::DenseMap<SILFunction *, IRGenModule *> DefaultIGMForFunction;
-  
+
+  // The IGMs where sepecializations of functions are emitted. The key is the
+  // non-specialized function.
+  // Storing all specializations of a function in the same IGM increases the
+  // chances of function merging.
+  llvm::DenseMap<const SILFunction *, IRGenModule *> IGMForSpecializations;
+
   // The IGM of the first source file.
   IRGenModule *PrimaryIGM = nullptr;
 
@@ -243,6 +254,21 @@ private:
   /// Field metadata records that have already been lazily emitted, or are
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
+
+  /// Maps every generic type that is specialized within the module to its
+  /// specializations.
+  llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
+      SpecializationsForGenericTypes;
+
+  /// The queue of specialized generic types whose prespecialized metadata to
+  /// emit.
+  llvm::SmallVector<CanType, 4> LazySpecializedTypeMetadataRecords;
+
+  /// The queue of metadata accessors to emit.
+  ///
+  /// The accessors must be emitted after everything else which might result in
+  /// a statically-known-canonical prespecialization.
+  llvm::SmallSetVector<NominalTypeDecl *, 4> LazyMetadataAccessors;
 
   struct LazyOpaqueInfo {
     bool IsDescriptorUsed = false;
@@ -283,7 +309,7 @@ private:
   
   friend class CurrentIGMPtr;  
 public:
-  explicit IRGenerator(IRGenOptions &opts, SILModule &module);
+  explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
 
   /// Attempt to create an llvm::TargetMachine for the current target.
   std::unique_ptr<llvm::TargetMachine> createTargetMachine();
@@ -375,9 +401,21 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
+  llvm::SmallVector<CanType, 4> specializationsForType(NominalTypeDecl *type) {
+    return SpecializationsForGenericTypes.lookup(type);
+  }
+
+  void noteUseOfMetadataAccessor(NominalTypeDecl *decl) {
+    if (LazyMetadataAccessors.count(decl) == 0) {
+      LazyMetadataAccessors.insert(decl);
+    }
+  }
+
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
   }
+
+  void noteUseOfSpecializedGenericTypeMetadata(CanType type);
 
   void noteUseOfTypeMetadata(CanType type) {
     type.visit([&](Type t) {
@@ -508,7 +546,6 @@ public:
   SILModuleConventions silConv;
   ModuleDecl *ObjCModule = nullptr;
   ModuleDecl *ClangImporterModule = nullptr;
-  SourceFile *CurSourceFile = nullptr;
 
   llvm::StringMap<ModuleDecl*> OriginalModules;
   llvm::SmallString<128> OutputFilename;
@@ -522,6 +559,8 @@ public:
   /// A global variable which stores the hash of the module. Used for
   /// incremental compilation.
   llvm::GlobalVariable *ModuleHash;
+
+  TypeLayoutCache typeLayoutCache;
 
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
@@ -639,6 +678,8 @@ public:
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
+  llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   /// Used to create unique names for class layout types with tail allocated
@@ -744,6 +785,8 @@ public:
   void error(SourceLoc loc, const Twine &message);
 
   bool useDllStorage();
+
+  bool shouldPrespecializeGenericMetadata();
   
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
   Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }
@@ -816,6 +859,8 @@ public:
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param,
                                            CanSILFunctionType funcTy);
+
+  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
 
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
@@ -909,6 +954,20 @@ public:
   llvm::Constant *emitTypeMetadataRecords();
   llvm::Constant *emitFieldDescriptors();
 
+  llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
+                                                   CanSILFunctionType fnType);
+
+  llvm::Constant *getConstantSignedCFunctionPointer(llvm::Constant *fn);
+
+  llvm::Constant *getConstantSignedPointer(llvm::Constant *pointer,
+                                           unsigned key,
+                                           llvm::Constant *addrDiscriminator,
+                                           llvm::Constant *otherDiscriminator);
+  llvm::Constant *getConstantSignedPointer(llvm::Constant *pointer,
+                                           const clang::PointerAuthSchema &schema,
+                                           const PointerAuthEntity &entity,
+                                           llvm::Constant *storageAddress);
+
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
                                             ArrayRef<llvm::Type*> paramTypes,
@@ -977,6 +1036,12 @@ private:
   /// Maps to constant swift 'String's.
   llvm::StringMap<llvm::Constant*> GlobalConstantStrings;
   llvm::StringMap<llvm::Constant*> GlobalConstantUTF16Strings;
+
+  struct PointerAuthCachesType;
+  PointerAuthCachesType *PointerAuthCaches = nullptr;
+  PointerAuthCachesType &getPointerAuthCaches();
+  void destroyPointerAuthCaches();
+  friend class PointerAuthEntity;
 
   /// LLVMUsed - List of global values which are required to be
   /// present in the object file; bitcast to i8*. This is used for
@@ -1181,6 +1246,8 @@ private:                            \
   llvm::Constant *Id##Fn = nullptr;
 #include "swift/Runtime/RuntimeFunctions.def"
   
+  Optional<llvm::Constant *> FixedClassInitializationFn;
+  
   llvm::Constant *FixLifetimeFn = nullptr;
 
   mutable Optional<SpareBitVector> HeapPointerSpareBits;
@@ -1188,6 +1255,8 @@ private:                            \
 //--- Generic ---------------------------------------------------------------
 public:
   llvm::Constant *getFixLifetimeFn();
+  
+  llvm::Constant *getFixedClassInitializationFn();
 
   /// The constructor used when generating code.
   ///
@@ -1196,14 +1265,15 @@ public:
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
               StringRef ModuleName, StringRef OutputFilename,
-              StringRef MainInputFilenameForDebugInfo);
+              StringRef MainInputFilenameForDebugInfo,
+              StringRef PrivateDiscriminator);
 
   /// The constructor used when we just need an IRGenModule for type lowering.
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               llvm::LLVMContext &LLVMContext)
     : IRGenModule(irgen, std::move(target), /*SF=*/nullptr, LLVMContext,
                   "<fake module name>", "<fake output filename>",
-                  "<fake main input filename>") {}
+                  "<fake main input filename>", "") {}
 
   ~IRGenModule();
 
@@ -1236,6 +1306,7 @@ public:
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILProperty(SILProperty *prop);
+  void emitSILDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
@@ -1250,8 +1321,8 @@ public:
                                       ForeignFunctionInfo *foreignInfo=nullptr);
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
 
-  llvm::Constant *getInt32(uint32_t value);
-  llvm::Constant *getSize(Size size);
+  llvm::ConstantInt *getInt32(uint32_t value);
+  llvm::ConstantInt *getSize(Size size);
   llvm::Constant *getAlignment(Alignment align);
   llvm::Constant *getBool(bool condition);
 
@@ -1283,6 +1354,9 @@ public:
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
                                              ConstantInit init = ConstantInit());
+  llvm::Constant *
+  getAddrOfEffectiveValueWitnessTable(CanType concreteType,
+                                      ConstantInit init = ConstantInit());
   Optional<llvm::Function*> getAddrOfIVarInitDestroy(ClassDecl *cd,
                                                      bool isDestroyer,
                                                      bool isForeign,
@@ -1424,6 +1498,10 @@ public:
   llvm::Function *getAddrOfDefaultAssociatedConformanceAccessor(
                                            AssociatedConformance requirement);
 
+  llvm::Constant *
+  getAddrOfDifferentiabilityWitness(const SILDifferentiabilityWitness *witness,
+                                    ConstantInit definition = ConstantInit());
+
   Address getAddrOfObjCISAMask();
 
   /// Retrieve the generic signature for the current generic context, or null if no
@@ -1436,8 +1514,7 @@ public:
   GenericEnvironment *getGenericEnvironment();
 
   ConstantReference
-  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
-       ConstantReference::Directness forceIndirect = ConstantReference::Direct);
+  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity);
 
   llvm::Constant *
   emitRelativeReference(ConstantReference target,

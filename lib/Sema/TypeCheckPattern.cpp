@@ -676,7 +676,8 @@ static Type validateTypedPattern(TypeResolution resolution,
   // variable binding, then we can bind the opaque return type from the
   // property definition.
   auto &Context = resolution.getASTContext();
-  if (auto opaqueRepr = dyn_cast_or_null<OpaqueReturnTypeRepr>(TL.getTypeRepr())) {
+  auto *Repr = TL.getTypeRepr();
+  if (Repr && isa<OpaqueReturnTypeRepr>(Repr)) {
     auto named = dyn_cast<NamedPattern>(
                            TP->getSubPattern()->getSemanticsProvidingPattern());
     if (named) {
@@ -700,7 +701,7 @@ static Type validateTypedPattern(TypeResolution resolution,
     return ErrorType::get(Context);
   }
 
-  assert(!dyn_cast_or_null<SpecifierTypeRepr>(TL.getTypeRepr()));
+  assert(!dyn_cast_or_null<SpecifierTypeRepr>(Repr));
   return TL.getType();
 }
 
@@ -826,55 +827,95 @@ llvm::Expected<Type> PatternTypeRequest::evaluate(
   llvm_unreachable("bad pattern kind!");
 }
 
-namespace {
-
+/// Potentially tuple/untuple a pattern before passing it to the pattern engine.
+///
 /// We need to allow particular matches for backwards compatibility, so we
-/// "repair" the pattern if needed, so that the exhaustiveness checker receives
-/// well-formed input. Also emit diagnostics warning the user to fix their code.
+/// "repair" the pattern if needed. This ensures that the pattern engine
+/// receives well-formed input, avoiding the need to implement an additional
+/// compatibility hack there, as doing that is lot more tricky due to the
+/// different cases that need to handled.
+///
+/// We also emit diagnostics and potentially a fix-it to help the user.
 ///
 /// See SR-11160 and SR-11212 for more discussion.
 //
 // type ~ (T1, ..., Tn) (n >= 2)
-//   1a. pat ~ ((P1, ..., Pm)) (m >= 2)
-//   1b. pat
+//   1a. pat ~ ((P1, ..., Pm)) (m >= 2) -> untuple the pattern
+//   1b. pat (a single pattern, not a tuple) -> handled by pattern engine
 // type ~ ((T1, ..., Tn)) (n >= 2)
-//   2. pat ~ (P1, ..., Pm) (m >= 2)
-void implicitlyUntuplePatternIfApplicable(DiagnosticEngine &DE,
-                                          Pattern *&enumElementInnerPat,
-                                          Type enumPayloadType) {
+//   2. pat ~ (P1, ..., Pm) (m >= 2) -> tuple the pattern
+static
+void repairTupleOrAssociatedValuePatternIfApplicable(
+    ASTContext &Ctx,
+    Pattern *&enumElementInnerPat,
+    Type enumPayloadType,
+    const EnumElementDecl *enumCase) {
+  auto &DE = Ctx.Diags;
+  bool addDeclNote = false;
   if (auto *tupleType = dyn_cast<TupleType>(enumPayloadType.getPointer())) {
     if (tupleType->getNumElements() >= 2
         && enumElementInnerPat->getKind() == PatternKind::Paren) {
       auto *semantic = enumElementInnerPat->getSemanticsProvidingPattern();
       if (auto *tuplePattern = dyn_cast<TuplePattern>(semantic)) {
         if (tuplePattern->getNumElements() >= 2) {
-          DE.diagnose(tuplePattern->getLoc(),
-                      diag::matching_tuple_pattern_with_many_assoc_values);
+          auto diag = DE.diagnose(tuplePattern->getLoc(),
+              diag::converting_tuple_into_several_associated_values,
+              enumCase->getNameStr(), tupleType->getNumElements());
+          auto subPattern =
+            dyn_cast<ParenPattern>(enumElementInnerPat)->getSubPattern();
+
+          // We might also have code like
+          //
+          // enum Upair { case upair(Int, Int) }
+          // func f(u: Upair) { switch u { case .upair(let (x, y)): () } }
+          //
+          // This needs a more complex rearrangement to fix the code. So only
+          // apply the fix-it if we have a tuple immediately inside.
+          if (subPattern->getKind() == PatternKind::Tuple) {
+            auto leadingParen = SourceRange(enumElementInnerPat->getStartLoc());
+            auto trailingParen = SourceRange(enumElementInnerPat->getEndLoc());
+            diag.fixItRemove(leadingParen)
+                .fixItRemove(trailingParen);
+          }
+
+          addDeclNote = true;
           enumElementInnerPat = semantic;
         }
       } else {
         DE.diagnose(enumElementInnerPat->getLoc(),
-                    diag::matching_pattern_with_many_assoc_values);
+          diag::found_one_pattern_for_several_associated_values,
+          enumCase->getNameStr(),
+          tupleType->getNumElements());
+        addDeclNote = true;
       }
     }
   } else if (auto *tupleType = enumPayloadType->getAs<TupleType>()) {
-    if (tupleType->getNumElements() >= 2
-        && enumElementInnerPat->getKind() == PatternKind::Tuple)
-      DE.diagnose(enumElementInnerPat->getLoc(),
-                  diag::matching_many_patterns_with_tupled_assoc_value);
+    if (tupleType->getNumElements() >= 2) {
+      if (auto *tuplePattern = dyn_cast<TuplePattern>(enumElementInnerPat)) {
+        DE.diagnose(enumElementInnerPat->getLoc(),
+                    diag::converting_several_associated_values_into_tuple,
+                    enumCase->getNameStr(),
+                    tupleType->getNumElements())
+          .fixItInsert(enumElementInnerPat->getStartLoc(), "(")
+          .fixItInsertAfter(enumElementInnerPat->getEndLoc(), ")");
+        addDeclNote = true;
+        enumElementInnerPat =
+          new (Ctx) ParenPattern(enumElementInnerPat->getStartLoc(),
+                                 enumElementInnerPat,
+                                 enumElementInnerPat->getEndLoc());
+      }
+    }
   }
-}
+
+  if (addDeclNote)
+    DE.diagnose(enumCase->getStartLoc(), diag::decl_declared_here,
+                enumCase->getFullName());
 }
 
 /// Perform top-down type coercion on the given pattern.
 Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
                                           Type type,
-                                          TypeResolutionOptions options,
-                                          TypeLoc tyLoc) {
-  if (tyLoc.isNull()) {
-    tyLoc = TypeLoc::withoutLoc(type);
-  }
-
+                                          TypeResolutionOptions options) {
   auto P = pattern.getPattern();
   auto dc = pattern.getDeclContext();
   auto &Context = dc->getASTContext();
@@ -1334,6 +1375,43 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       if (!elt)
         return nullptr;
 
+      // Emit an ambiguous none diagnostic if:
+      // 1) We have an Optional<T> type.
+      // 2) We're matching a 'none' enum case.
+      // 3) The 'none' enum case exists in T too.
+      if (EEP->getName().isSimpleName("none") &&
+          type->getOptionalObjectType()) {
+        SmallVector<Type, 4> allOptionals;
+        auto baseTyUnwrapped = type->lookThroughAllOptionalTypes(allOptionals);
+        if (lookupEnumMemberElement(dc, baseTyUnwrapped, EEP->getName(),
+                                    EEP->getLoc())) {
+          auto baseTyName = type->getCanonicalType().getString();
+          auto baseTyUnwrappedName = baseTyUnwrapped->getString();
+          diags.diagnoseWithNotes(
+              diags.diagnose(EEP->getLoc(), diag::optional_ambiguous_case_ref,
+                             baseTyName, baseTyUnwrappedName, "none"),
+              [&]() {
+                // Emit a note to swap '.none' with 'nil' to match with
+                // the 'none' case in Optional<T>.
+                diags.diagnose(EEP->getLoc(),
+                              diag::optional_fixit_ambiguous_case_ref_switch)
+                    .fixItReplace(EEP->getSourceRange(), "nil");
+                // Emit a note to swap '.none' with 'none?' to match with the
+                // 'none' case in T. Add as many '?' as needed to look though
+                // all the optionals.
+                std::string fixItString = "none";
+                llvm::for_each(allOptionals,
+                               [&](const Type) { fixItString += "?"; });
+                diags.diagnose(
+                        EEP->getLoc(),
+                        diag::type_fixit_optional_ambiguous_case_ref_switch,
+                        fixItString)
+                    .fixItReplace(EEP->getNameLoc().getSourceRange(),
+                                  fixItString);
+              });
+        }
+      }
+
       enumTy = type;
     } else {
       // Check if the explicitly-written enum type matches the type we're
@@ -1406,7 +1484,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
 
-      ::implicitlyUntuplePatternIfApplicable(Context.Diags, sub, elementType);
+      ::repairTupleOrAssociatedValuePatternIfApplicable(
+        Context, sub, elementType, elt);
 
       sub = coercePatternToType(
           pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,

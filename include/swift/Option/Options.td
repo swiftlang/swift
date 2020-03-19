@@ -137,8 +137,19 @@ def driver_always_rebuild_dependents :
 
 def enable_fine_grained_dependencies :
 Flag<["-"], "enable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
+HelpText<"Be more selective about incremental recompilation">;
 
+def disable_fine_grained_dependencies :
+Flag<["-"], "disable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Don't be more selective about incremental recompilation">;
+
+def enable_type_fingerprints :
+Flag<["-"], "enable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Enable per-nominal and extension body fingerprints">;
+
+def disable_type_fingerprints :
+Flag<["-"], "disable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Disable per-nominal and extension body fingerprints">;
 
 def enable_only_one_dependency_file :
 Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -173,6 +184,11 @@ Flag<["-"], "driver-verify-fine-grained-dependency-graph-after-every-import">,
 InternalDebugOpt,
 HelpText<"Debug DriverGraph by verifying it after every import">;
 
+def verify_incremental_dependencies :
+  Flag<["-"], "verify-incremental-dependencies">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable the dependency verifier for each frontend job">;
+
 def driver_emit_fine_grained_dependency_dot_file_after_every_import :
 Flag<["-"], "driver-emit-fine-grained-dependency-dot-file-after-every-import">,
 InternalDebugOpt,
@@ -180,8 +196,13 @@ HelpText<"Emit dot files every time driver imports an fine-grained swiftdeps fil
 
 def fine_grained_dependency_include_intrafile :
 Flag<["-"], "fine-grained-dependency-include-intrafile">,
-InternalDebugOpt,
+Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Include within-file dependencies.">;
+
+def emit_fine_grained_dependency_sourcefile_dot_files :
+Flag<["-"], "emit-fine-grained-dependency-sourcefile-dot-files">,
+InternalDebugOpt,
+HelpText<"Emit dot files for every source file.">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
@@ -328,6 +349,9 @@ def emit_tbd_path : Separate<["-"], "emit-tbd-path">,
 def emit_tbd_path_EQ : Joined<["-"], "emit-tbd-path=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
   Alias<emit_tbd_path>;
+def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
+  Flags<[FrontendOption]>,
+  HelpText<"Embed symbols from the module in the emitted tbd file">;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -403,6 +427,17 @@ def emit_module_interface_path :
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
 
+def emit_private_module_interface_path :
+  Separate<["-"], "emit-private-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
+         DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
+
+def avoid_emit_module_source_info :
+  Flag<["-"], "avoid-emit-module-source-info">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"don't emit Swift source info file">;
+
 def emit_module_source_info_path :
   Separate<["-"], "emit-module-source-info-path">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
@@ -467,7 +502,7 @@ def enable_experimental_differentiable_programming : Flag<["-"], "enable-experim
 def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable experimental concise '#file' identifier and '#filePath' alternative">;
+  HelpText<"Enable experimental concise '#file' identifier">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -518,10 +553,20 @@ def Rpass_missed_EQ : Joined<["-"], "Rpass-missed=">,
 
 def save_optimization_record : Flag<["-"], "save-optimization-record">,
   Flags<[FrontendOption]>, HelpText<"Generate a YAML optimization record file">;
+def save_optimization_record_EQ : Joined<["-"], "save-optimization-record=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Generate an optimization record file in a specific format "
+           "(default: YAML)">, MetaVarName<"<format>">;
 def save_optimization_record_path :
   Separate<["-"], "save-optimization-record-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
-  HelpText<"Specify the file name of any generated YAML optimization record">;
+  HelpText<"Specify the file name of any generated optimization record">;
+def save_optimization_record_passes :
+  Separate<["-"], "save-optimization-record-passes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Only include passes which match a specified regular expression in"
+           "the generated optimization record "
+           "(by default, include all passes)">, MetaVarName<"<regex>">;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
@@ -858,6 +903,10 @@ def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
   HelpText<"Optimize input files together instead of individually">,
   Flags<[FrontendOption, NoInteractiveOption]>;
 
+def no_whole_module_optimization : Flag<["-"], "no-whole-module-optimization">,
+  HelpText<"Disable optimizing input files together instead of individually">,
+  Flags<[FrontendOption, NoInteractiveOption]>;
+
 def enable_batch_mode : Flag<["-"], "enable-batch-mode">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Enable combining frontend jobs into batches">;
@@ -909,6 +958,11 @@ def print_target_info : Flag<["-"], "print-target-info">,
 
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
+
+def target_variant : Separate<["-"], "target-variant">,
+  Flags<[FrontendOption]>,
+  HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
+           " variant target triple in addition to the main -target triple">;
 
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,

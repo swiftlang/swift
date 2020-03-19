@@ -120,6 +120,10 @@ public:
     /// the interpreter.
     UntrackedSILValue,
 
+    /// Encountered a checked cast operation whose result cannot be evaluated
+    /// to a constant.
+    UnknownCastResult,
+
     /// Attempted to find a concrete protocol conformance for a witness method
     /// and failed.
     UnknownWitnessMethodConformance,
@@ -729,6 +733,8 @@ public:
   SILType getClosureType() { return closureInst->getType(); }
 
   SubstitutionMap getCallSubstitutionMap() { return substitutionMap; }
+
+  bool hasOnlyConstantCaptures() { return !hasNonConstantCaptures; }
 };
 
 } // end namespace swift

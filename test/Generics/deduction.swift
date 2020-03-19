@@ -28,7 +28,6 @@ func useIdentity(_ x: Int, y: Float, i32: Int32) {
   xx = identity2(yy) // expected-error{{no exact matches in call to global function 'identity2'}}
 }
 
-// FIXME: Crummy diagnostic!
 func twoIdentical<T>(_ x: T, _ y: T) -> T {}
 
 func useTwoIdentical(_ xi: Int, yi: Float) {
@@ -40,7 +39,7 @@ func useTwoIdentical(_ xi: Int, yi: Float) {
   y = twoIdentical(1.0, y)
   y = twoIdentical(y, 1.0)
   
-  twoIdentical(x, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+  twoIdentical(x, y) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. 'Float')}}
 }
 
 func mySwap<T>(_ x: inout T,
@@ -67,8 +66,9 @@ func takeTuples<T, U>(_: (T, U), _: (U, T)) {
 func useTuples(_ x: Int, y: Float, z: (Float, Int)) {
   takeTuples((x, y), (y, x))
 
-  takeTuples((x, y), (x, y)) // expected-error{{cannot convert value of type '(Int, Float)' to expected argument type '(Float, Int)'}}
-
+  takeTuples((x, y), (x, y))
+  // expected-error@-1 {{conflicting arguments to generic parameter 'U' ('Float' vs. 'Int')}}
+  // expected-error@-2 {{conflicting arguments to generic parameter 'T' ('Int' vs. 'Float')}}
   // FIXME: Use 'z', which requires us to fix our tuple-conversion
   // representation.
 }
@@ -243,11 +243,12 @@ genericInheritsA(C_GI())
 //===----------------------------------------------------------------------===//
 // Deduction for member operators
 //===----------------------------------------------------------------------===//
-protocol Addable { // expected-note {{where 'Self' = 'U'}}
+protocol Addable {
   static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
-  u + u // expected-error{{protocol 'Addable' requires that 'U' conform to 'Addable'}}
+  // FIXME(diagnostics): This should report the "no exact matches" diagnostic.
+  u + u // expected-error{{referencing operator function '+' on 'RangeReplaceableCollection' requires that 'U' conform to 'RangeReplaceableCollection'}}
   return x+y
 }
 
@@ -315,7 +316,7 @@ struct A {}
 func foo() {
     for i in min(1,2) { // expected-error{{for-in loop requires 'Int' to conform to 'Sequence'}}
     }
-    let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+    let j = min(Int(3), Float(2.5)) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. 'Float')}}
     let k = min(A(), A()) // expected-error{{global function 'min' requires that 'A' conform to 'Comparable'}}
     let oi : Int? = 5
     let l = min(3, oi) // expected-error{{global function 'min' requires that 'Int?' conform to 'Comparable'}}
@@ -342,3 +343,29 @@ prefix func +-<T>(_: T) where T: Sequence, T.Element == Int {}
 
 +-"hello"
 // expected-error@-1 {{operator function '+-' requires the types 'String.Element' (aka 'Character') and 'Int' be equivalent}}
+
+func test_transitive_subtype_deduction_for_generic_params() {
+  class A {}
+
+  func foo<T: A>(_: [(String, (T) -> Void)]) {}
+
+  func bar<U>(_: @escaping (U) -> Void) -> (U) -> Void {
+    return { _ in }
+  }
+
+  // Here we have:
+  //  - `W subtype of A`
+  //  - `W subtype of U`
+  //
+  // Type variable associated with `U` has to be attempted
+  // first because solver can't infer bindings for `W` transitively
+  // through `U`.
+  func baz<W: A>(_ arr: [(String, (W) -> Void)]) {
+    foo(arr.map { ($0.0, bar($0.1)) }) // Ok
+  }
+
+  func fiz<T>(_ a: T, _ op: (T, T) -> Bool, _ b: T) {}
+  func biz(_ v: Int32) {
+    fiz(v, !=, -1) // Ok because -1 literal should be inferred as Int32
+  }
+}

@@ -855,7 +855,6 @@ private:
 
   Kind TheKind;
   bool DiagnoseErrorOnTry = false;
-  bool isInDefer = false;
   DeclContext *RethrowsDC = nullptr;
   InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
 
@@ -899,9 +898,7 @@ public:
   }
 
   static Context forDeferBody() {
-    Context result(Kind::DeferBody);
-    result.isInDefer = true;
-    return result;
+    return Context(Kind::DeferBody);
   }
 
   static Context forInitializer(Initializer *init) {
@@ -979,18 +976,13 @@ public:
 
   static void diagnoseThrowInIllegalContext(DiagnosticEngine &Diags,
                                             ASTNode node,
-                                            StringRef description,
-                                            bool throwInDefer = false) {
-    if (auto *e = node.dyn_cast<Expr*>())
+                                            StringRef description) {
+    if (auto *e = node.dyn_cast<Expr*>()) {
       if (isa<ApplyExpr>(e)) {
         Diags.diagnose(e->getLoc(), diag::throwing_call_in_illegal_context,
                        description);
         return;
       }
-
-    if (throwInDefer) {
-      // Return because this would've already been diagnosed in TypeCheckStmt.
-      return;
     }
 
     Diags.diagnose(node.getStartLoc(), diag::throw_in_illegal_context,
@@ -1156,7 +1148,7 @@ public:
       diagnoseThrowInIllegalContext(Diags, E, "a catch guard expression");
       return;
     case Kind::DeferBody:
-      diagnoseThrowInIllegalContext(Diags, E, "a defer body", isInDefer);
+      diagnoseThrowInIllegalContext(Diags, E, "a defer body");
       return;
     }
     llvm_unreachable("bad context kind");
@@ -1627,10 +1619,6 @@ void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
 }
 
 void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
-  // In some cases, we won't have validated the signature
-  // by the time we got here.
-  if (!fn->hasInterfaceType()) return;
-
 #ifndef NDEBUG
   PrettyStackTraceDecl debugStack("checking error handling for", fn);
 #endif

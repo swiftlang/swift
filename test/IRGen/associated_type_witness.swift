@@ -41,7 +41,7 @@ protocol HasThreeAssocTypes {
 // GLOBAL-SAME:    @"$s23associated_type_witness13WithUniversalVAA8AssockedAAMc"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness13WithUniversalVAA8AssockedAA5AssocAaDP_AA1P",
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness13WithUniversalVAA8AssockedAA5AssocAaDP_AA1Q"
-// GLOBAL-SAME:    i64 add (i64 ptrtoint (<{ {{.*}} }>* @"symbolic{{.*}}23associated_type_witness9UniversalV" to i64), i64 1) to i8*)
+// GLOBAL-SAME:    @"symbolic{{.*}}23associated_type_witness9UniversalV"
 // GLOBAL-SAME:  ]
 struct WithUniversal : Assocked {
   typealias Assoc = Universal
@@ -98,7 +98,7 @@ struct Computed<T, U> : Assocked {
 }
 
 //   Instantiation function for GenericComputed : DerivedFromSimpleAssoc.
-// CHECK-LABEL: define internal void @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI"(i8**, %swift.type* %"GenericComputed<T>", i8**)
+// CHECK-LABEL: define internal void @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI"(i8** %0, %swift.type* %"GenericComputed<T>", i8** %1)
 // CHECK:         [[T0:%.*]] = call i8** @swift_getWitnessTable({{.*}}@"$s23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAMc"
 // CHECK-NEXT:    [[T1:%.*]] = bitcast i8** [[T0]] to i8*
 // CHECK-NEXT:    [[T2:%.*]] = getelementptr inbounds i8*, i8** %0, i32 1

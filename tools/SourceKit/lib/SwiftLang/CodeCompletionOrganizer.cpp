@@ -158,7 +158,8 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     CodeCompletion::SwiftResult swiftResult(
         CodeCompletion::SwiftResult::ResultKind::Pattern,
         SemanticContextKind::ExpressionSpecific,
-        /*NumBytesToErase=*/0, completionString);
+        /*NumBytesToErase=*/0, completionString,
+        CodeCompletionResult::ExpectedTypeRelation::Unknown);
 
     CompletionBuilder builder(sink, swiftResult);
     builder.setCustomKind(customCompletion.Kind);
@@ -342,6 +343,7 @@ ImportDepth::ImportDepth(ASTContext &context,
   ModuleDecl::ImportFilter importFilter;
   importFilter |= ModuleDecl::ImportFilterKind::Private;
   importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
   SmallVector<ModuleDecl::ImportedModule, 16> mainImports;
   main->getImportedModules(mainImports, importFilter);
   for (auto &import : mainImports) {
@@ -395,16 +397,16 @@ static StringRef copyString(llvm::BumpPtrAllocator &allocator, StringRef str) {
 }
 
 static std::unique_ptr<Group> make_group(StringRef name) {
-  auto g = llvm::make_unique<Group>();
-  g->name = name;
-  g->description = name;
+  auto g = std::make_unique<Group>();
+  g->name = name.str();
+  g->description = name.str();
   return g;
 }
 
 static std::unique_ptr<Result> make_result(Completion *result) {
-  auto r = llvm::make_unique<Result>(result);
-  r->name = result->getName();
-  r->description = result->getDescription();
+  auto r = std::make_unique<Result>(result);
+  r->name = result->getName().str();
+  r->description = result->getDescription().str();
   return r;
 }
 

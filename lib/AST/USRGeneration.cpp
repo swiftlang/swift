@@ -17,6 +17,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/USRGeneration.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -214,7 +215,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
     if (auto ClangD = ClangN.getAsDecl()) {
       bool Ignore = clang::index::generateUSRForDecl(ClangD, Buffer);
       if (!Ignore) {
-        return Buffer.str();
+        return std::string(Buffer.str());
       } else {
         return std::string();
       }
@@ -228,7 +229,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
         ClangMacroInfo->getDefinitionLoc(),
         Importer.getClangASTContext().getSourceManager(), Buffer);
     if (!Ignore)
-      return Buffer.str();
+      return std::string(Buffer.str());
     else
       return std::string();
   }
@@ -237,7 +238,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
     if (printObjCUSR(D, OS)) {
       return std::string();
     } else {
-      return OS.str();
+      return std::string(OS.str());
     }
   }
 

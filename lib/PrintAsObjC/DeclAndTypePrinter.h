@@ -70,6 +70,9 @@ public:
   void print(const Decl *D);
   void print(Type ty);
 
+  /// Is \p ED empty of members and protocol conformances to include?
+  bool isEmptyExtensionDecl(const ExtensionDecl *ED);
+
   /// Prints a category declaring the given members.
   ///
   /// All members must have the same parent type. The list must not be empty.

@@ -292,9 +292,11 @@ class ThisDerived1 : ThisBase1 {
     super.baseInstanceVar = 42 // expected-error {{member 'baseInstanceVar' cannot be used on type 'ThisBase1'}}
     super.baseProp = 42 // expected-error {{member 'baseProp' cannot be used on type 'ThisBase1'}}
     super.baseFunc0() // expected-error {{instance member 'baseFunc0' cannot be used on type 'ThisBase1'}}
-    super.baseFunc0(ThisBase1())()
+    // expected-error@-1 {{partial application of 'super' instance method with metatype base is not allowed}}
+    super.baseFunc0(ThisBase1())() // expected-error {{partial application of 'super' instance method with metatype base is not allowed}}
     super.baseFunc1(42) // expected-error {{instance member 'baseFunc1' cannot be used on type 'ThisBase1'}}
-    super.baseFunc1(ThisBase1())(42)
+    // expected-error@-1 {{partial application of 'super' instance method with metatype base is not allowed}}
+    super.baseFunc1(ThisBase1())(42) // expected-error {{partial application of 'super' instance method with metatype base is not allowed}}
     super[0] = 42.0 // expected-error {{instance member 'subscript' cannot be used on type 'ThisBase1'}}
     super.baseStaticVar = 42
     super.baseStaticProp = 42
@@ -302,6 +304,7 @@ class ThisDerived1 : ThisBase1 {
 
     super.baseExtProp = 42 // expected-error {{member 'baseExtProp' cannot be used on type 'ThisBase1'}}
     super.baseExtFunc0() // expected-error {{instance member 'baseExtFunc0' cannot be used on type 'ThisBase1'}}
+    // expected-error@-1 {{partial application of 'super' instance method with metatype base is not allowed}}
     super.baseExtStaticVar = 42 // expected-error {{instance member 'baseExtStaticVar' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticProp = 42 // expected-error {{member 'baseExtStaticProp' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticFunc0()
@@ -609,7 +612,7 @@ class ShadowingGenericParameter<T> {
   func foo (t : T) {}
 }
 
-_ = ShadowingGenericParameter<String>().foo(t: "hi")
+ShadowingGenericParameter<String>().foo(t: "hi")
 
 // rdar://problem/51266778
 struct PatternBindingWithTwoVars1 { var x = 3, y = x }
@@ -619,23 +622,21 @@ struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
 // expected-error@-1 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
 
 struct PatternBindingWithTwoVars3 { var x = y, y = x }
-// expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
-// expected-error@-2 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
-// expected-error@-3 {{circular reference}}
+// expected-error@-1 {{circular reference}}
+// expected-note@-2 {{through reference here}}
+// expected-note@-3 {{through reference here}}
 // expected-note@-4 {{through reference here}}
 // expected-note@-5 {{through reference here}}
 // expected-note@-6 {{through reference here}}
-// expected-note@-7 {{through reference here}}
+// expected-error@-7 {{circular reference}}
 // expected-note@-8 {{through reference here}}
-// expected-error@-9 {{circular reference}}
+// expected-note@-9 {{through reference here}}
 // expected-note@-10 {{through reference here}}
 // expected-note@-11 {{through reference here}}
 // expected-note@-12 {{through reference here}}
-// expected-note@-13 {{through reference here}}
-// expected-note@-14 {{through reference here}}
 
 // https://bugs.swift.org/browse/SR-9015
 func sr9015() {
-  let closure1 = { closure2() } // expected-error {{circular reference}} expected-note {{through reference here}} expected-note {{through reference here}}
-  let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}} expected-note {{through reference here}}
+  let closure1 = { closure2() } // expected-error {{circular reference}} expected-note {{through reference here}} expected-note {{through reference here}} expected-error {{unable to infer closure}}
+  let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}} expected-note {{through reference here}} expected-error {{unable to infer closure}}
 }

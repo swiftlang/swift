@@ -165,12 +165,16 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   if (auto existingThunk = M.lookUpFunction(name))
     return SILVTable::Entry(base, existingThunk, implKind);
 
+  GenericEnvironment *genericEnv = nullptr;
+  if (auto genericSig = overrideInfo.FormalType.getOptGenericSignature())
+    genericEnv = genericSig->getGenericEnvironment();
+
   // Emit the thunk.
   SILLocation loc(derivedDecl);
   SILGenFunctionBuilder builder(*this);
   auto thunk = builder.createFunction(
       SILLinkage::Private, name, overrideInfo.SILFnType,
-      cast<AbstractFunctionDecl>(derivedDecl)->getGenericEnvironment(), loc,
+      genericEnv, loc,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
       ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
@@ -273,7 +277,7 @@ public:
     IsSerialized_t serialized = IsNotSerialized;
     auto classIsPublic = theClass->getEffectiveAccess() >= AccessLevel::Public;
     // Only public, fixed-layout classes should have serialized vtables.
-    if (classIsPublic && !theClass->isResilient())
+    if (classIsPublic && !isResilient)
       serialized = IsSerialized;
 
     // Finally, create the vtable.
@@ -281,9 +285,9 @@ public:
   }
 
   void visitAncestor(ClassDecl *ancestor) {
-    auto superTy = ancestor->getSuperclass();
-    if (superTy)
-      visitAncestor(superTy->getClassOrBoundGenericClass());
+    auto *superDecl = ancestor->getSuperclassDecl();
+    if (superDecl)
+      visitAncestor(superDecl);
 
     addVTableEntries(ancestor);
   }
@@ -307,8 +311,14 @@ public:
   }
 
   void addPlaceholder(MissingMemberDecl *m) {
-    assert(m->getNumberOfVTableEntries() == 0
-           && "Should not be emitting class with missing members");
+#ifndef NDEBUG
+    auto *classDecl = cast<ClassDecl>(m->getDeclContext());
+    bool isResilient =
+        classDecl->isResilient(SGM.M.getSwiftModule(),
+                               ResilienceExpansion::Maximal);
+    assert(isResilient || m->getNumberOfVTableEntries() == 0 &&
+           "Should not be emitting fragile class with missing members");
+#endif
   }
 };
 
@@ -619,7 +629,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto *genericEnv = witness.getSyntheticEnvironment();
   CanGenericSignature genericSig;
   if (genericEnv)
-    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
+    genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
 
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
@@ -739,7 +749,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
   auto protocolType = protocol->getDeclaredInterfaceType();
   auto reqtSubs = SubstitutionMap::getProtocolSubstitutions(protocol,
                                           protocolType,
-                                          ProtocolConformanceRef(protocol));
+                                          ProtocolConformanceRef(conformance));
 
   // Open the protocol type.
   auto openedType = OpenedArchetypeType::get(protocolType);

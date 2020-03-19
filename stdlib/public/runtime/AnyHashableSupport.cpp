@@ -89,7 +89,7 @@ static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
     return nullptr;
   }
   // By this point, `type` is known to conform to `Hashable`.
-  const auto *conformance = witnessTable->Description;
+  const auto *conformance = witnessTable->getDescription();
   const Metadata *baseTypeThatConformsToHashable =
     findConformingSuperclass(type, conformance);
   HashableConformances.getOrInsert(HashableConformanceKey{type},

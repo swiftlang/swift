@@ -65,6 +65,10 @@ class SILCombiner :
   /// If set to true then the optimizer is free to erase cond_fail instructions.
   bool RemoveCondFails;
 
+  /// Set to true if some alloc/dealloc_stack instruction are inserted and at
+  /// the end of the run stack nesting needs to be corrected.
+  bool invalidatedStackNesting = false;
+
   /// The current iteration of the SILCombine.
   unsigned Iteration;
 

@@ -978,18 +978,3 @@ We are currently working on porting type-check based diagnostics over
 to the new diagnostic framework, which is described in detail in this
 `blog post
 <https://swift.org/blog/new-diagnostic-arch-overview/>`_.
-
-The things in the queue yet to be ported are:
-
-- Diagnostics related to member references: ``diagnoseMemberFailures``.
-  Most of the associated diagnostics have been ported and fixes are
-  located in ``ConstraintSystem::simplifyMemberConstraint``.
-
-- Problems related to calls and operator applications e.g.
-
-  - Missing explicit ``Self.`` and ``self.``
-  - Logic related to overload candidate ranking (``CalleeCandidateInfo``)
-  - ``diagnoseParameterErrors``
-  - ``diagnoseSimpleErrors``
-
-- Diagnostics related to array/dictionary literals: ``visit{Array, Dictionary}Expr``.

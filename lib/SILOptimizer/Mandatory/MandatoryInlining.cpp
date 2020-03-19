@@ -15,8 +15,8 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -136,9 +136,8 @@ static void fixupReferenceCounts(
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
       LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-      auto error = checker.checkValue(
-          pai, {BranchPropagatedUser(applySite.getCalleeOperand())}, {},
-          errorBehavior, &leakingBlocks);
+      auto error = checker.checkValue(pai, {applySite.getCalleeOperand()}, {},
+                                      errorBehavior, &leakingBlocks);
       if (error.getFoundLeak()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -342,7 +341,8 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
 
 /// Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
-static void cleanupCalleeValue(SILValue calleeValue) {
+static void cleanupCalleeValue(SILValue calleeValue,
+                               bool &invalidatedStackNesting) {
   // Handle the case where the callee of the apply is a load instruction. If we
   // fail to optimize, return. Otherwise, see if we can look through other
   // abstractions on our callee.
@@ -382,6 +382,7 @@ static void cleanupCalleeValue(SILValue calleeValue) {
       return;
     calleeValue = callee;
   }
+  invalidatedStackNesting = true;
 
   calleeValue = stripCopiesAndBorrows(calleeValue);
 
@@ -446,6 +447,10 @@ class ClosureCleanup {
   SmallBlotSetVector<SILInstruction *, 4> deadFunctionVals;
 
 public:
+  /// Set to true if some alloc/dealloc_stack instruction are inserted and at
+  /// the end of the run stack nesting needs to be corrected.
+  bool invalidatedStackNesting = false;
+
   /// This regular instruction deletion callback checks for any function-type
   /// values that may be unused after deleting the given instruction.
   void recordDeadFunction(SILInstruction *deletedInst) {
@@ -475,7 +480,7 @@ public:
         continue;
 
       if (auto *SVI = dyn_cast<SingleValueInstruction>(I.getValue()))
-        cleanupCalleeValue(SVI);
+        cleanupCalleeValue(SVI, invalidatedStackNesting);
     }
   }
 };
@@ -598,7 +603,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   FullArgs.clear();
 
   // First grab our basic arguments from our apply.
-  for (const auto &Arg : AI.getArguments())
+  for (const auto Arg : AI.getArguments())
     FullArgs.push_back(Arg);
 
   // Then grab a first approximation of our apply by stripping off all copy
@@ -633,17 +638,23 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     //  $@convention(thin) @noescape () -> () to
     //            $@noescape @callee_guaranteed () -> ()
     // %4 = apply %3() : $@noescape @callee_guaranteed () -> ()
-    if (auto *ThinToNoescapeCast = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
+    if (auto *ConvertFn = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
+      // If the conversion only changes the substitution level of the function,
+      // we can also look through it.
+      if (ConvertFn->onlyConvertsSubstitutions()) {
+        return stripCopiesAndBorrows(ConvertFn->getOperand());
+      }
+      
       auto FromCalleeTy =
-          ThinToNoescapeCast->getOperand()->getType().castTo<SILFunctionType>();
+          ConvertFn->getOperand()->getType().castTo<SILFunctionType>();
       if (FromCalleeTy->getExtInfo().hasContext())
         return CalleeValue;
-      auto ToCalleeTy = ThinToNoescapeCast->getType().castTo<SILFunctionType>();
+      auto ToCalleeTy = ConvertFn->getType().castTo<SILFunctionType>();
       auto EscapingCalleeTy = ToCalleeTy->getWithExtInfo(
           ToCalleeTy->getExtInfo().withNoEscape(false));
       if (FromCalleeTy != EscapingCalleeTy)
         return CalleeValue;
-      return stripCopiesAndBorrows(ThinToNoescapeCast->getOperand());
+      return stripCopiesAndBorrows(ConvertFn->getOperand());
     }
 
     // Ignore mark_dependence users. A partial_apply [stack] uses them to mark
@@ -749,7 +760,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
 
 static SILInstruction *tryDevirtualizeApplyHelper(FullApplySite InnerAI,
                                                   ClassHierarchyAnalysis *CHA) {
-  auto NewInst = tryDevirtualizeApply(InnerAI, CHA);
+  auto NewInst = tryDevirtualizeApply(InnerAI, CHA).first;
   if (!NewInst)
     return InnerAI.getInstruction();
 
@@ -806,7 +817,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
 
   SmallVector<ParameterConvention, 16> CapturedArgConventions;
   SmallVector<SILValue, 32> FullArgs;
-  bool needUpdateStackNesting = false;
+  bool invalidatedStackNesting = false;
 
   // Visiting blocks in reverse order avoids revisiting instructions after block
   // splitting, which would be quadratic.
@@ -924,7 +935,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
         closureCleanup.recordDeadFunction(I);
       });
 
-      needUpdateStackNesting |= Inliner.needsUpdateStackNesting(InnerAI);
+      invalidatedStackNesting |= Inliner.invalidatesStackNesting(InnerAI);
 
       // Inlining deletes the apply, and can introduce multiple new basic
       // blocks. After this, CalleeValue and other instructions may be invalid.
@@ -938,6 +949,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
       // we may be able to remove dead callee computations (e.g. dead
       // partial_apply closures).
       closureCleanup.cleanupDeadClosures(F);
+      invalidatedStackNesting |= closureCleanup.invalidatedStackNesting;
 
       // Resume inlining within nextBB, which contains only the inlined
       // instructions and possibly instructions in the original call block that
@@ -946,7 +958,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
     }
   }
 
-  if (needUpdateStackNesting) {
+  if (invalidatedStackNesting) {
     StackNesting().correctStackNesting(F);
   }
 

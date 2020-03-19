@@ -70,7 +70,7 @@ class DarwinPlatform(Platform):
     @property
     def is_embedded(self):
         """Check if this is a Darwin platform for embedded devices."""
-        return self.name != "macosx"
+        return self.name != "macosx" and self.name != "maccatalyst"
 
     @property
     def supports_benchmark(self):
@@ -117,7 +117,7 @@ class StdlibDeploymentTarget(object):
     OSX = DarwinPlatform("macosx", archs=["x86_64"],
                          sdk_name="OSX")
 
-    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64"],
+    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64", "arm64e"],
                          sdk_name="IOS")
     iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64"],
                                   sdk_name="IOS_SIMULATOR",
@@ -243,6 +243,11 @@ class StdlibDeploymentTarget(object):
     @classmethod
     def get_targets_by_name(cls, names):
         return [cls.get_target_for_name(name) for name in names]
+
+    @classmethod
+    def get_target_names(cls):
+        return sorted([name for (name, target) in
+                       cls._targets_by_name.items()])
 
 
 def install_prefix():

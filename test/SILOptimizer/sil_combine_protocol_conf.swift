@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -wmo -emit-sil -Xllvm -sil-disable-pass=DeadFunctionElimination -enforce-exclusivity=unchecked | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -wmo -emit-sil -Xllvm -sil-disable-pass=DeadFunctionElimination | %FileCheck %s
 
 // case 1: class protocol -- should optimize
 internal protocol SomeProtocol : class {

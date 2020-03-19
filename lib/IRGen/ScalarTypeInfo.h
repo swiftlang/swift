@@ -207,6 +207,31 @@ public:
         IGM, lowering, asDerived().getScalarType(), offset,
         Size(IGM.DataLayout.getTypeStoreSize(asDerived().getScalarType())));
   }
+
+};
+
+/// SingleScalarTypeInfoWithTypeLayout - A further specialization of
+/// SingleScalarTypeInfo for types which knows how-to construct a type layout
+/// from its derived type which must be a TypeInfo.
+template <class Derived, class Base>
+class SingleScalarTypeInfoWithTypeLayout
+    : public SingleScalarTypeInfo<Derived, Base> {
+protected:
+  template <class... T>
+  SingleScalarTypeInfoWithTypeLayout(T &&... args)
+      : SingleScalarTypeInfo<Derived, Base>(::std::forward<T>(args)...) {}
+
+  const Derived &asDerived() const {
+    return static_cast<const Derived &>(*this);
+  }
+
+public:
+  friend class SingleScalarTypeInfo<Derived, Base>;
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T);
+  }
 };
 
 /// PODSingleScalarTypeInfo - A further specialization of
@@ -223,6 +248,10 @@ protected:
                                           IsPOD, IsFixedSize,
                                           ::std::forward<T>(args)...) {}
 
+  const Derived &asDerived() const {
+    return static_cast<const Derived &>(*this);
+  }
+
 private:
   friend class SingleScalarTypeInfo<Derived, Base>;
   static const bool IsScalarPOD = true;
@@ -235,6 +264,12 @@ private:
 
   void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
   }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T);
+  }
+
 };
 
 }

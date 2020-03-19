@@ -65,7 +65,7 @@ class CodeCompletionResultBuilder {
       CurrentModule;
   ExpectedTypeContext declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
-      CodeCompletionResult::Unrelated;
+      CodeCompletionResult::Unknown;
   bool Cancelled = false;
   ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
   bool IsNotRecommended = false;
@@ -114,7 +114,7 @@ public:
     NumBytesToErase = N;
   }
 
-  void setAssociatedDecl(const Decl *D);
+  void setAssociatedDecl(const Decl *D, SourceFile *SF);
 
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
@@ -400,7 +400,8 @@ public:
     if (auto AFT = Ty->getAs<AnyFunctionType>()) {
       // If this is a closure type, add ChunkKind::CallParameterClosureType.
       PrintOptions PO;
-      PO.PrintFunctionRepresentationAttrs = false;
+      PO.PrintFunctionRepresentationAttrs =
+        PrintOptions::FunctionRepresentationMode::None;
       PO.SkipAttributes = true;
       PO.OpaqueReturnTypePrinting =
           PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;

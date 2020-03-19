@@ -25,7 +25,6 @@ namespace swift {
 class AbstractFunctionDecl;
 class ASTContext;
 class SubscriptDecl;
-class TypeChecker;
 class ValueDecl;
 class VarDecl;
 class InFlightDiagnostic;

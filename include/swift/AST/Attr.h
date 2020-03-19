@@ -685,23 +685,6 @@ public:
   }
 };
 
-/// Defines the @_implicitly_synthesizes_nested_requirement attribute.
-class ImplicitlySynthesizesNestedRequirementAttr : public DeclAttribute {
-public:
-  ImplicitlySynthesizesNestedRequirementAttr(StringRef Value, SourceLoc AtLoc,
-                                             SourceRange Range)
-    : DeclAttribute(DAK_ImplicitlySynthesizesNestedRequirement,
-                    AtLoc, Range, /*Implicit*/false),
-      Value(Value) {}
-
-  /// The name of the phantom requirement.
-  const StringRef Value;
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ImplicitlySynthesizesNestedRequirement;
-  }
-};
-
 /// Determine the result of comparing an availability attribute to a specific
 /// platform or language version.
 enum class AvailableVersionComparison {
@@ -1125,6 +1108,24 @@ public:
   }
 };
 
+/// The \c @_typeEraser(TypeEraserType) attribute.
+class TypeEraserAttr final : public DeclAttribute {
+  TypeLoc TypeEraserLoc;
+public:
+  TypeEraserAttr(SourceLoc atLoc, SourceRange range, TypeLoc typeEraserLoc)
+      : DeclAttribute(DAK_TypeEraser, atLoc, range, /*Implicit=*/false),
+        TypeEraserLoc(typeEraserLoc) {}
+
+  const TypeLoc &getTypeEraserLoc() const { return TypeEraserLoc; }
+  TypeLoc &getTypeEraserLoc() { return TypeEraserLoc; }
+
+  bool hasViableTypeEraserInit(ProtocolDecl *protocol) const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_TypeEraser;
+  }
+};
+
 /// Represents any sort of access control modifier.
 class AbstractAccessControlAttr : public DeclAttribute {
 protected:
@@ -1170,6 +1171,36 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SetterAccess;
+  }
+};
+
+/// SPI attribute applied to both decls and imports.
+class SPIAccessControlAttr final : public DeclAttribute,
+                                   private llvm::TrailingObjects<SPIAccessControlAttr, Identifier> {
+  friend TrailingObjects;
+
+  SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
+                       ArrayRef<Identifier> spiGroups);
+
+  // Number of trailing SPI group identifiers.
+  size_t numSPIGroups;
+
+public:
+  static SPIAccessControlAttr *create(ASTContext &context, SourceLoc atLoc,
+                                      SourceRange range,
+                                      ArrayRef<Identifier> spiGroups);
+
+  /// Name of SPIs declared by the attribute.
+  ///
+  /// Note: A single SPI name per attribute is currently supported but this
+  /// may change with the syntax change.
+  ArrayRef<Identifier> getSPIGroups() const {
+    return { this->template getTrailingObjects<Identifier>(),
+             numSPIGroups };
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_SPIAccessControl;
   }
 };
 
@@ -1623,8 +1654,16 @@ public:
   /// Indicates when the symbol was moved here.
   const llvm::VersionTuple MovedVersion;
 
-  /// Returns true if this attribute is active given the current platform.
-  bool isActivePlatform(const ASTContext &ctx) const;
+  struct ActiveVersion {
+    StringRef ModuleName;
+    PlatformKind Platform;
+    bool IsSimulator;
+    llvm::VersionTuple Version;
+  };
+
+  /// Returns non-optional if this attribute is active given the current platform.
+  /// The value provides more details about the active platform.
+  Optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_OriginallyDefinedIn;
   }
@@ -1647,7 +1686,12 @@ class DifferentiableAttr final
       private llvm::TrailingObjects<DifferentiableAttr,
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
+  friend class DifferentiableAttributeTypeCheckRequest;
 
+  /// The declaration on which the `@differentiable` attribute is declared.
+  /// May not be a valid declaration for `@differentiable` attributes.
+  /// Resolved during parsing and deserialization.
+  Decl *OriginalDeclaration = nullptr;
   /// Whether this function is linear (optional).
   bool Linear;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
@@ -1663,7 +1707,12 @@ class DifferentiableAttr final
   /// specified.
   FuncDecl *VJPFunction = nullptr;
   /// The differentiability parameter indices, resolved by the type checker.
-  IndexSubset *ParameterIndices = nullptr;
+  /// The bit stores whether the parameter indices have been computed.
+  ///
+  /// Note: it is necessary to use a bit instead of `nullptr` parameter indices
+  /// to represent "parameter indices not yet type-checked" because invalid
+  /// attributes have `nullptr` parameter indices but have been type-checked.
+  llvm::PointerIntPair<IndexSubset *, 1, bool> ParameterIndicesAndBit;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
   /// The generic signature for autodiff associated functions. Resolved by the
@@ -1703,6 +1752,12 @@ public:
                                     Optional<DeclNameRefWithLoc> vjp,
                                     GenericSignature derivativeGenSig);
 
+  Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
+
+  /// Sets the original declaration on which this attribute is declared.
+  /// Should only be used by parsing and deserialization.
+  void setOriginalDeclaration(Decl *originalDeclaration);
+
   /// Get the optional 'jvp:' function name and location.
   /// Use this instead of `getJVPFunction` to check whether the attribute has a
   /// registered JVP.
@@ -1713,12 +1768,14 @@ public:
   /// registered VJP.
   Optional<DeclNameRefWithLoc> getVJP() const { return VJP; }
 
-  IndexSubset *getParameterIndices() const {
-    return ParameterIndices;
-  }
-  void setParameterIndices(IndexSubset *parameterIndices) {
-    ParameterIndices = parameterIndices;
-  }
+private:
+  /// Returns true if the given `@differentiable` attribute has been
+  /// type-checked.
+  bool hasBeenTypeChecked() const;
+
+public:
+  IndexSubset *getParameterIndices() const;
+  void setParameterIndices(IndexSubset *parameterIndices);
 
   /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
@@ -1755,10 +1812,9 @@ public:
 
   // Print the attribute to the given stream.
   // If `omitWrtClause` is true, omit printing the `wrt:` clause.
-  // If `omitAssociatedFunctions` is true, omit printing associated functions.
-  void print(llvm::raw_ostream &OS, const Decl *D,
-             bool omitWrtClause = false,
-             bool omitAssociatedFunctions = false) const;
+  // If `omitDerivativeFunctions` is true, omit printing derivative functions.
+  void print(llvm::raw_ostream &OS, const Decl *D, bool omitWrtClause = false,
+             bool omitDerivativeFunctions = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
@@ -1789,7 +1845,7 @@ class DerivativeAttr final
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type repr for the referenced original function. This field is
+  /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.
@@ -1883,7 +1939,7 @@ class TransposeAttr final
       private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type repr for the referenced original function. This field is
+  /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.
@@ -1989,6 +2045,11 @@ public:
   bool
   isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
 
+  /// Finds the most-specific platform-specific attribute that is
+  /// active for the current platform.
+  const AvailableAttr *
+  findMostSpecificActivePlatform(const ASTContext &ctx) const;
+
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or the first one that indicates it's
   /// potentially unavailable, or null otherwise.
@@ -2069,6 +2130,15 @@ public:
   /// Retrieve the first attribute with the given kind.
   const DeclAttribute *getAttribute(DeclAttrKind DK,
                                     bool AllowInvalid = false) const {
+    for (auto Attr : *this)
+      if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
+        return Attr;
+    return nullptr;
+  }
+
+  /// Retrieve the first attribute with the given kind.
+  DeclAttribute *getAttribute(DeclAttrKind DK,
+                              bool AllowInvalid = false) {
     for (auto Attr : *this)
       if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
         return Attr;

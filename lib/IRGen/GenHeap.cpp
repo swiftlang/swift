@@ -33,6 +33,7 @@
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -54,6 +55,10 @@ namespace {
                                 FixedTypeInfo> { \
     llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
   public: \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
+                                        SILType T) const override { \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T); \
+    } \
     Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType, \
                                     llvm::Type *type, \
                                     Size size, Alignment alignment, \
@@ -138,6 +143,10 @@ namespace {
                              alignment, IsNotPOD, IsFixedSize), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     enum { IsScalarPOD = false }; \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,                    \
+                                          SILType T) const override {          \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);             \
+    } \
     llvm::Type *getScalarType() const { \
       return ValueTypeAndIsOptional.getPointer(); \
     } \
@@ -473,7 +482,8 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
   ConstantInitBuilder builder(IGM);
   auto fields = builder.beginStruct(IGM.FullBoxMetadataStructTy);
 
-  fields.add(dtorFn);
+  fields.addSignedPointer(dtorFn, IGM.getOptions().PointerAuth.HeapDestructors,
+                          PointerAuthEntity::Special::HeapDestructor);
   fields.addNullPointer(IGM.WitnessTablePtrTy);
   {
     auto kindStruct = fields.beginStruct(IGM.TypeMetadataStructTy);
@@ -1236,6 +1246,32 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
   return fixLifetime;
 }
 
+llvm::Constant *IRGenModule::getFixedClassInitializationFn() {
+  if (FixedClassInitializationFn)
+    return *FixedClassInitializationFn;
+  
+  // If ObjC interop is disabled, we don't need to do fixed class
+  // initialization.
+  llvm::Constant *fn;
+  if (!ObjCInterop) {
+    fn = nullptr;
+  } else {
+    // In new enough ObjC runtimes, objc_opt_self provides a direct fast path
+    // to realize a class.
+    if (getAvailabilityContext()
+         .isContainedIn(Context.getSwift51Availability())) {
+      fn = getObjCOptSelfFn();
+    }
+    // Otherwise, the Swift runtime always provides a `get
+    else {
+      fn = getGetInitializedObjCClassFn();
+    }
+  }
+  
+  FixedClassInitializationFn = fn;
+  return fn;
+}
+
 /// Fix the lifetime of a live value. This communicates to the LLVM level ARC
 /// optimizer not to touch this value.
 void IRGenFunction::emitFixLifetime(llvm::Value *value) {
@@ -1460,7 +1496,7 @@ public:
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
         boxedInterfaceType,
-        env ? env->getGenericSignature()->getCanonicalSignature()
+        env ? env->getGenericSignature().getCanonicalSignature()
             : CanGenericSignature());
     llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name,
                                                      boxDescriptor);

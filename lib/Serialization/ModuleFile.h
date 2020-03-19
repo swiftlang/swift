@@ -23,6 +23,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/LLVM.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -105,6 +106,8 @@ public:
   public:
     ModuleDecl::ImportedModule Import = {};
     const StringRef RawPath;
+    const StringRef RawSPIs;
+    SmallVector<Identifier, 4> spiGroups;
 
   private:
     using ImportFilterKind = ModuleDecl::ImportFilterKind;
@@ -119,9 +122,9 @@ public:
       return static_cast<ImportFilterKind>(1 << RawImportControl);
     }
 
-    Dependency(StringRef path, bool isHeader, ImportFilterKind importControl,
+    Dependency(StringRef path, StringRef spiGroups, bool isHeader, ImportFilterKind importControl,
                bool isScoped)
-      : RawPath(path), RawImportControl(rawControlFromKind(importControl)),
+      : RawPath(path), RawSPIs(spiGroups), RawImportControl(rawControlFromKind(importControl)),
         IsHeader(isHeader), IsScoped(isScoped) {
       assert(llvm::countPopulation(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
@@ -129,13 +132,13 @@ public:
     }
 
   public:
-    Dependency(StringRef path, ImportFilterKind importControl, bool isScoped)
-      : Dependency(path, false, importControl, isScoped) {}
+    Dependency(StringRef path, StringRef spiGroups, ImportFilterKind importControl, bool isScoped)
+      : Dependency(path, spiGroups, false, importControl, isScoped) {}
 
     static Dependency forHeader(StringRef headerPath, bool exported) {
       auto importControl = exported ? ImportFilterKind::Public
                                     : ImportFilterKind::Private;
-      return Dependency(headerPath, true, importControl, false);
+      return Dependency(headerPath, StringRef(), true, importControl, false);
     }
 
     bool isLoaded() const {
@@ -318,6 +321,9 @@ private:
   /// Types referenced by this module.
   MutableArrayRef<Serialized<Type>> Types;
 
+  /// Clang types referenced by this module.
+  MutableArrayRef<Serialized<const clang::Type *>> ClangTypes;
+
   /// Generic signatures referenced by this module.
   MutableArrayRef<Serialized<GenericSignature>> GenericSignatures;
 
@@ -417,6 +423,10 @@ private:
   /// An array of fixed size source location data for each USR appearing in
   /// \c DeclUSRsTable.
   StringRef BasicDeclLocsData;
+
+  /// An array of fixed-size location data for each `SingleRawComment` piece
+  /// of declaration's documentation `RawComment`s.
+  StringRef DocRangesData;
 
   struct ModuleBits {
     /// The decl ID of the main class in this module file, if it has one.
@@ -782,6 +792,11 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results);
 
+  /// Find all SPI names imported from \p importedModule by this module,
+  /// collecting the identifiers in \p spiGroups.
+  void lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                              SmallVectorImpl<Identifier> &spiGroups) const;
+
   /// Reports all link-time dependencies.
   void collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const;
 
@@ -819,6 +834,10 @@ public:
     return ModuleInputBuffer->getBufferIdentifier();
   }
 
+  StringRef getTargetTriple() const {
+    return TargetTriple;
+  }
+
   /// AST-verify imported decls.
   ///
   /// Has no effect in NDEBUG builds.
@@ -827,8 +846,7 @@ public:
   virtual void loadAllMembers(Decl *D,
                               uint64_t contextData) override;
 
-  virtual
-  Optional<TinyPtrVector<ValueDecl *>>
+  virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
@@ -878,6 +896,10 @@ public:
 
   /// Returns the type with the given ID, deserializing it if needed.
   llvm::Expected<Type> getTypeChecked(serialization::TypeID TID);
+
+  /// Returns the Clang type with the given ID, deserializing it if needed.
+  llvm::Expected<const clang::Type *>
+  getClangType(serialization::ClangTypeID TID);
 
   /// Returns the base name with the given ID, deserializing it if needed.
   DeclBaseName getDeclBaseName(serialization::IdentifierID IID);

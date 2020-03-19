@@ -7,27 +7,21 @@ add_swift_host_tool(swift-syntax-parser-test
     Support
   SWIFT_COMPONENT tools
 )
+if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  set_target_properties(swift-syntax-parser-test PROPERTIES
+    BUILD_WITH_INSTALL_RPATH YES
+    INSTALL_RPATH @executable_path/../lib)
+elseif(NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
+  set_target_properties(swift-syntax-parser-test PROPERTIES
+    BUILD_WITH_INSTALL_RPATH YES
+    INSTALL_RPATH ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+endif()
+target_compile_options(swift-syntax-parser-test PRIVATE
+  -fblocks)
+target_link_libraries(swift-syntax-parser-test PRIVATE
+  $<$<NOT:$<PLATFORM_ID:Darwin>>:BlocksRuntime>
+  libSwiftSyntaxParser)
+
 if(NOT SWIFT_BUILT_STANDALONE AND NOT CMAKE_C_COMPILER_ID MATCHES Clang)
   add_dependencies(swift-syntax-parser-test clang)
-endif()
-target_link_libraries(swift-syntax-parser-test
-  PRIVATE
-    libSwiftSyntaxParser
-)
-
-if(APPLE)
-  # Prioritize finding the parser library from the build/lib directory.
-  # Otherwise it may find it from the 'lib/swift/macosx' directory which could
-  # be out-of-date.
-  get_target_property(link_flags swift-syntax-parser-test LINK_FLAGS)
-  set(link_flags "-Xlinker -rpath -Xlinker @executable_path/../lib ${link_flags}")
-  set_property(TARGET swift-syntax-parser-test PROPERTY
-      LINK_FLAGS "${link_flags}")
-endif()
-
-set_property(TARGET swift-syntax-parser-test APPEND_STRING PROPERTY
-  COMPILE_FLAGS " -fblocks")
-if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  target_link_libraries(swift-syntax-parser-test PRIVATE
-    BlocksRuntime)
 endif()

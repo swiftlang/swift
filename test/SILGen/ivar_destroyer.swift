@@ -29,7 +29,9 @@ class DerivedClassWithNonTrivialProperties : RootClassWithoutProperties {
 // CHECK:       bb0(%0 : @guaranteed $DerivedClassWithNonTrivialProperties):
 // CHECK-NEXT:    debug_value %0
 // CHECK-NEXT:    [[Z_ADDR:%.*]] = ref_element_addr %0
-// CHECK-NEXT:    destroy_addr [[Z_ADDR]]
+// CHECK-NEXT:    [[Z_ADDR_DEINIT_ACCESS:%.*]] = begin_access [deinit] [static] [[Z_ADDR]]
+// CHECK-NEXT:    destroy_addr [[Z_ADDR_DEINIT_ACCESS]]
+// CHECK-NEXT:    end_access [[Z_ADDR_DEINIT_ACCESS]]
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RESULT]]
 

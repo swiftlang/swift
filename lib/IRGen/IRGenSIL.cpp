@@ -16,32 +16,19 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "irgensil"
-#include "llvm/IR/DIBuilder.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/InlineAsm.h"
-#include "llvm/IR/Intrinsics.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Transforms/Utils/Local.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/Basic/TargetInfo.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Pattern.h"
-#include "swift/AST/ParameterList.h"
-#include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/Types.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -49,8 +36,22 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/IR/DIBuilder.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/InlineAsm.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -69,6 +70,7 @@
 #include "GenObjC.h"
 #include "GenOpaque.h"
 #include "GenPoly.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
@@ -389,10 +391,6 @@ public:
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
-  /// To avoid inserting elements into ValueDomPoints twice.
-  llvm::SmallDenseSet<llvm::Instruction *, 8> ValueVariables;
-  /// Holds the DominancePoint of values that are storage for a source variable.
-  SmallVector<std::pair<llvm::Instruction *, DominancePoint>, 8> ValueDomPoints;
   unsigned NumAnonVars = 0;
 
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
@@ -661,78 +659,6 @@ public:
     return Name;
   }
 
-  /// Try to emit an inline assembly gadget which extends the lifetime of
-  /// \p Var. Returns whether or not this was successful.
-  bool emitLifetimeExtendingUse(llvm::Value *Var) {
-    llvm::Type *ArgTys;
-    auto *Ty = Var->getType();
-    // Vectors, Pointers and Floats are expected to fit into a register.
-    if (Ty->isPointerTy() || Ty->isFloatingPointTy() || Ty->isVectorTy())
-      ArgTys = {Ty};
-    else {
-      // If this is not a scalar or vector type, we can't handle it.
-      if (isa<llvm::CompositeType>(Ty))
-        return false;
-      // The storage is guaranteed to be no larger than the register width.
-      // Extend the storage so it would fit into a register.
-      llvm::Type *IntTy;
-      switch (IGM.getClangASTContext().getTargetInfo().getRegisterWidth()) {
-      case 64:
-        IntTy = IGM.Int64Ty;
-        break;
-      case 32:
-        IntTy = IGM.Int32Ty;
-        break;
-      default:
-        llvm_unreachable("unsupported register width");
-      }
-      ArgTys = {IntTy};
-      Var = Builder.CreateZExtOrBitCast(Var, IntTy);
-    }
-    // Emit an empty inline assembler expression depending on the register.
-    auto *AsmFnTy = llvm::FunctionType::get(IGM.VoidTy, ArgTys, false);
-    auto *InlineAsm = llvm::InlineAsm::get(AsmFnTy, "", "r", true);
-    Builder.CreateAsmCall(InlineAsm, Var);
-    return true;
-  }
-
-  /// At -Onone, forcibly keep all LLVM values that are tracked by
-  /// debug variables alive by inserting an empty inline assembler
-  /// expression depending on the value in the blocks dominated by the
-  /// value.
-  void emitDebugVariableRangeExtension(const SILBasicBlock *CurBB) {
-    if (IGM.IRGen.Opts.shouldOptimize())
-      return;
-    for (auto &Variable : ValueDomPoints) {
-      llvm::Instruction *Var = Variable.first;
-      DominancePoint VarDominancePoint = Variable.second;
-      if (getActiveDominancePoint() == VarDominancePoint ||
-          isActiveDominancePointDominatedBy(VarDominancePoint)) {
-        bool ExtendedLifetime = emitLifetimeExtendingUse(Var);
-        if (!ExtendedLifetime)
-          continue;
-
-        // Propagate dbg.values for Var into the current basic block. Note
-        // that this shouldn't be necessary. LiveDebugValues should be doing
-        // this but can't in general because it currently only tracks register
-        // locations.
-        llvm::BasicBlock *BB = Var->getParent();
-        llvm::BasicBlock *CurBB = Builder.GetInsertBlock();
-        if (BB == CurBB)
-          // The current basic block must be a successor of the dbg.value().
-          continue;
-
-        llvm::SmallVector<llvm::DbgValueInst *, 4> DbgValues;
-        llvm::findDbgValues(DbgValues, Var);
-        for (auto *DVI : DbgValues)
-          if (DVI->getParent() == BB)
-            IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
-                DVI->getValue(), DVI->getVariable(), DVI->getExpression(),
-                DVI->getDebugLoc(), &*CurBB->getFirstInsertionPt());
-      }
-    }
-  }
-
   /// To make it unambiguous whether a `var` binding has been initialized,
   /// zero-initialize the shadow copy alloca. LLDB uses the first pointer-sized
   /// field to recognize to detect uninitizialized variables. This can be
@@ -752,10 +678,13 @@ public:
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
     ZeroInitBuilder.CreateMemSet(
         AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
-        Size, AI->getAlignment());
+        Size, llvm::MaybeAlign(AI->getAlignment()));
   }
 
   /// Account for bugs in LLVM.
+  ///
+  /// - When a variable is spilled into a stack slot, LiveDebugValues fails to
+  ///   recognize a restore of that slot for a different variable.
   ///
   /// - The LLVM type legalizer currently doesn't update debug
   ///   intrinsics when a large value is split up into smaller
@@ -764,9 +693,7 @@ public:
   ///
   /// - CodeGen Prepare may drop dbg.values pointing to PHI instruction.
   bool needsShadowCopy(llvm::Value *Storage) {
-    return (IGM.DataLayout.getTypeSizeInBits(Storage->getType()) >
-            IGM.getClangASTContext().getTargetInfo().getRegisterWidth()) ||
-           isa<llvm::PHINode>(Storage);
+    return !isa<llvm::Constant>(Storage);
   }
 
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
@@ -800,27 +727,10 @@ public:
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
         IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
         isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage) ||
-        Storage->getType() == IGM.RefCountedPtrTy)
+        Storage->getType() == IGM.RefCountedPtrTy || !needsShadowCopy(Storage))
       return Storage;
 
-    // Always emit shadow copies for function arguments.
-    if (VarInfo.ArgNo == 0)
-      // Otherwise only if debug value range extension is not feasible.
-      if (!needsShadowCopy(Storage)) {
-        // Mark for debug value range extension unless this is a constant, or
-        // unless it's not possible to emit lifetime-extending uses for this.
-        if (auto *Value = dyn_cast<llvm::Instruction>(Storage)) {
-          // Emit a use at the start of the storage lifetime to force early
-          // materialization. This makes variables available for inspection as
-          // soon as they are defined.
-          bool ExtendedLifetime = emitLifetimeExtendingUse(Value);
-          if (ExtendedLifetime)
-            if (ValueVariables.insert(Value).second)
-              ValueDomPoints.push_back({Value, getActiveDominancePoint()});
-        }
-
-        return Storage;
-      }
+    // Emit a shadow copy.
     return emitShadowCopy(Storage, Scope, VarInfo, Align);
   }
 
@@ -1133,6 +1043,9 @@ public:
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
   
   void visitKeyPathInst(KeyPathInst *I);
+
+  void visitDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *i);
 
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
   void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
@@ -1677,12 +1590,6 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
     return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
-  llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile);
-  if (auto dc = f->getModule().getAssociatedContext()) {
-    if (auto sf = dc->getParentSourceFile()) {
-      CurSourceFile = sf;
-    }
-  }
   IRGenSILFunction(*this, f).emitSILFunction();
 }
 
@@ -1900,14 +1807,38 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         IGM.DebugInfo->setCurrentLoc(
             Builder, DS, RegularLocation::getAutoGeneratedLocation());
       }
-
-      if (isa<TermInst>(&I))
-        emitDebugVariableRangeExtension(BB);
     }
     visit(&I);
   }
 
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
+}
+
+void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
+    DifferentiabilityWitnessFunctionInst *i) {
+  llvm::Value *diffWitness =
+      IGM.getAddrOfDifferentiabilityWitness(i->getWitness());
+  unsigned offset = 0;
+  switch (i->getWitnessKind()) {
+  case DifferentiabilityWitnessFunctionKind::JVP:
+    offset = 0;
+    break;
+  case DifferentiabilityWitnessFunctionKind::VJP:
+    offset = 1;
+    break;
+  case DifferentiabilityWitnessFunctionKind::Transpose:
+    llvm_unreachable("Not yet implemented");
+  }
+
+  diffWitness = Builder.CreateStructGEP(diffWitness, offset);
+  diffWitness = Builder.CreateLoad(diffWitness, IGM.getPointerAlignment());
+
+  auto fnType = cast<SILFunctionType>(i->getType().getASTType());
+  Signature signature = IGM.getSignature(fnType);
+  diffWitness =
+      Builder.CreateBitCast(diffWitness, signature.getType()->getPointerTo());
+
+  setLoweredFunctionPointer(i, FunctionPointer(diffWitness, signature));
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
@@ -2662,10 +2593,9 @@ static void emitCoroutineExit(IRGenSILFunction &IGF) {
   // Emit the block.
   IGF.Builder.emitBlock(coroEndBB);
   auto handle = IGF.getCoroutineHandle();
-  IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_end, {
-    handle,
-    /*is unwind*/ IGF.Builder.getFalse()
-  });
+  IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
+                                  {handle,
+                                   /*is unwind*/ IGF.Builder.getFalse()});
   IGF.Builder.CreateUnreachable();
 }
 
@@ -2790,7 +2720,13 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, bool isAbort) {
   continuation = Builder.CreateBitCast(continuation,
                                        sig.getType()->getPointerTo());
 
-  FunctionPointer callee(continuation, sig);
+
+  auto schemaAndEntity =
+    getCoroutineResumeFunctionPointerAuth(IGM, i->getOrigCalleeType());
+  auto pointerAuth = PointerAuthInfo::emit(*this, schemaAndEntity.first,
+                                           coroutine.Buffer.getAddress(),
+                                           schemaAndEntity.second);
+  FunctionPointer callee(continuation, pointerAuth, sig);
 
   Builder.CreateCall(callee, {
     coroutine.Buffer.getAddress(),
@@ -3639,14 +3575,17 @@ void IRGenSILFunction::visitRefTailAddrInst(RefTailAddrInst *i) {
 }
 
 static bool isInvariantAddress(SILValue v) {
-  auto root = getUnderlyingAddressRoot(v);
-  if (auto ptrRoot = dyn_cast<PointerToAddressInst>(root)) {
+  SILValue accessedAddress = getAccessedAddress(v);
+  if (auto *ptrRoot = dyn_cast<PointerToAddressInst>(accessedAddress)) {
     return ptrRoot->isInvariant();
   }
   // TODO: We could be more aggressive about considering addresses based on
   // `let` variables as invariant when the type of the address is known not to
   // have any sharably-mutable interior storage (in other words, no weak refs,
-  // atomics, etc.)
+  // atomics, etc.). However, this currently miscompiles some programs.
+  // if (accessedAddress->getType().isAddress() && isLetAddress(accessedAddress)) {
+  //  return true;
+  // }
   return false;
 }
 
@@ -5645,7 +5584,11 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
     auto sig = IGM.getSignature(methodType);
     fnPtr = Builder.CreateBitCast(fnPtr, sig.getType()->getPointerTo());
 
-    FunctionPointer fn(fnPtr, sig);
+    auto &schema = getOptions().PointerAuth.SwiftClassMethodPointers;
+    auto authInfo =
+      PointerAuthInfo::emit(*this, schema, /*storageAddress=*/nullptr, method);
+
+    FunctionPointer fn(fnPtr, authInfo, sig);
 
     setLoweredFunctionPointer(i, fn);
     return;

@@ -16,6 +16,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenControl.cpp
   GenCoverage.cpp
   GenDecl.cpp
+  GenDiffWitness.cpp
   GenEnum.cpp
   GenExistential.cpp
   GenFunc.cpp
@@ -26,6 +27,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenMeta.cpp
   GenObjC.cpp
   GenOpaque.cpp
+  GenPointerAuth.cpp
   GenPoly.cpp
   GenProto.cpp
   GenReflection.cpp
@@ -39,6 +41,8 @@ add_swift_host_library(swiftIRGen STATIC
   IRGenFunction.cpp
   IRGenMangler.cpp
   IRGenModule.cpp
+  IRGenSILPasses.cpp
+  IRGenRequests.cpp
   IRGenSIL.cpp
   Linking.cpp
   LoadableByAddress.cpp
@@ -48,6 +52,7 @@ add_swift_host_library(swiftIRGen STATIC
   Outlining.cpp
   StructLayout.cpp
   SwiftTargetInfo.cpp
+  TypeLayout.cpp
   TypeLayoutDumper.cpp
   TypeLayoutVerifier.cpp
 

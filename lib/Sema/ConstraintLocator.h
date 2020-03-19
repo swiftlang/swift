@@ -68,6 +68,7 @@ public:
     case GenericParameter:
     case ProtocolRequirement:
     case Witness:
+    case PatternMatch:
       return 0;
 
     case ContextualType:
@@ -119,6 +120,7 @@ public:
       StoredWitness,
       StoredGenericSignature,
       StoredKeyPathDynamicMemberBase,
+      StoredPattern,
       StoredKindAndValue
     };
 
@@ -238,6 +240,9 @@ public:
 
       case StoredKeyPathDynamicMemberBase:
         return PathElementKind::KeyPathDynamicMember;
+
+      case StoredPattern:
+        return PathElementKind::PatternMatch;
 
       case StoredKindAndValue:
         return decodeStorage(storage).first;
@@ -359,6 +364,21 @@ public:
 
   /// Determine whether this locator points to the contextual type.
   bool isForContextualType() const;
+
+  /// Determine whether this locator points to the assignment expression.
+  bool isForAssignment() const;
+
+  /// Determine whether this locator points to the coercion expression.
+  bool isForCoercion() const;
+
+  /// Determine whether this locator points to the `try?` expression.
+  bool isForOptionalTry() const;
+
+  /// Determine whether this locator points directly to a given expression.
+  template <class E> bool directlyAt() const {
+    auto *anchor = getAnchor();
+    return anchor && isa<E>(anchor) && getPath().empty();
+  }
 
   /// Attempts to cast the first path element of the locator to a specific
   /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or
@@ -794,6 +814,18 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::TernaryBranch;
+  }
+};
+
+class LocatorPathElt::PatternMatch final : public LocatorPathElt {
+public:
+  PatternMatch(Pattern *pattern)
+      : LocatorPathElt(LocatorPathElt::StoredPattern, pattern) {}
+
+  Pattern *getPattern() const { return getStoredPointer<Pattern>(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PatternMatch;
   }
 };
 

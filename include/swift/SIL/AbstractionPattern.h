@@ -323,8 +323,10 @@ class AbstractionPattern {
     TheKind = unsigned(kind);
     OrigType = origType;
     GenericSig = CanGenericSignature();
-    if (OrigType->hasTypeParameter())
+    if (OrigType->hasTypeParameter()) {
+      assert(OrigType == signature->getCanonicalTypeInContext(origType));
       GenericSig = signature;
+    }
   }
 
   void initClangType(CanGenericSignature signature,
@@ -675,7 +677,7 @@ public:
           isa<GenericTypeParamType>(type)) {
         return true;
       }
-      if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+      if (isa<ArchetypeType>(type)) {
         return true;
       }
       return false;

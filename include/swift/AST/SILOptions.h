@@ -23,6 +23,7 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Remarks/RemarkFormat.h"
 #include <string>
 #include <climits>
 
@@ -57,6 +58,10 @@ public:
   /// purposes.
   bool EnableOSSAOptimizations = true;
 
+  /// Controls whether to turn on speculative devirtualization.
+  /// It is turned off by default.
+  bool EnableSpeculativeDevirtualization = false;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
@@ -73,6 +78,10 @@ public:
 
   /// Whether to dump verbose SIL with scope and location information.
   bool EmitVerboseSIL = false;
+
+  /// Should we sort SIL functions, vtables, witness tables, and global
+  /// variables by name when we print it out. This eases diffing of SIL files.
+  bool EmitSortedSIL = false;
 
   /// Whether to stop the optimization pipeline after serializing SIL.
   bool StopOptimizationAfterSerialization = false;
@@ -153,9 +162,16 @@ public:
   /// pipeline or after serialization.
   bool StripOwnershipAfterSerialization = true;
 
-  /// The name of the file to which the backend should save YAML optimization
+  /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;
+
+  /// The regex that filters the passes that should be saved to the optimization
+  /// records.
+  std::string OptRecordPasses;
+
+  /// The format used for serializing remarks (default: YAML)
+  llvm::remarks::Format OptRecordFormat = llvm::remarks::Format::YAML;
 
   SILOptions() {}
 

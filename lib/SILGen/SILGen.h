@@ -131,6 +131,9 @@ public:
 
   ASTContext &getASTContext() { return M.getASTContext(); }
 
+  llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>
+    MagicFileStringsByFilePath;
+
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
   
@@ -208,9 +211,6 @@ public:
 
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
   
-  /// Generate code for a source file of the module.
-  void emitSourceFile(SourceFile *sf);
-  
   /// Generates code for the given FuncDecl and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(decl). For
   /// curried functions, curried entry point Functions are also generated and
@@ -245,9 +245,6 @@ public:
   /// Emits default argument generators for the given parameter list.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                 ParameterList *paramList);
-
-  /// Emits the curry thunk between two uncurry levels of a function.
-  void emitCurryThunk(SILDeclRef thunk);
   
   /// Emits a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
@@ -342,6 +339,7 @@ public:
                               AbstractStorageDecl *storage,
                               ArrayRef<ProtocolConformanceRef> indexHashables,
                               CanType baseTy,
+                              DeclContext *useDC,
                               bool forPropertyDescriptor);
 
   /// Known functions for bridging.

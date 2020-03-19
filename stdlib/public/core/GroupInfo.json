@@ -70,6 +70,8 @@
     "Sort.swift",
     "Range.swift",
     "ClosedRange.swift",
+    "RangeSet.swift",
+    "RangeSetStorage.swift",
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
     "Sequence.swift",
@@ -96,6 +98,7 @@
         "Filter.swift",
         "Reverse.swift",
         "Slice.swift",
+        "DiscontiguousSlice.swift",
         "DropWhile.swift",
         "PrefixWhile.swift",
         "LazyCollection.swift",
@@ -223,7 +226,8 @@
     "Comparable.swift",
     "Codable.swift",
     "LegacyABI.swift",
-    "MigrationSupport.swift"
+    "MigrationSupport.swift",
+    "PtrAuth.swift"
   ],
   "Result": [
     "Result.swift"

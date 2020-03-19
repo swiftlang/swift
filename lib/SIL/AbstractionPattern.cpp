@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/SIL/TypeLowering.h"
@@ -45,12 +46,13 @@ TypeConverter::getAbstractionPattern(AbstractStorageDecl *decl,
 
 AbstractionPattern
 TypeConverter::getAbstractionPattern(SubscriptDecl *decl, bool isNonObjC) {
+  auto type = decl->getElementInterfaceType()->getCanonicalType();
   CanGenericSignature genericSig;
-  if (auto sig = decl->getGenericSignatureOfContext())
-    genericSig = sig->getCanonicalSignature();
-  return AbstractionPattern(genericSig,
-                            decl->getElementInterfaceType()
-                                ->getCanonicalType());
+  if (auto sig = decl->getGenericSignatureOfContext()) {
+    genericSig = sig.getCanonicalSignature();
+    type = sig->getCanonicalTypeInContext(type);
+  }
+  return AbstractionPattern(genericSig, type);
 }
 
 static const clang::Type *getClangType(const clang::Decl *decl) {
@@ -75,12 +77,14 @@ static Bridgeability getClangDeclBridgeability(const clang::Decl *decl) {
 
 AbstractionPattern
 TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
-  CanGenericSignature genericSig;
-  if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
-    genericSig = sig->getCanonicalSignature();
-
   CanType swiftType = var->getInterfaceType()
                          ->getCanonicalType();
+
+  CanGenericSignature genericSig;
+  if (auto sig = var->getDeclContext()->getGenericSignatureOfContext()) {
+    genericSig = sig.getCanonicalSignature();
+    swiftType = genericSig->getCanonicalTypeInContext(swiftType);
+  }
 
   if (isNonObjC)
     return AbstractionPattern(genericSig, swiftType);
@@ -108,12 +112,15 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
          "Optional.Some does not have a unique abstraction pattern because "
          "optionals are re-abstracted");
 
+  CanType type = decl->getArgumentInterfaceType()->getCanonicalType();
+
   CanGenericSignature genericSig;
-  if (auto sig = decl->getParentEnum()->getGenericSignatureOfContext())
-    genericSig = sig->getCanonicalSignature();
-  return AbstractionPattern(genericSig,
-                            decl->getArgumentInterfaceType()
-                                ->getCanonicalType());
+  if (auto sig = decl->getParentEnum()->getGenericSignatureOfContext()) {
+    genericSig = sig.getCanonicalSignature();
+    type = genericSig->getCanonicalTypeInContext(type);
+  }
+
+  return AbstractionPattern(genericSig, type);
 }
 
 AbstractionPattern::EncodedForeignErrorInfo
@@ -233,14 +240,28 @@ bool AbstractionPattern::requiresClass() const {
 }
 
 LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
+  // TODO: `ArchetypeType::getLayoutConstraint` and
+  // `GenericSignature::getLayoutConstraint` don't always propagate implied
+  // layout constraints from protocol/class constraints. `requiresClass`
+  // is, for the time being, the only one we really care about, though, and
+  // it behaves correctly.
+  if (requiresClass()) {
+    return LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class);
+  }
+  return LayoutConstraint();
+
+#if GET_LAYOUT_CONSTRAINT_WORKED_THE_WAY_I_WANT
   switch (getKind()) {
   case Kind::Opaque:
     return LayoutConstraint();
   case Kind::Type:
   case Kind::Discard: {
     auto type = getType();
-    if (auto archetype = dyn_cast<ArchetypeType>(type))
-      return archetype->getLayoutConstraint();
+    if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+      auto archetypeSig = archetype->getGenericEnvironment()
+                                   ->getGenericSignature();
+      return archetypeSig->getLayoutConstraint(archetype->getInterfaceType());
+    }
     else if (isa<DependentMemberType>(type) ||
              isa<GenericTypeParamType>(type)) {
       assert(GenericSig &&
@@ -252,6 +273,7 @@ LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
   default:
     return LayoutConstraint();
   }
+#endif
 }
 
 bool AbstractionPattern::matchesTuple(CanTupleType substType) {
@@ -274,11 +296,16 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
     return getNumTupleElements_Stored() == substType->getNumElements();
   case Kind::ClangType:
   case Kind::Type:
-  case Kind::Discard:
+  case Kind::Discard: {
     if (isTypeParameter())
       return true;
-    auto tuple = dyn_cast<TupleType>(getType());
-    return (tuple && tuple->getNumElements() == substType->getNumElements());
+    auto type = getType();
+    if (auto tuple = dyn_cast<TupleType>(type))
+      return (tuple->getNumElements() == substType->getNumElements());
+    if (isa<OpaqueTypeArchetypeType>(type))
+      return true;
+    return false;
+  }
   }
   llvm_unreachable("bad kind");
 }
@@ -839,10 +866,7 @@ const {
     CanType memberTy = origMemberInterfaceType
       ? origMemberInterfaceType
       : member->getInterfaceType()->getCanonicalType(sig);
-      
-    return AbstractionPattern(sig ? sig->getCanonicalSignature()
-                                  : CanGenericSignature(),
-                              memberTy);
+    return AbstractionPattern(sig.getCanonicalSignature(), memberTy);
   }
 
   switch (getKind()) {

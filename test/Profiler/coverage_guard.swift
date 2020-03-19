@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_guard %s | %FileCheck %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_guard.foo
 func foo(_ x : Int32) { // CHECK: [[@LINE]]:23 -> [[END:[0-9]+:2]] : 0

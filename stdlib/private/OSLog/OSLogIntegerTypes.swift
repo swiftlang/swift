@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,15 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This file defines extensions for interpolating integer expressions into a
+// This file defines extensions for interpolating integer expressions into an
 // OSLogMesage. It defines `appendInterpolation` functions for standard integer
 // types. It also defines extensions for serializing integer types into the
 // argument buffer passed to os_log ABIs.
 //
-// The `appendInterpolation` functions defined in this file accept formatting
-// and privacy options along with the interpolated expression as shown below:
+// The `appendInterpolation` functions defined in this file accept formatting,
+// privacy and alignment options along with the interpolated expression as
+// shown below:
 //
-//         "\(x, format: .hex, privacy: .private\)"
+//  1.  "\(x, format: .hex, privacy: .private, align: .right\)"
+//  2.  "\(x, format: .hex(minDigits: 10), align: .right(columns: 10)\)"
 
 extension OSLogInterpolation {
 
@@ -26,36 +28,63 @@ extension OSLogInterpolation {
   /// - Parameters:
   ///  - number: the interpolated expression of type Int, which is autoclosured.
   ///  - format: a formatting option available for integer types, defined by the
-  ///    enum `IntFormat`.
+  ///    type`OSLogIntegerFormatting`. The default is .decimal.
+  ///  - align: left or right alignment with the minimum number of columns as
+  ///    defined by the type `OSLogStringAlignment`.
   ///  - privacy: a privacy qualifier which is either private or public.
-  ///    The default is public.
+  ///    It is auto-inferred by default.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
     _ number: @autoclosure @escaping () -> Int,
-    format: IntFormat = .decimal,
-    privacy: Privacy = .public
+    format: OSLogIntegerFormatting = .decimal,
+    align: OSLogStringAlignment = .none,
+    privacy: OSLogPrivacy = .auto
   ) {
-    appendInteger(number, format: format, privacy: privacy)
+    appendInteger(number, format: format, align: align, privacy: privacy)
   }
 
   /// Define interpolation for expressions of type Int32.
   /// - Parameters:
   ///  - number: the interpolated expression of type Int32, which is autoclosured.
   ///  - format: a formatting option available for integer types, defined by the
-  ///    enum `IntFormat`.
+  ///    type `OSLogIntegerFormatting`.
+  ///  - align: left or right alignment with the minimum number of columns as
+  ///    defined by the type `OSLogStringAlignment`.
   ///  - privacy: a privacy qualifier which is either private or public.
-  ///    The default is public.
+  ///    It is auto-inferred by default.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
     _ number: @autoclosure @escaping () -> Int32,
-    format: IntFormat = .decimal,
-    privacy: Privacy = .public
+    format: OSLogIntegerFormatting = .decimal,
+    align: OSLogStringAlignment = .none,
+    privacy: OSLogPrivacy = .auto
   ) {
-    appendInteger(number, format: format, privacy: privacy)
+    appendInteger(number, format: format, align: align, privacy: privacy)
+  }
+
+  /// Define interpolation for expressions of type UInt.
+  /// - Parameters:
+  ///  - number: the interpolated expression of type UInt, which is autoclosured.
+  ///  - format: a formatting option available for integer types, defined by the
+  ///    type `OSLogIntegerFormatting`.
+  ///  - align: left or right alignment with the minimum number of columns as
+  ///    defined by the type `OSLogStringAlignment`.
+  ///  - privacy: a privacy qualifier which is either private or public.
+  ///    It is auto-inferred by default.
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
+  public mutating func appendInterpolation(
+    _ number: @autoclosure @escaping () -> UInt,
+    format: OSLogIntegerFormatting = .decimal,
+    align: OSLogStringAlignment = .none,
+    privacy: OSLogPrivacy = .auto
+  ) {
+    appendInteger(number, format: format, align: align, privacy: privacy)
   }
 
   /// Given an integer, create and append a format specifier for the integer to the
@@ -66,19 +95,26 @@ extension OSLogInterpolation {
   @_optimize(none)
   internal mutating func appendInteger<T>(
     _ number: @escaping () -> T,
-    format: IntFormat,
-    privacy: Privacy
+    format: OSLogIntegerFormatting,
+    align: OSLogStringAlignment,
+    privacy: OSLogPrivacy
   ) where T: FixedWidthInteger {
     guard argumentCount < maxOSLogArgumentCount else { return }
-
-    let isPrivateArgument = isPrivate(privacy)
     formatString +=
-      getIntegerFormatSpecifier(
-        T.self,
-        format,
-        isPrivateArgument)
-    addIntHeaders(isPrivateArgument, sizeForEncoding(T.self))
+      format.formatSpecifier(for: T.self, align: align, privacy: privacy)
+    // If minimum column width is specified, append this value first. Note that the
+    // format specifier would use a '*' for width e.g. %*d.
+    if let minColumns = align.minimumColumnWidth {
+      appendPrecisionArgument(minColumns)
+    }
 
+    // If minimum number of digits (precision) is specified, append the precision before
+    // the argument. Note that the format specifier would use a '*' for precision: %.*d.
+    if let minDigits = format.minDigits {
+      appendPrecisionArgument(minDigits)
+    }
+
+    addIntHeaders(privacy, sizeForEncoding(T.self))
     arguments.append(number)
     argumentCount += 1
   }
@@ -88,9 +124,12 @@ extension OSLogInterpolation {
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
-  internal mutating func addIntHeaders(_ isPrivate: Bool, _ byteCount: Int) {
+  internal mutating func addIntHeaders(
+    _ privacy: OSLogPrivacy,
+    _ byteCount: Int
+  ) {
     // Append argument header.
-    let argumentHeader = getArgumentHeader(isPrivate: isPrivate, type: .scalar)
+    let argumentHeader = getArgumentHeader(privacy: privacy, type: .scalar)
     arguments.append(argumentHeader)
 
     // Append number of bytes needed to serialize the argument.
@@ -101,39 +140,28 @@ extension OSLogInterpolation {
     // two bytes needed for the headers.
     totalBytesForSerializingArguments += byteCount + 2
 
-    preamble = getUpdatedPreamble(isPrivate: isPrivate, isScalar: true)
+    preamble = getUpdatedPreamble(privacy: privacy, isScalar: true)
   }
 
-  /// Construct an os_log format specifier from the given parameters.
-  /// This function must be constant evaluable and all its arguments
-  /// must be known at compile time.
-  @inlinable
+  // Append argument indicating precision or width of a format specifier to the buffer.
+  // These specify the value of the '*' in a format specifier like: %*.*ld.
   @_semantics("constant_evaluable")
-  @_effects(readonly)
+  @inlinable
   @_optimize(none)
-  internal func getIntegerFormatSpecifier<T>(
-    _ integerType: T.Type,
-    _ format: IntFormat,
-    _ isPrivate: Bool
-  ) -> String where T : FixedWidthInteger {
-    var formatSpecifier: String = isPrivate ? "%{private}" : "%{public}"
-
-    // Add a length modifier to the specifier.
-    // TODO: more length modifiers will be added.
-    if (integerType.bitWidth == CLongLong.bitWidth) {
-      formatSpecifier += "ll"
-    }
-
-    // TODO: more format specifiers will be added.
-    switch (format) {
-    case .hex:
-      formatSpecifier += "x"
-    case .octal:
-      formatSpecifier += "o"
-    default:
-      formatSpecifier += integerType.isSigned ? "d" : "u"
-    }
-    return formatSpecifier
+  internal mutating func appendPrecisionArgument(_ count: @escaping () -> Int) {
+    // Note that we don't have to update the preamble here.
+    let argumentHeader = getArgumentHeader(privacy: .auto, type: .count)
+    arguments.append(argumentHeader)
+    // Append number of bytes needed to serialize the argument.
+    let byteCount = sizeForEncoding(CInt.self)
+    arguments.append(UInt8(byteCount))
+    // Increment total byte size by the number of bytes needed for this
+    // argument, which is the sum of the byte size of the argument and
+    // two bytes needed for the headers.
+    totalBytesForSerializingArguments += 2 + byteCount
+    // The count is expected to be a CInt.
+    arguments.append({ CInt(count()) })
+    argumentCount += 1
   }
 }
 
@@ -154,10 +182,11 @@ extension OSLogArguments {
 }
 
 /// Return the number of bytes needed for serializing an integer argument as
-/// specified by os_log. This function must be constant evaluable.
-@_semantics("constant_evaluable")
-@inlinable
-@_optimize(none)
+/// specified by os_log. This function must be constant evaluable. Note that
+/// it is marked transparent instead of @inline(__always) as it is used in
+/// optimize(none) functions.
+@_transparent
+@usableFromInline
 internal func sizeForEncoding<T>(
   _ type: T.Type
 ) -> Int where T : FixedWidthInteger  {

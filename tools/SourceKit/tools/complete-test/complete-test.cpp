@@ -65,6 +65,7 @@ struct TestOptions {
   Optional<unsigned> fuzzyWeight;
   Optional<unsigned> popularityBonus;
   StringRef filterRulesJSON;
+  std::string moduleCachePath;
   bool rawOutput = false;
   bool structureOutput = false;
   ArrayRef<const char *> compilerArgs;
@@ -251,6 +252,8 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
         return false;
       }
       options.showTopNonLiteral = uval;
+    } else if (opt == "module-cache-path") {
+      options.moduleCachePath = value.str();
     }
   }
 
@@ -400,7 +403,7 @@ removeCodeCompletionTokens(StringRef Input, StringRef TokenName,
     StringRef next = StringRef(fullMatch).split(',').second;
     while (next != "") {
       auto split = next.split(',');
-      prefixes.push_back(split.first);
+      prefixes.push_back(split.first.str());
       next = split.second;
     }
   }
@@ -673,6 +676,10 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
       sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND,"-sdk");
       sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, sdk);
     }
+    if (!options.moduleCachePath.empty()) {
+      sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, "-module-cache-path");
+      sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, options.moduleCachePath.c_str());
+    }
     // Add -- options.
     for (const char *arg : options.compilerArgs)
       sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, arg);
@@ -688,7 +695,7 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
 
 static bool readPopularAPIList(StringRef filename,
                                std::vector<std::string> &result) {
-  std::ifstream in(filename);
+  std::ifstream in(filename.str());
   if (!in.is_open()) {
     llvm::errs() << "error opening '" << filename << "'\n";
     return true;

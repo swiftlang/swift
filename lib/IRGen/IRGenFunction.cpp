@@ -20,6 +20,7 @@
 #include "swift/IRGen/Linking.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Explosion.h"
@@ -32,7 +33,7 @@ using namespace swift;
 using namespace irgen;
 
 static llvm::cl::opt<bool> EnableTrapDebugInfo(
-    "enable-trap-debug-info", llvm::cl::Hidden,
+    "enable-trap-debug-info", llvm::cl::init(true), llvm::cl::Hidden,
     llvm::cl::desc("Generate failure-message functions in the debug info"));
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
@@ -102,7 +103,8 @@ void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
 
 void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
                                llvm::Value *size, Alignment align) {
-  Builder.CreateMemCpy(dest, align.getValue(), src, align.getValue(), size);
+  Builder.CreateMemCpy(dest, llvm::MaybeAlign(align.getValue()), src,
+                       llvm::MaybeAlign(align.getValue()), size);
 }
 
 void IRGenFunction::emitMemCpy(Address dest, Address src, Size size) {
@@ -456,7 +458,7 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
 
   // Emit the trap instruction.
   llvm::Function *trapIntrinsic =
-      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
+      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::trap);
   if (EnableTrapDebugInfo && IGM.DebugInfo && !failureMsg.empty()) {
     IGM.DebugInfo->addFailureMessageToCurrentLoc(*this, failureMsg);
   }

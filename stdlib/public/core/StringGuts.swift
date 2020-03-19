@@ -120,8 +120,10 @@ extension _StringGuts {
 
   internal var hasSharedStorage: Bool { return _object.hasSharedStorage }
 
+  // Whether this string has breadcrumbs
   internal var hasBreadcrumbs: Bool {
-    return hasNativeStorage || hasSharedStorage
+    return hasSharedStorage
+      || (hasNativeStorage && _object.nativeStorage.hasBreadcrumbs)
   }
 }
 
@@ -178,7 +180,7 @@ extension _StringGuts {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    #if arch(i386) || arch(arm)
+    #if arch(i386) || arch(arm) || arch(wasm32)
     _internalInvariant(MemoryLayout<String>.size == 12, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
@@ -323,10 +325,10 @@ extension _StringGuts {
 public // SPI(corelibs-foundation)
 func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let s = p else { return nil }
-  let count = Int(_swift_stdlib_strlen(s))
-  var result = [CChar](repeating: 0, count: count + 1)
-  for i in 0..<count {
-    result[i] = s[i]
+  let bytesToCopy = UTF8._nullCodeUnitOffset(in: s) + 1 // +1 for the terminating NUL
+  let result = [CChar](unsafeUninitializedCapacity: bytesToCopy) { buf, initedCount in
+    buf.baseAddress!.assign(from: s, count: bytesToCopy)
+    initedCount = bytesToCopy
   }
   return result
 }

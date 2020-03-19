@@ -144,10 +144,10 @@ namespace {
           }
         }
 
-        // If the closure has a single expression body, we need to walk into it
-        // with a new sequence.  Otherwise, it'll have been separately
-        // type-checked.
-        if (CE->hasSingleExpressionBody())
+        // If the closure has a single expression body or has had a function
+        // builder applied to it, we need to walk into it with a new sequence.
+        // Otherwise, it'll have been separately type-checked.
+        if (CE->hasSingleExpressionBody() || CE->hasAppliedFunctionBuilder())
           CE->getBody()->walk(ContextualizeClosures(CE));
 
         TypeChecker::computeCaptures(CE);
@@ -198,7 +198,7 @@ namespace {
       ASTContext &ctx = Function.getAsDeclContext()->getASTContext();
       auto *AFD = Function.getAbstractFunctionDecl();
 
-      if (ctx.TypeCheckerOpts.WarnLongFunctionBodies) {
+      if (ctx.TypeCheckerOpts.DebugTimeFunctionBodies) {
         // Round up to the nearest 100th of a millisecond.
         llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100) << "ms\t";
         Function.getLoc().print(llvm::errs(), ctx.SourceMgr);
@@ -213,7 +213,7 @@ namespace {
         llvm::errs() << "\n";
       }
 
-      const auto WarnLimit = ctx.TypeCheckerOpts.DebugTimeFunctionBodies;
+      const auto WarnLimit = ctx.TypeCheckerOpts.WarnLongFunctionBodies;
       if (WarnLimit != 0 && elapsedMS >= WarnLimit) {
         if (AFD) {
           ctx.Diags.diagnose(AFD, diag::debug_long_function_body,
@@ -408,7 +408,8 @@ public:
   
   template<typename StmtTy>
   bool typeCheckStmt(StmtTy *&S) {
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "typecheck-stmt", S);
+    FrontendStatsTracer StatsTracer(getASTContext().Stats,
+                                    "typecheck-stmt", S);
     PrettyStackTraceStmt trace(getASTContext(), "type-checking", S);
     StmtTy *S2 = cast_or_null<StmtTy>(visit(S));
     if (S2 == nullptr)
@@ -517,23 +518,6 @@ public:
     
     TypeCheckExprOptions options = {};
     
-    // If the result type is an opaque type, this is an opportunity to resolve
-    // the underlying type.
-    auto isOpaqueReturnTypeOfCurrentFunc = [&](OpaqueTypeDecl *opaque) -> bool {
-      // Closures currently don't support having opaque types.
-      auto funcDecl = TheFunc->getAbstractFunctionDecl();
-      if (!funcDecl)
-        return false;
-
-      return opaque->isOpaqueReturnTypeOfFunction(funcDecl);
-    };
-    
-    if (auto opaque = ResultTy->getAs<OpaqueTypeArchetypeType>()) {
-      if (isOpaqueReturnTypeOfCurrentFunc(opaque->getDecl())) {
-        options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
-      }
-    }
-
     if (EndTypeCheckLoc.isValid()) {
       assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
              "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
@@ -627,13 +611,6 @@ public:
   }
   
   Stmt *visitThrowStmt(ThrowStmt *TS) {
-    // If the throw is in a defer, then it isn't valid.
-    if (isInDefer()) {
-      getASTContext().Diags.diagnose(TS->getThrowLoc(),
-                                     diag::jump_out_of_defer, "throw");
-      return nullptr;
-    }
-
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
@@ -1058,40 +1035,6 @@ public:
     std::swap(*prevCaseDecls, *nextCaseDecls);
   }
 
-  void checkUnknownAttrRestrictions(CaseStmt *caseBlock,
-                                    bool &limitExhaustivityChecks) {
-    if (caseBlock->getCaseLabelItems().size() != 1) {
-      assert(!caseBlock->getCaseLabelItems().empty() &&
-             "parser should not produce case blocks with no items");
-      getASTContext().Diags.diagnose(caseBlock->getLoc(),
-                                     diag::unknown_case_multiple_patterns)
-          .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
-      limitExhaustivityChecks = true;
-    }
-
-    if (FallthroughDest != nullptr) {
-      if (!caseBlock->isDefault())
-        getASTContext().Diags.diagnose(caseBlock->getLoc(),
-                                       diag::unknown_case_must_be_last);
-      limitExhaustivityChecks = true;
-    }
-
-    const auto &labelItem = caseBlock->getCaseLabelItems().front();
-    if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
-      getASTContext().Diags.diagnose(labelItem.getStartLoc(),
-                                     diag::unknown_case_where_clause)
-          .highlight(labelItem.getGuardExpr()->getSourceRange());
-    }
-
-    const Pattern *pattern =
-        labelItem.getPattern()->getSemanticsProvidingPattern();
-    if (!isa<AnyPattern>(pattern)) {
-      getASTContext().Diags.diagnose(labelItem.getStartLoc(),
-                                     diag::unknown_case_must_be_catchall)
-          .highlight(pattern->getSourceRange());
-    }
-  }
-
   void checkFallthroughPatternBindingsAndTypes(CaseStmt *caseBlock,
                                                CaseStmt *previousBlock) {
     auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
@@ -1259,7 +1202,9 @@ public:
 
       // Check restrictions on '@unknown'.
       if (caseBlock->hasUnknownAttr()) {
-        checkUnknownAttrRestrictions(caseBlock, limitExhaustivityChecks);
+        checkUnknownAttrRestrictions(
+            getASTContext(), caseBlock, FallthroughDest,
+            limitExhaustivityChecks);
       }
 
       // If the previous case fellthrough, similarly check that that case's
@@ -1390,14 +1335,8 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
     case ExprKind::StringLiteral: return "string";
     case ExprKind::InterpolatedStringLiteral: return "string";
     case ExprKind::MagicIdentifierLiteral:
-      switch (cast<MagicIdentifierLiteralExpr>(LE)->getKind()) {
-      case MagicIdentifierLiteralExpr::Kind::File: return "#file";
-      case MagicIdentifierLiteralExpr::Kind::FilePath: return "#filePath";
-      case MagicIdentifierLiteralExpr::Kind::Line: return "#line";
-      case MagicIdentifierLiteralExpr::Kind::Column: return "#column";
-      case MagicIdentifierLiteralExpr::Kind::Function: return "#function";
-      case MagicIdentifierLiteralExpr::Kind::DSOHandle: return "#dsohandle";
-      }
+      return MagicIdentifierLiteralExpr::getKindString(
+          cast<MagicIdentifierLiteralExpr>(LE)->getKind());
     case ExprKind::NilLiteral: return "nil";
     case ExprKind::ObjectLiteral: return "object";
 
@@ -1496,8 +1435,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         isa<DotSyntaxCallExpr>(E) ? cast<DotSyntaxCallExpr>(E)->getFn() : E;
 
     if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
-      if (auto *declRef = dyn_cast<DeclRefExpr>(Fn->getFn())) {
-        if (auto *FD = dyn_cast<AbstractFunctionDecl>(declRef->getDecl())) {
+      if (auto *calledValue = Fn->getCalledValue()) {
+        if (auto *FD = dyn_cast<AbstractFunctionDecl>(calledValue)) {
           if (FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
             isDiscardable = true;
           }
@@ -1962,15 +1901,6 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
                                             SourceLoc endTypeCheckLoc) const {
   ASTContext &ctx = AFD->getASTContext();
 
-  // Accounting for type checking of function bodies.
-  // FIXME: We could probably take this away, given that the request-evaluator
-  // does much of it for us.
-  FrontendStatsTracer StatsTracer(ctx.Stats, "typecheck-fn", AFD);
-  PrettyStackTraceDecl StackEntry("type-checking", AFD);
-
-  if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumFunctionsTypechecked++;
-
   Optional<FunctionBodyTimer> timer;
   const auto &tyOpts = ctx.TypeCheckerOpts;
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
@@ -1980,12 +1910,17 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (!body || AFD->isBodyTypeChecked())
     return false;
 
+  bool alreadyTypeChecked = false;
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
     if (Type builderType = getFunctionBuilderType(func)) {
-      body = TypeChecker::applyFunctionBuilderBodyTransform(func, body,
-                                                            builderType);
-      if (!body)
-        return true;
+      if (auto optBody =
+            TypeChecker::applyFunctionBuilderBodyTransform(func, builderType)) {
+        if (!*optBody)
+          return true;
+
+        body = *optBody;
+        alreadyTypeChecked = true;
+      }
     } else if (func->hasSingleExpressionBody() &&
                func->getResultInterfaceType()->isVoid()) {
       // The function returns void.  We don't need an explicit return, no matter
@@ -2013,9 +1948,13 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (ctx.LangOpts.EnableASTScopeLookup)
     ASTScope::expandFunctionBody(AFD);
 
-  StmtChecker SC(AFD);
-  SC.EndTypeCheckLoc = endTypeCheckLoc;
-  bool hadError = SC.typeCheckBody(body);
+  // Type check the function body if needed.
+  bool hadError = false;
+  if (!alreadyTypeChecked) {
+    StmtChecker SC(AFD);
+    SC.EndTypeCheckLoc = endTypeCheckLoc;
+    hadError = SC.typeCheckBody(body);
+  }
 
   // If this was a function with a single expression body, let's see
   // if implicit return statement came out to be `Never` which means
@@ -2094,4 +2033,93 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   TLCD->setBody(Body);
   checkTopLevelErrorHandling(TLCD);
   performTopLevelDeclDiagnostics(TLCD);
+}
+
+void swift::checkUnknownAttrRestrictions(
+    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
+    bool &limitExhaustivityChecks) {
+  if (caseBlock->getCaseLabelItems().size() != 1) {
+    assert(!caseBlock->getCaseLabelItems().empty() &&
+           "parser should not produce case blocks with no items");
+    ctx.Diags.diagnose(caseBlock->getLoc(),
+                       diag::unknown_case_multiple_patterns)
+        .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
+    limitExhaustivityChecks = true;
+  }
+
+  if (fallthroughDest != nullptr) {
+    if (!caseBlock->isDefault())
+      ctx.Diags.diagnose(caseBlock->getLoc(),
+                         diag::unknown_case_must_be_last);
+    limitExhaustivityChecks = true;
+  }
+
+  const auto &labelItem = caseBlock->getCaseLabelItems().front();
+  if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
+    ctx.Diags.diagnose(labelItem.getStartLoc(),
+                                   diag::unknown_case_where_clause)
+        .highlight(labelItem.getGuardExpr()->getSourceRange());
+  }
+
+  const Pattern *pattern =
+      labelItem.getPattern()->getSemanticsProvidingPattern();
+  if (!isa<AnyPattern>(pattern)) {
+    ctx.Diags.diagnose(labelItem.getStartLoc(),
+                       diag::unknown_case_must_be_catchall)
+        .highlight(pattern->getSourceRange());
+  }
+}
+
+void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
+  llvm::SmallDenseMap<Identifier, std::pair<VarDecl *, bool>, 4> latestVars;
+  auto recordVar = [&](VarDecl *var) {
+    if (!var->hasName())
+      return;
+
+    // If there is an existing variable with this name, set it as the
+    // parent of this new variable.
+    auto &entry = latestVars[var->getName()];
+    if (entry.first) {
+      assert(!var->getParentVarDecl() ||
+             var->getParentVarDecl() == entry.first);
+      var->setParentVarDecl(entry.first);
+
+      // Check for a mutability mismatch.
+      if (entry.second != var->isLet()) {
+        // Find the original declaration.
+        auto initialCaseVarDecl = entry.first;
+        while (auto parentVar = initialCaseVarDecl->getParentVarDecl())
+          initialCaseVarDecl = parentVar;
+
+        auto diag = var->diagnose(diag::mutability_mismatch_multiple_pattern_list,
+                                  var->isLet(), initialCaseVarDecl->isLet());
+
+        VarPattern *foundVP = nullptr;
+        var->getParentPattern()->forEachNode([&](Pattern *P) {
+          if (auto *VP = dyn_cast<VarPattern>(P))
+            if (VP->getSingleVar() == var)
+              foundVP = VP;
+        });
+        if (foundVP)
+          diag.fixItReplace(foundVP->getLoc(),
+                            initialCaseVarDecl->isLet() ? "let" : "var");
+      }
+    } else {
+      entry.second = var->isLet();
+    }
+
+    // Record this variable as the latest with this name.
+    entry.first = var;
+  };
+
+  // Wire up the parent var decls for each variable that occurs within
+  // the patterns of each case item. in source order.
+  for (const auto &caseItem : caseStmt->getCaseLabelItems()) {
+    caseItem.getPattern()->forEachVariable(recordVar);
+  }
+
+  // Wire up the case body variables to the latest patterns.
+  for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    recordVar(bodyVar);
+  }
 }

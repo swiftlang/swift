@@ -76,6 +76,10 @@ public:
     CodeCompletionOffset = Offset;
   }
 
+  bool hasCodeCompletionBuffer() const {
+    return CodeCompletionBufferID != 0U;
+  }
+
   unsigned getCodeCompletionBufferID() const {
     return CodeCompletionBufferID;
   }
@@ -243,11 +247,16 @@ public:
   llvm::Optional<unsigned> resolveOffsetForEndOfLine(unsigned BufferId,
                                                      unsigned Line) const;
 
+  /// Get the length of the line
+  llvm::Optional<unsigned> getLineLength(unsigned BufferId, unsigned Line) const;
+
   SourceLoc getLocForLineCol(unsigned BufferId, unsigned Line, unsigned Col) const {
     auto Offset = resolveFromLineCol(BufferId, Line, Col);
     return Offset.hasValue() ? getLocForOffset(BufferId, Offset.getValue()) :
                                SourceLoc();
   }
+
+  std::string getLineString(unsigned BufferID, unsigned LineNumber);
 
   SourceLoc getLocFromExternalSource(StringRef Path, unsigned Line, unsigned Col);
 private:

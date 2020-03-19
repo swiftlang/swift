@@ -417,10 +417,8 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
       auto *gp = cast<GenericTypeParamType>(type);
       if (gp->getDepth() < superclassDepth)
         return Type(gp).subst(subMap);
-      return CanGenericTypeParamType::get(
-        gp->getDepth() - superclassDepth + depth,
-          gp->getIndex(),
-          ctx);
+      return genericParams->getParams()[gp->getIndex()]
+                 ->getDeclaredInterfaceType();
     };
 
     auto lookupConformanceFn =
@@ -806,23 +804,35 @@ llvm::Expected<bool> AreAllStoredPropertiesDefaultInitableRequest::evaluate(
     // synthesize an initial value (e.g. for an optional) then we suppress
     // generation of the default initializer.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
-      if (pbd->hasStorage() && !pbd->isStatic()) {
-        for (auto idx : range(pbd->getNumPatternEntries())) {
-          if (pbd->isInitialized(idx)) continue;
+      // Static variables are irrelevant.
+      if (pbd->isStatic()) {
+        continue;
+      }
 
+      for (auto idx : range(pbd->getNumPatternEntries())) {
+        bool HasStorage = false;
+        bool CheckDefaultInitializer = true;
+        pbd->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
           // If one of the bound variables is @NSManaged, go ahead no matter
           // what.
-          bool CheckDefaultInitializer = true;
-          pbd->getPattern(idx)->forEachVariable([&](VarDecl *vd) {
-            if (vd->getAttrs().hasAttribute<NSManagedAttr>())
-              CheckDefaultInitializer = false;
-          });
-        
-          // If we cannot default initialize the property, we cannot
-          // synthesize a default initializer for the class.
-          if (CheckDefaultInitializer && !pbd->isDefaultInitializable())
-            return false;
-        }
+          if (VD->getAttrs().hasAttribute<NSManagedAttr>())
+            CheckDefaultInitializer = false;
+
+          if (VD->hasStorage())
+            HasStorage = true;
+          auto *backing = VD->getPropertyWrapperBackingProperty();
+          if (backing && backing->hasStorage())
+            HasStorage = true;
+        });
+
+        if (!HasStorage) continue;
+
+        if (pbd->isInitialized(idx)) continue;
+
+        // If we cannot default initialize the property, we cannot
+        // synthesize a default initializer for the class.
+        if (CheckDefaultInitializer && !pbd->isDefaultInitializable())
+          return false;
       }
     }
   }
@@ -1082,8 +1092,11 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   // FIXME: This entire request is a layering violation made of smaller,
   // finickier layering violations. See rdar://56844567
 
-  auto &Context = target->getASTContext();
-  auto tryToInstallCodingKeys = [&](ProtocolDecl *protocol) {
+  // Checks whether the target conforms to the given protocol. If the
+  // conformance is incomplete, force the conformance.
+  //
+  // Returns whether the target conforms to the protocol.
+  auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
     if (!protocol)
       return false;
 
@@ -1106,6 +1119,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     return true;
   };
 
+  auto &Context = target->getASTContext();
   switch (action) {
   case ImplicitMemberAction::ResolveImplicitInit:
     TypeChecker::addImplicitConstructors(target);
@@ -1123,9 +1137,28 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     // synthesized, it will be synthesized.
     auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
     auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-    if (!tryToInstallCodingKeys(decodableProto)) {
-      (void)tryToInstallCodingKeys(encodableProto);
+    if (!evaluateTargetConformanceTo(decodableProto)) {
+      (void)evaluateTargetConformanceTo(encodableProto);
     }
+  }
+    break;
+  case ImplicitMemberAction::ResolveEncodable: {
+    // encode(to:) may be synthesized as part of derived conformance to the
+    // Encodable protocol.
+    // If the target should conform to the Encodable protocol, check the
+    // conformance here to attempt synthesis.
+    auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
+    (void)evaluateTargetConformanceTo(encodableProto);
+  }
+    break;
+  case ImplicitMemberAction::ResolveDecodable: {
+    // init(from:) may be synthesized as part of derived conformance to the
+    // Decodable protocol.
+    // If the target should conform to the Decodable protocol, check the
+    // conformance here to attempt synthesis.
+    TypeChecker::addImplicitConstructors(target);
+    auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
+    (void)evaluateTargetConformanceTo(decodableProto);
   }
     break;
   }
@@ -1213,7 +1246,8 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
-  FrontendStatsTracer StatsTracer(ctx.Stats, "define-default-ctor", decl);
+  FrontendStatsTracer StatsTracer(ctx.Stats,
+                                  "define-default-ctor", decl);
   PrettyStackTraceDecl stackTrace("defining default constructor for",
                                   decl);
 

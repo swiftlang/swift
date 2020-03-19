@@ -46,6 +46,7 @@
 #include "GenFunc.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -165,6 +166,8 @@ namespace {
 
     ClassMetadataOptions Options;
 
+    Size HeaderSize;
+
   public:
     ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
                        ReferenceCounting refcounting,
@@ -178,11 +181,13 @@ namespace {
       case ReferenceCounting::Native:
         // For native classes, place a full object header.
         addHeapHeader();
+        HeaderSize = CurSize;
         break;
       case ReferenceCounting::ObjC:
         // For ObjC-inheriting classes, we don't reliably know the size of the
         // base class, but NSObject only has an `isa` pointer at most.
         addNSObjectHeader();
+        HeaderSize = CurSize;
         break;
       case ReferenceCounting::Block:
       case ReferenceCounting::Unknown:
@@ -222,7 +227,7 @@ namespace {
       auto allElements = IGM.Context.AllocateCopy(Elements);
 
       return ClassLayout(*this, Options, classTy,
-                         allStoredProps, allFieldAccesses, allElements);
+                         allStoredProps, allFieldAccesses, allElements, HeaderSize);
     }
 
   private:
@@ -1229,9 +1234,9 @@ namespace {
       //   const class_t *theClass;
       fields.add(getClassMetadataRef());
       //   const method_list_t *instanceMethods;
-      fields.add(buildInstanceMethodList());
+      emitAndAddMethodList(fields, MethodListKind::InstanceMethods);
       //   const method_list_t *classMethods;
-      fields.add(buildClassMethodList());
+      emitAndAddMethodList(fields, MethodListKind::ClassMethods);
       //   const protocol_list_t *baseProtocols;
       fields.add(buildProtocolList());
       //   const property_list_t *properties;
@@ -1264,13 +1269,13 @@ namespace {
       //   const protocol_list_t *baseProtocols;
       fields.add(buildProtocolList());
       //   const method_list_t *requiredInstanceMethods;
-      fields.add(buildInstanceMethodList());
+      emitAndAddMethodList(fields, MethodListKind::InstanceMethods);
       //   const method_list_t *requiredClassMethods;
-      fields.add(buildClassMethodList());
+      emitAndAddMethodList(fields, MethodListKind::ClassMethods);
       //   const method_list_t *optionalInstanceMethods;
-      fields.add(buildOptInstanceMethodList());
+      emitAndAddMethodList(fields, MethodListKind::OptionalInstanceMethods);
       //   const method_list_t *optionalClassMethods;
-      fields.add(buildOptClassMethodList());
+      emitAndAddMethodList(fields, MethodListKind::OptionalClassMethods);
       //   const property_list_t *properties;
       fields.add(buildPropertyList(ForClass));
 
@@ -1348,7 +1353,8 @@ namespace {
       b.add(buildName());
 
       //   const method_list_t *baseMethods;
-      b.add(forMeta ? buildClassMethodList() : buildInstanceMethodList());
+      emitAndAddMethodList(b, forMeta ? MethodListKind::ClassMethods
+                                      : MethodListKind::InstanceMethods);
 
       //   const protocol_list_t *baseProtocols;
       // Apparently, this list is the same in the class and the metaclass.
@@ -1372,9 +1378,12 @@ namespace {
       if (hasUpdater) {
         //   Class _Nullable (*metadataUpdateCallback)(Class _Nonnull cls,
         //                                             void * _Nullable arg);
-        b.add(IGM.getAddrOfObjCMetadataUpdateFunction(
+        auto *impl = IGM.getAddrOfObjCMetadataUpdateFunction(
                 TheEntity.get<ClassDecl *>(),
-                NotForDefinition));
+                NotForDefinition);
+        const auto &schema =
+          IGM.getOptions().PointerAuth.ObjCMethodListFunctionPointers;
+        b.addSignedPointer(impl, schema, PointerAuthEntity());
       }
 
       // };
@@ -1512,27 +1521,33 @@ namespace {
     }
 
     void buildMethod(ConstantArrayBuilder &descriptors,
-                     MethodDescriptor descriptor) {
+                     MethodDescriptor descriptor,
+                     llvm::StringSet<> &uniqueSelectors) {
       switch (descriptor.getKind()) {
       case MethodDescriptor::Kind::Method:
-        return buildMethod(descriptors, descriptor.getMethod());
+        return buildMethod(descriptors, descriptor.getMethod(),
+                           uniqueSelectors);
       case MethodDescriptor::Kind::IVarInitializer:
         emitObjCIVarInitDestroyDescriptor(IGM, descriptors, getClass(),
-                                          descriptor.getImpl(), false);
+                                          descriptor.getImpl(), false,
+                                          uniqueSelectors);
         return;
       case MethodDescriptor::Kind::IVarDestroyer:
         emitObjCIVarInitDestroyDescriptor(IGM, descriptors, getClass(),
-                                          descriptor.getImpl(), true);
+                                          descriptor.getImpl(), true,
+                                          uniqueSelectors);
         return;
       }
       llvm_unreachable("bad method descriptor kind");
     }
 
     void buildMethod(ConstantArrayBuilder &descriptors,
-                     AbstractFunctionDecl *method) {
+                     AbstractFunctionDecl *method,
+                     llvm::StringSet<> &uniqueSelectors) {
       auto accessor = dyn_cast<AccessorDecl>(method);
       if (!accessor)
-        return emitObjCMethodDescriptor(IGM, descriptors, method);
+        return emitObjCMethodDescriptor(IGM, descriptors, method,
+                                        uniqueSelectors);
 
       switch (accessor->getAccessorKind()) {
       case AccessorKind::Get:
@@ -1566,28 +1581,45 @@ namespace {
       llvm_unreachable("not a class, category, or protocol?!");
     }
     
-    llvm::Constant *buildClassMethodList() {
-      return buildMethodList(ClassMethods,
-                             chooseNamePrefix("_CLASS_METHODS_",
-                                              "_CATEGORY_CLASS_METHODS_",
-                                              "_PROTOCOL_CLASS_METHODS_"));
-    }
 
-    llvm::Constant *buildInstanceMethodList() {
-      return buildMethodList(InstanceMethods,
-                             chooseNamePrefix("_INSTANCE_METHODS_",
-                                              "_CATEGORY_INSTANCE_METHODS_",
-                                              "_PROTOCOL_INSTANCE_METHODS_"));
-    }
+    enum class MethodListKind : uint8_t {
+      ClassMethods,
+      InstanceMethods,
+      OptionalClassMethods,
+      OptionalInstanceMethods
+    };
 
-    llvm::Constant *buildOptClassMethodList() {
-      return buildMethodList(OptClassMethods,
-                             "_PROTOCOL_CLASS_METHODS_OPT_");
-    }
-
-    llvm::Constant *buildOptInstanceMethodList() {
-      return buildMethodList(OptInstanceMethods,
-                             "_PROTOCOL_INSTANCE_METHODS_OPT_");
+    /// Emit the method list and add the pointer to the `builder`.
+    void emitAndAddMethodList(ConstantInitBuilder::StructBuilder &builder,
+                              MethodListKind kind) {
+      ArrayRef<MethodDescriptor> methods;
+      StringRef namePrefix;
+      switch (kind) {
+      case MethodListKind::ClassMethods:
+        methods = ClassMethods;
+        namePrefix = chooseNamePrefix("_CLASS_METHODS_",
+                                      "_CATEGORY_CLASS_METHODS_",
+                                      "_PROTOCOL_CLASS_METHODS_");
+        break;
+      case MethodListKind::InstanceMethods:
+        methods = InstanceMethods;
+        namePrefix = chooseNamePrefix("_INSTANCE_METHODS_",
+                                      "_CATEGORY_INSTANCE_METHODS_",
+                                      "_PROTOCOL_INSTANCE_METHODS_");
+        break;
+      case MethodListKind::OptionalClassMethods:
+        methods = OptClassMethods;
+        namePrefix = "_PROTOCOL_CLASS_METHODS_OPT_";
+        break;
+      case MethodListKind::OptionalInstanceMethods:
+        methods = OptInstanceMethods;
+        namePrefix = "_PROTOCOL_INSTANCE_METHODS_OPT_";
+        break;
+      }
+      llvm::StringSet<> uniqueSelectors;
+      llvm::Constant *methodListPtr =
+          buildMethodList(methods, namePrefix, uniqueSelectors);
+      builder.add(methodListPtr);
     }
 
     llvm::Constant *buildOptExtendedMethodTypes() {
@@ -1629,11 +1661,12 @@ namespace {
     ///
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildMethodList(ArrayRef<MethodDescriptor> methods,
-                                    StringRef name) {
+                                    StringRef name,
+                                    llvm::StringSet<> &uniqueSelectors) {
       return buildOptionalList(methods, 3 * IGM.getPointerSize(), name,
                                [&](ConstantArrayBuilder &descriptors,
                                    MethodDescriptor descriptor) {
-        buildMethod(descriptors, descriptor);
+        buildMethod(descriptors, descriptor, uniqueSelectors);
       });
     }
 
@@ -2327,7 +2360,10 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
 
     // If the Objective-C runtime is new enough, we can just use the update
     // pattern unconditionally.
-    if (Context.LangOpts.doesTargetSupportObjCMetadataUpdateCallback())
+    auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(Context);
+    if (deploymentAvailability.isContainedIn(
+          Context.getObjCMetadataUpdateCallbackAvailability()))
       return ClassMetadataStrategy::Update;
 
     // Otherwise, check if we have legacy type info for backward deployment.
@@ -2418,7 +2454,11 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                       IGF.IGM.getPointerAlignment());
   auto fnPtr = IGF.emitInvariantLoad(slot);
 
-  return FunctionPointer(fnPtr, signature);
+  auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
+  auto authInfo =
+    PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
+
+  return FunctionPointer(fnPtr, authInfo, signature);
 }
 
 FunctionPointer

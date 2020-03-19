@@ -277,6 +277,7 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
   TypeCheckerOptions tyckOpts;
   LangOptions langOpts;
   langOpts.BuildSyntaxTree = true;
+  langOpts.ParseForSyntaxTreeOnly = true;
   langOpts.CollectParsedToken = false;
   // Disable name lookups during parsing.
   // Not ready yet:
@@ -289,11 +290,9 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
   ParserUnit PU(SM, SourceFileKind::Main, bufID, langOpts, tyckOpts,
                 "syntax_parse_module", std::move(parseActions),
                 /*SyntaxCache=*/nullptr);
-  // Evaluating pound conditions may lead to unknown syntax.
-  PU.getParser().State->PerformConditionEvaluation = false;
   std::unique_ptr<SynParserDiagConsumer> pConsumer;
   if (DiagHandler) {
-    pConsumer = llvm::make_unique<SynParserDiagConsumer>(*this, bufID);
+    pConsumer = std::make_unique<SynParserDiagConsumer>(*this, bufID);
     PU.getDiagnosticEngine().addConsumer(*pConsumer);
   }
   return PU.parse();

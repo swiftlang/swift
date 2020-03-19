@@ -44,6 +44,11 @@ llvm::cl::opt<bool>
     EnableSILAggressiveInlining("sil-aggressive-inline", llvm::cl::init(false),
                                llvm::cl::desc("Enable aggressive inlining"));
 
+llvm::cl::opt<bool> EnableVerifyAfterInlining(
+    "sil-inline-verify-after-inline", llvm::cl::init(false),
+    llvm::cl::desc("Run sil verification after inlining all found callee apply "
+                   "sites into a caller."));
+
 //===----------------------------------------------------------------------===//
 //                           Performance Inliner
 //===----------------------------------------------------------------------===//
@@ -494,7 +499,7 @@ bool SILPerformanceInliner::isProfitableToInline(
 
   // This is the final inlining decision.
   if (CalleeCost > Benefit) {
-    ORE.emit([&]() {
+    OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
       using namespace OptRemark;
       return RemarkMissed("NoInlinedCost", *AI.getInstruction())
              << "Not profitable to inline function " << NV("Callee", Callee)
@@ -514,7 +519,7 @@ bool SILPerformanceInliner::isProfitableToInline(
                           << ", bb=" << Callee->size()
                           << ", c-bb=" << NumCallerBlocks
                           << "} " << Callee->getName() << '\n');
-  ORE.emit([&]() {
+  OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
     using namespace OptRemark;
     return RemarkPassed("Inlined", *AI.getInstruction())
            << NV("Callee", Callee) << " inlined into "
@@ -524,6 +529,15 @@ bool SILPerformanceInliner::isProfitableToInline(
   });
 
   return true;
+}
+
+static bool returnsClosure(SILFunction *F) {
+  for (SILBasicBlock &BB : *F) {
+    if (auto *RI = dyn_cast<ReturnInst>(BB.getTerminator())) {
+      return isa<PartialApplyInst>(RI->getOperand());
+    }
+  }
+  return false;
 }
 
 /// Checks if a given generic apply should be inlined unconditionally, i.e.
@@ -569,6 +583,13 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
     // not true.
     return None;
   }
+
+  // The returned partial_apply of a thunk is most likely being optimized away
+  // if inlined. Because some thunks cannot be specialized (e.g. if an opened
+  // existential is in the subsitution list), we inline such thunks also in case
+  // they are generic.
+  if (Callee->isThunk() && returnsClosure(Callee))
+    return true;
 
   // All other generic functions should not be inlined if this kind of inlining
   // is disabled.
@@ -888,7 +909,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // remains valid.
   SmallVector<FullApplySite, 8> AppliesToInline;
   collectAppliesToInline(Caller, AppliesToInline);
-  bool needUpdateStackNesting = false;
+  bool invalidatedStackNesting = false;
 
   if (AppliesToInline.empty())
     return false;
@@ -903,11 +924,9 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     }
 
     // If we have a callee that doesn't have ownership, but the caller does have
-    // ownership... do not inline. The two modes are incompatible. Today this
-    // should only happen with transparent functions.
+    // ownership... do not inline. The two modes are incompatible, so skip this
+    // apply site for now.
     if (!Callee->hasOwnership() && Caller->hasOwnership()) {
-      assert(Caller->isTransparent() &&
-             "Should only happen with transparent functions");
       continue;
     }
 
@@ -918,7 +937,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
 
     // Note that this must happen before inlining as the apply instruction
     // will be deleted after inlining.
-    needUpdateStackNesting |= SILInliner::needsUpdateStackNesting(AI);
+    invalidatedStackNesting |= SILInliner::invalidatesStackNesting(AI);
 
     // We've already determined we should be able to inline this, so
     // unconditionally inline the function.
@@ -933,8 +952,15 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // reestablish a canonical CFG.
   mergeBasicBlocks(Caller);
 
-  if (needUpdateStackNesting) {
+  if (invalidatedStackNesting) {
     StackNesting().correctStackNesting(Caller);
+  }
+
+  // If we were asked to verify our caller after inlining all callees we could
+  // find into it, do so now. This makes it easier to catch verification bugs in
+  // the inliner without running the entire inliner.
+  if (EnableVerifyAfterInlining) {
+    Caller->verify();
   }
 
   return true;
@@ -1010,6 +1036,11 @@ public:
 
 };
 } // end anonymous namespace
+
+SILTransform *swift::createAlwaysInlineInliner() {
+  return new SILPerformanceInlinerPass(InlineSelection::OnlyInlineAlways,
+                                       "InlineAlways");
+}
 
 /// Create an inliner pass that does not inline functions that are marked with
 /// the @_semantics, @_effects or global_init attributes.

@@ -40,9 +40,26 @@ prefix operator // expected-error {{expected operator name in operator declarati
 prefix operator %%+
 
 prefix operator ??
-postfix operator ?? // expected-error {{expected operator name in operator declaration}}
+postfix operator ?? // expected-error {{postfix operator names starting with '?' or '!' are disallowed to avoid collisions with built-in unwrapping operators}}
 prefix operator !!
-postfix operator !! // expected-error {{expected operator name in operator declaration}}
+postfix operator !! // expected-error {{postfix operator names starting with '?' or '!' are disallowed to avoid collisions with built-in unwrapping operators}}
+postfix operator ?$$
+// expected-error@-1 {{postfix operator names starting with '?' or '!' are disallowed}}
+// expected-error@-2 {{'$$' is considered an identifier}}
+
+infix operator --aa // expected-error {{'aa' is considered an identifier and must not appear within an operator name}}
+infix operator aa--: A // expected-error {{'aa' is considered an identifier and must not appear within an operator name}}
+infix operator <<$$@< // expected-error {{'$$' is considered an identifier and must not appear within an operator name}}
+infix operator !!@aa // expected-error {{'@' is not allowed in operator names}}
+infix operator #++= // expected-error {{'#' is not allowed in operator names}}
+infix operator ++=# // expected-error {{'#' is not allowed in operator names}}
+infix operator -># // expected-error {{'#' is not allowed in operator names}}
+
+// FIXME: Ideally, we shouldn't emit the «consistent whitespace» diagnostic
+// where = cannot possibly mean an assignment.
+infix operator =#=
+// expected-error@-1 {{'#' is not allowed in operator names}}
+// expected-error@-2 {{'=' must have consistent whitespace on both sides}}
 
 infix operator +++=
 infix operator *** : A

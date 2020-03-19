@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/DiagnosticsIRGen.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -49,8 +50,11 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 
+#include "Callee.h"
 #include "ConformanceDescription.h"
+#include "GenDecl.h"
 #include "GenEnum.h"
+#include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "GenType.h"
 #include "IRGenModule.h"
@@ -86,8 +90,9 @@ static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
 
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                  llvm::LLVMContext &LLVMContext,
-                                                      IRGenOptions &Opts,
-                                                      StringRef ModuleName) {
+                                                      const IRGenOptions &Opts,
+                                                      StringRef ModuleName,
+                                                      StringRef PD) {
   auto Loader = Context.getClangModuleLoader();
   auto *Importer = static_cast<ClangImporter*>(&*Loader);
   assert(Importer && "No clang module loader!");
@@ -118,13 +123,13 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   case IRGenDebugInfoFormat::DWARF:
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
-    CGO.DwarfDebugFlags = Opts.DebugFlags;
+    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
     break;
   case IRGenDebugInfoFormat::CodeView:
     CGO.EmitCodeView = true;
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     // This actually contains the debug flags for codeview.
-    CGO.DwarfDebugFlags = Opts.DebugFlags;
+    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
     break;
   }
 
@@ -139,14 +144,61 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   return ClangCodeGen;
 }
 
+#ifndef NDEBUG
+static ValueDecl *lookupSimple(ModuleDecl *module, ArrayRef<StringRef> declPath) {
+  DeclContext *dc = module;
+  for (;; declPath = declPath.drop_front()) {
+    SmallVector<ValueDecl*, 1> results;
+    module->lookupMember(results, dc, module->getASTContext().getIdentifier(declPath.front()), Identifier());
+    if (results.size() != 1) return nullptr;
+    if (declPath.size() == 1) return results.front();
+    dc = dyn_cast<DeclContext>(results.front());
+    if (!dc) return nullptr;
+  }
+}
+
+static void checkPointerAuthWitnessDiscriminator(IRGenModule &IGM, ArrayRef<StringRef> declPath, uint16_t expected) {
+  auto &schema = IGM.getOptions().PointerAuth.ProtocolWitnesses;
+  if (!schema.isEnabled()) return;
+
+  auto decl = lookupSimple(IGM.getSwiftModule(), declPath);
+  assert(decl && "decl not found");
+  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, SILDeclRef(decl));
+  assert(discriminator->getZExtValue() == expected && "discriminator value doesn't match");
+}
+
+static void checkPointerAuthAssociatedTypeDiscriminator(IRGenModule &IGM, ArrayRef<StringRef> declPath, uint16_t expected) {
+  auto &schema = IGM.getOptions().PointerAuth.ProtocolAssociatedTypeAccessFunctions;
+  if (!schema.isEnabled()) return;
+
+  auto decl = dyn_cast_or_null<AssociatedTypeDecl>(lookupSimple(IGM.getSwiftModule(), declPath));
+  assert(decl && "decl not found");
+  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, AssociatedType(decl));
+  assert(discriminator->getZExtValue() == expected && "discriminator value doesn't match");
+}
+
+static void sanityCheckStdlib(IRGenModule &IGM) {
+  if (!IGM.getSwiftModule()->isStdlibModule()) return;
+
+  // Only run the sanity check when we're building the real stdlib.
+  if (!lookupSimple(IGM.getSwiftModule(), { "String" })) return;
+
+  checkPointerAuthAssociatedTypeDiscriminator(IGM, { "_ObjectiveCBridgeable", "_ObjectiveCType" }, SpecialPointerAuthDiscriminators::ObjectiveCTypeDiscriminator);
+  checkPointerAuthWitnessDiscriminator(IGM, { "_ObjectiveCBridgeable", "_bridgeToObjectiveC" }, SpecialPointerAuthDiscriminators::bridgeToObjectiveCDiscriminator);
+  checkPointerAuthWitnessDiscriminator(IGM, { "_ObjectiveCBridgeable", "_forceBridgeFromObjectiveC" }, SpecialPointerAuthDiscriminators::forceBridgeFromObjectiveCDiscriminator);
+  checkPointerAuthWitnessDiscriminator(IGM, { "_ObjectiveCBridgeable", "_conditionallyBridgeFromObjectiveC" }, SpecialPointerAuthDiscriminators::conditionallyBridgeFromObjectiveCDiscriminator);
+}
+#endif
+
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, llvm::LLVMContext &LLVMContext,
                          StringRef ModuleName, StringRef OutputFilename,
-                         StringRef MainInputFilenameForDebugInfo)
+                         StringRef MainInputFilenameForDebugInfo,
+                         StringRef PrivateDiscriminator)
     : IRGen(irgen), Context(irgen.SIL.getASTContext()),
       ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
-                                            ModuleName)),
+                                            ModuleName, PrivateDiscriminator)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
       DataLayout(irgen.getClangDataLayout()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
@@ -490,7 +542,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
                                                      Module,
-                                                 MainInputFilenameForDebugInfo);
+                                                 MainInputFilenameForDebugInfo,
+                                                     PrivateDiscriminator);
 
   initClangTypeConverter();
 
@@ -503,6 +556,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   IsSwiftErrorInRegister =
     clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
       ClangCodeGen->CGM());
+
+#ifndef NDEBUG
+  sanityCheckStdlib(*this);
+#endif
 
   DynamicReplacementsTy =
       llvm::StructType::get(getLLVMContext(), {Int8PtrPtrTy, Int8PtrTy});
@@ -520,11 +577,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
+
+  DifferentiabilityWitnessTy = createStructType(
+      *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 }
 
 IRGenModule::~IRGenModule() {
   destroyClangTypeConverter();
   destroyMetadataLayoutMap();
+  destroyPointerAuthCaches();
   delete &Types;
 }
 
@@ -956,6 +1017,12 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
     FuncOptMode = IRGen.Opts.OptMode;
   if (FuncOptMode == OptimizationMode::ForSize)
     Attrs.addAttribute(llvm::Attribute::MinSize);
+
+  auto triple = llvm::Triple(ClangOpts.Triple);
+  if (triple.getArchName() == "arm64e") {
+    Attrs.addAttribute("ptrauth-returns");
+    Attrs.addAttribute("ptrauth-calls");
+  }
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
@@ -965,11 +1032,11 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
                                   llvm::AttributeList::FunctionIndex, b);
 }
 
-llvm::Constant *IRGenModule::getInt32(uint32_t value) {
+llvm::ConstantInt *IRGenModule::getInt32(uint32_t value) {
   return llvm::ConstantInt::get(Int32Ty, value);
 }
 
-llvm::Constant *IRGenModule::getSize(Size size) {
+llvm::ConstantInt *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
 }
 
@@ -1188,8 +1255,9 @@ void IRGenModule::emitAutolinkInfo() {
                                  llvm::GlobalValue::PrivateLinkage,
                                  EntriesConstant, "_swift1_autolink_entries");
     var->setSection(".swift1_autolink_entries");
-    var->setAlignment(getPointerAlignment().getValue());
+    var->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
 
+    disableAddressSanitizer(*this, var);
     addUsedGlobal(var);
   }
 
@@ -1329,6 +1397,21 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
 
 bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
+bool IRGenModule::shouldPrespecializeGenericMetadata() {
+  // Prespecialize generic metadata in the standard library always, disregarding
+  // flags.
+  if (isStandardLibrary()) {
+    return true;
+  }
+  auto &context = getSwiftModule()->getASTContext();
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(context);
+  return IRGen.Opts.PrespecializeGenericMetadata && 
+    deploymentAvailability.isContainedIn(
+      context.getPrespecializedGenericMetadataAvailability()) &&
+    (Triple.isOSDarwin() || Triple.isTvOS() || Triple.isOSLinux());
+}
+
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
   assert(GenModules.count(SF) == 0);
   GenModules[SF] = IGM;
@@ -1387,4 +1470,8 @@ const llvm::DataLayout &IRGenerator::getClangDataLayout() {
 TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
   return TypeExpansionContext::maximal(getSwiftModule(),
                                        getSILModule().isWholeModule());
+}
+
+const TypeLayoutEntry &IRGenModule::getTypeLayoutEntry(SILType T) {
+  return Types.getTypeLayoutEntry(T);
 }

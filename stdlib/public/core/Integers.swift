@@ -696,7 +696,7 @@ public protocol BinaryInteger :
   /// A type that represents the words of a binary integer.
   ///
   /// The `Words` type must conform to the `RandomAccessCollection` protocol
-  /// with an `Element` type of `UInt` and `Index` type of `Int.
+  /// with an `Element` type of `UInt` and `Index` type of `Int`.
   associatedtype Words: RandomAccessCollection
       where Words.Element == UInt, Words.Index == Int
 
@@ -1557,6 +1557,7 @@ extension BinaryInteger {
   }
 
   /// A textual representation of this value.
+  @_semantics("binaryInteger.description")
   public var description: String {
     return _description(radix: 10, uppercase: false)
   }
@@ -2732,11 +2733,6 @@ extension FixedWidthInteger {
     in range: ClosedRange<Self>,
     using generator: inout T
   ) -> Self {
-    _precondition(
-      !range.isEmpty,
-      "Can't get random value with an empty range"
-    )
-
     // Compute delta, the distance between the lower and upper bounds. This
     // value may not representable by the type Bound if Bound is signed, but
     // is always representable as Bound.Magnitude.
@@ -2746,7 +2742,7 @@ extension FixedWidthInteger {
     // If we used &+ instead, the result would be zero, which isn't helpful,
     // so we actually need to handle this case separately.
     if delta == Magnitude.max {
-      return Self(truncatingIfNeeded: generator.next())
+      return Self(truncatingIfNeeded: generator.next() as Magnitude)
     }
     // Need to widen delta to account for the right-endpoint of a closed range.
     delta += 1

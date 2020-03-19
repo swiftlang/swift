@@ -129,12 +129,6 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
                                           Ctx.LangOpts.CollectParsedToken,
                                           Ctx.LangOpts.BuildSyntaxTree);
   importMod->addFile(*importFile);
-
-  bool done;
-  parseIntoSourceFile(*importFile, bufferID, &done, nullptr, nullptr);
-  assert(done && "Parser returned early?");
-  (void)done;
-
   performNameBinding(*importFile);
   importMod->setHasResolvedImports();
   return importMod;

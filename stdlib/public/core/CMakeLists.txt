@@ -108,6 +108,7 @@ set(SWIFTLIB_ESSENTIAL
   Policy.swift
   PrefixWhile.swift
   Print.swift
+  PtrAuth.swift
   Random.swift
   RandomAccessCollection.swift
   Range.swift
@@ -206,10 +207,13 @@ set(SWIFTLIB_SOURCES
   Availability.swift
   CollectionDifference.swift
   CollectionOfOne.swift
+  DiscontiguousSlice.swift
   Diffing.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
+  RangeSet.swift
+  RangeSetStorage.swift
   SliceBuffer.swift
   SIMDVector.swift
   UnfoldSequence.swift

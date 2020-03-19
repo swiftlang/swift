@@ -23,6 +23,8 @@ public func foo() {
   let _ = d.simplyDoSomeWork(withSpeed:10)
   let _ = d.simplyDoVeryImportantWork(speed:10, thoroughness:12)
   let _ = d.simplyDoSomeWorkWithSpeed(speed:10, levelOfAlacrity:12)
+  let _ = d.__count
+  let _ = d.__object(forKey: nil)
 }
 
 // Make sure that simply subclassing an imported subclass doesn't page in all

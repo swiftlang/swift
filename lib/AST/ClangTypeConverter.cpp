@@ -34,6 +34,7 @@
 #include "swift/Basic/LLVM.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/Sema/Sema.h"
 
 using namespace swift;
@@ -369,7 +370,7 @@ clang::QualType ClangTypeConverter::visitTupleType(TupleType *type) {
     return clang::QualType();
 
   APInt size(32, tupleNumElements);
-  return ClangASTContext.getConstantArrayType(clangEltTy, size,
+  return ClangASTContext.getConstantArrayType(clangEltTy, size, nullptr,
            clang::ArrayType::Normal, 0);
 }
 
@@ -396,6 +397,8 @@ clang::QualType ClangTypeConverter::visitProtocolType(ProtocolType *type) {
   PDecl->addAttr(clang::ObjCRuntimeNameAttr::CreateImplicit(
                    PDecl->getASTContext(),
                    proto->getObjCRuntimeName(runtimeNameBuffer)));
+
+  registerExportedClangDecl(proto, PDecl);
 
   auto clangType  = clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
                                                &PDecl, 1);
@@ -445,6 +448,8 @@ clang::QualType ClangTypeConverter::visitClassType(ClassType *type) {
   CDecl->addAttr(clang::ObjCRuntimeNameAttr::CreateImplicit(
                    CDecl->getASTContext(),
                    swiftDecl->getObjCRuntimeName(runtimeNameBuffer)));
+
+  registerExportedClangDecl(swiftDecl, CDecl);
 
   auto clangType  = clangCtx.getObjCInterfaceType(CDecl);
   return clangCtx.getObjCObjectPointerType(clangType);
@@ -725,4 +730,20 @@ clang::QualType ClangTypeConverter::convert(Type type) {
   clang::QualType result = visit(type);
   Cache.insert({type, result});
   return result;
+}
+
+void ClangTypeConverter::registerExportedClangDecl(Decl *swiftDecl,
+                                             const clang::Decl *clangDecl) {
+  assert(clangDecl->isCanonicalDecl() &&
+         "generated Clang declaration for Swift declaration should not "
+         "have multiple declarations");
+  ReversedExportMap.insert({clangDecl, swiftDecl});
+}
+
+Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(
+                                             const clang::Decl *decl) const {
+  // We don't need to canonicalize the declaration because these exported
+  // declarations are never redeclarations.
+  auto it = ReversedExportMap.find(decl);
+  return (it != ReversedExportMap.end() ? it->second : nullptr);
 }

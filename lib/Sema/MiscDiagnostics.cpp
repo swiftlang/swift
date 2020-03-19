@@ -83,17 +83,23 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
       : IsExprStmt(isExprStmt), Ctx(DC->getASTContext()), DC(DC) {}
 
-    // Not interested in going outside a basic expression.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
       return { false, P };
     }
-    bool walkToDeclPre(Decl *D) override { return false; }
+
+    bool walkToDeclPre(Decl *D) override {
+      if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
+        return closure->hasAppliedFunctionBuilder();
+      return false;
+    }
+
     bool walkToTypeReprPre(TypeRepr *T) override { return true; }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // See through implicit conversions of the expression.  We want to be able
@@ -194,33 +200,51 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           callee = dynamicMRE->getMember();
         }
 
-        visitArguments(Call, [&](unsigned argIndex, Expr *arg) {
-          // InOutExprs can be wrapped in some implicit casts.
-          Expr *unwrapped = arg;
-          if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(arg))
-            unwrapped = IIO->getSubExpr();
+        if (callee) {
+          visitArguments(Call, [&](unsigned argIndex, Expr *arg) {
+            checkMagicIdentifierMismatch(callee, uncurryLevel, argIndex, arg);
 
-          if (isa<InOutToPointerExpr>(unwrapped) ||
-              isa<ArrayToPointerExpr>(unwrapped) ||
-              isa<ErasureExpr>(unwrapped)) {
-            auto operand =
-              cast<ImplicitConversionExpr>(unwrapped)->getSubExpr();
-            if (auto *IOE = dyn_cast<InOutExpr>(operand))
-              operand = IOE->getSubExpr();
+            // InOutExprs can be wrapped in some implicit casts.
+            Expr *unwrapped = arg;
+            if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(arg))
+              unwrapped = IIO->getSubExpr();
 
-            // Also do some additional work based on how the function uses
-            // the argument.
-            if (callee) {
+            if (isa<InOutToPointerExpr>(unwrapped) ||
+                isa<ArrayToPointerExpr>(unwrapped) ||
+                isa<ErasureExpr>(unwrapped)) {
+              auto operand =
+                cast<ImplicitConversionExpr>(unwrapped)->getSubExpr();
+              if (auto *IOE = dyn_cast<InOutExpr>(operand))
+                operand = IOE->getSubExpr();
+
+              // Also do some additional work based on how the function uses
+              // the argument.
               checkConvertedPointerArgument(callee, uncurryLevel, argIndex,
                                             unwrapped, operand);
             }
-          }
-        });
+          });
+        }
       }
       
       // If we have an assignment expression, scout ahead for acceptable _'s.
-      if (auto *AE = dyn_cast<AssignExpr>(E))
-        markAcceptableDiscardExprs(AE->getDest());
+      if (auto *AE = dyn_cast<AssignExpr>(E)) {
+        auto destExpr = AE->getDest();
+        markAcceptableDiscardExprs(destExpr);
+        // If the user is assigning the result of a function that returns
+        // Void to _ then warn, because that is redundant.
+        if (auto DAE = dyn_cast<DiscardAssignmentExpr>(destExpr)) {
+          if (auto CE = dyn_cast<CallExpr>(AE->getSrc())) {
+            if (CE->getCalledValue() && isa<FuncDecl>(CE->getCalledValue()) &&
+                CE->getType()->isVoid()) {
+              Ctx.Diags
+                  .diagnose(DAE->getLoc(),
+                            diag::discard_expr_void_result_redundant)
+                  .fixItRemoveChars(DAE->getStartLoc(),
+                                    AE->getSrc()->getStartLoc());
+            }
+          }
+        }
+      }
 
       /// Diagnose a '_' that isn't on the immediate LHS of an assignment.
       if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
@@ -407,7 +431,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     /// in simple pattern-like expressions, so we reject anything complex here.
     void markAcceptableDiscardExprs(Expr *E) {
       if (!E) return;
-      
+
       if (auto *PE = dyn_cast<ParenExpr>(E))
         return markAcceptableDiscardExprs(PE->getSubExpr());
       if (auto *TE = dyn_cast<TupleExpr>(E)) {
@@ -421,6 +445,91 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // Otherwise, we can't support this.
     }
 
+    void checkMagicIdentifierMismatch(ConcreteDeclRef callee,
+                                      unsigned uncurryLevel,
+                                      unsigned argIndex,
+                                      Expr *arg) {
+      // We only care about args in the arg list.
+      if (uncurryLevel != (callee.getDecl()->hasCurriedSelf() ? 1 : 0))
+        return;
+
+      // Get underlying params for both callee and caller, if declared.
+      auto *calleeParam = getParameterAt(callee.getDecl(), argIndex);
+      auto *callerParam = dyn_cast_or_null<ParamDecl>(
+          arg->getReferencedDecl(/*stopAtParenExpr=*/true).getDecl()
+      );
+
+      // (Otherwise, we don't need to do anything.)
+      if (!calleeParam || !callerParam)
+        return;
+
+      auto calleeDefaultArg = getMagicIdentifierDefaultArgKind(calleeParam);
+      auto callerDefaultArg = getMagicIdentifierDefaultArgKind(callerParam);
+
+      // If one of the parameters doesn't have a default arg, or they both have
+      // the same one, everything's fine.
+      if (!calleeDefaultArg || !callerDefaultArg ||
+          *calleeDefaultArg == *callerDefaultArg)
+        return;
+
+      StringRef calleeDefaultArgString =
+          MagicIdentifierLiteralExpr::getKindString(*calleeDefaultArg);
+      StringRef callerDefaultArgString =
+          MagicIdentifierLiteralExpr::getKindString(*callerDefaultArg);
+
+      // Emit main warning
+      Ctx.Diags.diagnose(arg->getLoc(), diag::default_magic_identifier_mismatch,
+                         callerParam->getName(), callerDefaultArgString,
+                         calleeParam->getName(), calleeDefaultArgString);
+
+      // Add "change caller default arg" fixit
+      SourceLoc callerDefaultArgLoc =
+          callerParam->getStructuralDefaultExpr()->getLoc();
+      Ctx.Diags.diagnose(callerDefaultArgLoc,
+                         diag::change_caller_default_to_match_callee,
+                         callerParam->getName(), calleeDefaultArgString)
+        .fixItReplace(callerDefaultArgLoc, calleeDefaultArgString);
+
+      // Add "silence with parens" fixit
+      Ctx.Diags.diagnose(arg->getLoc(),
+                         diag::silence_default_magic_identifier_mismatch)
+        .fixItInsert(arg->getStartLoc(), "(")
+        .fixItInsertAfter(arg->getEndLoc(), ")");
+
+      // Point to callee parameter
+      Ctx.Diags.diagnose(calleeParam, diag::decl_declared_here,
+                         calleeParam->getFullName());
+    }
+
+    Optional<MagicIdentifierLiteralExpr::Kind>
+    getMagicIdentifierDefaultArgKind(const ParamDecl *param) {
+      switch (param->getDefaultArgumentKind()) {
+      case DefaultArgumentKind::Column:
+        return MagicIdentifierLiteralExpr::Kind::Column;
+      case DefaultArgumentKind::DSOHandle:
+        return MagicIdentifierLiteralExpr::Kind::DSOHandle;
+      case DefaultArgumentKind::File:
+        return MagicIdentifierLiteralExpr::Kind::File;
+      case DefaultArgumentKind::FilePath:
+        return MagicIdentifierLiteralExpr::Kind::FilePath;
+      case DefaultArgumentKind::Function:
+        return MagicIdentifierLiteralExpr::Kind::Function;
+      case DefaultArgumentKind::Line:
+        return MagicIdentifierLiteralExpr::Kind::Line;
+
+      case DefaultArgumentKind::None:
+      case DefaultArgumentKind::Normal:
+      case DefaultArgumentKind::Inherited:
+      case DefaultArgumentKind::NilLiteral:
+      case DefaultArgumentKind::EmptyArray:
+      case DefaultArgumentKind::EmptyDictionary:
+      case DefaultArgumentKind::StoredProperty:
+        return None;
+      }
+
+      llvm_unreachable("Unhandled DefaultArgumentKind in "
+                       "getMagicIdentifierDefaultArgKind");
+    }
 
     void checkUseOfModule(DeclRefExpr *E) {
       // Allow module values as a part of:
@@ -1211,7 +1320,11 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       Expr *subExpr;
@@ -1375,10 +1488,16 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
     // Don't walk into nested decls.
     bool walkToDeclPre(Decl *D) override {
+      if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
+        return closure->hasAppliedFunctionBuilder();
       return false;
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
@@ -3199,7 +3318,11 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   public:
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       switch (E->getKind()) {
@@ -3344,7 +3467,11 @@ public:
   ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
 
-  bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+  bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+    return expr->hasAppliedFunctionBuilder();
+  }
+
+  bool shouldWalkIntoTapExpression() override { return false; }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
@@ -3655,8 +3782,15 @@ static void diagDeprecatedObjCSelectors(const DeclContext *dc,
   const_cast<Expr *>(expr)->walk(ObjCSelectorWalker(dc, selectorTy));
 }
 
-        
-        
+/// Skip over syntactic patterns that aren't typed patterns.
+static Pattern *skipNonTypeSyntacticPatterns(Pattern *pattern) {
+  if (auto *pp = dyn_cast<ParenPattern>(pattern))
+    return skipNonTypeSyntacticPatterns(pp->getSubPattern());
+  if (auto *vp = dyn_cast<VarPattern>(pattern))
+    return skipNonTypeSyntacticPatterns(vp->getSubPattern());
+  return pattern;
+}
+
 /// Diagnose things like this, where 'i' is an Int, not an Int?
 ///     if let x: Int = i {
 static void
@@ -3688,7 +3822,19 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
         .highlight(subExpr->getSourceRange());
       return;
     }
-    
+
+    // Check for 'if let' to produce a tuned diagnostic.
+    if (isa<OptionalSomePattern>(skipNonTypeSyntacticPatterns(p))) {
+      ctx.Diags.diagnose(
+          cond.getIntroducerLoc(),
+          p->isImplicit()
+            ? diag::condition_optional_element_pattern_not_valid_type
+            : diag::optional_element_pattern_not_valid_type,
+         subExpr->getType())
+            .highlight(subExpr->getSourceRange());
+      return;
+    }
+
     ctx.Diags.diagnose(cond.getIntroducerLoc(),
                        diag::optional_check_nonoptional,
                        subExpr->getType())
@@ -4061,7 +4207,11 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -4133,7 +4283,11 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
       }
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
+    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
+      return expr->hasAppliedFunctionBuilder();
+    }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -4183,7 +4337,10 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       auto property = lastComponent.getDeclRef().getDecl();
       if (!property)
         return;
-      if (property->isObjCDynamic())
+      auto propertyVar = cast<VarDecl>(property);
+      if (propertyVar->isObjCDynamic() ||
+          (propertyVar->isObjC() &&
+           propertyVar->getParsedAccessor(AccessorKind::Set)))
         return;
       C.Diags
           .diagnose(expr->getLoc(),

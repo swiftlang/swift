@@ -25,6 +25,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_GENERIC_RESULT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_GENERIC_RESULT_OPTIONAL | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_GENERICRESULT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_ROOT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_NONROOT | %FileCheck %s -check-prefix=OBJ-DOT
+
 class Person {
     var name: String
     var friends: [Person] = []
@@ -57,13 +62,13 @@ let _ = \Person.friends#^ARRAY_NODOT^#
 // ARRAY-NODOT: Begin completions
 // ARRAY-NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Person#]; name=[index: Int]
 // ARRAY-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .count[#Int#]; name=count
-// ARRAY-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .first[#Person?#]; name=first
+// ARRAY-NODOT-DAG: Decl[InstanceVar]/Super:            .first[#Person?#]; name=first
 
 let _ = \Person.friends.#^ARRAY_DOT^#
 // ARRAY-DOT: Begin completions
 // ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Element#]; name=[Int]
 // ARRAY-DOT-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
-// ARRAY-DOT-DAG: Decl[InstanceVar]/CurrNominal:      first[#Person?#]; name=first
+// ARRAY-DOT-DAG: Decl[InstanceVar]/Super:            first[#Person?#]; name=first
 // ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Element#]; name=[Int]
 
 let _ = \Person.friends[0]#^OBJ_NODOT^#
@@ -114,13 +119,13 @@ let _ = \[Person]#^ARRAYTYPE_NODOT^#
 // ARRAYTYPE-NODOT: Begin completions
 // ARRAYTYPE-NODOT-DAG: Decl[Subscript]/CurrNominal:        .[{#(index): Int#}][#Person#]; name=[index: Int]
 // ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .count[#Int#]; name=count
-// ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .first[#Person?#]; name=first
+// ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/Super:            .first[#Person?#]; name=first
 
 let _ = \[Person].#^ARRAYTYPE_DOT^#
 // ARRAYTYPE-DOT: Begin completions
 // ARRAYTYPE-DOT-DAG: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Person#]; name=[index: Int]
 // ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
-// ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal:      first[#Person?#]; name=first
+// ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/Super:            first[#Person?#]; name=first
 
 func test(_ p: Person) {
   let _ = p[keyPath: \Person.#^APPLY_TYPE_DOT^#]
@@ -148,4 +153,20 @@ func recvExplicitKPWithGenericResult<Result>(_ kp: KeyPath<Person, Result>) {
 func recvExplicitKPWithGenericResultOpt<Result>(_ kp: KeyPath<Person, Result>?) {
   recvExplicitKPWithGenericResult(\.#^CONTEXT_GENERIC_RESULT_OPTIONAL^#
   // Same as TYPE_DOT.
+}
+func recvFunc(_ fn: (Person) -> String) {
+  recvFunc(\.#^CONTEXT_FUNC^#)
+}
+func recvFuncGeneric<T>(_ fn: (Person) -> T) {
+  recvFunc(\.#^CONTEXT_FUNC_GENERICRESULT^#)
+}
+
+struct Wrap<T> {
+  func map<U>(_ fn: (T) -> U) -> U { fatalError() }
+}
+func testKeyPathAsFunctions(wrapped: Wrap<Person>) {
+  let _ = wrapped.map(\.#^CONTEXT_FUNC_ROOT^#)
+  // Same as TYPE_DOT.
+  let _ = wrapped.map(\.friends[0].#^CONTEXT_FUNC_NONROOT^#)
+  // Same as OBJ_DOT.
 }

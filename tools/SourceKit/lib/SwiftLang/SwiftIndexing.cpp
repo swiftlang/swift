@@ -200,7 +200,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
   }
 
   // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(Ctx);
+  Ctx.setLegacySemanticQueriesEnabled();
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
   index::indexModule(Mod, IdxDataConsumer);
@@ -217,7 +217,7 @@ static void initTraceInfoImpl(trace::SwiftInvocation &SwiftArgs,
                               ArrayRef<Str> Args) {
   llvm::raw_string_ostream OS(SwiftArgs.Args.Arguments);
   interleave(Args, [&OS](StringRef arg) { OS << arg; }, [&OS] { OS << ' '; });
-  SwiftArgs.Args.PrimaryFile = InputFile;
+  SwiftArgs.Args.PrimaryFile = InputFile.str();
 }
 
 void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
@@ -314,7 +314,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   }
 
   // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(CI.getASTContext());
+  CI.getASTContext().setLegacySemanticQueriesEnabled();
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
   index::indexSourceFile(CI.getPrimarySourceFile(), IdxDataConsumer);

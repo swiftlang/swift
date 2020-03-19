@@ -18,7 +18,7 @@ import Darwin
 import Glibc
 
 @inlinable // This is @inlinable as trivially computable.
-fileprivate func malloc_good_size(_ size: Int) -> Int {
+private func malloc_good_size(_ size: Int) -> Int {
     return size
 }
 
@@ -1402,7 +1402,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                         if newValue == 0 {
                             return nil
                         } else if InlineData.canStore(count: newValue) {
-                            return .inline(InlineData())
+                            return .inline(InlineData(count: newValue))
                         } else if InlineSlice.canStore(count: newValue) {
                             return .slice(InlineSlice(count: newValue))
                         } else {

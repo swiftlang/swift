@@ -461,7 +461,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
   llvm::SmallString<64> Err;
   llvm::raw_svector_ostream OS(Err);
   OS << "'" << PrimaryFile << "' is not part of the input files";
-  Error = OS.str();
+  Error = std::string(OS.str());
   return replacementInputsAndOutputs;
 }
 
@@ -501,7 +501,7 @@ bool SwiftASTManager::initCompilerInvocation(
   Diags.removeConsumer(DiagConsumer);
 
   if (HadError) {
-    Error = ErrOS.str();
+    Error = std::string(ErrOS.str());
     return true;
   }
 
@@ -683,7 +683,7 @@ static FileContent getFileContentFromSnap(ImmutableTextSnapshotRef Snap,
                                           bool IsPrimary, StringRef FilePath) {
   auto Buf = llvm::MemoryBuffer::getMemBufferCopy(
       Snap->getBuffer()->getText(), FilePath);
-  return FileContent(Snap, FilePath, std::move(Buf), IsPrimary,
+  return FileContent(Snap, FilePath.str(), std::move(Buf), IsPrimary,
                      Snap->getStamp());
 }
 
@@ -699,8 +699,8 @@ FileContent SwiftASTManager::Implementation::getFileContent(
   // FIXME: Is there a way to get timestamp and buffer for a file atomically ?
   auto Stamp = getBufferStamp(FilePath, FileSystem);
   auto Buffer = getMemoryBuffer(FilePath, FileSystem, Error);
-  return FileContent(nullptr, UnresolvedPath, std::move(Buffer), IsPrimary,
-                     Stamp);
+  return FileContent(nullptr, UnresolvedPath.str(), std::move(Buffer),
+                     IsPrimary, Stamp);
 }
 
 BufferStamp SwiftASTManager::Implementation::getBufferStamp(
@@ -883,6 +883,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     // Only collect implementation-only dependencies from the main module.
     ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   }
+  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   TopMod->getImportedModules(Imports, ImportFilter);
 
@@ -902,7 +903,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     // getModuleFilename() (by returning an empty path). Note that such modules
     // may be heterogeneous.
     {
-      std::string Path = Mod->getModuleFilename();
+      std::string Path = Mod->getModuleFilename().str();
       if (Path.empty() || Path == TopMod->getModuleFilename())
         continue; // this is a submodule.
       Filenames.push_back(std::move(Path));

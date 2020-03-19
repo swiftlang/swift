@@ -450,16 +450,17 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 ///
 
 GenericSignature TypeChecker::checkGenericSignature(
-                      GenericParamList *genericParamList,
+                      GenericParamSource paramSource,
                       DeclContext *dc,
                       GenericSignature parentSig,
                       bool allowConcreteGenericParams,
                       SmallVector<Requirement, 2> additionalRequirements,
                       SmallVector<TypeLoc, 2> inferenceSources) {
-  assert(genericParamList && "Missing generic parameters?");
+  if (auto genericParamList = paramSource.dyn_cast<GenericParamList *>())
+    assert(genericParamList && "Missing generic parameters?");
 
   auto request = InferredGenericSignatureRequest{
-    dc->getParentModule(), parentSig.getPointer(), genericParamList,
+    dc->getParentModule(), parentSig.getPointer(), paramSource,
     additionalRequirements, inferenceSources,
     allowConcreteGenericParams};
   auto sig = evaluateOrDefault(dc->getASTContext().evaluator,
@@ -478,7 +479,7 @@ GenericSignature TypeChecker::checkGenericSignature(
     sig->print(llvm::errs());
     llvm::errs() << "\n";
     llvm::errs() << "Canonical generic signature: ";
-    sig->getCanonicalSignature()->print(llvm::errs());
+    sig.getCanonicalSignature()->print(llvm::errs());
     llvm::errs() << "\n";
   }
 
@@ -489,7 +490,7 @@ GenericSignature TypeChecker::checkGenericSignature(
 /// extension's list of generic parameters.
 static Type formExtensionInterfaceType(
                          ExtensionDecl *ext, Type type,
-                         GenericParamList *genericParams,
+                         const GenericParamList *genericParams,
                          SmallVectorImpl<Requirement> &sameTypeReqs,
                          bool &mustInferRequirements) {
   if (type->is<ErrorType>())
@@ -596,34 +597,51 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       sig->print(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Canonical generic signature: ";
-      sig->getCanonicalSignature()->print(llvm::errs());
+      sig.getCanonicalSignature()->print(llvm::errs());
       llvm::errs() << "\n";
     }
     return sig;
   }
 
-  // We can fast-path computing the generic signature of non-generic
-  // declarations by re-using the parent context's signature.
-  auto *gp = GC->getGenericParams();
-  if (!gp) {
+  bool allowConcreteGenericParams = false;
+  const auto *genericParams = GC->getGenericParams();
+  if (genericParams) {
+    // Setup the depth of the generic parameters.
+    const_cast<GenericParamList *>(genericParams)
+        ->setDepth(GC->getGenericContextDepth());
+
+    // Accessors can always use the generic context of their storage
+    // declarations. This is a compile-time optimization since it lets us
+    // avoid the requirements-gathering phase, but it also simplifies that
+    // work for accessors which don't mention the value type in their formal
+    // signatures (like the read and modify coroutines, since yield types
+    // aren't tracked in the AST type yet).
+    if (auto accessor = dyn_cast<AccessorDecl>(GC->getAsDecl())) {
+      return cast<SubscriptDecl>(accessor->getStorage())->getGenericSignature();
+    }
+
+  // ...or we may have a where clause dependent on outer generic parameters.
+  } else if (const auto *where = GC->getTrailingWhereClause()) {
+    // If there is no generic context for the where clause to
+    // rely on, diagnose that now and bail out.
+    if (!GC->isGenericContext()) {
+      GC->getASTContext().Diags.diagnose(where->getWhereLoc(),
+                                         diag::where_nongeneric_ctx);
+      return nullptr;
+    }
+
+    allowConcreteGenericParams = true;
+  } else {
+    // We can fast-path computing the generic signature of non-generic
+    // declarations by re-using the parent context's signature.
+    if (auto accessor = dyn_cast<AccessorDecl>(GC->getAsDecl()))
+      if (auto subscript = dyn_cast<SubscriptDecl>(accessor->getStorage()))
+         return subscript->getGenericSignature();
+
     return GC->getParent()->getGenericSignatureOfContext();
   }
 
-  // Setup the depth of the generic parameters.
-  gp->setDepth(GC->getGenericContextDepth());
-
-  // Accessors can always use the generic context of their storage
-  // declarations. This is a compile-time optimization since it lets us
-  // avoid the requirements-gathering phase, but it also simplifies that
-  // work for accessors which don't mention the value type in their formal
-  // signatures (like the read and modify coroutines, since yield types
-  // aren't tracked in the AST type yet).
-  if (auto accessor = dyn_cast<AccessorDecl>(GC->getAsDecl())) {
-    return cast<SubscriptDecl>(accessor->getStorage())->getGenericSignature();
-  }
-
   auto parentSig = GC->getParent()->getGenericSignatureOfContext();
-  bool allowConcreteGenericParams = false;
   SmallVector<TypeLoc, 2> inferenceSources;
   SmallVector<Requirement, 2> sameTypeReqs;
   if (auto VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
@@ -685,11 +703,11 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     bool mustInferRequirements = false;
     Type extInterfaceType =
       formExtensionInterfaceType(ext, ext->getExtendedType(),
-                                 gp, sameTypeReqs,
+                                 genericParams, sameTypeReqs,
                                  mustInferRequirements);
     
     auto cannotReuseNominalSignature = [&]() -> bool {
-      const auto finalDepth = gp->getParams().back()->getDepth();
+      const auto finalDepth = genericParams->getParams().back()->getDepth();
       return mustInferRequirements
           || !sameTypeReqs.empty()
           || ext->getTrailingWhereClause()
@@ -717,7 +735,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   }
   
   return TypeChecker::checkGenericSignature(
-      gp, GC, parentSig,
+      GC, GC, parentSig,
       allowConcreteGenericParams,
       sameTypeReqs, inferenceSources);
 }

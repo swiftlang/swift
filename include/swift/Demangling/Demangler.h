@@ -516,7 +516,7 @@ protected:
   NodePointer popAnyProtocolConformanceList();
   NodePointer demangleRetroactiveConformance();
   NodePointer demangleInitializer();
-  NodePointer demangleImplParamConvention();
+  NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
   NodePointer demangleImplFunctionType();
   NodePointer demangleMetatype();
@@ -563,7 +563,6 @@ protected:
   NodePointer demangleGenericType();
   NodePointer demangleValueWitness();
 
-  NodePointer demangleObjCTypeName();
   NodePointer demangleTypeMangling();
   NodePointer demangleSymbolicReference(unsigned char rawKind,
                                         const void *at);

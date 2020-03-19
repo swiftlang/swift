@@ -241,7 +241,7 @@ protocol SillyDefault : ClassWithDefault<Int> {
 
 class ConformsToSillyDefault : ClassWithDefault<Int>, SillyDefault {}
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s24protocol_with_superclass22ConformsToSillyDefaultCAA0fG0A2aDP5makeTSiyFTW : $@convention(witness_method: SillyDefault) (@guaranteed ConformsToSillyDefault) -> Int
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s24protocol_with_superclass22ConformsToSillyDefaultCAA0fG0A2aDP5makeTSiyFTW :
 // CHECK: class_method %1 : $ClassWithDefault<Int>, #ClassWithDefault.makeT!1 : <T> (ClassWithDefault<T>) -> () -> T, $@convention(method) <τ_0_0> (@guaranteed ClassWithDefault<τ_0_0>) -> @out τ_0_0
 // CHECK: return
 
@@ -268,6 +268,25 @@ func passesRefinedProtocol(_ r: RefinedProto) {
 // CHECK-NEXT:  dealloc_stack [[BASE]] : $*BaseProto
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]] : $()
+
+func takesFuncTakingRefinedProto(arg: (RefinedProto) -> ()) {}
+
+func passesFuncTakingBaseClass() {
+  let closure: (BaseClass) -> () = { _ in }
+  takesFuncTakingRefinedProto(arg: closure)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s24protocol_with_superclass25passesFuncTakingBaseClassyyF : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s24protocol_with_superclass9BaseClassCIegg_AA12RefinedProto_pIegg_TR : $@convention(thin) (@guaranteed RefinedProto, @guaranteed @callee_guaranteed (@guaranteed BaseClass) -> ()) -> ()
+// CHECK: [[PAYLOAD:%.*]] = open_existential_ref %0 : $RefinedProto to $@opened("{{.*}}") RefinedProto
+// CHECK: [[COPY:%.*]] = copy_value [[PAYLOAD]]
+// CHECK: [[UPCAST:%.*]] = upcast [[COPY]] : $@opened("{{.*}}") RefinedProto to $BaseClass
+// CHECK: [[BORROW:%.*]] = begin_borrow [[UPCAST]]
+// CHECK: apply %1([[BORROW]])
+// CHECK: end_borrow [[BORROW]]
+// CHECK: destroy_value [[UPCAST]]
+// CHECK: return
 
 // CHECK-LABEL: sil_witness_table hidden ConformsToSillyDefault: SillyDefault module protocol_with_superclass {
 // CHECK-NEXT: method #SillyDefault.makeT!1: <Self where Self : SillyDefault> (Self) -> () -> Int : @$s24protocol_with_superclass22ConformsToSillyDefaultCAA0fG0A2aDP5makeTSiyFTW

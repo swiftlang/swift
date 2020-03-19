@@ -32,7 +32,7 @@ ambiguousWithVar(true)   // no-warning
 
 var localVar : Bool
 localVar = false
-localVar = 42 // expected-error {{cannot assign value of type 'Int' to type 'Bool'}}
+localVar = 42 // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 localVar(42)  // expected-error {{cannot call value of non-function type 'Bool'}}
 var _ : localVar // should still work
 
@@ -46,7 +46,7 @@ scopedFunction = 42
 // FIXME: Should be an error -- a type name and a function cannot overload.
 var _ : Int = TypeNameWins(42)
 
-TypeNameWins = 42 // expected-error {{no exact matches in assignment to 'TypeNameWins'}}
+TypeNameWins = 42 // expected-error {{no exact matches in reference to global function 'TypeNameWins'}}
 var _ : TypeNameWins // no-warning
 
 // rdar://problem/21739333

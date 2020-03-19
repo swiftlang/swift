@@ -335,7 +335,7 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 1,
 
@@ -358,7 +358,10 @@ protected:
     IsLazyStorageProperty : 1,
 
     /// Whether this is the backing storage for a property wrapper.
-    IsPropertyWrapperBackingProperty : 1
+    IsPropertyWrapperBackingProperty : 1,
+
+    /// Whether this is a lazily top-level global variable from the main file.
+    IsTopLevelGlobal : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+NumDefaultArgumentKindBits,
@@ -476,14 +479,10 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
-
-    /// Whether we have already added the phantom CodingKeys
-    /// nested requirement to this declaration.
-    AddedPhantomCodingKeys : 1,
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
     HasLazyConformances : 1,
@@ -666,9 +665,10 @@ private:
     SourceLoc Loc;
     SourceLoc StartLoc;
     SourceLoc EndLoc;
+    SmallVector<CharSourceRange, 4> DocRanges;
   };
-  mutable CachedExternalSourceLocs const *CachedLocs = nullptr;
-  const CachedExternalSourceLocs *calculateSerializedLocs() const;
+  mutable CachedExternalSourceLocs const *CachedSerializedLocs = nullptr;
+  const CachedExternalSourceLocs *getSerializedLocs() const;
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
@@ -757,6 +757,11 @@ public:
     return Attrs;
   }
 
+  /// Returns the introduced OS version in the given platform kind specified
+  /// by @available attribute.
+  /// This function won't consider the parent context to get the information.
+  Optional<llvm::VersionTuple> getIntroducedOSVersion(PlatformKind Kind) const;
+
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
 
@@ -824,7 +829,7 @@ public:
   }
 
   /// \returns the unparsed comment attached to this declaration.
-  RawComment getRawComment() const;
+  RawComment getRawComment(bool SerializedOK = false) const;
 
   Optional<StringRef> getGroupName() const;
 
@@ -875,7 +880,12 @@ public:
   LLVM_READONLY
   const GenericContext *getAsGenericContext() const;
 
+  bool hasUnderscoredNaming() const;
+
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
+  
+  /// Check if this is a declaration defined at the top level of the Swift module
+  bool isStdlibDecl() const;
 
   AvailabilityContext getAvailabilityForLinkage() const;
 
@@ -910,9 +920,22 @@ public:
   /// If this returns true, the decl can be safely casted to ValueDecl.
   bool isPotentiallyOverridable() const;
 
+  /// Returns true if this Decl cannot be seen by any other source file
+  bool isPrivateToEnclosingFile() const;
+
   /// If an alternative module name is specified for this decl, e.g. using
   /// @_originalDefinedIn attribute, this function returns this module name.
   StringRef getAlternateModuleName() const;
+
+  // Is this Decl an SPI? It can be directly marked with @_spi or is defined in
+  // an @_spi context.
+  bool isSPI() const;
+
+  // List the SPI groups declared with @_spi or inherited by this decl.
+  //
+  // SPI groups are inherited from the parent contexts only if the local decl
+  // doesn't declare any @_spi.
+  ArrayRef<Identifier> getSPIGroups() const;
 
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
@@ -1205,7 +1228,9 @@ public:
   void print(raw_ostream &OS) const;
   void print(ASTPrinter &Printer) const;
 };
-  
+
+using GenericParamSource = PointerUnion<GenericContext *, GenericParamList *>;
+
 /// GenericParamList - A list of generic parameters that is part of a generic
 /// function or type, along with extra requirements placed on those generic
 /// parameters and types derived from them.
@@ -1521,8 +1546,6 @@ private:
 
   /// The resolved module.
   ModuleDecl *Mod = nullptr;
-  /// The resolved decls if this is a decl import.
-  ArrayRef<ValueDecl *> Decls;
 
   ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
              SourceLoc KindLoc, ArrayRef<AccessPathElement> Path);
@@ -1575,8 +1598,9 @@ public:
   ModuleDecl *getModule() const { return Mod; }
   void setModule(ModuleDecl *M) { Mod = M; }
 
-  ArrayRef<ValueDecl *> getDecls() const { return Decls; }
-  void setDecls(ArrayRef<ValueDecl *> Ds) { Decls = Ds; }
+  /// For a scoped import such as 'import class Foundation.NSString', retrieve
+  /// the decls it references. Otherwise, returns an empty array.
+  ArrayRef<ValueDecl *> getDecls() const;
 
   const clang::Module *getClangModule() const {
     return getClangNode().getClangModule();
@@ -2326,17 +2350,17 @@ public:
       Bits.PoundDiagnosticDecl.HasBeenEmitted = false; 
     }
 
-  DiagnosticKind getKind() {
+  DiagnosticKind getKind() const {
     return isError() ? DiagnosticKind::Error : DiagnosticKind::Warning;
   }
 
-  StringLiteralExpr *getMessage() { return Message; }
+  StringLiteralExpr *getMessage() const { return Message; }
 
-  bool isError() {
+  bool isError() const {
     return Bits.PoundDiagnosticDecl.IsError;
   }
 
-  bool hasBeenEmitted() {
+  bool hasBeenEmitted() const {
     return Bits.PoundDiagnosticDecl.HasBeenEmitted;
   }
 
@@ -2862,7 +2886,7 @@ public:
 /// code. One is formed implicitly when a declaration is written with an opaque
 /// result type, as in:
 ///
-/// func foo() -> opaque SignedInteger { return 1 }
+/// func foo() -> some SignedInteger { return 1 }
 ///
 /// The declared type is a special kind of ArchetypeType representing the
 /// abstracted underlying type.
@@ -3323,6 +3347,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class ExtensionDecl;
   friend class DeclContext;
   friend class IterableDeclContext;
+  friend class DirectLookupRequest;
   friend ArrayRef<ValueDecl *>
   ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
 
@@ -3338,7 +3363,6 @@ protected:
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
-    Bits.NominalTypeDecl.AddedPhantomCodingKeys = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
@@ -3379,18 +3403,6 @@ public:
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
   }
 
-  /// Determine whether we have already attempted to add the
-  /// phantom CodingKeys type to this declaration.
-  bool addedPhantomCodingKeys() const {
-    return Bits.NominalTypeDecl.AddedPhantomCodingKeys;
-  }
-
-  /// Note that we have attempted to add the phantom CodingKeys type
-  /// to this declaration.
-  void setAddedPhantomCodingKeys() {
-    Bits.NominalTypeDecl.AddedPhantomCodingKeys = true;
-  }
-
   /// getDeclaredType - Retrieve the type declared by this entity, without
   /// any generic parameters bound if this is a generic type.
   Type getDeclaredType() const;
@@ -3410,6 +3422,12 @@ public:
     /// Whether to include @_implements members.
     /// Used by conformance-checking to find special @_implements members.
     IncludeAttrImplements = 1 << 0,
+    /// Whether to avoid loading lazy members from any new extensions that would otherwise be found
+    /// by deserialization.
+    ///
+    /// Used by the module loader to break recursion and as an optimization e.g. when it is known that a
+    /// particular member declaration will never appear in an extension.
+    IgnoreNewExtensions = 1 << 1,
   };
 
   /// Find all of the declarations with the given name within this nominal type
@@ -3579,7 +3597,6 @@ class EnumDecl final : public NominalTypeDecl {
 
   friend class EnumRawValuesRequest;
   friend class EnumRawTypeRequest;
-  friend class TypeChecker;
 
 public:
   EnumDecl(SourceLoc EnumLoc, Identifier Name, SourceLoc NameLoc,
@@ -3865,7 +3882,6 @@ class ClassDecl final : public NominalTypeDecl {
   friend class EmittedMembersRequest;
   friend class HasMissingDesignatedInitializersRequest;
   friend class InheritsSuperclassInitializersRequest;
-  friend class TypeChecker;
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -4240,7 +4256,6 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
   friend class ExistentialTypeSupportedRequest;
-  friend class TypeChecker;
 
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
@@ -4686,6 +4701,10 @@ public:
   /// To ensure an accessor is always returned, use getSynthesizedAccessor().
   AccessorDecl *getOpaqueAccessor(AccessorKind kind) const;
 
+  /// Collect all opaque accessors.
+  ArrayRef<AccessorDecl*>
+    getOpaqueAccessors(llvm::SmallVectorImpl<AccessorDecl*> &scratch) const;
+
   /// Return an accessor that was written in source. Returns null if the
   /// accessor was not explicitly defined by the user.
   AccessorDecl *getParsedAccessor(AccessorKind kind) const;
@@ -5087,6 +5106,10 @@ public:
     Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
   }
 
+  /// True if this is a top-level global variable from the main source file.
+  bool isTopLevelGlobal() const { return Bits.VarDecl.IsTopLevelGlobal; }
+  void setTopLevelGlobal(bool b) { Bits.VarDecl.IsTopLevelGlobal = b; }
+  
   /// Retrieve the custom attributes that attach property wrappers to this
   /// property. The returned list contains all of the attached property wrapper attributes in source order,
   /// which means the outermost wrapper attribute is provided first.
@@ -5746,6 +5769,20 @@ public:
 private:
   ParameterList *Params;
 
+  /// The generation at which we last loaded derivative function configurations.
+  unsigned DerivativeFunctionConfigGeneration = 0;
+  /// Prepare to traverse the list of derivative function configurations.
+  void prepareDerivativeFunctionConfigurations();
+
+  /// A uniqued list of derivative function configurations.
+  /// - `@differentiable` and `@derivative` attribute type-checking is
+  ///   responsible for populating derivative function configurations specified
+  ///   in the current module.
+  /// - Module loading is responsible for populating derivative function
+  ///   configurations from imported modules.
+  struct DerivativeFunctionConfigurationList;
+  DerivativeFunctionConfigurationList *DerivativeFunctionConfigs = nullptr;
+
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
   // we have saved the end location of the unparsed body.
@@ -6069,6 +6106,12 @@ public:
   /// Tests if this is a function returning a DynamicSelfType, or a
   /// constructor.
   bool hasDynamicSelfResult() const;
+
+  /// Get all derivative function configurations.
+  ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
+
+  /// Add the given derivative function configuration.
+  void addDerivativeFunctionConfiguration(AutoDiffConfig config);
 
   using DeclContext::operator new;
   using Decl::getASTContext;
@@ -6403,6 +6446,10 @@ public:
 #include "swift/AST/AccessorKinds.def"
     }
     llvm_unreachable("bad accessor kind");
+  }
+
+  bool isImplicitGetter() const {
+    return isGetter() && getAccessorKeywordLoc().isInvalid();
   }
 
   void setIsTransparent(bool transparent) {
@@ -7407,11 +7454,16 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   return result;
 }
 
-/// Retrieve the parameter list for a given declaration.
+/// Retrieve the parameter list for a given declaration, or nullputr if there
+/// is none.
 ParameterList *getParameterList(ValueDecl *source);
 
-/// Retrieve parameter declaration from the given source at given index.
+/// Retrieve parameter declaration from the given source at given index, or
+/// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
+
+void simple_display(llvm::raw_ostream &out,
+                    OptionSet<NominalTypeDecl::LookupDirectFlags> options);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);

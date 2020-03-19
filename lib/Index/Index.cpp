@@ -129,6 +129,7 @@ public:
     ImportFilter |= ModuleDecl::ImportFilterKind::Public;
     ImportFilter |= ModuleDecl::ImportFilterKind::Private;
     ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
 
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
       SF->getImportedModules(Modules, ImportFilter);
@@ -492,6 +493,13 @@ private:
     }
 
     return finishSourceEntity(Info.symInfo, Info.roles);
+  }
+
+  bool visitCallAsFunctionReference(ValueDecl *D, CharSourceRange Range,
+                                    ReferenceMetaData Data) override {
+    // Index implicit callAsFunction reference.
+    return visitDeclReference(D, Range, /*CtorTyRef*/ nullptr,
+                              /*ExtTyRef*/ nullptr, Type(), Data);
   }
 
   Decl *getParentDecl() const {
@@ -1561,6 +1569,7 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
   ModuleDecl::ImportFilter ImportFilter;
   ImportFilter |= ModuleDecl::ImportFilterKind::Public;
   ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   TopMod.getImportedModules(Imports);
 

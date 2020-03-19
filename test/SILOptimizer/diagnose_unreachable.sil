@@ -516,15 +516,20 @@ bb3:
   return %9999 : $()
 }
 
+// Rather than eliminate the end_borrow, we just propagate through since
+// branches now act like phis. We could eliminate the begin_borrow scope though,
+// but this pass does not perform that simplification.
+//
 // CHECK-LABEL: sil [ossa] @eliminate_end_borrow_when_propagating_bb_args : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
-// CHECK-NOT: end_borrow
+// CHECK: %1 = begin_borrow %0
 // CHECK: [[FUNC_REF:%.*]] = function_ref @guaranteed_nativeobject_user
-// CHECK-NEXT: apply [[FUNC_REF]](%0) :
-// CHECK-NOT: end_borrow
+// CHECK-NEXT: apply [[FUNC_REF]](%1) :
+// CHECK: end_borrow %1
 // CHECK: } // end sil function 'eliminate_end_borrow_when_propagating_bb_args'
 sil [ossa] @eliminate_end_borrow_when_propagating_bb_args : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
-  br bb1(%0 : $Builtin.NativeObject)
+  %0a = begin_borrow %0 : $Builtin.NativeObject
+  br bb1(%0a : $Builtin.NativeObject)
 
 bb1(%1 : @guaranteed $Builtin.NativeObject):
   %2 = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
@@ -781,4 +786,89 @@ bb1(%2 : @owned $Builtin.NativeObject):
 
 bb2:
   unreachable
+}
+
+enum EnumWithB {
+  case A(B)
+  func testit() -> Int
+}
+
+// Test propagation of guaranteed phi arguments. The nested end_borrow should
+// not be removed since guaranteed phis propagate now.
+//
+// CHECK-LABEL: sil hidden [ossa] @testEliminatePropagateGuaranteedPhiAfterSwitch : $@convention(method) (@guaranteed EnumWithB) -> () {
+// CHECK: bb1([[PHI:%.*]] : @guaranteed $B):
+// CHECK: end_borrow
+// CHECK-LABEL: } // end sil function 'testEliminatePropagateGuaranteedPhiAfterSwitch'
+sil hidden [ossa] @testEliminatePropagateGuaranteedPhiAfterSwitch : $@convention(method) (@guaranteed EnumWithB) -> () {
+bb0(%0 : @guaranteed $EnumWithB):
+  switch_enum %0 : $EnumWithB, case #EnumWithB.A!enumelt.1: bb1
+
+bb1(%2 : @guaranteed $B):
+  %2a = begin_borrow %2 : $B
+  br bb3(%2a : $B)
+
+bb3(%4 : @guaranteed $B):
+  %99 = tuple ()
+  end_borrow %4 : $B
+  return %99 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testEliminatePropagateBeginBorrowGuaranteedPhiAfterSwitch : $@convention(method) (@owned B) -> () {
+// CHECK: [[BORROW:%.*]] = begin_borrow
+// CHECK:  bb1:
+// CHECK:  bb2:
+// CHECK: end_borrow [[BORROW]]
+// CHECK-LABEL: } // end sil function 'testEliminatePropagateBeginBorrowGuaranteedPhiAfterSwitch'
+sil hidden [ossa] @testEliminatePropagateBeginBorrowGuaranteedPhiAfterSwitch : $@convention(method) (@owned B) -> () {
+bb0(%0 : @owned $B):
+  %1 = begin_borrow %0 : $B
+  br bb1(%1 : $B)
+
+bb1(%2 : @guaranteed $B):
+  br bb3(%2 : $B)
+
+bb3(%3 : @guaranteed $B):
+  %99 = tuple ()
+  end_borrow %3 : $B
+  destroy_value %0 : $B
+  return %99 : $()
+}
+
+// Make sure we do not look for end_borrow when looking at a switch_enum, switch_enum.
+//
+// CHECK-LABEL: sil hidden [ossa] @testPropagateGuaranteedPhiSwitchEnum : $@convention(method) (@guaranteed EnumWithB) -> () {
+// CHECK: bb1([[PHI:%.*]] : @guaranteed $B):
+// CHECK-NOT: end_borrow
+// CHECK-LABEL: } // end sil function 'testPropagateGuaranteedPhiSwitchEnum'
+sil hidden [ossa] @testPropagateGuaranteedPhiSwitchEnum : $@convention(method) (@guaranteed EnumWithB) -> () {
+bb0(%0 : @guaranteed $EnumWithB):
+  switch_enum %0 : $EnumWithB, case #EnumWithB.A!enumelt.1: bb1
+
+bb1(%2 : @guaranteed $B):
+  %3 = enum $EnumWithB, #EnumWithB.A!enumelt.1, %2 : $B
+  switch_enum %3 : $EnumWithB, case #EnumWithB.A!enumelt.1: bb3
+
+bb3(%4 : @guaranteed $B):
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Make sure that we can handle iterated end_borrow.
+//
+// CHECK-LABEL: sil hidden [ossa] @testPropagateGuaranteedPhi : $@convention(method) (@guaranteed B) -> () {
+// CHECK: end_borrow
+// CHECK-LABEL: } // end sil function 'testPropagateGuaranteedPhi'
+sil hidden [ossa] @testPropagateGuaranteedPhi : $@convention(method) (@guaranteed B) -> () {
+bb0(%0 : @guaranteed $B):
+  %0a = begin_borrow %0 : $B
+  br bb1(%0a : $B)
+
+bb1(%1 : @guaranteed $B):
+  br bb2(%1 : $B)
+
+bb2(%2 : @guaranteed $B):
+  %99 = tuple ()
+  end_borrow %2 : $B
+  return %99 : $()
 }

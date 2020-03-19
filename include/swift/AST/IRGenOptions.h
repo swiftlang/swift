@@ -23,6 +23,7 @@
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/OptimizationMode.h"
+#include "clang/Basic/PointerAuthOptions.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
 #include "llvm/Transforms/Instrumentation.h"
@@ -68,6 +69,59 @@ enum class IRGenEmbedMode : unsigned {
   None,
   EmbedMarker,
   EmbedBitcode
+};
+
+using clang::PointerAuthSchema;
+
+struct PointerAuthOptions : clang::PointerAuthOptions {
+  /// Native opaque function types, both thin and thick.
+  /// Never address-sensitive.
+  PointerAuthSchema SwiftFunctionPointers;
+
+  /// Swift key path helpers.
+  PointerAuthSchema KeyPaths;
+
+  /// Swift value witness functions.
+  PointerAuthSchema ValueWitnesses;
+
+  /// Swift protocol witness functions.
+  PointerAuthSchema ProtocolWitnesses;
+
+  /// Swift protocol witness table associated type metadata access functions.
+  PointerAuthSchema ProtocolAssociatedTypeAccessFunctions;
+
+  /// Swift protocol witness table associated conformance witness table
+  /// access functions.
+  PointerAuthSchema ProtocolAssociatedTypeWitnessTableAccessFunctions;
+
+  /// Swift class v-table functions.
+  PointerAuthSchema SwiftClassMethods;
+
+  /// Swift dynamic replacement implementations.
+  PointerAuthSchema SwiftDynamicReplacements;
+  PointerAuthSchema SwiftDynamicReplacementKeys;
+
+  /// Swift class v-table functions not signed with an address. This is the
+  /// return type of swift_lookUpClassMethod().
+  PointerAuthSchema SwiftClassMethodPointers;
+
+  /// Swift heap metadata destructors.
+  PointerAuthSchema HeapDestructors;
+
+  /// Non-constant function pointers captured in a partial-apply context.
+  PointerAuthSchema PartialApplyCapture;
+
+  /// Type descriptor data pointers.
+  PointerAuthSchema TypeDescriptors;
+
+  /// Type descriptor data pointers when passed as arguments.
+  PointerAuthSchema TypeDescriptorsAsArguments;
+
+  /// Resumption functions from yield-once coroutines.
+  PointerAuthSchema YieldOnceResumeFunctions;
+
+  /// Resumption functions from yield-many coroutines.
+  PointerAuthSchema YieldManyResumeFunctions;
 };
 
 /// The set of options supported by IR generation.
@@ -146,6 +200,9 @@ public:
   /// objects.
   unsigned EmitStackPromotionChecks : 1;
 
+  /// Emit functions to separate sections.
+  unsigned FunctionSections : 1;
+
   /// The maximum number of bytes used on a stack frame for stack promotion
   /// (includes alloc_stack allocations).
   unsigned StackPromotionSizeLimit = 1024;
@@ -190,6 +247,10 @@ public:
   /// Passing this flag completely disables this behavior.
   unsigned DisableLegacyTypeInfo : 1;
 
+  /// Create metadata specializations for generic types at statically known type
+  /// arguments.
+  unsigned PrespecializeGenericMetadata : 1;
+
   /// The path to load legacy type layouts from.
   StringRef ReadLegacyTypeInfoPath;
 
@@ -202,6 +263,10 @@ public:
 
   /// Enable use of the swiftcall calling convention.
   unsigned UseSwiftCall : 1;
+
+  /// Enable the use of type layouts for value witness functions and use
+  /// vw functions instead of outlined copy/destroy functions.
+  unsigned UseTypeLayoutValueHandling : 1;
 
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
@@ -224,6 +289,9 @@ public:
 
   /// Which sanitizer coverage is turned on.
   llvm::SanitizerCoverageOptions SanitizeCoverage;
+
+  /// Pointer authentication.
+  PointerAuthOptions PointerAuth;
 
   /// The different modes for dumping IRGen type info.
   enum class TypeInfoDumpFilter {
@@ -249,14 +317,15 @@ public:
         IntegratedREPL(false), DisableLLVMOptzns(false),
         DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
         DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
-        PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
+        FunctionSections(false), PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         HasValueNamesSetting(false), ValueNames(false),
         EnableReflectionMetadata(true), EnableReflectionNames(true),
         EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
         LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
-        UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
-        GenerateProfile(false), EnableDynamicReplacementChaining(false),
+        PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
+        UseSwiftCall(false), UseTypeLayoutValueHandling(true), GenerateProfile(false),
+        EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
@@ -264,7 +333,7 @@ public:
   /// Appends to \p os an arbitrary string representing all options which
   /// influence the llvm compilation but are not reflected in the llvm module
   /// itself.
-  void writeLLVMCodeGenOptionsTo(llvm::raw_ostream &os) {
+  void writeLLVMCodeGenOptionsTo(llvm::raw_ostream &os) const {
     // We put a letter between each value simply to keep them from running into
     // one another. There might be a vague correspondence between meaning and
     // letter, but don't sweat it.
@@ -293,6 +362,16 @@ public:
 
   bool optimizeForSize() const {
     return OptMode == OptimizationMode::ForSize;
+  }
+
+  std::string getDebugFlags(StringRef PrivateDiscriminator) const {
+    std::string Flags = DebugFlags;
+    if (!PrivateDiscriminator.empty()) {
+      if (!Flags.empty())
+        Flags += " ";
+      Flags += ("-private-discriminator " + PrivateDiscriminator).str();
+    }
+    return Flags;
   }
 
   /// Return a hash code of any components from these options that should

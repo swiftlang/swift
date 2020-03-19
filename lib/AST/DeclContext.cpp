@@ -287,6 +287,12 @@ DeclContext *DeclContext::getModuleScopeContext() const {
   }
 }
 
+void DeclContext::getSeparatelyImportedOverlays(
+    ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) const {
+  if (auto SF = getParentSourceFile())
+    SF->getSeparatelyImportedOverlays(declaring, overlays);
+}
+
 /// Determine whether the given context is generic at any level.
 bool DeclContext::isGenericContext() const {
   auto dc = this;
@@ -798,8 +804,7 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, loader);
-  auto lazyMembers = FirstDeclAndLazyMembers.getInt() | LazyMembers::Present;
-  FirstDeclAndLazyMembers.setInt(LazyMembers(lazyMembers));
+  FirstDeclAndLazyMembers.setInt(true);
   contextInfo->memberData = contextData;
 
   ++NumLazyIterableDeclContexts;
@@ -839,8 +844,10 @@ void IterableDeclContext::loadAllMembers() const {
     // members to this context, this call is important for recording the
     // dependency edge.
     auto mutableThis = const_cast<IterableDeclContext *>(this);
-    auto members = evaluateOrDefault(
-        ctx.evaluator, ParseMembersRequest{mutableThis}, ArrayRef<Decl*>());
+    auto members =
+        evaluateOrDefault(ctx.evaluator, ParseMembersRequest{mutableThis},
+                          FingerprintAndMembers())
+            .members;
 
     // If we haven't already done so, add these members to this context.
     if (!AddedParsedMembers) {
@@ -855,12 +862,11 @@ void IterableDeclContext::loadAllMembers() const {
     return;
 
   // Don't try to load all members re-entrant-ly.
-  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
-    /*lazyLoader=*/nullptr);
-  auto lazyMembers = FirstDeclAndLazyMembers.getInt() & ~LazyMembers::Present;
-  FirstDeclAndLazyMembers.setInt(LazyMembers(lazyMembers));
+  FirstDeclAndLazyMembers.setInt(false);
 
   const Decl *container = getDecl();
+  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
+    /*lazyLoader=*/nullptr);
   contextInfo->loader->loadAllMembers(const_cast<Decl *>(container),
                                       contextInfo->memberData);
 
@@ -901,6 +907,27 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
   }
 }
 
+Optional<std::string> IterableDeclContext::getBodyFingerprint() const {
+  // Only makes sense for contexts in a source file
+  if (!getDecl()->getDeclContext()->getParentSourceFile())
+    return None;
+  auto mutableThis = const_cast<IterableDeclContext *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ParseMembersRequest{mutableThis},
+                           FingerprintAndMembers())
+      .fingerprint;
+}
+
+bool IterableDeclContext::areTokensHashedForThisBodyInsteadOfInterfaceHash()
+    const {
+  // Do not keep separate hashes for extension bodies because the dependencies
+  // can miss the addition of a member in an extension because there is nothing
+  // corresponding to the fingerprinted nominal dependency node.
+  if (isa<ExtensionDecl>(this))
+    return false;
+  return getASTContext().LangOpts.EnableTypeFingerprints;
+}
+
 /// Return the DeclContext to compare when checking private access in
 /// Swift 4 mode. The context returned is the type declaration if the context
 /// and the type declaration are in the same file, otherwise it is the types
@@ -927,14 +954,16 @@ getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
   return lastExtension ? lastExtension : DC;
 }
 
-AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
-    : Value(DC, isPrivate) {
+AccessScope::AccessScope(const DeclContext *DC, bool isPrivate, bool isSPI)
+    : Value(DC, isPrivate || isSPI) {
   if (isPrivate) {
     DC = getPrivateDeclContext(DC, DC->getParentSourceFile());
     Value.setPointer(DC);
   }
   if (!DC || isa<ModuleDecl>(DC))
     assert(!isPrivate && "public or internal scope can't be private");
+  if (DC)
+    assert(!isSPI && "only public scopes can be SPI");
 }
 
 bool AccessScope::isFileScope() const {

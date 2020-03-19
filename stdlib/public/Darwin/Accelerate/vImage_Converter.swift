@@ -224,7 +224,7 @@ extension vImageConverter {
         
         var error = kvImageNoError
         
-        _ = withUnsafePointer(to: source) { src in
+        withUnsafePointer(to: source) { src in
             error = vImageConvert_AnyToAny(self,
                                            src,
                                            &destination,

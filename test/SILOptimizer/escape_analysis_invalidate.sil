@@ -1,8 +1,15 @@
-// RUN: %target-sil-opt %s -temp-rvalue-opt -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt %s -temp-rvalue-opt -enable-sil-verify-all -escapes-internal-verify -wmo | %FileCheck %s
 //
 // TempRValue iteratively uses EscapeAnalysis and deletes
 // instructions. Make sure that the connection graph remains valid
 // <rdar://57290845>.
+//
+// This test requires -wmo so EscapeAnalysis can find all
+// implementations of SomeProtocol.foo. Otherwise the existential
+// address appears to escape. As an alternative, we could be more
+// aggressive about considering address-type argument not to escape,
+// but that would require some limiting address_to_pointer to never
+// occur on an exclusive address argument.
 
 import Swift
 
@@ -81,4 +88,25 @@ bb0(%0 : $*SomeProtocol, %1 : $SomeClass):
   dealloc_stack %stk0 : $*SomeStruct
   %v = tuple ()
   return %v : $()
+}
+
+sil hidden @$s26escape_analysis_invalidate12SomeInstanceV3fooyyF : $@convention(method) (SomeInstance) -> () {
+bb0(%0 : $SomeInstance):
+  debug_value %0 : $SomeInstance, let, name "self", argno 1 // id: %1
+  %2 = tuple ()                                   // user: %3
+  return %2 : $()                                 // id: %3
+}
+
+sil private [transparent] [thunk] @$s26escape_analysis_invalidate12SomeInstanceVAA0A8ProtocolA2aDP3fooyyFTW : $@convention(witness_method: SomeProtocol) (@in_guaranteed SomeInstance) -> () {
+bb0(%0 : $*SomeInstance):
+  %1 = load %0 : $*SomeInstance
+  // function_ref SomeInstance.foo()
+  %2 = function_ref @$s26escape_analysis_invalidate12SomeInstanceV3fooyyF : $@convention(method) (SomeInstance) -> ()
+  %3 = apply %2(%1) : $@convention(method) (SomeInstance) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil_witness_table hidden SomeInstance: SomeProtocol module t {
+  method #SomeProtocol.foo!1: <Self where Self : SomeProtocol> (Self) -> () -> () : @$s26escape_analysis_invalidate12SomeInstanceVAA0A8ProtocolA2aDP3fooyyFTW     // protocol witness for SomeProtocol.foo() in conformance SomeInstance
 }

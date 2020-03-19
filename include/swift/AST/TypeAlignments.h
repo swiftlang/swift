@@ -46,6 +46,7 @@ namespace swift {
   class ProtocolDecl;
   class ProtocolConformance;
   class SILFunction;
+  class SILFunctionType;
   class Stmt;
   class TypeVariableType;
   class TypeBase;
@@ -100,6 +101,8 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::ExtensionDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeBase, swift::TypeAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ArchetypeType, swift::TypeAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeVariableType, swift::TypeVariableAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::SILFunctionType,
+                            swift::TypeVariableAlignInBits)
 
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Stmt, swift::StmtAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::BraceStmt, swift::StmtAlignInBits)

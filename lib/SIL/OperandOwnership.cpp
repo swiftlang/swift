@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILInstruction.h"
@@ -88,8 +89,6 @@ public:
   }
 
   OperandOwnershipKindMap
-  visitEnumArgument(ValueOwnershipKind requiredConvention);
-  OperandOwnershipKindMap
   visitApplyParameter(ValueOwnershipKind requiredConvention,
                       UseLifetimeConstraint requirement);
   OperandOwnershipKindMap visitFullApply(FullApplySite apply);
@@ -112,12 +111,15 @@ public:
 #define SHOULD_NEVER_VISIT_INST(INST)                                          \
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
       INST##Inst *i) {                                                         \
-    llvm_unreachable("Visited instruction that should never be visited?!");    \
+    llvm::errs() << "Unhandled inst: " << *i;                                  \
+    llvm::report_fatal_error(                                                  \
+        "Visited instruction that should never be visited?!");                 \
   }
 SHOULD_NEVER_VISIT_INST(AllocBox)
 SHOULD_NEVER_VISIT_INST(AllocExistentialBox)
 SHOULD_NEVER_VISIT_INST(AllocGlobal)
 SHOULD_NEVER_VISIT_INST(AllocStack)
+SHOULD_NEVER_VISIT_INST(DifferentiabilityWitnessFunction)
 SHOULD_NEVER_VISIT_INST(FloatLiteral)
 SHOULD_NEVER_VISIT_INST(FunctionRef)
 SHOULD_NEVER_VISIT_INST(DynamicFunctionRef)
@@ -165,13 +167,13 @@ INTERIOR_POINTER_PROJECTION(RefTailAddr)
   }
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)
+CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AbortApply)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, BeginAccess)
@@ -281,7 +283,6 @@ ACCEPTS_ANY_OWNERSHIP_INST(SuperMethod)
 ACCEPTS_ANY_OWNERSHIP_INST(BridgeObjectToWord)
 ACCEPTS_ANY_OWNERSHIP_INST(ClassifyBridgeObject)
 ACCEPTS_ANY_OWNERSHIP_INST(CopyBlock)
-ACCEPTS_ANY_OWNERSHIP_INST(OpenExistentialBox)
 ACCEPTS_ANY_OWNERSHIP_INST(RefToRawPointer)
 ACCEPTS_ANY_OWNERSHIP_INST(SetDeallocating)
 ACCEPTS_ANY_OWNERSHIP_INST(ProjectExistentialBox)
@@ -346,6 +347,7 @@ FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
+FORWARD_ANY_OWNERSHIP_INST(InitExistentialRef)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
@@ -409,48 +411,33 @@ OperandOwnershipKindClassifier::checkTerminatorArgumentMatchesDestBB(
   // Grab the ownership kind of the destination block.
   ValueOwnershipKind destBlockArgOwnershipKind =
       destBB->getArgument(opIndex)->getOwnershipKind();
-
-  // Then if we do not have an enum, make sure that the conventions match.
-  if (!getType().getEnumOrBoundGenericEnum()) {
-    auto lifetimeConstraint =
-        destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
-    return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
-  }
-
-  // Otherwise, we need to properly handle the sum type nature of enum
-  // arguments.
-  return visitEnumArgument(destBlockArgOwnershipKind);
+  auto lifetimeConstraint =
+      destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
 }
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitBranchInst(BranchInst *bi) {
-  return checkTerminatorArgumentMatchesDestBB(bi->getDestBB(),
-                                              getOperandIndex());
+  ValueOwnershipKind destBlockArgOwnershipKind =
+      bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
+
+  // If we have a guaranteed parameter, treat this as consuming.
+  if (destBlockArgOwnershipKind == ValueOwnershipKind::Guaranteed) {
+    return Map::compatibilityMap(destBlockArgOwnershipKind,
+                                 UseLifetimeConstraint::MustBeInvalidated);
+  }
+
+  // Otherwise, defer to defaults.
+  auto lifetimeConstraint =
+      destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
 }
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitCondBranchInst(CondBranchInst *cbi) {
-  // If our conditional branch is the condition, it is trivial. Check that the
-  // ownership kind is trivial.
-  if (cbi->isConditionOperandIndex(getOperandIndex()))
-    return Map::allLive();
-
-  // Otherwise, make sure that our operand matches the ownership of the relevant
-  // argument.
-  //
-  // TODO: Use more updated APIs here to get the operands/etc.
-  if (cbi->isTrueOperandIndex(getOperandIndex())) {
-    unsigned trueOffset = 1;
-    return checkTerminatorArgumentMatchesDestBB(cbi->getTrueBB(),
-                                                getOperandIndex() - trueOffset);
-  }
-
-  assert(cbi->isFalseOperandIndex(getOperandIndex()) &&
-         "If an operand is not the condition index or a true operand index, it "
-         "must be a false operand index");
-  unsigned falseOffset = 1 + cbi->getTrueOperands().size();
-  return checkTerminatorArgumentMatchesDestBB(cbi->getFalseBB(),
-                                              getOperandIndex() - falseOffset);
+  // In ossa, cond_br insts are not allowed to take non-trivial values. Thus, we
+  // just accept anything since we know all of our operands will be trivial.
+  return Map::allLive();
 }
 
 OperandOwnershipKindMap
@@ -537,9 +524,9 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
     return Map();
 
   auto ownershipKindRange = makeTransformRange(results,
-                                               [&](const SILResultInfo &info) {
-                                                 return info.getOwnershipKind(*f);
-                                               });
+     [&](const SILResultInfo &info) {
+       return info.getOwnershipKind(*f, f->getLoweredFunctionType());
+     });
 
   // Then merge all of our ownership kinds. If we fail to merge, return an empty
   // map so we fail on all operands.
@@ -548,12 +535,6 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
     return Map();
 
   auto base = *mergedBase;
-
-  // TODO: This may not be needed once trivial is any.
-  if (getType().getEnumOrBoundGenericEnum()) {
-    return visitEnumArgument(base);
-  }
-
   return Map::compatibilityMap(base, base.getForwardingLifetimeConstraint());
 }
 
@@ -641,57 +622,20 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
   llvm_unreachable("Unhandled ParameterConvention in switch.");
 }
 
-// Visit an enum value that is passed at argument position, including block
-// arguments, apply arguments, and return values.
-//
-// The operand definition's ownership kind may be known to be "trivial",
-// but it is still valid to pass that enum to a argument nontrivial type.
-// For example:
-//
-// %val = enum $Optional<SomeClass>, #Optional.none // trivial ownership
-// apply %f(%val) : (@owned Optional<SomeClass>)    // owned argument
-OperandOwnershipKindMap OperandOwnershipKindClassifier::visitEnumArgument(
-    ValueOwnershipKind requiredKind) {
-  // Begin with an empty map.
-  OperandOwnershipKindMap map;
-
-  // The operand has a non-trivial ownership kind. It must match the argument
-  // convention.
-  if (requiredKind != ValueOwnershipKind::Owned) {
-    map.addCompatibilityConstraint(ValueOwnershipKind::Owned,
-                                   UseLifetimeConstraint::MustBeLive);
-  } else {
-    map.addCompatibilityConstraint(ValueOwnershipKind::Owned,
-                                   UseLifetimeConstraint::MustBeInvalidated);
-  }
-  map.addCompatibilityConstraint(ValueOwnershipKind::Guaranteed,
-                                 UseLifetimeConstraint::MustBeLive);
-  map.addCompatibilityConstraint(ValueOwnershipKind::Unowned,
-                                 UseLifetimeConstraint::MustBeLive);
-  return map;
-}
-
 // We allow for trivial cases of enums with non-trivial cases to be passed in
 // non-trivial argument positions. This fits with modeling of a
 // SILFunctionArgument as a phi in a global program graph.
 OperandOwnershipKindMap OperandOwnershipKindClassifier::visitApplyParameter(
     ValueOwnershipKind kind, UseLifetimeConstraint requirement) {
 
-  // Check if we have an enum. If not, then we just check against the passed in
-  // convention.
-  if (!getType().getEnumOrBoundGenericEnum()) {
-    // We allow for owned to be passed to apply parameters.
-    if (kind != ValueOwnershipKind::Owned) {
-      return Map::compatibilityMap(
-          {{kind, requirement},
-           {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeLive}});
-    }
-    return Map::compatibilityMap(kind, requirement);
+  // Check against the passed in convention. We allow for owned to be passed to
+  // apply parameters.
+  if (kind != ValueOwnershipKind::Owned) {
+    return Map::compatibilityMap(
+        {{kind, requirement},
+         {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeLive}});
   }
-
-  // Otherwise consider that we may have a payload with a trivial case
-  // that has other non-trivial cases.
-  return visitEnumArgument(kind);
+  return Map::compatibilityMap(kind, requirement);
 }
 
 // Handle Apply and TryApply.
@@ -1061,6 +1005,7 @@ ANY_OWNERSHIP_BUILTIN(ZeroInitializer)
 ANY_OWNERSHIP_BUILTIN(Swift3ImplicitObjCEntrypoint)
 ANY_OWNERSHIP_BUILTIN(PoundAssert)
 ANY_OWNERSHIP_BUILTIN(GlobalStringTablePointer)
+ANY_OWNERSHIP_BUILTIN(TypePtrAuthDiscriminator)
 #undef ANY_OWNERSHIP_BUILTIN
 
 // This is correct today since we do not have any builtins which return

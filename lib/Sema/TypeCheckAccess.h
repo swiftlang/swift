@@ -20,7 +20,6 @@
 namespace swift {
 
 class Decl;
-class TypeChecker;
 
 /// Performs access-related checks for \p D.
 ///

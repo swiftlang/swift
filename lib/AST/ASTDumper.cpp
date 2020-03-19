@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -312,19 +313,6 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
   }
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
-}
-static StringRef
-getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
-  switch (value) {
-    case MagicIdentifierLiteralExpr::File: return "#file";
-    case MagicIdentifierLiteralExpr::FilePath: return "#filePath";
-    case MagicIdentifierLiteralExpr::Function: return "#function";
-    case MagicIdentifierLiteralExpr::Line: return "#line";
-    case MagicIdentifierLiteralExpr::Column: return "#column";
-    case MagicIdentifierLiteralExpr::DSOHandle: return "#dsohandle";
-  }
-
-  llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 static StringRef
 getObjCSelectorExprKindString(ObjCSelectorExpr::ObjCSelectorKind value) {
@@ -728,7 +716,7 @@ namespace {
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
         PrintWithColorRAII(OS, TypeColor) << " type='";
-        if (auto varTy = var->hasInterfaceType())
+        if (var->hasInterfaceType())
           var->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
         else
           PrintWithColorRAII(OS, TypeColor) << "<null type>";
@@ -793,13 +781,15 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, ASTNodeColor) << "source_file ";
       PrintWithColorRAII(OS, LocationColor) << '\"' << SF.getFilename() << '\"';
-      
-      for (Decl *D : SF.getTopLevelDecls()) {
-        if (D->isImplicit())
-          continue;
 
-        OS << '\n';
-        printRec(D);
+      if (auto decls = SF.getCachedTopLevelDecls()) {
+        for (Decl *D : *decls) {
+          if (D->isImplicit())
+            continue;
+
+          OS << '\n';
+          printRec(D);
+        }
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -1957,7 +1947,7 @@ public:
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
     printCommon(E, "magic_identifier_literal_expr")
-      << " kind=" << getMagicIdentifierLiteralExprKindString(E->getKind());
+      << " kind=" << MagicIdentifierLiteralExpr::getKindString(E->getKind());
 
     if (E->isString()) {
       OS << " encoding="
@@ -3013,6 +3003,31 @@ public:
     OS << " type="; Ty.dump(OS);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
+    printCommon("sil_box");
+    Indent += 2;
+
+    ArrayRef<SILBoxTypeReprField> Fields = T->getFields();
+    for (unsigned i = 0, end = Fields.size(); i != end; ++i) {
+      OS << '\n';
+      printCommon("sil_box_field");
+      if (Fields[i].isMutable()) {
+        OS << " mutable";
+      }
+      OS << '\n';
+      printRec(Fields[i].getFieldType());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    for (auto genArg : T->getGenericArguments()) {
+      OS << '\n';
+      printRec(genArg);
+    }
+
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    Indent -= 2;
+  }
 };
 
 } // end anonymous namespace
@@ -3216,8 +3231,11 @@ static void dumpSubstitutionMapRec(
     out << "substitution ";
     genericParams[i]->print(out);
     out << " -> ";
-    if (replacementTypes[i])
-      replacementTypes[i]->print(out);
+    if (replacementTypes[i]) {
+      PrintOptions opts;
+      opts.PrintForSIL = true;
+      replacementTypes[i]->print(out, opts);
+    }
     else
       out << "<<unresolved concrete type>>";
     printParen(')');
@@ -3661,8 +3679,26 @@ namespace {
 
     void visitSILFunctionType(SILFunctionType *T, StringRef label) {
       printCommon(label, "sil_function_type");
-      // FIXME: Print the structure of the type.
       printField("type", T->getString());
+
+      for (auto param : T->getParameters()) {
+        printRec("input", param.getInterfaceType());
+      }
+      for (auto yield : T->getYields()) {
+        printRec("yield", yield.getInterfaceType());
+      }
+      for (auto result : T->getResults()) {
+        printRec("result", result.getInterfaceType());
+      }
+      if (auto error  = T->getOptionalErrorResult()) {
+        printRec("error", error->getInterfaceType());
+      }
+      OS << '\n';
+      T->getPatternSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
+                                        Indent+2);
+      OS << '\n';
+      T->getInvocationSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
+                                           Indent+2);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -3775,6 +3811,10 @@ void Type::dump() const {
 }
 
 void Type::dump(raw_ostream &os, unsigned indent) const {
+  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+    return; // not needed for the parser library.
+  #endif
+
   PrintType(os, indent).visit(*this, "");
   os << "\n";
 }
@@ -3816,4 +3856,45 @@ StringRef swift::getAccessorKindString(AccessorKind value) {
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
+}
+
+void StableSerializationPath::dump() const {
+  dump(llvm::errs());
+}
+
+static StringRef getExternalPathComponentKindString(
+                  StableSerializationPath::ExternalPath::ComponentKind kind) {
+  switch (kind) {
+#define CASE(ID, STRING) \
+  case StableSerializationPath::ExternalPath::ID: return STRING;
+  CASE(Record, "record")
+  CASE(Enum, "enum")
+  CASE(Namespace, "namespace")
+  CASE(Typedef, "typedef")
+  CASE(TypedefAnonDecl, "anonymous tag")
+  CASE(ObjCInterface, "@interface")
+  CASE(ObjCProtocol, "@protocol")
+#undef CASE
+  }
+  llvm_unreachable("bad kind");
+}
+
+void StableSerializationPath::dump(llvm::raw_ostream &os) const {
+  if (isSwiftDecl()) {
+    os << "clang decl of:\n";
+    getSwiftDecl()->dump(os, 2);
+  } else {
+    auto &path = getExternalPath();
+    using ExternalPath = StableSerializationPath::ExternalPath;
+    os << "external path: ";
+    size_t index = 0;
+    for (auto &entry : path.Path) {
+      if (index++) os << " -> ";
+      os << getExternalPathComponentKindString(entry.first);
+      if (ExternalPath::requiresIdentifier(entry.first))  {
+        os << "(" << entry.second << ")";
+      }
+    }
+    os << "\n";
+  }
 }

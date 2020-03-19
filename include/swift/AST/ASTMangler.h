@@ -39,8 +39,8 @@ protected:
   bool OptimizeProtocolNames = true;
 
   /// If enabled, use Objective-C runtime names when mangling @objc Swift
-  /// protocols.
-  bool UseObjCProtocolNames = false;
+  /// protocols and classes.
+  bool UseObjCRuntimeNames = false;
 
   /// If enabled, non-canonical types are allowed and type alias types get a
   /// special mangling.
@@ -153,7 +153,15 @@ public:
                                              Type FromType, Type ToType,
                                              Type SelfType,
                                              ModuleDecl *Module);
-  
+
+  /// Mangle a SIL differentiability witness key:
+  /// - Mangled original function name.
+  /// - Parameter indices.
+  /// - Result indices.
+  /// - Derivative generic signature (optional).
+  std::string
+  mangleSILDifferentiabilityWitnessKey(SILDifferentiabilityWitnessKey key);
+
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature signature,
                                              CanType baseType,

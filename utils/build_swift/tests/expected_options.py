@@ -1,19 +1,20 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+from __future__ import absolute_import, unicode_literals
+
 import multiprocessing
 
-from swift_build_support.swift_build_support import host
-from swift_build_support.swift_build_support import targets
+from build_swift import argparse
+from build_swift import defaults
 
-from .. import argparse
-from .. import defaults
+from swift_build_support.swift_build_support import targets
 
 
 __all__ = [
@@ -74,6 +75,7 @@ EXPECTED_DEFAULTS = {
     'build_ninja': False,
     'build_osx': True,
     'build_playgroundsupport': False,
+    'build_pythonkit': False,
     'build_runtime_with_host_compiler': False,
     'build_stdlib_deployment_targets': ['all'],
     'build_subdir': None,
@@ -84,6 +86,7 @@ EXPECTED_DEFAULTS = {
     'build_swift_stdlib_unittest_extra': False,
     'build_swiftpm': False,
     'build_swiftsyntax': False,
+    'build_tensorflow_swift_apis': False,
     'build_libparser_only': False,
     'build_skstresstester': False,
     'build_swiftevolve': False,
@@ -91,11 +94,13 @@ EXPECTED_DEFAULTS = {
     'build_sourcekitlsp': False,
     'install_swiftpm': False,
     'install_swiftsyntax': False,
-    'skip_install_swiftsyntax_module': False,
     'swiftsyntax_verify_generated_files': False,
+    'install_playgroundsupport': False,
+    'install_pythonkit': False,
     'install_sourcekitlsp': False,
     'install_skstresstester': False,
     'install_swiftevolve': False,
+    'install_tensorflow_swift_apis': False,
     'build_toolchainbenchmarks': False,
     'build_tvos': True,
     'build_tvos_device': False,
@@ -150,6 +155,7 @@ EXPECTED_DEFAULTS = {
     'host_target': targets.StdlibDeploymentTarget.host_target().name,
     'host_test': False,
     'only_executable_test': False,
+    'only_non_executable_test': False,
     'install_prefix': targets.install_prefix(),
     'install_symroot': None,
     'install_destdir': None,
@@ -166,11 +172,13 @@ EXPECTED_DEFAULTS = {
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
     'llvm_max_parallel_lto_link_jobs':
-        host.max_lto_link_job_counts()['llvm'],
+        defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
     'llvm_targets_to_build': 'X86;ARM;AArch64;PowerPC;SystemZ;Mips',
     'tsan_libdispatch_test': False,
     'long_test': False,
     'lto_type': None,
+    'maccatalyst': False,
+    'maccatalyst_ios_tests': False,
     'dump_config': False,
     'show_sdks': False,
     'skip_build': False,
@@ -186,7 +194,7 @@ EXPECTED_DEFAULTS = {
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_max_parallel_lto_link_jobs':
-        host.max_lto_link_job_counts()['swift'],
+        defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
     'symbols_package': None,
     'test': None,
@@ -204,12 +212,14 @@ EXPECTED_DEFAULTS = {
     'test_optimized': None,
     'test_osx': False,
     'test_paths': [],
+    'test_pythonkit': False,
     'test_tvos': False,
     'test_tvos_host': False,
     'test_tvos_simulator': False,
     'test_watchos': False,
     'test_watchos_host': False,
     'test_watchos_simulator': False,
+    'test_playgroundsupport': True,
     'test_swiftpm': False,
     'test_swiftsyntax': False,
     'test_indexstoredb': False,
@@ -440,7 +450,17 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--llbuild', dest='build_llbuild'),
     SetTrueOption('--lldb', dest='build_lldb'),
     SetTrueOption('--libcxx', dest='build_libcxx'),
+    SetTrueOption('--maccatalyst', dest='maccatalyst'),
+    SetTrueOption('--maccatalyst-ios-tests', dest='maccatalyst_ios_tests'),
     SetTrueOption('--playgroundsupport', dest='build_playgroundsupport'),
+    SetTrueOption('--pythonkit', dest='build_pythonkit'),
+    SetTrueOption('--install-playgroundsupport',
+                  dest='install_playgroundsupport'),
+    SetTrueOption('--install-pythonkit', dest='install_pythonkit'),
+    SetTrueOption('--test-pythonkit', dest='test_pythonkit'),
+    SetTrueOption('--tensorflow-swift-apis', dest='build_tensorflow_swift_apis'),
+    SetTrueOption('--install-tensorflow-swift-apis',
+                  dest='install_tensorflow_swift_apis'),
     SetTrueOption('--skip-build'),
     SetTrueOption('--swiftpm', dest='build_swiftpm'),
     SetTrueOption('--swiftsyntax', dest='build_swiftsyntax'),
@@ -479,13 +499,12 @@ EXPECTED_OPTIONS = [
     EnableOption('--foundation', dest='build_foundation'),
     EnableOption('--host-test'),
     EnableOption('--only-executable-test'),
+    EnableOption('--only-non-executable-test'),
     EnableOption('--libdispatch', dest='build_libdispatch'),
     EnableOption('--libicu', dest='build_libicu'),
     EnableOption('--indexstore-db', dest='build_indexstoredb'),
     EnableOption('--sourcekit-lsp', dest='build_sourcekitlsp'),
     EnableOption('--install-swiftsyntax', dest='install_swiftsyntax'),
-    EnableOption('--skip-install-swiftsyntax-module',
-                 dest='skip_install_swiftsyntax_module'),
     EnableOption('--swiftsyntax-verify-generated-files',
                  dest='swiftsyntax_verify_generated_files'),
     EnableOption('--install-swiftpm', dest='install_swiftpm'),
@@ -546,6 +565,8 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-watchos-host', dest='test_watchos_host'),
     DisableOption('--skip-test-watchos-simulator',
                   dest='test_watchos_simulator'),
+    DisableOption('--skip-test-playgroundsupport',
+                  dest='test_playgroundsupport'),
     DisableOption('--skip-test-swiftpm', dest='test_swiftpm'),
     DisableOption('--skip-test-swiftsyntax', dest='test_swiftsyntax'),
     DisableOption('--skip-test-indexstore-db', dest='test_indexstoredb'),

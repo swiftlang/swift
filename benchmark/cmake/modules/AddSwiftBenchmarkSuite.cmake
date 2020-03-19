@@ -106,7 +106,7 @@ endmacro()
 
 macro(configure_sdks_darwin)
   set(macosx_arch "x86_64")
-  set(iphoneos_arch "arm64" "armv7")
+  set(iphoneos_arch "arm64" "arm64e" "armv7")
   set(appletvos_arch "arm64")
   set(watchos_arch "armv7k")
 
@@ -355,6 +355,10 @@ function (swift_benchmark_compile_archopts)
       "-target" "${target}"
       "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION})
 
+  if(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO)
+    list(APPEND common_options "-g")
+  endif()
+
   if (is_darwin)
     list(APPEND common_options
       "-I" "${srcdir}/utils/ObjectiveCTests"
@@ -383,6 +387,10 @@ function (swift_benchmark_compile_archopts)
       "-c"
       "-target" "${target}"
       "-${driver_opt}")
+
+  if(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO)
+    list(APPEND common_options_driver "-g")
+  endif()
 
   if (is_darwin)
     list(APPEND common_options_driver

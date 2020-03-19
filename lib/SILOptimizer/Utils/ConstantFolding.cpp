@@ -23,6 +23,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "sil-constant-folding"
@@ -288,9 +289,9 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, BuiltinValueKind ID,
 static SILValue
 constantFoldCountLeadingOrTrialingZeroIntrinsic(BuiltinInst *bi,
                                                 bool countLeadingZeros) {
-  assert(bi->getIntrinsicID() == llvm::Intrinsic::ctlz ||
-         bi->getIntrinsicID() == llvm::Intrinsic::cttz &&
-             "Invalid Intrinsic - expected Ctlz/Cllz");
+  assert((bi->getIntrinsicID() == (llvm::Intrinsic::ID)llvm::Intrinsic::ctlz ||
+          bi->getIntrinsicID() == (llvm::Intrinsic::ID)llvm::Intrinsic::cttz) &&
+         "Invalid Intrinsic - expected Ctlz/Cllz");
   OperandValueArrayRef args = bi->getArguments();
 
   // Fold for integer constant arguments.

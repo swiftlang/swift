@@ -43,6 +43,12 @@ SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
 SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
               Type(KnownProtocolKind, const DeclContext *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
+              IndexSubset *(DifferentiableAttr *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeEraserHasViableInitRequest,
+              bool(TypeEraserAttr *, ProtocolDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
               ValueDecl *(ValueDecl *),
               Cached, NoLocationInfo)
@@ -75,9 +81,11 @@ SWIFT_REQUEST(TypeChecker, HasCircularRawValueRequest,
               bool(EnumDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasDynamicMemberLookupAttributeRequest,
               bool(CanType), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasDynamicCallableAttributeRequest,
+              bool(CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
               GenericSignature (ModuleDecl *, GenericSignatureImpl *,
-                                 GenericParamList *,
+                                 GenericParamSource,
                                  SmallVector<Requirement, 2>,
                                  SmallVector<TypeLoc, 2>, bool),
               Cached, NoLocationInfo)
@@ -196,11 +204,14 @@ SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
 SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
               bool(StructDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PreCheckFunctionBuilderRequest,
-              FunctionBuilderClosurePreCheck(ClosureExpr *),
+              FunctionBuilderClosurePreCheck(AnyFunctionRef),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               bool(NominalTypeDecl *, ImplicitMemberAction), Uncached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
+              llvm::ArrayRef<Identifier>(Decl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeMemberwiseInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
@@ -208,7 +219,7 @@ SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
 SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckSourceFileRequest,
-              bool(SouceFile *, unsigned), SeparatelyCached, NoLocationInfo)
+              bool(SouceFile *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeWitnessRequest,
               TypeWitnessAndDecl(NormalProtocolConformance *,
                                  AssociatedTypeDecl *),
@@ -219,3 +230,5 @@ SWIFT_REQUEST(TypeChecker, ValueWitnessRequest,
 SWIFT_REQUEST(TypeChecker, PatternTypeRequest,
               Type(ContextualPattern),
               Cached, HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, ScopedImportLookupRequest,
+              ArrayRef<ValueDecl *>(ImportDecl *), Cached, NoLocationInfo)

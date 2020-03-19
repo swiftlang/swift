@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/CommandLine.h"
 
 
 using namespace swift;
@@ -34,7 +35,8 @@ class SideEffectAnalysis;
 enum class InlineSelection {
   Everything,
   NoGlobalInit, // and no availability semantics calls
-  NoSemanticsAndGlobalInit
+  NoSemanticsAndGlobalInit,
+  OnlyInlineAlways,
 };
 
 // Returns the callee of an apply_inst if it is basically inlinable.
