@@ -430,16 +430,15 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForLinearMap(
     SILOptFunctionBuilder &fb, SILFunction *parentThunk,
-    CanSILFunctionType linearMapType, CanSILFunctionType targetType,
-    AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
-    SILAutoDiffIndices actualIndices) {
-  assert(!linearMapType->getCombinedSubstitutions());
-  assert(!targetType->getCombinedSubstitutions());
-
+    CanSILFunctionType origFnType, CanSILFunctionType linearMapType,
+    CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
+    SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for " << linearMapType
              << " from " << actualIndices << " to " << desiredIndices << '\n');
 
+  assert(!linearMapType->getCombinedSubstitutions());
+  assert(!targetType->getCombinedSubstitutions());
   SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
   auto thunkType = buildThunkType(parentThunk, linearMapType, targetType,
@@ -578,28 +577,37 @@ getOrCreateSubsetParametersThunkForLinearMap(
   // - All actual arguments.
   case AutoDiffDerivativeFunctionKind::VJP: {
     auto toIndirectResultsIter = thunk->getIndirectResults().begin();
-    auto useNextResult = [&]() {
+    auto useNextIndirectResult = [&]() {
       arguments.push_back(*toIndirectResultsIter++);
     };
-    // Iterate over actual indices.
+    // Collect pullback arguments.
+    unsigned pullbackResultIndex = 0;
     for (unsigned i : actualIndices.parameters->getIndices()) {
-      auto resultInfo =
-          linearMapType->getResults()[mapOriginalParameterIndex(i)];
-      // Skip direct results. Only indirect results are relevant as arguments.
+      auto origParamInfo = origFnType->getParameters()[i];
+      // Skip original `inout` parameters. All non-indirect-result pullback
+      // arguments (including `inout` arguments) are appended to `arguments`
+      // later.
+      if (origParamInfo.isIndirectMutating())
+        continue;
+      auto resultInfo = linearMapType->getResults()[pullbackResultIndex];
+      assert(pullbackResultIndex < linearMapType->getNumResults());
+      pullbackResultIndex++;
+      // Skip pullback direct results. Only indirect results are relevant as
+      // arguments.
       if (resultInfo.isFormalDirect())
         continue;
-      // If index is desired, use next indirect result.
+      // If index is desired, use next pullback indirect result.
       if (desiredIndices.isWrtParameter(i)) {
-        useNextResult();
+        useNextIndirectResult();
         continue;
       }
-      // Otherwise, construct and use an uninitialized indirect result.
+      // Otherwise, allocate and use an uninitialized pullback indirect result.
       auto *indirectResult = builder.createAllocStack(
           loc, resultInfo.getSILStorageInterfaceType());
       localAllocations.push_back(indirectResult);
       arguments.push_back(indirectResult);
     }
-    // Foward all actual non-indirect-result arguments.
+    // Forward all actual non-indirect-result arguments.
     arguments.append(thunk->getArgumentsWithoutIndirectResults().begin(),
                      thunk->getArgumentsWithoutIndirectResults().end() - 1);
     break;
@@ -626,14 +634,28 @@ getOrCreateSubsetParametersThunkForLinearMap(
   extractAllElements(ai, builder, pullbackDirectResults);
   SmallVector<SILValue, 8> allResults;
   collectAllActualResultsInTypeOrder(ai, pullbackDirectResults, allResults);
+  // Collect pullback `inout` arguments in type order.
+  unsigned inoutArgIdx = 0;
+  SILFunctionConventions origConv(origFnType, thunk->getModule());
+  for (auto paramIdx : actualIndices.parameters->getIndices()) {
+    auto paramInfo = origConv.getParameters()[paramIdx];
+    if (!paramInfo.isIndirectMutating())
+      continue;
+    auto inoutArg = *std::next(ai->getInoutArguments().begin(), inoutArgIdx++);
+    allResults.insert(allResults.begin() + paramIdx, inoutArg);
+  }
+  assert(allResults.size() == actualIndices.parameters->getNumIndices() &&
+         "Number of pullback results should match number of differentiability "
+         "parameters");
 
   SmallVector<SILValue, 8> results;
   for (unsigned i : actualIndices.parameters->getIndices()) {
+    unsigned mappedIndex = mapOriginalParameterIndex(i);
     // If result is desired:
     // - Do nothing if result is indirect.
     //   (It was already forwarded to the `apply` instruction).
     // - Push it to `results` if result is direct.
-    auto result = allResults[mapOriginalParameterIndex(i)];
+    auto result = allResults[mappedIndex];
     if (desiredIndices.isWrtParameter(i)) {
       if (result->getType().isObject())
         results.push_back(result);
@@ -811,8 +833,8 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   SubstitutionMap linearMapSubs;
   std::tie(linearMapThunk, linearMapSubs) =
       getOrCreateSubsetParametersThunkForLinearMap(
-          fb, thunk, unsubstLinearMapType, unsubstLinearMapTargetType, kind,
-          desiredIndices, actualIndices);
+          fb, thunk, origFnType, unsubstLinearMapType,
+          unsubstLinearMapTargetType, kind, desiredIndices, actualIndices);
 
   auto *linearMapThunkFRI = builder.createFunctionRef(loc, linearMapThunk);
   SILValue thunkedLinearMap = linearMap;
@@ -831,8 +853,11 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
         SILType::getPrimitiveObjectType(linearMapTargetType),
         /*withoutActuallyEscaping*/ false); // todo: correct boolean value?
   }
-  assert(origFnType->getResults().size() == 1);
-  if (origFnType->getResults().front().isFormalDirect()) {
+  assert(origFnType->getNumResults() +
+             origFnType->getNumIndirectMutatingParameters() ==
+         1);
+  if (origFnType->getNumResults() > 0 &&
+      origFnType->getResults().front().isFormalDirect()) {
     auto result =
         joinElements({originalDirectResult, thunkedLinearMap}, builder, loc);
     builder.createReturn(loc, result);

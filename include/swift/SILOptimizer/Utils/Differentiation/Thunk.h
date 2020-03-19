@@ -110,9 +110,9 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForLinearMap(
     SILOptFunctionBuilder &fb, SILFunction *assocFn,
-    CanSILFunctionType linearMapType, CanSILFunctionType targetType,
-    AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
-    SILAutoDiffIndices actualIndices);
+    CanSILFunctionType origFnType, CanSILFunctionType linearMapType,
+    CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
+    SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
 
 /// Reabstracts the given function-typed value `fn` to the target type `toType`.
 /// Remaps substitutions using `remapSubstitutions`.

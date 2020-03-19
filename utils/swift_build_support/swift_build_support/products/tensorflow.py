@@ -82,6 +82,9 @@ class TensorFlowSwiftAPIs(product.Product):
                 '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
                 # SWIFT_ENABLE_TENSORFLOW
                 target,
+                '-D', 'BUILD_TESTING={}'.format(
+                    'NO' if host_target.startswith('macosx') else 'YES'
+                ),
                 '-D', 'USE_BUNDLED_CTENSORFLOW=YES',
                 '-D', 'TensorFlow_INCLUDE_DIR={}'.format(tensorflow_source_dir),
                 '-D', 'TensorFlow_LIBRARY={}'.format(
@@ -89,6 +92,9 @@ class TensorFlowSwiftAPIs(product.Product):
                                  lib_name)),
                 '-D', 'CMAKE_Swift_FLAGS={}'.format('-L{}'.format(
                     os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow'))
+                ),
+                '-D', 'BUILD_X10={}'.format(
+                    'YES' if self.args.enable_x10 else 'NO'
                 ),
                 '-D', 'X10_INCLUDE_DIR={}'.format(x10_inc),
                 # SWIFT_ENABLE_TENSORFLOW END
