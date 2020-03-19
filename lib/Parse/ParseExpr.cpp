@@ -2264,7 +2264,10 @@ Expr *Parser::parseExprIdentifier() {
   }
   
   ValueDecl *D = nullptr;
-  if (!InPoundIfEnvironment) {
+  // When doing incremental re-parsing for SwiftSyntax this check may emit bogus
+  // diagnostic. Also really the syntactic parser should not be doing name
+  // lookups, so disable this check when parsing for SwiftSyntax.
+  if (!InPoundIfEnvironment && !Context.LangOpts.ParseForSyntaxTreeOnly) {
     D = lookupInScope(name);
     // FIXME: We want this to work: "var x = { x() }", but for now it's better
     // to disallow it than to crash.

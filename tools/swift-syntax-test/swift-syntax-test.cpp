@@ -175,6 +175,10 @@ static llvm::cl::opt<std::string>
 OutputFilename("output-filename",
                llvm::cl::desc("Path to the output file"));
 
+static llvm::cl::opt<std::string>
+DiagsOutputFilename("diags-output-filename",
+  llvm::cl::desc("Path to the output file for parser diagnostics text"));
+
 static llvm::cl::opt<bool>
 PrintVisualReuseInfo("print-visual-reuse-info",
                      llvm::cl::desc("Print a coloured output of which parts of "
@@ -556,12 +560,17 @@ bool verifyReusedRegions(ByteBasedSourceRangeSet ExpectedReparseRegions,
   return NoUnexpectedParse;
 }
 
+struct ParseInfo {
+  SourceFile *SF;
+  SyntaxParsingCache *SyntaxCache;
+  std::string Diags;
+};
+
 /// Parse the given input file (incrementally if an old syntax tree was
 /// provided) and call the action specific callback with the new syntax tree
 int parseFile(
     const char *MainExecutablePath, const StringRef InputFileName,
-    llvm::function_ref<int(SourceFile *, SyntaxParsingCache *SyntaxCache)>
-        ActionSpecificCallback) {
+    llvm::function_ref<int(ParseInfo)> ActionSpecificCallback) {
   // The cache needs to be a heap allocated pointer since we construct it inside
   // an if block but need to keep it alive until the end of the function.
   SyntaxParsingCache *SyntaxCache = nullptr;
@@ -597,6 +606,7 @@ int parseFile(
   // Set up the compiler invocation
   CompilerInvocation Invocation;
   Invocation.getLangOptions().BuildSyntaxTree = true;
+  Invocation.getLangOptions().ParseForSyntaxTreeOnly = true;
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getLangOptions().RequestEvaluatorGraphVizPath = options::GraphVisPath;
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
@@ -608,7 +618,9 @@ int parseFile(
   Invocation.setMainFileSyntaxParsingCache(SyntaxCache);
   Invocation.setModuleName("Test");
 
-  PrintingDiagnosticConsumer DiagConsumer;
+  std::string DiagsString;
+  llvm::raw_string_ostream DiagOS(DiagsString);
+  PrintingDiagnosticConsumer DiagConsumer(DiagOS);
   CompilerInstance Instance;
   Instance.addDiagnosticConsumer(&DiagConsumer);
   if (Instance.setup(Invocation)) {
@@ -658,7 +670,8 @@ int parseFile(
     }
   }
 
-  int ActionSpecificExitCode = ActionSpecificCallback(SF, SyntaxCache);
+  int ActionSpecificExitCode =
+    ActionSpecificCallback({SF, SyntaxCache, DiagOS.str()});
   if (ActionSpecificExitCode != EXIT_SUCCESS) {
     return ActionSpecificExitCode;
   } else {
@@ -713,8 +726,8 @@ int doDumpRawTokenSyntax(const StringRef InputFile) {
 int doFullParseRoundTrip(const char *MainExecutablePath,
                          const StringRef InputFile) {
   return parseFile(MainExecutablePath, InputFile,
-    [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) -> int {
-    SF->getSyntaxRoot().print(llvm::outs(), {});
+    [](ParseInfo info) -> int {
+    info.SF->getSyntaxRoot().print(llvm::outs(), {});
     return EXIT_SUCCESS;
   });
 }
@@ -722,7 +735,9 @@ int doFullParseRoundTrip(const char *MainExecutablePath,
 int doSerializeRawTree(const char *MainExecutablePath,
                        const StringRef InputFile) {
   return parseFile(MainExecutablePath, InputFile,
-    [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) -> int {
+    [](ParseInfo info) -> int {
+    auto SF = info.SF;
+    auto SyntaxCache = info.SyntaxCache;
     auto Root = SF->getSyntaxRoot().getRaw();
     std::unordered_set<unsigned> ReusedNodeIds;
     if (options::IncrementalSerialization && SyntaxCache) {
@@ -780,6 +795,23 @@ int doSerializeRawTree(const char *MainExecutablePath,
         SerializeTree(llvm::outs(), Root, SyntaxCache);
       }
     }
+
+    if (!options::DiagsOutputFilename.empty()) {
+      std::error_code errorCode;
+      llvm::raw_fd_ostream os(options::DiagsOutputFilename, errorCode,
+                              llvm::sys::fs::F_None);
+      if (errorCode) {
+        llvm::errs() << "error opening file '" << options::DiagsOutputFilename
+          << "': " << errorCode.message() << '\n';
+        return EXIT_FAILURE;
+      }
+      if (!info.Diags.empty())
+        os << info.Diags << '\n';
+    } else {
+      if (!info.Diags.empty())
+        llvm::errs() << info.Diags << '\n';
+    }
+
     return EXIT_SUCCESS;
   });
 }
@@ -800,19 +832,19 @@ int doDeserializeRawTree(const char *MainExecutablePath,
 
 int doParseOnly(const char *MainExecutablePath, const StringRef InputFile) {
   return parseFile(MainExecutablePath, InputFile,
-    [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) {
-    return SF ? EXIT_SUCCESS : EXIT_FAILURE;
+    [](ParseInfo info) {
+    return info.SF ? EXIT_SUCCESS : EXIT_FAILURE;
   });
 }
 
 int dumpParserGen(const char *MainExecutablePath, const StringRef InputFile) {
   return parseFile(MainExecutablePath, InputFile,
-    [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) {
+    [](ParseInfo info) {
     SyntaxPrintOptions Opts;
     Opts.PrintSyntaxKind = options::PrintNodeKind;
     Opts.Visual = options::Visual;
     Opts.PrintTrivialNodeKind = options::PrintTrivialNodeKind;
-    SF->getSyntaxRoot().print(llvm::outs(), Opts);
+    info.SF->getSyntaxRoot().print(llvm::outs(), Opts);
     return EXIT_SUCCESS;
   });
 }
@@ -820,7 +852,8 @@ int dumpParserGen(const char *MainExecutablePath, const StringRef InputFile) {
 int dumpEOFSourceLoc(const char *MainExecutablePath,
                      const StringRef InputFile) {
   return parseFile(MainExecutablePath, InputFile,
-    [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) -> int {
+    [](ParseInfo info) -> int {
+    auto SF = info.SF;
     auto BufferId = *SF->getBufferID();
     auto Root = SF->getSyntaxRoot();
     auto AbPos = Root.getEOFToken().getAbsolutePosition();
@@ -841,8 +874,8 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
 }
 }// end of anonymous namespace
 
-int invokeCommand(const char *MainExecutablePath,
-                  const StringRef InputSourceFilename) {
+static int invokeCommand(const char *MainExecutablePath,
+                         const StringRef InputSourceFilename) {
   int ExitCode = EXIT_SUCCESS;
   
   switch (options::Action) {

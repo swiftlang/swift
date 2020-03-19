@@ -296,6 +296,11 @@ namespace swift {
     /// incrementals parsing.
     bool BuildSyntaxTree = false;
 
+    /// Whether parsing is occurring for creation of syntax tree only, and no typechecking will occur after
+    /// parsing e.g. when parsing for SwiftSyntax. This is intended to affect parsing, e.g. disable
+    /// unnecessary name lookups that are not useful for pure syntactic parsing.
+    bool ParseForSyntaxTreeOnly = false;
+
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 

@@ -277,6 +277,7 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
   TypeCheckerOptions tyckOpts;
   LangOptions langOpts;
   langOpts.BuildSyntaxTree = true;
+  langOpts.ParseForSyntaxTreeOnly = true;
   langOpts.CollectParsedToken = false;
   // Disable name lookups during parsing.
   // Not ready yet:
