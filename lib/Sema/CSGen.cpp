@@ -2225,9 +2225,12 @@ namespace {
     /// for the types of each variable declared within the pattern, along
     /// with a one-way constraint binding that to the type to which the
     /// variable will be ascribed or inferred.
-    Type getTypeForPattern(Pattern *pattern, ConstraintLocatorBuilder locator,
-                           Type externalPatternType,
-                           bool bindPatternVarsOneWay) {
+    Type getTypeForPattern(
+       Pattern *pattern, ConstraintLocatorBuilder locator,
+       Type externalPatternType,
+       bool bindPatternVarsOneWay,
+       PatternBindingDecl *patternBinding = nullptr,
+       unsigned patternBindingIndex = 0) {
       // If there's no pattern, then we have an unknown subpattern. Create a
       // type variable.
       if (!pattern) {
@@ -2319,8 +2322,11 @@ namespace {
       case PatternKind::Typed: {
         // FIXME: Need a better locator for a pattern as a base.
         // Compute the type ascribed to the pattern.
-        auto contextualPattern =
-            ContextualPattern::forRawPattern(pattern, CurDC);
+        auto contextualPattern = patternBinding
+            ? ContextualPattern::forPatternBindingDecl(
+                patternBinding, patternBindingIndex)
+            : ContextualPattern::forRawPattern(pattern, CurDC);
+
         Type type = TypeChecker::typeCheckPattern(contextualPattern);
         Type openedType = CS.openUnboundGenericType(type, locator);
 
@@ -4097,7 +4103,9 @@ static bool generateInitPatternConstraints(
   auto locator =
       cs.getConstraintLocator(initializer, LocatorPathElt::ContextualType());
   Type patternType = cs.generateConstraints(
-      pattern, locator, target.shouldBindPatternVarsOneWay());
+      pattern, locator, target.shouldBindPatternVarsOneWay(),
+      target.getInitializationPatternBindingDecl(),
+      target.getInitializationPatternBindingIndex());
   assert(patternType && "All patterns have a type");
 
   if (auto wrappedVar = target.getInitializationWrappedVar()) {
@@ -4199,11 +4207,13 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
   return generateConstraintsFor(*this, expr, dc);
 }
 
-Type ConstraintSystem::generateConstraints(Pattern *pattern,
-                                           ConstraintLocatorBuilder locator,
-                                           bool bindPatternVarsOneWay) {
+Type ConstraintSystem::generateConstraints(
+    Pattern *pattern, ConstraintLocatorBuilder locator,
+    bool bindPatternVarsOneWay, PatternBindingDecl *patternBinding,
+    unsigned patternIndex) {
   ConstraintGenerator cg(*this, nullptr);
-  return cg.getTypeForPattern(pattern, locator, Type(), bindPatternVarsOneWay);
+  return cg.getTypeForPattern(pattern, locator, Type(), bindPatternVarsOneWay,
+                              patternBinding, patternIndex);
 }
 
 bool ConstraintSystem::generateConstraints(StmtCondition condition,
@@ -4276,7 +4286,8 @@ bool ConstraintSystem::generateConstraints(
     // any variables that show up in this pattern, because those variables
     // can be referenced in the guard expressions and the body.
     Type patternType = generateConstraints(
-        pattern, locator, /* bindPatternVarsOneWay=*/true);
+        pattern, locator, /* bindPatternVarsOneWay=*/true,
+        /*patternBinding=*/nullptr, /*patternBindingIndex=*/0);
 
     // Convert the subject type to the pattern, which establishes the
     // bindings.

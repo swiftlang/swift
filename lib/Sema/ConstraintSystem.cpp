@@ -4160,6 +4160,8 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.wrappedVar = nullptr;
   expression.isDiscarded = isDiscarded;
   expression.bindPatternVarsOneWay = false;
+  expression.patternBinding = nullptr;
+  expression.patternBindingIndex = 0;
 }
 
 void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
@@ -4240,6 +4242,30 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
   target.expression.bindPatternVarsOneWay = bindPatternVarsOneWay;
   target.maybeApplyPropertyWrapper();
   return target;
+}
+
+SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
+    Expr *initializer, DeclContext *dc, Type patternType,
+    PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
+    bool bindPatternVarsOneWay) {
+    auto result = forInitialization(
+        initializer, dc, patternType,
+        patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
+    result.expression.patternBinding = patternBinding;
+    result.expression.patternBindingIndex = patternBindingIndex;
+    return result;
+}
+
+ContextualPattern
+SolutionApplicationTarget::getInitializationContextualPattern() const {
+  assert(kind == Kind::expression);
+  assert(expression.contextualPurpose == CTP_Initialization);
+  if (expression.patternBinding) {
+    return ContextualPattern::forPatternBindingDecl(
+        expression.patternBinding, expression.patternBindingIndex);
+  }
+
+  return ContextualPattern::forRawPattern(expression.pattern, expression.dc);
 }
 
 bool SolutionApplicationTarget::infersOpaqueReturnType() const {
