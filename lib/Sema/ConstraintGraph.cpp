@@ -566,33 +566,39 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
         acceptConstraintFn(constraint);
   };
 
-  // Add constraints for the given adjacent type variable.
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+  llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
+
+  if (kind == GatheringKind::AllMentions) {
+    // If we've been asked for "all mentions" of a type variable, search for
+    // constraints involving both it and its fixed bindings.
+    depthFirstSearch(
+        *this, typeVar,
+        [&](TypeVariableType *typeVar) {
+          return typeVars.insert(typeVar).second;
+        },
+        [&](Constraint *constraint) {
+          if (acceptConstraint(constraint))
+            constraints.push_back(constraint);
+
+          // Don't recurse into the constraint's type variables.
+          return false;
+        },
+        visitedConstraints);
+    return constraints;
+  }
+
+  // Add constraints for the given adjacent type variable.
 
   // Local function to add constraints
-  llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
   auto addConstraintsOfAdjacency = [&](TypeVariableType *adjTypeVar) {
-    ArrayRef<TypeVariableType *> adjTypeVarsToVisit;
-    switch (kind) {
-    case GatheringKind::EquivalenceClass:
-      adjTypeVarsToVisit = adjTypeVar;
-      break;
+    if (!typeVars.insert(adjTypeVar).second)
+      return;
 
-    case GatheringKind::AllMentions:
-      adjTypeVarsToVisit
-        = (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
-      break;
-    }
-
-    for (auto adjTypeVarEquiv : adjTypeVarsToVisit) {
-      if (!typeVars.insert(adjTypeVarEquiv).second)
-        continue;
-
-      for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints()) {
-        if (visitedConstraints.insert(constraint).second &&
-            acceptConstraint(constraint))
-          constraints.push_back(constraint);
-      }
+    for (auto constraint : (*this)[adjTypeVar].getConstraints()) {
+      if (visitedConstraints.insert(constraint).second &&
+          acceptConstraint(constraint))
+        constraints.push_back(constraint);
     }
   };
 
@@ -613,20 +619,6 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     for (auto adjTypeVar : node.getFixedBindings()) {
       addConstraintsOfAdjacency(adjTypeVar);
     }
-
-    switch (kind) {
-    case GatheringKind::EquivalenceClass:
-      break;
-
-    case GatheringKind::AllMentions:
-      // Retrieve the constraints from adjacent bindings.
-      for (auto adjTypeVar : node.getAdjacencies()) {
-        addConstraintsOfAdjacency(adjTypeVar);
-      }
-
-      break;
-    }
-
   }
 
   return constraints;
