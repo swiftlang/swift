@@ -7006,6 +7006,14 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         ConstraintKind::Conversion, getType(closureBody),
         closureType->getResult(),
         getConstraintLocator(closure, ConstraintLocator::ClosureResult));
+  } else if (!hasExplicitResult(closure)) {
+    // If multi-statement closure doesn't have an explicit result
+    // (no `return` statements) let's default it to `Void`.
+    auto &ctx = getASTContext();
+    addConstraint(
+        ConstraintKind::Defaultable, inferredClosureType->getResult(),
+        ctx.TheEmptyTupleType,
+        getConstraintLocator(closure, ConstraintLocator::ClosureResult));
   }
 
   return true;

@@ -2197,12 +2197,6 @@ namespace {
           resultTy = CS.createTypeVariable(
               resultLoc,
               closure->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
-
-          if (closureHasNoResult(closure)) {
-            // Allow it to default to () if there are no return statements.
-            CS.addConstraint(ConstraintKind::Defaultable, resultTy,
-                             ctx.TheEmptyTupleType, resultLoc);
-          }
         }
       }
 
@@ -2526,13 +2520,6 @@ namespace {
     Type visitCaptureListExpr(CaptureListExpr *expr) {
       // The type of the capture list is just the type of its closure.
       return CS.getType(expr->getClosureBody());
-    }
-
-    bool closureHasNoResult(ClosureExpr *closure) {
-      // Single statement closures always have a result because
-      // `return` is implicit.
-      return closure->hasSingleExpressionBody() ? false
-                                                : !hasExplicitResult(closure);
     }
 
     /// Walk a closure AST to determine if it can throw.
