@@ -141,7 +141,7 @@ public:
     }
     file_types::forAllTypes([&](file_types::ID Ty) {
       for (auto Output : Cmd.getOutput().getAdditionalOutputsForType(Ty)) {
-        Outputs.push_back(OutputPair(Ty, Output));
+        Outputs.push_back(OutputPair(Ty, Output.str()));
       }
     });
   }
