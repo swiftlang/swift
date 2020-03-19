@@ -1638,7 +1638,7 @@ public:
         Importer(static_cast<ClangImporter *>(CurrDeclContext->getASTContext().
           getClangModuleLoader())),
         CompletionContext(CompletionContext) {
-    (void)swift::createTypeChecker(Ctx);
+    Ctx.setLegacySemanticQueriesEnabled();
 
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext) {
@@ -3126,6 +3126,17 @@ public:
         }
 
         addMethodCall(FD, Reason, dynamicLookupInfo);
+
+        // SE-0253: Callable values of user-defined nominal types.
+        if (FD->isCallAsFunctionMethod() && !HaveDot &&
+            !ExprType->is<AnyMetatypeType>()) {
+          Type funcType = getTypeOfMember(FD, dynamicLookupInfo)
+                              ->castTo<AnyFunctionType>()
+                              ->getResult();
+          addFunctionCallPattern(
+              funcType->castTo<AnyFunctionType>(), FD,
+              getSemanticContext(FD, Reason, dynamicLookupInfo));
+        }
         return;
       }
 
@@ -3931,14 +3942,31 @@ public:
     }
   }
 
-  void addArgNameCompletionResults(ArrayRef<StringRef> Names) {
-    for (auto Name : Names) {
-      CodeCompletionResultBuilder Builder(Sink,
-                                          CodeCompletionResult::ResultKind::Keyword,
-                                          SemanticContextKind::ExpressionSpecific, {});
-      Builder.addTextChunk(Name);
-      Builder.addCallParameterColon();
-      Builder.addTypeAnnotation("Argument name");
+  void addCallArgumentCompletionResults(
+      ArrayRef<const AnyFunctionType::Param *> Args) {
+    Type ContextType;
+    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+      ContextType = typeContext->getDeclaredTypeInContext();
+
+    for (auto *Arg : Args) {
+      CodeCompletionResultBuilder Builder(
+          Sink, CodeCompletionResult::ResultKind::Pattern,
+          SemanticContextKind::ExpressionSpecific, {});
+      Builder.addCallParameter(Arg->getLabel(), Identifier(),
+                               Arg->getPlainType(), ContextType,
+                               Arg->isVariadic(), Arg->isInOut(),
+                               /*isIUO=*/false, Arg->isAutoClosure());
+      auto Ty = Arg->getPlainType();
+      if (Arg->isInOut()) {
+        Ty = InOutType::get(Ty);
+      } else if (Arg->isAutoClosure()) {
+        // 'Ty' may be ErrorType.
+        if (auto funcTy = Ty->getAs<FunctionType>())
+          Ty = funcTy->getResult();
+      }
+      addTypeAnnotation(Builder, Ty);
+      Builder.setExpectedTypeRelation(
+          CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
     }
   }
 
@@ -4164,7 +4192,7 @@ public:
                            SourceLoc introducerLoc)
       : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
         ParsedKeywords(ParsedKeywords), introducerLoc(introducerLoc) {
-    (void)createTypeChecker(Ctx);
+    Ctx.setLegacySemanticQueriesEnabled();
 
     hasFuncIntroducer = isKeywordSpecified("func");
     hasVarIntroducer = isKeywordSpecified("var") ||
@@ -5427,7 +5455,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       }
     } else {
       // Add argument labels, then fallthrough to get values.
-      Lookup.addArgNameCompletionResults(ContextInfo.getPossibleNames());
+      Lookup.addCallArgumentCompletionResults(ContextInfo.getPossibleParams());
     }
 
     if (!Lookup.FoundFunctionCalls ||
@@ -5565,8 +5593,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           !Lookup.FoundFunctionCalls ||
           (Lookup.FoundFunctionCalls &&
            Lookup.FoundFunctionsWithoutFirstKeyword);
-    } else if (!ContextInfo.getPossibleNames().empty()) {
-      Lookup.addArgNameCompletionResults(ContextInfo.getPossibleNames());
+    } else if (!ContextInfo.getPossibleParams().empty()) {
+      Lookup.addCallArgumentCompletionResults(ContextInfo.getPossibleParams());
 
       shouldPerformGlobalCompletion = !ContextInfo.getPossibleTypes().empty();
     }
@@ -5659,7 +5687,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
       std::vector<std::string> AccessPath;
       for (auto Piece : Path) {
-        AccessPath.push_back(Piece.Item.str());
+        AccessPath.push_back(std::string(Piece.Item));
       }
 
       StringRef ModuleFilename = TheModule->getModuleFilename();
@@ -5668,15 +5696,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       if (!ModuleFilename.empty()) {
         auto &Ctx = TheModule->getASTContext();
         CodeCompletionCache::Key K{
-          ModuleFilename, TheModule->getName().str(), AccessPath,
-              Request.NeedLeadingDot,
-              SF.hasTestableOrPrivateImport(
-                  AccessLevel::Internal, TheModule,
-                  SourceFile::ImportQueryKind::TestableOnly),
-              SF.hasTestableOrPrivateImport(
-                  AccessLevel::Internal, TheModule,
-                  SourceFile::ImportQueryKind::PrivateOnly),
-          Ctx.LangOpts.CodeCompleteInitsInPostfixExpr};
+            ModuleFilename.str(),
+            std::string(TheModule->getName()),
+            AccessPath,
+            Request.NeedLeadingDot,
+            SF.hasTestableOrPrivateImport(
+                AccessLevel::Internal, TheModule,
+                SourceFile::ImportQueryKind::TestableOnly),
+            SF.hasTestableOrPrivateImport(
+                AccessLevel::Internal, TheModule,
+                SourceFile::ImportQueryKind::PrivateOnly),
+            Ctx.LangOpts.CodeCompleteInitsInPostfixExpr};
 
         using PairType = llvm::DenseSet<swift::ide::CodeCompletionCache::Key,
             llvm::DenseMapInfo<CodeCompletionCache::Key>>::iterator;

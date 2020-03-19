@@ -114,11 +114,8 @@ protected:
   /// platforms.
   virtual std::string getTargetForLinker() const;
 
-  /// Whether to specify a linker -rpath to the Swift runtime library path.
-  /// -rpath is not supported on all platforms, and subclasses may override
-  /// this method to return false on platforms that don't support it. The
-  /// default is to return true (and so specify an -rpath).
-  virtual bool shouldProvideRPathToLinker() const;
+  bool addRuntimeRPath(const llvm::Triple &T,
+                       const llvm::opt::ArgList &Args) const;
 
   InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
                                      const JobContext &context) const override;
@@ -136,8 +133,6 @@ public:
 class LLVM_LIBRARY_VISIBILITY Android : public GenericUnix {
 protected:
   std::string getTargetForLinker() const override;
-
-  bool shouldProvideRPathToLinker() const override;
 
 public:
   Android(const Driver &D, const llvm::Triple &Triple)

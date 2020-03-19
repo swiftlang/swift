@@ -3031,7 +3031,7 @@ bool ValueDecl::isRecursiveValidation() const {
 Type ValueDecl::getInterfaceType() const {
   auto &ctx = getASTContext();
 
-  assert(ctx.areSemanticQueriesEnabled());
+  assert(ctx.areLegacySemanticQueriesEnabled());
 
   if (auto type =
           evaluateOrDefault(ctx.evaluator,
@@ -3688,21 +3688,20 @@ enum class DeclTypeKind : unsigned {
 static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   ASTContext &ctx = decl->getASTContext();
 
-  // Get the parent type.
-  Type Ty;
+  // If `decl` is a nested type, find the parent type.
+  Type ParentTy;
   DeclContext *dc = decl->getDeclContext();
   if (!isa<ProtocolDecl>(decl) && dc->isTypeContext()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType: {
-      auto *nominal = dc->getSelfNominalTypeDecl();
-      if (nominal)
-        Ty = nominal->getDeclaredType();
+      if (auto *nominal = dc->getSelfNominalTypeDecl())
+        ParentTy = nominal->getDeclaredType();
       break;
     }
     case DeclTypeKind::DeclaredInterfaceType:
-      Ty = dc->getDeclaredInterfaceType();
-      if (Ty->is<ErrorType>())
-        Ty = Type();
+      ParentTy = dc->getDeclaredInterfaceType();
+      if (ParentTy->is<ErrorType>())
+        ParentTy = Type();
       break;
     }
   }
@@ -3710,7 +3709,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   if (!isa<ProtocolDecl>(decl) && decl->getGenericParams()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType:
-      return UnboundGenericType::get(decl, Ty, ctx);
+      return UnboundGenericType::get(decl, ParentTy, ctx);
     case DeclTypeKind::DeclaredInterfaceType: {
       // Note that here, we need to be able to produce a type
       // before the decl has been validated, so we rely on
@@ -3720,13 +3719,13 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       for (auto param : decl->getGenericParams()->getParams())
         args.push_back(param->getDeclaredInterfaceType());
 
-      return BoundGenericType::get(decl, Ty, args);
+      return BoundGenericType::get(decl, ParentTy, args);
     }
     }
 
     llvm_unreachable("Unhandled DeclTypeKind in switch.");
   } else {
-    return NominalType::get(decl, Ty, ctx);
+    return NominalType::get(decl, ParentTy, ctx);
   }
 }
 
@@ -5922,7 +5921,7 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
 
 llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
   auto &ctx = getASTContext();
-  if (!ctx.areSemanticQueriesEnabled()) {
+  if (!ctx.areLegacySemanticQueriesEnabled()) {
     return { };
   }
 
@@ -6895,7 +6894,7 @@ ObjCSelector
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
                                       bool skipIsObjCResolution) const {
   // FIXME: Forces computation of the Objective-C selector.
-  if (getASTContext().areSemanticQueriesEnabled() && !skipIsObjCResolution)
+  if (getASTContext().areLegacySemanticQueriesEnabled() && !skipIsObjCResolution)
     (void)isObjC();
 
   // If there is an @objc attribute with a name, use that name.

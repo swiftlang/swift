@@ -99,7 +99,7 @@
 using namespace swift;
 
 static std::string displayName(StringRef MainExecutablePath) {
-  std::string Name = llvm::sys::path::stem(MainExecutablePath);
+  std::string Name = llvm::sys::path::stem(MainExecutablePath).str();
   Name += " -frontend";
   return Name;
 }
@@ -316,21 +316,20 @@ static void computeSwiftModuleTraceInfo(
                              // this is good enough.
         : buffer.str();
 
-      traceInfo.push_back({
-        /*Name=*/
-        depMod->getName(),
-        /*Path=*/
-        realDepPath,
-        // TODO: There is an edge case which is not handled here.
-        // When we build a framework using -import-underlying-module, or an
-        // app/test using -import-objc-header, we should look at the direct
-        // imports of the bridging modules, and mark those as our direct
-        // imports.
-        /*IsImportedDirectly=*/
-        importedModules.find(depMod) != importedModules.end(),
-        /*SupportsLibraryEvolution=*/
-        depMod->isResilient()
-      });
+      traceInfo.push_back(
+          {/*Name=*/
+           depMod->getName(),
+           /*Path=*/
+           realDepPath.str(),
+           // TODO: There is an edge case which is not handled here.
+           // When we build a framework using -import-underlying-module, or an
+           // app/test using -import-objc-header, we should look at the direct
+           // imports of the bridging modules, and mark those as our direct
+           // imports.
+           /*IsImportedDirectly=*/
+           importedModules.find(depMod) != importedModules.end(),
+           /*SupportsLibraryEvolution=*/
+           depMod->isResilient()});
       buffer.clear();
 
       continue;
@@ -443,9 +442,7 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   LoadedModuleTraceFormat trace = {
       /*version=*/LoadedModuleTraceFormat::CurrentVersion,
       /*name=*/mainModule->getName(),
-      /*arch=*/ctxt.LangOpts.Target.getArchName(),
-      swiftModules
-  };
+      /*arch=*/ctxt.LangOpts.Target.getArchName().str(), swiftModules};
 
   // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
   // so first write to memory and then dump the buffer to the trace file.
@@ -599,7 +596,7 @@ private:
     if (!(FixitAll || shouldTakeFixit(Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
-      AllEdits.push_back({SM, Fix.getRange(), Fix.getText()});
+      AllEdits.push_back({SM, Fix.getRange(), Fix.getText().str()});
     }
   }
 
@@ -1174,9 +1171,22 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   bool hadAnyError = false;
 
   if (opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+    std::string BridgingHeaderPathForPrint;
+    if (!opts.ImplicitObjCHeaderPath.empty()) {
+      if (opts.BridgingHeaderDirForPrint.hasValue()) {
+        // User specified preferred directory for including, use that dir.
+        llvm::SmallString<32> Buffer(*opts.BridgingHeaderDirForPrint);
+        llvm::sys::path::append(Buffer,
+          llvm::sys::path::filename(opts.ImplicitObjCHeaderPath));
+        BridgingHeaderPathForPrint = Buffer.str();
+      } else {
+        // By default, include the given bridging header path directly.
+        BridgingHeaderPathForPrint = opts.ImplicitObjCHeaderPath;
+      }
+    }
     hadAnyError |= printAsObjCIfNeeded(
         Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+        Instance.getMainModule(), BridgingHeaderPathForPrint, moduleIsPublic);
   }
 
   if (opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
@@ -1749,7 +1759,7 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
     SmallString<256> Path = OutDir;
     StringRef Filename = SF->getFilename();
     path::append(Path, path::filename(Filename));
-    return Path.str();
+    return std::string(Path.str());
   };
 
   std::unordered_set<std::string> Filenames;

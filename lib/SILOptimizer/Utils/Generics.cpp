@@ -805,12 +805,13 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 /// on the ReabstractionInfo.
 CanSILFunctionType ReabstractionInfo::
 createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
-  llvm::SmallVector<SILResultInfo, 8> SpecializedResults;
-  llvm::SmallVector<SILYieldInfo, 8> SpecializedYields;
-  llvm::SmallVector<SILParameterInfo, 8> SpecializedParams;
+  SmallVector<SILResultInfo, 8> SpecializedResults;
+  SmallVector<SILYieldInfo, 8> SpecializedYields;
+  SmallVector<SILParameterInfo, 8> SpecializedParams;
 
   unsigned IndirectResultIdx = 0;
   for (SILResultInfo RI : SubstFTy->getResults()) {
+    RI = RI.getUnsubstituted(M, SubstFTy);
     if (RI.isFormalIndirect()) {
       bool isTrivial = TrivialArgs.test(IndirectResultIdx);
       if (isFormalResultConverted(IndirectResultIdx++)) {
@@ -820,7 +821,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
         auto C = (isTrivial
                   ? ResultConvention::Unowned
                   : ResultConvention::Owned);
-        SpecializedResults.push_back(SILResultInfo(RI.getReturnValueType(M, SubstFTy), C));
+        SpecializedResults.push_back(RI.getWithConvention(C));
         continue;
       }
     }
@@ -829,6 +830,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   }
   unsigned ParamIdx = 0;
   for (SILParameterInfo PI : SubstFTy->getParameters()) {
+    PI = PI.getUnsubstituted(M, SubstFTy);
     bool isTrivial = TrivialArgs.test(param2ArgIndex(ParamIdx));
     if (!isParamConverted(ParamIdx++)) {
       // No conversion: re-use the original, substituted parameter info.
@@ -848,11 +850,11 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
         C = ParameterConvention::Direct_Owned;
       }
     }
-    SpecializedParams.push_back(SILParameterInfo(PI.getArgumentType(M, SubstFTy), C));
+    SpecializedParams.push_back(PI.getWithConvention(C));
   }
   for (SILYieldInfo YI : SubstFTy->getYields()) {
-    // For now, always just use the original, substituted parameter info.
-    SpecializedYields.push_back(YI);
+    // For now, always re-use the original, substituted yield info.
+    SpecializedYields.push_back(YI.getUnsubstituted(M, SubstFTy));
   }
 
   auto Signature = SubstFTy->isPolymorphic()
@@ -930,7 +932,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
       // we should return true.
       auto First = Req.getFirstType()->getCanonicalType();
       auto Second = Req.getSecondType()->getCanonicalType();
-      llvm::SmallSetVector<TypeBase *, 2> UsedGenericParams;
+      SmallSetVector<TypeBase *, 2> UsedGenericParams;
       First.visit([&](Type Ty) {
         if (auto *GP = Ty->getAs<GenericTypeParamType>()) {
           UsedGenericParams.insert(GP);
@@ -981,7 +983,7 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
       // we should return true.
       auto First = Req.getFirstType()->getCanonicalType();
       auto Second = Req.getSecondType()->getCanonicalType();
-      llvm::SmallSetVector<GenericTypeParamType *, 2> UsedGenericParams;
+      SmallSetVector<GenericTypeParamType *, 2> UsedGenericParams;
       First.visit([&](Type Ty) {
         if (auto *GP = Ty->getAs<GenericTypeParamType>()) {
           UsedGenericParams.insert(GP);
@@ -1951,8 +1953,8 @@ static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
 /// function being applied.
 static ApplySite replaceWithSpecializedCallee(ApplySite AI,
                                               SILValue Callee,
-                                              SILBuilder &Builder,
                                               const ReabstractionInfo &ReInfo) {
+  SILBuilderWithScope Builder(AI.getInstruction());
   SILLocation Loc = AI.getLoc();
   SmallVector<SILValue, 4> Arguments;
   SILValue StoreResultTo;
@@ -2041,7 +2043,7 @@ replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,
                                const ReabstractionInfo &ReInfo) {
   SILBuilderWithScope Builder(AI.getInstruction());
   FunctionRefInst *FRI = Builder.createFunctionRef(AI.getLoc(), NewF);
-  return replaceWithSpecializedCallee(AI, FRI, Builder, ReInfo);
+  return replaceWithSpecializedCallee(AI, FRI, ReInfo);
 }
 
 namespace {
@@ -2322,7 +2324,7 @@ static bool createPrespecializations(ApplySite Apply, SILFunction *ProxyFunc,
 void swift::trySpecializeApplyOfGeneric(
     SILOptFunctionBuilder &FuncBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
-    llvm::SmallVectorImpl<SILFunction *> &NewFunctions,
+    SmallVectorImpl<SILFunction *> &NewFunctions,
     OptRemark::Emitter &ORE) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
   auto *F = Apply.getFunction();
@@ -2456,11 +2458,11 @@ void swift::trySpecializeApplyOfGeneric(
     // thunk which converts from the re-abstracted function back to the
     // original function with indirect parameters/results.
     auto *PAI = cast<PartialApplyInst>(Apply.getInstruction());
-    SILBuilderWithScope Builder(PAI);
     SILFunction *Thunk =
       ReabstractionThunkGenerator(FuncBuilder, ReInfo, PAI, SpecializedF)
         .createThunk();
     NewFunctions.push_back(Thunk);
+    SILBuilderWithScope Builder(PAI);
     auto *FRI = Builder.createFunctionRef(PAI->getLoc(), Thunk);
     SmallVector<SILValue, 4> Arguments;
     for (auto &Op : PAI->getArgumentOperands()) {
@@ -2488,8 +2490,7 @@ void swift::trySpecializeApplyOfGeneric(
     for (Operand *Use : NewPAI->getUses()) {
       SILInstruction *User = Use->getUser();
       if (auto FAS = FullApplySite::isa(User)) {
-        SILBuilder Builder(User);
-        replaceWithSpecializedCallee(FAS, NewPAI, Builder, ReInfo);
+        replaceWithSpecializedCallee(FAS, NewPAI, ReInfo);
         DeadApplies.insert(FAS.getInstruction());
         continue;
       }

@@ -262,6 +262,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       case CaptureKind::Constant:
         capturedArgs.push_back(emitUndef(getLoweredType(type)));
         break;
+      case CaptureKind::Immutable:
       case CaptureKind::StorageAddress:
         capturedArgs.push_back(emitUndef(getLoweredType(type).getAddressType()));
         break;
@@ -333,7 +334,25 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       capturedArgs.push_back(emitManagedRValueWithCleanup(Val));
       break;
     }
-
+    case CaptureKind::Immutable: {
+      if (canGuarantee) {
+        auto entryValue = getAddressValue(Entry.value);
+        // No-escaping stored declarations are captured as the
+        // address of the value.
+        assert(entryValue->getType().isAddress() && "no address for captured var!");
+        capturedArgs.push_back(ManagedValue::forLValue(entryValue));
+      }
+      else {
+        auto entryValue = getAddressValue(Entry.value);
+        // We cannot pass a valid SILDebugVariable while creating the temp here
+        // See rdar://60425582
+        auto addr = B.createAllocStack(loc, entryValue->getType().getObjectType());
+        enterDeallocStackCleanup(addr);
+        B.createCopyAddr(loc, entryValue, addr, IsNotTake, IsInitialization);
+        capturedArgs.push_back(ManagedValue::forLValue(addr));
+      }
+      break;
+    }
     case CaptureKind::StorageAddress: {
       auto entryValue = getAddressValue(Entry.value);
       // No-escaping stored declarations are captured as the

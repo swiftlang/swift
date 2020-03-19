@@ -1871,11 +1871,16 @@ using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
 /// the layout of a witness table is dependent on the protocol being
 /// represented.
 template <typename Runtime>
-struct TargetWitnessTable {
+class TargetWitnessTable {
   /// The protocol conformance descriptor from which this witness table
   /// was generated.
   ConstTargetMetadataPointer<Runtime, TargetProtocolConformanceDescriptor>
     Description;
+
+public:
+  const TargetProtocolConformanceDescriptor<Runtime> *getDescription() const {
+    return Description;
+  }
 };
 
 using WitnessTable = TargetWitnessTable<InProcess>;
@@ -2720,7 +2725,7 @@ public:
     /// The conformance the param is constrained to use.
     ///
     /// Only valid if the requirement has SameConformance kind.
-    RelativeIndirectablePointer<TargetProtocolConformanceRecord<Runtime>,
+    RelativeIndirectablePointer<TargetProtocolConformanceDescriptor<Runtime>,
                                 /*nullable*/ false> Conformance;
     
     /// The kind of layout constraint.
@@ -2758,7 +2763,7 @@ public:
 
   /// Retrieve the protocol conformance record for a SameConformance
   /// requirement.
-  const TargetProtocolConformanceRecord<Runtime> *getConformance() const {
+  const TargetProtocolConformanceDescriptor<Runtime> *getConformance() const {
     assert(getKind() == GenericRequirementKind::SameConformance);
     return Conformance;
   }

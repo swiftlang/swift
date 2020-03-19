@@ -290,6 +290,10 @@ FRONTEND_STATISTIC(SILModule, NumSILOptWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILOptDefaultWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILOptGlobalVariables)
 
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(IRGen, NAME)
+#include "swift/AST/IRGenTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 /// The next 10 statistics count kinds of LLVM entities produced
 /// during the IRGen phase: globals, functions, aliases, ifuncs,
 /// named metadata, value and comdat symbols, basic blocks,

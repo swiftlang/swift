@@ -141,7 +141,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.2")
+set(SWIFT_VERSION "5.3")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -1044,11 +1044,13 @@ if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
       set(SOURCEKIT_RUNTIME_DIR lib)
     endif()
     add_dependencies(sourcekit-inproc BlocksRuntime dispatch)
-    swift_install_in_component(FILES
-                                 $<TARGET_FILE:dispatch>
-                                 $<TARGET_FILE:BlocksRuntime>
-                               DESTINATION ${SOURCEKIT_RUNTIME_DIR}
-                               COMPONENT sourcekit-inproc)
+    if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "OSX|WINDOWS")
+      swift_install_in_component(FILES
+                                   $<TARGET_FILE:dispatch>
+                                   $<TARGET_FILE:BlocksRuntime>
+                                 DESTINATION ${SOURCEKIT_RUNTIME_DIR}
+                                 COMPONENT sourcekit-inproc)
+    endif()
     if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
       swift_install_in_component(FILES
                                    $<TARGET_LINKER_FILE:dispatch>

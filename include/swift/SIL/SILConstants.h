@@ -733,6 +733,8 @@ public:
   SILType getClosureType() { return closureInst->getType(); }
 
   SubstitutionMap getCallSubstitutionMap() { return substitutionMap; }
+
+  bool hasOnlyConstantCaptures() { return !hasNonConstantCaptures; }
 };
 
 } // end namespace swift

@@ -31,7 +31,6 @@ namespace swift {
   class InFlightDiagnostic;
   class Stmt;
   class TopLevelCodeDecl;
-  class TypeChecker;
   class ValueDecl;
 
 /// Emit diagnostics for syntactic restrictions on a given expression.

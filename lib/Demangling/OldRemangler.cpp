@@ -48,7 +48,7 @@ namespace {
       }
       
       void setAnonymousContextDiscriminator(StringRef discriminator) {
-        AnonymousContextDiscriminator = discriminator;
+        AnonymousContextDiscriminator = discriminator.str();
       }
       
       std::string takeAnonymousContextDiscriminator() {

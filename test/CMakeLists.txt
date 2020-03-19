@@ -66,6 +66,7 @@ function(get_test_dependencies SDK result_var_name)
       dsymutil
       FileCheck
       llc
+      llvm-ar
       llvm-as
       llvm-bcanalyzer
       llvm-cov

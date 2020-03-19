@@ -37,14 +37,16 @@ static ManagedValue emitUnabstractedCast(SILGenFunction &SGF, SILLocation loc,
                                          ManagedValue value,
                                          CanType sourceFormalType,
                                          CanType targetFormalType) {
-  if (value.getType() == SGF.getLoweredType(targetFormalType))
+  SILType loweredResultTy = SGF.getLoweredType(targetFormalType);
+  if (value.getType() == loweredResultTy)
     return value;
 
   return SGF.emitTransformedValue(loc, value,
                                   AbstractionPattern(sourceFormalType),
                                   sourceFormalType,
                                   AbstractionPattern(targetFormalType),
-                                  targetFormalType);
+                                  targetFormalType,
+                                  loweredResultTy);
 }
 
 static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,

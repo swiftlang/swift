@@ -272,6 +272,14 @@ public:
   /// A set of synthesized declarations that need to be type checked.
   llvm::SmallVector<Decl *, 8> SynthesizedDecls;
 
+  /// The list of functions defined in this file whose bodies have yet to be
+  /// typechecked. They must be held in this list instead of eagerly validated
+  /// because their bodies may force us to perform semantic checks of arbitrary
+  /// complexity, and we currently cannot handle those checks in isolation. E.g.
+  /// we cannot, in general, perform witness matching on singular requirements
+  /// unless the entire conformance has been evaluated.
+  std::vector<AbstractFunctionDecl *> DelayedFunctions;
+
   /// We might perform type checking on the same source file more than once,
   /// if its the main file or a REPL instance, so keep track of the last
   /// checked synthesized declaration to avoid duplicating work.
@@ -326,10 +334,13 @@ public:
   /// forwarded on to IRGen.
   ASTStage_t ASTStage = Unprocessed;
 
-  /// Virtual filenames declared by #sourceLocation(file:) directives in this
-  /// file.
-  llvm::SmallVector<Located<StringRef>, 0> VirtualFilenames;
+  /// Virtual file paths declared by \c #sourceLocation(file:) declarations in
+  /// this source file.
+  llvm::SmallVector<Located<StringRef>, 0> VirtualFilePaths;
 
+  /// Returns information about the file paths used for diagnostics and magic
+  /// identifiers in this source file, including virtual filenames introduced by
+  /// \c #sourceLocation(file:) declarations.
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,

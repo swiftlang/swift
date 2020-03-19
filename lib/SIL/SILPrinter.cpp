@@ -2527,8 +2527,16 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isWithoutActuallyEscapingThunk())
     OS << "[without_actually_escaping] ";
 
-  if (isGlobalInit())
+  switch (getSpecialPurpose()) {
+  case SILFunction::Purpose::None:
+    break;
+  case SILFunction::Purpose::GlobalInit:
     OS << "[global_init] ";
+    break;
+  case SILFunction::Purpose::LazyPropertyGetter:
+    OS << "[lazy_getter] ";
+    break;
+  }
   if (isAlwaysWeakImported())
     OS << "[weak_imported] ";
   auto availability = getAvailabilityForLinkage();

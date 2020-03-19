@@ -1057,7 +1057,7 @@ static std::string getDeclNameFromContext(DeclContext *dc,
     }
     return result;
   } else {
-    return nominal->getName().str();
+    return std::string(nominal->getName());
   }
 }
 
@@ -3066,6 +3066,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       return ErrorType::get(Context);
 
     Type selfType = params.back().getInterfaceType();
+    if (patternSubs)
+      selfType = selfType.subst(patternSubs);
     if (invocationSubs) {
       selfType = selfType.subst(invocationSubs);
     }
@@ -3784,6 +3786,10 @@ public:
 
   bool walkToDeclPre(Decl *D) override {
     return !checkStatements;
+  }
+
+  void visitTypeRepr(TypeRepr *T) {
+    // Do nothing for all TypeReprs except the ones listed below.
   }
 
   void visitIdentTypeRepr(IdentTypeRepr *T) {

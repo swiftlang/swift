@@ -481,9 +481,8 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   if (!llvm::sys::fs::exists(shimsPath)) {
     shimsPath = searchPathOpts.SDKPath;
     llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
-    invocationArgStrs.insert(invocationArgStrs.end(), {
-      "-isystem", shimsPath.str()
-    });
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-isystem", std::string(shimsPath.str())});
   }
 
   // Construct the invocation arguments for the current target.
@@ -652,7 +651,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       llvm::sys::path::native(path);
 
       invocationArgStrs.push_back("-isystem");
-      invocationArgStrs.push_back(path.str());
+      invocationArgStrs.push_back(std::string(path.str()));
     } else {
       // On Darwin, Clang uses -isysroot to specify the include
       // system root. On other targets, it seems to use --sysroot.
@@ -764,7 +763,7 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     // Set the Clang resource directory to the path we computed.
     invocationArgStrs.push_back("-resource-dir");
-    invocationArgStrs.push_back(resourceDir.str());
+    invocationArgStrs.push_back(std::string(resourceDir.str()));
   } else {
     invocationArgStrs.push_back("-resource-dir");
     invocationArgStrs.push_back(overrideResourceDir);
@@ -1561,7 +1560,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
 
   auto &FrontendOpts = invocation.getFrontendOpts();
   FrontendOpts.Inputs = {inputFile};
-  FrontendOpts.OutputFile = outputPCHPath;
+  FrontendOpts.OutputFile = outputPCHPath.str();
   FrontendOpts.ProgramAction = clang::frontend::GeneratePCH;
 
   auto action = wrapActionForIndexingIfEnabled(
@@ -1585,7 +1584,7 @@ bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
 
   auto LangOpts = invocation.getLangOpts();
   LangOpts->setCompilingModule(clang::LangOptions::CMK_ModuleMap);
-  LangOpts->ModuleName = moduleName;
+  LangOpts->ModuleName = moduleName.str();
   LangOpts->CurrentModule = LangOpts->ModuleName;
 
   auto language = getLanguageFromOptions(LangOpts);
@@ -1595,8 +1594,8 @@ bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
 
   auto &FrontendOpts = invocation.getFrontendOpts();
   FrontendOpts.Inputs = {inputFile};
-  FrontendOpts.OriginalModuleMap = moduleMapPath;
-  FrontendOpts.OutputFile = outputPath;
+  FrontendOpts.OriginalModuleMap = moduleMapPath.str();
+  FrontendOpts.OutputFile = outputPath.str();
   FrontendOpts.ProgramAction = clang::frontend::GenerateModule;
 
   auto action = wrapActionForIndexingIfEnabled(
@@ -1624,7 +1623,7 @@ bool ClangImporter::dumpPrecompiledModule(StringRef modulePath,
 
   auto &FrontendOpts = invocation.getFrontendOpts();
   FrontendOpts.Inputs = {inputFile};
-  FrontendOpts.OutputFile = outputPath;
+  FrontendOpts.OutputFile = outputPath.str();
 
   auto action = std::make_unique<clang::DumpModuleInfoAction>();
   dumpInstance->ExecuteAction(*action);

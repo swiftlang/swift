@@ -845,6 +845,10 @@ public:
   /// Return true if the specified type or a super-class/super-protocol has the
   /// @dynamicMemberLookup attribute on it.
   bool hasDynamicMemberLookupAttribute();
+  
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicCallable attribute on it.
+  bool hasDynamicCallableAttribute();
 
   /// Retrieve the superclass of this type.
   ///
@@ -3849,6 +3853,11 @@ public:
     return SILParameterInfo(type, getConvention(), getDifferentiability());
   }
 
+  /// Return a version of this parameter info with the convention replaced.
+  SILParameterInfo getWithConvention(ParameterConvention c) const {
+    return SILParameterInfo(getInterfaceType(), c, getDifferentiability());
+  }
+
   /// Transform this SILParameterInfo by applying the user-provided
   /// function to its type.
   ///
@@ -3862,6 +3871,15 @@ public:
   SILParameterInfo mapTypeOutOfContext() const {
     return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
                                                   ->getCanonicalType());
+  }
+
+  /// Treating this parameter info as a component of the given function
+  /// type, apply any substitutions from the function type to it to
+  /// get a substituted version of it, as you would get from
+  /// SILFunctionType::getUnsubstitutedType.
+  SILParameterInfo getUnsubstituted(SILModule &M,
+                                    const SILFunctionType *fnType) const {
+    return getWithInterfaceType(getArgumentType(M, fnType));
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
@@ -3966,6 +3984,11 @@ public:
     return SILResultInfo(type, getConvention());
   }
 
+  /// Return a version of this result info with the convention replaced.
+  SILResultInfo getWithConvention(ResultConvention c) const {
+    return SILResultInfo(getInterfaceType(), c);
+  }
+
   // Does this result convention require indirect storage? This reflects a
   // SILFunctionType's formal (immutable) conventions, as opposed to the
   // transient SIL conventions that dictate SILValue types.
@@ -3989,6 +4012,15 @@ public:
   SILResultInfo mapTypeOutOfContext() const {
     return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
                                                   ->getCanonicalType());
+  }
+
+  /// Treating this result info as a component of the given function
+  /// type, apply any substitutions from the function type to it to
+  /// get a substituted version of it, as you would get from
+  /// SILFunctionType::getUnsubstitutedType.
+  SILResultInfo getUnsubstituted(SILModule &M,
+                                 const SILFunctionType *fnType) const {
+    return getWithInterfaceType(getReturnValueType(M, fnType));
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
@@ -4031,6 +4063,11 @@ public:
     return SILYieldInfo(type, getConvention());
   }
 
+  /// Return a version of this yield info with the convention replaced.
+  SILYieldInfo getWithConvention(YieldConvention c) const {
+    return SILYieldInfo(getInterfaceType(), c);
+  }
+
   template<typename F>
   SILYieldInfo map(const F &fn) const {
     return getWithInterfaceType(fn(getInterfaceType()));
@@ -4039,6 +4076,20 @@ public:
   SILYieldInfo mapTypeOutOfContext() const {
     return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
                                                   ->getCanonicalType());
+  }
+
+  CanType getYieldValueType(SILModule &M,
+                            const SILFunctionType *fnType) const {
+    return getArgumentType(M, fnType);
+  }
+
+  /// Treating this yield info as a component of the given function
+  /// type, apply any substitutions from the function type to it to
+  /// get a substituted version of it, as you would get from
+  /// SILFunctionType::getUnsubstitutedType.
+  SILYieldInfo getUnsubstituted(SILModule &M,
+                                const SILFunctionType *fnType) const {
+    return getWithInterfaceType(getYieldValueType(M, fnType));
   }
 };
 
@@ -4853,6 +4904,17 @@ public:
   /// must have the same signature as the new substitutions.
   CanSILFunctionType
   withPatternSubstitutions(SubstitutionMap subs) const;
+
+  /// Create a SILFunctionType with the same structure as this one,
+  /// but replacing the invocation generic signature and pattern
+  /// substitutions.  This type must either be polymorphic or have
+  /// pattern substitutions, and the substitution signature must
+  /// match `getSubstGenericSignature()`.
+  CanSILFunctionType
+  withPatternSpecialization(CanGenericSignature sign,
+                            SubstitutionMap subs,
+                            ProtocolConformanceRef witnessConformance =
+                              ProtocolConformanceRef()) const;
 
   class ABICompatibilityCheckResult {
     friend class SILFunctionType;

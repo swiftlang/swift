@@ -335,6 +335,9 @@ namespace swift {
     bool EnableExperimentalForwardModeDifferentiation = false;
     // SWIFT_ENABLE_TENSORFLOW END
 
+    /// Enable verification when every SubstitutionMap is constructed.
+    bool VerifyAllSubstitutionMaps = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
@@ -361,7 +364,7 @@ namespace swift {
     /// Sets an implicit platform condition.
     void addPlatformConditionValue(PlatformConditionKind Kind, StringRef Value) {
       assert(!Value.empty());
-      PlatformConditionValues.emplace_back(Kind, Value);
+      PlatformConditionValues.emplace_back(Kind, Value.str());
     }
 
     /// Removes all values added with addPlatformConditionValue.
@@ -379,7 +382,7 @@ namespace swift {
     /// compiler flag.
     void addCustomConditionalCompilationFlag(StringRef Name) {
       assert(!Name.empty());
-      CustomConditionalCompilationFlags.push_back(Name);
+      CustomConditionalCompilationFlags.push_back(Name.str());
     }
 
     /// Determines if a given conditional compilation flag has been set.
@@ -525,6 +528,7 @@ namespace swift {
     /// Enable constraint solver support for experimental
     ///        operator protocol designator feature.
     bool SolverEnableOperatorDesignatedTypes = false;
+    
   };
 } // end namespace swift
 

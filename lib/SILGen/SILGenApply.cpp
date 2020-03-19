@@ -2950,7 +2950,8 @@ private:
         switch (getSILFunctionLanguage(Rep)) {
         case SILFunctionLanguage::Swift:
           return Conversion::getSubstToOrig(origParamType,
-                                            arg.getSubstRValueType());
+                                            arg.getSubstRValueType(),
+                                            param.getSILStorageInterfaceType());
         case SILFunctionLanguage::C:
           return Conversion::getBridging(Conversion::BridgeToObjC,
              arg.getSubstRValueType(),
@@ -4789,7 +4790,8 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
     if (!payloadMV) {
       // If the payload was indirect, we already evaluated it and
       // have a single value. Otherwise, evaluate the payload.
-      payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
+      payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType,
+                                                      loweredPayloadType);
     }
 
     SILValue argValue = payloadMV.forward(*this);
@@ -4812,7 +4814,9 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
         } else if (payloadTL.isLoadable()) {
           // The payload of this specific enum case might be loadable
           // even if the overall enum is address-only.
-          payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
+          payloadMV =
+            std::move(payload).getAsSingleValue(*this, origFormalType,
+                                                loweredPayloadType);
           B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
                                     StoreOwnershipQualifier::Init);
         } else {
@@ -4896,7 +4900,7 @@ std::string SILGenFunction::getMagicFileString(SourceLoc loc) {
   if (result != SGM.MagicFileStringsByFilePath.end())
     return std::get<0>(result->second);
 
-  return path;
+  return path.str();
 }
 
 /// Emit an application of the given allocating initializer.

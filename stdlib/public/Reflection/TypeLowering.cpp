@@ -363,9 +363,53 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
     return false;
   }
 
-  case RecordKind::MultiPayloadEnum:// XXX TODO
-    return false;
-    
+  case RecordKind::MultiPayloadEnum: {
+    // Multi payload enums can export XIs from the tag, if any.
+    // They never export XIs from their payloads.
+    auto Fields = getFields();
+    unsigned long PayloadCaseCount = 0;
+    unsigned long NonPayloadCaseCount = 0;
+    unsigned long PayloadSize = 0;
+    for (auto Field : Fields) {
+      if (Field.TR != 0) {
+        PayloadCaseCount += 1;
+        if (Field.TI.getSize() > PayloadSize) {
+          PayloadSize = Field.TI.getSize();
+        }
+      } else {
+        NonPayloadCaseCount += 1;
+      }
+    }
+    if (getSize() > PayloadSize) {
+      // Multipayload enums that do use a separate tag
+      // export XIs from that tag.
+      unsigned tag = 0;
+      auto TagSize = getSize() - PayloadSize;
+      auto TagAddress = remote::RemoteAddress(address.getAddressData() + PayloadSize);
+      if (!reader.readInteger(TagAddress, TagSize, &tag))
+        return false;
+      if (tag < Fields.size()) {
+        *extraInhabitantIndex = -1; // Valid payload, not an XI
+      } else if (TagSize >= 4) {
+        // This is really just the 32-bit 2s-complement negation of `tag`, but
+        // coded so as to ensure we cannot overflow or underflow.
+        *extraInhabitantIndex = static_cast<int>(
+          std::numeric_limits<uint32_t>::max()
+          - (tag & std::numeric_limits<uint32_t>::max())
+          + 1);
+      } else {
+        // XIs are coded starting from the highest value that fits
+        // E.g., for 1-byte tag, tag 255 == XI #0, tag 254 == XI #1, etc.
+        unsigned maxTag = (1U << (TagSize * 8U)) - 1;
+        *extraInhabitantIndex = maxTag - tag;
+      }
+      return true;
+    } else {
+      // Multipayload enums that don't use a separate tag never
+      // export XIs.
+      return false;
+    }
+  }
   }
   return false;
 }
@@ -449,7 +493,7 @@ class ExistentialTypeInfoBuilder {
             }
 
             if (!isa<ReferenceTypeInfo>(SuperclassTI)) {
-              DEBUG_LOG(fprintf(stderr, "Superclass not a reference type: ")
+              DEBUG_LOG(fprintf(stderr, "Superclass not a reference type: ");
                         SuperclassTI->dump());
               Invalid = true;
               continue;
@@ -1134,7 +1178,10 @@ class EnumTypeInfoBuilder {
   }
 
   void addCase(const std::string &Name) {
-    Cases.push_back({Name, /*offset=*/0, /*value=*/-1, nullptr, TypeInfo()});
+    // FieldInfo's TI field is a reference, so give it a reference to a value
+    // that stays alive forever.
+    static TypeInfo emptyTI;
+    Cases.push_back({Name, /*offset=*/0, /*value=*/-1, nullptr, emptyTI});
   }
 
   void addCase(const std::string &Name, const TypeRef *TR,
@@ -1257,7 +1304,7 @@ public:
         Size += tagCounts.numTagBytes;
         // Dynamic multi-payload enums use the tag representations not assigned
         // to cases for extra inhabitants.
-        if (tagCounts.numTagBytes >= 32) {
+        if (tagCounts.numTagBytes >= 4) {
           NumExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
         } else {
           NumExtraInhabitants =
@@ -1566,7 +1613,7 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
                                                         unsigned start) {
   auto FD = getBuilder().getFieldTypeInfo(TR);
   if (FD == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No field descriptor: ";) TR->dump());
+    DEBUG_LOG(fprintf(stderr, "No field descriptor: "); TR->dump());
     return nullptr;
   }
 

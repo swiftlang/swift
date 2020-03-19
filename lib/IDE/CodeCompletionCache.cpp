@@ -437,7 +437,7 @@ static std::string getName(StringRef cacheDirectory,
   llvm::APInt(64, uint64_t(hash)).toStringUnsigned(hashStr, /*Radix*/ 36);
   OSS << "-" << hashStr << ".completions";
 
-  return name.str();
+  return std::string(name.str());
 }
 
 Optional<CodeCompletionCache::ValueRefCntPtr>
@@ -490,8 +490,8 @@ OnDiskCodeCompletionCache::getFromFile(StringRef filename) {
     return None;
 
   // Make up a key for readCachedModule.
-  CodeCompletionCache::Key K{filename, "<module-name>", {},   false,
-                             false,    false,           false};
+  CodeCompletionCache::Key K{filename.str(), "<module-name>", {},   false,
+                             false,          false,           false};
 
   // Read the cached results.
   auto V = CodeCompletionCache::createValue();

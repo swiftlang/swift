@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -check-prefix=CHECK-%target-cpu --check-prefix=CHECK-DEP-TARGET-GTE-13_0-%target-mandates-deployment-target-gte-13.0 -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-runtime-STABLE-ABI-%target-mandates-stable-abi -DINT=i%target-ptrsize
 // RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution -O %t/class_resilience.swift
 
 // CHECK: @"$s16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = hidden global [[INT]] 0
@@ -381,7 +381,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK: cacheIsNull:
-// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience26ClassWithResilientPropertyCMn" to %swift.type_descriptor*))
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience26ClassWithResilientPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
 // CHECK-NEXT: br label %cont
@@ -414,8 +414,9 @@ public class ClassWithResilientThenEmpty {
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK-DEP-TARGET-GTE-13_0-TRUE: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
-// CHECK-DEP-TARGET-GTE-13_0-FALSE:[[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-native:               [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-objc-STABLE-ABI-TRUE: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-objc-STABLE-ABI-FALSE:[[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 // CHECK-NEXT: [[INITDEP_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[INITDEP_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-NEXT: [[INITDEP_PRESENT:%.*]] = icmp eq %swift.type* [[INITDEP_METADATA]], null
@@ -444,7 +445,7 @@ public class ClassWithResilientThenEmpty {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience26ClassWithResilientPropertyCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$s16class_resilience26ClassWithResilientPropertyCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience26ClassWithResilientPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
 
@@ -457,7 +458,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK: cacheIsNull:
-// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn" to %swift.type_descriptor*))
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
 // CHECK-NEXT: br label %cont
@@ -491,8 +492,9 @@ public class ClassWithResilientThenEmpty {
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK-DEP-TARGET-GTE-13_0-TRUE: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
-// CHECK-DEP-TARGET-GTE-13_0-FALSE: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-native:               [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-objc-STABLE-ABI-TRUE: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-objc-STABLE-ABI-FALSE:[[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 // CHECK-NEXT: [[INITDEP_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[INITDEP_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-NEXT: [[INITDEP_PRESENT:%.*]] = icmp eq %swift.type* [[INITDEP_METADATA]], null
@@ -521,7 +523,7 @@ public class ClassWithResilientThenEmpty {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
 
@@ -540,7 +542,7 @@ public class ClassWithResilientThenEmpty {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience14ResilientChildCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$s16class_resilience14ResilientChildCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience14ResilientChildCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
 
@@ -594,6 +596,6 @@ public class ClassWithResilientThenEmpty {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience21ResilientGenericChildCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$s16class_resilience21ResilientGenericChildCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience21ResilientGenericChildCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }

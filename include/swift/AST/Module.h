@@ -310,6 +310,18 @@ public:
   /// Add a file declaring a cross-import overlay.
   void addCrossImportOverlayFile(StringRef file);
 
+  /// If this method returns \c false, the module does not declare any
+  /// cross-import overlays.
+  ///
+  /// This is a quick check you can use to bail out of expensive logic early;
+  /// however, a \c true return doesn't guarantee that the module declares
+  /// cross-import overlays--it only means that it \em might declare some.
+  ///
+  /// (Specifically, this method checks if the module loader found any
+  /// swiftoverlay files, but does not load the files to see if they list any
+  /// overlay modules.)
+  bool mightDeclareCrossImportOverlays() const;
+
   /// Append to \p overlayNames the names of all modules that this module
   /// declares should be imported when \p bystanderName is imported.
   ///

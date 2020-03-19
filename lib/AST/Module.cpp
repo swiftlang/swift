@@ -1564,6 +1564,10 @@ void ModuleDecl::addCrossImportOverlayFile(StringRef file) {
       .push_back(new (ctx) OverlayFile(ctx.AllocateCopy(file)));
 }
 
+bool ModuleDecl::mightDeclareCrossImportOverlays() const {
+  return !declaredCrossImports.empty();
+}
+
 void ModuleDecl::
 findDeclaredCrossImportOverlays(Identifier bystanderName,
                                 SmallVectorImpl<Identifier> &overlayNames,
@@ -1970,7 +1974,7 @@ SourceFile::getInfoForUsedFilePaths() const {
         getASTContext().SourceMgr.getLocForBufferStart(BufferID);
   }
 
-  for (auto &vpath : VirtualFilenames) {
+  for (auto &vpath : VirtualFilePaths) {
     result[vpath.Item].virtualFileLocs.insert(vpath.Loc);
   }
 
@@ -2411,7 +2415,7 @@ StringRef ModuleEntity::getName() const {
 std::string ModuleEntity::getFullName() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
-    return SwiftMod->getName().str();
+    return std::string(SwiftMod->getName());
   return getClangModule(Mod)->getFullModuleName();
 }
 

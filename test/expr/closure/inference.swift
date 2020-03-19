@@ -38,3 +38,16 @@ var nestedClosuresWithBrokenInference = { f: Int in {} }
     // expected-error@-2 {{consecutive statements on a line must be separated by ';'}} {{44-44=;}}
     // expected-error@-3 {{expected expression}}
     // expected-error@-4 {{use of unresolved identifier 'f'}}
+
+// SR-11540
+
+func SR11540<R>(action: () -> R) -> Void {}
+
+func SR11540<T, R>(action: (T) -> R) -> Void {}
+
+func SR11540_1<T, R>(action: (T) -> R) -> Void {} 
+
+SR11540(action: { return }) // Ok SR11540<R>(action: () -> R) was the selected overload.
+
+// In case that's the only possible overload, it's acceptable
+SR11540_1(action: { return }) // OK

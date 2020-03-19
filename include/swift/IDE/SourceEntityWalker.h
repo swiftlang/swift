@@ -120,6 +120,16 @@ public:
                                        ReferenceMetaData Data,
                                        bool IsOpenBracket);
 
+  /// This method is called when a ValueDecl for a callAsFunction decl is
+  /// referenced in source. If it returns false, the remaining traversal is
+  /// terminated and returns failure.
+  ///
+  /// \param D the referenced decl.
+  /// \param Range the source range of the source reference.
+  /// \param Data whether this is a read, write or read/write access, etc.
+  virtual bool visitCallAsFunctionReference(ValueDecl *D, CharSourceRange Range,
+                                            ReferenceMetaData Data);
+
   /// This method is called for each keyword argument in a call expression.
   /// If it returns false, the remaining traversal is terminated and returns
   /// failure.

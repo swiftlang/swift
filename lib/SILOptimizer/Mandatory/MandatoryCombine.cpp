@@ -199,10 +199,12 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
                                                  instructionDescription
 #endif
       );
+      madeChange = true;
     }
 
     for (SILInstruction *instruction : instructionsPendingDeletion) {
       worklist.eraseInstFromFunction(*instruction);
+      madeChange = true;
     }
     instructionsPendingDeletion.clear();
 
@@ -214,6 +216,7 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
       LLVM_DEBUG(llvm::dbgs() << "MC: add " << *instruction
                               << " from tracking list to worklist\n");
       worklist.add(instruction);
+      madeChange = true;
     }
     createdInstructions.clear();
   }

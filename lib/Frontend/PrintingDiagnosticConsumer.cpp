@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Markup/Markup.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
@@ -28,6 +29,7 @@
 #include <algorithm>
 
 using namespace swift;
+using namespace swift::markup;
 
 namespace {
   class ColoredStream : public raw_ostream {
@@ -84,6 +86,190 @@ namespace {
 
     size_t preferred_buffer_size() const override { return 0; }
   };
+
+// MARK: Markdown Printing
+    class TerminalMarkupPrinter : public MarkupASTVisitor<TerminalMarkupPrinter> {
+      llvm::raw_ostream &OS;
+      unsigned Indent;
+      unsigned ShouldBold;
+
+      void indent(unsigned Amount = 2) { Indent += Amount; }
+
+      void dedent(unsigned Amount = 2) {
+        assert(Indent >= Amount && "dedent without matching indent");
+        Indent -= Amount;
+      }
+
+      void bold() {
+        ++ShouldBold;
+        updateFormatting();
+      }
+
+      void unbold() {
+        assert(ShouldBold > 0 && "unbolded without matching bold");
+        --ShouldBold;
+        updateFormatting();
+      }
+
+      void updateFormatting() {
+        OS.resetColor();
+        if (ShouldBold > 0)
+          OS.changeColor(raw_ostream::Colors::SAVEDCOLOR, true);
+      }
+
+      void print(StringRef Str) {
+        for (auto c : Str) {
+          OS << c;
+          if (c == '\n')
+            for (unsigned i = 0; i < Indent; ++i)
+              OS << ' ';
+        }
+      }
+
+    public:
+      TerminalMarkupPrinter(llvm::raw_ostream &OS)
+          : OS(OS), Indent(0), ShouldBold(0) {}
+
+      void printNewline() { print("\n"); }
+
+      void visitDocument(const Document *D) {
+        for (const auto *Child : D->getChildren()) {
+          if (Child->getKind() == ASTNodeKind::Paragraph) {
+            // Add a newline before top-level paragraphs
+            printNewline();
+          }
+          visit(Child);
+        }
+      }
+
+      void visitBlockQuote(const BlockQuote *BQ) {
+        indent();
+        printNewline();
+        for (const auto *Child : BQ->getChildren())
+          visit(Child);
+        dedent();
+      }
+
+      void visitList(const List *BL) {
+        indent();
+        printNewline();
+        for (const auto *Child : BL->getChildren())
+          visit(Child);
+        dedent();
+      }
+
+      void visitItem(const Item *I) {
+        print("- ");
+        for (const auto *N : I->getChildren())
+          visit(N);
+      }
+
+      void visitCodeBlock(const CodeBlock *CB) {
+        indent();
+        printNewline();
+        print(CB->getLiteralContent());
+        dedent();
+      }
+
+      void visitCode(const Code *C) {
+        print("'");
+        print(C->getLiteralContent());
+        print("'");
+      }
+
+      void visitHTML(const HTML *H) { print(H->getLiteralContent()); }
+
+      void visitInlineHTML(const InlineHTML *IH) {
+        print(IH->getLiteralContent());
+      }
+
+      void visitSoftBreak(const SoftBreak *SB) { printNewline(); }
+
+      void visitLineBreak(const LineBreak *LB) {
+        printNewline();
+        printNewline();
+      }
+
+      void visitLink(const Link *L) {
+        print("[");
+        for (const auto *Child : L->getChildren())
+          visit(Child);
+        print("](");
+        print(L->getDestination());
+        print(")");
+      }
+
+      void visitImage(const Image *I) { llvm_unreachable("unsupported"); }
+
+      void visitParagraph(const Paragraph *P) {
+        for (const auto *Child : P->getChildren())
+          visit(Child);
+        printNewline();
+      }
+
+      // TODO: add raw_ostream support for italics ANSI codes in LLVM.
+      void visitEmphasis(const Emphasis *E) {
+        for (const auto *Child : E->getChildren())
+          visit(Child);
+      }
+
+      void visitStrong(const Strong *E) {
+        bold();
+        for (const auto *Child : E->getChildren())
+          visit(Child);
+        unbold();
+      }
+
+      void visitHRule(const HRule *HR) {
+        print("--------------");
+        printNewline();
+      }
+
+      void visitHeader(const Header *H) {
+        bold();
+        for (const auto *Child : H->getChildren())
+          visit(Child);
+        unbold();
+        printNewline();
+      }
+
+      void visitText(const Text *T) { print(T->getLiteralContent()); }
+
+      void visitPrivateExtension(const PrivateExtension *PE) {
+        llvm_unreachable("unsupported");
+      }
+
+      void visitParamField(const ParamField *PF) {
+        llvm_unreachable("unsupported");
+      }
+
+      void visitReturnField(const ReturnsField *RF) {
+        llvm_unreachable("unsupported");
+      }
+
+      void visitThrowField(const ThrowsField *TF) {
+        llvm_unreachable("unsupported");
+      }
+
+  #define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind)                              \
+    void visit##Id(const Id *Field) { llvm_unreachable("unsupported"); }
+  #include "swift/Markup/SimpleFields.def"
+    };
+
+    static void printMarkdown(StringRef Content, raw_ostream &Out,
+                              bool UseColor) {
+      markup::MarkupContext ctx;
+      auto document = markup::parseDocument(ctx, Content);
+      if (UseColor) {
+        ColoredStream stream{Out};
+        TerminalMarkupPrinter printer(stream);
+        printer.visit(document);
+      } else {
+        NoColorStream stream{Out};
+        TerminalMarkupPrinter printer(stream);
+        printer.visit(document);
+      }
+    }
 
   // MARK: Experimental diagnostic printing.
 
@@ -269,7 +455,7 @@ namespace {
 
     void addMessage(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                     StringRef Message) {
-      Messages.push_back({lineByteOffsetForLoc(SM, Loc), Kind, Message});
+      Messages.push_back({lineByteOffsetForLoc(SM, Loc), Kind, Message.str()});
     }
 
     void addHighlight(SourceManager &SM, CharSourceRange Range) {
@@ -279,7 +465,7 @@ namespace {
 
     void addFixIt(SourceManager &SM, CharSourceRange Range, StringRef Text) {
       FixIts.push_back({lineByteOffsetForLoc(SM, Range.getStart()),
-                        lineByteOffsetForLoc(SM, Range.getEnd()), Text});
+                        lineByteOffsetForLoc(SM, Range.getEnd()), Text.str()});
     }
 
     void render(unsigned LineNumberIndent, raw_ostream &Out) {
@@ -712,12 +898,18 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
       currentSnippet = std::make_unique<AnnotatedSourceSnippet>(SM);
       annotateSnippetWithInfo(SM, Info, *currentSnippet);
     }
+    for (auto path : Info.EducationalNotePaths) {
+      if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
+        BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
+    }
   } else {
     printDiagnostic(SM, Info);
 
     for (auto path : Info.EducationalNotePaths) {
-      if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
-        Stream << buffer->get()->getBuffer() << "\n";
+      if (auto buffer = SM.getFileSystem()->getBufferForFile(path)) {
+        printMarkdown(buffer->get()->getBuffer(), Stream, ForceColors);
+        Stream << "\n";
+      }
     }
 
     for (auto ChildInfo : Info.ChildDiagnosticInfo) {
@@ -741,6 +933,13 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
     }
     currentSnippet.reset();
   }
+
+  for (auto note : BufferedEducationalNotes) {
+    printMarkdown(note, Stream, ForceColors);
+    Stream << "\n";
+  }
+
+  BufferedEducationalNotes.clear();
 }
 
 bool PrintingDiagnosticConsumer::finishProcessing() {

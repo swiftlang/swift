@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sil -module-name coverage_force_emission %s | %FileCheck %s -check-prefix=COVERAGE
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -emit-sil -module-name coverage_force_emission %s | %FileCheck %s -check-prefix=PGO
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 final class VarInit {
   // COVERAGE: sil_coverage_map {{.*}} "$s23coverage_force_emission7VarInitC04lazydE033_7D375D72BA8B0C53C9AD7E4DBC7FF493LLSSvgSSyXEfU_"

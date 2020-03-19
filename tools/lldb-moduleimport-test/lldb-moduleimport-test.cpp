@@ -293,7 +293,7 @@ int main(int argc, char **argv) {
 
   // Infer SDK and Target triple from the module.
   if (!extendedInfo.getSDKPath().empty())
-    Invocation.setSDKPath(extendedInfo.getSDKPath());
+    Invocation.setSDKPath(extendedInfo.getSDKPath().str());
   Invocation.setTargetTriple(info.targetTriple);
 
   Invocation.setModuleName("lldbtest");

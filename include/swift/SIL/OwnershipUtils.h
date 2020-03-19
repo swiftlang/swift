@@ -388,11 +388,10 @@ Optional<BorrowScopeIntroducingValue>
 getSingleBorrowIntroducingValue(SILValue inputValue);
 
 struct InteriorPointerOperandKind {
-  using UnderlyingKindTy = std::underlying_type<SILInstructionKind>::type;
-
-  enum Kind : UnderlyingKindTy {
-    RefElementAddr = UnderlyingKindTy(SILInstructionKind::RefElementAddrInst),
-    RefTailAddr = UnderlyingKindTy(SILInstructionKind::RefTailAddrInst),
+  enum Kind : uint8_t {
+    RefElementAddr,
+    RefTailAddr,
+    OpenExistentialBox,
   };
 
   Kind value;
@@ -410,6 +409,8 @@ struct InteriorPointerOperandKind {
       return InteriorPointerOperandKind(RefElementAddr);
     case SILInstructionKind::RefTailAddrInst:
       return InteriorPointerOperandKind(RefTailAddr);
+    case SILInstructionKind::OpenExistentialBoxInst:
+      return InteriorPointerOperandKind(OpenExistentialBox);
     }
   }
 
@@ -457,6 +458,8 @@ struct InteriorPointerOperand {
       return cast<RefElementAddrInst>(operand->getUser());
     case InteriorPointerOperandKind::RefTailAddr:
       return cast<RefTailAddrInst>(operand->getUser());
+    case InteriorPointerOperandKind::OpenExistentialBox:
+      return cast<OpenExistentialBoxInst>(operand->getUser());
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
@@ -596,6 +599,28 @@ struct OwnedValueIntroducer {
     if (!kind)
       return None;
     return OwnedValueIntroducer(value, *kind);
+  }
+
+  /// Returns true if this owned introducer is able to be converted into a
+  /// guaranteed form if none of its uses are consuming uses (looking through
+  /// forwarding uses).
+  bool isConvertableToGuaranteed() const {
+    switch (kind) {
+    case OwnedValueIntroducerKind::Copy:
+    case OwnedValueIntroducerKind::LoadCopy:
+      return true;
+    case OwnedValueIntroducerKind::Apply:
+    case OwnedValueIntroducerKind::BeginApply:
+    case OwnedValueIntroducerKind::TryApply:
+    case OwnedValueIntroducerKind::LoadTake:
+    case OwnedValueIntroducerKind::Phi:
+    case OwnedValueIntroducerKind::FunctionArgument:
+    case OwnedValueIntroducerKind::PartialApplyInit:
+    case OwnedValueIntroducerKind::AllocBoxInit:
+    case OwnedValueIntroducerKind::AllocRefInit:
+      return false;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 
   bool operator==(const OwnedValueIntroducer &other) const {

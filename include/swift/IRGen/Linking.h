@@ -1155,6 +1155,8 @@ public:
   /// Get the default LLVM type to use for forward declarations of this
   /// entity.
   llvm::Type *getDefaultDeclarationType(IRGenModule &IGM) const;
+
+  bool isAlwaysSharedLinkage() const;
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 };

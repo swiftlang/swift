@@ -772,7 +772,7 @@ void SILPassManager::resetAndRemoveTransformations() {
 }
 
 void SILPassManager::setStageName(llvm::StringRef NextStage) {
-  StageName = NextStage;
+  StageName = NextStage.str();
 }
 
 StringRef SILPassManager::getStageName() const {
@@ -983,7 +983,7 @@ namespace llvm {
 
     std::string getNodeLabel(const CallGraph::Node *Node,
                              const CallGraph *Graph) {
-      std::string Label = Node->F->getName();
+      std::string Label = Node->F->getName().str();
       wrap(Label, Node->NumCallSites);
       return Label;
     }

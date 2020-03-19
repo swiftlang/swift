@@ -575,6 +575,10 @@ std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
 
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return std::string(); // not needed for the parser library.
+#endif
+
   DWARFMangling = true;
   beginManglingWithoutPrefix();
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
@@ -1578,6 +1582,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back('G');
     break;
   }
+
+  auto outerGenericSig = CurGenericSignature;
+  CurGenericSignature = fn->getSubstGenericSignature();
   
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
@@ -1605,8 +1612,10 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back(getResultConvention(error.getConvention()));
     appendType(error.getInterfaceType());
   }
+
   if (auto sig = fn->getInvocationGenericSignature()) {
     appendGenericSignature(sig);
+    CurGenericSignature = outerGenericSig;
   }
   if (auto subs = fn->getInvocationSubstitutions()) {
     appendFlatGenericArgs(subs);
@@ -1614,8 +1623,13 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   }
   if (auto subs = fn->getPatternSubstitutions()) {
     appendGenericSignature(subs.getGenericSignature());
+    CurGenericSignature =
+      fn->getInvocationGenericSignature()
+        ? fn->getInvocationGenericSignature()
+        : outerGenericSig;
     appendFlatGenericArgs(subs);
     appendRetroactiveConformances(subs, Mod);
+    CurGenericSignature = outerGenericSig;
   }
 
   OpArgs.push_back('_');

@@ -266,26 +266,18 @@ class Factory {
 
 // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self22partialApplySelfReturn1c1tyAA7FactoryC_AFmtF : $@convention(thin) (@guaranteed Factory, @thick Factory.Type) -> ()
 func partialApplySelfReturn(c: Factory, t: Factory.Type) {
-  // CHECK: function_ref @$s12dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@guaranteed Factory) -> @owned @callee_guaranteed () -> @owned Factory
   _ = c.newInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@guaranteed Factory) -> @owned @callee_guaranteed () -> @owned Factory
   _ = Factory.newInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@guaranteed Factory) -> @owned @callee_guaranteed () -> @owned Factory
+
   _ = t.newInstance
   _ = type(of: c).newInstance
 
-  // CHECK: function_ref @$s12dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = t.classNewInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = type(of: c).classNewInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = Factory.classNewInstance
 
-  // CHECK: function_ref @$s12dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = t.staticNewInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = type(of: c).staticNewInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = Factory.staticNewInstance
 }
 

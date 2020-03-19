@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sil -module-name coverage_closures %s | %FileCheck %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 func bar(arr: [(Int32) -> Int32]) {
 // CHECK-LABEL: sil_coverage_map {{.*}}// closure #1 (Swift.Int32) -> Swift.Int32 in coverage_closures.bar

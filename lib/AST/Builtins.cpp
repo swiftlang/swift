@@ -1552,7 +1552,7 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
    OverloadedBuiltinKind::Special,
 #define BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(id, name, attrs, overload)  \
   OverloadedBuiltinKind::overload,
-#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name, attrs)                  \
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name)                         \
   OverloadedBuiltinKind::Special,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
    OverloadedBuiltinKind::overload,
@@ -2193,7 +2193,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
 #define BUILTIN(id, name, attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
-#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name, attrs)                  \
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name)                         \
   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
       if (!Types.empty())
@@ -2475,7 +2475,7 @@ bool swift::isPolymorphicBuiltin(BuiltinValueKind id) {
 #define BUILTIN(Id, Name, Attrs)                                               \
   case BuiltinValueKind::Id:                                                   \
     return false;
-#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name, Attrs)                  \
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
   case BuiltinValueKind::Id:                                                   \
     return true;
 #include "swift/AST/Builtins.def"

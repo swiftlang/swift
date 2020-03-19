@@ -66,7 +66,6 @@ namespace swift {
   class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
-  class TypeChecker;
   class TypeCheckerOptions;
   struct TypeLoc;
   class UnifiedStatsReporter;
@@ -140,12 +139,6 @@ namespace swift {
   /// "program counter"-like debugging events. See the comment at the top of
   /// lib/Sema/PCMacro.cpp for a description of the calls inserted.
   void performPCMacro(SourceFile &SF);
-
-  /// Creates a type checker instance on the given AST context, if it
-  /// doesn't already have one.
-  ///
-  /// \returns a reference to the type checker instance.
-  TypeChecker &createTypeChecker(ASTContext &Ctx);
 
   /// Bind all 'extension' visible from \p SF to the extended nominal.
   void bindExtensions(SourceFile &SF);
@@ -389,6 +382,12 @@ namespace swift {
   /// Clients that form an ASTContext and will perform any TBD generation
   /// should call this functions after forming the ASTContext.
   void registerTBDGenRequestFunctions(Evaluator &evaluator);
+
+  /// Register IRGen-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any IR generation
+  /// should call this functions after forming the ASTContext.
+  void registerIRGenRequestFunctions(Evaluator &evaluator);
 
   /// Register IDE-level request functions with the evaluator.
   ///

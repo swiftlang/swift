@@ -206,7 +206,7 @@ struct RuntimeVersionCheck {
 
     // availableInfo = "#available(\(platformSpec), \(otherSpec))"
     auto availableInfo = PoundAvailableInfo::create(
-        C, SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
+        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
 
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
@@ -466,7 +466,22 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
   if (TypeChecker::conformsToProtocol(rawType, equatableProto, DC, None)
           .isInvalid())
     return false;
-  
+
+  auto &C = type->getASTContext();
+  auto rawValueDecls = enumDecl->lookupDirect(DeclName(C.Id_RawValue));
+  if (rawValueDecls.size() > 1)
+    return false;
+
+  // Check that the RawValue matches the expected raw type.
+  if (!rawValueDecls.empty()) {
+    if (auto alias = dyn_cast<TypeDecl>(rawValueDecls.front())) {
+      auto ty = alias->getDeclaredInterfaceType();
+      if (!DC->mapTypeIntoContext(ty)->isEqual(rawType)) {
+        return false;
+      }
+    }
+  }
+
   // There must be enum elements.
   if (enumDecl->getAllElements().empty())
     return false;

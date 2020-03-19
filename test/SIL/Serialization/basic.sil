@@ -58,6 +58,14 @@ entry(%0 : @guaranteed $@callee_guaranteed @substituted <C, D> (@in C, @in D) ->
   return undef : $()
 }
 
+// CHECK-LABEL: sil [lazy_getter] @test_lazy_getter
+sil [lazy_getter] @test_lazy_getter : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+
 struct EmptyStruct {}
 
 sil @test_empty_destructure : $@convention(thin) () -> () {

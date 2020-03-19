@@ -1493,10 +1493,23 @@ bool TypeBase::isCallableNominalType(DeclContext *dc) {
 }
 
 bool TypeBase::hasDynamicMemberLookupAttribute() {
+  if (!mayHaveMembers())
+    return false;
+
   auto canTy = getCanonicalType();
   auto &ctx = canTy->getASTContext();
   return evaluateOrDefault(
       ctx.evaluator, HasDynamicMemberLookupAttributeRequest{canTy}, false);
+}
+
+bool TypeBase::hasDynamicCallableAttribute() {
+  if (!mayHaveMembers())
+    return false;
+
+  auto canTy = getCanonicalType();
+  auto &ctx = canTy->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, HasDynamicCallableAttributeRequest{canTy}, false);
 }
 
 Type TypeBase::getSuperclass(bool useArchetypes) {
@@ -2387,7 +2400,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   if (wasOptional && !result.isRepresentableAsOptional())
     return failure();
-
+  
   // If our nominal type has type arguments, make sure they are
   // representable as well. Because type arguments are not actually
   // translated separately, whether they are trivially representable
@@ -2433,6 +2446,16 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       case ForeignRepresentableKind::BridgedError:
         break;
       }
+    }
+    
+    // Specialize the conformance we were given for the type we're testing.
+    if (result.getKind() == ForeignRepresentableKind::Bridged
+        && !result.getConformance()->getType()->isEqual(type)) {
+      auto specialized = type->getASTContext()
+        .getSpecializedConformance(type, result.getConformance(),
+             boundGenericType->getContextSubstitutionMap(dc->getParentModule(),
+                                                 boundGenericType->getDecl()));
+      result = ForeignRepresentationInfo::forBridged(specialized);
     }
   }
 
@@ -5271,6 +5294,25 @@ SILFunctionType::withPatternSubstitutions(SubstitutionMap subs) const {
                           subs, getInvocationSubstitutions(),
                           const_cast<SILFunctionType*>(this)->getASTContext(),
                           getWitnessMethodConformanceOrInvalid());
+}
+
+CanSILFunctionType
+SILFunctionType::withPatternSpecialization(CanGenericSignature sig,
+                                           SubstitutionMap subs,
+                                           ProtocolConformanceRef
+                                             witnessConformance) const {
+  assert(!hasInvocationSubstitutions());
+  subs = subs.getCanonical();
+  assert(!subs || CanGenericSignature(subs.getGenericSignature())
+                    == getSubstGenericSignature());
+  return SILFunctionType::get(sig,
+                          getExtInfo(), getCoroutineKind(),
+                          getCalleeConvention(),
+                          getParameters(), getYields(), getResults(),
+                          getOptionalErrorResult(),
+                          subs, SubstitutionMap(),
+                          const_cast<SILFunctionType*>(this)->getASTContext(),
+                          witnessConformance);
 }
 
 SourceLoc swift::extractNearestSourceLoc(Type ty) {

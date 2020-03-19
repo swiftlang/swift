@@ -112,3 +112,32 @@ bb0(%0 : $*Builtin.Int32):
   end_access %write : $*Builtin.Int32
   return %val : $Builtin.Int32
 }
+
+// ===-----------------------------------------------------------------------===
+// Test the effect of a [deinit] access on a global 'let'
+//
+// Test <rdar://60046018> Assert: (v->getType().isAddress()), getAccessedAddress
+
+sil_global hidden [let] @globalC : $C
+
+// CHECK-LABEL: @testDeinitInstVsNonAddressValue
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     load %{{.*}} : $*C
+// CHECK-NEXT:     begin_access [deinit] [static] %{{.*}} : $*Builtin.Int32
+// CHECK-NEXT:   r=1,w=0,se=0
+// CHECK:      PAIR #16.
+// CHECK-NEXT:    %6 = begin_access [deinit] [static] %5 : $*Builtin.Int32 // user: %7
+// CHECK-NEXT:    %2 = load %1 : $*C                              // user: %3
+// CHECK-NEXT:  r=1,w=0,se=0
+sil hidden @testDeinitInstVsNonAddressValue : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %1 = global_addr @globalC : $*C
+  %2 = load %1 : $*C
+  %3 = ref_element_addr %2 : $C, #C.prop
+  %4 = load %3 : $*Builtin.Int32
+  %5 = ref_element_addr %0 : $C, #C.prop
+  %6 = begin_access [deinit] [static] %5 : $*Builtin.Int32
+  end_access %6 : $*Builtin.Int32
+  %8 = tuple ()
+  return %8 : $()
+}

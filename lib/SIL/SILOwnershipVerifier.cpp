@@ -605,71 +605,28 @@ bool SILValueOwnershipChecker::gatherUsers(
       continue;
     }
 
-    // See if our forwarding terminator is a transformation terminator. If so,
-    // just add all of the uses of its successors to the worklist to visit as
-    // users.
-    if (ti->isTransformationTerminator()) {
-      for (auto &succ : ti->getSuccessors()) {
-        auto *succBlock = succ.getBB();
-
-        // If we do not have any arguments, then continue.
-        if (succBlock->args_empty())
-          continue;
-
-        // Otherwise, make sure that all arguments are trivial or guaranteed.
-        // If we fail, emit an error.
-        //
-        // TODO: We could ignore this error and emit a more specific error on
-        // the actual terminator.
-        for (auto *succArg : succBlock->getSILPhiArguments()) {
-          // *NOTE* We do not emit an error here since we want to allow for
-          // more specific errors to be found during use_verification.
-          //
-          // TODO: Add a flag that associates the terminator instruction with
-          // needing to be verified. If it isn't verified appropriately,
-          // assert when the verifier is destroyed.
-          auto succArgOwnershipKind = succArg->getOwnershipKind();
-          if (!succArgOwnershipKind.isCompatibleWith(
-                  ValueOwnershipKind::Guaranteed)) {
-            // This is where the error would go.
-            continue;
-          }
-
-          // If we have an any value, just continue.
-          if (succArgOwnershipKind == ValueOwnershipKind::None)
-            continue;
-
-          // Otherwise add all users of this BBArg to the worklist to visit
-          // recursively.
-          llvm::copy(succArg->getUses(), std::back_inserter(users));
-        }
-      }
-      continue;
-    }
-
-    // We should not have a true phi here. So validate that our argument has an
-    // end_borrow that acts as a subscope that is compeltely enclosed within the
-    // scopes of all incoming values. We require all of our arguments to be
-    // either trivial or guaranteed.
-    for (auto &succ : ti->getSuccessors()) {
-      auto *succBlock = succ.getBB();
-
+    // At this point, the only type of thing we could have is a transformation
+    // terminator since all forwarding terminators are transformation
+    // terminators.
+    assert(ti->isTransformationTerminator() &&
+           "Out of sync with isTransformationTerminator()");
+    for (auto *succBlock : ti->getSuccessorBlocks()) {
       // If we do not have any arguments, then continue.
       if (succBlock->args_empty())
         continue;
 
-      // Otherwise, make sure that all arguments are trivial or guaranteed. If
-      // we fail, emit an error.
+      // Otherwise, make sure that all arguments are trivial or guaranteed.
+      // If we fail, emit an error.
       //
       // TODO: We could ignore this error and emit a more specific error on
       // the actual terminator.
       for (auto *succArg : succBlock->getSILPhiArguments()) {
-        // *NOTE* We do not emit an error here since we want to allow for more
-        // specific errors to be found during use_verification.
+        // *NOTE* We do not emit an error here since we want to allow for
+        // more specific errors to be found during use_verification.
         //
         // TODO: Add a flag that associates the terminator instruction with
-        // needing to be verified. If it isn't verified appropriately, assert
-        // when the verifier is destroyed.
+        // needing to be verified. If it isn't verified appropriately,
+        // assert when the verifier is destroyed.
         auto succArgOwnershipKind = succArg->getOwnershipKind();
         if (!succArgOwnershipKind.isCompatibleWith(
                 ValueOwnershipKind::Guaranteed)) {
@@ -681,16 +638,9 @@ bool SILValueOwnershipChecker::gatherUsers(
         if (succArgOwnershipKind == ValueOwnershipKind::None)
           continue;
 
-        // Otherwise add all end_borrow users for this BBArg to the
-        // implicit regular user list. We know that BBArg must be
-        // completely joint post-dominated by these users, so we use
-        // them to ensure that all of BBArg's uses are completely
-        // enclosed within the end_borrow of this argument.
-        for (auto *op : succArg->getUses()) {
-          if (isa<EndBorrowInst>(op->getUser())) {
-            implicitRegularUsers.push_back(op);
-          }
-        }
+        // Otherwise add all users of this BBArg to the worklist to visit
+        // recursively.
+        llvm::copy(succArg->getUses(), std::back_inserter(users));
       }
     }
   }

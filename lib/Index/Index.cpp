@@ -495,6 +495,13 @@ private:
     return finishSourceEntity(Info.symInfo, Info.roles);
   }
 
+  bool visitCallAsFunctionReference(ValueDecl *D, CharSourceRange Range,
+                                    ReferenceMetaData Data) override {
+    // Index implicit callAsFunction reference.
+    return visitDeclReference(D, Range, /*CtorTyRef*/ nullptr,
+                              /*ExtTyRef*/ nullptr, Type(), Data);
+  }
+
   Decl *getParentDecl() const {
     if (!EntitiesStack.empty())
       return EntitiesStack.back().D;

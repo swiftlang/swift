@@ -147,11 +147,27 @@ bool TempRValueOptPass::collectLoads(
     LLVM_DEBUG(llvm::dbgs()
                << "  Temp use may write/destroy its source" << *user);
     return false;
-
   case SILInstructionKind::BeginAccessInst:
     return cast<BeginAccessInst>(user)->getAccessKind() == SILAccessKind::Read;
 
+  case SILInstructionKind::MarkDependenceInst: {
+    auto mdi = cast<MarkDependenceInst>(user);
+    // If the user is the base operand of the MarkDependenceInst we can return
+    // true, because this would be the end of this dataflow chain
+    if (mdi->getBase() == address) {
+      return true;
+    }
+    // If the user is the value operand of the MarkDependenceInst we have to
+    // transitively explore its uses until we reach a load or return false
+    for (auto *mdiUseOper : mdi->getUses()) {
+      if (!collectLoads(mdiUseOper, mdiUseOper->getUser(), mdi, srcAddr,
+                        loadInsts))
+        return false;
+    }
+    return true;
+  }
   case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::TryApplyInst: {
     ApplySite apply(user);
 
@@ -650,7 +666,14 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
       toDelete.push_back(fli);
       break;
     }
-
+    case SILInstructionKind::MarkDependenceInst: {
+      SILBuilderWithScope builder(user);
+      auto mdi = cast<MarkDependenceInst>(user);
+      auto newInst = builder.createMarkDependence(user->getLoc(), mdi->getValue(), si->getSrc());
+      mdi->replaceAllUsesWith(newInst);
+      toDelete.push_back(user);
+      break;
+    }
     // ASSUMPTION: no operations that may be handled by this default clause can
     // destroy tempObj. This includes operations that load the value from memory
     // and release it.

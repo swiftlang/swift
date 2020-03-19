@@ -3033,6 +3033,31 @@ public:
     OS << " type="; Ty.dump(OS);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
+    printCommon("sil_box");
+    Indent += 2;
+
+    ArrayRef<SILBoxTypeReprField> Fields = T->getFields();
+    for (unsigned i = 0, end = Fields.size(); i != end; ++i) {
+      OS << '\n';
+      printCommon("sil_box_field");
+      if (Fields[i].isMutable()) {
+        OS << " mutable";
+      }
+      OS << '\n';
+      printRec(Fields[i].getFieldType());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    for (auto genArg : T->getGenericArguments()) {
+      OS << '\n';
+      printRec(genArg);
+    }
+
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    Indent -= 2;
+  }
 };
 
 } // end anonymous namespace
@@ -3684,8 +3709,26 @@ namespace {
 
     void visitSILFunctionType(SILFunctionType *T, StringRef label) {
       printCommon(label, "sil_function_type");
-      // FIXME: Print the structure of the type.
       printField("type", T->getString());
+
+      for (auto param : T->getParameters()) {
+        printRec("input", param.getInterfaceType());
+      }
+      for (auto yield : T->getYields()) {
+        printRec("yield", yield.getInterfaceType());
+      }
+      for (auto result : T->getResults()) {
+        printRec("result", result.getInterfaceType());
+      }
+      if (auto error  = T->getOptionalErrorResult()) {
+        printRec("error", error->getInterfaceType());
+      }
+      OS << '\n';
+      T->getPatternSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
+                                        Indent+2);
+      OS << '\n';
+      T->getInvocationSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
+                                           Indent+2);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

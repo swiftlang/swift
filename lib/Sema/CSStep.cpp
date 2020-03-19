@@ -220,6 +220,7 @@ bool SplitterStep::mergePartialSolutions() const {
   ArrayRef<unsigned> counts = countsVec;
   SmallVector<unsigned, 2> indices(numComponents, 0);
   bool anySolutions = false;
+  size_t solutionMemory = 0;
   do {
     // Create a new solver scope in which we apply all of the relevant partial
     // solutions.
@@ -236,6 +237,7 @@ bool SplitterStep::mergePartialSolutions() const {
     if (!CS.worseThanBestSolution()) {
       // Finalize this solution.
       auto solution = CS.finalize();
+      solutionMemory += solution.getTotalMemory();
       if (isDebugMode())
         getDebugLogger() << "(composed solution " << CS.CurrentScore << ")\n";
 
@@ -243,6 +245,12 @@ bool SplitterStep::mergePartialSolutions() const {
       Solutions.push_back(std::move(solution));
       anySolutions = true;
     }
+
+    // Since merging partial solutions can go exponential, make sure we didn't
+    // pass the "too complex" thresholds including allocated memory and time.
+    if (CS.getExpressionTooComplex(solutionMemory))
+      return false;
+
   } while (nextCombination(counts, indices));
 
   return anySolutions;

@@ -47,6 +47,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/Basic/CharInfo.h"
 #include "swift/Basic/Statistic.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Lookup.h"
 
@@ -7685,7 +7686,7 @@ void ClangImporter::Implementation::importAttributes(
   // Ban CFRelease|CFRetain|CFAutorelease(CFTypeRef) as well as custom ones
   // such as CGColorRelease(CGColorRef).
   if (auto FD = dyn_cast<clang::FunctionDecl>(ClangDecl)) {
-    if (FD->getNumParams() == 1 &&
+    if (FD->getNumParams() == 1 && FD->getDeclName().isIdentifier() &&
          (FD->getName().endswith("Release") ||
           FD->getName().endswith("Retain") ||
           FD->getName().endswith("Autorelease")) &&

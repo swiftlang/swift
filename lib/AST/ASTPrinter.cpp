@@ -272,7 +272,7 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
     }
     Data += Step;
   }
-  return Builder.str();
+  return std::string(Builder.str());
 }
 
 void ASTPrinter::anchor() {}
@@ -819,7 +819,7 @@ private:
   bool shouldPrintPattern(const Pattern *P);
   void printPatternType(const Pattern *P);
   void printAccessors(const AbstractStorageDecl *ASD);
-  void printMutatingModifiersIfNeeded(const AccessorDecl *accessor);
+  void printMutabilityModifiersIfNeeded(const FuncDecl *FD);
   void printMembersOfDecl(Decl * NTD, bool needComma = false,
                           bool openBracket = true, bool closeBracket = true);
   void printMembers(ArrayRef<Decl *> members, bool needComma = false,
@@ -1008,9 +1008,6 @@ void PrintAST::printAttributes(const Decl *D) {
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(X, Class) EXCLUDE_ATTR(Class)
 #include "swift/AST/Attr.def"
-    } else if (isa<FuncDecl>(D)) {
-      Options.ExcludeAttrList.push_back(DAK_Mutating);
-      Options.ExcludeAttrList.push_back(DAK_NonMutating);
     }
 
     // If the declaration is implicitly @objc, print the attribute now.
@@ -1026,17 +1023,21 @@ void PrintAST::printAttributes(const Decl *D) {
     // clients, or if it inherits superclass convenience initializers,
     // then print those attributes specially.
     if (auto CD = dyn_cast<ClassDecl>(D)) {
-      if (Options.PrintImplicitAttrs) {
-        if (CD->inheritsSuperclassInitializers()) {
-          Printer.printAttrName("@_inheritsConvenienceInitializers");
-          Printer << " ";
-        }
-        if (CD->hasMissingDesignatedInitializers()) {
-          Printer.printAttrName("@_hasMissingDesignatedInitializers");
-          Printer << " ";
-        }
+      if (CD->inheritsSuperclassInitializers()) {
+        Printer.printAttrName("@_inheritsConvenienceInitializers");
+        Printer << " ";
+      }
+      if (CD->hasMissingDesignatedInitializers()) {
+        Printer.printAttrName("@_hasMissingDesignatedInitializers");
+        Printer << " ";
       }
     }
+  }
+
+  // We will handle 'mutating' and 'nonmutating' separately.
+  if (isa<FuncDecl>(D)) {
+    Options.ExcludeAttrList.push_back(DAK_Mutating);
+    Options.ExcludeAttrList.push_back(DAK_NonMutating);
   }
 
   D->getAttrs().print(Printer, Options, D);
@@ -1776,12 +1777,15 @@ void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
   printBraceStmt(decl->getBody(), /*newlineIfEmpty*/!isa<AccessorDecl>(decl));
 }
 
-void PrintAST::printMutatingModifiersIfNeeded(const AccessorDecl *accessor) {
-  if (accessor->isAssumedNonMutating() && accessor->isMutating() &&
-      !Options.excludeAttrKind(DAK_Mutating)) {
-    Printer.printKeyword("mutating", Options, " ");
-  } else if (accessor->isExplicitNonMutating() &&
-             !Options.excludeAttrKind(DAK_NonMutating)) {
+void PrintAST::printMutabilityModifiersIfNeeded(const FuncDecl *FD) {
+  const auto *AD = dyn_cast<AccessorDecl>(FD);
+
+  if (FD->isMutating()) {
+    if (AD == nullptr || AD->isAssumedNonMutating())
+      if (!Options.excludeAttrKind(DAK_Mutating))
+        Printer.printKeyword("mutating", Options, " ");
+  } else if (AD && AD->isExplicitNonMutating() &&
+             !Options.excludeAttrKind(DAK_Mutating)) {
     Printer.printKeyword("nonmutating", Options, " ");
   }
 }
@@ -1899,7 +1903,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       return true;
     if (!PrintAccessorBody) {
       Printer << " ";
-      printMutatingModifiersIfNeeded(Accessor);
+      printMutabilityModifiersIfNeeded(Accessor);
       Printer.printKeyword(getAccessorLabel(Accessor->getAccessorKind()), Options);
     } else {
       {
@@ -2795,10 +2799,9 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
 void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  // Explicitly print 'mutating' and 'nonmutating' if needed.
+  printMutabilityModifiersIfNeeded(decl);
 
-  // Explicitly print 'mutating' and 'nonmutating' before getters and setters
-  // for which that is true.
-  printMutatingModifiersIfNeeded(decl);
   switch (auto kind = decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
@@ -2855,9 +2858,9 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     if (!Options.SkipIntroducerKeywords) {
       if (decl->isStatic() && Options.PrintStaticKeyword)
         printStaticKeyword(decl->getCorrectStaticSpelling());
-      if (decl->isMutating() && !Options.excludeAttrKind(DAK_Mutating)) {
-        Printer.printKeyword("mutating", Options, " ");
-      } else if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
+
+      printMutabilityModifiersIfNeeded(decl);
+      if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
         Printer.printKeyword("__consuming", Options, " ");
       }
       Printer << tok::kw_func << " ";
@@ -4224,10 +4227,8 @@ public:
       }
       sub->Printer << ") -> ";
 
-      unsigned totalResults =
-        T->getNumYields() + T->getNumResults() + unsigned(T->hasErrorResult());
-
-      if (totalResults != 1)
+      bool parenthesizeResults = mustParenthesizeResults(T);
+      if (parenthesizeResults)
         sub->Printer << "(";
 
       first = true;
@@ -4251,7 +4252,7 @@ public:
         T->getErrorResult().getInterfaceType().print(sub->Printer, subOptions);
       }
 
-      if (totalResults != 1)
+      if (parenthesizeResults)
         sub->Printer << ")";
     }();
 
@@ -4266,6 +4267,24 @@ public:
       Printer << " for";
       printSubstitutions(substitutions);
     }
+  }
+
+  static bool mustParenthesizeResults(SILFunctionType *T) {
+    // If we don't have exactly one result, we must parenthesize.
+    unsigned totalResults =
+      T->getNumYields() + T->getNumResults() + unsigned(T->hasErrorResult());
+    if (totalResults != 1)
+      return true;
+
+    // If we have substitutions, we must parenthesize if the single
+    // result is a function type.
+    if (!T->hasPatternSubstitutions() && !T->hasInvocationSubstitutions())
+      return false;
+    if (T->getNumResults() == 1)
+      return isa<SILFunctionType>(T->getResults()[0].getInterfaceType());
+    if (T->getNumYields() == 1)
+      return isa<SILFunctionType>(T->getYields()[0].getInterfaceType());
+    return isa<SILFunctionType>(T->getErrorResult().getInterfaceType());
   }
 
   void visitSILBlockStorageType(SILBlockStorageType *T) {
@@ -4543,7 +4562,7 @@ AnyFunctionType::getParamListAsString(ArrayRef<AnyFunctionType::Param> Params,
   SmallString<16> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
   AnyFunctionType::printParams(Params, OS);
-  return OS.str();
+  return std::string(OS.str());
 }
 
 void LayoutConstraintInfo::print(raw_ostream &OS,

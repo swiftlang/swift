@@ -551,6 +551,9 @@ def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
 
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
+  
+def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
+  HelpText<"Verify all SubstitutionMaps on construction">;
 
 def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
   HelpText<"Do not eliminate functions in Mandatory Inlining/SILCombine dead "
@@ -690,4 +693,8 @@ def disable_type_layouts : Flag<["-"], "disable-type-layout">,
 
 def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
   HelpText<"Don't lock interface file when building module">;
+
+def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
+    HelpText<"Directory for bridging header to be printed in compatibility header">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
