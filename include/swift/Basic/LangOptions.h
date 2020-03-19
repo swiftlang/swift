@@ -296,6 +296,11 @@ namespace swift {
     /// incrementals parsing.
     bool BuildSyntaxTree = false;
 
+    /// Whether parsing is occurring for creation of syntax tree only, and no typechecking will occur after
+    /// parsing e.g. when parsing for SwiftSyntax. This is intended to affect parsing, e.g. disable
+    /// unnecessary name lookups that are not useful for pure syntactic parsing.
+    bool ParseForSyntaxTreeOnly = false;
+
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
@@ -351,7 +356,7 @@ namespace swift {
     /// Sets an implicit platform condition.
     void addPlatformConditionValue(PlatformConditionKind Kind, StringRef Value) {
       assert(!Value.empty());
-      PlatformConditionValues.emplace_back(Kind, Value);
+      PlatformConditionValues.emplace_back(Kind, Value.str());
     }
 
     /// Removes all values added with addPlatformConditionValue.
@@ -369,7 +374,7 @@ namespace swift {
     /// compiler flag.
     void addCustomConditionalCompilationFlag(StringRef Name) {
       assert(!Name.empty());
-      CustomConditionalCompilationFlags.push_back(Name);
+      CustomConditionalCompilationFlags.push_back(Name.str());
     }
 
     /// Determines if a given conditional compilation flag has been set.

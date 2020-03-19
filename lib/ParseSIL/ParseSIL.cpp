@@ -910,7 +910,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  IsExactSelfClass_t *isExactSelfClass,
                                  SILFunction **dynamicallyReplacedFunction,
                                  Identifier *objCReplacementFor,
-                                 bool *isGlobalInit,
+                                 SILFunction::Purpose *specialPurpose,
                                  Inline_t *inlineStrategy,
                                  OptimizationMode *optimizationMode,
                                  bool *isLet,
@@ -955,8 +955,10 @@ static bool parseDeclSILOptional(bool *isTransparent,
     else if (isWithoutActuallyEscapingThunk
              && SP.P.Tok.getText() == "without_actually_escaping")
       *isWithoutActuallyEscapingThunk = true;
-    else if (isGlobalInit && SP.P.Tok.getText() == "global_init")
-      *isGlobalInit = true;
+    else if (specialPurpose && SP.P.Tok.getText() == "global_init")
+      *specialPurpose = SILFunction::Purpose::GlobalInit;
+    else if (specialPurpose && SP.P.Tok.getText() == "lazy_getter")
+      *specialPurpose = SILFunction::Purpose::LazyPropertyGetter;
     else if (isWeakImported && SP.P.Tok.getText() == "weak_imported") {
       if (M.getASTContext().LangOpts.Target.isOSBinFormatCOFF())
         SP.P.diagnose(SP.P.Tok, diag::attr_unsupported_on_target,
@@ -1038,7 +1040,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
   
       // Drop the double quotes.
       StringRef rawString = SP.P.Tok.getText().drop_front().drop_back();
-      Semantics->push_back(rawString);
+      Semantics->push_back(rawString.str());
       SP.P.consumeToken(tok::string_literal);
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
@@ -1338,9 +1340,7 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 }
 
 ///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
-///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)?
-///                      ('.' sil-decl-lang)?
-///  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
+///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)?
 ///  sil-decl-subref ::= '!' sil-decl-lang
 ///  sil-decl-subref-part ::= 'getter'
 ///  sil-decl-subref-part ::= 'setter'
@@ -1349,7 +1349,6 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 ///  sil-decl-subref-part ::= 'enumelt'
 ///  sil-decl-subref-part ::= 'destroyer'
 ///  sil-decl-subref-part ::= 'globalaccessor'
-///  sil-decl-uncurry-level ::= [0-9]+
 ///  sil-decl-lang ::= 'foreign'
 bool SILParser::parseSILDeclRef(SILDeclRef &Result,
                                 SmallVectorImpl<ValueDecl *> &values) {
@@ -1357,25 +1356,21 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
   if (parseSILDottedPath(VD, values))
     return true;
 
-  // Initialize Kind, uncurryLevel and IsObjC.
+  // Initialize Kind and IsObjC.
   SILDeclRef::Kind Kind = SILDeclRef::Kind::Func;
-  unsigned uncurryLevel = 0;
   bool IsObjC = false;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
-    Result = SILDeclRef(VD, Kind, /*isCurried=*/false, IsObjC);
-    if (uncurryLevel < Result.getParameterListCount() - 1)
-      Result = Result.asCurried();
+    Result = SILDeclRef(VD, Kind, IsObjC);
     return false;
   }
 
   // Handle sil-constant-kind-and-uncurry-level.
   // ParseState indicates the value we just handled.
-  // 1 means we just handled Kind, 2 means we just handled uncurryLevel.
-  // We accept func|getter|setter|...|foreign or an integer when ParseState is
-  // 0; accept foreign or an integer when ParseState is 1; accept foreign when
-  // ParseState is 2.
+  // 1 means we just handled Kind.
+  // We accept func|getter|setter|...|foreign when ParseState is 0;
+  // accept foreign when ParseState is 1.
   unsigned ParseState = 0;
   Identifier Id;
   do {
@@ -1446,19 +1441,13 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         break;
       } else
         break;
-    } else if (ParseState < 2 && P.Tok.is(tok::integer_literal)) {
-      parseIntegerLiteral(P.Tok.getText(), 0, uncurryLevel);
-      P.consumeToken(tok::integer_literal);
-      ParseState = 2;
     } else
       break;
 
   } while (P.consumeIf(tok::period));
 
   // Construct SILDeclRef.
-  Result = SILDeclRef(VD, Kind, /*isCurried=*/false, IsObjC);
-  if (uncurryLevel < Result.getParameterListCount() - 1)
-    Result = Result.asCurried();
+  Result = SILDeclRef(VD, Kind, IsObjC);
   return false;
 }
 
@@ -5465,7 +5454,8 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
   IsThunk_t isThunk = IsNotThunk;
-  bool isGlobalInit = false, isWeakImported = false;
+  SILFunction::Purpose specialPurpose = SILFunction::Purpose::None;
+  bool isWeakImported = false;
   AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
   bool isWithoutActuallyEscapingThunk = false;
   Inline_t inlineStrategy = InlineDefault;
@@ -5480,8 +5470,9 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
       parseDeclSILOptional(
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
           &isThunk, &isDynamic, &isExactSelfClass, &DynamicallyReplacedFunction,
-          &objCReplacementFor, &isGlobalInit, &inlineStrategy, &optimizationMode, nullptr,
-          &isWeakImported, &availability, &isWithoutActuallyEscapingThunk, &Semantics,
+          &objCReplacementFor, &specialPurpose, &inlineStrategy,
+          &optimizationMode, nullptr, &isWeakImported, &availability,
+          &isWithoutActuallyEscapingThunk, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -5515,7 +5506,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
         DynamicallyReplacedFunction);
     if (!objCReplacementFor.empty())
       FunctionState.F->setObjCReplacement(objCReplacementFor);
-    FunctionState.F->setGlobalInit(isGlobalInit);
+    FunctionState.F->setSpecialPurpose(specialPurpose);
     FunctionState.F->setAlwaysWeakImported(isWeakImported);
     FunctionState.F->setAvailabilityForLinkage(availability);
     FunctionState.F->setWithoutActuallyEscapingThunk(

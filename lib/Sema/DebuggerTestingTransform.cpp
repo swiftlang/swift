@@ -243,7 +243,6 @@ private:
     // TODO: typeCheckExpression() seems to assign types to everything here,
     // but may not be sufficient in some cases.
     Expr *FinalExpr = ClosureCall;
-    (void)swift::createTypeChecker(Ctx);
     if (!TypeChecker::typeCheckExpression(FinalExpr, getCurrentDeclContext()))
       llvm::report_fatal_error("Could not type-check instrumentation");
 

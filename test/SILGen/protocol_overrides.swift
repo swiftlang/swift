@@ -15,7 +15,7 @@ protocol HasMutatingMethodClone: HasMutatingMethod {
 }
 extension HasMutatingMethodClone {
 // CHECK-LABEL: sil hidden [ossa] @$s4main22HasMutatingMethodClonePAAE10performFooyyF :
-// CHECK:         witness_method $Self, #HasMutatingMethod.foo!1
+// CHECK:         witness_method $Self, #HasMutatingMethod.foo :
   mutating func performFoo() {
     foo()
   }
@@ -26,7 +26,7 @@ protocol HasNonMutatingMethod: HasMutatingMethod {
 }
 extension HasNonMutatingMethod {
 // CHECK-LABEL: sil hidden [ossa] @$s4main20HasNonMutatingMethodPAAE10performFooyyF :
-// CHECK:         witness_method $Self, #HasNonMutatingMethod.foo!1 :
+// CHECK:         witness_method $Self, #HasNonMutatingMethod.foo :
   func performFoo() {
     foo()
   }
@@ -45,7 +45,7 @@ protocol HasMutatingGetterClone: HasMutatingGetter {
 }
 extension HasMutatingGetterClone {
 // CHECK-LABEL: sil hidden [ossa] @$s4main22HasMutatingGetterClonePAAE11readFromFooSiyF :
-// CHECK:         witness_method $Self, #HasMutatingGetter.foo!getter.1 :
+// CHECK:         witness_method $Self, #HasMutatingGetter.foo!getter :
   mutating func readFromFoo() -> Int {
     return foo
   }
@@ -56,7 +56,7 @@ protocol HasNonMutatingGetter: HasMutatingGetter {
 }
 extension HasNonMutatingGetter {
 // CHECK-LABEL: sil hidden [ossa] @$s4main20HasNonMutatingGetterPAAE11readFromFooSiyF :
-// CHECK:         witness_method $Self, #HasNonMutatingGetter.foo!getter.1 :
+// CHECK:         witness_method $Self, #HasNonMutatingGetter.foo!getter :
   func readFromFoo() -> Int {
     return foo
   }
@@ -75,13 +75,13 @@ protocol HasMutatingSetterClone: HasMutatingSetter {
 }
 extension HasMutatingSetterClone {
 // CHECK-LABEL: sil hidden [ossa] @$s4main22HasMutatingSetterClonePAAE11readFromFooSiyF :
-// CHECK:         witness_method $Self, #HasMutatingSetter.foo!getter.1 :
+// CHECK:         witness_method $Self, #HasMutatingSetter.foo!getter :
   func readFromFoo() -> Int {
     return foo
   }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main22HasMutatingSetterClonePAAE10writeToFooyySiF :
-// CHECK:         witness_method $Self, #HasMutatingSetter.foo!setter.1 :
+// CHECK:         witness_method $Self, #HasMutatingSetter.foo!setter :
   mutating func writeToFoo(_ x: Int) {
     foo = x
   }
@@ -94,13 +94,13 @@ extension HasNonMutatingSetter {
 //   It's unfortunate that this uses a new witness table entry,
 //   but we can live with it.
 // CHECK-LABEL: sil hidden [ossa] @$s4main20HasNonMutatingSetterPAAE11readFromFooSiyF :
-// CHECK:         witness_method $Self, #HasNonMutatingSetter.foo!getter.1 :
+// CHECK:         witness_method $Self, #HasNonMutatingSetter.foo!getter :
   func readFromFoo() -> Int {
     return foo
   }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main20HasNonMutatingSetterPAAE10writeToFooyySiF :
-// CHECK:         witness_method $Self, #HasNonMutatingSetter.foo!setter.1 :
+// CHECK:         witness_method $Self, #HasNonMutatingSetter.foo!setter :
   func writeToFoo(_ x: Int) {
     foo = x
   }

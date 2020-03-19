@@ -1907,6 +1907,27 @@ bool SourceFile::shouldCrossImport() const {
          getASTContext().LangOpts.EnableCrossImportOverlays;
 }
 
+ModuleDecl*
+SourceFile::getModuleShadowedBySeparatelyImportedOverlay(const ModuleDecl *overlay) {
+  if (separatelyImportedOverlaysReversed.empty() &&
+      !separatelyImportedOverlays.empty()) {
+    for (auto &entry: separatelyImportedOverlays) {
+      ModuleDecl *shadowed = entry.first;
+      for (ModuleDecl *overlay: entry.second) {
+        // If for some reason the same overlay shadows more than one module,
+        // pick the one whose name is alphabetically first.
+        ModuleDecl *old = separatelyImportedOverlaysReversed[overlay];
+        if (!old || shadowed->getNameStr() < old->getNameStr())
+          separatelyImportedOverlaysReversed[overlay] = shadowed;
+      }
+    }
+  }
+  auto i = separatelyImportedOverlaysReversed.find(overlay);
+  return i != separatelyImportedOverlaysReversed.end()
+    ? std::get<1>(*i)
+    : nullptr;
+};
+
 void ModuleDecl::clearLookupCache() {
   getASTContext().getImportCache().clear();
 
@@ -1968,7 +1989,7 @@ SourceFile::getInfoForUsedFilePaths() const {
         getASTContext().SourceMgr.getLocForBufferStart(BufferID);
   }
 
-  for (auto &vpath : VirtualFilenames) {
+  for (auto &vpath : VirtualFilePaths) {
     result[vpath.Item].virtualFileLocs.insert(vpath.Loc);
   }
 
@@ -2409,7 +2430,7 @@ StringRef ModuleEntity::getName() const {
 std::string ModuleEntity::getFullName() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
-    return SwiftMod->getName().str();
+    return std::string(SwiftMod->getName());
   return getClangModule(Mod)->getFullModuleName();
 }
 

@@ -434,7 +434,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
-      (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
+      (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
       F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
@@ -537,7 +537,6 @@ static void handleSILDeclRef(Serializer &S, const SILDeclRef &Ref,
                              SmallVectorImpl<ValueID> &ListOfValues) {
   ListOfValues.push_back(S.addDeclRef(Ref.getDecl()));
   ListOfValues.push_back((unsigned)Ref.kind);
-  ListOfValues.push_back(Ref.isCurried);
   ListOfValues.push_back(Ref.isForeign);
 }
 

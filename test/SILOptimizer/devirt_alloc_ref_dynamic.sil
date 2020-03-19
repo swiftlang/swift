@@ -33,12 +33,12 @@ bb0:
   %1 = metatype $@thick A.Type
   %2 = alloc_ref_dynamic %1 : $@thick A.Type, $A
   strong_retain %2 : $A
-  %8 = class_method %2 : $A, #A.foo!1 : (A) -> () -> Int32, $@convention(method) (@guaranteed A) -> Int32
+  %8 = class_method %2 : $A, #A.foo : (A) -> () -> Int32, $@convention(method) (@guaranteed A) -> Int32
   %9 = apply %8(%2) : $@convention(method) (@guaranteed A) -> Int32
   strong_release %2 : $A
   return %9 : $Int32
 }
 
 sil_vtable A {
-  #A.foo!1: @_TFC4test1A3foofS0_FT_Vs5Int32
+  #A.foo: @_TFC4test1A3foofS0_FT_Vs5Int32
 }

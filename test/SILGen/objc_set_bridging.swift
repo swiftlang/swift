@@ -17,7 +17,7 @@ import gizmo
     // CHECK:   [[NSSET_COPY:%.*]] = copy_value [[NSSET]] : $NSSet
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @$sSh10FoundationE36_unconditionallyBridgeFromObjectiveCyShyxGSo5NSSetCSgFZ
-    // CHECK:   [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt.1, [[NSSET_COPY]] : $NSSet
+    // CHECK:   [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt, [[NSSET_COPY]] : $NSSet
     // CHECK:   [[SET_META:%[0-9]+]] = metatype $@thin Set<Foo>.Type
     // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]], [[SET_META]])
     // CHECK:   [[BORROWED_SET:%.*]] = begin_borrow [[SET]]
@@ -74,7 +74,7 @@ import gizmo
   // CHECK:   [[NSSET_COPY:%.*]] = copy_value [[NSSET]] : $NSSet
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @$sSh10FoundationE36_unconditionallyBridgeFromObjectiveCyShyxGSo5NSSetCSgFZ
-  // CHECK:   [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt.1, [[NSSET_COPY]] : $NSSet
+  // CHECK:   [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt, [[NSSET_COPY]] : $NSSet
   // CHECK:   [[SET_META:%[0-9]+]] = metatype $@thin Set<Foo>.Type
   // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]], [[SET_META]])
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]

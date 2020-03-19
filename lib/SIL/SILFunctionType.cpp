@@ -2780,10 +2780,6 @@ static bool isClassOrProtocolMethod(ValueDecl *vd) {
 
 SILFunctionTypeRepresentation
 TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
-  // Currying thunks always have freestanding CC.
-  if (c.isCurried)
-    return SILFunctionTypeRepresentation::Thin;
-
   // If this is a foreign thunk, it always has the foreign calling convention.
   if (c.isForeign) {
     if (!c.hasDecl() ||

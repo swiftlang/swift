@@ -131,7 +131,7 @@ bb2(%5 : $Builtin.NativeObject, %6 : $S3, %7 : $Builtin.NativeObject, %8 : $*S3,
 
 sil @bb_arg_dont_process_switch_enum : $@convention(thin) (FakeOptional<S1>) -> () {
 bb0(%0 : $FakeOptional<S1>):
-  switch_enum %0 : $FakeOptional<S1>, case #FakeOptional.none!enumelt: bb2, case #FakeOptional.some!enumelt.1: bb1
+  switch_enum %0 : $FakeOptional<S1>, case #FakeOptional.none!enumelt: bb2, case #FakeOptional.some!enumelt: bb1
 
 bb1(%1 : $S1):
   unreachable

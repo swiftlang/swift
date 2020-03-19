@@ -904,8 +904,8 @@ bb0(%0 : $Y, %1 : $Y):
   %2 = struct $Pointer (%0 : $Y)
   %3 = struct $Pointer (%1 : $Y)
   %4 = tuple (%2 : $Pointer, %3 : $Pointer)
-  %5 = enum $PointerEnum, #PointerEnum.B!enumelt.1, %4 : $(Pointer, Pointer)
-  switch_enum %5 : $PointerEnum, case #PointerEnum.B!enumelt.1: bb1
+  %5 = enum $PointerEnum, #PointerEnum.B!enumelt, %4 : $(Pointer, Pointer)
+  switch_enum %5 : $PointerEnum, case #PointerEnum.B!enumelt: bb1
 
 bb1(%7 : $(Pointer, Pointer)):
   %8 = tuple_extract %7 : $(Pointer, Pointer), 1
@@ -1028,7 +1028,7 @@ bb0(%0 : $Pointer):
   %2 = init_existential_addr %1 : $*P, $Pointer
   store %0 to %2 : $*Pointer
   %4 = open_existential_addr immutable_access %1 : $*P to $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P
-  %5 = witness_method $@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P, #P.foo!1, %4 : $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %5 = witness_method $@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P, #P.foo, %4 : $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   dealloc_stack %1 : $*P
   %7 = tuple ()
   return %7 : $()
@@ -1041,7 +1041,7 @@ sil @test_existential_ref : $@convention(thin) (@owned X) -> () {
 bb0(%0 : $X):
   %1 = init_existential_ref %0 : $X : $X, $ClassP
   %2 = open_existential_ref %1 : $ClassP to $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP
-  %3 = witness_method $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP, #ClassP.foo!1, %2 : $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP : $@convention(witness_method: ClassP) <τ_0_0 where τ_0_0 : ClassP> (@guaranteed τ_0_0) -> ()
+  %3 = witness_method $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP, #ClassP.foo, %2 : $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP : $@convention(witness_method: ClassP) <τ_0_0 where τ_0_0 : ClassP> (@guaranteed τ_0_0) -> ()
   %7 = tuple ()
   return %7 : $()
 }
@@ -1558,11 +1558,11 @@ bb0(%0 : $Z):
 }
 
 sil_vtable X {
-  #X.deinit!deallocator.1: @$s4main1XCfD
+  #X.deinit!deallocator: @$s4main1XCfD
 }
 
 sil_vtable Z {
-  #Z.deinit!deallocator.1: @$s4main1ZCfD
+  #Z.deinit!deallocator: @$s4main1ZCfD
 }
 
 
@@ -1646,7 +1646,7 @@ sil @testInitializePointsToWrapOptional : $@convention(method) (@guaranteed Link
 bb0(%0: $LinkedNode):
   %adr = ref_element_addr %0 : $LinkedNode, #LinkedNode.next
   %val = load %adr : $*LinkedNode
-  %optional = enum $Optional<LinkedNode>, #Optional.some!enumelt.1, %val : $LinkedNode
+  %optional = enum $Optional<LinkedNode>, #Optional.some!enumelt, %val : $LinkedNode
   return %optional : $Optional<LinkedNode>
 }
 
@@ -1654,7 +1654,7 @@ sil @testInitializePointsToLeaf : $@convention(method) (@guaranteed LinkedNode) 
 bb0(%0 : $LinkedNode):
   %f1 = function_ref @testInitializePointsToWrapOptional : $@convention(method) (@guaranteed LinkedNode) -> Optional<LinkedNode>
   %call1 = apply %f1(%0) : $@convention(method) (@guaranteed LinkedNode) -> Optional<LinkedNode>
-  switch_enum %call1 : $Optional<LinkedNode>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb3
+  switch_enum %call1 : $Optional<LinkedNode>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb3
 
 bb2(%arg1 : $LinkedNode):
   br bb4
@@ -1664,7 +1664,7 @@ bb3:
 
 bb4:
   %call2 = apply %f1(%0) : $@convention(method) (@guaranteed LinkedNode) -> Optional<LinkedNode>
-  switch_enum %call2 : $Optional<LinkedNode>, case #Optional.some!enumelt.1: bb10, case #Optional.none!enumelt: bb9
+  switch_enum %call2 : $Optional<LinkedNode>, case #Optional.some!enumelt: bb10, case #Optional.none!enumelt: bb9
 
 bb9:
   %37 = integer_literal $Builtin.Int1, -1

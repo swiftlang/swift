@@ -69,9 +69,9 @@ public:
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   const TBDGenOptions &Opts;
-  Decl* TopLevelDecl = nullptr;
 
 private:
+  std::vector<Decl*> DeclStack;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     previousInstallNameMap;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
@@ -108,7 +108,7 @@ public:
         DataLayout(dataLayout), UniversalLinkInfo(universalLinkInfo),
         SwiftModule(swiftModule), Opts(opts),
         previousInstallNameMap(parsePreviousModuleInstallNameMap())  {}
-
+  ~TBDGenVisitor() { assert(DeclStack.empty()); }
   void addMainIfNecessary(FileUnit *file) {
     // HACK: 'main' is a special symbol that's always emitted in SILGen if
     //       the file has an entry point. Since it doesn't show up in the
@@ -152,6 +152,8 @@ public:
   void visitEnumElementDecl(EnumElementDecl *EED);
 
   void visitDecl(Decl *D) {}
+
+  void visit(Decl *D);
 };
 } // end namespace tbdgen
 } // end namespace swift

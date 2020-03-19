@@ -291,6 +291,19 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     overlays" feature, which is used to augment a module with additional
     functionality when it is imported alongside another module.
 
+  parent type
+    The type in which a given declaration is nested. For example::
+
+      struct Outer {
+        struct Inner {
+        }
+      }
+
+    ``Outer`` is the parent type of ``Inner``.
+
+    Note that the terms "parent type" and "superclass" refer to completely
+    different concepts.
+
   PCH
     Precompiled header, a type of file ending in .pch. A precompiled header is
     like a precompiled module, in the sense that it's the same file format and

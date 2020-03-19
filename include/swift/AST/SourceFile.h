@@ -194,6 +194,16 @@ private:
   /// mechanism which is not SourceFile-dependent.)
   SeparatelyImportedOverlayMap separatelyImportedOverlays;
 
+  using SeparatelyImportedOverlayReverseMap =
+    llvm::SmallDenseMap<ModuleDecl *, ModuleDecl *>;
+
+  /// A lazily populated mapping from a separately imported overlay to its
+  /// underlying shadowed module.
+  ///
+  /// This is used by tooling to substitute the name of the underlying module
+  /// wherever the overlay's name would otherwise be reported.
+  SeparatelyImportedOverlayReverseMap separatelyImportedOverlaysReversed;
+
   /// A pointer to PersistentParserState with a function reference to its
   /// deleter to handle the fact that it's forward declared.
   using ParserStatePtr =
@@ -267,6 +277,14 @@ public:
   /// A set of synthesized declarations that need to be type checked.
   llvm::SmallVector<Decl *, 8> SynthesizedDecls;
 
+  /// The list of functions defined in this file whose bodies have yet to be
+  /// typechecked. They must be held in this list instead of eagerly validated
+  /// because their bodies may force us to perform semantic checks of arbitrary
+  /// complexity, and we currently cannot handle those checks in isolation. E.g.
+  /// we cannot, in general, perform witness matching on singular requirements
+  /// unless the entire conformance has been evaluated.
+  std::vector<AbstractFunctionDecl *> DelayedFunctions;
+
   /// We might perform type checking on the same source file more than once,
   /// if its the main file or a REPL instance, so keep track of the last
   /// checked synthesized declaration to avoid duplicating work.
@@ -321,10 +339,13 @@ public:
   /// forwarded on to IRGen.
   ASTStage_t ASTStage = Unprocessed;
 
-  /// Virtual filenames declared by #sourceLocation(file:) directives in this
-  /// file.
-  llvm::SmallVector<Located<StringRef>, 0> VirtualFilenames;
+  /// Virtual file paths declared by \c #sourceLocation(file:) declarations in
+  /// this source file.
+  llvm::SmallVector<Located<StringRef>, 0> VirtualFilePaths;
 
+  /// Returns information about the file paths used for diagnostics and magic
+  /// identifiers in this source file, including virtual filenames introduced by
+  /// \c #sourceLocation(file:) declarations.
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
@@ -371,6 +392,7 @@ public:
   /// \returns true if the overlay was added; false if it already existed.
   bool addSeparatelyImportedOverlay(ModuleDecl *overlay,
                                     ModuleDecl *declaring) {
+    separatelyImportedOverlaysReversed.clear();
     return std::get<1>(separatelyImportedOverlays[declaring].insert(overlay));
   }
 
@@ -387,6 +409,12 @@ public:
     auto &value = std::get<1>(*i);
     overlays.append(value.begin(), value.end());
   }
+
+  /// Retrieves a module shadowed by the provided separately imported overlay
+  /// \p shadowed. If such a module is returned, it should be presented to users
+  /// as owning the symbols in \p overlay.
+  ModuleDecl *
+  getModuleShadowedBySeparatelyImportedOverlay(const ModuleDecl *overlay);
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;

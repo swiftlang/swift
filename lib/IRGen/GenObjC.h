@@ -155,7 +155,8 @@ namespace irgen {
   /// constructor, or destructor implementation.
   void emitObjCMethodDescriptor(IRGenModule &IGM,
                                 ConstantArrayBuilder &descriptors,
-                                AbstractFunctionDecl *method);
+                                AbstractFunctionDecl *method,
+                                llvm::StringSet<> &uniqueSelectors);
 
   /// Build an Objective-C method descriptor for the ivar initializer
   /// or destroyer of a class (-.cxx_construct or -.cxx_destruct).
@@ -163,7 +164,8 @@ namespace irgen {
                                          ConstantArrayBuilder &descriptors,
                                          ClassDecl *cd,
                                          llvm::Function *impl,
-                                         bool isDestroyer);
+                                         bool isDestroyer,
+                                         llvm::StringSet<> &uniqueSelectors);
 
   /// Get the type encoding for an ObjC property.
   void getObjCEncodingForPropertyType(IRGenModule &IGM, VarDecl *property,

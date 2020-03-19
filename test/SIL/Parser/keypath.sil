@@ -122,8 +122,8 @@ entry:
       id @id_a : $@convention(thin) () -> (),
       getter @get_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <S, S>) -> @out @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <C, C>,
       setter @set_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <C, C>, @in_guaranteed @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <S, S>) -> ())
-  // CHECK: keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter.1 : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @set_c_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
-  %d = keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter.1 : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @set_c_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
+  // CHECK: keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @set_c_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
+  %d = keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @set_c_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
 
   return undef : $()
 }

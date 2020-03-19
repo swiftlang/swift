@@ -155,9 +155,6 @@ struct ASTContext::Implementation {
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
 
-  /// A global type checker instance..
-  TypeChecker *Checker = nullptr;
-
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<Identifier::Aligner, llvm::BumpPtrAllocator&>
@@ -630,19 +627,6 @@ void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
 
 RC<syntax::SyntaxArena> ASTContext::getSyntaxArena() const {
   return getImpl().TheSyntaxArena;
-}
-
-bool ASTContext::areSemanticQueriesEnabled() const {
-  return getLegacyGlobalTypeChecker() != nullptr;
-}
-
-TypeChecker *ASTContext::getLegacyGlobalTypeChecker() const {
-  return getImpl().Checker;
-}
-
-void ASTContext::installGlobalTypeChecker(TypeChecker *TC) {
-  assert(!getImpl().Checker);
-  getImpl().Checker = TC;
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the
@@ -1447,7 +1431,7 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
   if (isFramework)
     SearchPathOpts.FrameworkSearchPaths.push_back({searchPath, isSystem});
   else
-    SearchPathOpts.ImportSearchPaths.push_back(searchPath);
+    SearchPathOpts.ImportSearchPaths.push_back(searchPath.str());
 
   if (auto *clangLoader = getClangModuleLoader())
     clangLoader->addSearchPath(searchPath, isFramework, isSystem);

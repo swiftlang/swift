@@ -69,7 +69,7 @@ bb0(%0 : $*SomeProtocol, %1 : $SomeClass):
   copy_addr %0 to [initialization] %stkAdr1 : $*SomeProtocol
   %instanceAdr = init_existential_addr %indirectLocalPropAdr : $*SomeProtocol, $SomeInstance
   %openadr1 = open_existential_addr immutable_access %stkAdr1 : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol
-  %witness1 = witness_method $@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol, #SomeProtocol.foo!1 : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr1 : $*@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+  %witness1 = witness_method $@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr1 : $*@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
   %call1 = apply %witness1<@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol>(%openadr1) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %stkAdr1 : $*SomeProtocol
 
@@ -79,7 +79,7 @@ bb0(%0 : $*SomeProtocol, %1 : $SomeClass):
   %stkAdr2 = alloc_stack $SomeProtocol
   copy_addr %propAdr1 to [initialization] %stkAdr2 : $*SomeProtocol
   %openadr2 = open_existential_addr immutable_access %stkAdr2 : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol
-  %witness2 = witness_method $@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol, #SomeProtocol.foo!1 : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr2 : $*@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+  %witness2 = witness_method $@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr2 : $*@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
   %call2 = apply %witness2<@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol>(%openadr2) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %stkAdr2 : $*SomeProtocol
 
@@ -108,5 +108,5 @@ bb0(%0 : $*SomeInstance):
 }
 
 sil_witness_table hidden SomeInstance: SomeProtocol module t {
-  method #SomeProtocol.foo!1: <Self where Self : SomeProtocol> (Self) -> () -> () : @$s26escape_analysis_invalidate12SomeInstanceVAA0A8ProtocolA2aDP3fooyyFTW     // protocol witness for SomeProtocol.foo() in conformance SomeInstance
+  method #SomeProtocol.foo: <Self where Self : SomeProtocol> (Self) -> () -> () : @$s26escape_analysis_invalidate12SomeInstanceVAA0A8ProtocolA2aDP3fooyyFTW     // protocol witness for SomeProtocol.foo() in conformance SomeInstance
 }

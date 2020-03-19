@@ -24,16 +24,13 @@ public func convert(strings: [String]) -> [Int] {
 // CHECK-NEXT: [[ALLOC_CONVERTER:%.*]] = function_ref @$s22partial_apply_override18StringIntConverterCACycfC :
 // CHECK-NEXT: [[CONVERTER:%.*]] = apply [[ALLOC_CONVERTER]]([[CONVERTER_TYPE]])
 // CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[CURRY_THUNK:%.*]] = function_ref @$s22partial_apply_override18StringIntConverterC7convert5inputSiSS_tFTc : $@convention(thin) (@guaranteed StringIntConverter) -> @owned @callee_guaranteed (@guaranteed String) -> Int
+// CHECK-NEXT: [[CURRY_THUNK:%.*]] = function_ref @$s22partial_apply_override7convert7stringsSaySiGSaySSG_tFSiSScAA18StringIntConverterCcfu_ : $@convention(thin) (@guaranteed StringIntConverter) -> @owned @callee_guaranteed (@guaranteed String) -> Int
 // CHECK-NEXT: [[CURRY_RESULT:%.*]] = apply [[CURRY_THUNK]]([[CONVERTER]])
-// CHECK-NEXT: destroy_value [[CONVERTER]] :
+// CHECK: [[CONVERTED:%.*]] = convert_function [[CURRY_RESULT]]
+// CHECK: [[NOESCAPE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CONVERTED]]
+// CHECK: // function_ref
+// CHECK-NEXT: [[THUNK:%.*]] = function_ref @$sSSSis5Error_pIggdzo_SSSisAA_pIegnrzo_TR : $@convention(thin) (@in_guaranteed String, @noescape @callee_guaranteed (@guaranteed String) -> (Int, @error Error)) -> (@out Int, @error Error)
+// CHECK-NEXT: [[REABSTRACTED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NOESCAPE]])
 
-// CHECK-LABEL: sil shared [thunk] [ossa] @$s22partial_apply_override18StringIntConverterC7convert5inputSiSS_tFTc : 
-// CHECK-SAME: $@convention(thin) (@guaranteed StringIntConverter) -> @owned @callee_guaranteed (@guaranteed String) -> Int
-// CHECK:      [[METHOD:%.*]] = class_method %0 : $StringIntConverter, #StringIntConverter.convert!1 : (StringIntConverter) -> (String) -> Int, $@convention(method) (@in_guaranteed String, @guaranteed StringIntConverter) -> @out Int
-// CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value %0 :
-// CHECK-NEXT: [[BOUND_METHOD:%.*]] = partial_apply [callee_guaranteed] [[METHOD]]([[SELF_COPY]])
-// CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[THUNK:%.*]] = function_ref @$sSSSiIegnr_SSSiIeggd_TR : $@convention(thin) (@guaranteed String, @guaranteed @callee_guaranteed (@in_guaranteed String) -> @out Int) -> Int 
-// CHECK-NEXT: [[REABSTRACTED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[BOUND_METHOD]])
-// CHECK-NEXT: return [[REABSTRACTED]]
+// CHECK-LABEL: sil private [ossa] @$s22partial_apply_override7convert7stringsSaySiGSaySSG_tFSiSScAA18StringIntConverterCcfu_SiSScfu0_ : $@convention(thin) (@guaranteed String, @guaranteed StringIntConverter) -> Int
+// CHECK:      [[METHOD:%.*]] = class_method %1 : $StringIntConverter, #StringIntConverter.convert : (StringIntConverter) -> (String) -> Int, $@convention(method) (@in_guaranteed String, @guaranteed StringIntConverter) -> @out Int

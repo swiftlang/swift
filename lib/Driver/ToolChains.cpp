@@ -403,11 +403,19 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     }
     if (usePersistentPCH) {
       context.Args.AddLastArg(Arguments, options::OPT_pch_output_dir);
-      if (context.OI.CompilerMode == OutputInfo::Mode::StandardCompile) {
+      switch (context.OI.CompilerMode) {
+      case OutputInfo::Mode::StandardCompile:
+      case OutputInfo::Mode::BatchModeCompile:
         // In the 'multiple invocations for each file' mode we don't need to
         // validate the PCH every time, it has been validated with the initial
         // -emit-pch invocation.
         Arguments.push_back("-pch-disable-validation");
+        break;
+
+      case OutputInfo::Mode::Immediate:
+      case OutputInfo::Mode::REPL:
+      case OutputInfo::Mode::SingleCompile:
+        break;
       }
     }
   }
@@ -1297,13 +1305,13 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
                                        StringRef SDKPath, bool shared) const {
   SmallString<128> scratchPath;
   getResourceDirPath(scratchPath, args, shared);
-  runtimeLibPaths.push_back(scratchPath.str());
+  runtimeLibPaths.push_back(std::string(scratchPath.str()));
 
   // If there's a secondary resource dir, add it too.
   scratchPath.clear();
   getSecondaryResourceDirPath(scratchPath, runtimeLibPaths[0]);
   if (!scratchPath.empty())
-    runtimeLibPaths.push_back(scratchPath.str());
+    runtimeLibPaths.push_back(std::string(scratchPath.str()));
 
   if (!SDKPath.empty()) {
     if (!scratchPath.empty()) {
@@ -1312,12 +1320,12 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
       scratchPath = SDKPath;
       llvm::sys::path::append(scratchPath, "System", "iOSSupport");
       llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
-      runtimeLibPaths.push_back(scratchPath.str());
+      runtimeLibPaths.push_back(std::string(scratchPath.str()));
     }
 
     scratchPath = SDKPath;
     llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
-    runtimeLibPaths.push_back(scratchPath.str());
+    runtimeLibPaths.push_back(std::string(scratchPath.str()));
   }
 }
 

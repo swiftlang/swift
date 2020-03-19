@@ -15,7 +15,7 @@ func test0() throws {
   // CHECK: inject_enum_addr [[ERR_TEMP0]] : $*Optional<NSError>, #Optional.none!enumelt
 
   // CHECK: [[SELF:%.*]] = metatype $@objc_metatype ErrorProne.Type
-  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!1.foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
+  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
 
   //   Create an unmanaged temporary, copy into it, and make a AutoreleasingUnsafeMutablePointer.
   // CHECK: [[ERR_TEMP1:%.*]] = alloc_stack $@sil_unmanaged Optional<NSError>
@@ -68,11 +68,11 @@ extension NSObject {
 // CHECK:   [[BOOL:%.*]] = struct $ObjCBool ([[VALUE]] : ${{Bool|UInt8}})
 // CHECK:   br bb6([[BOOL]] : $ObjCBool)
 // CHECK: bb2([[ERR:%.*]] : @owned $Error):
-// CHECK:   switch_enum %0 : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb4
+// CHECK:   switch_enum %0 : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, case #Optional.some!enumelt: bb3, case #Optional.none!enumelt: bb4
 // CHECK: bb3([[UNWRAPPED_OUT:%.+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>):
 // CHECK:   [[T0:%.*]] = function_ref @$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF : $@convention(thin) (@guaranteed Error) -> @owned NSError
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[ERR]])
-// CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
+// CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt, [[T1]] : $NSError
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   store [[OBJCERR]] to [init] [[TEMP]]
 // CHECK:   [[SETTER:%.*]] = function_ref @$sSA7pointeexvs :
@@ -105,17 +105,17 @@ extension NSObject {
 // CHECK:   [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]]
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[BORROWED_RESULT]])
 // CHECK:   end_borrow [[BORROWED_RESULT]]
-// CHECK:   [[T2:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]] : $NSString
+// CHECK:   [[T2:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[T1]] : $NSString
 // CHECK:   destroy_value [[RESULT]]  
 // CHECK:   br bb6([[T2]] : $Optional<NSString>)
 //
 // CHECK: [[ERROR_BB]]([[ERR:%.*]] : @owned $Error):
-// CHECK:   switch_enum [[UNOWNED_ARG0]] : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9][0-9]*]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9][0-9]*]]
+// CHECK:   switch_enum [[UNOWNED_ARG0]] : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9][0-9]*]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9][0-9]*]]
 //
 // CHECK: [[SOME_BB]]([[UNWRAPPED_OUT:%.+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>):
 // CHECK:   [[T0:%.*]] = function_ref @$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF : $@convention(thin) (@guaranteed Error) -> @owned NSError
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[ERR]])
-// CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
+// CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt, [[T1]] : $NSError
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   store [[OBJCERR]] to [init] [[TEMP]]
 // CHECK:   [[SETTER:%.*]] = function_ref @$sSA7pointeexvs :
@@ -148,15 +148,15 @@ extension NSObject {
 }
 
 let fn = ErrorProne.fail
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo10ErrorProneC4failyyKFZTcTO : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_guaranteed () -> @error Error
-// CHECK:      [[T0:%.*]] = function_ref @$sSo10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error
+// CHECK-LABEL: sil private [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_ : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_guaranteed () -> @error Error {
+// CHECK:      [[T0:%.*]] = function_ref @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_yyKcfu0_ : $@convention(thin) (@thick ErrorProne.Type) -> @error Error
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[T0]](%0)
 // CHECK-NEXT: return [[T1]]
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error {
-// CHECK:      [[SELF:%.*]] = thick_to_objc_metatype %0 : $@thick ErrorProne.Type to $@objc_metatype ErrorProne.Type
-// CHECK:      [[METHOD:%.*]] = objc_method [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!1.foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
+// CHECK-LABEL: sil private [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_yyKcfu0_ : $@convention(thin) (@thick ErrorProne.Type) -> @error Error {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $Optional<NSError>
+// CHECK:      [[SELF:%.*]] = thick_to_objc_metatype %0 : $@thick ErrorProne.Type to $@objc_metatype ErrorProne.Type
+// CHECK:      [[METHOD:%.*]] = objc_method [[SELF]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
 // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]({{%.*}}, [[SELF]])
 // CHECK:      cond_br
 // CHECK:      return
@@ -170,14 +170,14 @@ func testArgs() throws {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s14foreign_errors8testArgsyyKF : $@convention(thin) () -> @error Error
 // CHECK:   debug_value undef : $Error, var, name "$error", argno 1
-// CHECK:   objc_method {{.*}} : $@objc_metatype ErrorProne.Type, #ErrorProne.consume!1.foreign : (ErrorProne.Type) -> (Any?) throws -> (), $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
+// CHECK:   objc_method {{.*}} : $@objc_metatype ErrorProne.Type, #ErrorProne.consume!foreign : (ErrorProne.Type) -> (Any?) throws -> (), $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
 
 func testBridgedResult() throws {
   let array = try ErrorProne.collection(withCount: 0)
 }
 // CHECK-LABEL: sil hidden [ossa] @$s14foreign_errors17testBridgedResultyyKF : $@convention(thin) () -> @error Error {
 // CHECK:   debug_value undef : $Error, var, name "$error", argno 1
-// CHECK:   objc_method {{.*}} : $@objc_metatype ErrorProne.Type, #ErrorProne.collection!1.foreign : (ErrorProne.Type) -> (Int) throws -> [Any], $@convention(objc_method) (Int, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> @autoreleased Optional<NSArray>
+// CHECK:   objc_method {{.*}} : $@objc_metatype ErrorProne.Type, #ErrorProne.collection!foreign : (ErrorProne.Type) -> (Int) throws -> [Any], $@convention(objc_method) (Int, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> @autoreleased Optional<NSArray>
 
 // rdar://20861374
 // Clear out the self box before delegating.
@@ -205,7 +205,7 @@ class VeryErrorProne : ErrorProne {
 // CHECK-NOT:  [[PB]]{{^[0-9]}}
 // CHECK: [[BORROWED_T1:%.*]] = begin_borrow [[T1]]
 // CHECK-NEXT: [[DOWNCAST_BORROWED_T1:%.*]] = unchecked_ref_cast [[BORROWED_T1]] : $ErrorProne to $VeryErrorProne
-// CHECK-NEXT: [[T2:%.*]] = objc_super_method [[DOWNCAST_BORROWED_T1]] : $VeryErrorProne, #ErrorProne.init!initializer.1.foreign : (ErrorProne.Type) -> (Any?) throws -> ErrorProne, $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
+// CHECK-NEXT: [[T2:%.*]] = objc_super_method [[DOWNCAST_BORROWED_T1]] : $VeryErrorProne, #ErrorProne.init!initializer.foreign : (ErrorProne.Type) -> (Any?) throws -> ErrorProne, $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
 // CHECK:      end_borrow [[BORROWED_T1]]
 // CHECK:      apply [[T2]]([[ARG1_COPY]], {{%.*}}, [[T1]])
 
@@ -214,12 +214,12 @@ class VeryErrorProne : ErrorProne {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $ErrorProneProtocol):
 func testProtocol(_ p: ErrorProneProtocol) throws {
   // CHECK:   [[T0:%.*]] = open_existential_ref [[ARG0]] : $ErrorProneProtocol to $[[OPENED:@opened(.*) ErrorProneProtocol]]
-  // CHECK:   [[T1:%.*]] = objc_method [[T0]] : $[[OPENED]], #ErrorProneProtocol.obliterate!1.foreign : {{.*}}
+  // CHECK:   [[T1:%.*]] = objc_method [[T0]] : $[[OPENED]], #ErrorProneProtocol.obliterate!foreign : {{.*}}
   // CHECK:   apply [[T1]]<[[OPENED]]>({{%.*}}, [[T0]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : ErrorProneProtocol> (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, τ_0_0) -> ObjCBool
   try p.obliterate()
 
   // CHECK:   [[T0:%.*]] = open_existential_ref [[ARG0]] : $ErrorProneProtocol to $[[OPENED:@opened(.*) ErrorProneProtocol]]
-  // CHECK:   [[T1:%.*]] = objc_method [[T0]] : $[[OPENED]], #ErrorProneProtocol.invigorate!1.foreign : {{.*}}
+  // CHECK:   [[T1:%.*]] = objc_method [[T0]] : $[[OPENED]], #ErrorProneProtocol.invigorate!foreign : {{.*}}
   // CHECK:   apply [[T1]]<[[OPENED]]>({{%.*}}, {{%.*}}, [[T0]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : ErrorProneProtocol> (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, Optional<@convention(block) () -> ()>, τ_0_0) -> ObjCBool
   try p.invigorate(callback: {})
 }
@@ -238,11 +238,11 @@ func testNonNilError() throws -> Float {
 // CHECK-LABEL: sil hidden [ossa] @$s14foreign_errors15testNonNilErrorSfyKF :
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   [[T0:%.*]] = metatype $@objc_metatype ErrorProne.Type
-// CHECK:   [[T1:%.*]] = objc_method [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.bounce!1.foreign : (ErrorProne.Type) -> () throws -> Float, $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Float
+// CHECK:   [[T1:%.*]] = objc_method [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.bounce!foreign : (ErrorProne.Type) -> () throws -> Float, $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Float
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
 // CHECK:   assign {{%.*}} to [[OPTERR]]
 // CHECK:   [[T0:%.*]] = load [take] [[OPTERR]]
-// CHECK:   switch_enum [[T0]] : $Optional<NSError>, case #Optional.some!enumelt.1: [[ERROR_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NORMAL_BB:bb[0-9]+]]
+// CHECK:   switch_enum [[T0]] : $Optional<NSError>, case #Optional.some!enumelt: [[ERROR_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NORMAL_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
 // CHECK-NOT: destroy_value
 // CHECK:   return [[RESULT]]
@@ -254,7 +254,7 @@ func testPreservedResult() throws -> CInt {
 // CHECK-LABEL: sil hidden [ossa] @$s14foreign_errors19testPreservedResults5Int32VyKF
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   [[T0:%.*]] = metatype $@objc_metatype ErrorProne.Type
-// CHECK:   [[T1:%.*]] = objc_method [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.ounce!1.foreign : (ErrorProne.Type) -> () throws -> Int32, $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int32
+// CHECK:   [[T1:%.*]] = objc_method [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.ounce!foreign : (ErrorProne.Type) -> () throws -> Int32, $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int32
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
 // CHECK:   [[T0:%.*]] = struct_extract [[RESULT]]
 // CHECK:   [[T1:%.*]] = integer_literal $[[PRIM:Builtin.Int[0-9]+]], 0
@@ -272,7 +272,7 @@ func testPreservedResultBridged() throws -> Int {
 // CHECK-LABEL: sil hidden [ossa] @$s14foreign_errors26testPreservedResultBridgedSiyKF
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   [[T0:%.*]] = metatype $@objc_metatype ErrorProne.Type
-// CHECK:   [[T1:%.*]] = objc_method [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.ounceWord!1.foreign : (ErrorProne.Type) -> () throws -> Int, $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int
+// CHECK:   [[T1:%.*]] = objc_method [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.ounceWord!foreign : (ErrorProne.Type) -> () throws -> Int, $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
 // CHECK:   [[T0:%.*]] = struct_extract [[RESULT]]
 // CHECK:   [[T1:%.*]] = integer_literal $[[PRIM:Builtin.Int[0-9]+]], 0
@@ -290,7 +290,7 @@ func testPreservedResultInverted() throws {
 // CHECK-LABEL: sil hidden [ossa] @$s14foreign_errors27testPreservedResultInvertedyyKF
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   [[T0:%.*]] = metatype $@objc_metatype ErrorProne.Type
-// CHECK:   [[T1:%.*]] = objc_method [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.once!1.foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int32
+// CHECK:   [[T1:%.*]] = objc_method [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.once!foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int32
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
 // CHECK:   [[T0:%.*]] = struct_extract [[RESULT]]
 // CHECK:   [[T1:%.*]] = integer_literal $[[PRIM:Builtin.Int[0-9]+]], 0

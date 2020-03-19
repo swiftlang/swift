@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-emit-silgen -module-name boxed_existentials -Xllvm -sil-full-demangle %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -module-name boxed_existentials -Xllvm -sil-full-demangle %s | %FileCheck %s --check-prefix=GUARANTEED
 
@@ -68,7 +67,7 @@ func test_property(_ x: Error) -> String {
 // FIXME: Extraneous copy here
 // CHECK-NEXT:    [[COPY:%[0-9]+]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK-NEXT:    copy_addr [[VALUE]] to [initialization] [[COPY]] : $*[[VALUE_TYPE]]
-// CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter.1
+// CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter
 // -- self parameter of witness is @in_guaranteed; no need to copy since
 //    value in box is immutable and box is guaranteed
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]])
@@ -88,16 +87,17 @@ func test_property_of_lvalue(_ x: Error) -> String {
 // CHECK:         store [[ARG_COPY]] to [init] [[PVAR]]
 // CHECK:         [[ACCESS:%.*]] = begin_access [read] [unknown] [[PVAR]] : $*Error
 // CHECK:         [[VALUE_BOX:%.*]] = load [copy] [[ACCESS]]
-// CHECK:         [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
+// CHECK:         [[BORROWED_VALUE_BOX:%.*]] = begin_borrow [[VALUE_BOX]]
+// CHECK:         [[VALUE:%.*]] = open_existential_box [[BORROWED_VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
 // CHECK:         [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK:         copy_addr [[VALUE]] to [initialization] [[COPY]]
+// CHECK:         destroy_value [[VALUE_BOX]]
 // CHECK:         [[BORROW:%.*]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK:         copy_addr [[COPY]] to [initialization] [[BORROW]]
-// CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter.1
+// CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[BORROW]])
 // CHECK:         destroy_addr [[COPY]]
 // CHECK:         dealloc_stack [[COPY]]
-// CHECK:         destroy_value [[VALUE_BOX]]
 // CHECK:         destroy_value [[VAR]]
 // CHECK-NOT:         destroy_value [[ARG]]
 // CHECK:         return [[RESULT]]
@@ -153,7 +153,8 @@ func test_open_existential_semantics(_ guaranteed: Error,
   // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PB]] : $*Error
   // CHECK: [[IMMEDIATE:%.*]] = load [copy] [[ACCESS]]
   // -- need a copy_value to guarantee
-  // CHECK: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
+  // CHECK: [[IMMEDIATE_BORROW:%.*]] = begin_borrow [[IMMEDIATE]]
+  // CHECK: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE_BORROW]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK-NOT: copy_addr
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
@@ -165,7 +166,8 @@ func test_open_existential_semantics(_ guaranteed: Error,
   // GUARANTEED: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PB]] : $*Error
   // GUARANTEED: [[IMMEDIATE:%.*]] = load [copy] [[ACCESS]]
   // -- need a copy_value to guarantee
-  // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
+  // GUARANTEED: [[BORROWED_IMMEDIATE:%.*]] = begin_borrow [[IMMEDIATE]]
+  // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[BORROWED_IMMEDIATE]]
   // GUARANTEED: [[METHOD:%.*]] = function_ref
   // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // GUARANTEED-NOT: destroy_addr [[VALUE]]
@@ -175,7 +177,8 @@ func test_open_existential_semantics(_ guaranteed: Error,
 
   // CHECK: [[F:%.*]] = function_ref {{.*}}plusOneError
   // CHECK: [[PLUS_ONE:%.*]] = apply [[F]]()
-  // CHECK: [[VALUE:%.*]] = open_existential_box [[PLUS_ONE]]
+  // CHECK: [[PLUS_ONE_BORROW:%.*]] = begin_borrow [[PLUS_ONE]]
+  // CHECK: [[VALUE:%.*]] = open_existential_box [[PLUS_ONE_BORROW]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK-NOT: copy_addr
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
@@ -183,7 +186,8 @@ func test_open_existential_semantics(_ guaranteed: Error,
 
   // GUARANTEED: [[F:%.*]] = function_ref {{.*}}plusOneError
   // GUARANTEED: [[PLUS_ONE:%.*]] = apply [[F]]()
-  // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[PLUS_ONE]]
+  // GUARANTEED: [[BORROWED_PLUS_ONE:%.*]] = begin_borrow [[PLUS_ONE]]
+  // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[BORROWED_PLUS_ONE]]
   // GUARANTEED: [[METHOD:%.*]] = function_ref
   // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // GUARANTEED-NOT: destroy_addr [[VALUE]]
@@ -207,7 +211,8 @@ func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
   } else if true {
     // CHECK:     [[ACCESS:%.*]] = begin_access [read] [unknown] [[PB]]
     // CHECK:     [[IMMEDIATE:%.*]] = load [copy] [[ACCESS]]
-    // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
+    // CHECK:     [[BORROWED_IMMEDIATE:%.*]] = begin_borrow [[IMMEDIATE]]
+    // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[BORROWED_IMMEDIATE]]
     // CHECK:     [[TO_VALUE:%.*]] = init_existential_addr [[OUT]]
     // CHECK:     copy_addr [[FROM_VALUE]] to [initialization] [[TO_VALUE]]
     // CHECK:     destroy_value [[IMMEDIATE]]
@@ -215,7 +220,8 @@ func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
   } else if true {
     // CHECK:     function_ref boxed_existentials.plusOneError
     // CHECK:     [[PLUS_ONE:%.*]] = apply
-    // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[PLUS_ONE]]
+    // CHECK:     [[BORROWED_PLUS_ONE:%.*]] = begin_borrow [[PLUS_ONE]]
+    // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[BORROWED_PLUS_ONE]]
     // CHECK:     [[TO_VALUE:%.*]] = init_existential_addr [[OUT]]
     // CHECK:     copy_addr [[FROM_VALUE]] to [initialization] [[TO_VALUE]]
     // CHECK:     destroy_value [[PLUS_ONE]]
@@ -236,7 +242,8 @@ extension Error {
 // CHECK:  [[ARRAY_GET:%.*]] = function_ref @$sSayxSicig
 // CHECK:  apply [[ARRAY_GET]]<Error>([[ERROR_ADDR]]
 // CHECK:  [[ERROR:%.*]] = load [take] [[ERROR_ADDR]] : $*Error
-// CHECK:  open_existential_box [[ERROR]]
+// CHECK:  [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
+// CHECK:  open_existential_box [[BORROWED_ERROR]]
 func test() {
   var errors: [Error] = []
   test_property(errors[0].myError)

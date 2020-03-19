@@ -32,102 +32,102 @@ func genericNoOptional<T>(_: T) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlF
 func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
   let _ = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
   let _: P = p.p
-  // CHECK: function_ref @$s7ranking1PP1pyyAaB_pFTc
+  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcAaC_pcfu_ : $@convention(thin) (@in_guaranteed P) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
   let _: (P) -> () = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
   let _: P? = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
   let _: Any = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
   let _: Any? = p.p
 
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
   // CHECK: function_ref @$s7ranking15genericOverloadyyxlF
   genericOverload(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter.1
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
   // CHECK: function_ref @$s7ranking15genericOverloadyyxSglF
   genericOverload(p.q)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
   // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
   genericOptional(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter.1
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
   // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
   genericOptional(p.q)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
   // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
   genericNoOptional(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter.1
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
   // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
   genericNoOptional(p.q)
 
-  // CHECK: witness_method $T, #P.p!getter.1
+  // CHECK: witness_method $T, #P.p!getter
   let _ = t.p
-  // CHECK: witness_method $T, #P.p!getter.1
+  // CHECK: witness_method $T, #P.p!getter
   let _: P = t.p
-  // CHECK: function_ref @$s7ranking1PP1pyyAaB_pFTc
+  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcxcfu1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
   let _: (P) -> () = t.p
-  // CHECK: witness_method $T, #P.p!getter.1
+  // CHECK: witness_method $T, #P.p!getter
   let _: P? = t.p
-  // CHECK: witness_method $T, #P.p!getter.1
+  // CHECK: witness_method $T, #P.p!getter
   let _: Any = t.p
-  // CHECK: witness_method $T, #P.p!getter.1
+  // CHECK: witness_method $T, #P.p!getter
   let _: Any? = t.p
 
-  // CHECK: witness_method $T, #P.p!getter.1
+  // CHECK: witness_method $T, #P.p!getter
   // CHECK: function_ref @$s7ranking15genericOverloadyyxlF
   genericOverload(t.p)
-  // CHECK: witness_method $T, #P.q!getter.1
+  // CHECK: witness_method $T, #P.q!getter
   // CHECK: function_ref @$s7ranking15genericOverloadyyxSglF
   genericOverload(t.q)
-  // CHECK: witness_method $T, #P.p!getter.1
+  // CHECK: witness_method $T, #P.p!getter
   // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
   genericOptional(t.p)
-  // CHECK: witness_method $T, #P.q!getter.1
+  // CHECK: witness_method $T, #P.q!getter
   // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
   genericOptional(t.q)
-  // CHECK: witness_method $T, #P.p!getter.1
+  // CHECK: witness_method $T, #P.p!getter
   // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
   genericNoOptional(t.p)
-  // CHECK: witness_method $T, #P.q!getter.1
+  // CHECK: witness_method $T, #P.q!getter
   // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
   genericNoOptional(t.q)
 }
 
 extension P {
   func propertyVersusFunction() {
-    // CHECK: witness_method $Self, #P.p!getter.1
+    // CHECK: witness_method $Self, #P.p!getter
     let _ = self.p
-    // CHECK: witness_method $Self, #P.p!getter.1
+    // CHECK: witness_method $Self, #P.p!getter
     let _: P = self.p
-    // CHECK: function_ref @$s7ranking1PP1pyyAaB_pFTc
+    // CHECK: function_ref @$s7ranking1PPAAE22propertyVersusFunctionyyFyAaB_pcxcfu_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
     let _: (P) -> () = self.p
-    // CHECK: witness_method $Self, #P.p!getter.1
+    // CHECK: witness_method $Self, #P.p!getter
     let _: P? = self.p
-    // CHECK: witness_method $Self, #P.p!getter.1
+    // CHECK: witness_method $Self, #P.p!getter
     let _: Any = self.p
-    // CHECK: witness_method $Self, #P.p!getter.1
+    // CHECK: witness_method $Self, #P.p!getter
     let _: Any? = self.p
 
-    // CHECK: witness_method $Self, #P.p!getter.1
+    // CHECK: witness_method $Self, #P.p!getter
     // CHECK: function_ref @$s7ranking15genericOverloadyyxlF
     genericOverload(self.p)
-    // CHECK: witness_method $Self, #P.q!getter.1
+    // CHECK: witness_method $Self, #P.q!getter
     // CHECK: function_ref @$s7ranking15genericOverloadyyxSglF
     genericOverload(self.q)
-    // CHECK: witness_method $Self, #P.p!getter.1
+    // CHECK: witness_method $Self, #P.p!getter
     // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
     genericOptional(self.p)
-    // CHECK: witness_method $Self, #P.q!getter.1
+    // CHECK: witness_method $Self, #P.q!getter
     // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
     genericOptional(self.q)
-    // CHECK: witness_method $Self, #P.p!getter.1
+    // CHECK: witness_method $Self, #P.p!getter
     // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
     genericNoOptional(self.p)
-    // CHECK: witness_method $Self, #P.q!getter.1
+    // CHECK: witness_method $Self, #P.q!getter
     // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
     genericNoOptional(self.q)
   }
@@ -193,39 +193,39 @@ extension GenericClass {
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking32testGenericPropertyProtocolClassyyxAA1YCRbzAA1XRzlF
 func testGenericPropertyProtocolClass<T : X & Y>(_ t: T) {
-  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
+  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter
   _ = t.bar   // CHECK: function_ref @$s7ranking1YC3barSivg
   _ = t.baz() // CHECK: class_method {{%.*}} : $Y, #Y.baz
-  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
+  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking36testExistentialPropertyProtocolClassyyAA1X_AA1YCXcF
 func testExistentialPropertyProtocolClass(_ t: X & Y) {
-  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
+  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter
   _ = t.bar   // CHECK: function_ref @$s7ranking1YC3barSivg
   _ = t.baz() // CHECK: class_method {{%.*}} : $Y, #Y.baz
-  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
+  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking46testGenericPropertySubclassConstrainedProtocolyyxAA1ZRzlF
 func testGenericPropertySubclassConstrainedProtocol<T : Z>(_ t: T) {
-  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
+  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter
   _ = t.bar   // CHECK: function_ref @$s7ranking1YC3barSivg
   _ = t.baz() // CHECK: class_method {{%.*}} : $Y, #Y.baz
-  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
+  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking50testExistentialPropertySubclassConstrainedProtocolyyAA1Z_pF
 func testExistentialPropertySubclassConstrainedProtocol(_ t: Z) {
-  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
+  _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter
   _ = t.bar   // CHECK: function_ref @$s7ranking1YC3barSivg
   _ = t.baz() // CHECK: class_method {{%.*}} : $Y, #Y.baz
-  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
+  _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking43testExistentialPropertyProtocolGenericClassyyAA1X_AA0fG0CySiGXcF
 func testExistentialPropertyProtocolGenericClass(_ t: GenericClass<Int> & X) {
-  _ = t.foo   // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.foo!getter.1
+  _ = t.foo   // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.foo!getter
   _ = t.bar   // CHECK: function_ref @$s7ranking12GenericClassC3barxvg
   _ = t.baz() // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.baz
   _ = t[""]   // CHECK: function_ref @$s7ranking12GenericClassCySiSScig
@@ -233,7 +233,7 @@ func testExistentialPropertyProtocolGenericClass(_ t: GenericClass<Int> & X) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking43testExistentialPropertyProtocolGenericClassyyAA1X_AA0fG0CySSGXcF
 func testExistentialPropertyProtocolGenericClass(_ t: GenericClass<String> & X) {
-  _ = t.foo   // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.foo!getter.1
+  _ = t.foo   // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.foo!getter
   _ = t.bar   // CHECK: function_ref @$s7ranking12GenericClassC3barxvg
   _ = t.baz() // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.baz
   _ = t[""]   // CHECK: function_ref @$s7ranking12GenericClassCySiSScig
@@ -242,17 +242,17 @@ func testExistentialPropertyProtocolGenericClass(_ t: GenericClass<String> & X) 
 extension X where Self : Y {
   // CHECK-LABEL: sil hidden [ossa] @$s7ranking1XPA2A1YCRbzrlE32testGenericPropertyProtocolClassyyxF
   func testGenericPropertyProtocolClass(_ x: Self) {
-    _ = self.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
+    _ = self.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter
     _ = self.bar   // CHECK: function_ref @$s7ranking1YC3barSivg
     _ = self.baz() // CHECK: class_method {{%.*}} : $Y, #Y.baz
-    _ = self[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
+    _ = self[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter
   }
 }
 
 extension X where Self : GenericClass<Int> {
   // CHECK-LABEL: sil hidden [ossa] @$s7ranking1XPA2A12GenericClassCySiGRbzrlE04testb16PropertyProtocolbC0yyxF
   func testGenericPropertyProtocolGenericClass(_ x: Self) {
-    _ = self.foo   // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.foo!getter.1
+    _ = self.foo   // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.foo!getter
     _ = self.bar   // CHECK: function_ref @$s7ranking12GenericClassC3barxvg
     _ = self.baz() // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.baz
     _ = self[""]   // CHECK: function_ref @$s7ranking12GenericClassCySiSScig
@@ -262,7 +262,7 @@ extension X where Self : GenericClass<Int> {
 extension X where Self : GenericClass<String> {
   // CHECK-LABEL: sil hidden [ossa] @$s7ranking1XPA2A12GenericClassCySSGRbzrlE04testb16PropertyProtocolbC0yyxF
   func testGenericPropertyProtocolGenericClass(_ x: Self) {
-    _ = self.foo   // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.foo!getter.1
+    _ = self.foo   // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.foo!getter
     _ = self.bar   // CHECK: function_ref @$s7ranking12GenericClassC3barxvg
     _ = self.baz() // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.baz
     _ = self[""]   // CHECK: function_ref @$s7ranking12GenericClassCySiSScig

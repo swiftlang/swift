@@ -351,7 +351,7 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
     Result = "self";
   else if (ValueDecl *VD =
                dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
-    Result = VD->getBaseName().getIdentifier().str();
+    Result = std::string(VD->getBaseName().getIdentifier());
   else
     Result = "<unknown>";
 

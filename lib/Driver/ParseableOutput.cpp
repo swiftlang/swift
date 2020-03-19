@@ -48,7 +48,7 @@ namespace json {
   template <> struct ScalarEnumerationTraits<file_types::ID> {
     static void enumeration(Output &out, file_types::ID &value) {
       file_types::forAllTypes([&](file_types::ID ty) {
-        std::string typeName = file_types::getTypeName(ty);
+        std::string typeName = file_types::getTypeName(ty).str();
         out.enumCase(value, typeName.c_str(), ty);
       });
     }
@@ -125,7 +125,7 @@ public:
       if (const auto *BJAction = dyn_cast<BackendJobAction>(&Cmd.getSource())) {
         Inputs.push_back(CommandInput(OutFiles[BJAction->getInputIndex()]));
       } else {
-        for (const std::string FileName : OutFiles) {
+        for (llvm::StringRef FileName : OutFiles) {
           Inputs.push_back(CommandInput(FileName));
         }
       }
@@ -134,14 +134,14 @@ public:
     // TODO: set up Outputs appropriately.
     file_types::ID PrimaryOutputType = Cmd.getOutput().getPrimaryOutputType();
     if (PrimaryOutputType != file_types::TY_Nothing) {
-      for (const std::string OutputFileName : Cmd.getOutput().
-                                                 getPrimaryOutputFilenames()) {
-        Outputs.push_back(OutputPair(PrimaryOutputType, OutputFileName));
+      for (llvm::StringRef OutputFileName :
+           Cmd.getOutput().getPrimaryOutputFilenames()) {
+        Outputs.push_back(OutputPair(PrimaryOutputType, OutputFileName.str()));
       }
     }
     file_types::forAllTypes([&](file_types::ID Ty) {
       for (auto Output : Cmd.getOutput().getAdditionalOutputsForType(Ty)) {
-        Outputs.push_back(OutputPair(Ty, Output));
+        Outputs.push_back(OutputPair(Ty, Output.str()));
       }
     });
   }

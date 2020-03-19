@@ -42,7 +42,7 @@ sil [ossa] @function_with_cm : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @x : $*Bar                     // users: %2, %3
   %1 = alloc_ref $Bar                             // user: %2
-  %5 = class_method %1 : $Bar, #Bar.foo!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
+  %5 = class_method %1 : $Bar, #Bar.foo : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
   %6 = apply %5(%1) : $@convention(method) (@guaranteed Bar) -> ()
   destroy_value %1 : $Bar
   %7 = tuple ()                                   // user: %8
@@ -52,7 +52,7 @@ bb0:
 sil @_TFC4main3Bar3foofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
 
 sil_vtable Bar {
-  #Bar.foo!1: @_TFC4main3Bar3foofS0_FT_T_
+  #Bar.foo: @_TFC4main3Bar3foofS0_FT_T_
 }
 
 private class Node {
@@ -70,7 +70,7 @@ bb0(%0 : @guaranteed $Node):
   // CHECK-NOT: class_method [[ARG_COPY]]
   // CHECK: [[FUNC:%.*]] = function_ref @transparent_target
   // CHECK: [[BORROW_ARG_COPY:%.*]] = begin_borrow [[ARG_COPY]]
-  %3 = class_method %1 : $Node, #Node.index!getter.1 : (Node) -> () -> Int, $@convention(method) (@guaranteed Node) -> Int
+  %3 = class_method %1 : $Node, #Node.index!getter : (Node) -> () -> Int, $@convention(method) (@guaranteed Node) -> Int
   // CHECK: [[RESULT:%.*]] = apply [[FUNC]]([[BORROW_ARG_COPY]])
   %4 = apply %3(%1) : $@convention(method) (@guaranteed Node) -> Int
   // CHECK: destroy_value [[ARG_COPY]]
@@ -107,7 +107,7 @@ bb0(%0 : @guaranteed $Node):
 }
 
 sil_vtable Node {
-  #Node.index!getter.1: @transparent_target
+  #Node.index!getter: @transparent_target
 }
 
 private class B {
@@ -124,7 +124,7 @@ bb0(%0 : $@thick C.Type):
   %2 = upcast %0 : $@thick C.Type to $@thick B.Type
   // CHECK-NOT: class_method
   // CHECK: function_ref @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
-  %3 = class_method %2 : $@thick B.Type, #B.foo!1 : (B.Type) -> () -> Int, $@convention(method) (@thick B.Type) -> Int
+  %3 = class_method %2 : $@thick B.Type, #B.foo : (B.Type) -> () -> Int, $@convention(method) (@thick B.Type) -> Int
   %4 = apply %3(%2) : $@convention(method) (@thick B.Type) -> Int
   %5 = tuple ()
   // CHECK: return
@@ -149,9 +149,9 @@ bb0(%0 : $@thick C.Type):
 // YAML-NEXT: ...
 
 sil_vtable B {
-  #B.foo!1: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+  #B.foo: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
 }
 
 sil_vtable C {
-  #B.foo!1: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+  #B.foo: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
 }

@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: sil hidden [ossa] @$s27lying_about_optional_return0C37ChainingForeignFunctionTypeProperties{{[_0-9a-zA-Z]*}}F
 func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {
-  // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
+  // CHECK: enum $Optional<()>, #Optional.some!enumelt, {{%.*}} : $()
   let _: ()? = voidReturning()
   // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeMutableRawPointer to $Optional<UnsafeMutableRawPointer>
   let _: UnsafeMutableRawPointer? = voidPointerReturning()
@@ -13,7 +13,7 @@ func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {
   // CHECK: unchecked_trivial_bit_cast {{%.*}} : $OpaquePointer to $Optional<OpaquePointer>
   let _: OpaquePointer? = opaquePointerReturning()
 
-  // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
+  // CHECK: enum $Optional<()>, #Optional.some!enumelt, {{%.*}} : $()
   a?.voidReturning()
   // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeMutableRawPointer to $Optional<UnsafeMutableRawPointer>
   a?.voidPointerReturning()

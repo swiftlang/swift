@@ -460,7 +460,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
   }
   // In order to pass some tests, must leave ModuleName empty.
   if (!Opts.InputsAndOutputs.hasInputs()) {
-    Opts.ModuleName = StringRef();
+    Opts.ModuleName = std::string();
     // FIXME: This is a bug that should not happen, but does in tests.
     // The compiler should bail out earlier, where "no frontend action was
     // selected".
@@ -477,7 +477,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
           ? outputFilenames->front()
           : Opts.InputsAndOutputs.getFilenameOfFirstInput();
 
-  Opts.ModuleName = llvm::sys::path::stem(nameToStem);
+  Opts.ModuleName = llvm::sys::path::stem(nameToStem).str();
   return false;
 }
 

@@ -2697,6 +2697,11 @@ public:
     return !isObjC() && isDynamic();
   }
 
+  bool isEffectiveLinkageMoreVisibleThan(ValueDecl *other) const {
+    return (std::min(getEffectiveAccess(), AccessLevel::Public) >
+            std::min(other->getEffectiveAccess(), AccessLevel::Public));
+  }
+
   /// Set whether this type is 'dynamic' or not.
   void setIsDynamic(bool value);
 
@@ -3597,7 +3602,6 @@ class EnumDecl final : public NominalTypeDecl {
 
   friend class EnumRawValuesRequest;
   friend class EnumRawTypeRequest;
-  friend class TypeChecker;
 
 public:
   EnumDecl(SourceLoc EnumLoc, Identifier Name, SourceLoc NameLoc,
@@ -3883,7 +3887,6 @@ class ClassDecl final : public NominalTypeDecl {
   friend class EmittedMembersRequest;
   friend class HasMissingDesignatedInitializersRequest;
   friend class InheritsSuperclassInitializersRequest;
-  friend class TypeChecker;
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -4258,7 +4261,6 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
   friend class ExistentialTypeSupportedRequest;
-  friend class TypeChecker;
 
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
@@ -5985,11 +5987,6 @@ public:
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.
   bool needsNewVTableEntry() const;
-
-  bool isEffectiveLinkageMoreVisibleThan(ValueDecl *other) const {
-    return (std::min(getEffectiveAccess(), AccessLevel::Public) >
-            std::min(other->getEffectiveAccess(), AccessLevel::Public));
-  }
 
   bool isSynthesized() const {
     return Bits.AbstractFunctionDecl.Synthesized;

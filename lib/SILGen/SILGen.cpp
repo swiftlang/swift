@@ -540,8 +540,7 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
 }
 
 static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
-  return constant.isDefaultArgGenerator() || constant.isForeign ||
-         constant.isCurried;
+  return constant.isDefaultArgGenerator() || constant.isForeign;
 }
 
 /// Set up the function for profiling instrumentation.
@@ -573,9 +572,7 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   if (!constant.hasDecl())
     return false;
 
-  if (constant.isCurried ||
-      constant.isForeign ||
-      constant.isDirectReference)
+  if (constant.isForeign)
     return false;
 
   auto *d = constant.getDecl();

@@ -159,7 +159,7 @@ static void printTypeNameToString(Type Ty, std::string &Text) {
   SmallString<128> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
   Ty->print(OS);
-  Text = OS.str();
+  Text = std::string(OS.str());
 }
 
 bool swift::ide::

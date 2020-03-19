@@ -138,6 +138,27 @@ class ExprFinder : public ASTWalker {
     return SM.rangeContains(Node->getSourceRange(), TargetRange);
   }
 
+  bool shouldIgnore(Expr *E) {
+    // E.g. instanceOfDerived.methodInBaseReturningSelf().#^HERE^#'
+    // When calling a method in a base class returning 'Self', the call
+    // expression itself has the type of the base class. That is wrapped with
+    // CovariantReturnConversionExpr which downcasts it to the derived class.
+    if (isa<CovariantReturnConversionExpr>(E))
+      return false;
+
+    // E.g. TypeName(#^HERE^#
+    // In this case, we want the type expression instead of a reference to the
+    // initializer.
+    if (isa<ConstructorRefCallExpr>(E))
+      return true;
+
+    // Ignore other implicit expression.
+    if (E->isImplicit())
+      return true;
+
+    return false;
+  }
+
 public:
   ExprFinder(SourceManager &SM, SourceRange TargetRange)
       : SM(SM), TargetRange(TargetRange) {}
@@ -145,8 +166,7 @@ public:
   Expr *get() const { return FoundExpr; }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    if (TargetRange == E->getSourceRange() && !E->isImplicit() &&
-        !isa<ConstructorRefCallExpr>(E)) {
+    if (TargetRange == E->getSourceRange() && !shouldIgnore(E)) {
       assert(!FoundExpr && "non-nullptr for found expr");
       FoundExpr = E;
       return {false, nullptr};

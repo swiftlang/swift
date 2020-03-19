@@ -1342,7 +1342,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 
 sil [noinline] @dont_explode_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo {
 bb0(%0 : $Optional<(foo, foo)>):
-  %281 = unchecked_enum_data %0 : $Optional<(foo, foo)>, #Optional.some!enumelt.1
+  %281 = unchecked_enum_data %0 : $Optional<(foo, foo)>, #Optional.some!enumelt
   %282 = tuple_extract %281 : $(foo, foo), 0
   %283 = tuple_extract %281 : $(foo, foo), 1
   strong_release %283 : $foo
@@ -1537,7 +1537,7 @@ bb0(%0 : $Builtin.Int32):
 
 sil hidden [noinline] @generic_owned_to_guaranteed : $@convention(thin) <T where T : KlassFoo> (@owned T) -> Int64 {
 bb0(%0 : $T):
-  %2 = witness_method $T, #KlassFoo.bar!1 : <Self where Self : KlassFoo> (Self) -> () -> Int64 : $@convention(witness_method: KlassFoo) <τ_0_0 where τ_0_0 : KlassFoo> (@guaranteed τ_0_0) -> Int64
+  %2 = witness_method $T, #KlassFoo.bar : <Self where Self : KlassFoo> (Self) -> () -> Int64 : $@convention(witness_method: KlassFoo) <τ_0_0 where τ_0_0 : KlassFoo> (@guaranteed τ_0_0) -> Int64
   %3 = apply %2<T>(%0) : $@convention(witness_method: KlassFoo) <τ_0_0 where τ_0_0 : KlassFoo> (@guaranteed τ_0_0) -> Int64
   strong_release %0 : $T
   return %3 : $Int64
@@ -1577,7 +1577,7 @@ bb0(%0 : $T):
 
 sil hidden [noinline] @generic_in_to_guaranteed : $@convention(thin) <T where T : P> (@in T) -> Int64 {
 bb0(%0 : $*T):
-  %2 = witness_method $T, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int64 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %2 = witness_method $T, #P.foo : <Self where Self : P> (Self) -> () -> Int64 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %3 = apply %2<T>(%0) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   destroy_addr %0 : $*T
   return %3 : $Int64

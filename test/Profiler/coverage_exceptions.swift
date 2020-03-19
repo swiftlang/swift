@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_catch %s | %FileCheck %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 struct S {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.S.init() -> coverage_catch.S

@@ -1,0 +1,7 @@
+module AccessSpecifiers {
+  header "access_specifiers.h"
+}
+
+module MemoryLayout {
+  header "memory_layout.h"
+}

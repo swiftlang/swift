@@ -12,9 +12,11 @@
 #ifndef SWIFT_IRGEN_TBDGEN_H
 #define SWIFT_IRGEN_TBDGEN_H
 
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "swift/Basic/Version.h"
+#include <vector>
 
 namespace llvm {
 class raw_ostream;

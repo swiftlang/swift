@@ -455,7 +455,7 @@ namespace {
 
     void addMessage(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                     StringRef Message) {
-      Messages.push_back({lineByteOffsetForLoc(SM, Loc), Kind, Message});
+      Messages.push_back({lineByteOffsetForLoc(SM, Loc), Kind, Message.str()});
     }
 
     void addHighlight(SourceManager &SM, CharSourceRange Range) {
@@ -465,7 +465,7 @@ namespace {
 
     void addFixIt(SourceManager &SM, CharSourceRange Range, StringRef Text) {
       FixIts.push_back({lineByteOffsetForLoc(SM, Range.getStart()),
-                        lineByteOffsetForLoc(SM, Range.getEnd()), Text});
+                        lineByteOffsetForLoc(SM, Range.getEnd()), Text.str()});
     }
 
     void render(unsigned LineNumberIndent, raw_ostream &Out) {
@@ -898,6 +898,10 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
       currentSnippet = std::make_unique<AnnotatedSourceSnippet>(SM);
       annotateSnippetWithInfo(SM, Info, *currentSnippet);
     }
+    for (auto path : Info.EducationalNotePaths) {
+      if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
+        BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
+    }
   } else {
     printDiagnostic(SM, Info);
 
@@ -929,6 +933,13 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
     }
     currentSnippet.reset();
   }
+
+  for (auto note : BufferedEducationalNotes) {
+    printMarkdown(note, Stream, ForceColors);
+    Stream << "\n";
+  }
+
+  BufferedEducationalNotes.clear();
 }
 
 bool PrintingDiagnosticConsumer::finishProcessing() {

@@ -873,9 +873,14 @@ namespace {
           auto &TL = SGF.getTypeLowering(base.getType());
           error = SGF.emitLoad(loc, base.getValue(), TL,
                                SGFContext(), IsNotTake);
+          // Error comes back to us with a +1 cleanup that is not a formal
+          // access cleanup. We need it to be that so that the load nests
+          // properly with other lvalue scoped things like the borrow below.
+          error = SGF.emitFormalAccessManagedRValueWithCleanup(
+              loc, error.forward(SGF));
         }
-        addr = SGF.B.createOpenExistentialBox(
-          loc, error.getValue(), getTypeOfRValue().getAddressType());
+        SILType addrType = getTypeOfRValue().getAddressType();
+        addr = SGF.B.createOpenExistentialBox(loc, error, addrType).getValue();
         break;
       }
       default:

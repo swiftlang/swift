@@ -497,10 +497,6 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   if (!customAttr)
     return Type();
 
-  ASTContext &ctx = var->getASTContext();
-  if (!ctx.areSemanticQueriesEnabled())
-    return nullptr;
-
   auto resolution =
       TypeResolution::forContextual(var->getDeclContext());
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
@@ -508,8 +504,9 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
 
   if (TypeChecker::validateType(var->getASTContext(),
                                 customAttr->getTypeLoc(),
-                                resolution, options))
-    return ErrorType::get(ctx);
+                                resolution, options)) {
+    return ErrorType::get(var->getASTContext());
+  }
 
   return customAttr->getTypeLoc().getType();
 }
@@ -533,10 +530,6 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (!binding)
     return Type();
 
-  ASTContext &ctx = var->getASTContext();
-  if (!ctx.areSemanticQueriesEnabled())
-    return Type();
-
   // If there's an initializer of some sort, checking it will determine the
   // property wrapper type.
   unsigned index = binding->getPatternEntryIndexForVarDecl(var);
@@ -546,6 +539,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     if (!binding->isInitializerChecked(index))
       TypeChecker::typeCheckPatternBinding(binding, index);
 
+    ASTContext &ctx = var->getASTContext();
     Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
     assert(type || ctx.Diags.hadAnyError());
     return type;

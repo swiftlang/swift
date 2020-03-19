@@ -46,10 +46,10 @@ bb2:                                              // Preds: bb0
   checked_cast_br [exact] %2 : $Base to Derived2, bb6, bb7 // id: %11
 
 bb3:                                              // Preds: bb1 bb6 bb8 bb10
-  switch_enum_addr %3 : $*MyOptional<R>, case #MyOptional.some!enumelt.1: bb4, case #MyOptional.none!enumelt: bb5 // id: %12
+  switch_enum_addr %3 : $*MyOptional<R>, case #MyOptional.some!enumelt: bb4, case #MyOptional.none!enumelt: bb5 // id: %12
 
 bb4:                                              // Preds: bb3
-  %13 = unchecked_take_enum_data_addr %3 : $*MyOptional<R>, #MyOptional.some!enumelt.1 // user: %14
+  %13 = unchecked_take_enum_data_addr %3 : $*MyOptional<R>, #MyOptional.some!enumelt // user: %14
   copy_addr [take] %13 to [initialization] %0 : $*R // id: %14
   dealloc_stack %3 : $*MyOptional<R> // id: %15
   strong_release %2 : $Base // id: %16

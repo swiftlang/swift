@@ -229,7 +229,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
 
   // Devirtualize the apply instruction on the identical path.
   auto NewInst =
-    devirtualizeClassMethod(IdenAI, DownCastedClassInstance, CD, nullptr);
+      devirtualizeClassMethod(IdenAI, DownCastedClassInstance, CD, nullptr)
+          .first;
   assert(NewInst && "Expected to be able to devirtualize apply!");
   (void)NewInst;
 
@@ -414,7 +415,8 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     // try to devirtualize it completely.
     ClassHierarchyAnalysis::ClassList Subs;
     if (isDefaultCaseKnown(CHA, AI, CD, Subs)) {
-      auto NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue, CD, &ORE);
+      auto NewInst =
+          tryDevirtualizeClassMethod(AI, SubTypeValue, CD, &ORE).first;
       if (NewInst)
         deleteDevirtualizedApply(AI);
       return bool(NewInst);
@@ -574,7 +576,8 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     ORE.emit(RB);
     return true;
   }
-  auto NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue, CD, nullptr);
+  auto NewInst =
+      tryDevirtualizeClassMethod(AI, SubTypeValue, CD, nullptr).first;
   if (NewInst) {
     ORE.emit(RB);
     deleteDevirtualizedApply(AI);

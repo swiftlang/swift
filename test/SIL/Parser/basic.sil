@@ -194,18 +194,18 @@ bb0(%0 : $*P):
   // CHECK: open_existential_addr mutable_access %0
   %1 = open_existential_addr mutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
 
-  // CHECK: witness_method ${{.*}}, #P.doIt!1
-  %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method: P) <T: P> (@inout T) -> ()
+  // CHECK: witness_method ${{.*}}, #P.doIt
+  %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   // Make sure we have the correct scope for generic parameters.
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.doIt!1
-  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method: P) <T: P> (@inout T) -> ()
+  // CHECK: witness_method $@opened("{{.*}}") P, #P.doIt
+  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   // CHECK: apply
   %3 = apply %2<@opened("01234567-89ab-cdef-0123-000000000000") P>(%1) : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
 
   // CHECK: open_existential_addr immutable_access
   %5 = open_existential_addr immutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000001") P
-  %6 = witness_method $@opened("01234567-89ab-cdef-0123-000000000001") P, #P.doIt!1, %5 : $*@opened("01234567-89ab-cdef-0123-000000000001") P : $@convention(witness_method: P) <T: P> (@in_guaranteed T) -> ()
+  %6 = witness_method $@opened("01234567-89ab-cdef-0123-000000000001") P, #P.doIt, %5 : $*@opened("01234567-89ab-cdef-0123-000000000001") P : $@convention(witness_method: P) <T: P> (@in_guaranteed T) -> ()
   %8 = apply %6<@opened("01234567-89ab-cdef-0123-000000000001") P>(%5) : $@convention(witness_method: P) <T: P> (@in_guaranteed T) -> ()
 
   destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
@@ -233,8 +233,8 @@ bb0:
   // CHECK: unchecked_ref_cast %0 : $C to $AnyObject
   %O = unchecked_ref_cast %C : $C to $Builtin.AnyObject
 
-  // CHECK: class_method {{.*}} : $C, #C.doIt!1
-  %2 = class_method %C : $C, #C.doIt!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  // CHECK: class_method {{.*}} : $C, #C.doIt
+  %2 = class_method %C : $C, #C.doIt : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
 
   // CHECK: alloc_ref $D
   %D = alloc_ref $D
@@ -273,12 +273,12 @@ protocol Runcible {
 // CHECK: $@convention(thin) <T where T : Runcible> (@in T) -> ()
 sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@convention(thin) <T : Runcible> (@in T) -> () {
 bb0(%0 : $*T):
-  // CHECK: witness_method $T, #Runcible.free_method!1
-  %1 = witness_method $T, #Runcible.free_method!1 : $@convention(witness_method: Runcible) <Self : Runcible> (@in Self) -> Int
+  // CHECK: witness_method $T, #Runcible.free_method
+  %1 = witness_method $T, #Runcible.free_method : $@convention(witness_method: Runcible) <Self : Runcible> (@in Self) -> Int
   %2 = apply %1<T>(%0) : $@convention(witness_method: Runcible) <Self : Runcible> (@in Self) -> Int
   %3 = metatype $@thick T.Type
-  // CHECK: witness_method $T, #Runcible.static_method!1
-  %4 = witness_method $T, #Runcible.static_method!1 : $@convention(witness_method: Runcible) <Self : Runcible> (@thick T.Type) -> ()
+  // CHECK: witness_method $T, #Runcible.static_method
+  %4 = witness_method $T, #Runcible.static_method : $@convention(witness_method: Runcible) <Self : Runcible> (@thick T.Type) -> ()
   %5 = apply %4<T>(%3) : $@convention(witness_method: Runcible) <Self : Runcible> (@thick T.Type) -> ()
   %6 = tuple ()
   destroy_addr %0 : $*T
@@ -325,7 +325,7 @@ bb0(%0 : $ClassBound):
   // CHECK: open_existential_ref {{%.*}} : $ClassBound to $@opened({{.*}}) ClassBound
   %5 = open_existential_ref %3 : $ClassBound to $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound
   // CHECK: witness_method
-  %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound, #ClassBound.classBoundMethod!1, %5 : $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound : $@convention(witness_method: ClassBound) <T: ClassBound> (T) -> ()
+  %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound, #ClassBound.classBoundMethod, %5 : $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound : $@convention(witness_method: ClassBound) <T: ClassBound> (T) -> ()
   %7 = apply %6<@opened("01234567-89ab-cdef-0123-111111111111") ClassBound>(%5) : $@convention(witness_method: ClassBound) <T: ClassBound> (T) -> ()
   %8 = tuple ()
   strong_release %1 : $<τ_0_0> { var τ_0_0 } <ClassBound>
@@ -393,8 +393,8 @@ bb0:
 // CHECK-LABEL: sil @test_union_data_case : $@convention(thin) (Int) -> Beth {
 sil @test_union_data_case : $(Int) -> Beth {
 bb0(%0 : $Int):
-  // CHECK: %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int
-  %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int
+  // CHECK: %1 = enum $Beth, #Beth.DataCase!enumelt, %0 : $Int
+  %1 = enum $Beth, #Beth.DataCase!enumelt, %0 : $Int
   return %1 : $Beth
 }
 
@@ -415,10 +415,10 @@ bb0(%0 : $*Gimel):
 
 sil @test_union_addr_data_case : $(@in Q) -> (@out Gimel) {
 bb0(%0 : $*Gimel, %1 : $*Q):
-  // CHECK: {{%.*}} = init_enum_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!enumelt.1
-  %p = init_enum_data_addr %0 : $*Gimel, #Gimel.DataCase!enumelt.1
+  // CHECK: {{%.*}} = init_enum_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!enumelt
+  %p = init_enum_data_addr %0 : $*Gimel, #Gimel.DataCase!enumelt
   copy_addr [take] %1 to [initialization] %p : $*Q
-  inject_enum_addr %0 : $*Gimel, #Gimel.DataCase!enumelt.1
+  inject_enum_addr %0 : $*Gimel, #Gimel.DataCase!enumelt
   %t = tuple ()
   return %t : $()
 }
@@ -828,8 +828,8 @@ bb0(%0 : $MaybePair):
   store %0 to %1a : $*MaybePair
   %3 = load %1a : $*MaybePair
   %4 = tuple ()
-  // CHECK: switch_enum %{{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: bb{{.*}}, case #MaybePair.Left!enumelt.1: bb
-  switch_enum %3 : $MaybePair, case #MaybePair.Neither!enumelt: bb1, case #MaybePair.Left!enumelt.1: bb3
+  // CHECK: switch_enum %{{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: bb{{.*}}, case #MaybePair.Left!enumelt: bb
+  switch_enum %3 : $MaybePair, case #MaybePair.Neither!enumelt: bb1, case #MaybePair.Left!enumelt: bb3
 
 bb1:
   br bb2
@@ -840,8 +840,8 @@ bb2:
   br bb5                                                 // CHECK: br
 
 bb3(%10 : $Int):
-  // CHECK: unchecked_enum_data {{%.*}} : $MaybePair, #MaybePair.Left!enumelt.1
-  %x = unchecked_enum_data %3 : $MaybePair, #MaybePair.Left!enumelt.1
+  // CHECK: unchecked_enum_data {{%.*}} : $MaybePair, #MaybePair.Left!enumelt
+  %x = unchecked_enum_data %3 : $MaybePair, #MaybePair.Left!enumelt
   br bb4(%x : $Int)
 
 bb4(%y : $Int):
@@ -865,15 +865,15 @@ enum MaybeAddressOnlyPair {
 // CHECK-LABEL: sil @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
 sil @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> () {
 bb0(%0 : $*MaybeAddressOnlyPair):
-  // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt.1: bb
-  switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt.1: bb2
+  // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt: bb
+  switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt: bb2
 
 bb1:
   br bb3
 
 bb2:
-  // CHECK: unchecked_take_enum_data_addr [[ENUM]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt.1
-  %q = unchecked_take_enum_data_addr %0 : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt.1
+  // CHECK: unchecked_take_enum_data_addr [[ENUM]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
+  %q = unchecked_take_enum_data_addr %0 : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
   br bb3
 
 bb3:
@@ -962,12 +962,12 @@ bb0(%0 : $Builtin.Word):
   %1 = integer_literal $Builtin.Word, 0
   %2 = integer_literal $Builtin.Word, 1
   %3 = enum $IntEnum, #IntEnum.E1!enumelt
-  %4 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %3 : $IntEnum
+  %4 = enum $Optional<IntEnum>, #Optional.some!enumelt, %3 : $IntEnum
   %5 = integer_literal $Builtin.Word, 2
   %6 = enum $IntEnum, #IntEnum.E2!enumelt
-  %7 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %6 : $IntEnum
+  %7 = enum $Optional<IntEnum>, #Optional.some!enumelt, %6 : $IntEnum
   %8 = enum $IntEnum, #IntEnum.E0!enumelt
-  %9 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %8 : $IntEnum
+  %9 = enum $Optional<IntEnum>, #Optional.some!enumelt, %8 : $IntEnum
   %10 = enum $Optional<IntEnum>, #Optional.none!enumelt
 
   // CHECK: select_value %{{.*}} : $Builtin.Word, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, default %{{.*}} : $Optional<IntEnum>
@@ -1067,7 +1067,7 @@ bb0(%0 : $AnyObject):
   %4 = load %1a : $*AnyObject
   strong_retain %4 : $AnyObject
   %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject
-  dynamic_method_br %6 : $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject, #X.f!1.foreign, bb1, bb2
+  dynamic_method_br %6 : $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject, #X.f!foreign, bb1, bb2
 bb1(%z : $@convention(objc_method) (@opened("01234567-89ab-cdef-0123-222222222222") AnyObject) -> ()):
   br bb3
 
@@ -1318,10 +1318,10 @@ bb0(%0 : $*Beth):
   %1 = load %0 : $*Beth
   %2 = integer_literal $Builtin.Int32, 2
   %3 = integer_literal $Builtin.Int32, 3
-  // CHECK: %4 = select_enum %1 : $Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt.1: %3 : $Builtin.Int32
-  %4 = select_enum %1 : $Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt.1: %3 : $Builtin.Int32
-  // CHECK: %5 = select_enum_addr %0 : $*Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt.1: %3 : $Builtin.Int32
-  %5 = select_enum_addr %0 : $*Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt.1: %3 : $Builtin.Int32
+  // CHECK: %4 = select_enum %1 : $Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt: %3 : $Builtin.Int32
+  %4 = select_enum %1 : $Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt: %3 : $Builtin.Int32
+  // CHECK: %5 = select_enum_addr %0 : $*Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt: %3 : $Builtin.Int32
+  %5 = select_enum_addr %0 : $*Beth, case #Beth.EmptyCase!enumelt: %2, case #Beth.DataCase!enumelt: %3 : $Builtin.Int32
   // CHECK: %6 = select_enum %1 : $Beth, case #Beth.EmptyCase!enumelt: %2, default %3 : $Builtin.Int32
   %6 = select_enum %1 : $Beth, case #Beth.EmptyCase!enumelt: %2, default %3 : $Builtin.Int32
   // CHECK: %7 = select_enum_addr %0 : $*Beth, case #Beth.EmptyCase!enumelt: %2, default %3 : $Builtin.Int32
@@ -1651,6 +1651,13 @@ bb0:
   return %0 : $()
 }
 
+// CHECK-LABEL: sil [lazy_getter] @test_lazy_getter
+sil [lazy_getter] @test_lazy_getter : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
 struct EmptyStruct {}
 
 sil @test_empty_destructure : $@convention(thin) () -> () {
@@ -1663,10 +1670,10 @@ bb0:
 }
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: {{.*}} : @Foo_subscript_getter
-// CHECK: #Foo.subscript!setter.1: {{.*}} : @Foo_subscript_setter [override]
+// CHECK: #Foo.subscript!getter: {{.*}} : @Foo_subscript_getter
+// CHECK: #Foo.subscript!setter: {{.*}} : @Foo_subscript_setter [override]
 // CHECK: }
 sil_vtable Foo {
-  #Foo.subscript!getter.1: @Foo_subscript_getter
-  #Foo.subscript!setter.1: @Foo_subscript_setter [override]
+  #Foo.subscript!getter: @Foo_subscript_getter
+  #Foo.subscript!setter: @Foo_subscript_setter [override]
 }

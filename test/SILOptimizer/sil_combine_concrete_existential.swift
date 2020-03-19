@@ -59,7 +59,7 @@ final class CC: PP {
 // CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $PP to $@opened("{{.*}}") PP
 // CHECK: [[E2:%.*]] = init_existential_ref %{{.*}} : $@opened("{{.*}}") PP : $@opened("{{.*}}") PP, $PP
 // CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $PP to $@opened("{{.*}}") PP
-// CHECK: [[W:%.*]] = witness_method $@opened("{{.*}}") PP, #PP.returnOptionalSelf!1 : <Self where Self : PP> (Self) -> () -> Self?, [[O1]] : $@opened("{{.*}}") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+// CHECK: [[W:%.*]] = witness_method $@opened("{{.*}}") PP, #PP.returnOptionalSelf : <Self where Self : PP> (Self) -> () -> Self?, [[O1]] : $@opened("{{.*}}") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
 // CHECK: apply [[W]]<@opened("{{.*}}") PP>([[O2]]) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
 // CHECK-LABEL: } // end sil function '$s32sil_combine_concrete_existential29testWitnessReturnOptionalSelfAA2PP_pSgyF'
 public func testWitnessReturnOptionalSelf() -> PP? {
@@ -94,9 +94,9 @@ struct SS: PPP {
 
 // The first apply has been devirtualized and inlined. The second remains unspecialized.
 // CHECK-LABEL: sil @$s32sil_combine_concrete_existential37testWitnessReturnOptionalIndirectSelfyyF : $@convention(thin) () -> () {
-// CHECK: switch_enum_addr %{{.*}} : $*Optional<@opened("{{.*}}") PPP>, case #Optional.some!enumelt.1: bb{{.*}}, case #Optional.none!enumelt: bb{{.*}}
+// CHECK: switch_enum_addr %{{.*}} : $*Optional<@opened("{{.*}}") PPP>, case #Optional.some!enumelt: bb{{.*}}, case #Optional.none!enumelt: bb{{.*}}
 // CHECK: [[O:%.*]] = open_existential_addr immutable_access %{{.*}} : $*PPP to $*@opened("{{.*}}") PPP
-// CHECK: [[W:%.*]] = witness_method $@opened("{{.*}}") PPP, #PPP.returnsOptionalIndirect!1 : <Self where Self : PPP> (Self) -> () -> Self?, [[O]] : $*@opened("{{.*}}") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: [[W:%.*]] = witness_method $@opened("{{.*}}") PPP, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, [[O]] : $*@opened("{{.*}}") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK: apply [[W]]<@opened("{{.*}}") PPP>(%{{.*}}, [[O]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK-LABEL: } // end sil function '$s32sil_combine_concrete_existential37testWitnessReturnOptionalIndirectSelfyyF'
 public func testWitnessReturnOptionalIndirectSelf() {

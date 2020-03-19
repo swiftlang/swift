@@ -297,12 +297,13 @@ void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
     return;
   }
   auto FileName = VD->getASTContext().SourceMgr.getDisplayNameForLoc(Loc);
+  if (FileName.empty()) {
+    return;
+  }
   OS.attributeObject("location", [&](){
-    if (!FileName.empty()) {
-      SmallString<1024> FileURI("file://");
-      FileURI.append(FileName);
-      OS.attribute("uri", FileURI.str());
-    }
+    SmallString<1024> FileURI("file://");
+    FileURI.append(FileName);
+    OS.attribute("uri", FileURI.str());
     serializePosition("position", Loc, Graph->M.getASTContext().SourceMgr, OS);
   });
 }
@@ -394,9 +395,6 @@ void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
         }
         if (AvAttr->isUnconditionallyDeprecated()) {
           OS.attribute("isUnconditionallyDeprecated", true);
-        }
-        if (AvAttr->isUnconditionallyUnavailable()) {
-          OS.attribute("isUnconditionallyUnavailable", true);
         }
       }); // end availability object
     }

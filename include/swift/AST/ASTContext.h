@@ -105,7 +105,6 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
-  class TypeChecker;
   class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
@@ -442,18 +441,7 @@ public:
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);
 
-private:
-  friend class TypeChecker;
-
-  void installGlobalTypeChecker(TypeChecker *TC);
 public:
-  /// Returns if semantic AST queries are enabled. This generally means module
-  /// loading and name lookup can take place.
-  bool areSemanticQueriesEnabled() const;
-
-  /// Retrieve the global \c TypeChecker instance associated with this context.
-  TypeChecker *getLegacyGlobalTypeChecker() const;
-
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;

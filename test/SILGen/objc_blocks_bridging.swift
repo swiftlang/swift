@@ -81,12 +81,12 @@ import Foundation
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s20objc_blocks_bridging3FooC7optFunc{{[_0-9a-zA-Z]*}}FTo
   // CHECK: bb0([[ARG0:%.*]] : @unowned $Optional<@convention(block) (NSString) -> @autoreleased NSString>,
   // CHECK:         [[COPY:%.*]] = copy_block [[ARG0]]
-  // CHECK:         switch_enum [[COPY]] : $Optional<@convention(block) (NSString) -> @autoreleased NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  // CHECK:         switch_enum [[COPY]] : $Optional<@convention(block) (NSString) -> @autoreleased NSString>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   // CHECK: [[SOME_BB]]([[BLOCK:%.*]] : @owned $@convention(block) (NSString) -> @autoreleased NSString):
   // TODO: redundant reabstractions here
   // CHECK:         [[BLOCK_THUNK:%.*]] = function_ref @$sSo8NSStringCABIeyBya_S2SIeggo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [callee_guaranteed] [[BLOCK_THUNK]]([[BLOCK]])
-  // CHECK:         enum $Optional<@callee_guaranteed (@guaranteed String) -> @owned String>, #Optional.some!enumelt.1, [[BRIDGED]]
+  // CHECK:         enum $Optional<@callee_guaranteed (@guaranteed String) -> @owned String>, #Optional.some!enumelt, [[BRIDGED]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @$s20objc_blocks_bridging3FooC7optFunc{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed Optional<@callee_guaranteed (@guaranteed String) -> @owned String>, @guaranteed String, @guaranteed Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]
   @objc dynamic func optFunc(_ f: ((String) -> String)?, x: String) -> String? {
@@ -121,23 +121,23 @@ func callBlocks(_ x: Foo,
   // CHECK: [[F_BLOCK_INVOKE:%.*]] = function_ref @$sS2iIegyd_S2iIyByd_TR
   // CHECK: [[F_STACK_BLOCK:%.*]] = init_block_storage_header [[F_BLOCK_STORAGE]] : {{.*}}, invoke [[F_BLOCK_INVOKE]]
   // CHECK: [[F_BLOCK:%.*]] = copy_block_without_escaping [[F_STACK_BLOCK]]
-  // CHECK: [[FOO:%.*]] =  objc_method [[ARG0]] : $Foo, #Foo.foo!1.foreign
+  // CHECK: [[FOO:%.*]] =  objc_method [[ARG0]] : $Foo, #Foo.foo!foreign
   // CHECK: apply [[FOO]]([[F_BLOCK]]
 
   // CHECK: [[G_BLOCK_INVOKE:%.*]] = function_ref @$sS2SIeggo_So8NSStringCABIyBya_TR
   // CHECK: [[G_STACK_BLOCK:%.*]] = init_block_storage_header {{.*}}, invoke [[G_BLOCK_INVOKE]]
   // CHECK: [[G_BLOCK:%.*]] = copy_block_without_escaping [[G_STACK_BLOCK]]
-  // CHECK: [[BAR:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.bar!1.foreign
+  // CHECK: [[BAR:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.bar!foreign
   // CHECK: apply [[BAR]]([[G_BLOCK]]
 
   // CHECK: [[H_BLOCK_INVOKE:%.*]] = function_ref @$sSSSgAAIeggo_So8NSStringCSgADIyBya_TR
   // CHECK: [[H_STACK_BLOCK:%.*]] = init_block_storage_header {{.*}}, invoke [[H_BLOCK_INVOKE]]
   // CHECK: [[H_BLOCK:%.*]] = copy_block_without_escaping [[H_STACK_BLOCK]]
-  // CHECK: [[BAS:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.bas!1.foreign
+  // CHECK: [[BAS:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.bas!foreign
   // CHECK: apply [[BAS]]([[H_BLOCK]]
 
   // CHECK: [[G_BLOCK:%.*]] = copy_block {{%.*}} : $@convention(block) (NSString) -> @autoreleased NSString
-  // CHECK: enum $Optional<@convention(block) (NSString) -> @autoreleased NSString>, #Optional.some!enumelt.1, [[G_BLOCK]]
+  // CHECK: enum $Optional<@convention(block) (NSString) -> @autoreleased NSString>, #Optional.some!enumelt, [[G_BLOCK]]
 
   return (x.foo(f, x: 0), x.bar(g, x: "one"), x.bas(h, x: "two"), x.optFunc(g, x: "three"))
 }
@@ -159,14 +159,14 @@ func clearDraggingItemImageComponentsProvider(_ x: NSDraggingItem) {
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSayypGIego_So7NSArrayCSgIeyBa_TR
 // CHECK:         [[CONVERT:%.*]] = function_ref @$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF
 // CHECK:         [[CONVERTED:%.*]] = apply [[CONVERT]]
-// CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[CONVERTED]]
+// CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.some!enumelt, [[CONVERTED]]
 // CHECK:         return [[OPTIONAL]]
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}bridgeNonnullBlockResult{{.*}}
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSSIego_So8NSStringCSgIeyBa_TR
 // CHECK:         [[CONVERT:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:         [[BRIDGED:%.*]] = apply [[CONVERT]]
-// CHECK:         [[OPTIONAL_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
+// CHECK:         [[OPTIONAL_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[BRIDGED]]
 // CHECK:         return [[OPTIONAL_BRIDGED]]
 func bridgeNonnullBlockResult() {
   nonnullStringBlockResult { return "test" }
@@ -191,7 +191,7 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
   // CHECK: [[BLOCK:%.*]] = copy_block_without_escaping [[BLOCK_STACK]]
 
-  // CHECK: [[SOME_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt.1, [[BLOCK]]
+  // CHECK: [[SOME_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt, [[BLOCK]]
   // CHECK: dealloc_stack [[BLOCK_ALLOC]]
   // CHECK: [[FN:%.*]] = function_ref @noescapeBlock : $@convention(c) (Optional<@convention(block) @noescape () -> ()>) -> ()
   // CHECK: apply [[FN]]([[SOME_BLOCK]])
@@ -211,7 +211,7 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
   // CHECK: [[BLOCK:%.*]] = copy_block_without_escaping [[BLOCK_STACK]]
 
-  // CHECK: [[SOME_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt.1, [[BLOCK]]
+  // CHECK: [[SOME_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt, [[BLOCK]]
   // CHECK: dealloc_stack [[BLOCK_ALLOC]]
   // CHECK: [[FN:%.*]] = function_ref @noescapeBlock : $@convention(c) (Optional<@convention(block) @noescape () -> ()>) -> ()
   // CHECK: apply [[FN]]([[SOME_BLOCK]])

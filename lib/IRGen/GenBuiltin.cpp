@@ -314,7 +314,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     llvm::Value *v = IGF.Builder.Create##id(lhs, rhs);                         \
     return out.add(v);                                                         \
   }
-#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name, attrs)                  \
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name)                         \
   if (Builtin.ID == BuiltinValueKind::id) {                                    \
     /* This builtin must be guarded so that dynamically it is never called. */ \
     IGF.emitTrap("invalid use of polymorphic builtin", /*Unreachable*/ false); \
