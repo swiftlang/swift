@@ -514,6 +514,7 @@ namespace {
     RValue emitForceValue(ForceValueExpr *loc, Expr *E,
                           unsigned numOptionalEvaluations,
                           SGFContext C);
+    RValue visitFromUninhabitedExpr(FromUninhabitedExpr *E, SGFContext C);
     RValue visitOpenExistentialExpr(OpenExistentialExpr *E, SGFContext C);
     RValue visitMakeTemporarilyEscapableExpr(
                                  MakeTemporarilyEscapableExpr *E, SGFContext C);
@@ -4281,6 +4282,12 @@ RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
 
   ManagedValue v = SGF.emitProtocolMetatypeToObject(E, inputTy, resultTy);
   return RValue(SGF, E, v);
+}
+
+RValue RValueEmitter::visitFromUninhabitedExpr(FromUninhabitedExpr *E,
+                                               SGFContext C) {
+  SGF.emitIgnoredExpr(E->getSubExpr());
+  return SGF.emitUndefRValue(E, E->getType());
 }
 
 RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {

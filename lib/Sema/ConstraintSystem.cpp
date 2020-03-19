@@ -4043,6 +4043,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::HashableToAnyHashable:
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+  case ConversionRestrictionKind::FromUninhabited:
     // @_nonEphemeral has no effect on these conversions, so treat them as all
     // being non-ephemeral in order to allow their passing to an @_nonEphemeral
     // parameter.

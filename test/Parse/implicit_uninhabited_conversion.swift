@@ -1,14 +1,14 @@
 // RUN: %target-swift-frontend %s -typecheck -verify
 
-let int: Int = fatalError() // expected-error {{cannot convert value of type 'Never' to specified type 'Int'}}
+let int: Int = fatalError()
 
 func explicitReturn() -> Int {
-    return fatalError() // expected-error {{cannot convert return expression of type 'Never' to return type 'Int'}}
+    return fatalError()
 }
 
 func explicitMultiElement() -> Int {
     print("no way")
-    return fatalError() // expected-error {{cannot convert return expression of type 'Never' to return type 'Int'}}
+    return fatalError()
 }
 
 func implicitReturn() -> Int {

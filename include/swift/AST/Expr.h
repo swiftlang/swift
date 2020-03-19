@@ -3385,6 +3385,16 @@ public:
   }
 };
 
+class FromUninhabitedExpr : public ImplicitConversionExpr {
+public:
+  FromUninhabitedExpr(Expr *subExpr, Type type)
+      : ImplicitConversionExpr(ExprKind::FromUninhabited, subExpr, type) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::FromUninhabited;
+  }
+};
+
 /// The builtin unary '&' operator, which converts the
 /// given lvalue into an 'inout' argument value.
 class InOutExpr : public Expr {

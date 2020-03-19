@@ -518,6 +518,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[cf-toll-free-bridge-to-objc]";
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
     return "[objc-toll-free-bridge-to-cf]";
+  case ConversionRestrictionKind::FromUninhabited:
+    return "[from-uninhabited]";
   }
   llvm_unreachable("bad conversion restriction kind");
 }

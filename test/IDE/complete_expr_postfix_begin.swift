@@ -116,6 +116,7 @@ func fooFunc() -> FooStruct {
 }
 
 enum FooEnum {
+  case fooEnumCase
 }
 
 class FooClass {

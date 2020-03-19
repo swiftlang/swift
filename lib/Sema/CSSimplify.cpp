@@ -4804,6 +4804,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
+  if (kind >= ConstraintKind::Conversion && type1->isUninhabited()) {
+    conversionsOrFixes.push_back(ConversionRestrictionKind::FromUninhabited);
+  }
+
   if (kind == ConstraintKind::BindParam) {
     if (auto *iot = dyn_cast<InOutType>(desugar1)) {
       if (auto *lvt = dyn_cast<LValueType>(desugar2)) {
@@ -8976,6 +8980,10 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       bridgedObjCClass->getDeclaredInterfaceType(),
                       ConstraintKind::Subtype, subflags, locator);
   }
+  case ConversionRestrictionKind::FromUninhabited:
+    // Nothing more to solve.
+    addContextualScore();
+    return SolutionKind::Solved;
   }
   
   llvm_unreachable("bad conversion restriction");
