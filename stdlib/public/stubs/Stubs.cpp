@@ -41,9 +41,28 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__) || defined(__OpenBSD__)
+#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
 #include <sstream>
 #include <cmath>
+#elif defined(__OpenBSD__)
+#include <locale.h>
+
+static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
+  return strtod(nptr, endptr);
+}
+
+static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
+  return strtof(nptr, endptr);
+}
+
+static long double swift_strtold_l(const char *nptr, char **endptr,
+                                   locale_t loc) {
+  return strtold(nptr, endptr);
+}
+
+#define strtod_l swift_strtod_l
+#define strtof_l swift_strtof_l
+#define strtold_l swift_strtold_l
 #elif defined(__ANDROID__)
 #include <locale.h>
 
@@ -369,7 +388,7 @@ static bool swift_stringIsSignalingNaN(const char *nptr) {
   return strcasecmp(nptr, "snan") == 0;
 }
 
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__) || defined(__OpenBSD__)
+#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
 // Cygwin does not support uselocale(), but we can use the locale feature 
 // in stringstream object.
 template <typename T>
