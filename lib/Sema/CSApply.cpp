@@ -7788,7 +7788,9 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
   TypeResolutionOptions options =
       isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
       ? TypeResolverContext::EditorPlaceholderExpr
-      : TypeResolverContext::InExpression;
+      : target.getInitializationPatternBindingDecl()
+        ? TypeResolverContext::PatternBindingDecl
+        : TypeResolverContext::InExpression;
   options |= TypeResolutionFlags::OverrideType;
 
   // Determine the type of the pattern.
@@ -7804,9 +7806,7 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
   finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
 
   // Apply the solution to the pattern as well.
-  auto contextualPattern =
-      ContextualPattern::forRawPattern(target.getInitializationPattern(),
-                                       target.getDeclContext());
+  auto contextualPattern = target.getInitializationContextualPattern();
   if (auto coercedPattern = TypeChecker::coercePatternToType(
           contextualPattern, finalPatternType, options)) {
     resultTarget.setPattern(coercedPattern);
