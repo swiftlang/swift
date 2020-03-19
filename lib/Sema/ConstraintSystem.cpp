@@ -24,6 +24,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -3853,6 +3854,12 @@ bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
   return decl == ctx.getKeyPathDecl() || decl == ctx.getWritableKeyPathDecl() ||
          decl == ctx.getReferenceWritableKeyPathDecl() ||
          decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
+}
+
+bool constraints::hasExplicitResult(ClosureExpr *closure) {
+  auto &ctx = closure->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ClosureHasExplicitResultRequest{closure}, false);
 }
 
 static bool isOperator(Expr *expr, StringRef expectedName) {

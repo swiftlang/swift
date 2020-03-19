@@ -2528,55 +2528,13 @@ namespace {
       return CS.getType(expr->getClosureBody());
     }
 
-    /// Walk a closure body to determine if it's possible for
-    /// it to return with a non-void result.
-    static bool closureHasNoResult(ClosureExpr *expr) {
-      // A walker that looks for 'return' statements that aren't
-      // nested within closures or nested declarations.
-      class FindReturns : public ASTWalker {
-        bool FoundResultReturn = false;
-        bool FoundNoResultReturn = false;
-
-        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-          return { false, expr };
-        }
-        bool walkToDeclPre(Decl *decl) override {
-          return false;
-        }
-        std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-          // Record return statements.
-          if (auto ret = dyn_cast<ReturnStmt>(stmt)) {
-            // If it has a result, remember that we saw one, but keep
-            // traversing in case there's a no-result return somewhere.
-            if (ret->hasResult()) {
-              FoundResultReturn = true;
-
-            // Otherwise, stop traversing.
-            } else {
-              FoundNoResultReturn = true;
-              return { false, nullptr };
-            }
-          }
-          return { true, stmt };
-        }
-      public:
-        bool hasNoResult() const {
-          return FoundNoResultReturn || !FoundResultReturn;
-        }
-      };
-
-      // Don't apply this to single-expression-body closures.
-      if (expr->hasSingleExpressionBody())
-        return false;
-
-      auto body = expr->getBody();
-      if (!body) return false;
-
-      FindReturns finder;
-      body->walk(finder);
-      return finder.hasNoResult();
+    bool closureHasNoResult(ClosureExpr *closure) {
+      // Single statement closures always have a result because
+      // `return` is implicit.
+      return closure->hasSingleExpressionBody() ? false
+                                                : !hasExplicitResult(closure);
     }
-    
+
     /// Walk a closure AST to determine if it can throw.
     bool closureCanThrow(ClosureExpr *expr) {
       // A walker that looks for 'try' or 'throw' expressions

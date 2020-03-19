@@ -804,3 +804,48 @@ llvm::Expected<Expr *> CallerSideDefaultArgExprRequest::evaluate(
   }
   return initExpr;
 }
+
+llvm::Expected<bool>
+ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
+                                          ClosureExpr *closure) const {
+  // A walker that looks for 'return' statements that aren't
+  // nested within closures or nested declarations.
+  class FindReturns : public ASTWalker {
+    bool FoundResultReturn = false;
+    bool FoundNoResultReturn = false;
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      return {false, expr};
+    }
+
+    bool walkToDeclPre(Decl *decl) override { return false; }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      // Record return statements.
+      if (auto ret = dyn_cast<ReturnStmt>(stmt)) {
+        // If it has a result, remember that we saw one, but keep
+        // traversing in case there's a no-result return somewhere.
+        if (ret->hasResult()) {
+          FoundResultReturn = true;
+
+          // Otherwise, stop traversing.
+        } else {
+          FoundNoResultReturn = true;
+          return {false, nullptr};
+        }
+      }
+      return {true, stmt};
+    }
+
+  public:
+    bool hasResult() const { return !FoundNoResultReturn && FoundResultReturn; }
+  };
+
+  auto body = closure->getBody();
+  if (!body)
+    return false;
+
+  FindReturns finder;
+  body->walk(finder);
+  return finder.hasResult();
+}
