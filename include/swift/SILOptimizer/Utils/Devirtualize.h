@@ -65,11 +65,9 @@ SubstitutionMap getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI,
 ///
 /// If this succeeds, the caller must call deleteDevirtualizedApply on
 /// the original apply site.
-///
-/// Return the new apply and true if the CFG was also modified.
-std::pair<ApplySite, bool>
-tryDevirtualizeApply(ApplySite AI, ClassHierarchyAnalysis *CHA,
-                     OptRemark::Emitter *ORE = nullptr);
+ApplySite tryDevirtualizeApply(ApplySite AI,
+                               ClassHierarchyAnalysis *CHA,
+                               OptRemark::Emitter *ORE = nullptr);
 bool canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA);
 bool canDevirtualizeClassMethod(FullApplySite AI, ClassDecl *CD,
                                 OptRemark::Emitter *ORE = nullptr,
@@ -81,23 +79,21 @@ CanType getSelfInstanceType(CanType ClassOrMetatypeType);
 /// Devirtualize the given apply site, which is known to be devirtualizable.
 ///
 /// The caller must call deleteDevirtualizedApply on the original apply site.
-///
-/// Return the new apply and true if the CFG was also modified.
-std::pair<FullApplySite, bool> devirtualizeClassMethod(FullApplySite AI,
-                                                       SILValue ClassInstance,
-                                                       ClassDecl *CD,
-                                                       OptRemark::Emitter *ORE);
+FullApplySite devirtualizeClassMethod(FullApplySite AI,
+                                      SILValue ClassInstance,
+                                      ClassDecl *CD,
+                                      OptRemark::Emitter *ORE);
 
 /// Attempt to devirtualize the given apply site, which is known to be
 /// of a class method.  If this fails, the returned FullApplySite will be null.
 ///
 /// If this succeeds, the caller must call deleteDevirtualizedApply on
 /// the original apply site.
-///
-/// Return the new apply and true if the CFG was also modified.
-std::pair<FullApplySite, bool>
-tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
-                           ClassDecl *CD, OptRemark::Emitter *ORE,
+FullApplySite
+tryDevirtualizeClassMethod(FullApplySite AI,
+                           SILValue ClassInstance,
+                           ClassDecl *CD,
+                           OptRemark::Emitter *ORE,
                            bool isEffectivelyFinalMethod = false);
 
 /// Attempt to devirtualize the given apply site, which is known to be
@@ -106,9 +102,7 @@ tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
 ///
 /// If this succeeds, the caller must call deleteDevirtualizedApply on
 /// the original apply site.
-///
-/// Return the new apply and true if the CFG was also modified.
-std::pair<ApplySite, bool> tryDevirtualizeWitnessMethod(ApplySite AI, OptRemark::Emitter *ORE);
+ApplySite tryDevirtualizeWitnessMethod(ApplySite AI, OptRemark::Emitter *ORE);
 
 /// Delete a successfully-devirtualized apply site.  This must always be
 /// called after devirtualizing an apply; not only is it not semantically

@@ -30,10 +30,8 @@ using namespace swift;
 namespace {
 
 class Devirtualizer : public SILFunctionTransform {
-  bool Changed = false;
-  bool ChangedCFG = false;
 
-  void devirtualizeAppliesInFunction(SILFunction &F,
+  bool devirtualizeAppliesInFunction(SILFunction &F,
                                      ClassHierarchyAnalysis *CHA);
 
   /// The entry point to the transformation.
@@ -43,12 +41,7 @@ class Devirtualizer : public SILFunctionTransform {
     LLVM_DEBUG(llvm::dbgs() << "***** Devirtualizer on function:" << F.getName()
                             << " *****\n");
 
-    Changed = false;
-    ChangedCFG = false;
-    devirtualizeAppliesInFunction(F, CHA);
-    if (ChangedCFG)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
-    else if (Changed)
+    if (devirtualizeAppliesInFunction(F, CHA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
   }
 
@@ -56,9 +49,9 @@ class Devirtualizer : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-// Return true if any calls changed, and true if the CFG also changed.
-void Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
+bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
                                                   ClassHierarchyAnalysis *CHA) {
+  bool Changed = false;
   llvm::SmallVector<ApplySite, 8> NewApplies;
   OptRemark::Emitter ORE(DEBUG_TYPE, F.getModule());
 
@@ -76,14 +69,11 @@ void Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
    }
   }
   for (auto Apply : Applies) {
-    ApplySite NewInst;
-    bool modifiedCFG;
-    std::tie(NewInst, modifiedCFG) = tryDevirtualizeApply(Apply, CHA, &ORE);
+    auto NewInst = tryDevirtualizeApply(Apply, CHA, &ORE);
     if (!NewInst)
       continue;
 
     Changed = true;
-    ChangedCFG |= modifiedCFG;
 
     deleteDevirtualizedApply(Apply);
     NewApplies.push_back(NewInst);
@@ -115,6 +105,8 @@ void Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     if (CalleeFn->isDefinition() && CalleeFn->shouldOptimize())
       addFunctionToPassManagerWorklist(CalleeFn, nullptr);
   }
+
+  return Changed;
 }
 
 SILTransform *swift::createDevirtualizer() { return new Devirtualizer(); }

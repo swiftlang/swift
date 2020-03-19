@@ -482,12 +482,12 @@ static ApplyInst *replaceApplyInst(SILBuilder &builder, SILLocation loc,
   return newAI;
 }
 
-// Return the new try_apply and true if a cast required CFG modification.
-static std::pair<TryApplyInst *, bool>
-replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
-                    SILValue newFn, SubstitutionMap newSubs,
-                    ArrayRef<SILValue> newArgs, SILFunctionConventions conv,
-                    ArrayRef<SILValue> newArgBorrows) {
+static TryApplyInst *replaceTryApplyInst(SILBuilder &builder, SILLocation loc,
+                                         TryApplyInst *oldTAI, SILValue newFn,
+                                         SubstitutionMap newSubs,
+                                         ArrayRef<SILValue> newArgs,
+                                         SILFunctionConventions conv,
+                                         ArrayRef<SILValue> newArgBorrows) {
   SILBasicBlock *normalBB = oldTAI->getNormalBB();
   SILBasicBlock *resultBB = nullptr;
 
@@ -537,7 +537,7 @@ replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
   }
 
   builder.setInsertionPoint(normalBB->begin());
-  return {newTAI, resultCastRequired};
+  return newTAI;
 }
 
 static BeginApplyInst *
@@ -599,18 +599,17 @@ replacePartialApplyInst(SILBuilder &builder, SILLocation loc,
   return newPAI;
 }
 
-// Return the new apply and true if the CFG was also modified.
-static std::pair<ApplySite, bool>
-replaceApplySite(SILBuilder &builder, SILLocation loc, ApplySite oldAS,
-                 SILValue newFn, SubstitutionMap newSubs,
-                 ArrayRef<SILValue> newArgs, SILFunctionConventions conv,
-                 ArrayRef<SILValue> newArgBorrows) {
+static ApplySite replaceApplySite(SILBuilder &builder, SILLocation loc,
+                                  ApplySite oldAS, SILValue newFn,
+                                  SubstitutionMap newSubs,
+                                  ArrayRef<SILValue> newArgs,
+                                  SILFunctionConventions conv,
+                                  ArrayRef<SILValue> newArgBorrows) {
   switch (oldAS.getKind()) {
   case ApplySiteKind::ApplyInst: {
     auto *oldAI = cast<ApplyInst>(oldAS);
-    return {replaceApplyInst(builder, loc, oldAI, newFn, newSubs, newArgs,
-                             newArgBorrows),
-            false};
+    return replaceApplyInst(builder, loc, oldAI, newFn, newSubs, newArgs,
+                            newArgBorrows);
   }
   case ApplySiteKind::TryApplyInst: {
     auto *oldTAI = cast<TryApplyInst>(oldAS);
@@ -619,16 +618,14 @@ replaceApplySite(SILBuilder &builder, SILLocation loc, ApplySite oldAS,
   }
   case ApplySiteKind::BeginApplyInst: {
     auto *oldBAI = dyn_cast<BeginApplyInst>(oldAS);
-    return {replaceBeginApplyInst(builder, loc, oldBAI, newFn, newSubs, newArgs,
-                                  newArgBorrows),
-            false};
+    return replaceBeginApplyInst(builder, loc, oldBAI, newFn, newSubs, newArgs,
+                                 newArgBorrows);
   }
   case ApplySiteKind::PartialApplyInst: {
     assert(newArgBorrows.empty());
     auto *oldPAI = cast<PartialApplyInst>(oldAS);
-    return {
-        replacePartialApplyInst(builder, loc, oldPAI, newFn, newSubs, newArgs),
-        false};
+    return replacePartialApplyInst(builder, loc, oldPAI, newFn, newSubs,
+                                   newArgs);
   }
   }
   llvm_unreachable("covered switch");
@@ -732,12 +729,10 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
 /// \p ClassOrMetatype is a class value or metatype value that is the
 ///    self argument of the apply we will devirtualize.
 /// return the result value of the new ApplyInst if created one or null.
-///
-/// Return the new apply and true if the CFG was also modified.
-std::pair<FullApplySite, bool>
-swift::devirtualizeClassMethod(FullApplySite applySite,
-                               SILValue classOrMetatype, ClassDecl *cd,
-                               OptRemark::Emitter *ore) {
+FullApplySite swift::devirtualizeClassMethod(FullApplySite applySite,
+                                             SILValue classOrMetatype,
+                                             ClassDecl *cd,
+                                             OptRemark::Emitter *ore) {
   LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize : "
                           << *applySite.getInstruction());
 
@@ -798,10 +793,8 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
     newArgs.push_back(arg);
     ++paramArgIter;
   }
-  ApplySite newAS;
-  bool modifiedCFG;
-  std::tie(newAS, modifiedCFG) = replaceApplySite(
-      builder, loc, applySite, fri, subs, newArgs, substConv, newArgBorrows);
+  ApplySite newAS = replaceApplySite(builder, loc, applySite, fri, subs,
+                                     newArgs, substConv, newArgBorrows);
   FullApplySite newAI = FullApplySite::isa(newAS.getInstruction());
   assert(newAI);
 
@@ -815,14 +808,16 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
     });
   NumClassDevirt++;
 
-  return {newAI, modifiedCFG};
+  return newAI;
 }
 
-std::pair<FullApplySite, bool> swift::tryDevirtualizeClassMethod(
-    FullApplySite applySite, SILValue classInstance, ClassDecl *cd,
-    OptRemark::Emitter *ore, bool isEffectivelyFinalMethod) {
+FullApplySite swift::tryDevirtualizeClassMethod(FullApplySite applySite,
+                                                SILValue classInstance,
+                                                ClassDecl *cd,
+                                                OptRemark::Emitter *ore,
+                                                bool isEffectivelyFinalMethod) {
   if (!canDevirtualizeClassMethod(applySite, cd, ore, isEffectivelyFinalMethod))
-    return {FullApplySite(), false};
+    return FullApplySite();
   return devirtualizeClassMethod(applySite, classInstance, cd, ore);
 }
 
@@ -965,12 +960,9 @@ swift::getWitnessMethodSubstitutions(SILModule &module, ApplySite applySite,
 /// Generate a new apply of a function_ref to replace an apply of a
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
-///
-/// Return the new apply and true if the CFG was also modified.
-static std::pair<ApplySite, bool>
-devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
-                          ProtocolConformanceRef cRef,
-                          OptRemark::Emitter *ore) {
+static ApplySite devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
+                                           ProtocolConformanceRef cRef,
+                                           OptRemark::Emitter *ore) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
   auto &module = applySite.getModule();
@@ -1025,9 +1017,7 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
   SILLocation loc = applySite.getLoc();
   auto *fri = applyBuilder.createFunctionRefFor(loc, f);
 
-  ApplySite newApplySite;
-  bool modifiedCFG;
-  std::tie(newApplySite, modifiedCFG) =
+  ApplySite newApplySite =
       replaceApplySite(applyBuilder, loc, applySite, fri, subMap, arguments,
                        substConv, borrowedArgs);
 
@@ -1039,7 +1029,7 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
              << "Devirtualized call to " << NV("Method", f);
     });
   NumWitnessDevirt++;
-  return {newApplySite, modifiedCFG};
+  return newApplySite;
 }
 
 static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
@@ -1076,11 +1066,10 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
 /// In the cases where we can statically determine the function that
 /// we'll call to, replace an apply of a witness_method with an apply
 /// of a function_ref, returning the new apply.
-std::pair<ApplySite, bool>
-swift::tryDevirtualizeWitnessMethod(ApplySite applySite,
-                                    OptRemark::Emitter *ore) {
+ApplySite swift::tryDevirtualizeWitnessMethod(ApplySite applySite,
+                                              OptRemark::Emitter *ore) {
   if (!canDevirtualizeWitnessMethod(applySite))
-    return {ApplySite(), false};
+    return ApplySite();
 
   SILFunction *f;
   SILWitnessTable *wt;
@@ -1099,11 +1088,9 @@ swift::tryDevirtualizeWitnessMethod(ApplySite applySite,
 
 /// Attempt to devirtualize the given apply if possible, and return a
 /// new instruction in that case, or nullptr otherwise.
-///
-/// Return the new apply and true if the CFG was also modified.
-std::pair<ApplySite, bool>
-swift::tryDevirtualizeApply(ApplySite applySite, ClassHierarchyAnalysis *cha,
-                            OptRemark::Emitter *ore) {
+ApplySite swift::tryDevirtualizeApply(ApplySite applySite,
+                                      ClassHierarchyAnalysis *cha,
+                                      OptRemark::Emitter *ore) {
   LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize: "
                           << *applySite.getInstruction());
 
@@ -1118,7 +1105,7 @@ swift::tryDevirtualizeApply(ApplySite applySite, ClassHierarchyAnalysis *cha,
   // TODO: check if we can also de-virtualize partial applies of class methods.
   FullApplySite fas = FullApplySite::isa(applySite.getInstruction());
   if (!fas)
-    return {ApplySite(), false};
+    return ApplySite();
 
   /// Optimize a class_method and alloc_ref pair into a direct function
   /// reference:
@@ -1164,7 +1151,7 @@ swift::tryDevirtualizeApply(ApplySite applySite, ClassHierarchyAnalysis *cha,
     return tryDevirtualizeClassMethod(fas, instance, cd, ore);
   }
 
-  return {ApplySite(), false};
+  return ApplySite();
 }
 
 bool swift::canDevirtualizeApply(FullApplySite applySite,
