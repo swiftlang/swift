@@ -100,36 +100,37 @@ struct BorrowScopeOperandKind {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               BorrowScopeOperandKind kind);
 
-struct BorrowScopeIntroducingValue;
+struct BorrowedValue;
 
 /// An operand whose user instruction introduces a new borrow scope for the
-/// operand's value. The value of the operand must be considered as implicitly
-/// borrowed until the user's corresponding end scope instruction.
+/// operand's value. By executing the given user, the operand's value becomes
+/// borrowed and thus the incoming value must implicitly be borrowed until the
+/// user's corresponding end scope instruction.
 ///
 /// NOTE: We do not require that the guaranteed scope be represented by a
 /// guaranteed value in the same function: see begin_apply. In such cases, we
 /// require instead an end_* instruction to mark the end of the scope's region.
-struct BorrowScopeOperand {
+struct BorrowingOperand {
   BorrowScopeOperandKind kind;
   Operand *op;
 
-  BorrowScopeOperand(Operand *op)
+  BorrowingOperand(Operand *op)
       : kind(*BorrowScopeOperandKind::get(op->getUser()->getKind())), op(op) {}
-  BorrowScopeOperand(const BorrowScopeOperand &other)
+  BorrowingOperand(const BorrowingOperand &other)
       : kind(other.kind), op(other.op) {}
-  BorrowScopeOperand &operator=(const BorrowScopeOperand &other) {
+  BorrowingOperand &operator=(const BorrowingOperand &other) {
     kind = other.kind;
     op = other.op;
     return *this;
   }
 
   /// If value is a borrow introducer return it after doing some checks.
-  static Optional<BorrowScopeOperand> get(Operand *op) {
+  static Optional<BorrowingOperand> get(Operand *op) {
     auto *user = op->getUser();
     auto kind = BorrowScopeOperandKind::get(user->getKind());
     if (!kind)
       return None;
-    return BorrowScopeOperand(*kind, op);
+    return BorrowingOperand(*kind, op);
   }
 
   void visitEndScopeInstructions(function_ref<void(Operand *)> func) const;
@@ -182,8 +183,8 @@ struct BorrowScopeOperand {
   /// Visit all of the "results" of the user of this operand that are borrow
   /// scope introducers for the specific scope that this borrow scope operand
   /// summarizes.
-  void visitBorrowIntroducingUserResults(
-      function_ref<void(BorrowScopeIntroducingValue)> visitor);
+  void
+  visitBorrowIntroducingUserResults(function_ref<void(BorrowedValue)> visitor);
 
   /// Passes to visitor all of the consuming uses of this use's using
   /// instruction.
@@ -200,14 +201,14 @@ struct BorrowScopeOperand {
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
-  BorrowScopeOperand(BorrowScopeOperandKind kind, Operand *op)
+  BorrowingOperand(BorrowScopeOperandKind kind, Operand *op)
       : kind(kind), op(op) {}
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                              const BorrowScopeOperand &operand);
+                              const BorrowingOperand &operand);
 
-struct BorrowScopeIntroducingValueKind {
+struct BorrowedValueKind {
   /// Enum we use for exhaustive pattern matching over borrow scope introducers.
   enum Kind {
     LoadBorrow,
@@ -216,18 +217,18 @@ struct BorrowScopeIntroducingValueKind {
     Phi,
   };
 
-  static Optional<BorrowScopeIntroducingValueKind> get(SILValue value) {
+  static Optional<BorrowedValueKind> get(SILValue value) {
     if (value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
       return None;
     switch (value->getKind()) {
     default:
       return None;
     case ValueKind::LoadBorrowInst:
-      return BorrowScopeIntroducingValueKind(LoadBorrow);
+      return BorrowedValueKind(LoadBorrow);
     case ValueKind::BeginBorrowInst:
-      return BorrowScopeIntroducingValueKind(BeginBorrow);
+      return BorrowedValueKind(BeginBorrow);
     case ValueKind::SILFunctionArgument:
-      return BorrowScopeIntroducingValueKind(SILFunctionArgument);
+      return BorrowedValueKind(SILFunctionArgument);
     case ValueKind::SILPhiArgument: {
       if (llvm::any_of(value->getParentBlock()->getPredecessorBlocks(),
                        [](SILBasicBlock *block) {
@@ -235,16 +236,15 @@ struct BorrowScopeIntroducingValueKind {
                        })) {
         return None;
       }
-      return BorrowScopeIntroducingValueKind(Phi);
+      return BorrowedValueKind(Phi);
     }
     }
   }
 
   Kind value;
 
-  BorrowScopeIntroducingValueKind(Kind newValue) : value(newValue) {}
-  BorrowScopeIntroducingValueKind(const BorrowScopeIntroducingValueKind &other)
-      : value(other.value) {}
+  BorrowedValueKind(Kind newValue) : value(newValue) {}
+  BorrowedValueKind(const BorrowedValueKind &other) : value(other.value) {}
   operator Kind() const { return value; }
 
   /// Is this a borrow scope that begins and ends within the same function and
@@ -255,11 +255,11 @@ struct BorrowScopeIntroducingValueKind {
   /// of the scope.
   bool isLocalScope() const {
     switch (value) {
-    case BorrowScopeIntroducingValueKind::BeginBorrow:
-    case BorrowScopeIntroducingValueKind::LoadBorrow:
-    case BorrowScopeIntroducingValueKind::Phi:
+    case BorrowedValueKind::BeginBorrow:
+    case BorrowedValueKind::LoadBorrow:
+    case BorrowedValueKind::Phi:
       return true;
-    case BorrowScopeIntroducingValueKind::SILFunctionArgument:
+    case BorrowedValueKind::SILFunctionArgument:
       return false;
     }
     llvm_unreachable("Covered switch isnt covered?!");
@@ -269,13 +269,12 @@ struct BorrowScopeIntroducingValueKind {
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                              BorrowScopeIntroducingValueKind kind);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, BorrowedValueKind kind);
 
 struct InteriorPointerOperand;
 
-/// A higher level construct for working with values that represent the
-/// introduction of a new borrow scope.
+/// A higher level construct for working with values that act as a "borrow
+/// introducer" for a new borrow scope.
 ///
 /// DISCUSSION: A "borrow introducer" is a SILValue that represents the
 /// beginning of a borrow scope that the ownership verifier validates. The idea
@@ -290,19 +289,19 @@ struct InteriorPointerOperand;
 /// guaranteed results are borrow introducers. In practice this means that
 /// borrow introducers can not have guaranteed results that are not creating a
 /// new borrow scope. No such instructions exist today.
-struct BorrowScopeIntroducingValue {
-  BorrowScopeIntroducingValueKind kind;
+struct BorrowedValue {
+  BorrowedValueKind kind;
   SILValue value;
 
   /// If value is a borrow introducer return it after doing some checks.
   ///
   /// This is the only way to construct a BorrowScopeIntroducingValue. We make
   /// the primary constructor private for this reason.
-  static Optional<BorrowScopeIntroducingValue> get(SILValue value) {
-    auto kind = BorrowScopeIntroducingValueKind::get(value);
+  static Optional<BorrowedValue> get(SILValue value) {
+    auto kind = BorrowedValueKind::get(value);
     if (!kind)
       return None;
-    return BorrowScopeIntroducingValue(*kind, value);
+    return BorrowedValue(*kind, value);
   }
 
   /// If this value is introducing a local scope, gather all local end scope
@@ -359,13 +358,12 @@ struct BorrowScopeIntroducingValue {
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
-  BorrowScopeIntroducingValue(BorrowScopeIntroducingValueKind kind,
-                              SILValue value)
+  BorrowedValue(BorrowedValueKind kind, SILValue value)
       : kind(kind), value(value) {}
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                              const BorrowScopeIntroducingValue &value);
+                              const BorrowedValue &value);
 
 /// Look up the def-use graph starting at use \p inputOperand, recording any
 /// "borrow" introducing values that we find into \p out. If at any point, we
@@ -376,16 +374,15 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// NOTE: This may return multiple borrow introducing values in cases where
 /// there are phi-like nodes in the IR like any true phi block arguments or
 /// aggregate literal instructions (struct, tuple, enum, etc.).
-bool getAllBorrowIntroducingValues(
-    SILValue value, SmallVectorImpl<BorrowScopeIntroducingValue> &out);
+bool getAllBorrowIntroducingValues(SILValue value,
+                                   SmallVectorImpl<BorrowedValue> &out);
 
 /// Look up through the def-use chain of \p inputValue, looking for an initial
 /// "borrow" introducing value. If at any point, we find two introducers or we
 /// find a point in the chain we do not understand, we bail and return false. If
 /// we are able to understand all of the def-use graph and only find a single
 /// introducer, then we return a .some(BorrowScopeIntroducingValue).
-Optional<BorrowScopeIntroducingValue>
-getSingleBorrowIntroducingValue(SILValue inputValue);
+Optional<BorrowedValue> getSingleBorrowIntroducingValue(SILValue inputValue);
 
 struct InteriorPointerOperandKind {
   enum Kind : uint8_t {
@@ -441,7 +438,7 @@ struct InteriorPointerOperand {
   /// projection. Returns true if we were able to find all borrow introducing
   /// values.
   bool visitBaseValueScopeEndingUses(function_ref<void(Operand *)> func) const {
-    SmallVector<BorrowScopeIntroducingValue, 4> introducers;
+    SmallVector<BorrowedValue, 4> introducers;
     if (!getAllBorrowIntroducingValues(operand->get(), introducers))
       return false;
     for (const auto &introducer : introducers) {
