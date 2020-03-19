@@ -51,3 +51,25 @@ SR11540(action: { return }) // Ok SR11540<R>(action: () -> R) was the selected o
 
 // In case that's the only possible overload, it's acceptable
 SR11540_1(action: { return }) // OK
+
+// SR-8563
+func SR8563<A,Z>(_ f: @escaping (A) -> Z) -> (A) -> Z {
+    return f
+}
+
+func SR8563<A,B,Z>(_ f: @escaping (A, B) -> Z) -> (A, B) -> Z {
+    return f
+}
+
+let aa = SR8563 { (a: Int) in }
+let bb = SR8563 { (a1: Int, a2: String) in } // expected-note {{'bb' declared here}}
+
+aa(1) // Ok
+bb(1, "2") // Ok
+bb(1) // expected-error {{missing argument for parameter #2 in call}}
+
+// Tuple
+let cc = SR8563 { (_: (Int)) in }
+
+cc((1)) // Ok
+cc(1) // Ok
