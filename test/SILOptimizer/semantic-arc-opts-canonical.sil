@@ -348,7 +348,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObje
 sil [ossa] @switch_enum_test_no_default : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : @guaranteed $FakeOptional<Builtin.NativeObject>):
   %1 = copy_value %0 : $FakeOptional<Builtin.NativeObject>
-  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
@@ -368,7 +368,7 @@ bb3:
 sil [ossa] @switch_enum_test_with_default : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : @guaranteed $FakeOptional<Builtin.NativeObject>):
   %1 = copy_value %0 : $FakeOptional<Builtin.NativeObject>
-  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, default bb2
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
@@ -403,7 +403,7 @@ bb0(%0 : @guaranteed $(Klass, MyInt)):
 // CHECK: } // end sil function 'handle_phi_address_nodes'
 sil [ossa] @handle_phi_address_nodes : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt.1, %0 : $Klass
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   %2 = copy_value %1 : $FakeOptional<Klass>
   %3 = copy_value %1 : $FakeOptional<Klass>
 
@@ -443,7 +443,7 @@ bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
   %0a = alloc_stack $FakeOptional<Builtin.NativeObject>
   store %0 to [init] %0a : $*FakeOptional<Builtin.NativeObject>
   %1 = load [copy] %0a : $*FakeOptional<Builtin.NativeObject>
-  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
@@ -469,7 +469,7 @@ bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
   %0a = alloc_stack $FakeOptional<Builtin.NativeObject>
   store %0 to [init] %0a : $*FakeOptional<Builtin.NativeObject>
   %1 = load [copy] %0a : $*FakeOptional<Builtin.NativeObject>
-  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, default bb2
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject

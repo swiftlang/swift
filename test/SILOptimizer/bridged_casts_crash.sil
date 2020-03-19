@@ -27,7 +27,7 @@ bb0(%0 : $NSObject):
   %73 = alloc_stack $NSObject
   store %0 to %73 : $*NSObject
   %75 = alloc_stack $Optional<TestBridgedKeyTy>
-  %76 = init_enum_data_addr %75 : $*Optional<TestBridgedKeyTy>, #Optional.some!enumelt.1
+  %76 = init_enum_data_addr %75 : $*Optional<TestBridgedKeyTy>, #Optional.some!enumelt
   %77 = load %73 : $*NSObject
   checked_cast_addr_br take_always NSObject in %73 : $*NSObject to TestBridgedKeyTy in %76 : $*TestBridgedKeyTy, bb1, bb2
 

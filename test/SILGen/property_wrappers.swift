@@ -66,7 +66,7 @@ func forceHasMemberwiseInit() {
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_y33_{{.*}}23WrapperWithInitialValueVyxGvpfi : $@convention(thin) <T where T : DefaultInit> () -> @out 
 // CHECK: bb0(%0 : $*T):
 // CHECK-NOT: return
-// CHECK: witness_method $T, #DefaultInit.init!allocator.1 : <Self where Self : DefaultInit> (Self.Type) -> () -> Self : $@convention(witness_method: DefaultInit) <τ_0_0 where τ_0_0 : DefaultInit> (@thick τ_0_0.Type) -> @out τ_0_0
+// CHECK: witness_method $T, #DefaultInit.init!allocator : <Self where Self : DefaultInit> (Self.Type) -> () -> Self : $@convention(witness_method: DefaultInit) <τ_0_0 where τ_0_0 : DefaultInit> (@thick τ_0_0.Type) -> @out τ_0_0
 
 // variable initialization expression of HasMemberwiseInit._z
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_z33_{{.*}}23WrapperWithInitialValueVySiGvpfi : $@convention(thin) <T where T : DefaultInit> () -> WrapperWithInitialValue<Int> {
@@ -511,7 +511,7 @@ open class TestMyWrapper {
 // rdar://problem/54352235 - crash due to reference to private backing var
 extension UsesMyPublished {
   // CHECK-LABEL: sil hidden [ossa] @$s21property_wrapper_defs15UsesMyPublishedC0A9_wrappersE6setFooyySiF : $@convention(method) (Int, @guaranteed UsesMyPublished) -> ()
-  // CHECK: class_method %1 : $UsesMyPublished, #UsesMyPublished.foo!setter.1
+  // CHECK: class_method %1 : $UsesMyPublished, #UsesMyPublished.foo!setter
   // CHECK-NOT: assign_by_wrapper
   // CHECK: return
   func setFoo(_ x: Int) {
@@ -586,12 +586,12 @@ struct HasStaticWrapper {
 }
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
-// CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
-// CHECK-NEXT:  #ClassUsingWrapper.x!setter.1: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter
-// CHECK-NEXT:  #ClassUsingWrapper.x!modify.1: (ClassUsingWrapper) -> () -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivM    // ClassUsingWrapper.x.modify
-// CHECK-NEXT:  #ClassUsingWrapper.init!allocator.1: (ClassUsingWrapper.Type) -> () -> ClassUsingWrapper : @$s17property_wrappers17ClassUsingWrapperCACycfC
-// CHECK-NEXT: #ClassUsingWrapper.deinit!deallocator.1: @$s17property_wrappers17ClassUsingWrapperCfD
+// CHECK-NEXT:  #ClassUsingWrapper.x!getter: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
+// CHECK-NEXT:  #ClassUsingWrapper.x!setter: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter
+// CHECK-NEXT:  #ClassUsingWrapper.x!modify: (ClassUsingWrapper) -> () -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivM    // ClassUsingWrapper.x.modify
+// CHECK-NEXT:  #ClassUsingWrapper.init!allocator: (ClassUsingWrapper.Type) -> () -> ClassUsingWrapper : @$s17property_wrappers17ClassUsingWrapperCACycfC
+// CHECK-NEXT: #ClassUsingWrapper.deinit!deallocator: @$s17property_wrappers17ClassUsingWrapperCfD
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_vtable [serialized] TestMyWrapper
-// CHECK: #TestMyWrapper.$useMyWrapper!getter.1
+// CHECK: #TestMyWrapper.$useMyWrapper!getter

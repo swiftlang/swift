@@ -1109,7 +1109,7 @@ swift::tryDevirtualizeApply(ApplySite applySite, ClassHierarchyAnalysis *cha,
 
   // Devirtualize apply instructions that call witness_method instructions:
   //
-  //   %8 = witness_method $Optional<UInt16>, #LogicValue.boolValue!getter.1
+  //   %8 = witness_method $Optional<UInt16>, #LogicValue.boolValue!getter
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
   if (isa<WitnessMethodInst>(applySite.getCallee()))
@@ -1125,7 +1125,7 @@ swift::tryDevirtualizeApply(ApplySite applySite, ClassHierarchyAnalysis *cha,
   ///
   /// \code
   /// %XX = alloc_ref $Foo
-  /// %YY = class_method %XX : $Foo, #Foo.get!1 : $@convention(method)...
+  /// %YY = class_method %XX : $Foo, #Foo.get : $@convention(method)...
   /// \endcode
   ///
   ///  or
@@ -1174,7 +1174,7 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
 
   // Devirtualize apply instructions that call witness_method instructions:
   //
-  //   %8 = witness_method $Optional<UInt16>, #LogicValue.boolValue!getter.1
+  //   %8 = witness_method $Optional<UInt16>, #LogicValue.boolValue!getter
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
   if (isa<WitnessMethodInst>(applySite.getCallee()))
@@ -1185,7 +1185,7 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
   ///
   /// \code
   /// %XX = alloc_ref $Foo
-  /// %YY = class_method %XX : $Foo, #Foo.get!1 : $@convention(method)...
+  /// %YY = class_method %XX : $Foo, #Foo.get : $@convention(method)...
   /// \endcode
   ///
   ///  or

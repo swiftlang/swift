@@ -25,7 +25,7 @@ import gizmo
 
 sil @test : $@convention(thin) (@owned Optional<Int>) -> () {
 bb0(%0 : $Optional<Int>):
-  switch_enum %0 : $Optional<Int>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+  switch_enum %0 : $Optional<Int>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
 
 bb1:
   %1 = alloc_ref [objc] $Gizmo
@@ -36,7 +36,7 @@ bb2:
   br bb3(%2 : $Gizmo)
 
 bb3(%3 : $Gizmo):
-  %4 = objc_method %3 : $Gizmo, #Gizmo.frob!1.foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> ()
+  %4 = objc_method %3 : $Gizmo, #Gizmo.frob!foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> ()
   %5 = apply %4(%3) : $@convention(objc_method) (Gizmo) -> ()
   %6 = tuple ()
   return %6 : $()
@@ -58,7 +58,7 @@ bb3(%3 : $Gizmo):
 sil @class_test : $@convention(thin) (@owned Optional<Int>, @thick Gizmo.Type) -> () {
 bb0(%0 : $Optional<Int>, %1:  $@thick Gizmo.Type):
   %4 = thick_to_objc_metatype %1 : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  switch_enum %0 : $Optional<Int>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+  switch_enum %0 : $Optional<Int>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
 
 bb1:
   %5 = alloc_ref_dynamic [objc] %4 : $@objc_metatype Gizmo.Type, $Gizmo

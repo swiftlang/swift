@@ -92,7 +92,7 @@ class C1 {
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK:   [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
 
-    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_META]] : $@thick C1.Type, #C1.init!allocator.1
+    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_META]] : $@thick C1.Type, #C1.init!allocator
     // CHECK:   [[SELFP:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_META]])
     // CHECK:   assign [[SELFP]] to [[PB]]
     // CHECK:   [[SELFP:%[0-9]+]] = load [copy] [[PB]] : $*C1
@@ -113,7 +113,7 @@ class C1 {
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var C2 }
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK:   [[PB_SELF:%.*]] = project_box [[MARKED_SELF_BOX]]
-    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_META]] : $@thick C2.Type, #C2.init!allocator.1
+    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_META]] : $@thick C2.Type, #C2.init!allocator
     // CHECK:   [[REPLACE_SELF:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_META]])
     // CHECK:   assign [[REPLACE_SELF]] to [[PB_SELF]] : $*C2
     // CHECK:   [[VAR_15:%[0-9]+]] = load [copy] [[PB_SELF]] : $*C2
@@ -137,7 +137,7 @@ class C3 {
   convenience init() {
     // CHECK: mark_uninitialized [delegatingself]
     // CHECK-NOT: integer_literal
-    // CHECK: class_method [[SELF:%[0-9]+]] : $@thick C3.Type, #C3.init!allocator.1
+    // CHECK: class_method [[SELF:%[0-9]+]] : $@thick C3.Type, #C3.init!allocator
     // CHECK-NOT: integer_literal
     // CHECK: return
     self.init(x: x)

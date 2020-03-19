@@ -24,10 +24,10 @@ bb0(%0 : $*ConformingAssoc):
 }
 
 // CHECK-LABEL: sil_witness_table [serialized] ConformingAssoc: AssocReqt module witness_tables {
-// CHECK: #AssocReqt.requiredMethod!1: {{.*}} : @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
+// CHECK: #AssocReqt.requiredMethod: {{.*}} : @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
 // CHECK: }
 sil_witness_table [serialized] ConformingAssoc: AssocReqt module witness_tables {
-  method #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
+  method #AssocReqt.requiredMethod: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
 }
 
 protocol AnyProtocol {
@@ -82,9 +82,9 @@ class DeadMethodClass : Proto {
 }
 
 // CHECK-LABEL: sil_witness_table [serialized] DeadMethodClass: Proto module witness_tables
-// CHECK: method #Proto.abc!1: {{.*}} : nil
+// CHECK: method #Proto.abc: {{.*}} : nil
 // CHECK: }
 sil_witness_table [serialized] DeadMethodClass: Proto module witness_tables {
-  method #Proto.abc!1: nil
+  method #Proto.abc: nil
 }
 

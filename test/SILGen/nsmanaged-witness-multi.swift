@@ -23,6 +23,6 @@ extension Fish : FishProtocol {}
 // CHECK: return
 
 // CHECK-LABEL: sil shared [serialized] [ossa] @$s4main4FishC4nameSSvM : $@yield_once @convention(method) (@guaranteed Fish) -> @yields @inout String
-// CHECK: objc_method %0 : $Fish, #Fish.name!getter.1.foreign
-// CHECK: objc_method %0 : $Fish, #Fish.name!setter.1.foreign
+// CHECK: objc_method %0 : $Fish, #Fish.name!getter.foreign
+// CHECK: objc_method %0 : $Fish, #Fish.name!setter.foreign
 // CHECK: unwind

@@ -1570,7 +1570,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   }
 
   // Produce a reference to the C-compatible entry point for the function.
-  SILDeclRef constant(loc, /*curried*/ false, /*foreign*/ true);
+  SILDeclRef constant(loc, /*foreign*/ true);
   SILConstantInfo constantInfo =
       SGF.getConstantInfo(SGF.getTypeExpansionContext(), constant);
 

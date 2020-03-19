@@ -37,7 +37,7 @@ class B : A, Barrable {}
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21witnesses_inheritance1BCAA8BarrableA2aDP3bar{{[_0-9a-zA-Z]*}}FTW
 // CHECK:         [[B:%.*]] = load_borrow {{%.*}} : $*B
 // CHECK-NEXT:    [[A:%.*]] = upcast [[B]] : $B to $A
-// CHECK-NEXT:    [[METH:%.*]] = class_method [[A]] : $A, #A.bar!1
+// CHECK-NEXT:    [[METH:%.*]] = class_method [[A]] : $A, #A.bar :
 // CHECK-NEXT:    apply [[METH]]([[A]]) : $@convention(method) (@guaranteed A) -> ()
 // CHECK:         end_borrow [[B]]
 

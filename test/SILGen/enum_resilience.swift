@@ -13,7 +13,7 @@ import resilient_enum
 // CHECK:         [[BOX:%.*]] = alloc_stack $Medium
 // CHECK-NEXT:    copy_addr %0 to [initialization] [[BOX]]
 // CHECK-NEXT:    [[METATYPE:%.+]] = value_metatype $@thick Medium.Type, [[BOX]] : $*Medium
-// CHECK-NEXT:    switch_enum_addr [[BOX]] : $*Medium, case #Medium.Paper!enumelt: bb1, case #Medium.Canvas!enumelt: bb2, case #Medium.Pamphlet!enumelt.1: bb3, case #Medium.Postcard!enumelt.1: bb4, default bb5
+// CHECK-NEXT:    switch_enum_addr [[BOX]] : $*Medium, case #Medium.Paper!enumelt: bb1, case #Medium.Canvas!enumelt: bb2, case #Medium.Pamphlet!enumelt: bb3, case #Medium.Postcard!enumelt: bb4, default bb5
 // CHECK:       bb1:
 // CHECK-NEXT:    dealloc_stack [[BOX]]
 // CHECK-NEXT:    br bb6
@@ -85,7 +85,7 @@ func resilientSwitchUnknownCase(_ m: Medium) -> Int32 {
 
 // CHECK-LABEL: sil hidden [ossa] @$s15enum_resilience36resilientSwitchUnknownCaseExhaustiveys5Int32V0c1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> Int32 {
 func resilientSwitchUnknownCaseExhaustive(_ m: Medium) -> Int32 {
-  // CHECK: switch_enum_addr %2 : $*Medium, case #Medium.Paper!enumelt: [[PAPER:[^ ]+]], case #Medium.Canvas!enumelt: [[CANVAS:[^ ]+]], case #Medium.Pamphlet!enumelt.1: [[PAMPHLET:[^ ]+]], case #Medium.Postcard!enumelt.1: [[POSTCARD:[^ ]+]], default [[DEFAULT:[^ ]+]]
+  // CHECK: switch_enum_addr %2 : $*Medium, case #Medium.Paper!enumelt: [[PAPER:[^ ]+]], case #Medium.Canvas!enumelt: [[CANVAS:[^ ]+]], case #Medium.Pamphlet!enumelt: [[PAMPHLET:[^ ]+]], case #Medium.Postcard!enumelt: [[POSTCARD:[^ ]+]], default [[DEFAULT:[^ ]+]]
   switch m {
   // CHECK: [[PAPER]]:
   // CHECK: integer_literal $Builtin.IntLiteral, 0
@@ -152,7 +152,7 @@ public enum MoreHorses {
   // CHECK:       [[INT_METATYPE:%.*]] = metatype $@thin Int.Type
   // CHECK:       [[INT_CTOR:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
   // CHECK:       [[PAYLOAD:%.*]] = apply [[INT_CTOR]]([[BUILTIN_INT]], [[INT_METATYPE]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-  // CHECK:       [[NEW_SELF:%.*]] = enum $MoreHorses, #MoreHorses.marshall!enumelt.1, [[PAYLOAD]] : $Int
+  // CHECK:       [[NEW_SELF:%.*]] = enum $MoreHorses, #MoreHorses.marshall!enumelt, [[PAYLOAD]] : $Int
   // CHECK:       [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF_ADDR]] : $*MoreHorses
   // CHECK:       assign [[NEW_SELF]] to [[ACCESS]] : $*MoreHorses
   // CHECK:       end_access [[ACCESS]] : $*MoreHorses

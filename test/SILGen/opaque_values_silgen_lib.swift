@@ -32,7 +32,7 @@ func s010______PAndS_cases() {
 // CHECK:   [[COPY0:%.*]] = copy_value [[ARG0]]
 // CHECK:   [[COPY1:%.*]] = copy_value [[ARG1]]
 // CHECK:   [[RTUPLE:%.*]] = tuple ([[COPY0]] : $EmptyP, [[COPY1]] : $String)
-// CHECK:   [[RETVAL:%.*]] = enum $PAndSEnum, #PAndSEnum.A!enumelt.1, [[RTUPLE]] : $(EmptyP, String)
+// CHECK:   [[RETVAL:%.*]] = enum $PAndSEnum, #PAndSEnum.A!enumelt, [[RTUPLE]] : $(EmptyP, String)
 // CHECK:   return [[RETVAL]] : $PAndSEnum
 // CHECK-LABEL: } // end sil function '$ss21s010______PAndS_casesyyFs0B5SEnumOs6EmptyP_p_SStcACmcfu_ACsAD_p_SStcfu0_'
 enum PAndSEnum { case A(EmptyP, String) }

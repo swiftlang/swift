@@ -12,10 +12,10 @@ public class Foo {
 // CHECK-LABEL: sil hidden [ossa] @$s15argument_labels7testFoo{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Foo,
 func testFoo(foo: Foo, x: X, y: Y) {
-  // CHECK: class_method [[ARG0]] : $Foo, #Foo.doSomething!1 : (Foo) -> (X, Y) -> ()
+  // CHECK: class_method [[ARG0]] : $Foo, #Foo.doSomething : (Foo) -> (X, Y) -> ()
   foo.doSomething(x: x, y: y)
 
-  // CHECK: class_method [[ARG0]] : $Foo, #Foo.doSomethingElse!1 : (Foo) -> (X) -> ()
+  // CHECK: class_method [[ARG0]] : $Foo, #Foo.doSomethingElse : (Foo) -> (X) -> ()
   foo.doSomethingElse(x: x)
 }
 

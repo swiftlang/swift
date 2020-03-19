@@ -26,17 +26,17 @@ bb0(%0 : $RC):
 sil private [transparent] [thunk] @$s6test0_2RCCAA2RPA2aDP8getThress5Int32VyFTW : $@convention(witness_method: RP) (@in_guaranteed RC) -> Int32 {
 bb0(%0 : $*RC):
   %1 = load %0 : $*RC
-  %2 = class_method %1 : $RC, #RC.getThres!1 : (RC) -> () -> Int32, $@convention(method) (@guaranteed RC) -> Int32
+  %2 = class_method %1 : $RC, #RC.getThres : (RC) -> () -> Int32, $@convention(method) (@guaranteed RC) -> Int32
   %3 = apply %2(%1) : $@convention(method) (@guaranteed RC) -> Int32
   return %3 : $Int32
 }
 
 sil_vtable RC {
-  #RC.getThres!1: (RC) -> () -> Int32 : @$s6test0_2RCC8getThress5Int32VyF
+  #RC.getThres: (RC) -> () -> Int32 : @$s6test0_2RCC8getThress5Int32VyF
 }
 
 sil_witness_table hidden RC: RP module simple {
-  method #RP.getThres!1: <Self where Self : RP> (Self) -> () -> Int32 : @$s6test0_2RCCAA2RPA2aDP8getThress5Int32VyFTW
+  method #RP.getThres: <Self where Self : RP> (Self) -> () -> Int32 : @$s6test0_2RCCAA2RPA2aDP8getThress5Int32VyFTW
 }
 
 // Note: The function_ref of "function_ref @$s6test0_4find5count4Obj1Sbs5Int32V_AA2RP_ptFTf4ne_n4main2RCC_Tg5 : $@convention(thin) (Int32, @guaranteed RC) -> Bool" in the transformed code was originally a "function_ref @$s6test0_4find5count4Obj1Sbs5Int32V_AA2RP_ptF : $@convention(thin) (Int32, @in_guaranteed RP) -> Bool" taking an existential parameter and has been generic specialized after existential specialization.
@@ -73,7 +73,7 @@ bb0:
   return %10 : $Bool                              
 }
 
-// Note 1: The function_ref of "function_ref @$s6test0_2RCC8getThress5Int32VyF : $@convention(method) (@guaranteed RC) -> Int32" in the transformed code was originally a witness method "witness_method $@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP, #RP.getThres!1 : <Self where Self : RP> (Self) -> () -> Int32, %4 : $*@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP : $@convention(witness_method: RP) <τ_0_0 where τ_0_0 : RP> (@in_guaranteed τ_0_0) -> Int32" and has been devirtualized after existential specialization.
+// Note 1: The function_ref of "function_ref @$s6test0_2RCC8getThress5Int32VyF : $@convention(method) (@guaranteed RC) -> Int32" in the transformed code was originally a witness method "witness_method $@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP, #RP.getThres : <Self where Self : RP> (Self) -> () -> Int32, %4 : $*@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP : $@convention(witness_method: RP) <τ_0_0 where τ_0_0 : RP> (@in_guaranteed τ_0_0) -> Int32" and has been devirtualized after existential specialization.
 // Note 2: The function_ref of "function_ref @$s6test0_4find5count4Obj1Sbs5Int32V_AA2RP_ptFTf4ne_n4main2RCC_Tg5 : $@convention(thin) (Int32, @guaranteed RC) -> Bool" in the transformed code was originally a "function_ref @$s6test0_4find5count4Obj1Sbs5Int32V_AA2RP_ptF : $@convention(thin) (Int32, @in_guaranteed RP) -> Bool" taking an existential parameter and has been generic specialized after existential specialization.
 // CHECK-LABEL: sil shared [noinline] @$s6test0_4find5count4Obj1Sbs5Int32V_AA2RP_ptFTf4ne_n4main2RCC_Tg5 : $@convention(thin) (Int32, @guaranteed RC) -> Bool {
 // CHECK: bb0
@@ -113,7 +113,7 @@ bb0:
 sil hidden [noinline] @$s6test0_4find5count4Obj1Sbs5Int32V_AA2RP_ptF : $@convention(thin) (Int32, @in_guaranteed RP) -> Bool {
 bb0(%0 : $Int32, %1 : $*RP):
   %4 = open_existential_addr immutable_access %1 : $*RP to $*@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP 
-  %5 = witness_method $@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP, #RP.getThres!1 : <Self where Self : RP> (Self) -> () -> Int32, %4 : $*@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP : $@convention(witness_method: RP) <τ_0_0 where τ_0_0 : RP> (@in_guaranteed τ_0_0) -> Int32 
+  %5 = witness_method $@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP, #RP.getThres : <Self where Self : RP> (Self) -> () -> Int32, %4 : $*@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP : $@convention(witness_method: RP) <τ_0_0 where τ_0_0 : RP> (@in_guaranteed τ_0_0) -> Int32 
   %6 = apply %5<@opened("7AE0C0CA-28D3-11E9-B1D4-F21898973DF0") RP>(%4) : $@convention(witness_method: RP) <τ_0_0 where τ_0_0 : RP> (@in_guaranteed τ_0_0) -> Int32 
   %7 = struct_extract %0 : $Int32, #Int32._value  
   %8 = struct_extract %6 : $Int32, #Int32._value  
@@ -439,7 +439,7 @@ bb0(%0 : $ClassA<T> & ProtocolA):
   %2 = open_existential_ref %0 : $ClassA<T> & ProtocolA to $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
   %3 = alloc_stack $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
   store %2 to %3 : $*@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
-  %5 = witness_method $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA, #ProtocolA.foo!1 : <Self where Self : ProtocolA> (Self) -> () -> Int, %2 : $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA : $@convention(witness_method: ProtocolA) <τ_0_0 where τ_0_0 : ProtocolA> (@in_guaranteed τ_0_0) -> Int
+  %5 = witness_method $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA, #ProtocolA.foo : <Self where Self : ProtocolA> (Self) -> () -> Int, %2 : $@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA : $@convention(witness_method: ProtocolA) <τ_0_0 where τ_0_0 : ProtocolA> (@in_guaranteed τ_0_0) -> Int
   %6 = apply %5<@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA>(%3) : $@convention(witness_method: ProtocolA) <τ_0_0 where τ_0_0 : ProtocolA> (@in_guaranteed τ_0_0) -> Int
   dealloc_stack %3 : $*@opened("92C29DA8-5479-11EA-8668-ACDE48001122") ClassA<T> & ProtocolA
   return %6 : $Int
