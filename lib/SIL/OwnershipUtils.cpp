@@ -144,7 +144,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-void BorrowScopeOperand::print(llvm::raw_ostream &os) const {
+void BorrowingOperand::print(llvm::raw_ostream &os) const {
   os << "BorrowScopeOperand:\n"
         "Kind: " << kind << "\n"
         "Value: " << op->get()
@@ -152,12 +152,12 @@ void BorrowScopeOperand::print(llvm::raw_ostream &os) const {
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     const BorrowScopeOperand &operand) {
+                                     const BorrowingOperand &operand) {
   operand.print(os);
   return os;
 }
 
-void BorrowScopeOperand::visitEndScopeInstructions(
+void BorrowingOperand::visitEndScopeInstructions(
     function_ref<void(Operand *)> func) const {
   switch (kind) {
   case BorrowScopeOperandKind::BeginBorrow:
@@ -189,21 +189,20 @@ void BorrowScopeOperand::visitEndScopeInstructions(
   llvm_unreachable("Covered switch isn't covered");
 }
 
-void BorrowScopeOperand::visitBorrowIntroducingUserResults(
-    function_ref<void(BorrowScopeIntroducingValue)> visitor) {
+void BorrowingOperand::visitBorrowIntroducingUserResults(
+    function_ref<void(BorrowedValue)> visitor) {
   switch (kind) {
   case BorrowScopeOperandKind::BeginApply:
     llvm_unreachable("Never has borrow introducer results!");
   case BorrowScopeOperandKind::BeginBorrow: {
-    auto value =
-        *BorrowScopeIntroducingValue::get(cast<BeginBorrowInst>(op->getUser()));
+    auto value = *BorrowedValue::get(cast<BeginBorrowInst>(op->getUser()));
     return visitor(value);
   }
   case BorrowScopeOperandKind::Branch: {
     auto *bi = cast<BranchInst>(op->getUser());
     for (auto *succBlock : bi->getSuccessorBlocks()) {
-      auto value = *BorrowScopeIntroducingValue::get(
-          succBlock->getArgument(op->getOperandNumber()));
+      auto value =
+          *BorrowedValue::get(succBlock->getArgument(op->getOperandNumber()));
       visitor(value);
     }
     return;
@@ -212,11 +211,11 @@ void BorrowScopeOperand::visitBorrowIntroducingUserResults(
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowScopeOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
+void BorrowingOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
     function_ref<void(Operand *)> func) {
   // First visit all of the results of our user that are borrow introducing
   // values.
-  visitBorrowIntroducingUserResults([&](BorrowScopeIntroducingValue value) {
+  visitBorrowIntroducingUserResults([&](BorrowedValue value) {
     // Visit the scope ending instructions of this value. If any of them are
     // consuming borrow scope operands, visit the consuming uses of the
     // results or successor arguments.
@@ -224,7 +223,7 @@ void BorrowScopeOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
     // This enables one to walk the def-use chain of guaranteed phis for a
     // single guaranteed scope.
     value.visitLocalScopeEndingUses([&](Operand *valueUser) {
-      if (auto subBorrowScopeOp = BorrowScopeOperand::get(valueUser)) {
+      if (auto subBorrowScopeOp = BorrowingOperand::get(valueUser)) {
         if (subBorrowScopeOp->consumesGuaranteedValues()) {
           subBorrowScopeOp->visitUserResultConsumingUses(func);
           return;
@@ -238,7 +237,7 @@ void BorrowScopeOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
   });
 }
 
-void BorrowScopeOperand::visitUserResultConsumingUses(
+void BorrowingOperand::visitUserResultConsumingUses(
     function_ref<void(Operand *)> visitor) {
   auto *ti = dyn_cast<TermInst>(op->getUser());
   if (!ti) {
@@ -266,40 +265,40 @@ void BorrowScopeOperand::visitUserResultConsumingUses(
 //                             Borrow Introducers
 //===----------------------------------------------------------------------===//
 
-void BorrowScopeIntroducingValueKind::print(llvm::raw_ostream &os) const {
+void BorrowedValueKind::print(llvm::raw_ostream &os) const {
   switch (value) {
-  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
+  case BorrowedValueKind::SILFunctionArgument:
     os << "SILFunctionArgument";
     return;
-  case BorrowScopeIntroducingValueKind::BeginBorrow:
+  case BorrowedValueKind::BeginBorrow:
     os << "BeginBorrowInst";
     return;
-  case BorrowScopeIntroducingValueKind::LoadBorrow:
+  case BorrowedValueKind::LoadBorrow:
     os << "LoadBorrowInst";
     return;
-  case BorrowScopeIntroducingValueKind::Phi:
+  case BorrowedValueKind::Phi:
     os << "Phi";
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowScopeIntroducingValue::print(llvm::raw_ostream &os) const {
+void BorrowedValue::print(llvm::raw_ostream &os) const {
   os << "BorrowScopeIntroducingValue:\n"
     "Kind: " << kind << "\n"
     "Value: " << value;
 }
 
-void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
+void BorrowedValue::getLocalScopeEndingInstructions(
     SmallVectorImpl<SILInstruction *> &scopeEndingInsts) const {
   assert(isLocalScope() && "Should only call this given a local scope");
 
   switch (kind) {
-  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
+  case BorrowedValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
-  case BorrowScopeIntroducingValueKind::BeginBorrow:
-  case BorrowScopeIntroducingValueKind::LoadBorrow:
-  case BorrowScopeIntroducingValueKind::Phi:
+  case BorrowedValueKind::BeginBorrow:
+  case BorrowedValueKind::LoadBorrow:
+  case BorrowedValueKind::Phi:
     for (auto *use : value->getUses()) {
       if (use->isConsumingUse()) {
 	scopeEndingInsts.push_back(use->getUser());
@@ -310,15 +309,15 @@ void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowScopeIntroducingValue::visitLocalScopeEndingUses(
+void BorrowedValue::visitLocalScopeEndingUses(
     function_ref<void(Operand *)> visitor) const {
   assert(isLocalScope() && "Should only call this given a local scope");
   switch (kind) {
-  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
+  case BorrowedValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
-  case BorrowScopeIntroducingValueKind::LoadBorrow:
-  case BorrowScopeIntroducingValueKind::BeginBorrow:
-  case BorrowScopeIntroducingValueKind::Phi:
+  case BorrowedValueKind::LoadBorrow:
+  case BorrowedValueKind::BeginBorrow:
+  case BorrowedValueKind::Phi:
     for (auto *use : value->getUses()) {
       if (use->isConsumingUse()) {
         visitor(use);
@@ -330,18 +329,18 @@ void BorrowScopeIntroducingValue::visitLocalScopeEndingUses(
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     BorrowScopeIntroducingValueKind kind) {
+                                     BorrowedValueKind kind) {
   kind.print(os);
   return os;
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     const BorrowScopeIntroducingValue &value) {
+                                     const BorrowedValue &value) {
   value.print(os);
   return os;
 }
 
-bool BorrowScopeIntroducingValue::areUsesWithinScope(
+bool BorrowedValue::areUsesWithinScope(
     ArrayRef<Operand *> uses, SmallVectorImpl<Operand *> &scratchSpace,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
     DeadEndBlocks &deadEndBlocks) const {
@@ -368,7 +367,7 @@ bool BorrowScopeIntroducingValue::areUsesWithinScope(
   return checker.validateLifetime(value, scratchSpace, uses);
 }
 
-bool BorrowScopeIntroducingValue::visitLocalScopeTransitiveEndingUses(
+bool BorrowedValue::visitLocalScopeTransitiveEndingUses(
     function_ref<void(Operand *)> visitor) const {
   assert(isLocalScope());
 
@@ -388,7 +387,7 @@ bool BorrowScopeIntroducingValue::visitLocalScopeTransitiveEndingUses(
 
     // See if we have a borrow scope operand. If we do not, then we know we are
     // a final consumer of our borrow scope introducer. Visit it and continue.
-    auto scopeOperand = BorrowScopeOperand::get(op);
+    auto scopeOperand = BorrowingOperand::get(op);
     if (!scopeOperand) {
       visitor(op);
       continue;
@@ -410,7 +409,7 @@ bool BorrowScopeIntroducingValue::visitLocalScopeTransitiveEndingUses(
   return foundError;
 }
 
-bool BorrowScopeIntroducingValue::visitInteriorPointerOperands(
+bool BorrowedValue::visitInteriorPointerOperands(
     function_ref<void(const InteriorPointerOperand &)> func) const {
   SmallVector<Operand *, 32> worklist(value->getUses());
   while (!worklist.empty()) {
@@ -502,8 +501,8 @@ void OwnedValueIntroducerKind::print(llvm::raw_ostream &os) const {
 //                       Introducer Searching Routines
 //===----------------------------------------------------------------------===//
 
-bool swift::getAllBorrowIntroducingValues(
-    SILValue inputValue, SmallVectorImpl<BorrowScopeIntroducingValue> &out) {
+bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
+                                          SmallVectorImpl<BorrowedValue> &out) {
   if (inputValue.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
     return false;
 
@@ -514,7 +513,7 @@ bool swift::getAllBorrowIntroducingValues(
     SILValue value = worklist.pop_back_val();
 
     // First check if v is an introducer. If so, stash it and continue.
-    if (auto scopeIntroducer = BorrowScopeIntroducingValue::get(value)) {
+    if (auto scopeIntroducer = BorrowedValue::get(value)) {
       out.push_back(*scopeIntroducer);
       continue;
     }
@@ -554,7 +553,7 @@ bool swift::getAllBorrowIntroducingValues(
   return true;
 }
 
-Optional<BorrowScopeIntroducingValue>
+Optional<BorrowedValue>
 swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
   if (inputValue.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
     return None;
@@ -563,7 +562,7 @@ swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
   while (true) {
     // First check if our initial value is an introducer. If we have one, just
     // return it.
-    if (auto scopeIntroducer = BorrowScopeIntroducingValue::get(currentValue)) {
+    if (auto scopeIntroducer = BorrowedValue::get(currentValue)) {
       return scopeIntroducer;
     }
 
