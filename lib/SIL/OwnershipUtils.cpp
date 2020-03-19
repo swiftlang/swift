@@ -190,7 +190,7 @@ void BorrowingOperand::visitEndScopeInstructions(
 }
 
 void BorrowingOperand::visitBorrowIntroducingUserResults(
-    function_ref<void(BorrowedValue)> visitor) {
+    function_ref<void(BorrowedValue)> visitor) const {
   switch (kind) {
   case BorrowScopeOperandKind::BeginApply:
     llvm_unreachable("Never has borrow introducer results!");
@@ -212,7 +212,7 @@ void BorrowingOperand::visitBorrowIntroducingUserResults(
 }
 
 void BorrowingOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
-    function_ref<void(Operand *)> func) {
+    function_ref<void(Operand *)> func) const {
   // First visit all of the results of our user that are borrow introducing
   // values.
   visitBorrowIntroducingUserResults([&](BorrowedValue value) {
@@ -238,7 +238,7 @@ void BorrowingOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
 }
 
 void BorrowingOperand::visitUserResultConsumingUses(
-    function_ref<void(Operand *)> visitor) {
+    function_ref<void(Operand *)> visitor) const {
   auto *ti = dyn_cast<TermInst>(op->getUser());
   if (!ti) {
     for (SILValue result : op->getUser()->getResults()) {
