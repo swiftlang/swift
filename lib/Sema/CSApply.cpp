@@ -483,10 +483,6 @@ namespace {
 
         // Handle operator requirements found in protocols.
         if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
-          bool isCurried = shouldBuildCurryThunk(choice,
-                                                 /*baseIsInstance=*/false,
-                                                 /*extraUncurryLevel=*/false);
-
           // If we have a concrete conformance, build a call to the witness.
           //
           // FIXME: This is awful. We should be able to handle this as a call to
@@ -498,53 +494,49 @@ namespace {
                       ConformanceCheckFlags::InExpression);
           if (conformance.isConcrete()) {
             if (auto witness = conformance.getConcrete()->getWitnessDecl(decl)) {
-              bool isMemberOperator = witness->getDeclContext()->isTypeContext();
+              // The fullType was computed by substituting the protocol
+              // requirement so it always has a (Self) -> ... curried
+              // application. Strip it off if the witness was a top-level
+              // function.
+              Type refType;
+              if (witness->getDeclContext()->isTypeContext())
+                refType = fullType;
+              else
+                refType = fullType->castTo<AnyFunctionType>()->getResult();
 
-              if (!isMemberOperator || !isCurried) {
-                // The fullType was computed by substituting the protocol
-                // requirement so it always has a (Self) -> ... curried
-                // application. Strip it off if the witness was a top-level
-                // function.
-                Type refType;
-                if (isMemberOperator)
-                  refType = fullType;
-                else
-                  refType = fullType->castTo<AnyFunctionType>()->getResult();
+              // Build the AST for the call to the witness.
+              auto subMap = getOperatorSubstitutions(witness, refType);
+              if (subMap) {
+                ConcreteDeclRef witnessRef(witness, *subMap);
+                auto declRefExpr =  new (ctx) DeclRefExpr(witnessRef, loc,
+                                                          /*Implicit=*/false);
+                declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
+                cs.setType(declRefExpr, refType);
 
-                // Build the AST for the call to the witness.
-                auto subMap = getOperatorSubstitutions(witness, refType);
-                if (subMap) {
-                  ConcreteDeclRef witnessRef(witness, *subMap);
-                  auto declRefExpr =  new (ctx) DeclRefExpr(witnessRef, loc,
-                                                            /*Implicit=*/false);
-                  declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
-                  cs.setType(declRefExpr, refType);
+                Expr *refExpr;
+                if (witness->getDeclContext()->isTypeContext()) {
+                  // If the operator is a type member, add the implicit
+                  // (Self) -> ... call.
+                  Expr *base =
+                    TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
+                                                 ctx);
+                  cs.setType(base, MetatypeType::get(baseTy));
 
-                  Expr *refExpr;
-                  if (isMemberOperator) {
-                    // If the operator is a type member, add the implicit
-                    // (Self) -> ... call.
-                    Expr *base =
-                      TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
-                                                   ctx);
-                    cs.setType(base, MetatypeType::get(baseTy));
-
-                    refExpr = new (ctx) DotSyntaxCallExpr(declRefExpr,
-                                                          SourceLoc(), base);
-                    auto refType = fullType->castTo<FunctionType>()->getResult();
-                    cs.setType(refExpr, refType);
-                  } else {
-                    refExpr = declRefExpr;
-                  }
-
-                  return forceUnwrapIfExpected(refExpr, choice, locator);
+                  refExpr = new (ctx) DotSyntaxCallExpr(declRefExpr,
+                                                        SourceLoc(), base);
+                  auto refType = fullType->castTo<FunctionType>()->getResult();
+                  cs.setType(refExpr, refType);
+                } else {
+                  refExpr = declRefExpr;
                 }
+
+                return forceUnwrapIfExpected(refExpr, choice, locator);
               }
             }
           }
         }
 
-        // Build a reference to the member.
+        // Build a reference to the protocol requirement.
         Expr *base =
           TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy, ctx);
         cs.cacheExprTypes(base);

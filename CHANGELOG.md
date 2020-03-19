@@ -49,7 +49,7 @@ Swift Next
 
 * [SR-75][]:
 
-  Unapplied references to protocol methods are now supported. Previously this
+  Unapplied references to protocol methods methods are now supported. Previously this
   only worked for methods defined in structs, enums and classes.
 
   ```swift
@@ -57,7 +57,7 @@ Swift Next
     func play(catToy: Toy)
   }
 
-  let fn = Cat.play(catToy:)
+  let fn = Cat.play
   fn(myCat)(myToy)
   ```
 
