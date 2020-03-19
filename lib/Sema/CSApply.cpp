@@ -5943,7 +5943,8 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
   // Conversion from a non-`@differentiable` function to a `@differentiable` is
   // only allowed from a closure expression or a declaration/member reference.
   if (!fromFnType->isDifferentiable() && toType->isDifferentiable()) {
-    auto maybeDiagnoseFunctionRef = [&](Expr *semanticExpr) {
+    std::function<void(Expr *)> maybeDiagnoseFunctionRef;
+    maybeDiagnoseFunctionRef = [&](Expr *semanticExpr) {
       if (auto *capture = dyn_cast<CaptureListExpr>(semanticExpr))
         semanticExpr = capture->getClosureBody();
       if (isa<ClosureExpr>(semanticExpr)) return;
@@ -5978,9 +5979,13 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
         if (isa<FuncDecl>(memberRef->getMember().getDecl())) return;
       } else if (auto *dotSyntaxCall =
                      dyn_cast<DotSyntaxCallExpr>(semanticExpr)) {
-        if (isa<FuncDecl>(dotSyntaxCall->getFn()
-                ->getSemanticsProvidingExpr()->getReferencedDecl().getDecl()))
-          return;
+        Expr *fnExpr = dotSyntaxCall->getFn()->getSemanticsProvidingExpr();
+        while (auto *autoclosureExpr = dyn_cast<AutoClosureExpr>(fnExpr))
+          if (auto *unwrappedFnExpr = autoclosureExpr->getUnwrappedCurryThunkExpr())
+            fnExpr = unwrappedFnExpr;
+        // Recurse on the function expression.
+        maybeDiagnoseFunctionRef(fnExpr);
+        return;
       }
       ctx.Diags.diagnose(expr->getLoc(),
                          diag::invalid_differentiable_function_conversion_expr,

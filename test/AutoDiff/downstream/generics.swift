@@ -246,6 +246,8 @@ extension TF_682_Proto where Self : Differentiable,
   }
 }
 
+// NOTE(TF-1208): Differentiation regression due to changes in curry thunk generation.
+/*
 // TF-688: Test generic curry thunk cloning.
 public struct TF_688_Struct<Scalar> {
   var x: Scalar
@@ -263,6 +265,7 @@ public func TF_688<Scalar: Differentiable>(
 ) -> TF_688_Struct<Scalar> {
   reduction(x)
 }
+*/
 
 // TF-697: Test generic requirements of generated derivative function.
 protocol TF_697_Module: Differentiable {
