@@ -161,6 +161,7 @@ def main():
                                      serialization_format=serialization_format,
                                      omit_node_ids=False,
                                      output_file=pre_edit_tree_file,
+                                     diags_output_file=None,
                                      temp_dir=temp_dir,
                                      swift_syntax_test=swift_syntax_test,
                                      print_visual_reuse_info=False)
@@ -172,6 +173,7 @@ def main():
                                      serialization_format=serialization_format,
                                      omit_node_ids=False,
                                      output_file=incremental_tree_file,
+                                     diags_output_file=None,
                                      temp_dir=temp_dir,
                                      swift_syntax_test=swift_syntax_test,
                                      print_visual_reuse_info=False)

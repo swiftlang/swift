@@ -37,6 +37,9 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   // implicitly associated with it. Uses `std::unique_ptr` so that
   // `AnnotatedSourceSnippet` can be forward declared.
   std::unique_ptr<AnnotatedSourceSnippet> currentSnippet;
+  // Educational notes which are buffered until the consumer is finished
+  // constructing a snippet.
+  SmallVector<std::string, 1> BufferedEducationalNotes;
 
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());

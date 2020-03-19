@@ -166,7 +166,7 @@ private:
       SILValue value,
       const SmallVectorImpl<Operand *> &lifetimeEndingUsers) const;
   bool discoverBorrowOperandImplicitRegularUsers(
-      const BorrowScopeOperand &initialScopedOperand,
+      const BorrowingOperand &initialScopedOperand,
       SmallVectorImpl<Operand *> &implicitRegularUsers, bool isGuaranteed);
   bool discoverInteriorPointerOperandImplicitRegularUsers(
       const InteriorPointerOperand &interiorPointerOperand,
@@ -244,7 +244,7 @@ bool SILValueOwnershipChecker::isCompatibleDefUse(
 
 /// Returns true if an error was found.
 bool SILValueOwnershipChecker::discoverBorrowOperandImplicitRegularUsers(
-    const BorrowScopeOperand &initialScopedOperand,
+    const BorrowingOperand &initialScopedOperand,
     SmallVectorImpl<Operand *> &implicitRegularUsers, bool isGuaranteed) {
   if (!initialScopedOperand.areAnyUserResultsBorrowIntroducers()) {
     initialScopedOperand.visitEndScopeInstructions(
@@ -256,7 +256,7 @@ bool SILValueOwnershipChecker::discoverBorrowOperandImplicitRegularUsers(
   // result is that borrow scope. In such a case, we need to not just add the
   // end scope instructions of this scoped operand, but also look through any
   // guaranteed phis and add their end_borrow to this list as well.
-  SmallVector<BorrowScopeOperand, 8> worklist;
+  SmallVector<BorrowingOperand, 8> worklist;
   SmallPtrSet<Operand *, 8> visitedValue;
   worklist.push_back(initialScopedOperand);
   visitedValue.insert(initialScopedOperand.op);
@@ -265,7 +265,7 @@ bool SILValueOwnershipChecker::discoverBorrowOperandImplicitRegularUsers(
     auto scopedOperand = worklist.pop_back_val();
     scopedOperand.visitConsumingUsesOfBorrowIntroducingUserResults(
         [&](Operand *op) {
-          if (auto subSub = BorrowScopeOperand::get(op)) {
+          if (auto subSub = BorrowingOperand::get(op)) {
             if (!visitedValue.insert(op).second) {
               handleError([&] {
                 llvm::errs()
@@ -450,7 +450,7 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
     // regular users so we can ensure that the borrow scope operand's scope is
     // completely within the owned value's scope. If we do not have a borrow
     // scope operand, just continue, we are done.
-    auto initialScopedOperand = BorrowScopeOperand::get(op);
+    auto initialScopedOperand = BorrowingOperand::get(op);
     if (!initialScopedOperand) {
       continue;
     }
@@ -550,7 +550,7 @@ bool SILValueOwnershipChecker::gatherUsers(
       // Ok, our operand does not consume guaranteed values. Check if it is a
       // BorrowScopeOperand and if so, add its end scope instructions as
       // implicit regular users of our value.
-      if (auto scopedOperand = BorrowScopeOperand::get(op)) {
+      if (auto scopedOperand = BorrowingOperand::get(op)) {
         assert(!scopedOperand->consumesGuaranteedValues());
 
         foundError |= discoverBorrowOperandImplicitRegularUsers(

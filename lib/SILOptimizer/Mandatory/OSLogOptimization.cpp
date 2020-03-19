@@ -868,7 +868,7 @@ getEndPointsOfDataDependentChain(SILValue value, SILFunction *fun,
 /// value, if there is exactly one such introducing value. Otherwise, return
 /// None. There can be multiple borrow scopes for a SILValue iff it is derived
 /// from a guaranteed basic block parameter representing a phi node.
-static Optional<BorrowScopeIntroducingValue>
+static Optional<BorrowedValue>
 getUniqueBorrowScopeIntroducingValue(SILValue value) {
   assert(value.getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
          "parameter must be a guarenteed value");
@@ -925,7 +925,7 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
   // destroy foldedVal at the end of the borrow scope.
   assert(originalVal.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
 
-  Optional<BorrowScopeIntroducingValue> originalScopeBegin =
+  Optional<BorrowedValue> originalScopeBegin =
       getUniqueBorrowScopeIntroducingValue(originalVal);
   assert(originalScopeBegin &&
          "value without a unique borrow scope should not have been folded");
@@ -976,7 +976,7 @@ static void substituteConstants(FoldState &foldState) {
     // value at the point where the owned value is defined.
     SILInstruction *insertionPoint = definingInst;
     if (constantSILValue.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
-      Optional<BorrowScopeIntroducingValue> borrowIntroducer =
+      Optional<BorrowedValue> borrowIntroducer =
           getUniqueBorrowScopeIntroducingValue(constantSILValue);
       if (!borrowIntroducer) {
         // This case happens only if constantSILValue is derived from a

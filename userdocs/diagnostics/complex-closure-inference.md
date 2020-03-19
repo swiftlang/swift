@@ -1,5 +1,4 @@
-Inferring Closure Types
----
+# Inferring Closure Types
 If a closure contains a single expression, Swift will consider its body in addition to its signature and the surrounding context when performing type inference. For example, in the following code the type of `doubler` is inferred to be `(Int) -> Int` using only its body:
 ```
 let doubler = {

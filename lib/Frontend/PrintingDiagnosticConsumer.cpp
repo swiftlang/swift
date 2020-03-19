@@ -898,6 +898,10 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
       currentSnippet = std::make_unique<AnnotatedSourceSnippet>(SM);
       annotateSnippetWithInfo(SM, Info, *currentSnippet);
     }
+    for (auto path : Info.EducationalNotePaths) {
+      if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
+        BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
+    }
   } else {
     printDiagnostic(SM, Info);
 
@@ -929,6 +933,13 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
     }
     currentSnippet.reset();
   }
+
+  for (auto note : BufferedEducationalNotes) {
+    printMarkdown(note, Stream, ForceColors);
+    Stream << "\n";
+  }
+
+  BufferedEducationalNotes.clear();
 }
 
 bool PrintingDiagnosticConsumer::finishProcessing() {
