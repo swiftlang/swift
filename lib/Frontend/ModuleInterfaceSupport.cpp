@@ -294,21 +294,26 @@ public:
     const NominalTypeDecl *nominal;
     const IterableDeclContext *memberContext;
 
+    auto shouldInclude = [](const ExtensionDecl *extension) {
+      if (extension->isConstrainedExtension()) {
+        // Conditional conformances never apply to inherited protocols, nor
+        // can they provide unconditional conformances that might be used in
+        // other extensions.
+        return false;
+      }
+      return true;
+    };
     if ((nominal = dyn_cast<NominalTypeDecl>(D))) {
       directlyInherited = nominal->getInherited();
       memberContext = nominal;
 
     } else if (auto *extension = dyn_cast<ExtensionDecl>(D)) {
-      if (extension->isConstrainedExtension()) {
-        // Conditional conformances never apply to inherited protocols, nor
-        // can they provide unconditional conformances that might be used in
-        // other extensions.
+      if (!shouldInclude(extension)) {
         return;
       }
       nominal = extension->getExtendedNominal();
       directlyInherited = extension->getInherited();
       memberContext = extension;
-
     } else {
       return;
     }
@@ -317,6 +322,18 @@ public:
       return;
 
     map[nominal].recordProtocols(directlyInherited, D);
+    // Collect protocols inherited from super classes
+    if (auto *CD = dyn_cast<ClassDecl>(D)) {
+      for (auto *SD = CD->getSuperclassDecl(); SD;
+           SD = SD->getSuperclassDecl()) {
+        map[nominal].recordProtocols(SD->getInherited(), SD);
+        for (auto *Ext: SD->getExtensions()) {
+          if (shouldInclude(Ext)) {
+            map[nominal].recordProtocols(Ext->getInherited(), Ext);
+          }
+        }
+      }
+    }
 
     // Recurse to find any nested types.
     for (const Decl *member : memberContext->getMembers())
