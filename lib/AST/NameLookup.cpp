@@ -1622,9 +1622,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
     // Make sure we've resolved property wrappers, if we need them.
-    if (ctx.areLegacySemanticQueriesEnabled()) {
-      installPropertyWrapperMembersIfNeeded(current, member);
-    }
+    installPropertyWrapperMembersIfNeeded(current, member);
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
