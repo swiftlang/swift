@@ -9184,16 +9184,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     ConstraintFix *fix, Type type1, Type type2, ConstraintKind matchKind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
 
-  // Local function to form an unsolved result.
-  auto formUnsolved = [&] {
-    if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(Constraint::createFixed(
-          *this, matchKind, fix, type1, type2, getConstraintLocator(locator)));
-      return SolutionKind::Solved;
-    }
-    return SolutionKind::Unsolved;
-  };
-
   // Try with the fix.
   TypeMatchOptions subflags =
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
@@ -9317,13 +9307,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
         return SolutionKind::Error;
 
       return SolutionKind::Solved;
-    case ConversionEphemeralness::NonEphemeral:
-      return SolutionKind::Solved;
     case ConversionEphemeralness::Unresolved:
-      // It's possible we don't yet have enough information to know whether
-      // the conversion is ephemeral or not, for example if we're dealing with
-      // an overload that hasn't yet been resolved.
-      return formUnsolved();
+    case ConversionEphemeralness::NonEphemeral:
+      // FIXME: The unresolved case should form an unsolved constraint rather
+      // than being treated as fully solved. This will require a way to connect
+      // the unsolved constraint to the type variable for the unresolved
+      // overload such that the fix gets re-activated when the overload is
+      // bound.
+      return SolutionKind::Solved;
     }
   }
 

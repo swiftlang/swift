@@ -222,10 +222,13 @@ public:
   /// Describes which constraints \c gatherConstraints should gather.
   enum class GatheringKind {
     /// Gather constraints associated with all of the variables within the
-    /// same equivalence class as the given type variable.
+    /// same equivalence class as the given type variable, as well as its
+    /// immediate fixed bindings.
     EquivalenceClass,
     /// Gather all constraints that mention this type variable or type variables
-    /// that it is equivalent to.
+    /// that it is a fixed binding of. Unlike EquivalenceClass, this looks
+    /// through transitive fixed bindings. This can be used to find all the
+    /// constraints that may be affected when binding a type variable.
     AllMentions,
   };
 

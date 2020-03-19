@@ -373,7 +373,7 @@ func bridgeTupleToAnyObject() {
 
 // Array defaulting and bridging type checking error per rdar://problem/54274245
 func rdar54274245(_ arr: [Any]?) {
-  _ = (arr ?? []) as [NSObject]
+  _ = (arr ?? []) as [NSObject] // expected-error {{type of expression is ambiguous without more context}}
 }
 
 // rdar://problem/60501780 - failed to infer NSString as a value type of a dictionary

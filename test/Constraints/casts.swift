@@ -238,3 +238,40 @@ func test_tuple_casts_no_warn() {
   _ = arr as! [(a: Foo, Foo)] // expected-warning {{cast from '[(Any, Any)]' to unrelated type '[(a: Foo, Foo)]' always fails}}
   _ = tup as! (a: Foo, Foo) // expected-warning {{cast from '(Any, Any)' to unrelated type '(a: Foo, Foo)' always fails}}
 }
+
+infix operator ^^^
+func ^^^ <T> (lhs: T?, rhs: @autoclosure () -> T) -> T { lhs! }
+func ^^^ <T> (lhs: T?, rhs: @autoclosure () -> T?) -> T? { lhs! }
+
+func ohno<T>(_ x: T) -> T? { nil }
+
+// SR-12369: Make sure we don't drop the coercion constraint.
+func test_coercions_with_overloaded_operator(str: String, optStr: String?, veryOptString: String????) {
+  _ = (str ?? "") as String // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}}
+  _ = (optStr ?? "") as String
+
+  _ = (str ?? "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
+  _ = (optStr ?? "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
+  _ = (optStr ?? "") as Int? // expected-error {{cannot convert value of type 'String' to type 'Int?' in coercion}}
+
+  _ = (str ^^^ "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
+  _ = (optStr ^^^ "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
+  _ = (optStr ^^^ "") as Int? // expected-error {{cannot convert value of type 'String' to type 'Int?' in coercion}}
+
+  _ = ([] ?? []) as String // expected-error {{cannot convert value of type '[Any]' to type 'String' in coercion}}
+  _ = ([""] ?? []) as [Int: Int] // expected-error {{cannot convert value of type '[String]' to type '[Int : Int]' in coercion}}
+  _ = (["": ""] ?? [:]) as [Int] // expected-error {{cannot convert value of type '[String : String]' to type '[Int]' in coercion}}
+  _ = (["": ""] ?? [:]) as Set<Int> // expected-error {{cannot convert value of type '[String : String]' to type 'Set<Int>' in coercion}}
+  _ = (["": ""] ?? [:]) as Int? // expected-error {{cannot convert value of type '[String : String]' to type 'Int?' in coercion}}
+
+  _ = ("" ?? "" ?? "") as String // expected-warning 2{{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}}
+  _ = ((veryOptString ?? "") ?? "") as String??
+  _ = ((((veryOptString ?? "") ?? "") ?? "") ?? "") as String
+
+  _ = ("" ?? "" ?? "") as Float // expected-error {{cannot convert value of type 'String' to type 'Float' in coercion}}
+  _ = ((veryOptString ?? "") ?? "") as [String] // expected-error {{cannot convert value of type 'String??' to type '[String]' in coercion}}
+  _ = ((((veryOptString ?? "") ?? "") ?? "") ?? "") as [String] // expected-error {{cannot convert value of type 'String' to type '[String]' in coercion}}
+
+  _ = ohno(ohno(ohno(str))) as String???
+  _ = ohno(ohno(ohno(str))) as Int // expected-error {{cannot convert value of type 'String???' to type 'Int' in coercion}}
+}
