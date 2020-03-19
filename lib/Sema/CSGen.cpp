@@ -2328,6 +2328,10 @@ namespace {
             : ContextualPattern::forRawPattern(pattern, CurDC);
 
         Type type = TypeChecker::typeCheckPattern(contextualPattern);
+
+        // Look through reference storage types.
+        type = type->getReferenceStorageReferent();
+
         Type openedType = CS.openUnboundGenericType(type, locator);
 
         // Determine the subpattern type. It will be convertible to the
