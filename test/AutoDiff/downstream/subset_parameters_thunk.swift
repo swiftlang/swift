@@ -111,7 +111,7 @@ SubsetParameterThunkTests.test("InoutParametersIndirect") {
 
 // Check SIL for representative pullback subset parameters thunks.
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @AD__$s13TangentVectorQy_AAQzAAQy0_Ieglrr_AbCIeglr_s14DifferentiableRzsAER_sAER0_r1_lTR_src_0_wrt_0_1_pullback_index_subset_thunk : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : Differentiable, τ_0_1 : Differentiable, τ_0_2 : Differentiable> (@inout τ_0_1.TangentVector, @guaranteed @callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)) -> @out τ_0_0.TangentVector {
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @AD__$s13TangentVectors14DifferentiablePQy_AaCQzAaCQy0_Ieglrr_AdEIeglr_sABRzsABR_sABR0_r1_lTR_src_0_wrt_0_1_pullback_index_subset_thunk : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : Differentiable, τ_0_1 : Differentiable, τ_0_2 : Differentiable> (@inout τ_0_1.TangentVector, @guaranteed @callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)) -> @out τ_0_0.TangentVector {
 // CHECK: bb0(%0 : $*τ_0_0.TangentVector, %1 : $*τ_0_1.TangentVector, %2 : $@callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)):
 // CHECK:   %3 = alloc_stack $τ_0_2.TangentVector
 // CHECK:   %4 = apply %2(%0, %3, %1) : $@callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)
@@ -121,7 +121,7 @@ SubsetParameterThunkTests.test("InoutParametersIndirect") {
 // CHECK:   return %7 : $()
 // CHECK: }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @AD__$s13TangentVectorQy_AAQzAAQy0_Ieglrr_ABIegl_s14DifferentiableRzsAER_sAER0_r1_lTR_src_0_wrt_1_pullback_index_subset_thunk : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : Differentiable, τ_0_1 : Differentiable, τ_0_2 : Differentiable> (@inout τ_0_1.TangentVector, @guaranteed @callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @AD__$s13TangentVectors14DifferentiablePQy_AaCQzAaCQy0_Ieglrr_ADIegl_sABRzsABR_sABR0_r1_lTR_src_0_wrt_1_pullback_index_subset_thunk : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : Differentiable, τ_0_1 : Differentiable, τ_0_2 : Differentiable> (@inout τ_0_1.TangentVector, @guaranteed @callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)) -> () {
 // CHECK: bb0(%0 : $*τ_0_1.TangentVector, %1 : $@callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)):
 // CHECK:   %2 = alloc_stack $τ_0_0.TangentVector
 // CHECK:   %3 = alloc_stack $τ_0_2.TangentVector
