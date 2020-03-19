@@ -120,10 +120,10 @@ bool swift::isOwnershipForwardingInst(SILInstruction *i) {
 }
 
 //===----------------------------------------------------------------------===//
-//                           Borrow Scope Operand
+//                           Borrowing Operand
 //===----------------------------------------------------------------------===//
 
-void BorrowScopeOperandKind::print(llvm::raw_ostream &os) const {
+void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   switch (value) {
   case Kind::BeginBorrow:
     os << "BeginBorrow";
@@ -139,7 +139,7 @@ void BorrowScopeOperandKind::print(llvm::raw_ostream &os) const {
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     BorrowScopeOperandKind kind) {
+                                     BorrowingOperandKind kind) {
   kind.print(os);
   return os;
 }
@@ -160,21 +160,21 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 void BorrowingOperand::visitEndScopeInstructions(
     function_ref<void(Operand *)> func) const {
   switch (kind) {
-  case BorrowScopeOperandKind::BeginBorrow:
+  case BorrowingOperandKind::BeginBorrow:
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
       if (use->isConsumingUse()) {
         func(use);
       }
     }
     return;
-  case BorrowScopeOperandKind::BeginApply: {
+  case BorrowingOperandKind::BeginApply: {
     auto *user = cast<BeginApplyInst>(op->getUser());
     for (auto *use : user->getTokenResult()->getUses()) {
       func(use);
     }
     return;
   }
-  case BorrowScopeOperandKind::Branch:
+  case BorrowingOperandKind::Branch:
     for (auto *succBlock :
          cast<BranchInst>(op->getUser())->getSuccessorBlocks()) {
       auto *arg = succBlock->getArgument(op->getOperandNumber());
@@ -192,13 +192,13 @@ void BorrowingOperand::visitEndScopeInstructions(
 void BorrowingOperand::visitBorrowIntroducingUserResults(
     function_ref<void(BorrowedValue)> visitor) {
   switch (kind) {
-  case BorrowScopeOperandKind::BeginApply:
+  case BorrowingOperandKind::BeginApply:
     llvm_unreachable("Never has borrow introducer results!");
-  case BorrowScopeOperandKind::BeginBorrow: {
+  case BorrowingOperandKind::BeginBorrow: {
     auto value = *BorrowedValue::get(cast<BeginBorrowInst>(op->getUser()));
     return visitor(value);
   }
-  case BorrowScopeOperandKind::Branch: {
+  case BorrowingOperandKind::Branch: {
     auto *bi = cast<BranchInst>(op->getUser());
     for (auto *succBlock : bi->getSuccessorBlocks()) {
       auto value =
