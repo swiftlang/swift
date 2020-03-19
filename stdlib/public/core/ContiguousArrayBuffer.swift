@@ -279,7 +279,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     }
     else {
       let headerSize = MemoryLayout<UnsafeRawPointer>.stride &* 4
-      let (storage, realTailAllocationSize) = _allocate2(
+      let (storage, realTailAllocationSize) = _allocate(
         numHeaderBytes: headerSize,
         numTailBytes: MemoryLayout<Element>.stride &* realMinimumCapacity,
         objectType: _ContiguousArrayStorage<Element>.self,
