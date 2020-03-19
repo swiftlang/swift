@@ -3029,13 +3029,13 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
   // convention appropriately before calling the derived method.
   bool hasGenericRequirementDifference = false;
 
-  auto derivedSig = derived.getDecl()->getAsGenericContext()
+  const auto derivedSig = derived.getDecl()->getAsGenericContext()
                                      ->getGenericSignature();
-  auto genericSig = Context.getOverrideGenericSignature(base.getDecl(),
-                                                        derived.getDecl());
-  if (genericSig) {
+  const auto overrideSig = Context.getOverrideGenericSignature(
+                                       base.getDecl(), derived.getDecl());
+  if (overrideSig) {
     hasGenericRequirementDifference =
-      !genericSig->requirementsNotSatisfiedBy(derivedSig).empty();
+      !overrideSig->requirementsNotSatisfiedBy(derivedSig).empty();
   }
 
   auto baseInfo = getConstantInfo(context, base);
@@ -3068,10 +3068,10 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
     overrideInterfaceTy = derivedInfo.FormalType;
   }
 
-  if (genericSig && !genericSig->areAllParamsConcrete()) {
+  if (overrideSig) {
     overrideInterfaceTy =
       cast<AnyFunctionType>(
-        GenericFunctionType::get(genericSig,
+        GenericFunctionType::get(overrideSig,
                                  overrideInterfaceTy->getParams(),
                                  overrideInterfaceTy->getResult(),
                                  overrideInterfaceTy->getExtInfo())
@@ -3079,11 +3079,12 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
   }
 
   // Build the lowered AST function type for the class method call.
-  auto bridgedTypes = getLoweredFormalTypes(derived, overrideInterfaceTy);
+  auto bridgedUncurriedTy =
+      getLoweredFormalTypes(derived, overrideInterfaceTy).Uncurried;
 
   // Build the SILFunctionType for the class method call.
   CanSILFunctionType fnTy = getNativeSILFunctionType(
-      *this, context, basePattern, bridgedTypes.Uncurried, base, derived,
+      *this, context, basePattern, bridgedUncurriedTy, base, derived,
       /*reqt subs*/ None, ProtocolConformanceRef());
 
   // Build the SILConstantInfo and cache it.
@@ -3092,7 +3093,7 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
   auto result = ::new (resultBuf) SILConstantInfo{
     overrideInterfaceTy,
     basePattern,
-    bridgedTypes.Uncurried,
+    bridgedUncurriedTy,
     fnTy};
   
   auto inserted = ConstantOverrideTypes.insert({{derived, base}, result});
