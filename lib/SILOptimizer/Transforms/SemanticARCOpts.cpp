@@ -1190,7 +1190,7 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
 //
 // TODO: This needs a better name.
 bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
-  SmallVector<BorrowScopeIntroducingValue, 4> borrowScopeIntroducers;
+  SmallVector<BorrowedValue, 4> borrowScopeIntroducers;
 
   // Find all borrow introducers for our copy operand. If we are unable to find
   // all of the reproducers (due to pattern matching failure), conservatively
@@ -1269,8 +1269,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // dead end blocks that use the value in a non-consuming way.
   //
   // TODO: There may be some way of sinking this into the loop below.
-  bool haveAnyLocalScopes = llvm::any_of(
-      borrowScopeIntroducers, [](BorrowScopeIntroducingValue borrowScope) {
+  bool haveAnyLocalScopes =
+      llvm::any_of(borrowScopeIntroducers, [](BorrowedValue borrowScope) {
         return borrowScope.isLocalScope();
       });
 
@@ -1302,12 +1302,10 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
       return false;
     SmallVector<Operand *, 8> scratchSpace;
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
-    if (llvm::any_of(borrowScopeIntroducers,
-                     [&](BorrowScopeIntroducingValue borrowScope) {
-                       return !borrowScope.areUsesWithinScope(
-                           destroys, scratchSpace, visitedBlocks,
-                           getDeadEndBlocks());
-                     })) {
+    if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
+          return !borrowScope.areUsesWithinScope(
+              destroys, scratchSpace, visitedBlocks, getDeadEndBlocks());
+        })) {
       return false;
     }
   }
@@ -1339,7 +1337,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
       }
 
       if (llvm::any_of(borrowScopeIntroducers,
-                       [&](BorrowScopeIntroducingValue borrowScope) {
+                       [&](BorrowedValue borrowScope) {
                          return !borrowScope.areUsesWithinScope(
                              phiArgLR.getDestroyingUses(), scratchSpace,
                              visitedBlocks, getDeadEndBlocks());
@@ -1716,7 +1714,7 @@ public:
     // function. To be conservative, assume that all other non-local scopes
     // write to memory.
     if (!value->isLocalScope()) {
-      if (value->kind == BorrowScopeIntroducingValueKind::SILFunctionArgument) {
+      if (value->kind == BorrowedValueKind::SILFunctionArgument) {
         return answer(false);
       }
 
@@ -1727,7 +1725,7 @@ public:
 
     // TODO: This is disabled temporarily for guaranteed phi args just for
     // staging purposes. Thus be conservative and assume true in these cases.
-    if (value->kind == BorrowScopeIntroducingValueKind::Phi) {
+    if (value->kind == BorrowedValueKind::Phi) {
       return answer(true);
     }
 
