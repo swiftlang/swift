@@ -178,11 +178,41 @@ SubstitutionMap SubstitutionMap::getCanonical() const {
 
 
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
-                                     SubstitutionMap substitutions) {
+                                     SubstitutionMap substitutions,
+                                     bool fallBackToModuleConformanceLookup) {
   if (!genericSig) {
     assert(!substitutions.hasAnySubstitutableParams() &&
            "Shouldn't have substitutions here");
     return SubstitutionMap();
+  }
+
+  LookupConformanceFn lookupConformanceFn;
+  if (fallBackToModuleConformanceLookup) {
+    /// Like \c LookUpConformanceInSubstitutionMap , but falls back to module
+    /// lookup if the conformance could not be found.
+    class LookUpConformanceInSubstitutionMapOrModule {
+      SubstitutionMap Subs;
+    public:
+      LookUpConformanceInSubstitutionMapOrModule(SubstitutionMap Subs)
+          : Subs(Subs) {}
+
+      ProtocolConformanceRef operator()(CanType dependentType,
+                                        Type conformingReplacementType,
+                                        ProtocolDecl *conformedProtocol) const {
+        auto conformance = LookUpConformanceInSubstitutionMap(Subs)
+            (dependentType, conformingReplacementType, conformedProtocol);
+
+        if (conformance.isInvalid())
+          return conformedProtocol->getParentModule()->lookupConformance(
+                     conformingReplacementType, conformedProtocol);
+        return conformance;
+      };
+    };
+
+    lookupConformanceFn =
+        LookUpConformanceInSubstitutionMapOrModule(substitutions);
+  } else {
+    lookupConformanceFn = LookUpConformanceInSubstitutionMap(substitutions);
   }
 
   return SubstitutionMap::get(genericSig,
@@ -190,7 +220,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
              return substitutions.lookupSubstitution(
                       CanSubstitutableType(type));
            },
-           LookUpConformanceInSubstitutionMap(substitutions));
+           lookupConformanceFn);
 }
 
 /// Build an interface type substitution map for the given generic signature

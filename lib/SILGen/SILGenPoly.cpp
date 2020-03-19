@@ -3744,7 +3744,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
 
   auto subs = getForwardingSubstitutionMap();
   if (auto genericSig = derivedFTy->getInvocationGenericSignature()) {
-    subs = SubstitutionMap::get(genericSig, subs);
+    subs = SubstitutionMap::get(genericSig, subs,
+                                /*fallBackToModuleConformanceLookup*/true);
 
     derivedFTy =
         derivedFTy->substGenericArgs(SGM.M, subs, getTypeExpansionContext());

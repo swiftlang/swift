@@ -111,8 +111,30 @@ public:
 
   /// Build an interface type substitution map for the given generic
   /// signature using the mapping in the given substitutions.
+  ///
+  /// \Note
+  /// Currently, \p fallBackToModuleConformanceLookup is only necessary
+  /// when we emit a reabstraction thunk for an override, because we might
+  /// not have enough information in the substitution map alone.
+  ///
+  /// For example, combining the override substitutions with the invocation
+  /// generic signature for the following override requires recovering
+  /// the implied conformance Foo : P.
+  ///
+  /// \code
+  /// class Base<T> {
+  ///   func foo<U>(u: U) where T == Foo {}
+  /// }
+  /// class Derived<T>: Base<T> {
+  ///   override func foo<U>(u: U) where T: P {}
+  /// }
+  /// \endcode
+  ///
+  /// \param fallBackToModuleConformanceLookup Fall back to module lookup
+  /// if a conformance could not be found otherwise.
   static SubstitutionMap get(GenericSignature genericSig,
-                             SubstitutionMap substitutions);
+                             SubstitutionMap substitutions,
+                             bool fallBackToModuleConformanceLookup = false);
 
   /// Build an interface type substitution map for the given generic signature
   /// from a type substitution function and conformance lookup function.

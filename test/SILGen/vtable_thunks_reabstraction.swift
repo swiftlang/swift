@@ -484,11 +484,14 @@ class ConcreteOptional: Opaque<S?> {
 class GenericBase<T> {
   func doStuff<U>(t: T, u: U) {}
   init<U>(t: T, u: U) {}
+
+  func doStuff2<U>(u: U) where T == Int {}
 }
 
 // CHECK-LABEL: sil_vtable GenericBase {
 // CHECK-NEXT:   #GenericBase.doStuff!1: <T><U> (GenericBase<T>) -> (T, U) -> () : @$s27vtable_thunks_reabstraction11GenericBaseC7doStuff1t1uyx_qd__tlF        // GenericBase.doStuff<A>(t:u:)
 // CHECK-NEXT:   #GenericBase.init!allocator.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$s27vtable_thunks_reabstraction11GenericBaseC1t1uACyxGx_qd__tclufC
+// CHECK-NEXT:   #GenericBase.doStuff2!1: <T where T == Int><U> (GenericBase<T>) -> (U) -> () : @$s27vtable_thunks_reabstraction11GenericBaseC8doStuff21uyqd___tSiRszlF
 // CHECK-NEXT:   #GenericBase.deinit!deallocator.1: @$s27vtable_thunks_reabstraction11GenericBaseCfD     // GenericBase.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -504,6 +507,7 @@ class ConcreteSub : GenericBase<Int> {
 // CHECK-LABEL: sil_vtable ConcreteSub {
 // CHECK-NEXT:   #GenericBase.doStuff!1: <T><U> (GenericBase<T>) -> (T, U) -> () : @$s27vtable_thunks_reabstraction11ConcreteSubC7doStuff1t1uySi_xtlFAA11GenericBaseCAdeFyx_qd__tlFTV [override]        // vtable thunk for GenericBase.doStuff<A>(t:u:) dispatching to ConcreteSub.doStuff<A>(t:u:)
 // CHECK-NEXT:   #GenericBase.init!allocator.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$s27vtable_thunks_reabstraction11ConcreteSubC1t1uACSi_xtclufCAA11GenericBaseCAdeGyxGx_qd__tclufCTV [override]
+// CHECK-NEXT:   #GenericBase.doStuff2!1: <T where T == Int><U> {{.*}}F [inherited]
 // CHECK-NEXT:   #ConcreteSub.deinit!deallocator.1: @$s27vtable_thunks_reabstraction11ConcreteSubCfD     // ConcreteSub.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -543,6 +547,7 @@ class MoreGenericSub1<T, TT> : GenericBase<T> {
 // CHECK-LABEL: sil_vtable MoreGenericSub1 {
 // CHECK-NEXT:   #GenericBase.doStuff!1: <T><U> (GenericBase<T>) -> (T, U) -> () : @$s27vtable_thunks_reabstraction15MoreGenericSub1C7doStuff1t1uyx_qd__tlF [override] // MoreGenericSub1.doStuff<A>(t:u:)
 // CHECK-NEXT:   #GenericBase.init!allocator.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$s27vtable_thunks_reabstraction15MoreGenericSub1C1t1uACyxq_Gx_qd__tclufC [override]
+// CHECK-NEXT:   #GenericBase.doStuff2!1: <T where T == Int><U> {{.*}}F [inherited]
 // CHECK-NEXT:   #MoreGenericSub1.deinit!deallocator.1: @$s27vtable_thunks_reabstraction15MoreGenericSub1CfD     // MoreGenericSub1.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -555,5 +560,18 @@ class MoreGenericSub2<TT, T> : GenericBase<T> {
 // CHECK-LABEL: sil_vtable MoreGenericSub2 {
 // CHECK-NEXT:   #GenericBase.doStuff!1: <T><U> (GenericBase<T>) -> (T, U) -> () : @$s27vtable_thunks_reabstraction15MoreGenericSub2C7doStuff1t1uyq__qd__tlF [override]        // MoreGenericSub2.doStuff<A>(t:u:)
 // CHECK-NEXT:   #GenericBase.init!allocator.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$s27vtable_thunks_reabstraction15MoreGenericSub2C1t1uACyxq_Gq__qd__tclufC [override]
+// CHECK-NEXT:   #GenericBase.doStuff2!1: <T where T == Int><U> {{.*}}F [inherited]
 // CHECK-NEXT:   #MoreGenericSub2.deinit!deallocator.1: @$s27vtable_thunks_reabstraction15MoreGenericSub2CfD     // MoreGenericSub2.__deallocating_deinit
+// CHECK-NEXT: }
+
+class GenericSub2<T>: GenericBase<T> {
+  override func doStuff2<U>(u: U) where T: FixedWidthInteger {}
+}
+
+// CHECK-LABEL: sil_vtable GenericSub2 {
+// CHECK-NEXT:   #GenericBase.doStuff!1: <T><U> {{.*}}F [inherited]
+// CHECK-NEXT:   #GenericBase.init
+// CHECK-NEXT:   #GenericBase.doStuff2!1: <T where T == Int><U> (GenericBase<T>) -> (U) -> () : @$s27vtable_thunks_reabstraction11GenericSub2C8doStuff21uyqd___ts17FixedWidthIntegerRzlFAA0D4BaseCAdEyqd___tSiRszlFTV [override]
+// CHECK-NEXT:   #GenericSub2.doStuff2!1: <T where T : FixedWidthInteger><U> (GenericSub2<T>) -> (U) -> () : @$s27vtable_thunks_reabstraction11GenericSub2C8doStuff21uyqd___ts17FixedWidthIntegerRzlF
+// CHECK-NEXT:   #GenericSub2.deinit
 // CHECK-NEXT: }
