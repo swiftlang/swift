@@ -144,7 +144,7 @@ def main():
                   file=sys.stderr)
             print(diag, file=sys.stderr)
             sys.exit(1)
-        full_idx += 1 # continue searching from the next diagnostic line.
+        full_idx += 1  # continue searching from the next diagnostic line.
 
 
 if __name__ == '__main__':
