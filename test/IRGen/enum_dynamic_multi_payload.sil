@@ -45,17 +45,17 @@ entry(%e : $Either<(), ()>):
   // CHECK-NEXT: llvm.lifetime.start
   %s = alloc_stack $Either<(), ()>
 
-  %l = enum $Either<(), ()>, #Either.Left!enumelt.1, undef : $()
+  %l = enum $Either<(), ()>, #Either.Left!enumelt, undef : $()
   // CHECK-NEXT: bitcast {{.*}} to i1*
   // CHECK-NEXT: store i1 false
   store %l to %s : $*Either<(), ()>
-  %r = enum $Either<(), ()>, #Either.Right!enumelt.1, undef : $()
+  %r = enum $Either<(), ()>, #Either.Right!enumelt, undef : $()
   // CHECK-NEXT: bitcast {{.*}} to i1*
   // CHECK-NEXT: store i1 true
   store %r to %s : $*Either<(), ()>
 
-  %a = unchecked_enum_data %l : $Either<(), ()>, #Either.Left!enumelt.1
-  %b = unchecked_enum_data %r : $Either<(), ()>, #Either.Right!enumelt.1
+  %a = unchecked_enum_data %l : $Either<(), ()>, #Either.Left!enumelt
+  %b = unchecked_enum_data %r : $Either<(), ()>, #Either.Right!enumelt
 
   // CHECK-NEXT: br i1 {{%.*}}, label %7, label %6
   // CHECK:      6:
@@ -63,8 +63,8 @@ entry(%e : $Either<(), ()>):
   // CHECK:      7:
   // CHECK:        br label %9
   switch_enum %e : $Either<(), ()>,
-    case #Either.Left!enumelt.1: left,
-    case #Either.Right!enumelt.1: right
+    case #Either.Left!enumelt: left,
+    case #Either.Right!enumelt: right
 
 left(%x : $()):
   %0 = integer_literal $Builtin.Int8, 0
@@ -96,11 +96,11 @@ entry(%e : $EitherOr<(), ()>):
 
   // CHECK-NEXT: bitcast {{.*}} to i8*
   // CHECK-NEXT: store i8 0
-  %l = enum $EitherOr<(), ()>, #EitherOr.Left!enumelt.1, undef : $()
+  %l = enum $EitherOr<(), ()>, #EitherOr.Left!enumelt, undef : $()
   store %l to %s : $*EitherOr<(), ()>
   // CHECK-NEXT: bitcast {{.*}} to i8*
   // CHECK-NEXT: store i8 1
-  %r = enum $EitherOr<(), ()>, #EitherOr.Right!enumelt.1, undef : $()
+  %r = enum $EitherOr<(), ()>, #EitherOr.Right!enumelt, undef : $()
   store %r to %s : $*EitherOr<(), ()>
   // CHECK-NEXT: bitcast {{.*}} to i8*
   // CHECK-NEXT: store i8 2
@@ -111,8 +111,8 @@ entry(%e : $EitherOr<(), ()>):
   %k = enum $EitherOr<(), ()>, #EitherOr.Center!enumelt
   store %k to %s : $*EitherOr<(), ()>
 
-  %a = unchecked_enum_data %l : $EitherOr<(), ()>, #EitherOr.Left!enumelt.1
-  %b = unchecked_enum_data %r : $EitherOr<(), ()>, #EitherOr.Right!enumelt.1
+  %a = unchecked_enum_data %l : $EitherOr<(), ()>, #EitherOr.Left!enumelt
+  %b = unchecked_enum_data %r : $EitherOr<(), ()>, #EitherOr.Right!enumelt
 
   // CHECK-NEXT: switch
   // CHECK-NEXT:   i8 0, label %[[LEFT_PRE:[0-9]+]]
@@ -120,10 +120,10 @@ entry(%e : $EitherOr<(), ()>):
   // CHECK-NEXT:   i8 2, label [[MIDDLE:%[0-9]+]]
   // CHECK-NEXT:   i8 3, label [[CENTER:%[0-9]+]]
   switch_enum %e : $EitherOr<(), ()>,
-    case #EitherOr.Left!enumelt.1: left,
+    case #EitherOr.Left!enumelt: left,
     case #EitherOr.Middle!enumelt: middle,
     case #EitherOr.Center!enumelt: center,
-    case #EitherOr.Right!enumelt.1: right
+    case #EitherOr.Right!enumelt: right
 
   // CHECK:      [[LEFT_PRE]]:
   // CHECK:        br label [[LEFT:%[0-9]+]]
@@ -163,15 +163,15 @@ entry:
   %f = integer_literal $Builtin.Int1, 0
 
   %a = enum $EitherOr<Builtin.Int64, Builtin.Int64>,
-    #EitherOr.Left!enumelt.1, %0 : $Builtin.Int64
+    #EitherOr.Left!enumelt, %0 : $Builtin.Int64
   %x = select_enum %a : $EitherOr<Builtin.Int64, Builtin.Int64>,
-    case #EitherOr.Left!enumelt.1: %t,
+    case #EitherOr.Left!enumelt: %t,
     default %f : $Builtin.Int1
 
   %b = enum $EitherOr<Builtin.Int64, Builtin.Int64>,
-    #EitherOr.Right!enumelt.1, %0 : $Builtin.Int64
+    #EitherOr.Right!enumelt, %0 : $Builtin.Int64
   %y = select_enum %b : $EitherOr<Builtin.Int64, Builtin.Int64>,
-    case #EitherOr.Right!enumelt.1: %t,
+    case #EitherOr.Right!enumelt: %t,
     default %f : $Builtin.Int1
 
   %c = enum $EitherOr<Builtin.Int64, Builtin.Int64>,
@@ -199,15 +199,15 @@ entry:
   %f = integer_literal $Builtin.Int1, 0
 
   %a = enum $EitherOr<(), ()>,
-    #EitherOr.Left!enumelt.1, undef : $()
+    #EitherOr.Left!enumelt, undef : $()
   %x = select_enum %a : $EitherOr<(), ()>,
-    case #EitherOr.Left!enumelt.1: %t,
+    case #EitherOr.Left!enumelt: %t,
     default %f : $Builtin.Int1
 
   %b = enum $EitherOr<(), ()>,
-    #EitherOr.Right!enumelt.1, undef : $()
+    #EitherOr.Right!enumelt, undef : $()
   %y = select_enum %b : $EitherOr<(), ()>,
-    case #EitherOr.Right!enumelt.1: %t,
+    case #EitherOr.Right!enumelt: %t,
     default %f : $Builtin.Int1
 
   %c = enum $EitherOr<(), ()>,
@@ -237,12 +237,12 @@ entry:
 
   // CHECK: [[LEFT:%.*]] = icmp eq i32 {{%.*}}, 0
   %x = select_enum_addr %a : $*EitherOr<T, U>,
-    case #EitherOr.Left!enumelt.1: %t,
+    case #EitherOr.Left!enumelt: %t,
     default %f : $Builtin.Int1
 
   // CHECK: [[RIGHT:%.*]] = icmp eq i32 {{%.*}}, 1
   %y = select_enum_addr %a : $*EitherOr<T, U>,
-    case #EitherOr.Right!enumelt.1: %t,
+    case #EitherOr.Right!enumelt: %t,
     default %f : $Builtin.Int1
 
   // CHECK: [[MIDDLE:%.*]] = icmp eq i32 {{%.*}}, 2
@@ -268,13 +268,13 @@ entry:
 sil @dynamic_inject : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
   // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE:%.*]], i32 0)
-  inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Left!enumelt.1
+  inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Left!enumelt
   // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 2)
   inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Middle!enumelt
   // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 3)
   inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Center!enumelt
   // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 1)
-  inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Right!enumelt.1
+  inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Right!enumelt
 
   return undef : $()
 }
@@ -284,9 +284,9 @@ entry(%e : $*EitherOr<T, Builtin.Int64>):
 sil @dynamic_project : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
   // CHECK: bitcast [[EITHER_OR]]* %0 to %swift.opaque*
-  %l = unchecked_take_enum_data_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Left!enumelt.1
+  %l = unchecked_take_enum_data_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Left!enumelt
   // CHECK: bitcast [[EITHER_OR]]* %0 to i64*
-  %r = unchecked_take_enum_data_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Right!enumelt.1
+  %r = unchecked_take_enum_data_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Right!enumelt
 
   return undef : $()
 }
@@ -302,10 +302,10 @@ entry(%e : $*EitherOr<T, Builtin.Int64>):
   // CHECK-NEXT: i32 2, label %[[MIDDLE:[0-9]+]]
   // CHECK-NEXT: i32 3, label %[[CENTER:[0-9]+]]
   switch_enum_addr %e : $*EitherOr<T, Builtin.Int64>,
-    case #EitherOr.Left!enumelt.1: left,
+    case #EitherOr.Left!enumelt: left,
     case #EitherOr.Middle!enumelt: middle,
     case #EitherOr.Center!enumelt: center,
-    case #EitherOr.Right!enumelt.1: right
+    case #EitherOr.Right!enumelt: right
 
   // CHECK: [[LEFT]]:
 left:

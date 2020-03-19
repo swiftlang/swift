@@ -49,11 +49,11 @@ func objcKeypaths() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s13keypaths_objc0B18KeypathIdentifiersyyF
 func objcKeypathIdentifiers() {
-  // CHECK: keypath $KeyPath<ObjCFoo, String>, (objc "objcProp"; {{.*}} id #ObjCFoo.objcProp!getter.1.foreign
+  // CHECK: keypath $KeyPath<ObjCFoo, String>, (objc "objcProp"; {{.*}} id #ObjCFoo.objcProp!getter.foreign
   _ = \ObjCFoo.objcProp
-  // CHECK: keypath $KeyPath<Foo, String>, (objc "dyn"; {{.*}} id #Foo.dyn!getter.1.foreign
+  // CHECK: keypath $KeyPath<Foo, String>, (objc "dyn"; {{.*}} id #Foo.dyn!getter.foreign
   _ = \Foo.dyn
-  // CHECK: keypath $KeyPath<Foo, Int>, (objc "int"; {{.*}} id #Foo.int!getter.1 :
+  // CHECK: keypath $KeyPath<Foo, Int>, (objc "int"; {{.*}} id #Foo.int!getter :
   _ = \Foo.int
 }
 
@@ -70,9 +70,9 @@ func nonobjcExtensionOfObjCClass() {
   // Should be treated as a statically-dispatch property
   // CHECK: keypath $KeyPath<NSObject, X>, ({{.*}} id @
   _ = \NSObject.x
-  // CHECK: keypath $KeyPath<NSObject, Int>, ({{.*}} id #NSObject.objc!getter.1.foreign
+  // CHECK: keypath $KeyPath<NSObject, Int>, ({{.*}} id #NSObject.objc!getter.foreign
   _ = \NSObject.objc
-  // CHECK: keypath $KeyPath<NSObject, Int>, ({{.*}} id #NSObject.dynamic!getter.1.foreign
+  // CHECK: keypath $KeyPath<NSObject, Int>, ({{.*}} id #NSObject.dynamic!getter.foreign
   _ = \NSObject.dynamic
 
 }
@@ -83,9 +83,9 @@ func nonobjcExtensionOfObjCClass() {
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}ProtocolRequirement
 func objcProtocolRequirement<T: ObjCProto>(_: T) {
-  // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.1.foreign
+  // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.foreign
   _ = \T.objcRequirement
-  // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.1.foreign
+  // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.foreign
   _ = \ObjCProto.objcRequirement
 }
 

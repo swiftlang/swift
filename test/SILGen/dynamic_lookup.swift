@@ -27,7 +27,7 @@ func direct_to_class(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
   // CHECK: [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK: [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
-  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #X.f!foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: apply [[METHOD]]([[OPENED_ARG_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: destroy_value [[OPENED_ARG_COPY]]
   obj.f!()
@@ -39,7 +39,7 @@ func direct_to_protocol(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
   // CHECK:   [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK:   [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
-  // CHECK:   [[METHOD:%[0-9]+]] = objc_method [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> (Self) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK:   [[METHOD:%[0-9]+]] = objc_method [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #P.g!foreign : <Self where Self : P> (Self) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK:   apply [[METHOD]]([[OPENED_ARG_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK:   destroy_value [[OPENED_ARG_COPY]]
   obj.g!()
@@ -59,7 +59,7 @@ func direct_to_static_method(_ obj: AnyObject) {
   // CHECK: end_access [[READ]]
   // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened([[UUID:".*"]]) AnyObject).Type
-  // CHECK-NEXT: [[METHOD:%[0-9]+]] = objc_method [[OPENMETA]] : $@thick (@opened([[UUID]]) AnyObject).Type, #X.staticF!1.foreign : (X.Type) -> () -> (), $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
+  // CHECK-NEXT: [[METHOD:%[0-9]+]] = objc_method [[OPENMETA]] : $@thick (@opened([[UUID]]) AnyObject).Type, #X.staticF!foreign : (X.Type) -> () -> (), $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
   // CHECK: apply [[METHOD]]([[OPENMETA]]) : $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
   // CHECK: destroy_value [[OBJBOX]]
   type(of: obj).staticF!()
@@ -80,7 +80,7 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK:   [[EXISTVAL:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[OBJ_SELF:%[0-9]*]] = open_existential_ref [[EXISTVAL]]
   // CHECK:   [[OPT_TMP:%.*]] = alloc_stack $Optional<@callee_guaranteed () -> ()>
-  // CHECK:   dynamic_method_br [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
+  // CHECK:   dynamic_method_br [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
 
   // Has method BB:
   // CHECK: [[HASBB]]([[UNCURRIED:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()):
@@ -88,7 +88,7 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK:   [[PARTIAL:%[0-9]+]] = partial_apply [callee_guaranteed] [[UNCURRIED]]([[OBJ_SELF_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK:   [[THUNK_PAYLOAD:%.*]] = init_enum_data_addr [[OPT_TMP]]
   // CHECK:   store [[PARTIAL]] to [init] [[THUNK_PAYLOAD]]
-  // CHECK:   inject_enum_addr [[OPT_TMP]] : $*Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt.1
+  // CHECK:   inject_enum_addr [[OPT_TMP]] : $*Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt
   // CHECK:   br [[CONTBB:[a-zA-Z0-9]+]]
 
   // No method BB:
@@ -133,7 +133,7 @@ func opt_to_static_method(_ obj: AnyObject) {
   // CHECK:   [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened
   // CHECK:   [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<@callee_guaranteed () -> ()>
-  // CHECK:   dynamic_method_br [[OBJCMETA]] : $@objc_metatype (@opened({{".*"}}) AnyObject).Type, #X.staticF!1.foreign, [[HASMETHOD:[A-Za-z0-9_]+]], [[NOMETHOD:[A-Za-z0-9_]+]]
+  // CHECK:   dynamic_method_br [[OBJCMETA]] : $@objc_metatype (@opened({{".*"}}) AnyObject).Type, #X.staticF!foreign, [[HASMETHOD:[A-Za-z0-9_]+]], [[NOMETHOD:[A-Za-z0-9_]+]]
   var optF: (() -> ())! = type(of: obj).staticF
 }
 
@@ -151,7 +151,7 @@ func opt_to_property(_ obj: AnyObject) {
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
-  // CHECK:   dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.1.foreign, bb1, bb2
+  // CHECK:   dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.foreign, bb1, bb2
 
   // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int):
   // CHECK:   [[RAWOBJ_SELF_COPY:%.*]] = copy_value [[RAWOBJ_SELF]]
@@ -180,7 +180,7 @@ func opt_to_property(_ obj: AnyObject) {
   // GUARANTEED:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // GUARANTEED:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
   // GUARANTEED:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
-  // GUARANTEED:   dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.1.foreign, bb1, bb2
+  // GUARANTEED:   dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.foreign, bb1, bb2
 
   // GUARANTEED: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int):
   // GUARANTEED:   [[RAWOBJ_SELF_COPY:%.*]] = copy_value [[RAWOBJ_SELF]]
@@ -214,7 +214,7 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBI]]
   // CHECK:   [[I:%[0-9]+]] = load [trivial] [[READ]] : $*Int
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
-  // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
+  // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.foreign, bb1, bb2
 
   // CHECK: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
   // CHECK:   [[OBJ_REF_COPY:%.*]] = copy_value [[OBJ_REF]]
@@ -248,7 +248,7 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // GUARANTEED:   [[READ:%.*]] = begin_access [read] [unknown] [[PBI]]
   // GUARANTEED:   [[I:%[0-9]+]] = load [trivial] [[READ]] : $*Int
   // GUARANTEED:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
-  // GUARANTEED:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
+  // GUARANTEED:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.foreign, bb1, bb2
 
   // GUARANTEED: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
   // GUARANTEED:   [[OBJ_REF_COPY:%.*]] = copy_value [[OBJ_REF]]
@@ -280,7 +280,7 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBI]]
   // CHECK:   [[I:%[0-9]+]] = load [trivial] [[READ]] : $*Int
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
-  // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
+  // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.foreign, bb1, bb2
 
   // CHECK: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
   // CHECK:   [[OBJ_REF_COPY:%.*]] = copy_value [[OBJ_REF]]
@@ -321,7 +321,7 @@ func downcast(_ obj: AnyObject) -> X {
 // CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup7consumeyyAA5Fruit_pF
 // CHECK: bb0(%0 : @guaranteed $Fruit):
 // CHECK:        [[BOX:%.*]] = alloc_stack $Optional<Juice>
-// CHECK:        dynamic_method_br [[SELF:%.*]] : $@opened("{{.*}}") Fruit, #Fruit.juice!getter.1.foreign, bb1, bb2
+// CHECK:        dynamic_method_br [[SELF:%.*]] : $@opened("{{.*}}") Fruit, #Fruit.juice!getter.foreign, bb1, bb2
 
 // CHECK: bb1([[FN:%.*]] : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice):
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -329,9 +329,9 @@ func downcast(_ obj: AnyObject) -> X {
 // CHECK:   [[B:%.*]] = begin_borrow [[METHOD]]
 // CHECK:   [[RESULT:%.*]] = apply [[B]]() : $@callee_guaranteed () -> @owned Juice
 // CHECK:   end_borrow [[B]]
-// CHECK:   [[PAYLOAD:%.*]] = init_enum_data_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
+// CHECK:   [[PAYLOAD:%.*]] = init_enum_data_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt
 // CHECK:   store [[RESULT]] to [init] [[PAYLOAD]]
-// CHECK:   inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
+// CHECK:   inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt
 // CHECK:   destroy_value [[METHOD]]
 // CHECK:   br bb3
 
@@ -364,7 +364,7 @@ func testAnyObjectWithDefault(_ x: AnyObject) {
   // CHECK: function_ref default argument 0 of X.hasDefaultParam(_:)
   // CHECK: [[DEFGEN:%[0-9]+]] = function_ref @$s14dynamic_lookup1XC15hasDefaultParamyySiFfA_ : $@convention(thin) () -> Int
   // CHECK: [[DEFARG:%[0-9]+]] = apply %4() : $@convention(thin) () -> Int
-  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[OPENEDX:%[0-9]+]] : $@opened("{{.*}}") AnyObject, #X.hasDefaultParam!1.foreign : (X) -> (Int) -> (), $@convention(objc_method) (Int, @opened("{{.*}}") AnyObject) -> ()
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[OPENEDX:%[0-9]+]] : $@opened("{{.*}}") AnyObject, #X.hasDefaultParam!foreign : (X) -> (Int) -> (), $@convention(objc_method) (Int, @opened("{{.*}}") AnyObject) -> ()
   // CHECK: apply [[METHOD]]([[DEFARG]], [[OPENEDX]])
   x.hasDefaultParam()
 }

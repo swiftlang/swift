@@ -20,7 +20,7 @@ func lazyPropertiesAreNotStored(_ container: LazyContainer) {
 // CHECK-LABEL: sil hidden [ossa] @$s10multi_file29lazyRefPropertiesAreNotStored{{[_0-9a-zA-Z]*}}F
 func lazyRefPropertiesAreNotStored(_ container: LazyContainerClass) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $LazyContainerClass):
-  // CHECK:   {{%[0-9]+}} = class_method [[ARG]] : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : (LazyContainerClass) -> () -> Int, $@convention(method) (@guaranteed LazyContainerClass) -> Int
+  // CHECK:   {{%[0-9]+}} = class_method [[ARG]] : $LazyContainerClass, #LazyContainerClass.lazyVar!getter : (LazyContainerClass) -> () -> Int, $@convention(method) (@guaranteed LazyContainerClass) -> Int
   markUsed(container.lazyVar)
 }
 
@@ -29,7 +29,7 @@ func finalVarsAreDevirtualized(_ obj: FinalPropertyClass) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $FinalPropertyClass):
   // CHECK:   ref_element_addr [[ARG]] : $FinalPropertyClass, #FinalPropertyClass.foo
   markUsed(obj.foo)
-  // CHECK: class_method [[ARG]] : $FinalPropertyClass, #FinalPropertyClass.bar!getter.1
+  // CHECK: class_method [[ARG]] : $FinalPropertyClass, #FinalPropertyClass.bar!getter
   markUsed(obj.bar)
 }
 

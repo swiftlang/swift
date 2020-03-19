@@ -22,7 +22,7 @@ public class ItemSubclass : Item {
 
 sil @witness_method_impl : $@convention(witness_method: Decodable) (@owned Dictionary<String, Any>, @thick Item.Type) -> @out Item {
 bb0(%0 : $*Item, %1 : $Dictionary<String, Any>, %2 : $@thick Item.Type):
-  %3 = class_method %2 : $@thick Item.Type, #Item.init!allocator.1 : (Item.Type) -> ([String : Any]) -> Item, $@convention(method) (@owned Dictionary<String, Any>, @thick Item.Type) -> @owned Item
+  %3 = class_method %2 : $@thick Item.Type, #Item.init!allocator : (Item.Type) -> ([String : Any]) -> Item, $@convention(method) (@owned Dictionary<String, Any>, @thick Item.Type) -> @owned Item
   %4 = apply %3(%1, %2) : $@convention(method) (@owned Dictionary<String, Any>, @thick Item.Type) -> @owned Item
   store %4 to %0 : $*Item
   %6 = tuple ()
@@ -42,12 +42,12 @@ bb0(%0 : $*Item, %1 : $Dictionary<String, Any>, %2 : $@thick Item.Type):
 
 sil @test_generic_witness_method_partial_apply_devirt : $@convention(thin) (@thick ItemSubclass.Type) -> @owned @callee_owned (@owned Dictionary<String, Any>) -> @out ItemSubclass {
 bb0(%0 : $@thick ItemSubclass.Type):
-  %1 = witness_method $ItemSubclass, #Decodable.init!allocator.1 : <Self where Self : Decodable> (Self.Type) -> ([String : Any]) -> Self : $@convention(witness_method: Decodable) <τ_0_0 where τ_0_0 : Decodable> (@owned Dictionary<String, Any>, @thick τ_0_0.Type) -> @out τ_0_0
+  %1 = witness_method $ItemSubclass, #Decodable.init!allocator : <Self where Self : Decodable> (Self.Type) -> ([String : Any]) -> Self : $@convention(witness_method: Decodable) <τ_0_0 where τ_0_0 : Decodable> (@owned Dictionary<String, Any>, @thick τ_0_0.Type) -> @out τ_0_0
   %2 = partial_apply %1<ItemSubclass>(%0) : $@convention(witness_method: Decodable) <τ_0_0 where τ_0_0 : Decodable> (@owned Dictionary<String, Any>, @thick τ_0_0.Type) -> @out τ_0_0
   return %2 : $@callee_owned (@owned Dictionary<String, Any>) -> @out ItemSubclass
 }
 
 sil_witness_table [serialized] Item: Decodable module main {
-  method #Decodable.init!allocator.1: <Self where Self : Decodable> (Self.Type) -> ([String : Any]) -> Self : @witness_method_impl
+  method #Decodable.init!allocator: <Self where Self : Decodable> (Self.Type) -> ([String : Any]) -> Self : @witness_method_impl
 }
 

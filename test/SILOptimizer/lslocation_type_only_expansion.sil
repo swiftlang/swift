@@ -299,7 +299,7 @@ bb0:
   %1 = alloc_stack $Int, var, name "a"                 // users: %8, %10
   %2 = integer_literal $Builtin.Int64, 10         // user: %3
   %3 = struct $Int64 (%2 : $Builtin.Int64)        // user: %4
-  %4 = enum $Example, #Example.A!enumelt.1, %3 : $Int64 // user: %5
+  %4 = enum $Example, #Example.A!enumelt, %3 : $Int64 // user: %5
   store %4 to %0 : $*Example                    // id: %5
   %6 = integer_literal $Builtin.Int64, 10         // user: %7
   %7 = struct $Int (%6 : $Builtin.Int64)          // user: %8

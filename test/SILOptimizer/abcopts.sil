@@ -201,8 +201,8 @@ bb2:
   %12 = integer_literal $Builtin.Int1, -1
   %13 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
-  %15 = enum $Optional<Int32>, #Optional.some!enumelt.1, %6 : $Int32
-  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt.1
+  %15 = enum $Optional<Int32>, #Optional.some!enumelt, %6 : $Int32
+  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt
   %17 = struct_extract %16 : $Int32, #Int32._value
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -275,8 +275,8 @@ bb2:
   %12 = integer_literal $Builtin.Int1, -1
   %13 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
-  %15 = enum $Optional<Int32>, #Optional.some!enumelt.1, %6 : $Int32
-  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt.1
+  %15 = enum $Optional<Int32>, #Optional.some!enumelt, %6 : $Int32
+  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt
   %17 = struct_extract %16 : $Int32, #Int32._value
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -348,8 +348,8 @@ bb2:
   %12 = integer_literal $Builtin.Int1, -1
   %13 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
-  %15 = enum $Optional<Int32>, #Optional.some!enumelt.1, %6 : $Int32
-  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt.1
+  %15 = enum $Optional<Int32>, #Optional.some!enumelt, %6 : $Int32
+  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt
   %17 = struct_extract %16 : $Int32, #Int32._value
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)

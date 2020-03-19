@@ -39,7 +39,7 @@ bb0:
   %4 = unconditional_checked_cast %3 : $Bar to Foo // user: %6
   destroy_value %1 : $Foo                        // id: %5
   %6 = upcast %4 : $Foo to $Bar                   // user: %7
-  %10 = class_method %6 : $Bar, #Bar.ping!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %11
+  %10 = class_method %6 : $Bar, #Bar.ping : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %11
   %11 = apply %10(%6) : $@convention(method) (@guaranteed Bar) -> ()
   destroy_value %6 : $Bar
   %12 = tuple ()                                  // user: %13
@@ -68,7 +68,7 @@ bb3(%3 : @owned $Bar):
 
 bb4(%4 : @owned $Bar):
   // Devirtualizer should be able to figure out that the exact dynamic type of %1 is Bar.
-  %5 = class_method %4 : $Bar, #Bar.ping!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
+  %5 = class_method %4 : $Bar, #Bar.ping : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
   %6 = apply %5(%4) : $@convention(method) (@guaranteed Bar) -> ()
   destroy_value %4 : $Bar
   br bb6
@@ -103,7 +103,7 @@ bb2:
 
 bb3(%4 : @owned $Bar):
   // Devirtualizer should be able to figure out that the exact dynamic type of %4 is Bar.
-  %5 = class_method %4 : $Bar, #Bar.ping!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
+  %5 = class_method %4 : $Bar, #Bar.ping : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
   %6 = apply %5(%4) : $@convention(method) (@guaranteed Bar) -> ()
   br bb4
 
@@ -118,11 +118,11 @@ sil @_TFC4main3Bar4pingfS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
 sil @_TFC4main3Foo4pingfS0_FT_T_ : $@convention(method) (@guaranteed Foo) -> ()
 
 sil_vtable Bar {
-  #Bar.ping!1: @_TFC4main3Bar4pingfS0_FT_T_
+  #Bar.ping: @_TFC4main3Bar4pingfS0_FT_T_
 }
 
 sil_vtable Foo {
-  #Bar.ping!1: @_TFC4main3Foo4pingfS0_FT_T_
+  #Bar.ping: @_TFC4main3Foo4pingfS0_FT_T_
 }
 
 

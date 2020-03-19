@@ -341,9 +341,9 @@ enum Optional<T> {
 
 // CHECK-LABEL: sil @f080_optional : $@convention(thin) <T> (@in T) -> @out Optional<T> {
 // CHECK: bb0(%0 : $*Optional<T>, %1 : $*T):
-// CHECK:   %[[DATA:.*]] = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt.1
+// CHECK:   %[[DATA:.*]] = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
 // CHECK:   copy_addr %1 to [initialization] %[[DATA]] : $*T
-// CHECK:   inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt.1
+// CHECK:   inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt
 // CHECK:   destroy_addr %1 : $*T
 // CHECK:   %[[T:.*]] = tuple ()
 // CHECK:   return %[[T]] : $()
@@ -351,7 +351,7 @@ enum Optional<T> {
 sil @f080_optional : $@convention(thin) <T> (@in T) -> @out Optional<T> {
 bb0(%0 : $T):
   %cpy = copy_value %0 : $T
-  %opt = enum $Optional<T>, #Optional.some!enumelt.1, %cpy : $T
+  %opt = enum $Optional<T>, #Optional.some!enumelt, %cpy : $T
   destroy_value %0 : $T
   return %opt : $Optional<T>
 }
