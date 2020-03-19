@@ -3434,6 +3434,7 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
+    case ConstraintLocator::ClosureBody:
     case ConstraintLocator::ClosureResult:
       if (auto CE = dyn_cast<ClosureExpr>(anchor)) {
         if (CE->hasSingleExpressionBody()) {

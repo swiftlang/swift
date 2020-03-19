@@ -823,6 +823,9 @@ ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       // Record return statements.
       if (auto ret = dyn_cast<ReturnStmt>(stmt)) {
+        if (ret->isImplicit())
+          return {true, stmt};
+
         // If it has a result, remember that we saw one, but keep
         // traversing in case there's a no-result return somewhere.
         if (ret->hasResult()) {
