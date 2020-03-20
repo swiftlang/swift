@@ -187,7 +187,7 @@ class OverridableGetter : ReadableTitle {
 // CHECK-LABEL: // end sil function '$s13read_accessor17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW'
 //   The concrete read accessor is generated on-demand and does a class dispatch to the getter.
 // CHECK-LABEL: sil shared [ossa] @$s13read_accessor17OverridableGetterC5titleSSvr
-// CHECK:       class_method %0 : $OverridableGetter, #OverridableGetter.title!getter.1
+// CHECK:       class_method %0 : $OverridableGetter, #OverridableGetter.title!getter
 // CHECK-LABEL: // end sil function '$s13read_accessor17OverridableGetterC5titleSSvr'
 
 protocol GettableTitle {
@@ -203,5 +203,5 @@ class OverridableReader : GettableTitle {
 // CHECK-LABEL: // end sil function '$s13read_accessor17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW'
 //   The concrete getter is generated on-demand and does a class dispatch to the read accessor.
 // CHECK-LABEL: sil shared [ossa] @$s13read_accessor17OverridableReaderC5titleSSvg
-// CHECK:       class_method %0 : $OverridableReader, #OverridableReader.title!read.1
+// CHECK:       class_method %0 : $OverridableReader, #OverridableReader.title!read
 // CHECK-LABEL: // end sil function '$s13read_accessor17OverridableReaderC5titleSSvg'

@@ -22,7 +22,7 @@ func optionalMethodGeneric<T : P1>(t t : T) {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[READ]] : $*T
   // CHECK:   alloc_stack $Optional<@callee_guaranteed (Int) -> ()>
-  // CHECK:   dynamic_method_br [[T]] : $T, #P1.method!1.foreign
+  // CHECK:   dynamic_method_br [[T]] : $T, #P1.method!foreign
   var methodRef = t.method
 }
 // CHECK: } // end sil function '$s17protocol_optional0B13MethodGeneric1tyx_tAA2P1RzlF'
@@ -40,7 +40,7 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[READ]] : $*T
   // CHECK:   alloc_stack $Optional<Int>
-  // CHECK:   dynamic_method_br [[T]] : $T, #P1.prop!getter.1.foreign
+  // CHECK:   dynamic_method_br [[T]] : $T, #P1.prop!getter.foreign
   var propertyRef = t.prop
 }
 // CHECK: } // end sil function '$s17protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F'
@@ -62,7 +62,7 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   // CHECK:   [[INTCONV:%[0-9]+]] = function_ref @$sSi2{{[_0-9a-zA-Z]*}}fC
   // CHECK:   [[FIVE:%[0-9]+]] = apply [[INTCONV]]([[FIVELIT]], [[INT64]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
   // CHECK:   alloc_stack $Optional<Int>
-  // CHECK:   dynamic_method_br [[T]] : $T, #P1.subscript!getter.1.foreign
+  // CHECK:   dynamic_method_br [[T]] : $T, #P1.subscript!getter.foreign
   var subscriptRef = t[5]
 }
 // CHECK: } // end sil function '$s17protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F'

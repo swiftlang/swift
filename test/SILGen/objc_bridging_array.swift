@@ -30,7 +30,7 @@ func setChildren(p: Parent, c: Child) {
 // CHECK: [[BRIDGED_ARRAY:%.*]] = apply [[FN]]<Child>([[BORROW_ARRAY]]) : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @owned NSArray
 // CHECK: end_borrow [[BORROW_ARRAY]] : $Array<Child>
 // CHECK: destroy_value [[ARRAY]] : $Array<Child>
-// CHECK: [[FN:%.*]] = objc_method [[COPIED]] : $[[OPENED_TYPE]], #Parent.children!setter.1.foreign : <Self where Self : Parent> (Self) -> ([Child]) -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : Parent> (NSArray, τ_0_0) -> ()
+// CHECK: [[FN:%.*]] = objc_method [[COPIED]] : $[[OPENED_TYPE]], #Parent.children!setter.foreign : <Self where Self : Parent> (Self) -> ([Child]) -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : Parent> (NSArray, τ_0_0) -> ()
 // CHECK: apply [[FN]]<[[OPENED_TYPE]]>([[BRIDGED_ARRAY]], [[COPIED]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Parent> (NSArray, τ_0_0) -> ()
 // CHECK: destroy_value [[BRIDGED_ARRAY]] : $NSArray
 // CHECK: destroy_value [[COPIED]] : $[[OPENED_TYPE]]

@@ -20,7 +20,7 @@ bb0(%0 : $Optional<() -> ()>):
   retain_value %0 : $Optional<() -> ()>
 
   // CHECK: icmp eq i64 %0, 0
-  switch_enum %0 : $Optional<() -> ()>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+  switch_enum %0 : $Optional<() -> ()>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
   // CHECK: [[FNPTR:%.*]] = inttoptr [[WORD]] %0 to i8*
   // CHECK: [[CTX:%.*]] = inttoptr [[WORD]] %1 to %swift.refcounted*

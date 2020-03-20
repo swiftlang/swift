@@ -28,7 +28,7 @@ bb1:
   cond_br %1, bb2, bb3(%2 : $E)
 
 // CHECK: [[ENUM1:%[0-9]+]] = enum $E, #E.B
-// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $E2, #E2.Y!enumelt.1, [[ENUM1]]
+// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $E2, #E2.Y!enumelt, [[ENUM1]]
 // CHECK-NEXT: br [[RETBB:bb[0-9]+]]([[ENUM2]] : $E2)
 bb2:
   // This block should be jump-threaded
@@ -36,7 +36,7 @@ bb2:
   br bb3(%3 : $E)
 
 bb3(%4 : $E):
-  %5 = enum $E2, #E2.Y!enumelt.1, %4 : $E
+  %5 = enum $E2, #E2.Y!enumelt, %4 : $E
   br bb5(%5 : $E2)
 
 bb4:

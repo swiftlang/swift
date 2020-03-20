@@ -19,19 +19,19 @@ func useOptAnyObject(_: AnyObject?) {}
 // CHECK-LABEL: sil hidden [ossa] @$s22objc_bridging_peephole16testMethodResult5dummyySo10DummyClassC_tF
 func testMethodResult(dummy: DummyClass) {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $DummyClass):
-  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]] : $DummyClass, #DummyClass.fetchNullableString!1.foreign
+  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]] : $DummyClass, #DummyClass.fetchNullableString!foreign
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK:      [[USE:%.*]] = function_ref @$s22objc_bridging_peephole8useOptNSyySo8NSStringCSgF
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   useOptNS(dummy.fetchNullableString() as NSString?)
 
-  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]] : $DummyClass, #DummyClass.fetchNullproneString!1.foreign
+  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]] : $DummyClass, #DummyClass.fetchNullproneString!foreign
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK:      [[USE:%.*]] = function_ref @$s22objc_bridging_peephole8useOptNSyySo8NSStringCSgF
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   useOptNS(dummy.fetchNullproneString() as NSString?)
 
-  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]] : $DummyClass, #DummyClass.fetchNonnullString!1.foreign
+  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]] : $DummyClass, #DummyClass.fetchNonnullString!foreign
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK:      [[USE:%.*]] = function_ref @$s22objc_bridging_peephole8useOptNSyySo8NSStringCSgF
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
@@ -327,7 +327,7 @@ func testMethodArgument(dummy: DummyClass) {
   // CHECK:      // function_ref
   // CHECK-NEXT: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]] : $NSString
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
@@ -336,7 +336,7 @@ func testMethodArgument(dummy: DummyClass) {
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]] : $NSString
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
@@ -350,7 +350,7 @@ func testValueToOptMethodArgument(dummy: DummyClass) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $DummyClass):
   // CHECK: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]] : $NSString
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
@@ -358,7 +358,7 @@ func testValueToOptMethodArgument(dummy: DummyClass) {
 
   // CHECK: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]] : $NSString
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
@@ -401,7 +401,7 @@ func testPropertySetter(dummy: DummyClass) {
 
   // CHECK: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]] : $NSString
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
@@ -409,7 +409,7 @@ func testPropertySetter(dummy: DummyClass) {
 
   // CHECK: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]] : $NSString
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
@@ -423,7 +423,7 @@ func testValueToOptPropertySetter(dummy: DummyClass) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $DummyClass):
   // CHECK: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]] : $NSString
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
@@ -431,7 +431,7 @@ func testValueToOptPropertySetter(dummy: DummyClass) {
 
   // CHECK: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]] : $NSString
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
@@ -485,7 +485,7 @@ func testNullableSubscriptSet(object: NullableSubscript, index: AnyObject) {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $NullableSubscript,
   // CHECK:      [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]]
   // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
@@ -496,7 +496,7 @@ func testNullableSubscriptSet(object: NullableSubscript, index: AnyObject) {
 
   // CHECK:      [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]]
   // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
@@ -523,7 +523,7 @@ func testNullproneSubscriptSet(object: NullproneSubscript, index: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $NullproneSubscript,
   // CHECK:      [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]]
   // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
@@ -534,7 +534,7 @@ func testNullproneSubscriptSet(object: NullproneSubscript, index: AnyObject) {
 
   // CHECK:      [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[ARG]]
   // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
@@ -582,7 +582,7 @@ func testBlockToOptionalAnyObjectBridge(block: @escaping @convention(block) () -
   // CHECK:      [[T0:%.*]] = begin_borrow {{%.*}} : $@convention(block) () -> ()
   // CHECK-NEXT: [[T1:%.*]] = copy_value [[T0]]
   // CHECK-NEXT: [[REF:%.*]] = unchecked_ref_cast [[T1]] : $@convention(block) () -> () to $AnyObject
-  // CHECK-NEXT: [[OPTREF:%.*]] = enum $Optional<AnyObject>, #Optional.some!enumelt.1, [[REF]] : $AnyObject
+  // CHECK-NEXT: [[OPTREF:%.*]] = enum $Optional<AnyObject>, #Optional.some!enumelt, [[REF]] : $AnyObject
   // CHECK-NEXT: end_borrow [[T0]]
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[FN:%.*]] = function_ref @takeNullableId : $@convention(c) (Optional<AnyObject>) -> ()

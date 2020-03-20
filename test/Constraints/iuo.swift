@@ -225,3 +225,7 @@ var y: Int = 2
 
 let r = sr6988(x: x, y: y)
 let _: Int = r
+
+// SR-11998 / rdar://problem/58455441
+class C<T> {}
+var sub: C! = C<Int>()

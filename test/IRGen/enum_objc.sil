@@ -53,7 +53,7 @@ enum SinglePayloadObjCProtocol {
 
 sil @single_payload_class_protocol_switch : $(SinglePayloadClassProtocol) -> () {
 entry(%c : $SinglePayloadClassProtocol):
-  switch_enum %c : $SinglePayloadClassProtocol, case #SinglePayloadClassProtocol.x!enumelt.1: x_dest, case #SinglePayloadClassProtocol.y!enumelt: y_dest, case #SinglePayloadClassProtocol.z!enumelt: z_dest, case #SinglePayloadClassProtocol.w!enumelt: w_dest
+  switch_enum %c : $SinglePayloadClassProtocol, case #SinglePayloadClassProtocol.x!enumelt: x_dest, case #SinglePayloadClassProtocol.y!enumelt: y_dest, case #SinglePayloadClassProtocol.z!enumelt: z_dest, case #SinglePayloadClassProtocol.w!enumelt: w_dest
 
 x_dest(%d : $PC):
   br end
@@ -88,7 +88,7 @@ end:
 
 sil @single_payload_objc_protocol_switch : $(SinglePayloadObjCProtocol) -> () {
 entry(%c : $SinglePayloadObjCProtocol):
-  switch_enum %c : $SinglePayloadObjCProtocol, case #SinglePayloadObjCProtocol.x!enumelt.1: x_dest, case #SinglePayloadObjCProtocol.y!enumelt: y_dest, case #SinglePayloadObjCProtocol.z!enumelt: z_dest, case #SinglePayloadObjCProtocol.w!enumelt: w_dest
+  switch_enum %c : $SinglePayloadObjCProtocol, case #SinglePayloadObjCProtocol.x!enumelt: x_dest, case #SinglePayloadObjCProtocol.y!enumelt: y_dest, case #SinglePayloadObjCProtocol.z!enumelt: z_dest, case #SinglePayloadObjCProtocol.w!enumelt: w_dest
 
 x_dest(%d : $PO):
   br end
@@ -114,7 +114,7 @@ sil @weak_optional : $@convention(thin) (@in StructWithWeakVar?) -> () {
 entry(%x : $*StructWithWeakVar?):
   // CHECK:      icmp eq [[WORD:i32|i64]] {{%.*}}, 0
   switch_enum_addr %x : $*StructWithWeakVar?,
-    case #Optional.some!enumelt.1: a,
+    case #Optional.some!enumelt: a,
     case #Optional.none!enumelt:   b
 a:
   br x

@@ -114,15 +114,12 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                       bool isCurried, bool isForeign)
-  : loc(vd), kind(kind),
-    isCurried(isCurried), isForeign(isForeign),
-    isDirectReference(0), defaultArgIndex(0)
+                       bool isForeign)
+  : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0)
 {}
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
-                       bool isCurried, bool asForeign) 
-  : isCurried(isCurried), isDirectReference(0), defaultArgIndex(0)
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign) 
+  : defaultArgIndex(0)
 {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
@@ -174,7 +171,7 @@ Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
 }
 
 bool SILDeclRef::isThunk() const {
-  return isCurried || isForeignToNativeThunk() || isNativeToForeignThunk();
+  return isForeignToNativeThunk() || isNativeToForeignThunk();
 }
 
 bool SILDeclRef::isClangImported() const {
@@ -245,22 +242,6 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
     }
     moduleContext = moduleContext->getParent();
-  }
-
-  // Enum constructors and curry thunks either have private or shared
-  // linkage, dependings are essentially the same as thunks, they are
-  // emitted by need and have shared linkage.
-  if (isEnumElement() || isCurried) {
-    switch (d->getEffectiveAccess()) {
-    case AccessLevel::Private:
-    case AccessLevel::FilePrivate:
-      return maybeAddExternal(SILLinkage::Private);
-
-    case AccessLevel::Internal:
-    case AccessLevel::Public:
-    case AccessLevel::Open:
-      return SILLinkage::Shared;
-    }
   }
 
   // Calling convention thunks have shared linkage.
@@ -539,18 +520,6 @@ IsSerialized_t SILDeclRef::isSerialized() const {
         fn->hasForcedStaticDispatch())
       return IsSerialized;
 
-  // Enum element constructors are serializable if the enum is
-  // @usableFromInline or public.
-  if (isEnumElement())
-    return IsSerializable;
-
-  // Currying thunks are serialized if referenced from an inlinable
-  // context -- Sema's semantic checks ensure the serialization of
-  // such a thunk is valid, since it must in turn reference a public
-  // symbol, or dispatch via class_method or witness_method.
-  if (isCurried)
-    return IsSerializable;
-
   if (isForeignToNativeThunk())
     return IsSerializable;
 
@@ -687,8 +656,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   // As a special case, Clang functions and globals don't get mangled at all.
   if (hasDecl()) {
     if (auto clangDecl = getDecl()->getClangDecl()) {
-      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()
-          && !isCurried) {
+      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
         if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
           if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
             std::string s(1, '\01');
@@ -712,8 +680,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     case SILDeclRef::ManglingKind::Default:
       if (isForeign) {
         SKind = ASTMangler::SymbolKind::SwiftAsObjCThunk;
-      } else if (isDirectReference) {
-        SKind = ASTMangler::SymbolKind::DirectMethodReferenceThunk;
       } else if (isForeignToNativeThunk()) {
         SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
       }
@@ -733,8 +699,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // point.
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!NameA->Name.empty() &&
-          !isForeignToNativeThunk() && !isNativeToForeignThunk()
-          && !isCurried) {
+          !isForeignToNativeThunk() && !isNativeToForeignThunk()) {
         return NameA->Name.str();
       }
       
@@ -748,16 +713,14 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     LLVM_FALLTHROUGH;
 
   case SILDeclRef::Kind::EnumElement:
-    return mangler.mangleEntity(getDecl(), isCurried, SKind);
+    return mangler.mangleEntity(getDecl(), SKind);
 
   case SILDeclRef::Kind::Deallocator:
-    assert(!isCurried);
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
                                           /*isDeallocating*/ true,
                                           SKind);
 
   case SILDeclRef::Kind::Destroyer:
-    assert(!isCurried);
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
                                           /*isDeallocating*/ false,
                                           SKind);
@@ -765,42 +728,35 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::Allocator:
     return mangler.mangleConstructorEntity(cast<ConstructorDecl>(getDecl()),
                                            /*allocating*/ true,
-                                           isCurried,
                                            SKind);
 
   case SILDeclRef::Kind::Initializer:
     return mangler.mangleConstructorEntity(cast<ConstructorDecl>(getDecl()),
                                            /*allocating*/ false,
-                                           isCurried,
                                            SKind);
 
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
-    assert(!isCurried);
     return mangler.mangleIVarInitDestroyEntity(cast<ClassDecl>(getDecl()),
                                   kind == SILDeclRef::Kind::IVarDestroyer,
                                   SKind);
 
   case SILDeclRef::Kind::GlobalAccessor:
-    assert(!isCurried);
     return mangler.mangleAccessorEntity(AccessorKind::MutableAddress,
                                         cast<AbstractStorageDecl>(getDecl()),
                                         /*isStatic*/ false,
                                         SKind);
 
   case SILDeclRef::Kind::DefaultArgGenerator:
-    assert(!isCurried);
     return mangler.mangleDefaultArgumentEntity(
                                         cast<DeclContext>(getDecl()),
                                         defaultArgIndex,
                                         SKind);
 
   case SILDeclRef::Kind::StoredPropertyInitializer:
-    assert(!isCurried);
     return mangler.mangleInitializerEntity(cast<VarDecl>(getDecl()), SKind);
 
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
-    assert(!isCurried);
     return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
                                                   SKind);
   }
@@ -829,7 +785,7 @@ SILDeclRef SILDeclRef::getOverridden() const {
   if (!overridden)
     return SILDeclRef();
 
-  return SILDeclRef(overridden, kind, isCurried);
+  return SILDeclRef(overridden, kind);
 }
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
@@ -889,7 +845,7 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
 SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
   auto bestOverridden =
     getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-  return SILDeclRef(bestOverridden, kind, isCurried);
+  return SILDeclRef(bestOverridden, kind);
 }
 
 AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(
@@ -1056,7 +1012,7 @@ SubclassScope SILDeclRef::getSubclassScope() const {
 }
 
 unsigned SILDeclRef::getParameterListCount() const {
-  if (isCurried || !hasDecl() || kind == Kind::DefaultArgGenerator)
+  if (!hasDecl() || kind == Kind::DefaultArgGenerator)
     return 1;
 
   auto *vd = getDecl();

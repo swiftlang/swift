@@ -135,7 +135,7 @@ struct FailableStruct {
 // CHECK-NEXT:    [[SELF_VALUE:%.*]] = unchecked_enum_data [[SELF_OPTIONAL]]
 // CHECK-NEXT:    retain_value [[SELF_VALUE]]
 // CHECK-NEXT:    store [[SELF_VALUE]] to [[SELF_BOX]]
-// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableStruct>, #Optional.some!enumelt.1, [[SELF_VALUE]]
+// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableStruct>, #Optional.some!enumelt, [[SELF_VALUE]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<FailableStruct>)
@@ -201,7 +201,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
 // CHECK:         [[X_BOX:%.*]] = alloc_stack $T
 // CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
-// CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
+// CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[X_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
@@ -223,7 +223,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
 // CHECK:         [[X_BOX:%.*]] = alloc_stack $T
 // CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
-// CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
+// CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[X_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
@@ -232,7 +232,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK-NEXT:    dealloc_stack [[X_BOX]]
 // CHECK-NEXT:    [[Y_BOX:%.*]] = alloc_stack $T
 // CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
-// CHECK-NEXT:    [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
+// CHECK-NEXT:    [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[Y_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    [[Y_ADDR:%.*]] = struct_element_addr [[WRITE]]
@@ -512,7 +512,7 @@ struct ThrowStruct {
 // CHECK-NEXT:    try_apply [[INIT_FN]]([[ARG1]], [[ARG2]]) : $@convention(method) (Int, @thin ThrowStruct.Type) -> (@owned ThrowStruct, @error Error), normal [[TRY_APPLY_SUCC_BB:bb[0-9]+]], error [[TRY_APPLY_FAIL_BB:bb[0-9]+]]
 //
 // CHECK:       [[TRY_APPLY_SUCC_BB]]([[NEW_SELF:%.*]] : $ThrowStruct):
-// CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt.1, [[NEW_SELF]]
+// CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt, [[NEW_SELF]]
 // CHECK-NEXT:    br [[TRY_APPLY_CONT:bb[0-9]+]]([[SELF_OPTIONAL]] : $Optional<ThrowStruct>)
 //
 // CHECK:       [[TRY_APPLY_CONT]]([[SELF_OPTIONAL:%.*]] : $Optional<ThrowStruct>):
@@ -529,7 +529,7 @@ struct ThrowStruct {
 // CHECK-NEXT:    [[SELF_VALUE:%.*]] = unchecked_enum_data [[SELF_OPTIONAL]]
 // CHECK-NEXT:    retain_value [[SELF_VALUE]]
 // CHECK-NEXT:    store [[SELF_VALUE]] to [[SELF_BOX]]
-// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt.1, [[SELF_VALUE]]
+// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt, [[SELF_VALUE]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<ThrowStruct>)
@@ -783,7 +783,7 @@ class FailableBaseClass {
 // CHECK-NEXT:    [[SELF_VALUE:%.*]] = unchecked_enum_data [[SELF_OPTIONAL]]
 // CHECK-NEXT:    strong_retain [[SELF_VALUE]]
 // CHECK-NEXT:    store [[SELF_VALUE]] to [[SELF_BOX]]
-// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableBaseClass>, #Optional.some!enumelt.1, [[SELF_VALUE]]
+// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableBaseClass>, #Optional.some!enumelt, [[SELF_VALUE]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<FailableBaseClass>)
@@ -870,7 +870,7 @@ class FailableDerivedClass : FailableBaseClass {
 // CHECK-NEXT:    [[SELF_VALUE:%.*]] = unchecked_ref_cast [[BASE_SELF_VALUE]]
 // CHECK-NEXT:    strong_retain [[SELF_VALUE]]
 // CHECK-NEXT:    store [[SELF_VALUE]] to [[SELF_BOX]]
-// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableDerivedClass>, #Optional.some!enumelt.1, [[SELF_VALUE]]
+// CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableDerivedClass>, #Optional.some!enumelt, [[SELF_VALUE]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<FailableDerivedClass>)

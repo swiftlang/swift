@@ -65,7 +65,7 @@ bb0(%0 : $AnyObject):
   // CHECK: [[RESPONDS:%[0-9]+]] = load i8*, i8** @"\01L_selector(respondsToSelector:)"
   // CHECK: [[HAS_SEL:%[0-9]]] = call i1 {{.*}}@objc_msgSend {{.*}}(%objc_object* [[OBJECT:%[0-9]+]], i8* [[RESPONDS]], i8* [[SEL]])
   // CHECK: br i1 [[HAS_SEL]]
-  dynamic_method_br %6 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject, #X.f!1.foreign, bb1, bb2
+  dynamic_method_br %6 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject, #X.f!foreign, bb1, bb2
 
 bb1(%8 : $@convention(objc_method) (@opened("01234567-89ab-cdef-0123-000000000000") AnyObject) -> ()):
   br bb3
@@ -88,7 +88,7 @@ bb0(%0 : $@thick AnyObject.Type):
   // CHECK: [[HAS_SEL:%[0-9]]] = call i1 {{.*}}@objc_msgSend {{.*}}(%objc_object* [[OBJECT:%[0-9]+]], i8* [[RESPONDS]], i8* [[SEL]])
   // CHECK: br i1 [[HAS_SEL]]
   %1 = open_existential_metatype %0 : $@thick AnyObject.Type to $@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type
-  dynamic_method_br %1 : $@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type, #X.g!1.foreign, bb1, bb2
+  dynamic_method_br %1 : $@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type, #X.g!foreign, bb1, bb2
 
 bb1(%8 : $@convention(objc_method) (@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type) -> ()):
   br bb3
@@ -109,7 +109,7 @@ sil @_T1t23dynamic_lookup_propertyFT1xPSo13AnyObject__T_ : $@convention(thin) (A
   %6 = load %1a : $*AnyObject                // users: %24, %8, %7
   strong_retain %6 : $AnyObject
   %8 = open_existential_ref %6 : $AnyObject to $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject // users: %11, %9
-  dynamic_method_br %8 : $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject, #X.value!getter.1.foreign, bb1, bb2
+  dynamic_method_br %8 : $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject, #X.value!getter.foreign, bb1, bb2
 
 bb1(%10 : $@convention(objc_method) (@opened("01234567-89ab-cdef-0123-111111111111") AnyObject) -> Int):
   br bb3
@@ -140,7 +140,7 @@ bb0(%0 : $AnyObject, %1 : $Int):
   // CHECK-NEXT: [[HAS_SEL:%[0-9]]] = call i1 {{.*}}@objc_msgSend {{.*}}(%objc_object* [[OBJECT:%[0-9]+]], i8* [[RESPONDS]], i8* [[SEL]])
   // CHECK-NEXT: br i1 [[HAS_SEL]], label [[HAS_METHOD:%[0-9]+]], label [[HAS_METHOD:%[0-9]+]]
 
-  dynamic_method_br %10 : $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
+  dynamic_method_br %10 : $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject, #X.subscript!getter.foreign, bb1, bb2
 
 bb1(%13 : $@convention(objc_method) (Int, @opened("01234567-89ab-cdef-0123-111111111111") AnyObject) -> Int): // Preds: bb0
   %14 = partial_apply %13(%10) : $@convention(objc_method) (Int, @opened("01234567-89ab-cdef-0123-111111111111") AnyObject) -> Int

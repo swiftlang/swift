@@ -170,9 +170,9 @@ sil @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_ : $@convention(metho
 sil @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_ : $@convention(method) <T> (@guaranteed RootGeneric<T>) -> ()
 
 sil_vtable RootGeneric {
-  #RootGeneric.foo!1: @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_
-  #RootGeneric.bar!1: @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_
-  #RootGeneric.bas!1: @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_
+  #RootGeneric.foo: @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_
+  #RootGeneric.bar: @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_
+  #RootGeneric.bas: @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_
 }
 
 class RootGenericFixedLayout<T> {
@@ -213,12 +213,12 @@ sil @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_ : $@c
 sil @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_ : $@convention(method) <A, B> (@guaranteed GenericInheritsGeneric<A, B>) -> ()
 
 sil_vtable GenericInheritsGeneric {
-  #RootGeneric.foo!1: @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_ [inherited]
-  #RootGeneric.bar!1: @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_ [inherited]
-  #RootGeneric.bas!1: @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_ [inherited]
-  #GenericInheritsGeneric.zippity!1: @_TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_
-  #GenericInheritsGeneric.doo!1: @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_
-  #GenericInheritsGeneric.dah!1: @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_
+  #RootGeneric.foo: @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_ [inherited]
+  #RootGeneric.bar: @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_ [inherited]
+  #RootGeneric.bas: @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_ [inherited]
+  #GenericInheritsGeneric.zippity: @_TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_
+  #GenericInheritsGeneric.doo: @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_
+  #GenericInheritsGeneric.dah: @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_
 }
 
 class GenericInheritsNonGeneric<C> : RootNonGeneric {

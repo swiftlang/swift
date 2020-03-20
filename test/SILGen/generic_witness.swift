@@ -9,7 +9,7 @@ protocol Runcible {
 // CHECK-LABEL: sil hidden [ossa] @$s15generic_witness3foo{{[_0-9a-zA-Z]*}}F : $@convention(thin) <B where B : Runcible> (@in_guaranteed B) -> () {
 
 func foo<B : Runcible>(_ x: B) {
-  // CHECK: [[METHOD:%.*]] = witness_method $B, #Runcible.runce!1 : {{.*}} : $@convention(witness_method: Runcible) <τ_0_0 where τ_0_0 : Runcible><τ_1_0> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
+  // CHECK: [[METHOD:%.*]] = witness_method $B, #Runcible.runce : {{.*}} : $@convention(witness_method: Runcible) <τ_0_0 where τ_0_0 : Runcible><τ_1_0> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
   // CHECK: apply [[METHOD]]<B, Int>
   x.runce(5)
 }
@@ -20,7 +20,7 @@ func bar(_ x: Runcible) {
   // CHECK: [[BOX:%.*]] = alloc_box ${ var Runcible }
   // CHECK: [[TEMP:%.*]] = alloc_stack $Runcible
   // CHECK: [[EXIST:%.*]] = open_existential_addr immutable_access [[TEMP]] : $*Runcible to $*[[OPENED:@opened(.*) Runcible]]
-  // CHECK: [[METHOD:%.*]] = witness_method $[[OPENED]], #Runcible.runce!1
+  // CHECK: [[METHOD:%.*]] = witness_method $[[OPENED]], #Runcible.runce :
   // CHECK: apply [[METHOD]]<[[OPENED]], Int>
   x.runce(5)
 }

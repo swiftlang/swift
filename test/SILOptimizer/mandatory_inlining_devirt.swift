@@ -6,7 +6,7 @@
 
 open class OpenClass {
   // CHECK-LABEL: sil @$s4test9OpenClassC1xACSi_tcfC
-  // CHECK: [[M:%[0-9]+]] = class_method %1 : $@thick OpenClass.Type, #OpenClass.init!allocator.1
+  // CHECK: [[M:%[0-9]+]] = class_method %1 : $@thick OpenClass.Type, #OpenClass.init!allocator
   // CHECK: apply [[M]]
   // CHECK: return
   public convenience init(x: Int) {

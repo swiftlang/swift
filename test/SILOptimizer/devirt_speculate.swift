@@ -92,7 +92,7 @@ class Sub7 : Base {
 
 // CHECK: bb15:
 // CHECK-NOT: checked_cast_br
-// CHECK:   %[[CM:[0-9]+]] = class_method %0 : $Base, #Base.foo!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// CHECK:   %[[CM:[0-9]+]] = class_method %0 : $Base, #Base.foo : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
 // CHECK:   apply %[[CM]](%0) : $@convention(method) (@guaranteed Base) -> ()
 
 // YAML:      Pass:            sil-speculative-devirtualizer

@@ -978,7 +978,6 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
 
   ASTContext &Ctx = CI.getASTContext();
   registerIDERequestFunctions(Ctx.evaluator);
-  Ctx.setLegacySemanticQueriesEnabled();
 
   SourceTextInfo IFaceInfo;
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))
@@ -1105,9 +1104,6 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   ASTContext &Ctx = CI.getASTContext();
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
   CI.performSema();
-
-  // Setup a typechecker for protocol conformance resolving.
-  Ctx.setLegacySemanticQueriesEnabled();
 
   SourceTextInfo SourceInfo;
   if (getSourceTextInfo(CI, SourceInfo))
@@ -1456,11 +1452,8 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
     return;
   }
 
-  ASTContext &Ctx = CI.getASTContext();
-  // Setup a typechecker for protocol conformance resolving.
-  Ctx.setLegacySemanticQueriesEnabled();
-
   // Load standard library so that Clang importer can use it.
+  ASTContext &Ctx = CI.getASTContext();
   auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
   if (!Stdlib) {
     Error = "Cannot load stdlib.";

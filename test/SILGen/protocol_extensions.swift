@@ -14,7 +14,7 @@ extension P1 {
   // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions2P1PAAE6extP1a{{[_0-9a-zA-Z]*}}F : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK: bb0([[SELF:%[0-9]+]] : $*Self):
   func extP1a() {
-    // CHECK: [[WITNESS:%[0-9]+]] = witness_method $Self, #P1.reqP1a!1 : {{.*}} : $@convention(witness_method: P1) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
+    // CHECK: [[WITNESS:%[0-9]+]] = witness_method $Self, #P1.reqP1a : {{.*}} : $@convention(witness_method: P1) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     // CHECK-NEXT: apply [[WITNESS]]<Self>([[SELF]]) : $@convention(witness_method: P1) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     reqP1a()
     // CHECK: return
@@ -42,7 +42,7 @@ extension P1 {
 
     // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions2P1PAAE13callSubscript{{[_0-9a-zA-Z]*}}F
     // CHECK: bb0(%0 : $*Self):
-    // CHECK: witness_method $Self, #P1.subscript!getter.1
+    // CHECK: witness_method $Self, #P1.subscript!getter
     // CHECK: return
     return self[0]
   }
@@ -700,7 +700,7 @@ extension InitRequirement {
     // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
     // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
     // CHECK-NEXT: [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
-    // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : {{.*}} : $@convention(witness_method: InitRequirement) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
+    // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator : {{.*}} : $@convention(witness_method: InitRequirement) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
     // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY_CAST]], [[SELF_TYPE]])
     // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
@@ -743,7 +743,7 @@ extension InitRequirement {
     // CHECK-NEXT: [[SELF_TYPE:%.*]] = metatype $@thick Self.Type
     // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
     // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-    // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1
+    // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator
     // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY]], [[SELF_TYPE]])
     // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF_BOX_ADDR]]
@@ -768,7 +768,7 @@ extension ClassInitRequirement {
   // CHECK:         [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:         [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:         [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
-  // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator.1 : {{.*}} : $@convention(witness_method: ClassInitRequirement) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
+  // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator : {{.*}} : $@convention(witness_method: ClassInitRequirement) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
   // CHECK:         apply [[DELEGATEE]]<Self>([[ARG_COPY_CAST]], [[SELF_TYPE]])
   // CHECK:         end_borrow [[BORROWED_ARG]]
   
@@ -798,7 +798,7 @@ extension ObjCInitRequirement {
   // CHECK:         [[BORROWED_ARG_1_UPCAST:%.*]] = upcast [[BORROWED_ARG_1]]
   // CHECK:         [[BORROWED_ARG_2:%.*]] = begin_borrow [[ARG]]
   // CHECK:         [[BORROWED_ARG_2_UPCAST:%.*]] = upcast [[BORROWED_ARG_2]]
-  // CHECK:         [[WITNESS:%.*]] = objc_method [[SELF]] : $Self, #ObjCInitRequirement.init!initializer.1.foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjCInitRequirement> (OC, OC, @owned τ_0_0) -> @owned τ_0_0
+  // CHECK:         [[WITNESS:%.*]] = objc_method [[SELF]] : $Self, #ObjCInitRequirement.init!initializer.foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjCInitRequirement> (OC, OC, @owned τ_0_0) -> @owned τ_0_0
   // CHECK:         apply [[WITNESS]]<Self>([[BORROWED_ARG_1_UPCAST]], [[BORROWED_ARG_2_UPCAST]], [[SELF]])
   // CHECK:         end_borrow [[BORROWED_ARG_2]]
   // CHECK:         end_borrow [[BORROWED_ARG_1]]
@@ -824,7 +824,7 @@ extension ProtoDelegatesToObjC where Self : ObjCInitClass {
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK:   [[PB_SELF_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
     // CHECK:   [[SELF_META_C:%[0-9]+]] = upcast [[SELF_META]] : $@thick Self.Type to $@thick ObjCInitClass.Type
-    // CHECK:   [[OBJC_INIT:%[0-9]+]] = class_method [[SELF_META_C]] : $@thick ObjCInitClass.Type, #ObjCInitClass.init!allocator.1
+    // CHECK:   [[OBJC_INIT:%[0-9]+]] = class_method [[SELF_META_C]] : $@thick ObjCInitClass.Type, #ObjCInitClass.init!allocator
     // CHECK:   [[SELF_RESULT:%[0-9]+]] = apply [[OBJC_INIT]]([[SELF_META_C]])
     // CHECK:   [[SELF_RESULT_AS_SELF:%[0-9]+]] = unchecked_ref_cast [[SELF_RESULT]] : $ObjCInitClass to $Self
     // CHECK:   assign [[SELF_RESULT_AS_SELF]] to [[PB_SELF_BOX]] : $*Self
@@ -848,7 +848,7 @@ extension ProtoDelegatesToRequired where Self : RequiredInitClass {
   // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[PB_SELF_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
   // CHECK:   [[SELF_META_AS_CLASS_META:%[0-9]+]] = upcast [[SELF_META]] : $@thick Self.Type to $@thick RequiredInitClass.Type
-  // CHECK:   [[INIT:%[0-9]+]] = class_method [[SELF_META_AS_CLASS_META]] : $@thick RequiredInitClass.Type, #RequiredInitClass.init!allocator.1 : (RequiredInitClass.Type) -> () -> RequiredInitClass, $@convention(method) (@thick RequiredInitClass.Type) -> @owned RequiredInitClass
+  // CHECK:   [[INIT:%[0-9]+]] = class_method [[SELF_META_AS_CLASS_META]] : $@thick RequiredInitClass.Type, #RequiredInitClass.init!allocator : (RequiredInitClass.Type) -> () -> RequiredInitClass, $@convention(method) (@thick RequiredInitClass.Type) -> @owned RequiredInitClass
   // CHECK:   [[SELF_RESULT:%[0-9]+]] = apply [[INIT]]([[SELF_META_AS_CLASS_META]]) : $@convention(method) (@thick RequiredInitClass.Type) -> @owned RequiredInitClass
   // CHECK:   [[SELF_RESULT_AS_SELF:%[0-9]+]] = unchecked_ref_cast [[SELF_RESULT]] : $RequiredInitClass to $Self
   // CHECK:   assign [[SELF_RESULT_AS_SELF]] to [[PB_SELF_BOX]] : $*Self
@@ -869,7 +869,7 @@ protocol P2 {
 
 extension P2 {
   // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions2P2PAAE2f1{{[_0-9a-zA-Z]*}}F
-  // CHECK: witness_method $Self, #P2.f2!1
+  // CHECK: witness_method $Self, #P2.f2 :
   // CHECK: function_ref @$s19protocol_extensions2P2PAAE2f3{{[_0-9a-zA-Z]*}}F
   // CHECK: return
   func f1(_ a: A) {
@@ -878,7 +878,7 @@ extension P2 {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions2P2PAAE2f2{{[_0-9a-zA-Z]*}}F
-  // CHECK: witness_method $Self, #P2.f1!1
+  // CHECK: witness_method $Self, #P2.f1 :
   // CHECK: function_ref @$s19protocol_extensions2P2PAAE2f3{{[_0-9a-zA-Z]*}}F
   // CHECK: return
   func f2(_ a: A) {
@@ -889,8 +889,8 @@ extension P2 {
   func f3(_ a: A) {}
 
   // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions2P2PAAE2f4{{[_0-9a-zA-Z]*}}F
-  // CHECK: witness_method $Self, #P2.f1!1
-  // CHECK: witness_method $Self, #P2.f2!1
+  // CHECK: witness_method $Self, #P2.f1 :
+  // CHECK: witness_method $Self, #P2.f2 :
   // CHECK: return
   func f4() {
     f1(x)

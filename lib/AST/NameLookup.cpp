@@ -1371,13 +1371,9 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
 ///
 /// This utility is used by qualified name lookup.
 static void configureLookup(const DeclContext *dc,
-                            NLOptions &options,
+                            NLOptions options,
                             ReferencedNameTracker *&tracker,
                             bool &isLookupCascading) {
-  auto &ctx = dc->getASTContext();
-  if (ctx.isAccessControlDisabled())
-    options |= NL_IgnoreAccessControl;
-
   // Find the dependency tracker we'll need for this lookup.
   tracker = nullptr;
   if (auto containingSourceFile =
@@ -1439,7 +1435,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   }
 
   // Check access.
-  if (!(options & NL_IgnoreAccessControl)) {
+  if (!(options & NL_IgnoreAccessControl) &&
+      !dc->getASTContext().isAccessControlDisabled()) {
     return decl->isAccessibleFrom(dc);
   }
 
@@ -1622,9 +1619,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
     // Make sure we've resolved property wrappers, if we need them.
-    if (ctx.areLegacySemanticQueriesEnabled()) {
-      installPropertyWrapperMembersIfNeeded(current, member);
-    }
+    installPropertyWrapperMembersIfNeeded(current, member);
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);

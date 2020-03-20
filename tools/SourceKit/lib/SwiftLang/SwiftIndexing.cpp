@@ -199,9 +199,6 @@ static void indexModule(llvm::MemoryBuffer *Input,
     Mod->setHasResolvedImports();
   }
 
-  // Setup a typechecker for protocol conformance resolving.
-  Ctx.setLegacySemanticQueriesEnabled();
-
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
   index::indexModule(Mod, IdxDataConsumer);
 }
@@ -312,10 +309,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     IdxConsumer.failed("no primary source file found");
     return;
   }
-
-  // Setup a typechecker for protocol conformance resolving.
-  CI.getASTContext().setLegacySemanticQueriesEnabled();
-
+  
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
   index::indexSourceFile(CI.getPrimarySourceFile(), IdxDataConsumer);
 }

@@ -2196,8 +2196,6 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   }
 
   fn.isForeign = 0;
-  fn.isCurried = 0;
-  fn.isDirectReference = 0;
 
   // See if we've cached the lowered capture list for this function.
   auto found = LoweredCaptures.find(fn);

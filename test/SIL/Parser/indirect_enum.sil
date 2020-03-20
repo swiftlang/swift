@@ -23,10 +23,10 @@ enum TreeInt {
 
 sil @indirect_enum : $@convention(thin) <T> (@owned TreeA<T>) -> () {
 entry(%e : $TreeA<T>):
-  %a = unchecked_enum_data %e : $TreeA<T>, #TreeA.Leaf!enumelt.1
+  %a = unchecked_enum_data %e : $TreeA<T>, #TreeA.Leaf!enumelt
   %b = project_box %a : $<τ_0_0> { var τ_0_0 } <T>, 0
 
-  %c = unchecked_enum_data %e : $TreeA<T>, #TreeA.Branch!enumelt.1
+  %c = unchecked_enum_data %e : $TreeA<T>, #TreeA.Branch!enumelt
   %d = project_box %c : $<τ_0_0> { var (left: TreeA<τ_0_0>, right: TreeA<τ_0_0>) } <T>, 0
 
   return undef : $()
@@ -34,10 +34,10 @@ entry(%e : $TreeA<T>):
 
 sil @indirect_enum_case_addr_only : $@convention(thin) <T> (@in TreeB<T>) -> () {
 entry(%e : $*TreeB<T>):
-  %a = unchecked_take_enum_data_addr %e : $*TreeB<T>, #TreeB.Leaf!enumelt.1
+  %a = unchecked_take_enum_data_addr %e : $*TreeB<T>, #TreeB.Leaf!enumelt
   destroy_addr %a : $*T
 
-  %c = unchecked_take_enum_data_addr %e : $*TreeB<T>, #TreeB.Branch!enumelt.1
+  %c = unchecked_take_enum_data_addr %e : $*TreeB<T>, #TreeB.Branch!enumelt
   %d = load %c : $*<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>
 
   return undef : $()
@@ -45,10 +45,10 @@ entry(%e : $*TreeB<T>):
 
 sil @indirect_enum_case_loadable : $@convention(thin) (@owned TreeInt) -> () {
 entry(%e : $TreeInt):
-  %a = unchecked_enum_data %e : $TreeInt, #TreeInt.Leaf!enumelt.1
+  %a = unchecked_enum_data %e : $TreeInt, #TreeInt.Leaf!enumelt
   store %a to undef : $*Int
 
-  %c = unchecked_enum_data %e : $TreeInt, #TreeInt.Branch!enumelt.1
+  %c = unchecked_enum_data %e : $TreeInt, #TreeInt.Branch!enumelt
   %d = project_box %c : ${ var (left: TreeInt, right: TreeInt) }, 0
 
   return undef : $()

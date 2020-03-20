@@ -44,7 +44,7 @@ sil shared @struct_caller : $@convention(thin) (@in S) -> Builtin.Int1 {
 // CHECK: bb0
 bb0(%0 : $*S):
   // CHECK-NOT: witness_method
-  %2 = witness_method $S, #P.foo!1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Builtin.Int1
+  %2 = witness_method $S, #P.foo : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Builtin.Int1
   // CHECK-NOT: apply
   %3 = apply %2<S>(%0) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Builtin.Int1
   // CHECK: [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
@@ -67,7 +67,7 @@ bb0(%0 : $*C):
   // CHECK-NOT: load
   %1 = load %0 : $*C
   // CHECK-NOT: class_method
-  %3 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Builtin.Int1, $@convention(method) (@guaranteed C) -> Builtin.Int1
+  %3 = class_method %1 : $C, #C.foo : (C) -> () -> Builtin.Int1, $@convention(method) (@guaranteed C) -> Builtin.Int1
   // CHECK-NOT: apply
   %4 = apply %3(%1) : $@convention(method) (@guaranteed C) -> Builtin.Int1
   // CHECK: [[ONE:%.*]] = integer_literal $Builtin.Int1, -1
@@ -80,7 +80,7 @@ sil shared @class_caller : $@convention(thin) (@in C) -> Builtin.Int1 {
 // CHECK: bb0
 bb0(%0 : $*C):
   // CHECK-NOT: witness_method
-  %1 = witness_method $C, #P.foo!1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Builtin.Int1
+  %1 = witness_method $C, #P.foo : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Builtin.Int1
   // CHECK-NOT: apply
   %2 = apply %1<C>(%0) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Builtin.Int1
   destroy_addr %0 : $*C
@@ -90,13 +90,13 @@ bb0(%0 : $*C):
 }
 
 sil_vtable C {
-  #C.foo!1: @class_target
+  #C.foo: @class_target
 }
 
 sil_witness_table C: P module main {
-  method #P.foo!1: @class_witness
+  method #P.foo: @class_witness
 }
 
 sil_witness_table S: P module main {
-  method #P.foo!1: @struct_witness
+  method #P.foo: @struct_witness
 }

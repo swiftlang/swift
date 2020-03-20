@@ -344,15 +344,8 @@ void SILDeclRef::print(raw_ostream &OS) const {
     break;
   }
 
-  auto uncurryLevel = getParameterListCount() - 1;
-  if (uncurryLevel != 0)
-    OS << (isDot ? '.' : '!')  << uncurryLevel;
-
   if (isForeign)
-    OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "foreign";
-
-  if (isDirectReference)
-    OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "direct";
+    OS << (isDot ? '.' : '!')  << "foreign";
 }
 
 void SILDeclRef::dump() const {

@@ -114,9 +114,9 @@ extension ConcreteWithInt : ProtoWithAssoc {
 }
 
 // CHECK-LABEL: sil_vtable ConcreteWithInt {
-// CHECK:         #Generic.generic!modify.1: <T> (Generic<T>) -> () -> () : @$s3mod15ConcreteWithIntC7genericSivMAA7GenericCADxvMTV [override]
-// CHECK:         #Generic.genericFunction!modify.1: <T> (Generic<T>) -> () -> () : @$s3mod15ConcreteWithIntC15genericFunctionSiycvMAA7GenericCADxycvMTV [override]
-// CHECK:         #Generic.subscript!modify.1: <T><U> (Generic<T>) -> (U) -> () : @$s3mod15ConcreteWithIntC16returningGenericSix_tcluiMAA0F0CADxqd___tcluiMTV [override]
-// CHECK:         #Generic.subscript!modify.1: <T><U> (Generic<T>) -> (U) -> () : @$s3mod15ConcreteWithIntC19returningOwnGenericxx_tcluiM [override]
-// CHECK:         #Generic.complexTuple!modify.1: <T> (Generic<T>) -> () -> () : @$s3mod15ConcreteWithIntC12complexTupleSiSg_SDySSSiGtvMAA7GenericCADxSg_SDySSxGtvMTV [override]
+// CHECK:         #Generic.generic!modify: <T> (Generic<T>) -> () -> () : @$s3mod15ConcreteWithIntC7genericSivMAA7GenericCADxvMTV [override]
+// CHECK:         #Generic.genericFunction!modify: <T> (Generic<T>) -> () -> () : @$s3mod15ConcreteWithIntC15genericFunctionSiycvMAA7GenericCADxycvMTV [override]
+// CHECK:         #Generic.subscript!modify: <T><U> (Generic<T>) -> (U) -> () : @$s3mod15ConcreteWithIntC16returningGenericSix_tcluiMAA0F0CADxqd___tcluiMTV [override]
+// CHECK:         #Generic.subscript!modify: <T><U> (Generic<T>) -> (U) -> () : @$s3mod15ConcreteWithIntC19returningOwnGenericxx_tcluiM [override]
+// CHECK:         #Generic.complexTuple!modify: <T> (Generic<T>) -> () -> () : @$s3mod15ConcreteWithIntC12complexTupleSiSg_SDySSSiGtvMAA7GenericCADxSg_SDySSxGtvMTV [override]
 // CHECK:       }

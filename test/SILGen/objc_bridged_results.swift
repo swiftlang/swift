@@ -10,7 +10,7 @@ import Foundation
 
 // CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results11testNonnullySayypGSo4TestCF
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
-// CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullArray!getter.1.foreign : (Test) -> () -> [Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+// CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullArray!getter.foreign : (Test) -> () -> [Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
 // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
 // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ
 // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type
@@ -24,17 +24,17 @@ func testNonnull(_ obj: Test) -> [Any] {
 // CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results12testNullableySayypGSgSo4TestCF
 func testNullable(_ obj: Test) -> [Any]? {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
-  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nullableArray!getter.1.foreign : (Test) -> () -> [Any]?, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nullableArray!getter.foreign : (Test) -> () -> [Any]?, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
-  // CHECK: switch_enum [[COCOA_VAL]] : $Optional<NSArray>, case #Optional.some!enumelt.1: [[CASE_NON_NIL:bb[0-9]+]], case #Optional.none!enumelt: [[CASE_NIL:bb[0-9]+]]
+  // CHECK: switch_enum [[COCOA_VAL]] : $Optional<NSArray>, case #Optional.some!enumelt: [[CASE_NON_NIL:bb[0-9]+]], case #Optional.none!enumelt: [[CASE_NIL:bb[0-9]+]]
   //
   // CHECK: [[CASE_NON_NIL]]([[COCOA_VAL_NON_NIL:%.*]] : @owned $NSArray):
   // CHECK-NOT: unchecked_enum_data
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ
-  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
+  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt, [[COCOA_VAL_NON_NIL]]
   // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type
   // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_SOME_VAL]], [[ARRAY_META]])
-  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.some!enumelt.1, [[RESULT_VAL]] : $Array<Any>
+  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.some!enumelt, [[RESULT_VAL]] : $Array<Any>
   // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $Optional<Array<Any>>)
   
   // CHECK: [[CASE_NIL]]:
@@ -50,17 +50,17 @@ func testNullable(_ obj: Test) -> [Any]? {
 // CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results19testNullUnspecifiedySayypGSgSo4TestCF
 func testNullUnspecified(_ obj: Test) -> [Any]! {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
-  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : (Test) -> () -> [Any]?, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nullUnspecifiedArray!getter.foreign : (Test) -> () -> [Any]?, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
-  // CHECK: switch_enum [[COCOA_VAL]] : $Optional<NSArray>, case #Optional.some!enumelt.1: [[CASE_NON_NIL:bb[0-9]+]], case #Optional.none!enumelt: [[CASE_NIL:bb[0-9]+]]
+  // CHECK: switch_enum [[COCOA_VAL]] : $Optional<NSArray>, case #Optional.some!enumelt: [[CASE_NON_NIL:bb[0-9]+]], case #Optional.none!enumelt: [[CASE_NIL:bb[0-9]+]]
 
   // CHECK: [[CASE_NON_NIL]]([[COCOA_VAL_NON_NIL:%.*]] : @owned $NSArray):
   // CHECK-NOT: unchecked_enum_data
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ
-  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
+  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt, [[COCOA_VAL_NON_NIL]]
   // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type
   // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_SOME_VAL]], [[ARRAY_META]])
-  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.some!enumelt.1, [[RESULT_VAL]] : $Array<Any>
+  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.some!enumelt, [[RESULT_VAL]] : $Array<Any>
   // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $Optional<Array<Any>>)
   
   // CHECK: [[CASE_NIL]]:
@@ -77,7 +77,7 @@ func testNullUnspecified(_ obj: Test) -> [Any]! {
 // CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results21testNonnullDictionaryySDys11AnyHashableVypGSo4TestCF
 func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
-  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullDictionary!getter.1.foreign : (Test) -> () -> [AnyHashable : Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullDictionary!getter.foreign : (Test) -> () -> [AnyHashable : Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$sSD10FoundationE36_unconditionallyBridgeFromObjectiveCySDyxq_GSo12NSDictionaryCSgFZ
   // CHECK: [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<AnyHashable, Any>.Type
@@ -90,7 +90,7 @@ func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
 // CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results14testNonnullSetyShys11AnyHashableVGSo4TestCF
 func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
-  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullSet!getter.1.foreign : (Test) -> () -> Set<AnyHashable>, $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullSet!getter.foreign : (Test) -> () -> Set<AnyHashable>, $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$sSh10FoundationE36_unconditionallyBridgeFromObjectiveCyShyxGSo5NSSetCSgFZ
   // CHECK: [[SET_META:%[0-9]+]] = metatype $@thin Set<AnyHashable>.Type
@@ -103,7 +103,7 @@ func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
 // CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results17testNonnullStringySSSo4TestCF
 func testNonnullString(_ obj: Test) -> String {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
-  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullString!getter.1.foreign : (Test) -> () -> String, $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullString!getter.foreign : (Test) -> () -> String, $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
@@ -116,7 +116,7 @@ func testNonnullString(_ obj: Test) -> String {
 // CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results13testClassPropSSyF
 func testClassProp() -> String {
   // CHECK: [[CLASS:%.+]] = metatype $@objc_metatype Test.Type
-  // CHECK: [[METHOD:%.+]] = objc_method [[CLASS]] : $@objc_metatype Test.Type, #Test.nonnullSharedString!getter.1.foreign : (Test.Type) -> () -> String, $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
+  // CHECK: [[METHOD:%.+]] = objc_method [[CLASS]] : $@objc_metatype Test.Type, #Test.nonnullSharedString!getter.foreign : (Test.Type) -> () -> String, $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[CLASS]]) : $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
@@ -132,7 +132,7 @@ func testClassProp() -> String {
 // CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results20testNonnullSubscriptySayypGSo4TestCF
 func testNonnullSubscript(_ obj: Test) -> [Any] {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
-  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.subscript!getter.1.foreign : (Test) -> (Int) -> [Any], $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.subscript!getter.foreign : (Test) -> (Int) -> [Any], $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, [[ARG]]) : $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ
   // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type,
@@ -146,7 +146,7 @@ func testNonnullSubscript(_ obj: Test) -> [Any] {
 // CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results19testPerformSelectoryySo8NSObjectCF
 func testPerformSelector(_ obj: NSObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $NSObject):
-  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $NSObject, #NSObject.perform!1.foreign
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $NSObject, #NSObject.perform!foreign
   // CHECK: [[RESULT:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, {{%[0-9]+}}, [[ARG]])
   _ = obj.perform("foo", with: nil)
   // CHECK-NOT: {{(retain|release).+}}[[RESULT]]

@@ -553,7 +553,7 @@ bb0(%0 : $Int, %1 : $S):
 }
 
 sil_witness_table S: P module test {
-  method #P.foo!1: @$s4test1SVAA1PA2aDP3fooyS2iycFZTW
+  method #P.foo: @$s4test1SVAA1PA2aDP3fooyS2iycFZTW
 }
 
 // Test partial_apply -> convert_function -> convert_function -> try_apply.

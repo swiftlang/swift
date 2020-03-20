@@ -337,7 +337,7 @@ entry:
   %h = keypath $KeyPath<C, Int>, (root $C; stored_property #C.z : $S; stored_property #S.x : $Int)
 
   %k = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @k_id : $@convention(thin) () -> (), getter @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int)
-  %l = keypath $KeyPath<C, Int>, (root $C; settable_property $Int, id #C.w!getter.1, getter @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
+  %l = keypath $KeyPath<C, Int>, (root $C; settable_property $Int, id #C.w!getter, getter @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
   %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed @substituted <A> () -> @out A for <()>, setter @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <()>, @inout S) -> ())
   %m2 = keypath $KeyPath<C2, () -> ()>, (root $C2; settable_property $() -> (), id ##C2.reabstracted, getter @m2_get : $@convention(thin) (@in_guaranteed C2) -> @out @callee_guaranteed @substituted <A> () -> @out A for <()>, setter @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <()>, @inout C2) -> ())
 

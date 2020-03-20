@@ -554,9 +554,7 @@ class LinkEntity {
   LinkEntity() = default;
 
   static bool isValidResilientMethodRef(SILDeclRef declRef) {
-    if (declRef.isForeign ||
-        declRef.isDirectReference ||
-        declRef.isCurried)
+    if (declRef.isForeign)
       return false;
 
     auto *decl = declRef.getDecl();

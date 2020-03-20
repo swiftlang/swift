@@ -85,7 +85,7 @@ struct S : P {}
 //   Success block.
 // CHECK: bb1:
 // CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*S
-// CHECK:   [[T1:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, [[T0]] : $S
+// CHECK:   [[T1:%.*]] = enum $Optional<S>, #Optional.some!enumelt, [[T0]] : $S
 // CHECK:   dealloc_stack [[TMP]]
 // CHECK:   br bb3([[T1]] : $Optional<S>)
 //   Failure block.
