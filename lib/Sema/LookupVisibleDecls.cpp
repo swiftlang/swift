@@ -415,7 +415,9 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     }
 
     DeclVisibilityKind ReasonForThisProtocol;
-    if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
+    if (Conformance->getKind() == ProtocolConformanceKind::Inherited)
+      ReasonForThisProtocol = getReasonForSuper(Reason);
+    else if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
       ReasonForThisProtocol =
           DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal;
     else
@@ -629,50 +631,61 @@ static void lookupVisibleMemberDeclsImpl(
     }
   }
 
-  llvm::SmallPtrSet<ClassDecl *, 8> Ancestors;
-  do {
-    NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
-    if (!CurNominal)
-      break;
-
-    synthesizeMemberDeclsForLookup(CurNominal, CurrDC);
+  const auto synthesizeAndLookupTypeMembers = [&](NominalTypeDecl *NTD) {
+    synthesizeMemberDeclsForLookup(NTD, CurrDC);
 
     // Look in for members of a nominal type.
     lookupTypeMembers(BaseTy, BaseTy, Consumer, CurrDC, LS, Reason);
+  };
+
+  llvm::SmallPtrSet<ClassDecl *, 8> Ancestors;
+  {
+    const auto NTD = BaseTy->getAnyNominal();
+    if (NTD == nullptr)
+      return;
+
+    synthesizeAndLookupTypeMembers(NTD);
+    // Look into protocols only on the current nominal to avoid repeatedly
+    // visiting inherited conformances.
     lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
                                              Reason, Visited);
-    // If we have a class type, look into its superclass.
-    auto *CurClass = dyn_cast<ClassDecl>(CurNominal);
+
+    const auto CD = dyn_cast<ClassDecl>(NTD);
 
     // FIXME: We check `getSuperclass()` here because we'll be using the
     // superclass Type below, and in ill-formed code `hasSuperclass()` could
     // be true while `getSuperclass()` returns null, because the latter
     // looks for a declaration.
-    if (CurClass && CurClass->getSuperclass()) {
-      // FIXME: This path is no substitute for an actual circularity check.
-      // The real fix is to check that the superclass doesn't introduce a
-      // circular reference before it's written into the AST.
-      if (Ancestors.count(CurClass)) {
-        break;
-      }
+    if (!CD || !CD->getSuperclass())
+      return;
 
-      BaseTy = CurClass->getSuperclass();
-      Reason = getReasonForSuper(Reason);
+    // We have a superclass; switch state and look into the inheritance chain.
+    Ancestors.insert(CD);
 
-      bool InheritsSuperclassInitializers =
-          CurClass->inheritsSuperclassInitializers();
-      if (LS.isOnSuperclass() && !InheritsSuperclassInitializers)
-        LS = LS.withoutInheritsSuperclassInitializers();
-      else if (!LS.isOnSuperclass()) {
-        LS = LS.withOnSuperclass();
-        if (InheritsSuperclassInitializers)
-          LS = LS.withInheritsSuperclassInitializers();
-      }
-    } else {
+    Reason = getReasonForSuper(Reason);
+    BaseTy = CD->getSuperclass();
+
+    LS = LS.withOnSuperclass();
+    if (CD->inheritsSuperclassInitializers())
+      LS = LS.withInheritsSuperclassInitializers();
+  }
+
+  // Look into the inheritance chain.
+  do {
+    const auto CurClass = BaseTy->getClassOrBoundGenericClass();
+
+    // FIXME: This path is no substitute for an actual circularity check.
+    // The real fix is to check that the superclass doesn't introduce a
+    // circular reference before it's written into the AST.
+    if (!Ancestors.insert(CurClass).second)
       break;
-    }
-    Ancestors.insert(CurClass);
-  } while (1);
+
+    synthesizeAndLookupTypeMembers(CurClass);
+
+    BaseTy = CurClass->getSuperclass();
+    if (!CurClass->inheritsSuperclassInitializers())
+      LS = LS.withoutInheritsSuperclassInitializers();
+  } while (BaseTy);
 }
 
 swift::DynamicLookupInfo::DynamicLookupInfo(
