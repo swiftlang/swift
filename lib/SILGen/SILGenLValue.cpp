@@ -1448,11 +1448,16 @@ namespace {
             SGF.getConstantInfo(SGF.getTypeExpansionContext(), setter);
         SILValue setterFRef;
         if (setter.hasDecl() && setter.getDecl()->isObjCDynamic()) {
-          auto methodTy = SILType::getPrimitiveObjectType(
-              SGF.SGM.Types.getConstantFunctionType(SGF.getTypeExpansionContext(),
-                                                    setter));
-          setterFRef = SGF.B.createObjCMethod(
-              loc, base.getValue(), setter, methodTy);
+          // Emit a thunk we might have to bridge arguments.
+          auto foreignSetterThunk = setter.asForeign(false);
+          setterFRef =
+              SGF.emitDynamicMethodRef(
+                     loc, foreignSetterThunk,
+                     SGF.SGM.Types
+                         .getConstantInfo(SGF.getTypeExpansionContext(), foreignSetterThunk)
+                         .SILFnType)
+                  .getValue();
+
         } else
           setterFRef = SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
         CanSILFunctionType setterTy = setterFRef->getType().castTo<SILFunctionType>();
