@@ -3147,7 +3147,7 @@ public:
 
         // SE-0253: Callable values of user-defined nominal types.
         if (FD->isCallAsFunctionMethod() && !HaveDot &&
-            !ExprType->is<AnyMetatypeType>()) {
+            (!ExprType || !ExprType->is<AnyMetatypeType>())) {
           Type funcType = getTypeOfMember(FD, dynamicLookupInfo)
                               ->castTo<AnyFunctionType>()
                               ->getResult();
