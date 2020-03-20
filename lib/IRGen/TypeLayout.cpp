@@ -25,6 +25,18 @@ using namespace irgen;
 
 TypeLayoutEntry::~TypeLayoutEntry() {}
 
+void TypeLayoutEntry::computeProperties() {
+  // does not add anything.
+}
+
+void TypeLayoutEntry::gatherProperties(TypeLayoutEntry *fromEntry) {
+  hasArchetypeField |= fromEntry->hasArchetypeField;
+  hasResilientField |= fromEntry->hasResilientField;
+  hasDependentResilientField |= fromEntry->hasDependentResilientField;
+
+  assert(!(!hasResilientField && hasDependentResilientField));
+}
+
 const EnumTypeLayoutEntry *TypeLayoutEntry::getAsEnum() const {
   if (getKind() == TypeLayoutEntryKind::Enum) {
     return static_cast<const EnumTypeLayoutEntry *>(this);
@@ -99,8 +111,16 @@ void TypeLayoutEntry::initWithTake(IRGenFunction &IGF, Address dest,
   // Nothing to copy.
 }
 
-bool TypeLayoutEntry::containsEnum() const {
-  return false;
+bool TypeLayoutEntry::containsResilientField() const {
+  return hasResilientField;
+}
+
+bool TypeLayoutEntry::containsArchetypeField() const {
+  return hasArchetypeField;
+}
+
+bool TypeLayoutEntry::containsDependentResilientField() const {
+  return hasDependentResilientField;
 }
 
 llvm::Value *TypeLayoutEntry::getEnumTagSinglePayload(
@@ -571,6 +591,10 @@ llvm::Value *TypeLayoutEntry::initBufferWithCopyOfBuffer(IRGenFunction &IGF,
   return pointerToObject;
 }
 
+void ScalarTypeLayoutEntry::computeProperties() {
+  // does not add anything.
+}
+
 void ScalarTypeLayoutEntry::Profile(llvm::FoldingSetNodeID &id) const {
   ScalarTypeLayoutEntry::Profile(id, typeInfo);
 }
@@ -606,10 +630,6 @@ llvm::Value *ScalarTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
                                 cast<FixedTypeInfo>(typeInfo).isBitwiseTakable(
                                     ResilienceExpansion::Maximal));
-}
-
-bool ScalarTypeLayoutEntry::containsEnum() const {
-  return false;
 }
 
 void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
@@ -709,6 +729,12 @@ LLVM_DUMP_METHOD void ScalarTypeLayoutEntry::dump() const {
 }
 #endif
 
+void AlignedGroupEntry::computeProperties() {
+  for (auto *entry : entries) {
+    gatherProperties(entry);
+  }
+}
+
 void AlignedGroupEntry::Profile(llvm::FoldingSetNodeID &id) const {
   AlignedGroupEntry::Profile(id, entries, minimumAlignment, isFixedSize);
 }
@@ -761,14 +787,6 @@ llvm::Value *AlignedGroupEntry::size(IRGenFunction &IGF) const {
   }
   currentSize->setName("size");
   return currentSize;
-}
-
-bool AlignedGroupEntry::containsEnum() const {
-  for (auto *entry : entries) {
-    if (entry->containsEnum())
-      return true;
-  }
-  return false;
 }
 
 llvm::Value *AlignedGroupEntry::extraInhabitantCount(IRGenFunction &IGF) const {
@@ -1001,6 +1019,8 @@ LLVM_DUMP_METHOD void AlignedGroupEntry::dump() const {
 }
 #endif
 
+void ArchetypeLayoutEntry::computeProperties() { hasArchetypeField = true; }
+
 void ArchetypeLayoutEntry::Profile(llvm::FoldingSetNodeID &id) const {
   ArchetypeLayoutEntry::Profile(id, archetype);
 }
@@ -1028,10 +1048,6 @@ ArchetypeLayoutEntry::extraInhabitantCount(IRGenFunction &IGF) const {
 llvm::Value *
 ArchetypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return emitLoadOfIsBitwiseTakable(IGF, archetype);
-}
-
-bool ArchetypeLayoutEntry::containsEnum() const {
-  return false;
 }
 
 void ArchetypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
@@ -1139,10 +1155,10 @@ llvm::Value *EnumTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return isBitwiseTakable;
 }
 
-bool EnumTypeLayoutEntry::containsEnum() const {
-  if (cases.size() == 1)
-    return false;
-  return false;
+void EnumTypeLayoutEntry::computeProperties() {
+  for (auto c: cases) {
+    gatherProperties(c);
+  }
 }
 
 llvm::Value *EnumTypeLayoutEntry::size(IRGenFunction &IGF) const {
@@ -2006,8 +2022,10 @@ ResilientTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return emitLoadOfIsBitwiseTakable(IGF, ty);
 }
 
-bool ResilientTypeLayoutEntry::containsEnum() const {
-  return false;
+void ResilientTypeLayoutEntry::computeProperties() {
+  hasResilientField = true;
+  if (ty.getASTType()->hasArchetype())
+    hasDependentResilientField = true;
 }
 
 void ResilientTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
@@ -2076,6 +2094,7 @@ TypeLayoutCache::getOrCreateScalarEntry(const TypeInfo &ti,
   auto mem = bumpAllocator.Allocate(bytes, alignof(ScalarTypeLayoutEntry));
   auto newEntry = new (mem) ScalarTypeLayoutEntry(ti, representative);
   scalarEntries.InsertNode(newEntry, insertPos);
+  newEntry->computeProperties();
   return newEntry;
 }
 
@@ -2091,6 +2110,7 @@ TypeLayoutCache::getOrCreateArchetypeEntry(SILType archetype) {
   auto mem = bumpAllocator.Allocate(bytes, alignof(ArchetypeLayoutEntry));
   auto newEntry = new (mem) ArchetypeLayoutEntry(archetype);
   archetypeEntries.InsertNode(newEntry, insertPos);
+  newEntry->computeProperties();
   return newEntry;
 }
 
@@ -2108,6 +2128,7 @@ AlignedGroupEntry *TypeLayoutCache::getOrCreateAlignedGroupEntry(
   auto newEntry =
       new (mem) AlignedGroupEntry(entries, minimumAlignment, isFixedSize);
   alignedGroupEntries.InsertNode(newEntry, insertPos);
+  newEntry->computeProperties();
   return newEntry;
 }
 
@@ -2127,6 +2148,7 @@ EnumTypeLayoutEntry *TypeLayoutCache::getOrCreateEnumEntry(
   auto mem = bumpAllocator.Allocate(bytes, alignof(EnumTypeLayoutEntry));
   auto newEntry = new (mem) EnumTypeLayoutEntry(numEmptyCases, nonEmptyCases);
   enumEntries.InsertNode(newEntry, insertPos);
+  newEntry->computeProperties();
   return newEntry;
 }
 
@@ -2142,6 +2164,7 @@ TypeLayoutCache::getOrCreateResilientEntry(SILType ty) {
   auto mem = bumpAllocator.Allocate(bytes, alignof(ResilientTypeLayoutEntry));
   auto newEntry = new (mem) ResilientTypeLayoutEntry(ty);
   resilientEntries.InsertNode(newEntry, insertPos);
+  newEntry->computeProperties();
   return newEntry;
 }
 

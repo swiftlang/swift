@@ -23,7 +23,7 @@ namespace irgen {
 
 class EnumTypeLayoutEntry;
 
-enum class TypeLayoutEntryKind {
+enum class TypeLayoutEntryKind : uint8_t {
   Empty,
   Scalar,
   Archetype,
@@ -35,10 +35,26 @@ enum class TypeLayoutEntryKind {
 class TypeLayoutEntry {
 public:
   TypeLayoutEntryKind kind;
-  TypeLayoutEntry() : kind(TypeLayoutEntryKind::Empty) {}
-  TypeLayoutEntry(TypeLayoutEntryKind kind) : kind(kind) {}
+  uint8_t hasArchetypeField : 1;
+  uint8_t hasResilientField : 1;
+  uint8_t hasDependentResilientField : 1;
+
+  TypeLayoutEntry()
+      : kind(TypeLayoutEntryKind::Empty), hasArchetypeField(false),
+        hasResilientField(false), hasDependentResilientField(false) {}
+
+  TypeLayoutEntry(TypeLayoutEntryKind kind)
+      : kind(kind), hasArchetypeField(false), hasResilientField(false),
+        hasDependentResilientField(false) {}
 
   virtual ~TypeLayoutEntry();
+
+  virtual void computeProperties();
+
+  bool containsResilientField() const;
+  bool containsArchetypeField() const;
+  bool containsDependentResilientField() const;
+
 
   bool isEmpty() const { return kind == TypeLayoutEntryKind::Empty; }
 
@@ -79,9 +95,6 @@ public:
                                          llvm::Value *numEmptyCases,
                                          Address enumAddr) const;
 
-
-  virtual bool containsEnum() const;
-
   const EnumTypeLayoutEntry *getAsEnum() const;
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -102,6 +115,8 @@ protected:
       Address addr,
       llvm::function_ref<void(Address addr, llvm::Value *tag)>
           storeExtraInhabitantIndexFun) const;
+
+  void gatherProperties(TypeLayoutEntry *fromEntry);
 };
 
 class ScalarTypeLayoutEntry : public TypeLayoutEntry,
@@ -114,6 +129,8 @@ public:
         representative(representative) {}
 
   ~ScalarTypeLayoutEntry();
+
+  void computeProperties() override;
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
@@ -144,8 +161,6 @@ public:
                                  llvm::Value *numEmptyCases,
                                  Address enumAddr) const override;
 
-  bool containsEnum() const override;
-
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   void dump() const override;
 #endif
@@ -161,6 +176,8 @@ public:
       : TypeLayoutEntry(TypeLayoutEntryKind::Archetype), archetype(archetype) {}
 
   ~ArchetypeLayoutEntry();
+
+  void computeProperties() override;
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
@@ -191,8 +208,6 @@ public:
                                  llvm::Value *numEmptyCases,
                                  Address enumAddr) const override;
 
-  bool containsEnum() const override;
-
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   void dump() const override;
 #endif
@@ -207,6 +222,8 @@ public:
       : TypeLayoutEntry(TypeLayoutEntryKind::Resilient), ty(ty) {}
 
   ~ResilientTypeLayoutEntry();
+
+  void computeProperties() override;
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
@@ -237,8 +254,6 @@ public:
                                  llvm::Value *numEmptyCases,
                                  Address enumAddr) const override;
 
-  bool containsEnum() const override;
-
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   void dump() const override;
 #endif
@@ -256,6 +271,8 @@ public:
         minimumAlignment(minimumAlignment), isFixedSize(isFixedSize) {}
 
   ~AlignedGroupEntry();
+
+  void computeProperties() override;
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
@@ -288,8 +305,6 @@ public:
                                  llvm::Value *numEmptyCases,
                                  Address enumAddr) const override;
 
-  bool containsEnum() const override;
-
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   void dump() const override;
 #endif
@@ -321,6 +336,8 @@ public:
         numEmptyCases(numEmptyCases), minimumAlignment(1), cases(cases) {}
 
   ~EnumTypeLayoutEntry();
+
+  void computeProperties() override;
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
@@ -358,8 +375,6 @@ public:
 
   void destructiveInjectEnumTag(IRGenFunction &IGF, llvm::Value *tag,
                                 Address enumAddr) const;
-
-  bool containsEnum() const override;
 
   bool isMultiPayloadEnum() const;
 
