@@ -228,9 +228,9 @@ struct UseLazy<T: DefaultInit> {
   @Lazy var bar = T()
   @Lazy var wibble = [1, 2, 3]
 
-  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers7UseLazyV3foo3bar6wibbleACyxGSiyXA_xyXASaySiGyXAtcfC : $@convention(method) <T where T : DefaultInit> (@owned @callee_guaranteed () -> Int, @owned @callee_guaranteed () -> @out T, @owned @callee_guaranteed () -> @owned Array<Int>, @thin UseLazy<T>.Type) -> @out UseLazy<T>
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers7UseLazyV3foo3bar6wibbleACyxGSiyXA_xyXASaySiGyXAtcfC : $@convention(method) <T where T : DefaultInit> (@owned @callee_guaranteed () -> Int, @owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>, @owned @callee_guaranteed () -> @owned Array<Int>, @thin UseLazy<T>.Type) -> @out UseLazy<T> {
   // CHECK: function_ref @$s17property_wrappers7UseLazyV3fooSivpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned @callee_guaranteed () -> Int) -> @owned Lazy<Int>
-  // CHECK: function_ref @$s17property_wrappers7UseLazyV3barxvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned @callee_guaranteed () -> @out τ_0_0) -> @out Lazy<τ_0_0>
+  // CHECK: function_ref @$s17property_wrappers7UseLazyV3barxvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>) -> @out Lazy<τ_0_0>
   // CHECK: function_ref @$s17property_wrappers7UseLazyV6wibbleSaySiGvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned @callee_guaranteed () -> @owned Array<Int>) -> @owned Lazy<Array<Int>>
 }
 
