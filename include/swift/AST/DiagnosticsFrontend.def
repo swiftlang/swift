@@ -396,7 +396,7 @@ ERROR(missing_member_dependency,none,
       "dependency does not exist: %1",
       (/*Expectation::Kind*/uint8_t, StringRef))
 ERROR(unexpected_dependency,none,
-      "unexpected %0 %select{%error|%error||potential member|dynamic member}1 "
+      "unexpected %0 %select{%error|%error|member|potential member|dynamic member}1 "
       "dependency: %2", (StringRef, /*Expectation::Kind*/uint8_t, StringRef))
 ERROR(unexpected_provided_entity,none,
       "unexpected provided entity: %0", (StringRef))
