@@ -232,3 +232,5 @@ SWIFT_REQUEST(TypeChecker, PatternTypeRequest,
               Cached, HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, ScopedImportLookupRequest,
               ArrayRef<ValueDecl *>(ImportDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ClosureHasExplicitResultRequest,
+              bool(ClosureExpr *), Cached, NoLocationInfo)

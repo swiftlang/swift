@@ -5127,6 +5127,11 @@ bool isKnownKeyPathType(Type type);
 /// Determine whether given declaration is one for a key path
 /// `{Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
+
+/// Determine whether givne closure has any explicit `return`
+/// statements that could produce non-void result.
+bool hasExplicitResult(ClosureExpr *closure);
+
 } // end namespace constraints
 
 template<typename ...Args>

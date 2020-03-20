@@ -1005,3 +1005,10 @@ func r60074136() {
   takesClosure { ((Int) -> Void) -> Void in // expected-warning {{unnamed parameters must be written with the empty name '_'}}
   }
 }
+
+func rdar52204414() {
+  let _: () -> Void = { return 42 }
+  // expected-error@-1 {{cannot convert value of type 'Int' to closure result type 'Void'}}
+  let _ = { () -> Void in return 42 }
+  // expected-error@-1 {{declared closure result 'Int' is incompatible with contextual type 'Void'}}
+}
