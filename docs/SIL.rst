@@ -4725,7 +4725,6 @@ alloc_existential_box
   //   representation
   // $T must be an AST type that conforms to P
   // %1 will be of type $P
-  // %1#1 will be of type $*T', where T' is the most abstracted lowering of T
 
 Allocates a boxed existential container of type ``$P`` with space to hold a
 value of type ``$T'``. The box is not fully initialized until a valid value
