@@ -446,8 +446,9 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
           return;
         case NodeKind::potentialMember: {
           auto key = copyDemangledTypeName(Ctx, context);
+          auto nameCpy = Ctx.AllocateCopy(name);
           Obligations.insert({Obligation::Key::forPotentialMember(key),
-                              {name, Expectation::Kind::PotentialMember,
+                              {nameCpy, Expectation::Kind::PotentialMember,
                                isCascadingUse ? Expectation::Scope::Cascading
                                               : Expectation::Scope::Private}});
         }
@@ -463,18 +464,21 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
           break;
         case NodeKind::dynamicLookup: {
           auto contextCpy = Ctx.AllocateCopy(context);
-          Obligations.insert({Obligation::Key::forDynamicMember(name),
+          auto key = Ctx.AllocateCopy(name);
+          Obligations.insert({Obligation::Key::forDynamicMember(key),
                               {contextCpy, Expectation::Kind::DynamicMember,
                                isCascadingUse ? Expectation::Scope::Cascading
                                               : Expectation::Scope::Private}});
           break;
         }
         case NodeKind::topLevel:
-        case NodeKind::sourceFileProvide:
-          Obligations.insert({Obligation::Key::forProvides(name),
-                              {name, Expectation::Kind::Provides,
+        case NodeKind::sourceFileProvide: {
+          auto key = Ctx.AllocateCopy(name);
+          Obligations.insert({Obligation::Key::forProvides(key),
+                              {key, Expectation::Kind::Provides,
                                Expectation::Scope::None}});
           break;
+        }
         case NodeKind::kindCount:
           llvm_unreachable("Given count node?");
         }
