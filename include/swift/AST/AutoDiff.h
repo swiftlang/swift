@@ -26,6 +26,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/StringExtras.h"
 
 namespace swift {
 
@@ -95,6 +96,45 @@ struct DifferentiabilityWitnessFunctionKind {
   Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
 };
 
+/// SIL-level automatic differentiation indices. Consists of:
+/// - Parameter indices: indices of parameters to differentiate with respect to.
+/// - Result index: index of the result to differentiate from.
+// TODO(TF-913): Remove `SILAutoDiffIndices` in favor of `AutoDiffConfig`.
+// `AutoDiffConfig` supports multiple result indices.
+struct SILAutoDiffIndices {
+  /// The index of the dependent result to differentiate from.
+  unsigned source;
+  /// The indices for independent parameters to differentiate with respect to.
+  IndexSubset *parameters;
+
+  /*implicit*/ SILAutoDiffIndices(unsigned source, IndexSubset *parameters)
+      : source(source), parameters(parameters) {}
+
+  bool operator==(const SILAutoDiffIndices &other) const;
+
+  bool operator!=(const SILAutoDiffIndices &other) const {
+    return !(*this == other);
+  };
+
+  /// Returns true if `parameterIndex` is a differentiability parameter index.
+  bool isWrtParameter(unsigned parameterIndex) const {
+    return parameterIndex < parameters->getCapacity() &&
+           parameters->contains(parameterIndex);
+  }
+
+  void print(llvm::raw_ostream &s = llvm::outs()) const;
+  SWIFT_DEBUG_DUMP;
+
+  std::string mangle() const {
+    std::string result = "src_" + llvm::utostr(source) + "_wrt_";
+    interleave(
+        parameters->getIndices(),
+        [&](unsigned idx) { result += llvm::utostr(idx); },
+        [&] { result += '_'; });
+    return result;
+  }
+};
+
 /// Identifies an autodiff derivative function configuration:
 /// - Parameter indices.
 /// - Result indices.
@@ -109,6 +149,11 @@ struct AutoDiffConfig {
                               GenericSignature derivativeGenericSignature)
       : parameterIndices(parameterIndices), resultIndices(resultIndices),
         derivativeGenericSignature(derivativeGenericSignature) {}
+
+  /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
+  // TODO(TF-913): This is a temporary shim for incremental removal of
+  // `SILAutoDiffIndices`. Eventually remove this.
+  SILAutoDiffIndices getSILAutoDiffIndices() const;
 
   void print(llvm::raw_ostream &s = llvm::outs()) const;
   SWIFT_DEBUG_DUMP;
@@ -281,6 +326,37 @@ void getFunctionSemanticResultTypes(
     AnyFunctionType *functionType,
     SmallVectorImpl<AutoDiffSemanticFunctionResultType> &result,
     GenericEnvironment *genericEnv = nullptr);
+
+/// Returns the lowered SIL parameter indices for the given AST parameter
+/// indices and `AnyfunctionType`.
+///
+/// Notable lowering-related changes:
+/// - AST tuple parameter types are exploded when lowered to SIL.
+/// - AST curried `Self` parameter types become the last parameter when lowered
+///   to SIL.
+///
+/// Examples:
+///
+///   AST function type: (A, B, C) -> R
+///   AST parameter indices: 101, {A, C}
+///   Lowered SIL function type: $(A, B, C) -> R
+///   Lowered SIL parameter indices: 101
+///
+///   AST function type: (Self) -> (A, B, C) -> R
+///   AST parameter indices: 1010, {Self, B}
+///   Lowered SIL function type: $(A, B, C, Self) -> R
+///   Lowered SIL parameter indices: 0101
+///
+///   AST function type: (A, (B, C), D) -> R
+///   AST parameter indices: 110, {A, (B, C)}
+///   Lowered SIL function type: $(A, B, C, D) -> R
+///   Lowered SIL parameter indices: 1110
+///
+/// Note:
+/// - The AST function type must not be curried unless it is a method.
+///   Otherwise, the behavior is undefined.
+IndexSubset *getLoweredParameterIndices(IndexSubset *astParameterIndices,
+                                        AnyFunctionType *functionType);
 
 /// "Constrained" derivative generic signatures require all differentiability
 /// parameters to conform to the `Differentiable` protocol.
