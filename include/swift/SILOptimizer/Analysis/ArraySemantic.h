@@ -187,9 +187,6 @@ public:
 
   /// Could this array be backed by an NSArray.
   bool mayHaveBridgedObjectElementType() const;
-  
-  /// Can this function be inlined by the early inliner.
-  bool canInlineEarly() const;
 
   /// If this is a call to  ArrayUninitialized (or
   /// ArrayUninitializedInstrinsic), identify the instructions that store

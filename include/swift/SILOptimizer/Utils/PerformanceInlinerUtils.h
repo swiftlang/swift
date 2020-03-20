@@ -33,19 +33,26 @@ class SideEffectAnalysis;
 // Controls the decision to inline functions with @_semantics, @effect and
 // global_init attributes.
 enum class InlineSelection {
-  Everything,
-  NoGlobalInit, // and no availability semantics calls
-  NoSemanticsAndGlobalInit,
-  OnlyInlineAlways,
+  Unoptimized,            // -Onone level, only @inline(__always)
+  PreModuleSerialization, // no @semantics, no @availability
+  PreserveSemantics,      // preserve the deepest level of @semantic calls
+  Everything              // expose full implementation, including global init
 };
 
 // Returns the callee of an apply_inst if it is basically inlinable.
-SILFunction *getEligibleFunction(FullApplySite AI,
-                                 InlineSelection WhatToInline);
+SILFunction *getEligibleFunction(
+    FullApplySite AI, InlineSelection WhatToInline,
+    const SmallPtrSetImpl<SILFunction *> &nestedSemanticFunctions);
 
 // Returns true if this is a pure call, i.e. the callee has no side-effects
 // and all arguments are constants.
 bool isPureCall(FullApplySite AI, SideEffectAnalysis *SEA);
+
+// Return true if the given function has a semantic annotation which may be
+// recognized by semantics passes. Such calls should only be inlined after all
+// semantic passes have been able to evaluate them.
+bool isOptimizableSemanticFunction(SILFunction *callee);
+
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//

@@ -1936,6 +1936,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       !isa<BeginApplyInst>(I)) {
     ArraySemanticsCall ASC(FAS.getInstruction());
     switch (ASC.getKind()) {
+      // TODO: Model ReserveCapacityForAppend, AppendContentsOf, AppendElement.
       case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
       case ArrayCallKind::kCheckSubscript:
       case ArrayCallKind::kCheckIndex:
