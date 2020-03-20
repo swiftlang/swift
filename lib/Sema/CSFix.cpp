@@ -1136,9 +1136,8 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
 }
 
-bool RemoveUnnecessaryCoercion::diagnose(bool asNote) const {
-  auto &cs = getConstraintSystem();
-  UnnecessaryCoercionFailure failure(cs, getFromType(), getToType(),
+bool RemoveUnnecessaryCoercion::diagnose(const Solution &solution, bool asNote) const {
+  UnnecessaryCoercionFailure failure(solution, getFromType(), getToType(),
                                      getLocator());
   return failure.diagnose(asNote);
 }

@@ -1804,10 +1804,10 @@ class UnnecessaryCoercionFailure final
     : public ContextualFailure {
       
 public:
-  UnnecessaryCoercionFailure(ConstraintSystem &cs,
+  UnnecessaryCoercionFailure(const Solution &solution,
                              Type fromType, Type toType,
                              ConstraintLocator *locator)
-      : ContextualFailure(cs, fromType, toType, locator) {}
+      : ContextualFailure(solution, fromType, toType, locator) {}
   
   bool diagnoseAsError() override;
 };

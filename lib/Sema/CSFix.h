@@ -1577,7 +1577,7 @@ public:
     return "remove unnecessary explicit type coercion";
   }
 
-  bool diagnose(bool asNote = false) const override;
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static bool attempt(ConstraintSystem &cs, Type fromType, Type toType,
                       ConstraintLocatorBuilder locator);
