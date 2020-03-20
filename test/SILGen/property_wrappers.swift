@@ -642,6 +642,38 @@ struct HasStaticWrapper {
   }
 }
 
+@propertyWrapper
+struct ObservedObject<ObjectType : AnyObject > {
+  var wrappedValue: ObjectType
+
+  init(defaulted: Int = 17, wrappedValue: ObjectType) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+// rdar://problem/58986940 - composition of wrappers with autoclosure
+@propertyWrapper
+struct Once<Value> {
+  enum Storage {
+    case initialValue(() -> Value)
+    case value(Value)
+  }
+
+  var storage: Storage
+
+  init(defaulted: Int = 0, wrappedValue value: @escaping @autoclosure () -> Value) {
+    storage = .initialValue(value)
+  }
+
+  var wrappedValue: Value { fatalError() }
+}
+
+class Model {}
+
+struct TestAutoclosureComposition {
+  @Once @ObservedObject var model = Model()
+}
+
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
 // CHECK-NEXT:  #ClassUsingWrapper.x!setter: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter

@@ -6343,6 +6343,8 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
         return { false, E };
 
       if (auto call = dyn_cast<CallExpr>(E)) {
+        ASTContext &ctx = innermostNominal->getASTContext();
+
         // We're looking for an implicit call.
         if (!call->isImplicit())
           return { true, E };
@@ -6352,9 +6354,19 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
         // property.
         if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
           if (tuple->getNumElements() > 0) {
-            auto elem = tuple->getElement(0);
-            if (elem->isImplicit() && isa<CallExpr>(elem)) {
-              return { true, E };
+            for (unsigned i : range(tuple->getNumElements())) {
+              if (tuple->getElementName(i) == ctx.Id_wrappedValue ||
+                  tuple->getElementName(i) == ctx.Id_initialValue) {
+                auto elem = tuple->getElement(i)->getSemanticsProvidingExpr();
+
+                // Look through autoclosures.
+                if (auto autoclosure = dyn_cast<AutoClosureExpr>(elem))
+                  elem = autoclosure->getSingleExpressionBody();
+
+                if (elem->isImplicit() && isa<CallExpr>(elem)) {
+                  return { true, E };
+                }
+              }
             }
           }
         }
@@ -6367,7 +6379,6 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
 
         // Find the implicit initialValue/wrappedValue argument.
         if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
-          ASTContext &ctx = innermostNominal->getASTContext();
           for (unsigned i : range(tuple->getNumElements())) {
             if (tuple->getElementName(i) == ctx.Id_wrappedValue ||
                 tuple->getElementName(i) == ctx.Id_initialValue) {
