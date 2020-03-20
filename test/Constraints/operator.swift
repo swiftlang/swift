@@ -217,10 +217,11 @@ func rdar46459603() {
   var arr = ["key": e]
 
   _ = arr.values == [e]
-  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'Dictionary<String, E>.Values' and '[E]'}}
+  // expected-error@-1 {{referencing operator function '==' on 'Equatable' requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
+  // expected-error@-2 {{cannot convert value of type '[E]' to expected argument type 'Dictionary<String, E>.Values'}}
   _ = [arr.values] == [[e]]
-  // expected-error@-1 {{value of protocol type 'Any' cannot conform to 'Equatable'; only struct/enum/class types can conform to protocols}}
-  // expected-note@-2 {{requirement from conditional conformance of '[Any]' to 'Equatable'}}
+  // expected-error@-1 {{operator function '==' requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
+  // expected-error@-2 {{cannot convert value of type '[E]' to expected element type 'Dictionary<String, E>.Values'}}
 }
 
 // SR-10843
