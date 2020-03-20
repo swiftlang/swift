@@ -78,12 +78,9 @@ std::string ASTMangler::mangleClosureEntity(const AbstractClosureExpr *closure,
   return finalize();
 }
 
-std::string ASTMangler::mangleEntity(const ValueDecl *decl, bool isCurried,
-                                     SymbolKind SKind) {
+std::string ASTMangler::mangleEntity(const ValueDecl *decl, SymbolKind SKind) {
   beginMangling();
   appendEntity(decl);
-  if (isCurried)
-    appendOperator("Tc");
   appendSymbolKind(SKind);
   return finalize();
 }
@@ -99,12 +96,9 @@ std::string ASTMangler::mangleDestructorEntity(const DestructorDecl *decl,
 
 std::string ASTMangler::mangleConstructorEntity(const ConstructorDecl *ctor,
                                                 bool isAllocating,
-                                                bool isCurried,
                                                 SymbolKind SKind) {
   beginMangling();
   appendConstructorEntity(ctor, isAllocating);
-  if (isCurried)
-    appendOperator("Tc");
   appendSymbolKind(SKind);
   return finalize();
 }
@@ -642,7 +636,6 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::DynamicThunk: return appendOperator("TD");
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
-    case SymbolKind::DirectMethodReferenceThunk: return appendOperator("Td");
   }
 }
 

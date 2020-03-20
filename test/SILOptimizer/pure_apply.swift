@@ -69,7 +69,7 @@ bb0:
 }
 
 sil_vtable Foo {
-  #Foo.init!initializer.1: @_TFC4main3FoocfMS0_FT_S0_	// main.Foo.init (main.Foo.Type)() -> main.Foo
+  #Foo.init!initializer: @_TFC4main3FoocfMS0_FT_S0_	// main.Foo.init (main.Foo.Type)() -> main.Foo
 }
 
 

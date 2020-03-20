@@ -601,8 +601,6 @@ public:
       return ManagedValue::forUnmanaged(methodVal);
     }
     case Kind::SuperMethod: {
-      assert(!constant->isCurried);
-
       ArgumentScope S(SGF, Loc);
       ManagedValue castValue = borrowedCastToOriginalSelfType(
         SGF, Loc, *borrowedSelf);

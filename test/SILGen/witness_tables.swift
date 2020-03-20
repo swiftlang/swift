@@ -63,7 +63,7 @@ struct ConformingAssoc : AssocReqt {
 }
 // TABLE-LABEL: sil_witness_table hidden ConformingAssoc: AssocReqt module witness_tables {
 // TABLE-TESTABLE-LABEL: sil_witness_table [serialized] ConformingAssoc: AssocReqt module witness_tables {
-// TABLE-ALL-NEXT:    method #AssocReqt.requiredMethod!1: {{.*}} : @$s14witness_tables15ConformingAssocVAA0D4ReqtA2aDP14requiredMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-ALL-NEXT:    method #AssocReqt.requiredMethod: {{.*}} : @$s14witness_tables15ConformingAssocVAA0D4ReqtA2aDP14requiredMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-ALL-NEXT:  }
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s14witness_tables15ConformingAssocVAA0D4ReqtA2aDP14requiredMethod{{[_0-9a-zA-Z]*}}FTW :
 // SYMBOL-TESTABLE:      sil shared [transparent] [serialized] [thunk] [ossa] @$s14witness_tables15ConformingAssocVAA0D4ReqtA2aDP14requiredMethod{{[_0-9a-zA-Z]*}}FTW :
@@ -84,11 +84,11 @@ func <~>(x: ConformingStruct, y: ConformingStruct) {}
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW :
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s14witness_tables16ConformingStructVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW {{.*}}: ArchetypeReqt> (@in_guaranteed τ_0_0, @in_guaranteed ConformingStruct, @in_guaranteed ConformingStruct) -> ()
@@ -121,11 +121,11 @@ func <~>(x: ConformingAddressOnlyStruct, y: ConformingAddressOnlyStruct) {}
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW :
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s14witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW :
@@ -149,11 +149,11 @@ func <~>(x: ConformingClass, y: ConformingClass) {}
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW :
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s14witness_tables15ConformingClassCAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW :
@@ -178,11 +178,11 @@ func <~>(x: ConformsByExtension, y: ConformsByExtension) {}
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW :
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s14witness_tables19ConformsByExtensionVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW :
@@ -206,11 +206,11 @@ func <~>(x: OtherModuleStruct, y: OtherModuleStruct) {}
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP6method{{[_0-9a-zA-Z]*}}FTW :
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s16witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolA2dEP7generic{{[_0-9a-zA-Z]*}}FTW :
@@ -236,11 +236,11 @@ func <~> <P: OtherProtocol>(x: P, y: P) {}
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW :
 // SYMBOL:      sil private [transparent] [thunk] [ossa] @$s14witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW :
@@ -265,11 +265,11 @@ func <~>(x: ConformingClassToClassProtocol,
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
-// TABLE-NEXT:    method #ClassProtocol.method!1: {{.*}} : @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #ClassProtocol.generic!1: {{.*}} : @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #ClassProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #ClassProtocol.staticMethod!1: {{.*}} : @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #ClassProtocol."<~>"!1: {{.*}} : @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #ClassProtocol.method: {{.*}} : @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #ClassProtocol.generic: {{.*}} : @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #ClassProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #ClassProtocol.staticMethod: {{.*}} : @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #ClassProtocol."<~>": {{.*}} : @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 // SYMBOL:  sil private [transparent] [thunk] [ossa] @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP6method{{[_0-9a-zA-Z]*}}FTW :
 // SYMBOL:  sil private [transparent] [thunk] [ossa] @$s14witness_tables017ConformingClassToD8ProtocolCAA0dF0A2aDP7generic{{[_0-9a-zA-Z]*}}FTW :
@@ -299,11 +299,11 @@ func <~> <R: AssocReqt>(x: ConformingGeneric<R>, y: ConformingGeneric<R>) {}
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): dependent
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: R
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s14witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s14witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP16assocTypesMetho{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s14witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s14witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s14witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s14witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP16assocTypesMetho{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s14witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s14witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 protocol AnotherProtocol {}
@@ -326,11 +326,11 @@ func <~> <AA: AnotherProtocol, BB: AnotherProtocol>(x: AA, y: BB) {}
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): dependent
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: S
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s14witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s14witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP7{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s14witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s14witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s14witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s14witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP7{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s14witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s14witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 protocol InheritedProtocol1 : AnyProtocol {
@@ -361,17 +361,17 @@ struct InheritedConformance : InheritedProtocol1 {
 func <~>(x: InheritedConformance, y: InheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden InheritedConformance: InheritedProtocol1 module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: InheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: {{.*}} : @$s14witness_tables20InheritedConformanceVAA0C9Protocol1A2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod: {{.*}} : @$s14witness_tables20InheritedConformanceVAA0C9Protocol1A2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden InheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s14witness_tables20InheritedConformanceVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s14witness_tables20InheritedConformanceVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables20InheritedConformanceVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s14witness_tables20InheritedConformanceVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s14witness_tables20InheritedConformanceVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s14witness_tables20InheritedConformanceVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s14witness_tables20InheritedConformanceVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables20InheritedConformanceVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s14witness_tables20InheritedConformanceVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s14witness_tables20InheritedConformanceVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 struct RedundantInheritedConformance : InheritedProtocol1, AnyProtocol {
@@ -390,17 +390,17 @@ struct RedundantInheritedConformance : InheritedProtocol1, AnyProtocol {
 func <~>(x: RedundantInheritedConformance, y: RedundantInheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden RedundantInheritedConformance: InheritedProtocol1 module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: RedundantInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA0D9Protocol1A2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod: {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA0D9Protocol1A2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden RedundantInheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s14witness_tables29RedundantInheritedConformanceVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 struct DiamondInheritedConformance : InheritedProtocol1, InheritedProtocol2 {
@@ -419,21 +419,21 @@ struct DiamondInheritedConformance : InheritedProtocol1, InheritedProtocol2 {
 func <~>(x: DiamondInheritedConformance, y: DiamondInheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: InheritedProtocol1 module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: DiamondInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA0D9Protocol1A2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA0D9Protocol1A2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: InheritedProtocol2 module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: DiamondInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol2.inheritedMethod!1: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA0D9Protocol2A2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #InheritedProtocol2.inheritedMethod: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA0D9Protocol2A2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s14witness_tables27DiamondInheritedConformanceVAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 class ClassInheritedConformance : InheritedClassProtocol {
@@ -452,17 +452,17 @@ class ClassInheritedConformance : InheritedClassProtocol {
 func <~>(x: ClassInheritedConformance, y: ClassInheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden ClassInheritedConformance: InheritedClassProtocol module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: ClassInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedClassProtocol.inheritedMethod!1: {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA0dC8ProtocolA2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #InheritedClassProtocol.inheritedMethod: {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA0dC8ProtocolA2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden ClassInheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
-// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol.method: {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA11AnyProtocolA2aDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic: {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA11AnyProtocolA2aDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod: {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA11AnyProtocolA2aDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod: {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA11AnyProtocolA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>": {{.*}} : @$s14witness_tables25ClassInheritedConformanceCAA11AnyProtocolA2aDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 // -- Witnesses have the 'self' abstraction level of their protocol.
 //    AnyProtocol has no class bound, so its witnesses treat Self as opaque.
@@ -505,7 +505,7 @@ class ConformsInheritedFromObjC : InheritedFromObjC {
   func inheritedMethod() {}
 }
 // TABLE-LABEL: sil_witness_table hidden ConformsInheritedFromObjC: InheritedFromObjC module witness_tables {
-// TABLE-NEXT:    method #InheritedFromObjC.inheritedMethod!1: {{.*}} : @$s14witness_tables25ConformsInheritedFromObjCCAA0deF1CA2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #InheritedFromObjC.inheritedMethod: {{.*}} : @$s14witness_tables25ConformsInheritedFromObjCCAA0deF1CA2aDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 
 protocol ObjCAssoc {
@@ -524,7 +524,7 @@ protocol Initializer {
 }
 
 // TABLE-LABEL: sil_witness_table hidden HasInitializerStruct: Initializer module witness_tables {
-// TABLE-NEXT:  method #Initializer.init!allocator.1: {{.*}} : @$s14witness_tables20HasInitializerStructVAA0D0A2aDP{{[_0-9a-zA-Z]*}}fCTW
+// TABLE-NEXT:  method #Initializer.init!allocator: {{.*}} : @$s14witness_tables20HasInitializerStructVAA0D0A2aDP{{[_0-9a-zA-Z]*}}fCTW
 // TABLE-NEXT: }
 // SYMBOL: sil private [transparent] [thunk] [ossa] @$s14witness_tables20HasInitializerStructVAA0D0A2aDP{{[_0-9a-zA-Z]*}}fCTW :
 struct HasInitializerStruct : Initializer { 
@@ -532,7 +532,7 @@ struct HasInitializerStruct : Initializer {
 }
 
 // TABLE-LABEL: sil_witness_table hidden HasInitializerClass: Initializer module witness_tables {
-// TABLE-NEXT:  method #Initializer.init!allocator.1: {{.*}} : @$s14witness_tables19HasInitializerClassCAA0D0A2aDP{{[_0-9a-zA-Z]*}}fCTW
+// TABLE-NEXT:  method #Initializer.init!allocator: {{.*}} : @$s14witness_tables19HasInitializerClassCAA0D0A2aDP{{[_0-9a-zA-Z]*}}fCTW
 // TABLE-NEXT: }
 // SYMBOL: sil private [transparent] [thunk] [ossa] @$s14witness_tables19HasInitializerClassCAA0D0A2aDP{{[_0-9a-zA-Z]*}}fCTW :
 class HasInitializerClass : Initializer {
@@ -540,7 +540,7 @@ class HasInitializerClass : Initializer {
 }
 
 // TABLE-LABEL: sil_witness_table hidden HasInitializerEnum: Initializer module witness_tables {
-// TABLE-NEXT:  method #Initializer.init!allocator.1: {{.*}} : @$s14witness_tables18HasInitializerEnumOAA0D0A2aDP{{[_0-9a-zA-Z]*}}fCTW
+// TABLE-NEXT:  method #Initializer.init!allocator: {{.*}} : @$s14witness_tables18HasInitializerEnumOAA0D0A2aDP{{[_0-9a-zA-Z]*}}fCTW
 // TABLE-NEXT: }
 // SYMBOL: sil private [transparent] [thunk] [ossa] @$s14witness_tables18HasInitializerEnumOAA0D0A2aDP{{[_0-9a-zA-Z]*}}fCTW :
 enum HasInitializerEnum : Initializer {

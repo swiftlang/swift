@@ -146,5 +146,5 @@ func setBuilder<F: Factory>(_ factory: inout F) where F.Product == MyClass {
 // CHECK:   [[F2:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[F1]])
 // CHECK:   [[F3:%.*]] = convert_function [[F2]]
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*F
-// CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
+// CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter
 // CHECK:   apply [[SETTER]]<F>([[F3]], [[WRITE]])

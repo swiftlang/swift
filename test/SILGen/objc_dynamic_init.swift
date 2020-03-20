@@ -57,7 +57,7 @@ func callInit() {
 }
 
 // CHECK-LABEL: sil_vtable Gadget {
-// CHECK-NOT:     #Gadget.init!allocator.1
+// CHECK-NOT:     #Gadget.init!allocator
 
 // CHECK-LABEL: sil_vtable Gizmo {
-// CHECK-NOT:     #Gadget.init!allocator.1
+// CHECK-NOT:     #Gadget.init!allocator

@@ -80,7 +80,6 @@ public:
     DynamicThunk,
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
-    DirectMethodReferenceThunk,
   };
 
   ASTMangler(bool DWARFMangling = false)
@@ -98,14 +97,14 @@ public:
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
                                   SymbolKind SKind);
 
-  std::string mangleEntity(const ValueDecl *decl, bool isCurried,
+  std::string mangleEntity(const ValueDecl *decl,
                            SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleDestructorEntity(const DestructorDecl *decl,
                                      bool isDeallocating, SymbolKind SKind);
 
   std::string mangleConstructorEntity(const ConstructorDecl *ctor,
-                                      bool isAllocating, bool isCurried,
+                                      bool isAllocating,
                                       SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleIVarInitDestroyEntity(const ClassDecl *decl,

@@ -326,23 +326,23 @@ struct Foo<Base>: FooProtocol {
 
 // Make sure addressors don't get vtable entries.
 // CHECK-LABEL: sil_vtable Base {
-// CHECK-NEXT: #Base.data!getter.1: (Base) -> () -> UnsafeMutablePointer<Int32> : @$s10addressors4BaseC4dataSpys5Int32VGvg
-// CHECK-NEXT: #Base.data!setter.1: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @$s10addressors4BaseC4dataSpys5Int32VGvs
-// CHECK-NEXT: #Base.data!modify.1: (Base) -> () -> () : @$s10addressors4BaseC4dataSpys5Int32VGvM
-// CHECK-NEXT: #Base.value!getter.1: (Base) -> () -> Int32 : @$s10addressors4BaseC5values5Int32Vvg
-// CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : @$s10addressors4BaseC5values5Int32Vvs
-// CHECK-NEXT: #Base.value!modify.1: (Base) -> () -> () : @$s10addressors4BaseC5values5Int32VvM
-// CHECK-NEXT: #Base.init!allocator.1: (Base.Type) -> () -> Base : @$s10addressors4BaseCACycfC
-// CHECK-NEXT: #Base.deinit!deallocator.1: @$s10addressors4BaseCfD
+// CHECK-NEXT: #Base.data!getter: (Base) -> () -> UnsafeMutablePointer<Int32> : @$s10addressors4BaseC4dataSpys5Int32VGvg
+// CHECK-NEXT: #Base.data!setter: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @$s10addressors4BaseC4dataSpys5Int32VGvs
+// CHECK-NEXT: #Base.data!modify: (Base) -> () -> () : @$s10addressors4BaseC4dataSpys5Int32VGvM
+// CHECK-NEXT: #Base.value!getter: (Base) -> () -> Int32 : @$s10addressors4BaseC5values5Int32Vvg
+// CHECK-NEXT: #Base.value!setter: (Base) -> (Int32) -> () : @$s10addressors4BaseC5values5Int32Vvs
+// CHECK-NEXT: #Base.value!modify: (Base) -> () -> () : @$s10addressors4BaseC5values5Int32VvM
+// CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base : @$s10addressors4BaseCACycfC
+// CHECK-NEXT: #Base.deinit!deallocator: @$s10addressors4BaseCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable Sub {
-// CHECK-NEXT: #Base.data!getter.1: (Base) -> () -> UnsafeMutablePointer<Int32> : @$s10addressors4BaseC4dataSpys5Int32VGvg
-// CHECK-NEXT: #Base.data!setter.1: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @$s10addressors4BaseC4dataSpys5Int32VGvs
-// CHECK-NEXT: #Base.data!modify.1: (Base) -> () -> () : @$s10addressors4BaseC4dataSpys5Int32VGvM
-// CHECK-NEXT: #Base.value!getter.1: (Base) -> () -> Int32 : @$s10addressors3SubC5values5Int32Vvg
-// CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : @$s10addressors3SubC5values5Int32Vvs
-// CHECK-NEXT: #Base.value!modify.1: (Base) -> () -> () : @$s10addressors3SubC5values5Int32VvM
-// CHECK-NEXT: #Base.init!allocator.1: (Base.Type) -> () -> Base : @$s10addressors3SubCACycfC
-// CHECK-NEXT: #Sub.deinit!deallocator.1: @$s10addressors3SubCfD
+// CHECK-NEXT: #Base.data!getter: (Base) -> () -> UnsafeMutablePointer<Int32> : @$s10addressors4BaseC4dataSpys5Int32VGvg
+// CHECK-NEXT: #Base.data!setter: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @$s10addressors4BaseC4dataSpys5Int32VGvs
+// CHECK-NEXT: #Base.data!modify: (Base) -> () -> () : @$s10addressors4BaseC4dataSpys5Int32VGvM
+// CHECK-NEXT: #Base.value!getter: (Base) -> () -> Int32 : @$s10addressors3SubC5values5Int32Vvg
+// CHECK-NEXT: #Base.value!setter: (Base) -> (Int32) -> () : @$s10addressors3SubC5values5Int32Vvs
+// CHECK-NEXT: #Base.value!modify: (Base) -> () -> () : @$s10addressors3SubC5values5Int32VvM
+// CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base : @$s10addressors3SubCACycfC
+// CHECK-NEXT: #Sub.deinit!deallocator: @$s10addressors3SubCfD
 // CHECK-NEXT: }

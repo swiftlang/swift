@@ -1351,14 +1351,15 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
            .Default(None);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 ///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
-///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)?
-///                      ('.' sil-decl-lang)? ('.' sil-decl-autodiff)?
-///  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
+// SWIFT_ENABLE_TENSORFLOW
+///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)?
 ///                      ('.' sil-decl-autodiff)?
-///  sil-decl-subref ::= '!' sil-decl-lang ('.' sil-decl-autodiff)?
+// SWIFT_ENABLE_TENSORFLOW END
+///  sil-decl-subref ::= '!' sil-decl-lang
+// SWIFT_ENABLE_TENSORFLOW
 ///  sil-decl-subref ::= '!' sil-decl-autodiff
+// SWIFT_ENABLE_TENSORFLOW END
 ///  sil-decl-subref-part ::= 'getter'
 ///  sil-decl-subref-part ::= 'setter'
 ///  sil-decl-subref-part ::= 'allocator'
@@ -1366,44 +1367,41 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 ///  sil-decl-subref-part ::= 'enumelt'
 ///  sil-decl-subref-part ::= 'destroyer'
 ///  sil-decl-subref-part ::= 'globalaccessor'
-///  sil-decl-uncurry-level ::= [0-9]+
 ///  sil-decl-lang ::= 'foreign'
+// SWIFT_ENABLE_TENSORFLOW
 ///  sil-decl-autodiff ::= sil-decl-autodiff-kind '.' sil-decl-autodiff-order
 ///                        '.' sil-decl-autodiff-indices
 ///  sil-decl-autodiff-kind ::= 'jvp'
 ///  sil-decl-autodiff-kind ::= 'vjp'
 ///  sil-decl-autodiff-order ::= [0-9]+
 ///  sil-decl-autodiff-indices ::= [FM][SU]+
+// SWIFT_ENABLE_TENSORFLOW END
 bool SILParser::parseSILDeclRef(SILDeclRef &Result,
                                 SmallVectorImpl<ValueDecl *> &values) {
   ValueDecl *VD;
   if (parseSILDottedPath(VD, values))
     return true;
 
-  // Initialize Kind, uncurryLevel and IsObjC.
+  // Initialize Kind and IsObjC.
   SILDeclRef::Kind Kind = SILDeclRef::Kind::Func;
-  unsigned uncurryLevel = 0;
   bool IsObjC = false;
   // SWIFT_ENABLE_TENSORFLOW
   AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId = nullptr;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
-    Result = SILDeclRef(VD, Kind, /*isCurried=*/false, IsObjC);
-    if (uncurryLevel < Result.getParameterListCount() - 1)
-      Result = Result.asCurried();
+    Result = SILDeclRef(VD, Kind, IsObjC);
     return false;
   }
 
   // Handle sil-constant-kind-and-uncurry-level.
   // ParseState indicates the value we just handled.
+  // 1 means we just handled Kind.
+  // We accept func|getter|setter|...|foreign when ParseState is 0;
+  // accept foreign when ParseState is 1.
   // SWIFT_ENABLE_TENSORFLOW
-  // 1 means we just handled Kind, 2 means we just handled uncurryLevel, 3 means
-  // we just handled foreign.
-  // We accept func|getter|setter|...|foreign, an autodiff identifier, or an
-  // integer when ParseState is 0; accept foreign, an autodiff identifier, or an
-  // integer when ParseState is 1; accept foreign or an autodiff identifier when
-  // ParseState is 2; accept an autodiff identifier when ParseState is 3.
+  // accept autodiff identifier when ParseState is 2.
+  // SWIFT_ENABLE_TENSORFLOW END
   unsigned ParseState = 0;
   Identifier Id;
   do {
@@ -1469,11 +1467,10 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (!ParseState && Id.str() == "backinginit") {
         Kind = SILDeclRef::Kind::PropertyWrapperBackingInitializer;
         ParseState = 1;
-      // SWIFT_ENABLE_TENSORFLOW
-      } else if (ParseState < 3 && Id.str() == "foreign") {
+      } else if (Id.str() == "foreign") {
         IsObjC = true;
-        // SWIFT_ENABLE_TENSORFLOW
-        ParseState = 3;
+        break;
+      // SWIFT_ENABLE_TENSORFLOW
       } else if (Id.str() == "jvp" || Id.str() == "vjp") {
         AutoDiffDerivativeFunctionKind kind;
         IndexSubset *parameterIndices = nullptr;
@@ -1511,12 +1508,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
             kind, parameterIndices, derivativeGenSig,
             SILMod.getASTContext());
         break;
+      // SWIFT_ENABLE_TENSORFLOW END
       } else
         break;
-    } else if (ParseState < 2 && P.Tok.is(tok::integer_literal)) {
-      parseIntegerLiteral(P.Tok.getText(), 0, uncurryLevel);
-      P.consumeToken(tok::integer_literal);
-      ParseState = 2;
     } else
       break;
 
@@ -1524,9 +1518,8 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
 
   // Construct SILDeclRef.
   // SWIFT_ENABLE_TENSORFLOW
-  Result = SILDeclRef(VD, Kind, /*isCurried=*/false, IsObjC, autoDiffFuncId);
-  if (uncurryLevel < Result.getParameterListCount() - 1)
-    Result = Result.asCurried();
+  Result = SILDeclRef(VD, Kind, IsObjC, autoDiffFuncId);
+  // SWIFT_ENABLE_TENSORFLOW END
   return false;
 }
 

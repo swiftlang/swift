@@ -180,7 +180,7 @@ bb0:
   %0 = function_ref @takeEnumClosure : $@convention(thin) (@owned E) -> Int32
   %1 = function_ref @closure : $@convention(thin) (Int32) -> Int32
   %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_guaranteed (Int32) -> Int32
-  %3 = enum $E, #E.B!enumelt.1, %2 : $@callee_guaranteed (Int32) -> Int32
+  %3 = enum $E, #E.B!enumelt, %2 : $@callee_guaranteed (Int32) -> Int32
   %4 = apply %0(%3) : $@convention(thin) (@owned E) -> Int32
   return %4 : $Int32
 }
@@ -192,7 +192,7 @@ bb0(%0 : $E):
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
-  %1 = unchecked_enum_data %0 : $E, #E.B!enumelt.1
+  %1 = unchecked_enum_data %0 : $E, #E.B!enumelt
   %2 = integer_literal $Builtin.Int32, 27
   %3 = struct $Int32 (%2 : $Builtin.Int32)
   %4 = apply %1(%3) : $@callee_guaranteed (Int32) -> Int32
@@ -317,7 +317,7 @@ sil @testSwitchEnumArg : $@convention(thin) (Builtin.Int32) -> () {
 bb0(%1 : $Builtin.Int32):
   %0 = function_ref @switchEnumCallee : $@convention(thin) (Optional<Int32>) -> Int32
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = enum $Optional<Int32>, #Optional.some!enumelt.1, %2 : $Int32
+  %3 = enum $Optional<Int32>, #Optional.some!enumelt, %2 : $Int32
   %4 = apply %0(%3) : $@convention(thin) (Optional<Int32>) -> Int32
   %5 = tuple ()
   return %5 : $()
@@ -337,7 +337,7 @@ bb0:
   %0 = function_ref @switchEnumCallee : $@convention(thin) (Optional<Int32>) -> Int32
   %1 = integer_literal $Builtin.Int32, 27
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = enum $Optional<Int32>, #Optional.some!enumelt.1, %2 : $Int32
+  %3 = enum $Optional<Int32>, #Optional.some!enumelt, %2 : $Int32
   %4 = apply %0(%3) : $@convention(thin) (Optional<Int32>) -> Int32
   %5 = tuple ()
   return %5 : $()
@@ -345,10 +345,10 @@ bb0:
 
 sil @switchEnumCallee : $@convention(thin) (Optional<Int32>) -> Int32 {
 bb0(%0 : $Optional<Int32>):
-  switch_enum %0 : $Optional<Int32>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+  switch_enum %0 : $Optional<Int32>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
-  %2 = unchecked_enum_data %0 : $Optional<Int32>, #Optional.some!enumelt.1
+  %2 = unchecked_enum_data %0 : $Optional<Int32>, #Optional.some!enumelt
   br bb3(%2 : $Int32)
 
 bb2:

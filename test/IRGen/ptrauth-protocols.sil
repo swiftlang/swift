@@ -39,7 +39,7 @@ bb0(%0 : $@thick A.Type):
 
 
 sil_witness_table A : P module test {
-  method #P.foo!1: @A_foo
+  method #P.foo: @A_foo
 }
 // CHECK: @A_foo.ptrauth = private constant { i8*, i32, i64, i64 } { i8* bitcast (void (%swift.type*, %swift.type*, i8**)* @A_foo to i8*), i32 0, i64 ptrtoint (i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @"$s4test1AVAA1PAAWP", i32 0, i32 1) to i64), i64 53700 }, section "llvm.ptrauth"
 
@@ -53,7 +53,7 @@ bb0(%0 : $*B, %1 : $@thick B.Type):
 sil_witness_table B : Q module test {
   associated_type_protocol (Assoc: P): A: P module main
   associated_type Assoc: A
-  method #Q.init!allocator.1: @B_init
+  method #Q.init!allocator: @B_init
 }
 // CHECK: @B_init.ptrauth = private constant { i8*, i32, i64, i64 } { i8* bitcast (void (%T4test1BV*, %swift.type*, %swift.type*, i8**)* @B_init to i8*), i32 0, i64 ptrtoint (i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @"$s4test1BVAA1QAAWP", i32 0, i32 3) to i64), i64 33208 }, section "llvm.ptrauth"
 // CHECK: @"$s4test1BVAA1QAAWP" = hidden global [4 x i8*] [
@@ -63,7 +63,7 @@ sil_witness_table B : Q module test {
 
 sil @test_accesses : $@convention(thin) <T : Q> () -> () {
 bb0:
-  %0 = witness_method $T.Assoc, #P.foo!1 : $@convention(witness_method : P) <Self where Self : P> (@thick Self.Type) -> ()
+  %0 = witness_method $T.Assoc, #P.foo : $@convention(witness_method : P) <Self where Self : P> (@thick Self.Type) -> ()
   %1 = metatype $@thick T.Assoc.Type
   apply %0<T.Assoc>(%1) : $@convention(witness_method : P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ()
   return undef : $()

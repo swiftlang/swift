@@ -30,7 +30,7 @@ func testClonable(c: Clonable) {
   // CHECK: [[THUNK:%.*]] = apply [[THUNK_FN]]({{.*}})
   let _: () -> Clonable.Type = c.cloneMetatype
 
-  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}") Clonable, #Clonable.getCloneFn!1
+  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}") Clonable, #Clonable.getCloneFn :
   // CHECK: [[RESULT:%.*]] = apply [[METHOD_FN]]<@opened("{{.*}}") Clonable>({{.*}})
   // CHECK: [[CONV_RESULT:%.*]] = convert_function [[RESULT]]
   // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxIegr_22partial_apply_protocol8Clonable_pIegr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
@@ -72,7 +72,7 @@ func testClonableInGenericContext<T>(c: Clonable, t: T) {
   // CHECK: [[THUNK:%.*]] = apply [[THUNK_FN]]({{.*}})
   let _: () -> Clonable.Type = c.cloneMetatype
 
-  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}") Clonable, #Clonable.getCloneFn!1 :
+  // CHECK: [[METHOD_FN:%.*]] = witness_method $@opened("{{.*}}") Clonable, #Clonable.getCloneFn :
   // CHECK: [[RESULT:%.*]] = apply [[METHOD_FN]]<@opened("{{.*}}") Clonable>({{.*}})
   // CHECK: [[RESULT_CONV:%.*]] = convert_function [[RESULT]]
   // CHECK: [[THUNK_FN:%.*]] = function_ref @$sxIegr_22partial_apply_protocol8Clonable_pIegr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable

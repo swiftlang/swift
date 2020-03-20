@@ -1355,7 +1355,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 /// it a 'return' use of self.
 ///
 ///   %3 = load %2 : $*Enum
-///   %4 = enum $Optional<Enum>, #Optional.Some!enumelt.1, %3 : $Enum
+///   %4 = enum $Optional<Enum>, #Optional.Some!enumelt, %3 : $Enum
 ///   br bb2(%4 : $Optional<Enum>)                    // id: %5
 /// bb1:
 ///   %6 = enum $Optional<Enum>, #Optional.None!enumelt // user: %7

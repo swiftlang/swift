@@ -37,9 +37,9 @@ struct SortedFuncList {
     Mangle::ASTMangler mangler;
     std::string mangledName;
     if (auto *cd = dyn_cast<ConstructorDecl>(afd))
-      mangledName = mangler.mangleConstructorEntity(cd, 0, 0);
+      mangledName = mangler.mangleConstructorEntity(cd, 0);
     else
-      mangledName = mangler.mangleEntity(afd, 0);
+      mangledName = mangler.mangleEntity(afd);
 
     elts.push_back(std::make_pair(mangledName, afd));
   }

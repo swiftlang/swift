@@ -909,13 +909,12 @@ static CastConsumptionKind getCastConsumptionKind(unsigned attr) {
 static SILDeclRef getSILDeclRef(ModuleFile *MF,
                                 ArrayRef<uint64_t> ListOfValues,
                                 unsigned &NextIdx) {
-  assert(ListOfValues.size() >= NextIdx+4 &&
-         "Expect 4 numbers for SILDeclRef");
+  assert(ListOfValues.size() >= NextIdx+3 &&
+         "Expect 3 numbers for SILDeclRef");
   SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[NextIdx])),
                   (SILDeclRef::Kind)ListOfValues[NextIdx+1],
-                  /*isCurried=*/ListOfValues[NextIdx+2] > 0,
-                  /*isForeign=*/ListOfValues[NextIdx+3] > 0);
-  NextIdx += 4;
+                  /*isForeign=*/ListOfValues[NextIdx+2] > 0);
+  NextIdx += 3;
   return DRef;
 }
 

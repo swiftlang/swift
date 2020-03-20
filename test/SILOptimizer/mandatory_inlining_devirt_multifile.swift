@@ -16,6 +16,6 @@ class Derived : Middle {
 }
 
 // CHECK-LABEL: sil hidden @$s4test4BaseC6callityyF
-// CHECK:         [[T0:%.*]] = class_method %0 : $Base, #Base.foo!1
+// CHECK:         [[T0:%.*]] = class_method %0 : $Base, #Base.foo
 // CHECK-NEXT:    apply [[T0]](%0)
 // CHECK-LABEL: } // end sil function '$s4test4BaseC6callityyF'

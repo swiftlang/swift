@@ -266,20 +266,20 @@ public protocol ResilientAssocTypes {
 // CHECK-LABEL: sil_default_witness_table ResilientMethods {
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #ResilientMethods.defaultWitness!1: {{.*}} : @$s19protocol_resilience16ResilientMethodsP14defaultWitnessyyF
-// CHECK-NEXT:    method #ResilientMethods.anotherDefaultWitness!1: {{.*}} : @$s19protocol_resilience16ResilientMethodsP21anotherDefaultWitnessyxSiF
-// CHECK-NEXT:    method #ResilientMethods.defaultWitnessWithAssociatedType!1: {{.*}} : @$s19protocol_resilience16ResilientMethodsP32defaultWitnessWithAssociatedTypeyy05AssocI0QzF
-// CHECK-NEXT:    method #ResilientMethods.defaultWitnessMoreAbstractThanRequirement!1: {{.*}} : @$s19protocol_resilience16ResilientMethodsP41defaultWitnessMoreAbstractThanRequirement_1by9AssocTypeQz_SitF
-// CHECK-NEXT:    method #ResilientMethods.defaultWitnessMoreAbstractThanGenericRequirement!1: {{.*}} : @$s19protocol_resilience16ResilientMethodsP48defaultWitnessMoreAbstractThanGenericRequirement_1ty9AssocTypeQz_qd__tlF
+// CHECK-NEXT:    method #ResilientMethods.defaultWitness: {{.*}} : @$s19protocol_resilience16ResilientMethodsP14defaultWitnessyyF
+// CHECK-NEXT:    method #ResilientMethods.anotherDefaultWitness: {{.*}} : @$s19protocol_resilience16ResilientMethodsP21anotherDefaultWitnessyxSiF
+// CHECK-NEXT:    method #ResilientMethods.defaultWitnessWithAssociatedType: {{.*}} : @$s19protocol_resilience16ResilientMethodsP32defaultWitnessWithAssociatedTypeyy05AssocI0QzF
+// CHECK-NEXT:    method #ResilientMethods.defaultWitnessMoreAbstractThanRequirement: {{.*}} : @$s19protocol_resilience16ResilientMethodsP41defaultWitnessMoreAbstractThanRequirement_1by9AssocTypeQz_SitF
+// CHECK-NEXT:    method #ResilientMethods.defaultWitnessMoreAbstractThanGenericRequirement: {{.*}} : @$s19protocol_resilience16ResilientMethodsP48defaultWitnessMoreAbstractThanGenericRequirement_1ty9AssocTypeQz_qd__tlF
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #ResilientMethods.staticDefaultWitness!1: {{.*}} : @$s19protocol_resilience16ResilientMethodsP20staticDefaultWitnessyxSiFZ
+// CHECK-NEXT:    method #ResilientMethods.staticDefaultWitness: {{.*}} : @$s19protocol_resilience16ResilientMethodsP20staticDefaultWitnessyxSiFZ
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientConstructors {
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #ResilientConstructors.init!allocator.1: {{.*}} : @$s19protocol_resilience21ResilientConstructorsP7defaultxyt_tcfC
-// CHECK-NEXT:    method #ResilientConstructors.init!allocator.1: {{.*}} : @$s19protocol_resilience21ResilientConstructorsP17defaultIsOptionalxSgyt_tcfC
+// CHECK-NEXT:    method #ResilientConstructors.init!allocator: {{.*}} : @$s19protocol_resilience21ResilientConstructorsP7defaultxyt_tcfC
+// CHECK-NEXT:    method #ResilientConstructors.init!allocator: {{.*}} : @$s19protocol_resilience21ResilientConstructorsP17defaultIsOptionalxSgyt_tcfC
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
 // CHECK-NEXT: }
@@ -287,39 +287,39 @@ public protocol ResilientAssocTypes {
 // CHECK-LABEL: sil_default_witness_table ResilientStorage {
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
-// CHECK-NEXT:   method #ResilientStorage.propertyWithDefault!getter.1: {{.*}} : @$s19protocol_resilience16ResilientStorageP19propertyWithDefaultSivg
+// CHECK-NEXT:   method #ResilientStorage.propertyWithDefault!getter: {{.*}} : @$s19protocol_resilience16ResilientStorageP19propertyWithDefaultSivg
 // CHECK-NEXT:   no_default
-// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!getter.1: {{.*}} : @$s19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivg
-// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!setter.1: {{.*}} : @$s19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivs
-// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!modify.1: {{.*}} : @$s19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivM
+// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!getter: {{.*}} : @$s19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivg
+// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!setter: {{.*}} : @$s19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivs
+// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!modify: {{.*}} : @$s19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivM
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
-// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!getter.1: {{.*}} : @$s19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvg
-// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!setter.1: {{.*}} : @$s19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvs
-// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!modify.1: {{.*}} : @$s19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvM
-// CHECK-NEXT:   method #ResilientStorage.subscript!getter.1: {{.*}} : @$s19protocol_resilience16ResilientStoragePy1TQzAEcig
-// CHECK-NEXT:   method #ResilientStorage.subscript!setter.1: {{.*}} : @$s19protocol_resilience16ResilientStoragePy1TQzAEcis
-// CHECK-NEXT:   method #ResilientStorage.subscript!modify.1: {{.*}} : @$s19protocol_resilience16ResilientStoragePy1TQzAEciM
-// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!getter.1: {{.*}} : @$s19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivg
-// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!setter.1: {{.*}} : @$s19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivs
-// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!modify.1: {{.*}} : @$s19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivM
+// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!getter: {{.*}} : @$s19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvg
+// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!setter: {{.*}} : @$s19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvs
+// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!modify: {{.*}} : @$s19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvM
+// CHECK-NEXT:   method #ResilientStorage.subscript!getter: {{.*}} : @$s19protocol_resilience16ResilientStoragePy1TQzAEcig
+// CHECK-NEXT:   method #ResilientStorage.subscript!setter: {{.*}} : @$s19protocol_resilience16ResilientStoragePy1TQzAEcis
+// CHECK-NEXT:   method #ResilientStorage.subscript!modify: {{.*}} : @$s19protocol_resilience16ResilientStoragePy1TQzAEciM
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!getter: {{.*}} : @$s19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivg
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!setter: {{.*}} : @$s19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivs
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!modify: {{.*}} : @$s19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivM
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientOperators {
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #ResilientOperators."~~~"!1: {{.*}} : @$s19protocol_resilience18ResilientOperatorsP3tttopyyxFZ
-// CHECK-NEXT:    method #ResilientOperators."<*>"!1: {{.*}} : @$s19protocol_resilience18ResilientOperatorsP3lmgoiyyx_qd__tlFZ
-// CHECK-NEXT:    method #ResilientOperators."<**>"!1: {{.*}} : @$s19protocol_resilience18ResilientOperatorsP4lmmgoiy9AssocTypeQzqd___xtlFZ
-// CHECK-NEXT:    method #ResilientOperators."<===>"!1: {{.*}} : @$s19protocol_resilience18ResilientOperatorsP5leeegoiy9AssocTypeQyd__qd___xtAaBRd__lFZ
+// CHECK-NEXT:    method #ResilientOperators."~~~": {{.*}} : @$s19protocol_resilience18ResilientOperatorsP3tttopyyxFZ
+// CHECK-NEXT:    method #ResilientOperators."<*>": {{.*}} : @$s19protocol_resilience18ResilientOperatorsP3lmgoiyyx_qd__tlFZ
+// CHECK-NEXT:    method #ResilientOperators."<**>": {{.*}} : @$s19protocol_resilience18ResilientOperatorsP4lmmgoiy9AssocTypeQzqd___xtlFZ
+// CHECK-NEXT:    method #ResilientOperators."<===>": {{.*}} : @$s19protocol_resilience18ResilientOperatorsP5leeegoiy9AssocTypeQyd__qd___xtAaBRd__lFZ
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ReabstractSelfRefined {
 // CHECK-NEXT:   no_default
-// CHECK-NEXT:   method #ReabstractSelfRefined.callback!getter.1: {{.*}} : @$s19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg
-// CHECK-NEXT:   method #ReabstractSelfRefined.callback!setter.1: {{.*}} : @$s19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvs
-// CHECK-NEXT:   method #ReabstractSelfRefined.callback!modify.1: {{.*}} : @$s19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvM
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!getter: {{.*}} : @$s19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!setter: {{.*}} : @$s19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvs
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!modify: {{.*}} : @$s19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvM
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientAssocTypes {

@@ -11,7 +11,7 @@ extension Gizmo {
     // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
     // CHECK:   [[SELF_OBJC_META:%.*]] = thick_to_objc_metatype [[SELF_META]]
     // CHECK:   [[ORIG_SELF:%.*]] = alloc_ref_dynamic [objc] [[SELF_OBJC_META]]
-    // CHECK:   [[INIT_DELEG:%[0-9]+]] = objc_method [[ORIG_SELF]] : $Gizmo, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo?, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
+    // CHECK:   [[INIT_DELEG:%[0-9]+]] = objc_method [[ORIG_SELF]] : $Gizmo, #Gizmo.init!initializer.foreign : (Gizmo.Type) -> (Int) -> Gizmo?, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
     // CHECK:   [[SELF_RET:%[0-9]+]] = apply [[INIT_DELEG]]([[I]], [[ORIG_SELF]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
     // CHECK:   [[SELF4:%.*]] = load [copy] [[PB_BOX]]
     // CHECK:   destroy_value [[MARKED_SELF_BOX]]

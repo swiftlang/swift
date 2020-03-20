@@ -32,7 +32,7 @@ bb0(%0 : $*T, %1 : $Bool):
 
 bb1:                                              // Preds: bb0
   %5 = metatype $@thick T.Type                    // user: %9
-  %6 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %9
+  %6 = witness_method $T, #P.init!allocator : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %9
   %7 = integer_literal $Builtin.Int32, 10          // user: %8
   %8 = struct $Int32 (%7 : $Builtin.Int32)           // user: %9
   %9 = apply %6<T>(%2, %8, %5) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
@@ -40,7 +40,7 @@ bb1:                                              // Preds: bb0
 
 bb2:                                              // Preds: bb0
   %11 = metatype $@thick T.Type                   // user: %15
-  %12 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %15
+  %12 = witness_method $T, #P.init!allocator : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %15
   %13 = integer_literal $Builtin.Int32, 1          // user: %14
   %14 = struct $Int32 (%13 : $Builtin.Int32)         // user: %15
   %15 = apply %12<T>(%2, %14, %11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
@@ -66,7 +66,7 @@ bb0(%0 : $*T, %1 : $Bool):
   debug_value_addr %2 : $*T
   %3 = struct_extract %1 : $Bool, #Bool._value     // user: %4
   %5 = metatype $@thick T.Type                    // user: %9
-  %6 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %9
+  %6 = witness_method $T, #P.init!allocator : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %9
   %7 = integer_literal $Builtin.Int32, 10          // user: %8
   %8 = struct $Int32 (%7 : $Builtin.Int32)           // user: %9
   %9 = apply %6<T>(%2, %8, %5) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
@@ -440,7 +440,7 @@ bb0:
 
   dealloc_stack %v1 : $*Optional<AClass>
   %l1 = load %v0 : $*Optional<AClass>
-  %d1 = unchecked_enum_data %l1 : $Optional<AClass>, #Optional.some!enumelt.1
+  %d1 = unchecked_enum_data %l1 : $Optional<AClass>, #Optional.some!enumelt
   %f2 = function_ref @f_owned : $@convention(thin) <A> (@owned A) -> ()
   %c2 = apply %f2<AClass>(%d1) : $@convention(thin) <τ_0_0> (@owned τ_0_0) -> ()
   strong_retain %d1 : $AClass
@@ -463,10 +463,10 @@ bb0(%0 : $*Optional<T>):
   %2 = alloc_stack $Optional<T>
   copy_addr %0 to [initialization] %2 : $*Optional<T>
   destroy_addr %0 : $*Optional<T>
-  switch_enum_addr %2 : $*Optional<T>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+  switch_enum_addr %2 : $*Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
-  %6 = unchecked_take_enum_data_addr %2 : $*Optional<T>, #Optional.some!enumelt.1
+  %6 = unchecked_take_enum_data_addr %2 : $*Optional<T>, #Optional.some!enumelt
   destroy_addr %6 : $*T
   %8 = integer_literal $Builtin.Int1, -1
   br bb3(%8 : $Builtin.Int1)
@@ -576,9 +576,9 @@ bb0(%0 : $*Optional<P>, %1 : $*P):
   copy_addr %1 to [initialization] %2 : $*P
   %3 = function_ref @element_use : $@convention(thin)  (@inout P) -> ()
   %4 = apply %3(%1) : $@convention(thin)  (@inout P) -> ()
-  %5 = init_enum_data_addr %0 : $*Optional<P>, #Optional.some!enumelt.1
+  %5 = init_enum_data_addr %0 : $*Optional<P>, #Optional.some!enumelt
   copy_addr %2 to [initialization] %5 : $*P
-  inject_enum_addr %0 : $*Optional<P>, #Optional.some!enumelt.1
+  inject_enum_addr %0 : $*Optional<P>, #Optional.some!enumelt
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   %27 = tuple ()
@@ -594,7 +594,7 @@ sil @backward_propagate_exi_init : $@convention(thin) <T where T : P>(@inout T) 
 bb0(%0 : $*P, %1 : $*T):
   %2 = alloc_stack $T
   copy_addr %1 to [initialization] %2 : $*T
-  %3 = witness_method $T, #P.poke!1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
+  %3 = witness_method $T, #P.poke : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
   %4 = apply %3<T>(%1) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
   %5 = init_existential_addr %0 : $*P, $T
   copy_addr [take] %2 to [initialization] %5 : $*T
