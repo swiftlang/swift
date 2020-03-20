@@ -156,7 +156,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
   }
   if (auto *VD = dyn_cast<VarDecl>(Member)) {
     // Cannot use static properties on non-metatypes.
-    if (!(LS.isQualified() && LS.isOnMetatype()) && VD->isStatic())
+    if (!LS.isOnMetatype() && VD->isStatic())
       return false;
 
     // Cannot use instance properties on metatypes.
@@ -167,14 +167,16 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
   }
   if (isa<EnumElementDecl>(Member)) {
     // Cannot reference enum elements on non-metatypes.
-    if (!(LS.isQualified() && LS.isOnMetatype()))
+    if (!LS.isOnMetatype())
       return false;
   }
   if (auto CD = dyn_cast<ConstructorDecl>(Member)) {
+    if (!LS.isQualified())
+      return false;
     // Constructors with stub implementations cannot be called in Swift.
     if (CD->hasStubImplementation())
       return false;
-    if (LS.isQualified() && LS.isOnSuperclass()) {
+    if (LS.isOnSuperclass()) {
       // Cannot call initializers from a superclass, except for inherited
       // convenience initializers.
       return LS.isInheritsSuperclassInitializers() && CD->isInheritable();
@@ -1078,8 +1080,11 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
 
     // Skip initializer contexts, we will not find any declarations there.
     if (isa<Initializer>(DC)) {
+      // For non-'lazy' decls, lookup on the meta type.
+      if (!isa<PatternBindingInitializer>(DC) ||
+          !cast<PatternBindingInitializer>(DC)->getInitializedLazyVar())
+        LS = LS.withOnMetatype();
       DC = DC->getParent();
-      LS = LS.withOnMetatype();
     }
 
     // We don't look for generic parameters if we are in the context of a
@@ -1096,6 +1101,8 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
     if (auto *SE = dyn_cast<SubscriptDecl>(DC)) {
       ExtendedType = SE->getDeclContext()->getSelfTypeInContext();
       DC = DC->getParent();
+      if (SE->isStatic())
+        LS = LS.withOnMetatype();
     } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
 
       // Look for local variables; normally, the parser resolves these
@@ -1125,7 +1132,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())
-            ExtendedType = MetatypeType::get(ExtendedType);
+            LS = LS.withOnMetatype();
       }
     } else if (auto CE = dyn_cast<ClosureExpr>(DC)) {
       if (Loc.isValid()) {
