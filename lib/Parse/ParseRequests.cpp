@@ -181,6 +181,14 @@ void ParseSourceFileRequest::cacheResult(ArrayRef<Decl *> decls) const {
   verify(*SF);
 }
 
+//----------------------------------------------------------------------------//
+// CodeCompletionSecondPassRequest computation.
+//----------------------------------------------------------------------------//
+
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const CodeCompletionCallbacksFactory *factory) { }
+
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *parseRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
