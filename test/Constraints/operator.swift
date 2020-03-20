@@ -273,3 +273,9 @@ func rdar60727310() {
   var e: Error? = nil
   myAssertion(e, ==, nil) // expected-error {{binary operator '==' cannot be applied to two 'Error?' operands}}
 }
+
+// FIXME(SR-12438): Bad diagnostic.
+func sr12438(_ e: Error) {
+  func foo<T>(_ a: T, _ op: ((T, T) -> Bool)) {}
+  foo(e, ==) // expected-error {{type of expression is ambiguous without more context}}
+}
