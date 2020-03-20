@@ -473,26 +473,3 @@ bb3(%14 : $C):
 // CHECK: return
   return %16 : $T
 }
-
-// CHECK-LABEL: sil @test_inject_tuple
-// CHECK:   [[A:%[0-9]+]] = alloc_stack $Optional<(Int, Int)>
-// CHECK:   [[T:%[0-9]+]] = tuple (%0 : $Int, %1 : $Int)
-// CHECK:   [[E:%[0-9]+]] = enum $Optional<(Int, Int)>, #Optional.some!enumelt.1, [[T]] : $(Int, Int)
-// CHECK:   store [[E]] to [[A]]
-// CHECK:   [[L:%[0-9]+]] = load [[A]]
-// CHECK:   return [[L]]
-// CHECK: } // end sil function 'test_inject_tuple'
-sil @test_inject_tuple : $@convention(thin) (Int, Int) -> Optional<(Int, Int)> {
-bb0(%0 : $Int, %1 : $Int):
-  %17 = alloc_stack $Optional<(Int, Int)>
-  %45 = init_enum_data_addr %17 : $*Optional<(Int, Int)>, #Optional.some!enumelt.1
-  %46 = tuple_element_addr %45 : $*(Int, Int), 0
-  %47 = tuple_element_addr %45 : $*(Int, Int), 1
-  store %0 to %46 : $*Int
-  store %1 to %47 : $*Int
-  inject_enum_addr %17 : $*Optional<(Int, Int)>, #Optional.some!enumelt.1
-  %r = load %17 : $*Optional<(Int, Int)>
-  dealloc_stack %17 : $*Optional<(Int, Int)>
-  return %r : $Optional<(Int, Int)>
-}
-

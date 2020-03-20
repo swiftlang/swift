@@ -945,73 +945,13 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
   return nullptr;
 }
 
-/// Create a value from stores to an address.
-///
-/// If there are only stores to \p addr, return the stored value. Also, if there
-/// are address projections, create aggregate instructions for it.
-/// If builder is null, it's just a dry-run to check if it's possible.
-static SILValue createValueFromAddr(SILValue addr, SILBuilder *builder,
-                                    SILLocation loc) {
-  SmallVector<SILValue, 4> elems;
-  enum Kind {
-    none, store, tuple
-  } kind = none;
-
-  for (Operand *use : addr->getUses()) {
-    SILInstruction *user = use->getUser();
-    if (user->isDebugInstruction())
-      continue;
-
-    auto *st = dyn_cast<StoreInst>(user);
-    if (st && kind == none && st->getDest() == addr) {
-      elems.push_back(st->getSrc());
-      kind = store;
-      // We cannot just return st->getSrc() here because we also have to check
-      // if the store destination is the only use of addr.
-      continue;
-    }
-
-    if (auto *telem = dyn_cast<TupleElementAddrInst>(user)) {
-      if (kind == none) {
-        elems.resize(addr->getType().castTo<TupleType>()->getNumElements());
-        kind = tuple;
-      }
-      if (kind == tuple) {
-        if (elems[telem->getFieldNo()])
-          return SILValue();
-        elems[telem->getFieldNo()] = createValueFromAddr(telem, builder, loc);
-        continue;
-      }
-    }
-    // TODO: handle StructElementAddrInst to create structs.
-
-    return SILValue();
-  }
-  switch (kind) {
-  case none:
-    return SILValue();
-  case store:
-    assert(elems.size() == 1);
-    return elems[0];
-  case tuple:
-    if (std::any_of(elems.begin(), elems.end(),
-                    [](SILValue v){ return !(bool)v; }))
-      return SILValue();
-    if (builder) {
-      return builder->createTuple(loc, addr->getType().getObjectType(), elems);
-    }
-    // Just return anything not null for the dry-run.
-    return elems[0];
-  }
-}
-
 /// Simplify the following two frontend patterns:
 ///
 ///   %payload_addr = init_enum_data_addr %payload_allocation
 ///   store %payload to %payload_addr
 ///   inject_enum_addr %payload_allocation, $EnumType.case
 ///
-///   inject_enum_addr %nopayload_allocation, $EnumType.case
+///   inject_enum_add %nopayload_allocation, $EnumType.case
 ///
 /// for a concrete enum type $EnumType.case to:
 ///
@@ -1204,6 +1144,16 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   }
   assert((EnumAddrIns == IEAI) &&
          "Found InitEnumDataAddrInst differs from IEAI");
+  // Found the DataAddrInst to this enum payload. Check if it has only use.
+  if (!hasOneNonDebugUse(DataAddrInst))
+    return nullptr;
+
+  auto *SI = dyn_cast<StoreInst>(getSingleNonDebugUser(DataAddrInst));
+  auto *AI = dyn_cast<ApplyInst>(getSingleNonDebugUser(DataAddrInst));
+  if (!SI && !AI) {
+    return nullptr;
+  }
+
   // Make sure the enum pattern instructions are the only ones which write to
   // this location
   if (!WriteSet.empty()) {
@@ -1251,30 +1201,18 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     }
   }
 
-  // Check if we can replace all stores to the enum data with an enum of the
-  // stored value. We can also handle tuples as payloads, e.g.
-  //
-  //   %payload_addr = init_enum_data_addr %enum_addr
-  //   %elem0_addr = tuple_element_addr %payload_addr, 0
-  //   %elem1_addr = tuple_element_addr %payload_addr, 1
-  //   store %payload0 to %elem0_addr
-  //   store %payload1 to %elem1_addr
-  //   inject_enum_addr %enum_addr, $EnumType.case
-  //
-  if (createValueFromAddr(DataAddrInst, nullptr, DataAddrInst->getLoc())) {
-    SILValue en =
-      createValueFromAddr(DataAddrInst, &Builder, DataAddrInst->getLoc());
-    assert(en);
-
+  if (SI) {
+    assert((SI->getDest() == DataAddrInst) &&
+           "Can't find StoreInst with DataAddrInst as its destination");
     // In that case, create the payload enum/store.
     EnumInst *E = Builder.createEnum(
-        DataAddrInst->getLoc(), en, DataAddrInst->getElement(),
+        DataAddrInst->getLoc(), SI->getSrc(), DataAddrInst->getElement(),
         DataAddrInst->getOperand()->getType().getObjectType());
     Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand(),
                         StoreOwnershipQualifier::Unqualified);
     // Cleanup.
-    eraseUsesOfInstruction(DataAddrInst);
-    recursivelyDeleteTriviallyDeadInstructions(DataAddrInst, true);
+    eraseInstFromFunction(*SI);
+    eraseInstFromFunction(*DataAddrInst);
     return eraseInstFromFunction(*IEAI);
   }
 
@@ -1292,9 +1230,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   //  %1 = enum $EnumType, $EnumType.case, %load
   //  store %1 to %nopayload_addr
   //
-  auto *AI = dyn_cast_or_null<ApplyInst>(getSingleNonDebugUser(DataAddrInst));
-  if (!AI)
-    return nullptr;
+  assert(AI && "Must have an apply");
   unsigned ArgIdx = 0;
   Operand *EnumInitOperand = nullptr;
   for (auto &Opd : AI->getArgumentOperands()) {
