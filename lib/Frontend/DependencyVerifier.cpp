@@ -224,6 +224,7 @@ public:
            "Cannot form negative obligation!");
   }
 
+  Expectation::Scope getScope() const { return info.second; }
   Expectation::Kind getKind() const { return info.first; }
   StringRef getName() const { return name; }
   bool getCascades() const {
@@ -238,6 +239,22 @@ public:
     case Expectation::Scope::Cascading:
       return "cascading";
     }
+  }
+
+  StringRef renderAsFixit(ASTContext &Ctx) const {
+    llvm::StringRef selector =
+#define MATRIX_ENTRY(SELECTOR, SCOPE, KIND) \
+    if (getKind() == Expectation::Kind::KIND && \
+        getScope() == Expectation::Scope::SCOPE) { \
+      return SELECTOR; \
+    }
+
+    [this]() -> StringRef {
+      EXPECTATION_MATRIX
+      return "";
+    }();
+#undef MATRIX_ENTRY
+    return Ctx.AllocateCopy(("// " + selector + "{{" + getName() + "}}").str());
   }
 
 public:
@@ -439,17 +456,19 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
           auto demContext = copyDemangledTypeName(Ctx, context);
           auto key = Ctx.AllocateCopy((demContext + "." + name).str());
           Obligations.insert({Obligation::Key::forMember(key),
-                              {context, Expectation::Kind::Member,
+                              {key, Expectation::Kind::Member,
                                isCascadingUse ? Expectation::Scope::Cascading
                                               : Expectation::Scope::Private}});
         }
           break;
-        case NodeKind::dynamicLookup:
+        case NodeKind::dynamicLookup: {
+          auto contextCpy = Ctx.AllocateCopy(context);
           Obligations.insert({Obligation::Key::forDynamicMember(name),
-                              {context, Expectation::Kind::DynamicMember,
+                              {contextCpy, Expectation::Kind::DynamicMember,
                                isCascadingUse ? Expectation::Scope::Cascading
                                               : Expectation::Scope::Private}});
           break;
+        }
         case NodeKind::topLevel:
         case NodeKind::sourceFileProvide:
           Obligations.insert({Obligation::Key::forProvides(name),
@@ -564,6 +583,7 @@ bool DependencyVerifier::diagnoseUnfulfilledObligations(
   CharSourceRange EntireRange = SM.getRangeForBuffer(*SF->getBufferID());
   StringRef InputFile = SM.extractText(EntireRange);
   auto &diags = SF->getASTContext().Diags;
+  auto &Ctx = SF->getASTContext();
   forEachOwedObligation(Obligations, [&](StringRef key, Obligation &p) {
     // HACK: Diagnosing the end of the buffer will print a carat pointing
     // at the file path, but not print any of the buffer's contents, which
@@ -576,10 +596,12 @@ bool DependencyVerifier::diagnoseUnfulfilledObligations(
     case Expectation::Kind::DynamicMember:
     case Expectation::Kind::PotentialMember:
       diags.diagnose(Loc, diag::unexpected_dependency, p.describeCascade(),
-                     static_cast<uint8_t>(p.getKind()), key);
+                     static_cast<uint8_t>(p.getKind()), key)
+        .fixItInsert(Loc, p.renderAsFixit(Ctx));
       break;
     case Expectation::Kind::Provides:
-      diags.diagnose(Loc, diag::unexpected_provided_entity, p.getName());
+      diags.diagnose(Loc, diag::unexpected_provided_entity, p.getName())
+        .fixItInsert(Loc, p.renderAsFixit(Ctx));
       break;
     }
   });
