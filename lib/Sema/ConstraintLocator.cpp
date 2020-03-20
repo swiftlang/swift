@@ -197,7 +197,8 @@ bool ConstraintLocator::isForAssignment() const {
 }
 
 bool ConstraintLocator::isForCoercion() const {
-  return directlyAt<CoerceExpr>();
+  return isLastElement<LocatorPathElt::ExplicitTypeCoercion>() ||
+         directlyAt<CoerceExpr>();
 }
 
 bool ConstraintLocator::isForOptionalTry() const {
