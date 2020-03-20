@@ -71,3 +71,7 @@ static inline _Bool _withStackOrHeapBuffer(size_t amount, void (__attribute__((n
     }
     return true;
 }
+
+@protocol _NSKVOCompatibilityShim <NSObject>
++ (void)_noteProcessHasUsedKVOSwiftOverlay;
+@end

@@ -24,6 +24,11 @@
 
 #pragma clang assume_nonnull begin
 
+static inline uint32_t
+_swift_nw_data_transfer_report_all_paths(void) {
+	return (uint32_t)(-1);
+}
+
 typedef void (^__swift_nw_connection_send_completion_t)(_Nullable nw_error_t error);
 
 static inline SWIFT_NW_RETURNS_RETAINED nw_content_context_t
@@ -49,6 +54,12 @@ _swift_nw_connection_send_idempotent(nw_connection_t connection, _Nullable dispa
 static inline void
 _swift_nw_connection_send(nw_connection_t connection, _Nullable dispatch_data_t content, nw_content_context_t context, bool is_complete, __swift_nw_connection_send_completion_t completion) {
 	nw_connection_send(connection, content, context, is_complete, completion);
+}
+
+API_AVAILABLE(macos(10.15)) API_UNAVAILABLE(ios, watchos, tvos)
+static inline SWIFT_NW_RETURNS_RETAINED nw_parameters_t
+_swift_nw_parameters_create_custom_ip(uint8_t custom_ip_protocol_number) {
+	nw_parameters_create_custom_ip(custom_ip_protocol_number, _nw_parameters_configure_protocol_default_configuration);
 }
 
 API_AVAILABLE(macos(10.14), ios(12.0), watchos(5.0), tvos(12.0))

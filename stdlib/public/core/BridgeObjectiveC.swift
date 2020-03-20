@@ -85,11 +85,13 @@ public protocol _ObjectiveCBridgeable {
 
 #if _runtime(_ObjC)
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-@available(*, deprecated)
+// Note: This function is not intended to be called from Swift.  The
+// availability information here is perfunctory; this function isn't considered
+// part of the Stdlib's Swift ABI.
+@available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
 @_cdecl("_SwiftCreateBridgedArray")
 @usableFromInline
-internal func _SwiftCreateBridgedArray(
+internal func _SwiftCreateBridgedArray_DoNotCall(
   values: UnsafePointer<AnyObject>,
   numValues: Int
 ) -> Unmanaged<AnyObject> {
@@ -98,11 +100,13 @@ internal func _SwiftCreateBridgedArray(
   return Unmanaged<AnyObject>.passRetained(bridged)
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-@available(*, deprecated)
+// Note: This function is not intended to be called from Swift.  The
+// availability information here is perfunctory; this function isn't considered
+// part of the Stdlib's Swift ABI.
+@available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
 @_cdecl("_SwiftCreateBridgedMutableArray")
 @usableFromInline
-internal func _SwiftCreateBridgedMutableArray(
+internal func _SwiftCreateBridgedMutableArray_DoNotCall(
   values: UnsafePointer<AnyObject>,
   numValues: Int
 ) -> Unmanaged<AnyObject> {

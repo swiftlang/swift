@@ -55,3 +55,26 @@ extension DecodingError {
         }
     }
 }
+
+// Only support 64bit
+#if !(os(iOS) && (arch(i386) || arch(arm)))
+
+import Combine
+
+//===----------------------------------------------------------------------===//
+// Generic Decoding
+//===----------------------------------------------------------------------===//
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension JSONEncoder: TopLevelEncoder { }
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension PropertyListEncoder: TopLevelEncoder { }
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension JSONDecoder: TopLevelDecoder { }
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension PropertyListDecoder: TopLevelDecoder { }
+
+#endif /* !(os(iOS) && (arch(i386) || arch(arm))) */
