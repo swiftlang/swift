@@ -1152,7 +1152,7 @@ namespace {
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
       auto *parentExpr = CS.getParentExpr(expr);
-      if (parentExpr && isa<ParenExpr>(parentExpr))
+      while (parentExpr && isa<ParenExpr>(parentExpr))
         parentExpr = CS.getParentExpr(parentExpr);
 
       if (parentExpr) {
