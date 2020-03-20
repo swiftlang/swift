@@ -645,52 +645,47 @@ static void lookupVisibleMemberDeclsImpl(
       return;
 
     synthesizeAndLookupTypeMembers(NTD);
+    // Look into protocols only on the current nominal to avoid repeatedly
+    // visiting inherited conformances.
     lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
                                              Reason, Visited);
 
     const auto CD = dyn_cast<ClassDecl>(NTD);
+
     // FIXME: We check `getSuperclass()` here because we'll be using the
     // superclass Type below, and in ill-formed code `hasSuperclass()` could
     // be true while `getSuperclass()` returns null, because the latter
     // looks for a declaration.
-    //
-    // If we have a superclass, switch state and look into the
-    // inheritance chain.
-    if (CD && CD->getSuperclass()) {
-      Ancestors.insert(CD);
-
-      Reason = getReasonForSuper(Reason);
-      BaseTy = CD->getSuperclass();
-
-      LS = LS.withOnSuperclass();
-      if (CD->inheritsSuperclassInitializers())
-        LS = LS.withInheritsSuperclassInitializers();
-    } else {
+    if (!CD || !CD->getSuperclass())
       return;
-    }
+
+    // We have a superclass; switch state and look into the inheritance chain.
+    Ancestors.insert(CD);
+
+    Reason = getReasonForSuper(Reason);
+    BaseTy = CD->getSuperclass();
+
+    LS = LS.withOnSuperclass();
+    if (CD->inheritsSuperclassInitializers())
+      LS = LS.withInheritsSuperclassInitializers();
   }
 
   // Look into the inheritance chain.
-  while (const auto CurClass = cast_or_null<ClassDecl>(
-                                   BaseTy->getAnyNominal())) {
-    synthesizeAndLookupTypeMembers(CurClass);
-    if (const auto superclassTy = CurClass->getSuperclass()) {
-      // FIXME: This path is no substitute for an actual circularity check.
-      // The real fix is to check that the superclass doesn't introduce a
-      // circular reference before it's written into the AST.
-      if (Ancestors.count(CurClass)) {
-        break;
-      }
-      Ancestors.insert(CurClass);
+  do {
+    const auto CurClass = BaseTy->getClassOrBoundGenericClass();
 
-      BaseTy = superclassTy;
-
-      if (!CurClass->inheritsSuperclassInitializers())
-        LS = LS.withoutInheritsSuperclassInitializers();
-    } else {
+    // FIXME: This path is no substitute for an actual circularity check.
+    // The real fix is to check that the superclass doesn't introduce a
+    // circular reference before it's written into the AST.
+    if (!Ancestors.insert(CurClass).second)
       break;
-    }
-  }
+
+    synthesizeAndLookupTypeMembers(CurClass);
+
+    BaseTy = CurClass->getSuperclass();
+    if (!CurClass->inheritsSuperclassInitializers())
+      LS = LS.withoutInheritsSuperclassInitializers();
+  } while (BaseTy);
 }
 
 swift::DynamicLookupInfo::DynamicLookupInfo(
