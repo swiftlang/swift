@@ -1557,17 +1557,6 @@ namespace {
     /// \returns The coerced closure expression.
     ///
     ClosureExpr *coerceClosureExprToVoid(ClosureExpr *expr);
-
-    /// Coerce a closure expression with a Never return type to a
-    /// contextual function type with some other return type.
-    ///
-    /// This operation cannot fail.
-    ///
-    /// \param expr The closure expression to coerce.
-    ///
-    /// \returns The coerced closure expression.
-    ///
-    ClosureExpr *coerceClosureExprFromNever(ClosureExpr *expr);
     
     /// Coerce the given expression to the given type.
     ///
@@ -5891,36 +5880,6 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
   return closureExpr;
 }
 
-ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) {
-  // Re-write the single-expression closure to drop the 'return'.
-  assert(closureExpr->hasSingleExpressionBody());
-
-  // A single-expression body contains a single return statement
-  // prior to this transformation.
-  auto member = closureExpr->getBody()->getFirstElement();
-
-  if (member.is<Stmt *>()) {
-    auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
-    auto singleExpr = returnStmt->getResult();
-
-    solution.setExprTypes(singleExpr);
-    TypeChecker::checkIgnoredExpr(singleExpr);
-
-    SmallVector<ASTNode, 1> elements;
-    elements.push_back(singleExpr);
-
-    auto braceStmt =
-        BraceStmt::create(cs.getASTContext(), closureExpr->getStartLoc(),
-                          elements, closureExpr->getEndLoc(),
-                          /*implicit*/ true);
-
-    closureExpr->setImplicit();
-    closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
-  }
-
-  return closureExpr;
-}
-
 // Look through sugar and DotSyntaxBaseIgnoredExprs.
 static Expr *
 getSemanticExprForDeclOrMemberRef(Expr *expr) {
@@ -7606,10 +7565,6 @@ namespace {
             // coerces to a Void-returning function type.
             if (fnType->getResult()->isVoid() && !cs.getType(body)->isVoid()) {
               closure = Rewriter.coerceClosureExprToVoid(closure);
-            // A single-expression closure with a Never expression type
-            // coerces to any other function type.
-            } else if (cs.getType(body)->isUninhabited()) {
-              closure = Rewriter.coerceClosureExprFromNever(closure);
             } else {
             
               body = Rewriter.coerceToType(body,

@@ -4779,18 +4779,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     });
   }
 
-  // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
+  // Allow '() -> T' to '() -> ()' for closure
   // literals and expressions representing an implicit return type of the single
   // expression functions.
   if (auto elt = locator.last()) {
-    if (kind >= ConstraintKind::Subtype &&
-        (type1->isUninhabited() || type2->isVoid())) {
+    if (kind >= ConstraintKind::Subtype && type2->isVoid()) {
       // A conversion from closure body type to its signature result type.
       if (auto resultElt = elt->getAs<LocatorPathElt::ClosureBody>()) {
         // If a single statement closure has explicit `return` let's
         // forbid conversion to `Void` and report an error instead to
         // honor user's intent.
-        if (type1->isUninhabited() || !resultElt->hasExplicitReturn()) {
+        if (!resultElt->hasExplicitReturn()) {
           increaseScore(SK_FunctionConversion);
           return getTypeMatchSuccess();
         }
