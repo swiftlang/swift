@@ -259,8 +259,8 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyze() {
   if (FSODisableOwnedToGuaranteed)
     return false;
 
-  bool Result = OwnedToGuaranteedAnalyzeResults();
-  bool Params = OwnedToGuaranteedAnalyzeParameters();
+  const bool Result = OwnedToGuaranteedAnalyzeResults();
+  const bool Params = OwnedToGuaranteedAnalyzeParameters();
   return Params || Result;
 }
 
