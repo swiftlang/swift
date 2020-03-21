@@ -1201,7 +1201,7 @@ bool DSEContext::run() {
     return false;
 
   // Do we run a pessimistic data flow ?
-  bool Optimistic = Kind == ProcessKind::ProcessOptimistic ? true : false;
+  const bool Optimistic = (Kind == ProcessKind::ProcessOptimistic);
 
   // For all basic blocks in the function, initialize a BB state.
   //
