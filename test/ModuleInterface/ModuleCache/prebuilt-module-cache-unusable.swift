@@ -2,10 +2,10 @@
 // RUN: %empty-directory(%t/MCP)
 // RUN: %empty-directory(%t/prebuilt-cache/Lib.swiftmodule)
 // RUN: %empty-directory(%t/include/Lib.swiftmodule)
-// RUN: cp %S/Inputs/prebuilt-module-cache/Lib.swiftinterface %t/include/Lib.swiftmodule/%target-cpu.swiftinterface
+// RUN: cp %S/Inputs/prebuilt-module-cache/Lib.swiftinterface %t/include/Lib.swiftmodule/%target-swiftinterface-name
 
 // Prebuild a module for the current target CPU, and put it in the prebuilt cache under some imaginary CPU.
-// RUN: sed -e 's/FromInterface/FromPrebuilt/g' %t/include/Lib.swiftmodule/%target-cpu.swiftinterface | %target-swift-frontend -parse-stdlib -module-cache-path %t/MCP -emit-module-path %t/prebuilt-cache/Lib.swiftmodule/leg128.swiftmodule - -module-name Lib
+// RUN: sed -e 's/FromInterface/FromPrebuilt/g' %t/include/Lib.swiftmodule/%target-swiftinterface-name | %target-swift-frontend -parse-stdlib -module-cache-path %t/MCP -emit-module-path %t/prebuilt-cache/Lib.swiftmodule/leg128.swiftmodule - -module-name Lib
 
 // Make sure that, if there's a module for a different architecture
 // present in the prebuilt cache, it's ignored and the module is

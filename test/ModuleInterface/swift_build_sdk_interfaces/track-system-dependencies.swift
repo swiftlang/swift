@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/system-dependencies-sdk %t/sdk
-// RUN: echo 'import Platform; public func usesCStruct(_: SomeCStruct?) {}' | %target-swift-frontend - -emit-module-interface-path %t/sdk/usr/lib/swift/Swifty.swiftmodule/%target-cpu.swiftinterface -emit-module -o /dev/null -module-name Swifty -sdk %t/sdk
+// RUN: echo 'import Platform; public func usesCStruct(_: SomeCStruct?) {}' | %target-swift-frontend - -emit-module-interface-path %t/sdk/usr/lib/swift/Swifty.swiftmodule/%target-swiftinterface-name -emit-module -o /dev/null -module-name Swifty -sdk %t/sdk
 
 // RUN: %swift_build_sdk_interfaces -sdk %t/sdk -v -o %t/prebuilt
 // RUN: ls %t/prebuilt | %FileCheck %s
