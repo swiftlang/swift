@@ -576,7 +576,7 @@ class C: Differentiable {
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE] %1 = argument of bb0 : $C
 // CHECK: [USEFUL]   %4 = metatype $@thin Float.Type
-// CHECK: [VARIED]   %5 = class_method %1 : $C, #C.float!getter.1 : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
+// CHECK: [VARIED]   %5 = class_method %1 : $C, #C.float!getter : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
 // CHECK: [ACTIVE]   %6 = apply %5(%1) : $@convention(method) (@guaranteed C) -> Float
 // CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
 // CHECK:   %7 = function_ref @$sSf1moiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
@@ -598,10 +598,10 @@ func testClassModifyAccessor(_ c: inout C) {
 // CHECK: [ACTIVE]   %6 = begin_access [read] [static] %0 : $*C
 // CHECK: [VARIED]   %7 = load [copy] %6 : $*C
 // CHECK: [VARIED]   %9 = begin_borrow %7 : $C
-// CHECK: [VARIED]   %10 = class_method %9 : $C, #C.float!getter.1 : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
+// CHECK: [VARIED]   %10 = class_method %9 : $C, #C.float!getter : (C) -> () -> Float, $@convention(method) (@guaranteed C) -> Float
 // CHECK: [VARIED]   %11 = apply %10(%9) : $@convention(method) (@guaranteed C) -> Float
 // CHECK: [VARIED]   %14 = begin_borrow %4 : $C
-// CHECK: [VARIED]   %15 = class_method %14 : $C, #C.float!modify.1 : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
+// CHECK: [VARIED]   %15 = class_method %14 : $C, #C.float!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
 // CHECK: [VARIED] (**%16**, %17) = begin_apply %15(%14) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
 // CHECK: [VARIED] (%16, **%17**) = begin_apply %15(%14) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Float
 // CHECK: [NONE]   // function_ref static Float.*= infix(_:_:)
@@ -630,8 +630,8 @@ func testActiveOptional(_ x: Float) -> Float {
 // CHECK: [USEFUL]   %4 = metatype $@thin Float.Type
 // CHECK: [NONE]   // function_ref Float.init(_builtinIntegerLiteral:)
 // CHECK: [USEFUL]   %6 = apply %5(%3, %4) : $@convention(method) (Builtin.IntLiteral, @thin Float.Type) -> Float
-// CHECK: [USEFUL]   %7 = enum $Optional<Float>, #Optional.some!enumelt.1, %6 : $Float
-// CHECK: [ACTIVE]   %9 = enum $Optional<Float>, #Optional.some!enumelt.1, %0 : $Float
+// CHECK: [USEFUL]   %7 = enum $Optional<Float>, #Optional.some!enumelt, %6 : $Float
+// CHECK: [ACTIVE]   %9 = enum $Optional<Float>, #Optional.some!enumelt, %0 : $Float
 // CHECK: [ACTIVE]   %10 = begin_access [modify] [static] %2 : $*Optional<Float>
 // CHECK: [ACTIVE]   %13 = begin_access [read] [static] %2 : $*Optional<Float>
 // CHECK: [ACTIVE]   %14 = load [trivial] %13 : $*Optional<Float>
@@ -712,10 +712,10 @@ func testActiveEnumAddr<T>(_ e: IndirectEnum<T>) -> T {
 // CHECK: [ACTIVE] %1 = argument of bb0 : $*IndirectEnum<T>
 // CHECK: [ACTIVE]   %3 = alloc_stack $IndirectEnum<T>
 // CHECK: bb1:
-// CHECK: [ACTIVE]   %6 = unchecked_take_enum_data_addr %3 : $*IndirectEnum<T>, #IndirectEnum.case1!enumelt.1
+// CHECK: [ACTIVE]   %6 = unchecked_take_enum_data_addr %3 : $*IndirectEnum<T>, #IndirectEnum.case1!enumelt
 // CHECK: [ACTIVE]   %7 = alloc_stack $T, let, name "y1"
 // CHECK: bb2:
-// CHECK: [ACTIVE]   %14 = unchecked_take_enum_data_addr %3 : $*IndirectEnum<T>, #IndirectEnum.case2!enumelt.1
+// CHECK: [ACTIVE]   %14 = unchecked_take_enum_data_addr %3 : $*IndirectEnum<T>, #IndirectEnum.case2!enumelt
 // CHECK: [ACTIVE]   %15 = tuple_element_addr %14 : $*(Float, T), 0
 // CHECK: [VARIED]   %16 = load [trivial] %15 : $*Float
 // CHECK: [ACTIVE]   %17 = tuple_element_addr %14 : $*(Float, T), 1
