@@ -270,13 +270,36 @@ public struct SomeWrapper {
   }
 }
 
+@propertyWrapper struct W<Value> {
+  var wrappedValue: Value {
+    get { return x }
+    set {  }
+  }
+
+  var x: Value
+
+  init(wrappedValue: Value) {
+    x = wrappedValue
+  }
+}
+
 class SomeWrapperTests {
   @objc @SomeWrapper dynamic var someWrapper: Int = 0
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsC14testAssignmentyyF
-// CHECK: [[M:%.*]] = objc_method %0 : $SomeWrapperTests, #SomeWrapperTests.someWrapper!setter.foreign
-// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[M]]({{.*}}) : $@convention(objc_method)
+// CHECK:  [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC04someD0SivsTD
+// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[M]]({{.*}})
 // CHECK: assign_by_wrapper {{%.*}}: $Int to {{%.*}} : $*SomeWrapper, init {{.*}} : $@callee_guaranteed (Int) -> SomeWrapper, set [[C]] : $@callee_guaranteed (Int) -> ()
   func testAssignment() {
     someWrapper = 1000
+  }
+
+  @W @objc dynamic var s: String? = nil
+// CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsC16testBridgedValueyySSF
+// CHECK: [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC1sSSSgvsTD
+// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[M]](
+// CHECK:  assign_by_wrapper {{.*}} : $Optional<String> to {{.*}} : $*W<Optional<String>>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @owned W<Optional<String>>, set [[C]] : $@callee_guaranteed (@owned Optional<String>) -> ()
+  // Let's not crash.
+  func testBridgedValue(_ s: String) {
+    self.s = s
   }
 }
