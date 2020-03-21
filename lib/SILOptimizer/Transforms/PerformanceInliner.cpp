@@ -16,6 +16,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/Analysis/NestedSemanticsAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -67,16 +68,11 @@ class SILPerformanceInliner {
   DominanceAnalysis *DA;
   SILLoopAnalysis *LA;
   SideEffectAnalysis *SEA;
+  NestedSemanticsAnalysis *NSAnalysis;
 
   // For keys of SILFunction and SILLoop.
   llvm::DenseMap<SILFunction *, ShortestPathAnalysis *> SPAs;
   llvm::SpecificBumpPtrAllocator<ShortestPathAnalysis> SPAAllocator;
-
-  // Mark semantic functions that have nested semantic calls. This is
-  // effectively an immutable cache since we do not inline semantic calls into
-  // other semantic calls. This is computed bottom up--when checking a call
-  // site, we assume that a callee has already been evaluated.
-  llvm::SmallPtrSet<SILFunction *, 8> nestedSemanticFunctions;
 
   ColdBlockInfo CBI;
 
@@ -202,9 +198,10 @@ public:
   SILPerformanceInliner(SILOptFunctionBuilder &FuncBuilder,
 			InlineSelection WhatToInline, DominanceAnalysis *DA,
                         SILLoopAnalysis *LA, SideEffectAnalysis *SEA,
+                        NestedSemanticsAnalysis *NSAnalysis,
                         OptimizationMode OptMode, OptRemark::Emitter &ORE)
       : FuncBuilder(FuncBuilder), WhatToInline(WhatToInline), DA(DA), LA(LA),
-	SEA(SEA), CBI(DA), ORE(ORE), OptMode(OptMode) {}
+	SEA(SEA), NSAnalysis(NSAnalysis), CBI(DA), ORE(ORE), OptMode(OptMode) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
 };
@@ -806,7 +803,9 @@ void SILPerformanceInliner::collectAppliesToInline(
     addWeightCorrection(FAS, WeightCorrections);
 
     if (SILFunction *Callee =
-            getEligibleFunction(FAS, WhatToInline, nestedSemanticFunctions)) {
+            getEligibleFunction(FAS, WhatToInline,
+                                NSAnalysis->isNestedSemanticFunction(
+                                    FAS.getReferencedFunctionOrNull()))) {
       // Compute the shortest-path analysis for the callee.
       SILLoopInfo *CalleeLI = LA->get(Callee);
       ShortestPathAnalysis *CalleeSPA = getSPA(Callee, CalleeLI);
@@ -833,8 +832,6 @@ void SILPerformanceInliner::collectAppliesToInline(
   }
 #endif
 
-  bool semanticFunction = isOptimizableSemanticFunction(Caller);
-
   ConstantTracker constTracker(Caller);
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());
   int NumCallerBlocks = (int)Caller->size();
@@ -857,13 +854,10 @@ void SILPerformanceInliner::collectAppliesToInline(
 
       FullApplySite AI = FullApplySite(&*I);
 
-      auto *Callee =
-          getEligibleFunction(AI, WhatToInline, nestedSemanticFunctions);
+      auto *Callee = getEligibleFunction(AI, WhatToInline,
+                                         NSAnalysis->isNestedSemanticFunction(
+                                             AI.getReferencedFunctionOrNull()));
       if (Callee) {
-        // Mark nested semantic functions to guide inlining of callers.
-        if (semanticFunction && isOptimizableSemanticFunction(Callee))
-          nestedSemanticFunctions.insert(Caller);
-
         // Check if we have an always_inline or transparent function. If we do,
         // just add it to our final Applies list and continue.
         if (isInlineAlwaysCallSite(Callee)) {
@@ -941,28 +935,6 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (AppliesToInline.empty())
     return false;
 
-#if 0
-  //!!!
-  bool trace = false;
-  if (Caller->hasName("$s22array_semantics_nested16testInlineAppend5countSaySiGSi_tF")) {
-    //!!!llvm::dbgs() << "inlining into testInlineAppend\n";
-    //!!!trace = true;
-  }
-
-  llvm::SmallPtrSet<FullApplySite, 4> nestedSemanticCalls;
-  for (auto fullApply : AppliesToInline) {
-    //!!!
-    if (false
-        && nestedSemanticFunctions.count(
-            fullApply.getReferencedFunctionOrNull())) {
-      //!!!
-      if (trace)
-        llvm::dbgs() << "Nested: "
-                     << fullApply.getReferencedFunctionOrNull()->getName() << "\n";
-      nestedSemanticCalls.insert(fullApply);
-    }
-  }
-#endif
   // Second step: do the actual inlining.
   // We inline in reverse order, because for very large blocks with many applies
   // to inline, splitting the block at every apply would be quadratic.
@@ -974,17 +946,6 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
       continue;
     }
 
-#if 0
-    // If this function calls any nested semantics, only inline the nested
-    // semantic calls.
-    if (!nestedSemanticCalls.empty() && !nestedSemanticCalls.count(AI)) {
-      //!!!
-      if (trace)
-        llvm::dbgs() << "Non Nested: " << Callee->getName() << "\n";
-      if (ArraySemanticsCall(AI.getInstruction()))
-        continue;
-    }
-#endif
     // If we have a callee that doesn't have ownership, but the caller does have
     // ownership... do not inline. The two modes are incompatible, so skip this
     // apply site for now.
@@ -1040,8 +1001,9 @@ void SILPerformanceInliner::visitColdBlocks(
       if (!AI)
         continue;
 
-      auto *Callee =
-          getEligibleFunction(AI, WhatToInline, nestedSemanticFunctions);
+      auto *Callee = getEligibleFunction(
+          AI, WhatToInline,
+          NSAnalysis->isNestedSemanticFunction(AI->getReferencedFunctionOrNull()));
       if (Callee && decideInColdBlock(AI, Callee)) {
         AppliesToInline.push_back(AI);
       }
@@ -1072,6 +1034,7 @@ public:
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
+    NestedSemanticsAnalysis *NSAnalysis = PM->getAnalysis<NestedSemanticsAnalysis>();
     OptRemark::Emitter ORE(DEBUG_TYPE, getFunction()->getModule());
 
     if (getOptions().InlineThreshold == 0) {
@@ -1082,7 +1045,7 @@ public:
 
     SILOptFunctionBuilder FuncBuilder(*this);
     SILPerformanceInliner Inliner(FuncBuilder, WhatToInline, DA, LA, SEA,
-				  OptMode, ORE);
+                                  NSAnalysis, OptMode, ORE);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");

@@ -374,6 +374,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
 
   P.addCOWOpts();
+  P.addCOWArrayOpts();
   P.addPerformanceConstantPropagation();
   // Remove redundant arguments right before CSE and DCE, so that CSE and DCE
   // can cleanup redundant and dead instructions.

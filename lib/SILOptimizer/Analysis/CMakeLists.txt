@@ -19,6 +19,7 @@ target_sources(swiftSILOptimizer PRIVATE
   LoopAnalysis.cpp
   LoopRegionAnalysis.cpp
   MemoryBehavior.cpp
+  NestedSemanticsAnalysis.cpp
   PassManagerVerifierAnalysis.cpp
   ProtocolConformanceAnalysis.cpp
   RCIdentityAnalysis.cpp

@@ -40,9 +40,8 @@ enum class InlineSelection {
 };
 
 // Returns the callee of an apply_inst if it is basically inlinable.
-SILFunction *getEligibleFunction(
-    FullApplySite AI, InlineSelection WhatToInline,
-    const SmallPtrSetImpl<SILFunction *> &nestedSemanticFunctions);
+SILFunction *getEligibleFunction(FullApplySite AI, InlineSelection WhatToInline,
+                                 bool isNestedSemanticFunction = false);
 
 // Returns true if this is a pure call, i.e. the callee has no side-effects
 // and all arguments are constants.

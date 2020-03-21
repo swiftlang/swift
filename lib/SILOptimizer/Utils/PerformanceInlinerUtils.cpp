@@ -569,7 +569,6 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
 // Returns true if a given function has recognized @_semantics, and should
 // have inlining deferred.
 bool swift::isOptimizableSemanticFunction(SILFunction *callee) {
-
   // Currently, we only consider "array" semantic calls to be "semantic
   // functions" because we only have semantic passes that recognize array
   // operations. In the future, any call that encapsulates the semantics of a
@@ -583,6 +582,11 @@ bool swift::isOptimizableSemanticFunction(SILFunction *callee) {
     // inlined away immediately.
     return arrayCallKind != ArrayCallKind::kArrayUninitializedIntrinsic;
   }
+
+  if (callee->hasSemanticsAttr("self_no_escaping_closure") ||
+      callee->hasSemanticsAttr("pair_no_escaping_closure"))
+  return true;
+
   return false;
 }
 
@@ -628,7 +632,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(
     FullApplySite AI, InlineSelection WhatToInline,
-    const SmallPtrSetImpl<SILFunction *> &nestedSemanticFunctions) {
+    bool isNestedSemanticCallee) {
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
 
   if (!Callee) {
@@ -687,17 +691,16 @@ SILFunction *swift::getEligibleFunction(
       // Avoid inlining the lowest level of semantic call. Doing so will
       // pessimize analyses such as EscapeAnlysis and SideEffectAnalysis by
       // exposing underlying ADT guts.
-      if (!nestedSemanticFunctions.count(Callee))
+      if (!isNestedSemanticCallee)
         return nullptr;
-
       // Avoid inlining a semantic call into a semantic function. It hides the
       // underlying semantics from semantic passes. First, the outer semantic
       // call must be inlined. Then a full round of semantic passes must rerun
       // (all array optimizations). Afterward, the next level of semantic calls
-      // can be inlined. This relies on no unannotated functions on the call
-      // stack between the outer and inner semantic functions.
-      if (!isOptimizableSemanticFunction(AI.getFunction()))
+      // can be inlined.
+      if (isOptimizableSemanticFunction(AI.getFunction())) {
         return nullptr;
+      }
     }
     if (Callee->hasSemanticsAttrThatStartsWith("inline_late")) {
       return nullptr;
