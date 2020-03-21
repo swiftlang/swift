@@ -45,6 +45,9 @@ enum class ArrayCallKind {
   kArrayUninitializedIntrinsic
 };
 
+/// Return true is the given function is an array semantics call.
+ArrayCallKind getArraySemanticsKind(SILFunction *f);
+
 /// Wrapper around array semantic calls.
 class ArraySemanticsCall {
   ApplyInst *SemanticsCall;

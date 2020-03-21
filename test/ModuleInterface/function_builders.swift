@@ -36,11 +36,14 @@ public func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
 }
 
 public struct UsesBuilderProperty {
-  // CHECK: @FunctionBuilders.TupleBuilder public var myVar: (Swift.String, Swift.String) {
+  // CHECK: public var myVar: (Swift.String, Swift.String) {
   // CHECK-NEXT: get
   // CHECK-NEXT: }
   @TupleBuilder public var myVar: (String, String) {
     "hello"
     "goodbye"
   }
+
+  // CHECK: public func myFunc(@FunctionBuilders.TupleBuilder fn: () -> ())
+  public func myFunc(@TupleBuilder fn: () -> ()) {}
 }

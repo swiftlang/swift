@@ -661,6 +661,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::ClosureBody:
     case ConstraintLocator::ClosureResult: {
       diagnostic = diag::cannot_convert_closure_result;
       break;
@@ -1904,6 +1905,7 @@ bool ContextualFailure::diagnoseAsError() {
 
   Diag<Type, Type> diagnostic;
   switch (path.back().getKind()) {
+  case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
     auto *closure = cast<ClosureExpr>(getRawAnchor());
     if (closure->hasExplicitResultType() &&
@@ -3788,7 +3790,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   if (!(locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
         locator->isLastElement<LocatorPathElt::ContextualType>() ||
         locator->isLastElement<LocatorPathElt::ApplyArgument>() ||
-        locator->isLastElement<LocatorPathElt::ClosureResult>()))
+        locator->isLastElement<LocatorPathElt::ClosureResult>() ||
+        locator->isLastElement<LocatorPathElt::ClosureBody>()))
     return false;
 
   // If this is a misplaced `missng argument` situation, it would be
@@ -4047,7 +4050,8 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
     if (auto objectType = paramType->getOptionalObjectType())
       paramType = objectType;
     funcType = paramType->getAs<FunctionType>();
-  } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
+  } else if (locator->isLastElement<LocatorPathElt::ClosureResult>() ||
+             locator->isLastElement<LocatorPathElt::ClosureBody>()) {
     // Based on the locator we know this this is something like this:
     // `let _: () -> ((Int) -> Void) = { return {} }`.
     funcType = getType(getRawAnchor())

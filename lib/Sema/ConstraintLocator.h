@@ -71,6 +71,7 @@ public:
     case PatternMatch:
       return 0;
 
+    case ClosureBody:
     case ContextualType:
     case OpenedGeneric:
     case GenericArgument:
@@ -714,6 +715,20 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::TypeParameterRequirement;
+  }
+};
+
+class LocatorPathElt::ClosureBody final : public LocatorPathElt {
+  public:
+  ClosureBody(bool hasExplicitReturn = false)
+    : LocatorPathElt(ConstraintLocator::ClosureBody,
+                     hasExplicitReturn) {}
+
+  /// Indicates whether body of the closure has any `return` statements.
+  bool hasExplicitReturn() const { return bool(getValue(0)); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ClosureBody;
   }
 };
 

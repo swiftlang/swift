@@ -15,11 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Module.h"
-#include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -31,11 +31,12 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Compiler.h"
@@ -48,15 +49,15 @@
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -943,6 +944,7 @@ namespace {
 
   template <>
   struct OperatorLookup<PrefixOperatorDecl> {
+    constexpr static auto map_ptr = &SourceFile::PrefixOperators;
     template <typename T>
     static PrefixOperatorDecl *lookup(T &container, Identifier name) {
       return cast_or_null<PrefixOperatorDecl>(
@@ -952,6 +954,7 @@ namespace {
 
   template <>
   struct OperatorLookup<InfixOperatorDecl> {
+    constexpr static auto map_ptr = &SourceFile::InfixOperators;
     template <typename T>
     static InfixOperatorDecl *lookup(T &container, Identifier name) {
       return cast_or_null<InfixOperatorDecl>(
@@ -961,6 +964,7 @@ namespace {
 
   template <>
   struct OperatorLookup<PostfixOperatorDecl> {
+    constexpr static auto map_ptr = &SourceFile::PostfixOperators;
     template <typename T>
     static PostfixOperatorDecl *lookup(T &container, Identifier name) {
       return cast_or_null<PostfixOperatorDecl>(
@@ -970,6 +974,7 @@ namespace {
 
   template <>
   struct OperatorLookup<PrecedenceGroupDecl> {
+    constexpr static auto map_ptr = &SourceFile::PrecedenceGroups;
     template <typename T>
     static PrecedenceGroupDecl *lookup(T &container, Identifier name) {
       return container.lookupPrecedenceGroup(name);
@@ -1058,12 +1063,11 @@ checkOperatorConflicts(const SourceFile &SF, SourceLoc loc,
 
 // Returns None on error, Optional(nullptr) if no operator decl found, or
 // Optional(decl) if decl was found.
-template<typename OP_DECL>
+template <typename OP_DECL>
 static Optional<OP_DECL *>
-lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
-                          bool includePrivate,
-                          OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
-{
+lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
+                          Identifier Name, bool includePrivate,
+                          OperatorMap<OP_DECL *> SourceFile::*OP_MAP) {
   switch (File.getKind()) {
   case FileUnitKind::Builtin:
     // The Builtin module declares no operators.
@@ -1152,31 +1156,45 @@ lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
   return result;
 }
 
-#define LOOKUP_OPERATOR(Kind) \
-Kind##Decl * \
-ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) { \
-  auto result = lookupOperatorDeclForName(this, loc, name, \
-                                          &SourceFile::Kind##s); \
-  return result ? *result : nullptr; \
-} \
-Kind##Decl * \
-SourceFile::lookup##Kind(Identifier name, bool isCascading, SourceLoc loc) { \
-  auto result = lookupOperatorDeclForName(*this, loc, name, true, \
-                                          &SourceFile::Kind##s); \
-  if (!result.hasValue()) \
-    return nullptr; \
-  if (ReferencedNames) {\
-    if (!result.getValue() || \
-        result.getValue()->getDeclContext()->getModuleScopeContext() != this) {\
-      ReferencedNames->addTopLevelName(name, isCascading); \
-    } \
-  } \
-  if (!result.getValue()) { \
-    result = lookupOperatorDeclForName(getParentModule(), loc, name, \
-                                       &SourceFile::Kind##s); \
-  } \
-  return result.hasValue() ? result.getValue() : nullptr; \
+template <typename OperatorType>
+llvm::Expected<OperatorType *> LookupOperatorRequest<OperatorType>::evaluate(
+    Evaluator &evaluator, OperatorLookupDescriptor desc) const {
+  auto result = lookupOperatorDeclForName(*desc.SF, desc.diagLoc, desc.name,
+                                          /*includePrivate*/ true,
+                                          OperatorLookup<OperatorType>::map_ptr);
+  if (!result.hasValue())
+    return nullptr;
+  if (auto *tracker = desc.SF->getReferencedNameTracker()) {
+    if (!result.getValue() ||
+        result.getValue()->getDeclContext()->getModuleScopeContext() !=
+            desc.SF) {
+      tracker->addTopLevelName(desc.name, desc.isCascading);
+    }
+  }
+  if (!result.getValue()) {
+    result = lookupOperatorDeclForName(desc.SF->getParentModule(), desc.diagLoc,
+                                       desc.name,
+                                       OperatorLookup<OperatorType>::map_ptr);
+  }
+  return result.hasValue() ? result.getValue() : nullptr;
 }
+
+
+#define LOOKUP_OPERATOR(Kind)                                                  \
+  Kind##Decl *ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) {       \
+    auto result =                                                              \
+        lookupOperatorDeclForName(this, loc, name, &SourceFile::Kind##s);      \
+    return result ? *result : nullptr;                                         \
+  }                                                                            \
+  Kind##Decl *SourceFile::lookup##Kind(Identifier name, bool cascades,         \
+                                       SourceLoc loc) {                        \
+    return evaluateOrDefault(                                                  \
+        getASTContext().evaluator,                                             \
+        Lookup##Kind##Request{{this, name, cascades, loc}}, nullptr);          \
+  }                                                                            \
+  template llvm::Expected<Kind##Decl *>                                        \
+  LookupOperatorRequest<Kind##Decl>::evaluate(Evaluator &e,                    \
+                                              OperatorLookupDescriptor d) const;
 
 LOOKUP_OPERATOR(PrefixOperator)
 LOOKUP_OPERATOR(InfixOperator)

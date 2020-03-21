@@ -343,9 +343,6 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
   BufferIndirectlyCausingDiagnosticRAII cpr(*SF);
 
-  // Make sure we have a type checker.
-  Ctx.setLegacySemanticQueriesEnabled();
-
   // Make sure that name binding has been completed before doing any type
   // checking.
   performNameBinding(*SF);
@@ -535,7 +532,6 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
-  assert(Ctx.areLegacySemanticQueriesEnabled());
   return TypeChecker::validateType(Ctx, T, resolution, options);
 }
 
@@ -572,7 +568,6 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
 
   auto &Ctx = PBD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  Ctx.setLegacySemanticQueriesEnabled();
   (void)evaluateOrDefault(
       Ctx.evaluator, PatternBindingEntryRequest{PBD, bindingIndex}, nullptr);
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
@@ -627,7 +622,6 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
   DiagnosticSuppression suppression(Ctx.Diags);
-  Ctx.setLegacySemanticQueriesEnabled();
 
   // Try to solve for the actual type of the expression.
   return ::getTypeOfCompletionContextExpr(DC, kind, parsedExpr,
@@ -642,7 +636,6 @@ swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
                                    ConcreteDeclRef &referencedDecl) {
   auto &ctx = DC->getASTContext();
   DiagnosticSuppression suppression(ctx.Diags);
-  ctx.setLegacySemanticQueriesEnabled();
   return TypeChecker::getTypeOfCompletionOperator(DC, LHS, opName, refKind,
                                                   referencedDecl);
 }
@@ -650,7 +643,6 @@ swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
   DiagnosticSuppression suppression(ctx.Diags);
-  ctx.setLegacySemanticQueriesEnabled();
   auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC, TypeLoc(),
                                                    CTP_Unused);
   return !resultTy;
@@ -660,15 +652,12 @@ bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                                SourceLoc EndTypeCheckLoc) {
   auto &Ctx = AFD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-
-  Ctx.setLegacySemanticQueriesEnabled();
   return !TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
 }
 
 bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   auto &Ctx = static_cast<Decl *>(TLCD)->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  Ctx.setLegacySemanticQueriesEnabled();
   TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
   return true;
 }

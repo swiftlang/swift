@@ -18,6 +18,7 @@
 
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -514,6 +515,62 @@ private:
   llvm::Expected<TinyPtrVector<ValueDecl *>>
   evaluate(Evaluator &evaluator, DirectLookupDescriptor desc) const;
 };
+
+class OperatorLookupDescriptor final {
+public:
+  SourceFile *SF;
+  Identifier name;
+  bool isCascading;
+  SourceLoc diagLoc;
+
+  OperatorLookupDescriptor(SourceFile *SF, Identifier name, bool isCascading,
+                           SourceLoc diagLoc)
+      : SF(SF), name(name), isCascading(isCascading), diagLoc(diagLoc) {}
+
+  friend llvm::hash_code hash_value(const OperatorLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.SF, desc.name, desc.isCascading);
+  }
+
+  friend bool operator==(const OperatorLookupDescriptor &lhs,
+                         const OperatorLookupDescriptor &rhs) {
+    return lhs.SF == rhs.SF && lhs.name == rhs.name &&
+           lhs.isCascading == rhs.isCascading;
+  }
+
+  friend bool operator!=(const OperatorLookupDescriptor &lhs,
+                         const OperatorLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const OperatorLookupDescriptor &desc);
+
+SourceLoc extractNearestSourceLoc(const OperatorLookupDescriptor &desc);
+
+template <typename OperatorType>
+class LookupOperatorRequest
+    : public SimpleRequest<LookupOperatorRequest<OperatorType>,
+                           OperatorType *(OperatorLookupDescriptor),
+                           CacheKind::Uncached> {
+  using SimpleRequest<LookupOperatorRequest<OperatorType>,
+                      OperatorType *(OperatorLookupDescriptor),
+                      CacheKind::Uncached>::SimpleRequest;
+
+private:
+  friend SimpleRequest<LookupOperatorRequest<OperatorType>,
+                       OperatorType *(OperatorLookupDescriptor),
+                       CacheKind::Uncached>;
+
+  // Evaluation.
+  llvm::Expected<OperatorType *> evaluate(Evaluator &evaluator,
+                                          OperatorLookupDescriptor desc) const;
+};
+
+using LookupPrefixOperatorRequest = LookupOperatorRequest<PrefixOperatorDecl>;
+using LookupInfixOperatorRequest = LookupOperatorRequest<InfixOperatorDecl>;
+using LookupPostfixOperatorRequest = LookupOperatorRequest<PostfixOperatorDecl>;
+using LookupPrecedenceGroupRequest = LookupOperatorRequest<PrecedenceGroupDecl>;
 
 #define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"

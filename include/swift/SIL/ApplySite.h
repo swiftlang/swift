@@ -603,6 +603,32 @@ public:
 
 namespace llvm {
 
+template<>
+struct PointerLikeTypeTraits<swift::ApplySite> {
+public:
+  static inline void *getAsVoidPointer(swift::ApplySite apply) {
+    return (void*)apply.getInstruction();
+  }
+  static inline swift::ApplySite getFromVoidPointer(void *pointer) {
+    return swift::ApplySite((swift::SILInstruction*)pointer);
+  }
+  enum { NumLowBitsAvailable =
+         PointerLikeTypeTraits<swift::SILNode *>::NumLowBitsAvailable };
+};
+
+template<>
+struct PointerLikeTypeTraits<swift::FullApplySite> {
+public:
+  static inline void *getAsVoidPointer(swift::FullApplySite apply) {
+    return (void*)apply.getInstruction();
+  }
+  static inline swift::FullApplySite getFromVoidPointer(void *pointer) {
+    return swift::FullApplySite((swift::SILInstruction*)pointer);
+  }
+  enum { NumLowBitsAvailable =
+         PointerLikeTypeTraits<swift::SILNode *>::NumLowBitsAvailable };
+};
+
 // An ApplySite casts like a SILInstruction*.
 template <> struct simplify_type<const ::swift::ApplySite> {
   using SimpleType = ::swift::SILInstruction *;

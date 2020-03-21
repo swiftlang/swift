@@ -1587,7 +1587,7 @@ NOTE(unstable_mangled_name_add_objc,none,
      "for compatibility with existing archives, use '@objc' "
      "to record the Swift 3 runtime name", ())
 
-// Generic types
+// Generic declarations
 ERROR(unsupported_type_nested_in_generic_function,none,
       "type %0 cannot be nested in generic function %1",
       (Identifier, DeclName))
@@ -1603,6 +1603,12 @@ ERROR(unsupported_type_nested_in_protocol_extension,none,
 ERROR(unsupported_nested_protocol,none,
       "protocol %0 cannot be nested inside another declaration",
       (Identifier))
+ERROR(where_nongeneric_ctx,none,
+      "'where' clause on non-generic member declaration requires a "
+      "generic context", ())
+ERROR(where_nongeneric_toplevel,none,
+      "'where' clause cannot be applied to a non-generic top-level "
+      "declaration", ())
 
 // Type aliases
 ERROR(type_alias_underlying_type_access,none,
@@ -2796,10 +2802,6 @@ ERROR(dynamic_self_stored_property_init,none,
       "covariant 'Self' type cannot be referenced from a stored property initializer", ())
 ERROR(dynamic_self_default_arg,none,
       "covariant 'Self' type cannot be referenced from a default argument expression", ())
-
-ERROR(where_nongeneric_ctx,none,
-      "'where' clause on non-generic member declaration requires a "
-      "generic context", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes

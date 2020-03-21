@@ -276,7 +276,10 @@ struct PrintOptions {
   /// Prints type variables and unresolved types in an expanded notation suitable
   /// for debugging.
   bool PrintTypesForDebugging = false;
-  
+
+  /// Whether this print option is for printing .swiftinterface file
+  bool IsForSwiftInterface = false;
+
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
     /// 'some P1 & P2'.

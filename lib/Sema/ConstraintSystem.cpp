@@ -24,6 +24,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -3451,6 +3452,7 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
+    case ConstraintLocator::ClosureBody:
     case ConstraintLocator::ClosureResult:
       if (auto CE = dyn_cast<ClosureExpr>(anchor)) {
         if (CE->hasSingleExpressionBody()) {
@@ -3873,6 +3875,12 @@ bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
          decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
 }
 
+bool constraints::hasExplicitResult(ClosureExpr *closure) {
+  auto &ctx = closure->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ClosureHasExplicitResultRequest{closure}, false);
+}
+
 static bool isOperator(Expr *expr, StringRef expectedName) {
   auto name = getOperatorName(expr);
   return name ? name->is(expectedName) : false;
@@ -4178,6 +4186,8 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.wrappedVar = nullptr;
   expression.isDiscarded = isDiscarded;
   expression.bindPatternVarsOneWay = false;
+  expression.patternBinding = nullptr;
+  expression.patternBindingIndex = 0;
 }
 
 void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
@@ -4258,6 +4268,30 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
   target.expression.bindPatternVarsOneWay = bindPatternVarsOneWay;
   target.maybeApplyPropertyWrapper();
   return target;
+}
+
+SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
+    Expr *initializer, DeclContext *dc, Type patternType,
+    PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
+    bool bindPatternVarsOneWay) {
+    auto result = forInitialization(
+        initializer, dc, patternType,
+        patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
+    result.expression.patternBinding = patternBinding;
+    result.expression.patternBindingIndex = patternBindingIndex;
+    return result;
+}
+
+ContextualPattern
+SolutionApplicationTarget::getInitializationContextualPattern() const {
+  assert(kind == Kind::expression);
+  assert(expression.contextualPurpose == CTP_Initialization);
+  if (expression.patternBinding) {
+    return ContextualPattern::forPatternBindingDecl(
+        expression.patternBinding, expression.patternBindingIndex);
+  }
+
+  return ContextualPattern::forRawPattern(expression.pattern, expression.dc);
 }
 
 bool SolutionApplicationTarget::infersOpaqueReturnType() const {

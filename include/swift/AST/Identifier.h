@@ -168,6 +168,10 @@ public:
   /// Null identifiers come after all other identifiers.
   int compare(Identifier other) const;
 
+  friend llvm::hash_code hash_value(Identifier ident) {
+    return llvm::hash_value(ident.getAsOpaquePointer());
+  }
+
   bool operator==(Identifier RHS) const { return Pointer == RHS.Pointer; }
   bool operator!=(Identifier RHS) const { return !(*this==RHS); }
 

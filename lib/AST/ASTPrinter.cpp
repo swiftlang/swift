@@ -103,6 +103,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    bool printSPIs) {
   PrintOptions result;
+  result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
   result.PrintIfConfig = false;

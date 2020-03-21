@@ -2697,6 +2697,11 @@ public:
     return !isObjC() && isDynamic();
   }
 
+  bool isEffectiveLinkageMoreVisibleThan(ValueDecl *other) const {
+    return (std::min(getEffectiveAccess(), AccessLevel::Public) >
+            std::min(other->getEffectiveAccess(), AccessLevel::Public));
+  }
+
   /// Set whether this type is 'dynamic' or not.
   void setIsDynamic(bool value);
 
@@ -5210,6 +5215,18 @@ public:
   /// a suitable `init(initialValue:)`.
   bool isPropertyMemberwiseInitializedWithWrappedType() const;
 
+  /// Whether the innermost property wrapper's initializer's 'wrappedValue' parameter
+  /// is marked with '@autoclosure' and '@escaping'.
+  bool isInnermostPropertyWrapperInitUsesEscapingAutoClosure() const;
+
+  /// Return the interface type of the value used for the 'wrappedValue:'
+  /// parameter when initializing a property wrapper.
+  ///
+  /// If the property has an attached property wrapper and the 'wrappedValue:'
+  /// parameter is an autoclosure, return a function type returning the stored
+  /// value. Otherwise, return the interface type of the stored value.
+  Type getPropertyWrapperInitValueInterfaceType() const;
+
   /// If this property is the backing storage for a property with an attached
   /// property wrapper, return the original property.
   ///
@@ -6006,11 +6023,6 @@ public:
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.
   bool needsNewVTableEntry() const;
-
-  bool isEffectiveLinkageMoreVisibleThan(ValueDecl *other) const {
-    return (std::min(getEffectiveAccess(), AccessLevel::Public) >
-            std::min(other->getEffectiveAccess(), AccessLevel::Public));
-  }
 
   bool isSynthesized() const {
     return Bits.AbstractFunctionDecl.Synthesized;

@@ -341,32 +341,6 @@ public:
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 
-private:
-  bool SemanticQueriesEnabled = false;
-
-public:
-  /// Returns \c true if legacy semantic AST queries are enabled.
-  ///
-  /// The request evaluator generally subsumes the use of this bit. However,
-  /// there are clients - mostly SourceKit - that rely on the fact that this bit
-  /// being \c false causes some property wrapper requests to return null
-  /// sentinel values. These clients should be migrated off of this interface
-  /// to syntactic requests as soon as possible.
-  ///
-  /// rdar://60516325
-  bool areLegacySemanticQueriesEnabled() const {
-    return SemanticQueriesEnabled;
-  }
-
-  /// Enable "semantic queries".
-  ///
-  /// Setting this bit tells property wrapper requests to return a semantic
-  /// value.  It does not otherwise affect compiler behavior and should be
-  /// removed as soon as possible.
-  void setLegacySemanticQueriesEnabled() {
-    SemanticQueriesEnabled = true;
-  }
-
 public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long bytes, unsigned alignment,

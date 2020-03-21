@@ -916,7 +916,9 @@ void coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
 
 /// Type-check an initialized variable pattern declaration.
 bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC,
-                      Type patternType);
+                      Type patternType,
+                      PatternBindingDecl *PBD = nullptr,
+                      unsigned patternNumber = 0);
 bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
                              Type patternType = Type());
 
