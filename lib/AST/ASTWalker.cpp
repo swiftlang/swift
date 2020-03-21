@@ -267,8 +267,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (doIt(Inherit))
         return true;
     }
-    
-    if (auto *ATD = dyn_cast<AssociatedTypeDecl>(TPD)) {
+
+    if (const auto ATD = dyn_cast<AssociatedTypeDecl>(TPD)) {
+      if (const auto DefaultTy = ATD->getDefaultDefinitionTypeRepr())
+        if (doIt(DefaultTy))
+          return true;
+
       if (auto *WhereClause = ATD->getTrailingWhereClause()) {
         for (auto &Req: WhereClause->getRequirements()) {
           if (doIt(Req))
