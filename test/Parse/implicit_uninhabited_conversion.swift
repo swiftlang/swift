@@ -7,7 +7,7 @@ func explicitReturn() -> Int {
 }
 
 func explicitMultiElement() -> Int {
-    print("no way")
+    print("yes way")
     return fatalError()
 }
 
