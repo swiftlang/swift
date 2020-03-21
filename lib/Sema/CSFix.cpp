@@ -1276,3 +1276,17 @@ AddQualifierToAccessTopLevelName::create(ConstraintSystem &cs,
                                          ConstraintLocator *locator) {
   return new (cs.getAllocator()) AddQualifierToAccessTopLevelName(cs, locator);
 }
+
+bool AllowCoercionToForceCast::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  CoercionAsForceCastFailure failure(solution, getFromType(), getToType(),
+                                     getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowCoercionToForceCast *
+AllowCoercionToForceCast::create(ConstraintSystem &cs, Type fromType,
+                                 Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowCoercionToForceCast(cs, fromType, toType, locator);
+}

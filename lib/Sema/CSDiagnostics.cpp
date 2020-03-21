@@ -6184,3 +6184,11 @@ bool MissingQuialifierInMemberRefFailure::diagnoseAsError() {
   emitDiagnostic(choice, diag::decl_declared_here, choice->getFullName());
   return true;
 }
+
+bool CoercionAsForceCastFailure::diagnoseAsError() {
+  auto *coercion = cast<CoerceExpr>(getRawAnchor());
+  emitDiagnostic(coercion->getLoc(), diag::coercion_may_fail_warning,
+                 getFromType(), getToType())
+      .highlight(coercion->getSourceRange());
+  return true;
+}

@@ -1977,6 +1977,16 @@ public:
   bool diagnoseAsError();
 };
 
+/// Emits a warning about an attempt to use the 'as' operator as the 'as!'
+/// operator.
+class CoercionAsForceCastFailure final : public ContextualFailure {
+public:
+  CoercionAsForceCastFailure(const Solution &solution, Type fromType,
+                             Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+};
 } // end namespace constraints
 } // end namespace swift
 

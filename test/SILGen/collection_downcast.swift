@@ -239,3 +239,10 @@ func testSetDowncastBridgedConditional(_ dict: Set<NSObject>)
   // CHECK-NOT: destroy_value [[SET]]
   return dict as? Set<BridgedSwift>
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast35testDeprecatedAnyToNSObjectCoercionyySayypGSgF
+func testDeprecatedAnyToNSObjectCoercion(_ arr: [Any]?) {
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: apply [[CAST_FN]]<Any, NSObject>({{%.+}}) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1> // user: %20
+  _ = (arr ?? []) as [NSObject]
+}

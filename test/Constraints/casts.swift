@@ -263,3 +263,28 @@ func test_coercions_with_overloaded_operator(str: String, optStr: String?, veryO
   _ = (veryOptString ?? "" ?? "") as [String] // expected-error {{cannot convert value of type 'String???' to type '[String]' in coercion}}
   _ = (veryOptString ?? "" ?? "" ?? "" ?? "") as [String] // expected-error {{cannot convert value of type 'String???' to type '[String]' in coercion}}
 }
+
+func id<T>(_ x: T) -> T { x }
+
+func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?) {
+  // Don't fix the simple case where no type variable is introduced, that was
+  // always disallowed.
+  _ = arr as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+
+  // Apply the compatibility logic when a type variable is introduced. It's
+  // unfortunate that this means we'll temporarily accept code we didn't before,
+  // but it at least means we shouldn't break compatibility with anything.
+  _ = id(arr) as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+
+  _ = (arr ?? []) as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+  // expected-warning@-1 {{left side of nil coalescing operator '??' has non-optional type '[Int]', so the right side is never used}}
+  _ = (arr ?? [] ?? []) as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+  // expected-warning@-1 2{{left side of nil coalescing operator '??' has non-optional type '[Int]', so the right side is never used}}
+  _ = (optArr ?? []) as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+
+  // In this case the array literal can be inferred to be [String], so totally
+  // valid.
+  _ = ([] ?? []) as [String] // expected-warning {{left side of nil coalescing operator '??' has non-optional type '[String]', so the right side is never used}}
+  _ = (([] as Optional) ?? []) as [String]
+}

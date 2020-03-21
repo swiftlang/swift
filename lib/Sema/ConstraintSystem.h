@@ -2861,9 +2861,12 @@ public:
   /// \param rememberChoice Whether the conversion disjunction should record its
   /// choice.
   /// \param locator The locator.
+  /// \param warnOnFailure Whether a warning fix should be used for recovery if
+  /// the conversion fails. This is used to preserve compatibility.
   void addExplicitConversionConstraint(Type fromType, Type toType,
                                        RememberChoice_t rememberChoice,
-                                       ConstraintLocatorBuilder locator);
+                                       ConstraintLocatorBuilder locator,
+                                       bool warnOnFailure = false);
 
   /// Add a disjunction constraint.
   void
