@@ -1186,12 +1186,6 @@ llvm::Expected<OperatorType *> LookupOperatorRequest<OperatorType>::evaluate(
         lookupOperatorDeclForName(this, loc, name, &SourceFile::Kind##s);      \
     return result ? *result : nullptr;                                         \
   }                                                                            \
-  Kind##Decl *SourceFile::lookup##Kind(Identifier name, bool cascades,         \
-                                       SourceLoc loc) {                        \
-    return evaluateOrDefault(                                                  \
-        getASTContext().evaluator,                                             \
-        Lookup##Kind##Request{{this, name, cascades, loc}}, nullptr);          \
-  }                                                                            \
   template llvm::Expected<Kind##Decl *>                                        \
   LookupOperatorRequest<Kind##Decl>::evaluate(Evaluator &e,                    \
                                               OperatorLookupDescriptor d) const;
