@@ -852,7 +852,8 @@ SILDeclRef SILDeclRef::getOverridden() const {
     return SILDeclRef();
 
   // SWIFT_ENABLE_TENSORFLOW
-  return SILDeclRef(overridden, kind, autoDiffDerivativeFunctionIdentifier);
+  return SILDeclRef(overridden, kind, isForeign,
+                    autoDiffDerivativeFunctionIdentifier);
   // SWIFT_ENABLE_TENSORFLOW END
 }
 
@@ -917,11 +918,12 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
           continue;
 
         // TODO(TF-1056): Do we need to check generic signature requirements?
-
-        auto dfi = overridden.autoDiffDerivativeFunctionIdentifier;
+        auto *overriddenDerivativeId =
+            overridden.autoDiffDerivativeFunctionIdentifier;
         overridden.autoDiffDerivativeFunctionIdentifier =
             AutoDiffDerivativeFunctionIdentifier::get(
-                dfi->getKind(), dfi->getParameterIndices(),
+                overriddenDerivativeId->getKind(),
+                overriddenDerivativeId->getParameterIndices(),
                 attr->getDerivativeGenericSignature(),
                 getDecl()->getASTContext());
         return overridden;
