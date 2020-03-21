@@ -918,3 +918,104 @@ bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass, %2 : @guaranteed $Klass):
   %9999 = tuple ()
   return %9999 : $()
 }
+
+///////////////////////
+// Store Elimination //
+///////////////////////
+
+// CHECK-LABEL: sil [ossa] @remove_all_stores
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end sil function 'remove_all_stores'
+sil [ossa] @remove_all_stores : $@convention(thin) (@guaranteed Klass, @guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass, %2 : @guaranteed $Klass):
+  %3 = alloc_stack $Klass
+  %4 = copy_value %0 : $Klass
+  store %4 to [init] %3 : $*Klass
+
+  %6 = alloc_stack $Klass
+  %7 = copy_value %0 : $Klass
+  store %7 to [init] %6 : $*Klass
+
+  %9 = alloc_stack $Klass
+  %10 = copy_value %0 : $Klass
+  store %10 to [init] %9 : $*Klass
+
+  destroy_addr %9 : $*Klass
+  dealloc_stack %9 : $*Klass
+  
+  destroy_addr %6 : $*Klass
+  dealloc_stack %6 : $*Klass
+  
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_second_store
+// CHECK: bb0
+// CHECK: store
+// CHECK-NOT: store
+// CHECK-LABEL: end sil function 'remove_second_store'
+sil [ossa] @remove_second_store : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %3 = alloc_stack $Klass
+  %4 = copy_value %0 : $Klass
+  store %4 to [init] %3 : $*Klass
+  
+  // Now we can't remove the first store but, we can still remove the second.
+  copy_addr %3 to undef : $*Klass
+
+  %7 = copy_value %0 : $Klass
+  store %7 to [assign] %3 : $*Klass
+  
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_second_init_store
+// CHECK: bb0
+// CHECK: store
+// CHECK: store
+// CHECK-LABEL: end sil function 'dont_remove_second_init_store'
+sil [ossa] @dont_remove_second_init_store : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %3 = alloc_stack $Klass
+  %4 = copy_value %0 : $Klass
+  store %4 to [init] %3 : $*Klass
+
+  %7 = copy_value %0 : $Klass
+  // This is valid but we can't yet remove the second store.
+  destroy_addr %3 : $*Klass
+  store %7 to [init] %3 : $*Klass
+  
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @consume_store_src
+// CHECK: bb0
+// CHECK-NEXT: destroy_value %0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end sil function 'consume_store_src'
+sil [ossa] @consume_store_src : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %3 = alloc_stack $Klass
+  store %0 to [init] %3 : $*Klass
+  
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
