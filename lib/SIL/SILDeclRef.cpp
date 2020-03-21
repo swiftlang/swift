@@ -114,12 +114,14 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                       bool isForeign)
-  : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0)
+                       bool isForeign,
+                       AutoDiffDerivativeFunctionIdentifier *derivativeId)
+  : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0),
+    derivativeFunctionIdentifier(derivativeId)
 {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign) 
-  : defaultArgIndex(0)
+  : defaultArgIndex(0), derivativeFunctionIdentifier(nullptr)
 {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
@@ -845,7 +847,8 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
 SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
   auto bestOverridden =
     getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-  return SILDeclRef(bestOverridden, kind);
+  return SILDeclRef(bestOverridden, kind, isForeign,
+                    derivativeFunctionIdentifier);
 }
 
 AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(
