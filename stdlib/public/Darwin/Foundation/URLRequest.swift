@@ -41,7 +41,7 @@ public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
         _handle = _MutableHandle(adoptingReference: NSMutableURLRequest(url: url, cachePolicy: cachePolicy, timeoutInterval: timeoutInterval))
     }
 
-    fileprivate init(_bridged request: __shared NSURLRequest) {
+    private init(_bridged request: __shared NSURLRequest) {
         _handle = _MutableHandle(reference: request.mutableCopy() as! NSMutableURLRequest)
     }
     

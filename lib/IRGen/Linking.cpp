@@ -403,7 +403,7 @@ std::string LinkEntity::mangleAsString() const {
   }
 
   case Kind::SILGlobalVariable:
-    return getSILGlobalVariable()->getName();
+    return getSILGlobalVariable()->getName().str();
 
   case Kind::ReflectionBuiltinDescriptor:
     return mangler.mangleReflectionBuiltinDescriptor(getType());
@@ -670,6 +670,75 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILDifferentiabilityWitness()->getLinkage();
   }
   llvm_unreachable("bad link entity kind");
+}
+
+bool LinkEntity::isContextDescriptor() const {
+  switch (getKind()) {
+  case Kind::ModuleDescriptor:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+  case Kind::NominalTypeDescriptor:
+  case Kind::ProtocolDescriptor:
+  case Kind::OpaqueTypeDescriptor:
+    return true;
+  case Kind::PropertyDescriptor:
+  case Kind::DispatchThunk:
+  case Kind::DispatchThunkInitializer:
+  case Kind::DispatchThunkAllocator:
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+  case Kind::MethodLookupFunction:
+  case Kind::EnumCase:
+  case Kind::FieldOffset:
+  case Kind::ObjCClass:
+  case Kind::ObjCClassRef:
+  case Kind::ObjCMetaclass:
+  case Kind::ObjCMetadataUpdateFunction:
+  case Kind::ObjCResilientClassStub:
+  case Kind::SwiftMetaclassStub:
+  case Kind::ClassMetadataBaseOffset:
+  case Kind::TypeMetadataPattern:
+  case Kind::TypeMetadataInstantiationCache:
+  case Kind::TypeMetadataInstantiationFunction:
+  case Kind::TypeMetadataSingletonInitializationCache:
+  case Kind::TypeMetadataCompletionFunction:
+  case Kind::ProtocolRequirementsBaseDescriptor:
+  case Kind::AssociatedTypeDescriptor:
+  case Kind::AssociatedConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor:
+  case Kind::DefaultAssociatedConformanceAccessor:
+  case Kind::SILFunction:
+  case Kind::SILGlobalVariable:
+  case Kind::ProtocolWitnessTable:
+  case Kind::ProtocolWitnessTablePattern:
+  case Kind::GenericProtocolWitnessTableInstantiationFunction:
+  case Kind::AssociatedTypeWitnessTableAccessFunction:
+  case Kind::ReflectionAssociatedTypeDescriptor:
+  case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolWitnessTableLazyAccessFunction:
+  case Kind::ProtocolWitnessTableLazyCacheVariable:
+  case Kind::ValueWitness:
+  case Kind::ValueWitnessTable:
+  case Kind::TypeMetadata:
+  case Kind::TypeMetadataAccessFunction:
+  case Kind::TypeMetadataLazyCacheVariable:
+  case Kind::TypeMetadataDemanglingCacheVariable:
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ReflectionFieldDescriptor:
+  case Kind::CoroutineContinuationPrototype:
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
+  case Kind::DynamicallyReplaceableFunctionImpl:
+  case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::OpaqueTypeDescriptorAccessor:
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
+  case Kind::DifferentiabilityWitness:
+    return false;
+  }
 }
 
 llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
@@ -988,8 +1057,8 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::ReflectionAssociatedTypeDescriptor:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
-    return getRootProtocolConformance()->getDeclContext();
-    
+    return getProtocolConformance()->getDeclContext();
+
   case Kind::TypeMetadata: {
     auto ty = getType();
     // Only fully concrete nominal type metadata gets emitted eagerly.
@@ -1008,6 +1077,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
+    assert(isAlwaysSharedLinkage() && "kind should always be shared linkage");
     return nullptr;
 
   // TODO
@@ -1018,5 +1088,21 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::ValueWitnessTable:
   case Kind::DifferentiabilityWitness:
     return nullptr;
+  }
+}
+
+bool LinkEntity::isAlwaysSharedLinkage() const {
+  switch (getKind()) {
+  case Kind::ModuleDescriptor:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+  case Kind::ObjCClassRef:
+  case Kind::TypeMetadataAccessFunction:
+  case Kind::TypeMetadataLazyCacheVariable:
+  case Kind::TypeMetadataDemanglingCacheVariable:
+    return true;
+
+  default:
+    return false;
   }
 }

@@ -477,8 +477,8 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
       fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
-  if (getContext().Stats)
-    getContext().Stats->getFrontendCounters().NumConformancesDeserialized++;
+  if (auto *Stats = getContext().Stats)
+    Stats->getFrontendCounters().NumConformancesDeserialized++;
 
   unsigned kind = fatalIfUnexpected(Cursor.readRecord(next.ID, scratch));
   switch (kind) {
@@ -581,7 +581,11 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
     ProtocolConformanceXrefLayout::readRecord(scratch, protoID, nominalID,
                                               moduleID);
 
-    auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
+    auto maybeNominal = getDeclChecked(nominalID);
+    if (!maybeNominal)
+      return maybeNominal.takeError();
+
+    auto nominal = cast<NominalTypeDecl>(maybeNominal.get());
     PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
     auto proto = cast<ProtocolDecl>(getDecl(protoID));
     PrettyStackTraceDecl traceTo("... to", proto);
@@ -4230,6 +4234,19 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::TypeEraser_DECL_ATTR: {
+        bool isImplicit;
+        TypeID typeEraserID;
+        serialization::decls_block::TypeEraserDeclAttrLayout::readRecord(
+            scratch, isImplicit, typeEraserID);
+
+        auto typeEraser = MF.getType(typeEraserID);
+        assert(!isImplicit);
+        Attr = new (ctx) TypeEraserAttr(SourceLoc(), SourceRange(),
+                                        TypeLoc::withoutLoc(typeEraser));
+        break;
+      }
+
       case decls_block::Custom_DECL_ATTR: {
         bool isImplicit;
         TypeID typeID;
@@ -5284,9 +5301,9 @@ public:
     unsigned numParams;
     unsigned numYields;
     unsigned numResults;
-    bool isGenericSignatureImplied;
-    GenericSignatureID rawGenericSig;
-    SubstitutionMapID rawSubs;
+    GenericSignatureID rawInvocationGenericSig;
+    SubstitutionMapID rawInvocationSubs;
+    SubstitutionMapID rawPatternSubs;
     ArrayRef<uint64_t> variableData;
     ClangTypeID clangFunctionTypeID;
 
@@ -5301,9 +5318,9 @@ public:
                                              numParams,
                                              numYields,
                                              numResults,
-                                             isGenericSignatureImplied,
-                                             rawGenericSig,
-                                             rawSubs,
+                                             rawInvocationGenericSig,
+                                             rawInvocationSubs,
+                                             rawPatternSubs,
                                              clangFunctionTypeID,
                                              variableData);
 
@@ -5453,14 +5470,18 @@ public:
       witnessMethodConformance = MF.readConformance(MF.DeclTypeCursor);
     }
 
-    GenericSignature genericSig = MF.getGenericSignature(rawGenericSig);
-    SubstitutionMap subs = MF.getSubstitutionMap(rawSubs).getCanonical();
-    
-    return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
+    GenericSignature invocationSig =
+      MF.getGenericSignature(rawInvocationGenericSig);
+    SubstitutionMap invocationSubs =
+      MF.getSubstitutionMap(rawInvocationSubs).getCanonical();
+    SubstitutionMap patternSubs =
+      MF.getSubstitutionMap(rawPatternSubs).getCanonical();
+
+    return SILFunctionType::get(invocationSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
                                 errorResult,
-                                subs, isGenericSignatureImplied,
+                                patternSubs, invocationSubs,
                                 ctx, witnessMethodConformance);
   }
 

@@ -316,7 +316,8 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   auto origFnSubstTy = ai->getSubstCalleeType();
   auto remappedOrigFnSubstTy =
       remapTypeInDerivative(SILType::getPrimitiveObjectType(origFnSubstTy))
-          .castTo<SILFunctionType>();
+          .castTo<SILFunctionType>()
+          ->getUnsubstitutedType(original->getModule());
   if (remappedOrigFnSubstTy->isDifferentiable()) {
     parameters = remappedOrigFnSubstTy->getDifferentiabilityParameterIndices();
   } else {
@@ -358,17 +359,22 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
 
   AutoDiffDerivativeFunctionKind derivativeFnKind(kind);
   auto derivativeFnType =
-      remappedOrigFnSubstTy->getAutoDiffDerivativeFunctionType(
-          parameters, source, derivativeFnKind, context.getTypeConverter(),
-          LookUpConformanceInModule(derivative->getModule().getSwiftModule()));
+      remappedOrigFnSubstTy
+          ->getAutoDiffDerivativeFunctionType(
+              parameters, source, derivativeFnKind, context.getTypeConverter(),
+              LookUpConformanceInModule(
+                  derivative->getModule().getSwiftModule()))
+          ->getUnsubstitutedType(original->getModule());
 
   auto derivativeFnResultTypes = derivativeFnType->getAllResultsInterfaceType();
   auto linearMapSILType = derivativeFnResultTypes;
-  if (auto tupleType = derivativeFnResultTypes.getAs<TupleType>()) {
+  if (auto tupleType = linearMapSILType.getAs<TupleType>()) {
     linearMapSILType = SILType::getPrimitiveObjectType(
-        tupleType->getElement(tupleType->getElements().size() - 1)
-            .getType()
-            ->getCanonicalType());
+        tupleType.getElementType(tupleType->getElements().size() - 1));
+  }
+  if (auto fnTy = linearMapSILType.getAs<SILFunctionType>()) {
+    linearMapSILType = SILType::getPrimitiveObjectType(
+        fnTy->getUnsubstitutedType(original->getModule()));
   }
   addLinearMapDecl(ai, linearMapSILType);
 }

@@ -3,8 +3,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG3 | %FileCheck %s -check-prefix=ARG-NAME2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG4 | %FileCheck %s -check-prefix=EXPECT_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG5 | %FileCheck %s -check-prefix=EXPECT_OSTRING
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG6 | %FileCheck %s -check-prefix=ARG-NAME2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG7 | %FileCheck %s -check-prefix=ARG-NAME1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG6 | %FileCheck %s -check-prefix=ARG-NAME3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG7 | %FileCheck %s -check-prefix=ARG-NAME4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG8 | %FileCheck %s -check-prefix=EXPECT_STRING
 
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD1 | %FileCheck %s -check-prefix=OVERLOAD1
@@ -93,6 +93,14 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARCHETYPE_GENERIC_1 | %FileCheck %s -check-prefix=ARCHETYPE_GENERIC_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_WITH_ERROR_AUTOCLOSURE| %FileCheck %s -check-prefix=PARAM_WITH_ERROR_AUTOCLOSURE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPECHECKED_OVERLOADED | %FileCheck %s -check-prefix=TYPECHECKED_OVERLOADED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPECHECKED_TYPEEXPR | %FileCheck %s -check-prefix=TYPECHECKED_TYPEEXPR
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_INOUT | %FileCheck %s -check-prefix=ARG_PARAMFLAG_INOUT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_AUTOCLOSURE| %FileCheck %s -check-prefix=ARG_PARAMFLAG_AUTOCLOSURE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_IUO | %FileCheck %s -check-prefix=ARG_PARAMFLAG_IUO
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_VARIADIC | %FileCheck %s -check-prefix=ARG_PARAMFLAG_VARIADIC
+
 
 var i1 = 1
 var i2 = 2
@@ -169,11 +177,19 @@ class C1 {
 }
 
 // ARG-NAME1: Begin completions, 2 items
-// ARG-NAME1-DAG: Keyword/ExprSpecific:               b1: [#Argument name#]; name=b1:
-// ARG-NAME1-DAG: Keyword/ExprSpecific:               b2: [#Argument name#]; name=b2:
+// ARG-NAME1-DAG: Pattern/ExprSpecific: {#b1: Int?#}[#Int?#];
+// ARG-NAME1-DAG: Pattern/ExprSpecific: {#b2: Int?#}[#Int?#];
 
 // ARG-NAME2: Begin completions, 1 items
-// ARG-NAME2-DAG: Keyword/ExprSpecific:               b: [#Argument name#]; name=b:
+// ARG-NAME2-DAG: Pattern/ExprSpecific: {#b: Int#}[#Int#];
+
+// ARG-NAME3: Begin completions, 1 items
+// ARG-NAME3-DAG: Pattern/ExprSpecific: {#b: String?#}[#String?#];
+
+// ARG-NAME4: Begin completions, 2 items
+// ARG-NAME4-DAG: Pattern/ExprSpecific: {#b1: String#}[#String#];
+// ARG-NAME4-DAG: Pattern/ExprSpecific: {#b2: String#}[#String#];
+// ARG-NAME4: End completions
 
 // EXPECT_OINT: Begin completions
 // EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
@@ -334,7 +350,7 @@ extension C3 {
 // HASERROR2: End completions
 
 // HASERROR3: Begin completions
-// HASERROR3-DAG: Keyword/ExprSpecific:               b1: [#Argument name#];
+// HASERROR3-DAG: Pattern/ExprSpecific: {#b1: <<error type>>#}[#<<error type>>#];
 // HASERROR3: End completions
 
 // HASERROR4: Begin completions
@@ -462,7 +478,7 @@ func testArg2Name1() {
 func testArg2Name3() {
   firstArg(#^FIRST_ARG_NAME_3^#,
 }
-// FIRST_ARG_NAME_3: Keyword/ExprSpecific: arg1: [#Argument name#]
+// FIRST_ARG_NAME_3: Pattern/ExprSpecific: {#arg1: Int#}[#Int#];
 // FIRST_ARG_NAME_4: Decl[FreeFunction]/CurrModule: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
 
 func takeArray<T>(_ x: [T]) {}
@@ -580,7 +596,7 @@ func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
 
   let _ = obj[42, #^SUBSCRIPT_2^#
 // SUBSCRIPT_2: Begin completions, 1 items
-// SUBSCRIPT_2-NEXT: Keyword/ExprSpecific:               default: [#Argument name#]; name=default: 
+// SUBSCRIPT_2-NEXT: Pattern/ExprSpecific: {#default: String#}[#String#];
 
   let _ = obj[42, .#^SUBSCRIPT_2_DOT^#
 // SUBSCRIPT_2_DOT-NOT: Begin completions
@@ -657,16 +673,16 @@ func testStaticMemberCall() {
 
   let _ = TestStaticMemberCall.create2(1, #^STATIC_METHOD_SECOND^#)
 // STATIC_METHOD_SECOND: Begin completions, 3 items
-// STATIC_METHOD_SECOND: Keyword/ExprSpecific:               arg2: [#Argument name#];
-// STATIC_METHOD_SECOND: Keyword/ExprSpecific:               arg3: [#Argument name#];
-// STATIC_METHOD_SECOND: Keyword/ExprSpecific:               arg4: [#Argument name#];
+// STATIC_METHOD_SECOND: Pattern/ExprSpecific: {#arg2: Int#}[#Int#];
+// STATIC_METHOD_SECOND: Pattern/ExprSpecific: {#arg3: Int#}[#Int#];
+// STATIC_METHOD_SECOND: Pattern/ExprSpecific: {#arg4: Int#}[#Int#];
 // STATIC_METHOD_SECOND: End completions
 
   let _ = TestStaticMemberCall.create2(1, arg3: 2, #^STATIC_METHOD_SKIPPED^#)
 // STATIC_METHOD_SKIPPED: Begin completions, 2 items
 // FIXME: 'arg3' shouldn't be suggested.
-// STATIC_METHOD_SKIPPED: Keyword/ExprSpecific:               arg3: [#Argument name#];
-// STATIC_METHOD_SKIPPED: Keyword/ExprSpecific:               arg4: [#Argument name#];
+// STATIC_METHOD_SKIPPED: Pattern/ExprSpecific: {#arg3: Int#}[#Int#];
+// STATIC_METHOD_SKIPPED: Pattern/ExprSpecific: {#arg4: Int#}[#Int#];
 // STATIC_METHOD_SKIPPED: End completions
 }
 func testImplicitMember() {
@@ -685,16 +701,16 @@ func testImplicitMember() {
 
   let _: TestStaticMemberCall = .create2(1, #^IMPLICIT_MEMBER_SECOND^#)
 // IMPLICIT_MEMBER_SECOND: Begin completions, 3 items
-// IMPLICIT_MEMBER_SECOND: Keyword/ExprSpecific:               arg2: [#Argument name#];
-// IMPLICIT_MEMBER_SECOND: Keyword/ExprSpecific:               arg3: [#Argument name#];
-// IMPLICIT_MEMBER_SECOND: Keyword/ExprSpecific:               arg4: [#Argument name#];
+// IMPLICIT_MEMBER_SECOND: Pattern/ExprSpecific: {#arg2: Int#}[#Int#];
+// IMPLICIT_MEMBER_SECOND: Pattern/ExprSpecific: {#arg3: Int#}[#Int#];
+// IMPLICIT_MEMBER_SECOND: Pattern/ExprSpecific: {#arg4: Int#}[#Int#];
 // IMPLICIT_MEMBER_SECOND: End completions
 
   let _: TestStaticMemberCall = .create2(1, arg3: 2, #^IMPLICIT_MEMBER_SKIPPED^#)
 // IMPLICIT_MEMBER_SKIPPED: Begin completions, 2 items
 // FIXME: 'arg3' shouldn't be suggested.
-// IMPLICIT_MEMBER_SKIPPED: Keyword/ExprSpecific:               arg3: [#Argument name#];
-// IMPLICIT_MEMBER_SKIPPED: Keyword/ExprSpecific:               arg4: [#Argument name#];
+// IMPLICIT_MEMBER_SKIPPED: Pattern/ExprSpecific: {#arg3: Int#}[#Int#];
+// IMPLICIT_MEMBER_SKIPPED: Pattern/ExprSpecific: {#arg4: Int#}[#Int#];
 // IMPLICIT_MEMBER_SKIPPED: End completions
 }
 func testImplicitMemberInArrayLiteral() {
@@ -737,7 +753,7 @@ struct Wrap<T> {
 func testGenricMethodOnGenericOfArchetype<Wrapped>(value: Wrap<Wrapped>) {
   value.method(#^ARCHETYPE_GENERIC_1^#)
 // ARCHETYPE_GENERIC_1: Begin completions
-// ARCHETYPE_GENERIC_1: Decl[InstanceMethod]/CurrNominal:   ['(']{#(fn): (Wrapped) -> _##(Wrapped) -> _#}[')'][#Wrap<_>#];
+// ARCHETYPE_GENERIC_1: Decl[InstanceMethod]/CurrNominal:   ['(']{#(fn): (Wrapped) -> U##(Wrapped) -> U#}[')'][#Wrap<U>#];
 }
 
 struct TestHasErrorAutoclosureParam {
@@ -750,4 +766,53 @@ struct TestHasErrorAutoclosureParam {
 // PARAM_WITH_ERROR_AUTOCLOSURE: Decl[InstanceMethod]/CurrNominal:   ['(']{#value: <<error type>>#}[')'][#Void#];
 // PARAM_WITH_ERROR_AUTOCLOSURE: End completions
   }
+}
+
+struct MyType<T> {
+  init(arg1: String, arg2: T) {}
+  func overloaded() {}
+  func overloaded(_ int: Int) {}
+  func overloaded(name: String, value: String) {}
+}
+func testTypecheckedOverloaded<T>(value: MyType<T>) {
+  value.overloaded(#^TYPECHECKED_OVERLOADED^#)
+// TYPECHECKED_OVERLOADED: Begin completions
+// TYPECHECKED_OVERLOADED-DAG: Decl[InstanceMethod]/CurrNominal:   ['('][')'][#Void#];
+// TYPECHECKED_OVERLOADED-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#(int): Int#}[')'][#Void#];
+// TYPECHECKED_OVERLOADED-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#name: String#}, {#value: String#}[')'][#Void#];
+// TYPECHECKED_OVERLOADED: End completions
+}
+
+extension MyType where T == Int {
+  init(_ intVal: T) {}
+}
+func testTypecheckedTypeExpr() {
+  MyType(#^TYPECHECKED_TYPEEXPR^#
+}
+// TYPECHECKED_TYPEEXPR: Begin completions
+// TYPECHECKED_TYPEEXPR: Decl[Constructor]/CurrNominal:      ['(']{#arg1: String#}, {#arg2: _#}[')'][#MyType<_>#]; name=arg1: String, arg2: _
+// TYPECHECKED_TYPEEXPR: Decl[Constructor]/CurrNominal:      ['(']{#(intVal): Int#}[')'][#MyType<Int>#]; name=intVal: Int
+// TYPECHECKED_TYPEEXPR: End completions
+
+func testPamrameterFlags(_: Int, inoutArg: inout Int, autoclosureArg: @autoclosure () -> Int, iuoArg: Int!, variadicArg: Int...) {
+  var intVal = 1
+  testPamrameterFlags(intVal, #^ARG_PARAMFLAG_INOUT^#)
+// ARG_PARAMFLAG_INOUT: Begin completions, 1 items
+// ARG_PARAMFLAG_INOUT-DAG: Pattern/ExprSpecific: {#inoutArg: &Int#}[#inout Int#]; name=inoutArg:
+// ARG_PARAMFLAG_INOUT: End completions
+
+  testPamrameterFlags(intVal, inoutArg: &intVal, #^ARG_PARAMFLAG_AUTOCLOSURE^#)
+// ARG_PARAMFLAG_AUTOCLOSURE: Begin completions, 1 items
+// ARG_PARAMFLAG_AUTOCLOSURE-DAG: Pattern/ExprSpecific: {#autoclosureArg: Int#}[#Int#];
+// ARG_PARAMFLAG_AUTOCLOSURE: End completions
+
+  testPamrameterFlags(intVal, inoutArg: &intVal, autoclosureArg: intVal, #^ARG_PARAMFLAG_IUO^#)
+// ARG_PARAMFLAG_IUO: Begin completions, 1 items
+// ARG_PARAMFLAG_IUO-DAG: Pattern/ExprSpecific: {#iuoArg: Int?#}[#Int?#];
+// ARG_PARAMFLAG_IUO: End completions
+
+  testPamrameterFlags(intVal, inoutArg: &intVal, autoclosureArg: intVal, iuoArg: intVal, #^ARG_PARAMFLAG_VARIADIC^#)
+// ARG_PARAMFLAG_VARIADIC: Begin completions, 1 items
+// ARG_PARAMFLAG_VARIADIC-DAG: Pattern/ExprSpecific: {#variadicArg: Int...#}[#Int#];
+// ARG_PARAMFLAG_VARIADIC: End completions
 }

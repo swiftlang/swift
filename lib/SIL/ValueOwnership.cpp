@@ -78,13 +78,6 @@ CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
 CONSTANT_OWNERSHIP_INST(Owned, GlobalValue) // TODO: is this correct?
 
-// NOTE: Even though init_existential_ref from a reference counting perspective
-// is not considered to be "owned" since it doesn't affect reference counts,
-// conceptually we want to treat it as an owned value that produces owned
-// things, rather than a forwarding thing since initialization is generally a
-// consuming operation.
-CONSTANT_OWNERSHIP_INST(Owned, InitExistentialRef)
-
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
 // implementations of retain/release nothing happens, so this is safe.
@@ -263,9 +256,20 @@ FORWARDING_OWNERSHIP_INST(Upcast)
 FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
 FORWARDING_OWNERSHIP_INST(SelectEnum)
 FORWARDING_OWNERSHIP_INST(Enum)
+// NOTE: init_existential_ref from a reference counting perspective is not
+// considered to be "owned" since it doesn't affect reference counts. That being
+// said in the past, we wanted to conceptually treat it as an owned value that
+// produces owned things, rather than a forwarding thing since initialization is
+// generally a consuming operation. That being said, there are often cases in
+// class based code where we are propagating around a plus zero version of a
+// value and need to wrap the class in an existential wrapper in an intermediate
+// frame from usage. In such cases, we have been creating unnecessary ref count
+// traffic in code.
+FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 // SWIFT_ENABLE_TENSORFLOW
 FORWARDING_OWNERSHIP_INST(DifferentiableFunction)
 FORWARDING_OWNERSHIP_INST(LinearFunction)
+// SWIFT_ENABLE_TENSORFLOW END
 #undef FORWARDING_OWNERSHIP_INST
 
 ValueOwnershipKind
@@ -325,7 +329,7 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
   // Otherwise, map our results to their ownership kinds and then merge them!
   auto resultOwnershipKinds =
       makeTransformRange(results, [&](const SILResultInfo &info) {
-        return info.getOwnershipKind(*f);
+        return info.getOwnershipKind(*f, ai->getSubstCalleeType());
       });
   auto mergedOwnershipKind = ValueOwnershipKind::merge(resultOwnershipKinds);
   if (!mergedOwnershipKind) {
@@ -528,6 +532,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, OnceWithContext)
 CONSTANT_OWNERSHIP_BUILTIN(None, TSanInoutAccess)
 CONSTANT_OWNERSHIP_BUILTIN(None, Swift3ImplicitObjCEntrypoint)
 CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
+CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN

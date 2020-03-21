@@ -919,12 +919,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // If the referenced decl isn't a VarDecl, it should be a constant of some
   // sort.
   SILDeclRef silDeclRef(decl);
-  if (silDeclRef.getParameterListCount() == 2) {
-    // Unqualified reference to an instance method from a static context,
-    // without applying 'self'.
-    silDeclRef = silDeclRef.asCurried();
-  }
-
+  assert(silDeclRef.getParameterListCount() == 1);
   ManagedValue result = emitClosureValue(loc, silDeclRef, refType,
                                          declRef.getSubstitutions());
   return RValue(*this, loc, refType, result);
@@ -2727,7 +2722,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, {}, result, None,
-      SubstitutionMap(), false,
+      SubstitutionMap(), SubstitutionMap(),
       SGM.getASTContext());
   }();
   
@@ -2876,7 +2871,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, {}, {}, None,
-      SubstitutionMap(), false,
+      SubstitutionMap(), SubstitutionMap(),
       SGM.getASTContext());
   }();
   
@@ -3058,7 +3053,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None,
-      SubstitutionMap(), false,
+      SubstitutionMap(), SubstitutionMap(),
       C);
     
     // Mangle the name of the thunk to see if we already created it.
@@ -3232,7 +3227,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None,
-      SubstitutionMap(), false, C);
+      SubstitutionMap(), SubstitutionMap(), C);
     
     // Mangle the name of the thunk to see if we already created it.
     SmallString<64> nameBuf;

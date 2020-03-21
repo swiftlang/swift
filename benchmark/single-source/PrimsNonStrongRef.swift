@@ -35,9 +35,18 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
     var benchmarks: [BenchmarkInfo] = []
 #if false
     // TODO: Stabilize weak benchmark.
-    benchmarks..append(BenchmarkInfo(
+    benchmarks.append(BenchmarkInfo(
         name: "Prims.NonStrongRef.Weak",
         runFunction: run_PrimsWeak,
+        tags: [.validation, .algorithm],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(weakPrimsState)
+        }))
+    // TODO: Stabilize weak benchmark.
+    benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.Weak.Closure",
+        runFunction: run_PrimsWeakClosureAccess,
         tags: [.validation, .algorithm],
         setUpFunction: {
           touchGlobalInfo()
@@ -53,8 +62,24 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
           blackHole(unownedSafePrimsState)
         }))
     benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.UnownedSafe.Closure",
+        runFunction: run_PrimsUnownedSafeClosureAccess,
+        tags: [.validation, .algorithm],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(unownedSafePrimsState)
+        }))
+    benchmarks.append(BenchmarkInfo(
         name: "Prims.NonStrongRef.UnownedUnsafe",
         runFunction: run_PrimsUnownedUnsafe,
+        tags: [.validation, .algorithm],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(unownedUnsafePrimsState)
+        }))
+    benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.UnownedUnsafe.Closure",
+        runFunction: run_PrimsUnownedUnsafeClosureAccess,
         tags: [.validation, .algorithm],
         setUpFunction: {
           touchGlobalInfo()
@@ -67,6 +92,30 @@ public let PrimsNonStrongRef: [BenchmarkInfo] = ({
         setUpFunction: {
           touchGlobalInfo()
           blackHole(unmanagedPrimsState)
+        }))
+    benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.Unmanaged.Closure",
+        runFunction: run_PrimsUnmanagedClosureAccess,
+        tags: [.validation, .algorithm, .api],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(unmanagedPrimsState)
+        }))
+    benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.UnmanagedUGR",
+        runFunction: run_PrimsUnmanagedUGR,
+        tags: [.validation, .algorithm, .api],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(unmanagedUGRPrimsState)
+        }))
+    benchmarks.append(BenchmarkInfo(
+        name: "Prims.NonStrongRef.UnmanagedUGR.Closure",
+        runFunction: run_PrimsUnmanagedUGRClosureAccess,
+        tags: [.validation, .algorithm, .api],
+        setUpFunction: {
+          touchGlobalInfo()
+          blackHole(unmanagedUGRPrimsState)
         }))
     return benchmarks
   })()
@@ -617,6 +666,7 @@ let weakPrimsState = PrimsState(WeakGraphNode.self)
 let unownedSafePrimsState = PrimsState(UnownedSafeGraphNode.self)
 let unownedUnsafePrimsState = PrimsState(UnownedUnsafeGraphNode.self)
 let unmanagedPrimsState = PrimsState(UnmanagedGraphNode.self)
+let unmanagedUGRPrimsState = PrimsState(UnmanagedUGRGraphNode.self)
 
 //===----------------------------------------------------------------------===//
 //                                 Protocols
@@ -628,11 +678,16 @@ protocol ValueBox : Hashable {
   init(_ inputValue: ValueType)
   var value: ValueType { get }
 
+  func withValue<Result>(_ f: (ValueType) throws -> Result) rethrows -> Result
   func free()
 }
 
 extension ValueBox {
   func free() {}
+  @_transparent
+  func withValue<Result>(_ f: (ValueType) throws -> Result) rethrows -> Result {
+    return try f(value)
+  }
 }
 
 protocol GraphNode {
@@ -724,6 +779,46 @@ func ==<T>(lhs: UnmanagedVarBox<T>, rhs: UnmanagedVarBox<T>) -> Bool {
 extension UnmanagedVarBox : Hashable where T : Hashable {
   func hash(into hasher: inout Hasher) {
     hasher.combine(ObjectIdentifier(value))
+  }
+}
+
+struct UnmanagedUGRVarBox<T : AnyObject & Hashable> {
+  var _value: Unmanaged<T>
+
+  init(_ inputValue: T) {
+    _value = Unmanaged<T>.passRetained(inputValue)
+  }
+}
+
+extension UnmanagedUGRVarBox : ValueBox where T : GraphNode {
+  typealias ValueType = T
+
+  func free() {
+    _value.release()
+  }
+
+  var value: T { return _value._withUnsafeGuaranteedRef { $0 } }
+
+  func withValue<Result>(_ f: (ValueType) throws -> Result) rethrows -> Result {
+    try _value._withUnsafeGuaranteedRef { try f($0) }
+  }
+}
+
+extension UnmanagedUGRVarBox : Equatable where T : Equatable {
+}
+
+func ==<T>(lhs: UnmanagedUGRVarBox<T>, rhs: UnmanagedUGRVarBox<T>) -> Bool {
+  return lhs._value._withUnsafeGuaranteedRef { x in
+    return rhs._value._withUnsafeGuaranteedRef { y in
+      return x == y
+    }}
+}
+
+extension UnmanagedUGRVarBox : Hashable where T : Hashable {
+  func hash(into hasher: inout Hasher) {
+    _value._withUnsafeGuaranteedRef {
+      hasher.combine(ObjectIdentifier($0))
+    }
   }
 }
 
@@ -846,6 +941,41 @@ extension UnmanagedGraphNode : Hashable {
 }
 
 func ==(lhs: UnmanagedGraphNode, rhs: UnmanagedGraphNode) -> Bool {
+  return lhs === rhs
+}
+
+
+final class UnmanagedUGRGraphNode {
+  /// This id is only meant for dumping the state of the graph. It is not meant
+  /// to be used functionally by the algorithm.
+  var id: Int
+
+  var adjList: Array<UnmanagedUGRVarBox<UnmanagedUGRGraphNode>>
+
+  init(id inputId: Int) {
+    id = inputId
+    adjList = Array<UnmanagedUGRVarBox<UnmanagedUGRGraphNode>>()
+  }
+
+  deinit {
+    for x in adjList {
+      x.free()
+    }
+  }
+}
+
+extension UnmanagedUGRGraphNode : GraphNode {
+  typealias BoxType = UnmanagedUGRVarBox<UnmanagedUGRGraphNode>
+}
+
+extension UnmanagedUGRGraphNode : Equatable {}
+extension UnmanagedUGRGraphNode : Hashable {
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
+  }
+}
+
+func ==(lhs: UnmanagedUGRGraphNode, rhs: UnmanagedUGRGraphNode) -> Bool {
   return lhs === rhs
 }
 
@@ -1054,6 +1184,41 @@ where Node.BoxType == Box, Box.ValueType == Node
   return treeEdges
 }
 
+func primsMainLoopClosureAccess<Node : GraphNode, Box>(
+  _ graph : Array<Node>,
+  _ fun : (Node.BoxType, Node.BoxType) -> Double) -> Array<Int?>
+where Node.BoxType == Box, Box.ValueType == Node
+{
+  var treeEdges = Array<Int?>(repeating:nil, count:graph.count)
+  let queue = PriorityQueue<Node>(count: graph.count)
+
+  // Make the minimum spanning tree root its own parent for simplicity.
+  queue.insert(EdgeCost(to: graph[0], cost: 0.0, from: graph[0]))
+
+  // Take an element with the smallest cost from the queue and add its
+  // neighbors to the queue if their cost was updated
+  while !queue.isEmpty {
+    // Add an edge with minimum cost to the spanning tree
+    let e = queue.pop()!
+    let newnode: Node.BoxType = e.to
+
+    // Add record about the edge newnode->e.from to treeEdges
+    treeEdges[newnode.withValue { $0.id }] = e.from.withValue { $0.id }
+
+    // Check all adjacent nodes and add edges, ending outside the tree, to the
+    // queue. If the queue already contains an edge to an adjacent node, we
+    // replace existing one with the new one in case the new one costs less.
+    for toNode: Box in (newnode.withValue { $0.adjList }) {
+      if treeEdges[toNode.withValue { $0.id }] != nil {
+        continue
+      }
+      let newcost = fun(newnode, toNode)
+      queue.insertOrUpdate(EdgeCost(to: toNode, cost: newcost, from: newnode))
+    }
+  }
+  return treeEdges
+}
+
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
@@ -1079,6 +1244,25 @@ func run_PrimsNonStrongRef<Node: GraphNode, Box>(_ state: PrimsState<Node, Box>)
   CheckResults(Int(cost) == 49324)
 }
 
+@inline(__always)
+func run_PrimsNonStrongRefClosureAccess<Node: GraphNode, Box>(_ state: PrimsState<Node, Box>) where Node.BoxType == Box, Box.ValueType == Node {
+  let graph = state.graph
+  let map = state.edgeToCostMap
+
+  // Find spanning tree
+  let treeEdges = primsMainLoopClosureAccess(graph, { (start: Box, end: Box) in
+      return map[Edge(start: start, end: end)]!
+    })
+
+  // Compute its cost in order to check results
+  var cost = 0.0
+  for i in 1..<treeEdges.count {
+    if let n = treeEdges[i] {
+      cost += map[Edge(start: Box(graph[n]), end: Box(graph[i]))]!
+    }
+  }
+  CheckResults(Int(cost) == 49324)
+}
 
 
 @inline(never)
@@ -1086,6 +1270,14 @@ public func run_PrimsWeak(_ N: Int) {
   let state = weakPrimsState
   for _ in 0..<N {
     run_PrimsNonStrongRef(state)
+  }
+}
+
+@inline(never)
+public func run_PrimsWeakClosureAccess(_ N: Int) {
+  let state = weakPrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRefClosureAccess(state)
   }
 }
 
@@ -1098,6 +1290,14 @@ public func run_PrimsUnownedSafe(_ N: Int) {
 }
 
 @inline(never)
+public func run_PrimsUnownedSafeClosureAccess(_ N: Int) {
+  let state = unownedSafePrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRefClosureAccess(state)
+  }
+}
+
+@inline(never)
 public func run_PrimsUnownedUnsafe(_ N: Int) {
   let state = unownedUnsafePrimsState
   for _ in 0..<N {
@@ -1106,9 +1306,41 @@ public func run_PrimsUnownedUnsafe(_ N: Int) {
 }
 
 @inline(never)
+public func run_PrimsUnownedUnsafeClosureAccess(_ N: Int) {
+  let state = unownedUnsafePrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRefClosureAccess(state)
+  }
+}
+
+@inline(never)
 public func run_PrimsUnmanaged(_ N: Int) {
   let state = unmanagedPrimsState
   for _ in 0..<N {
     run_PrimsNonStrongRef(state)
+  }
+}
+
+@inline(never)
+public func run_PrimsUnmanagedClosureAccess(_ N: Int) {
+  let state = unmanagedPrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRefClosureAccess(state)
+  }
+}
+
+@inline(never)
+public func run_PrimsUnmanagedUGR(_ N: Int) {
+  let state = unmanagedUGRPrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRef(state)
+  }
+}
+
+@inline(never)
+public func run_PrimsUnmanagedUGRClosureAccess(_ N: Int) {
+  let state = unmanagedUGRPrimsState
+  for _ in 0..<N {
+    run_PrimsNonStrongRefClosureAccess(state)
   }
 }

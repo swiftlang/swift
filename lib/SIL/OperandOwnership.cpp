@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILInstruction.h"
@@ -110,7 +111,9 @@ public:
 #define SHOULD_NEVER_VISIT_INST(INST)                                          \
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
       INST##Inst *i) {                                                         \
-    llvm_unreachable("Visited instruction that should never be visited?!");    \
+    llvm::errs() << "Unhandled inst: " << *i;                                  \
+    llvm::report_fatal_error(                                                  \
+        "Visited instruction that should never be visited?!");                 \
   }
 SHOULD_NEVER_VISIT_INST(AllocBox)
 SHOULD_NEVER_VISIT_INST(AllocExistentialBox)
@@ -164,13 +167,13 @@ INTERIOR_POINTER_PROJECTION(RefTailAddr)
   }
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)
+CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AbortApply)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, BeginAccess)
@@ -280,7 +283,6 @@ ACCEPTS_ANY_OWNERSHIP_INST(SuperMethod)
 ACCEPTS_ANY_OWNERSHIP_INST(BridgeObjectToWord)
 ACCEPTS_ANY_OWNERSHIP_INST(ClassifyBridgeObject)
 ACCEPTS_ANY_OWNERSHIP_INST(CopyBlock)
-ACCEPTS_ANY_OWNERSHIP_INST(OpenExistentialBox)
 ACCEPTS_ANY_OWNERSHIP_INST(RefToRawPointer)
 ACCEPTS_ANY_OWNERSHIP_INST(SetDeallocating)
 ACCEPTS_ANY_OWNERSHIP_INST(ProjectExistentialBox)
@@ -345,9 +347,11 @@ FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
+FORWARD_ANY_OWNERSHIP_INST(InitExistentialRef)
 // SWIFT_ENABLE_TENSORFLOW
 FORWARD_ANY_OWNERSHIP_INST(DifferentiableFunction)
 FORWARD_ANY_OWNERSHIP_INST(LinearFunction)
+// SWIFT_ENABLE_TENSORFLOW END
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
@@ -441,27 +445,9 @@ OperandOwnershipKindClassifier::visitBranchInst(BranchInst *bi) {
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitCondBranchInst(CondBranchInst *cbi) {
-  // If our conditional branch is the condition, it is trivial. Check that the
-  // ownership kind is trivial.
-  if (cbi->isConditionOperandIndex(getOperandIndex()))
-    return Map::allLive();
-
-  // Otherwise, make sure that our operand matches the ownership of the relevant
-  // argument.
-  //
-  // TODO: Use more updated APIs here to get the operands/etc.
-  if (cbi->isTrueOperandIndex(getOperandIndex())) {
-    unsigned trueOffset = 1;
-    return checkTerminatorArgumentMatchesDestBB(cbi->getTrueBB(),
-                                                getOperandIndex() - trueOffset);
-  }
-
-  assert(cbi->isFalseOperandIndex(getOperandIndex()) &&
-         "If an operand is not the condition index or a true operand index, it "
-         "must be a false operand index");
-  unsigned falseOffset = 1 + cbi->getTrueOperands().size();
-  return checkTerminatorArgumentMatchesDestBB(cbi->getFalseBB(),
-                                              getOperandIndex() - falseOffset);
+  // In ossa, cond_br insts are not allowed to take non-trivial values. Thus, we
+  // just accept anything since we know all of our operands will be trivial.
+  return Map::allLive();
 }
 
 OperandOwnershipKindMap
@@ -548,9 +534,9 @@ OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
     return Map();
 
   auto ownershipKindRange = makeTransformRange(results,
-                                               [&](const SILResultInfo &info) {
-                                                 return info.getOwnershipKind(*f);
-                                               });
+     [&](const SILResultInfo &info) {
+       return info.getOwnershipKind(*f, f->getLoweredFunctionType());
+     });
 
   // Then merge all of our ownership kinds. If we fail to merge, return an empty
   // map so we fail on all operands.
@@ -1029,6 +1015,7 @@ ANY_OWNERSHIP_BUILTIN(ZeroInitializer)
 ANY_OWNERSHIP_BUILTIN(Swift3ImplicitObjCEntrypoint)
 ANY_OWNERSHIP_BUILTIN(PoundAssert)
 ANY_OWNERSHIP_BUILTIN(GlobalStringTablePointer)
+ANY_OWNERSHIP_BUILTIN(TypePtrAuthDiscriminator)
 #undef ANY_OWNERSHIP_BUILTIN
 
 // This is correct today since we do not have any builtins which return

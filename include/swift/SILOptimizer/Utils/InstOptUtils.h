@@ -292,12 +292,32 @@ struct InstModCallbacks {
       [](SILValue oldValue, SILValue newValue) {
         oldValue->replaceAllUsesWith(newValue);
       };
+  std::function<void(SingleValueInstruction *, SILValue)>
+      eraseAndRAUWSingleValueInst =
+          [](SingleValueInstruction *i, SILValue newValue) {
+            i->replaceAllUsesWith(newValue);
+            i->eraseFromParent();
+          };
 
   InstModCallbacks(decltype(deleteInst) deleteInst,
                    decltype(createdNewInst) createdNewInst,
                    decltype(replaceValueUsesWith) replaceValueUsesWith)
       : deleteInst(deleteInst), createdNewInst(createdNewInst),
-        replaceValueUsesWith(replaceValueUsesWith) {}
+        replaceValueUsesWith(replaceValueUsesWith),
+        eraseAndRAUWSingleValueInst(
+            [](SingleValueInstruction *i, SILValue newValue) {
+              i->replaceAllUsesWith(newValue);
+              i->eraseFromParent();
+            }) {}
+
+  InstModCallbacks(
+      decltype(deleteInst) deleteInst, decltype(createdNewInst) createdNewInst,
+      decltype(replaceValueUsesWith) replaceValueUsesWith,
+      decltype(eraseAndRAUWSingleValueInst) eraseAndRAUWSingleValueInst)
+      : deleteInst(deleteInst), createdNewInst(createdNewInst),
+        replaceValueUsesWith(replaceValueUsesWith),
+        eraseAndRAUWSingleValueInst(eraseAndRAUWSingleValueInst) {}
+
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
   InstModCallbacks(const InstModCallbacks &) = default;
@@ -344,11 +364,18 @@ void releasePartialApplyCapturedArg(
     SILParameterInfo paramInfo,
     InstModCallbacks callbacks = InstModCallbacks());
 
+void deallocPartialApplyCapturedArg(
+    SILBuilder &builder, SILLocation loc, SILValue arg,
+    SILParameterInfo paramInfo);
+
 /// Insert destroys of captured arguments of partial_apply [stack].
 void insertDestroyOfCapturedArguments(
     PartialApplyInst *pai, SILBuilder &builder,
     llvm::function_ref<bool(SILValue)> shouldInsertDestroy =
         [](SILValue arg) -> bool { return true; });
+
+void insertDeallocOfCapturedArguments(
+    PartialApplyInst *pai, SILBuilder &builder);
 
 /// This iterator 'looks through' one level of builtin expect users exposing all
 /// users of the looked through builtin expect instruction i.e it presents a

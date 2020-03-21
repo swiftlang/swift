@@ -20,6 +20,7 @@
 
 #include "IRGen.h"
 #include "SwiftTargetInfo.h"
+#include "TypeLayout.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -48,6 +49,7 @@
 
 namespace llvm {
   class Constant;
+  class ConstantInt;
   class DataLayout;
   class Function;
   class FunctionType;
@@ -71,6 +73,7 @@ namespace clang {
   class Decl;
   class GlobalDecl;
   class Type;
+  class PointerAuthSchema;
   namespace CodeGen {
     class CGFunctionInfo;
     class CodeGenModule;
@@ -137,6 +140,7 @@ namespace irgen {
   class NecessaryBindings;
   class NominalMetadataLayout;
   class OutliningMetadataCollector;
+  class PointerAuthEntity;
   class ProtocolInfo;
   enum class ProtocolInfoKind : uint8_t;
   class Signature;
@@ -556,6 +560,8 @@ public:
   /// incremental compilation.
   llvm::GlobalVariable *ModuleHash;
 
+  TypeLayoutCache typeLayoutCache;
+
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;
 
@@ -855,6 +861,8 @@ public:
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param,
                                            CanSILFunctionType funcTy);
 
+  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
+
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
            "requesting clang AST context without clang importer!");
@@ -947,6 +955,20 @@ public:
   llvm::Constant *emitTypeMetadataRecords();
   llvm::Constant *emitFieldDescriptors();
 
+  llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
+                                                   CanSILFunctionType fnType);
+
+  llvm::Constant *getConstantSignedCFunctionPointer(llvm::Constant *fn);
+
+  llvm::Constant *getConstantSignedPointer(llvm::Constant *pointer,
+                                           unsigned key,
+                                           llvm::Constant *addrDiscriminator,
+                                           llvm::Constant *otherDiscriminator);
+  llvm::Constant *getConstantSignedPointer(llvm::Constant *pointer,
+                                           const clang::PointerAuthSchema &schema,
+                                           const PointerAuthEntity &entity,
+                                           llvm::Constant *storageAddress);
+
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
                                             ArrayRef<llvm::Type*> paramTypes,
@@ -1015,6 +1037,12 @@ private:
   /// Maps to constant swift 'String's.
   llvm::StringMap<llvm::Constant*> GlobalConstantStrings;
   llvm::StringMap<llvm::Constant*> GlobalConstantUTF16Strings;
+
+  struct PointerAuthCachesType;
+  PointerAuthCachesType *PointerAuthCaches = nullptr;
+  PointerAuthCachesType &getPointerAuthCaches();
+  void destroyPointerAuthCaches();
+  friend class PointerAuthEntity;
 
   /// LLVMUsed - List of global values which are required to be
   /// present in the object file; bitcast to i8*. This is used for
@@ -1219,6 +1247,8 @@ private:                            \
   llvm::Constant *Id##Fn = nullptr;
 #include "swift/Runtime/RuntimeFunctions.def"
   
+  Optional<llvm::Constant *> FixedClassInitializationFn;
+  
   llvm::Constant *FixLifetimeFn = nullptr;
 
   mutable Optional<SpareBitVector> HeapPointerSpareBits;
@@ -1226,6 +1256,8 @@ private:                            \
 //--- Generic ---------------------------------------------------------------
 public:
   llvm::Constant *getFixLifetimeFn();
+  
+  llvm::Constant *getFixedClassInitializationFn();
 
   /// The constructor used when generating code.
   ///
@@ -1290,8 +1322,8 @@ public:
                                       ForeignFunctionInfo *foreignInfo=nullptr);
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
 
-  llvm::Constant *getInt32(uint32_t value);
-  llvm::Constant *getSize(Size size);
+  llvm::ConstantInt *getInt32(uint32_t value);
+  llvm::ConstantInt *getSize(Size size);
   llvm::Constant *getAlignment(Alignment align);
   llvm::Constant *getBool(bool condition);
 

@@ -453,6 +453,9 @@ public:
   virtual void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                            SILType T) const = 0;
 
+  virtual TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                                SILType T) const = 0;
+
   virtual bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                          ReferenceCounting *rc) const {
     return false;
@@ -460,8 +463,10 @@ public:
 
   void emitResilientTagIndices(IRGenModule &IGM) const;
 
-protected:
-
+  virtual bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                                   unsigned index) const {
+    return false;
+  }
 
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;

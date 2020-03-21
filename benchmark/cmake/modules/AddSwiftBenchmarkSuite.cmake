@@ -106,7 +106,7 @@ endmacro()
 
 macro(configure_sdks_darwin)
   set(macosx_arch "x86_64")
-  set(iphoneos_arch "arm64" "armv7")
+  set(iphoneos_arch "arm64" "arm64e" "armv7")
   set(appletvos_arch "arm64")
   set(watchos_arch "armv7k")
 

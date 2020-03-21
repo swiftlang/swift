@@ -491,3 +491,176 @@ tuplify(true) { c in
 // CHECK-SAME: hello
 // CHECK-SAME: true
 
+// Use if let / if case with various forms of decomposition.
+func getOptionalInt(_: Bool) -> Int? { return 25 }
+
+enum E {
+  case a
+  case b(Int, String?)
+}
+
+func getE(_ i: Int) -> E {
+  switch i {
+  case 0:
+    return .a
+  case 1:
+    return .b(17, "hello")
+  case 2:
+    return .b(42, nil)
+  default:
+    fatalError("Unhandled case")
+  }
+}
+
+tuplify(true) { c in
+  "testIfLetMatching"
+  if let theValue = getOptionalInt(c) {
+    theValue + 17
+  }
+  if case let .a = getE(0) {
+    "matched without payload"
+  }
+  if case let .b(i, s?) = getE(1) {
+    "matched with payload"
+    s + "!"
+    i + 17
+  }
+  if case let .b(i, s?) = getE(2) {
+    fatalError("cannot match this")
+  } else {
+    "intentional mismatch"
+  }
+}
+// CHECK: testIfLetMatching
+// CHECK-SAME: Optional(42)
+// CHECK-SAME: Optional("matched without payload")
+// CHECK-SAME: "matched with payload", "hello!", 34
+// CHECK-SAME: "intentional mismatch"
+
+class Super { }
+
+class Sub : Super {
+  func subMethod() -> String {
+    return "subMethod"
+  }
+}
+
+func getSuper(wantSubclass: Bool) -> Super {
+  return wantSubclass ? Sub() : Super()
+}
+
+tuplify(true) { c in
+  "testIfLetAsMatching"
+  if case let sub as Sub = getSuper(wantSubclass: true) {
+    sub.subMethod()
+  }
+  if case let sub as Sub = getSuper(wantSubclass: false) {
+    fatalError("cannot match this")
+  } else {
+    "Superclass instance"
+  }
+}
+// CHECK: testIfLetAsMatching
+// CHECK-SAME: "subMethod"
+// CHECK-SAME: "Superclass instance"
+
+
+// switch statements
+func testSwitch(_ e: E) {
+  tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    case .a:
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+    case .b(let i, nil):
+      "just \(i)"
+    }
+  }
+}
+
+// CHECK: testSwitch
+// CHECK-SAME: first(main.Either<Swift.String, (Swift.Int, Swift.String)>.first("a"))
+testSwitch(getE(0))
+
+// CHECK: testSwitch
+// CHECK-SAME: first(main.Either<Swift.String, (Swift.Int, Swift.String)>.second(34, "hello!"))
+testSwitch(getE(1))
+
+// CHECK: testSwitch
+// CHECK-SAME: second("just 42")
+testSwitch(getE(2))
+
+func testSwitchCombined(_ eIn: E) {
+  var e = eIn
+  tuplify(true) { c in
+    "testSwitchCombined"
+    switch e {
+    case .a:
+      "a"
+    case .b(let i, _?), .b(let i, nil):
+      "just \(i)"
+    }
+  }
+}
+
+// CHECK: testSwitchCombined
+// CHECK-SAME: main.Either<Swift.String, Swift.String>.first("a")
+testSwitchCombined(getE(0))
+
+// CHECK: testSwitchCombined
+// CHECK-SAME: second("just 17")
+testSwitchCombined(getE(1))
+
+// CHECK: testSwitchCombined
+// CHECK-SAME: second("just 42")
+testSwitchCombined(getE(2))
+
+
+// Test buildOptional(_:) as an alternative to buildIf(_:).
+@_functionBuilder
+struct TupleBuilderWithOpt {
+  static func buildBlock<T1>(_ t1: T1) -> (T1) {
+    return (t1)
+  }
+
+  static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
+    return (t1, t2)
+  }
+  
+  static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
+      -> (T1, T2, T3) {
+    return (t1, t2, t3)
+  }
+
+  static func buildBlock<T1, T2, T3, T4>(_ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4)
+      -> (T1, T2, T3, T4) {
+    return (t1, t2, t3, t4)
+  }
+
+  static func buildBlock<T1, T2, T3, T4, T5>(
+    _ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4, _ t5: T5
+  ) -> (T1, T2, T3, T4, T5) {
+    return (t1, t2, t3, t4, t5)
+  }
+
+  static func buildDo<T>(_ value: T) -> T { return value }
+  static func buildOptional<T>(_ value: T?) -> T? { return value }
+
+  static func buildEither<T,U>(first value: T) -> Either<T,U> {
+    return .first(value)
+  }
+  static func buildEither<T,U>(second value: U) -> Either<T,U> {
+    return .second(value)
+  }
+}
+
+func tuplifyWithOpt<T>(_ cond: Bool, @TupleBuilderWithOpt body: (Bool) -> T) {
+  print(body(cond))
+}
+tuplifyWithOpt(true) { c in
+  "1"
+  3.14159
+}

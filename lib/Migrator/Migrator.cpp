@@ -279,7 +279,8 @@ void printRemap(const StringRef OriginalFilename,
   assert(!OriginalFilename.empty());
 
   diff_match_patch<std::string> DMP;
-  const auto Diffs = DMP.diff_main(InputText, OutputText, /*checkLines=*/false);
+  const auto Diffs =
+      DMP.diff_main(InputText.str(), OutputText.str(), /*checkLines=*/false);
 
   OS << "[";
 
@@ -354,7 +355,7 @@ void printRemap(const StringRef OriginalFilename,
       continue;
     Current.Offset -= 1;
     Current.Remove += 1;
-    Current.Text = InputText.substr(Current.Offset, 1);
+    Current.Text = InputText.substr(Current.Offset, 1).str();
   }
 
   for (auto Rep = Replacements.begin(); Rep != Replacements.end(); ++Rep) {

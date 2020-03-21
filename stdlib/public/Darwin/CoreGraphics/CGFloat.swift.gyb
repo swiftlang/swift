@@ -549,8 +549,8 @@ extension CGFloat: ElementaryFunctions {
   }
 
   @_alwaysEmitIntoClient
-  public static func atan2(y: CGFloat, x: CGFloat) -> CGFloat {
-    return CGFloat(NativeType.atan2(y: y.native, x: x.native))
+  public static func atan2(_ y: CGFloat, _ x: CGFloat) -> CGFloat {
+    return CGFloat(NativeType.atan2(y.native, x.native))
   }
 
   @_alwaysEmitIntoClient

@@ -1,3 +1,8 @@
+# SWIFT_ENABLE_TENSORFLOW
+# These changes were part of `ElementaryFunctions`, which was removed from
+# apple/swift master branch and moved to apple/swift-numerics.
+# TF-1203 tracks eliminating these ad-hoc tensorflow branch changes.
+
 class SwiftMathFunction(object):
     def __init__(self, name, kind=None, swiftName=None, args="x", comment=None,
                  platforms=None):
@@ -27,7 +32,7 @@ class SwiftMathFunction(object):
             builtin = "Builtin.int_" + self.name + "_FPIEEE" + str(type.bits)
             return type.stdlib_name + "(" + builtin + "(" + \
                 self.params("", "._value") + "))"
-        return "_swift_stdlib_" + self.name + type.cFuncSuffix + "(" + \
+        return "_stdlib_" + self.name + type.cFuncSuffix + "(" + \
             self.params() + ")"
 
 

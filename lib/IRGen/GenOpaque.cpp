@@ -31,6 +31,7 @@
 #include "Callee.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
+#include "GenPointerAuth.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "ProtocolInfo.h"
@@ -312,7 +313,8 @@ llvm::PointerType *IRGenModule::getEnumValueWitnessTablePtrTy() {
 /// always an i8*.
 llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
                                                      llvm::Value *table,
-                                                     WitnessIndex index) {
+                                                     WitnessIndex index,
+                                                     llvm::Value **slotPtr) {
   assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
 
   // GEP to the appropriate index, avoiding spurious IR in the trivial case.
@@ -320,6 +322,8 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
   if (index.getValue() != 0)
     slot = IGF.Builder.CreateConstInBoundsGEP1_32(
         /*Ty=*/nullptr, table, index.getValue());
+
+  if (slotPtr) *slotPtr = slot;
 
   auto witness =
     IGF.Builder.CreateLoad(Address(slot, IGF.IGM.getPointerAlignment()));
@@ -331,11 +335,14 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
 /// always an i8*.
 llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
                                                      llvm::Value *table,
-                                                     llvm::Value *index) {
+                                                     llvm::Value *index,
+                                                     llvm::Value **slotPtr) {
   assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
 
   // GEP to the appropriate index.
   llvm::Value *slot = IGF.Builder.CreateInBoundsGEP(table, index);
+
+  if (slotPtr) *slotPtr = slot;
 
   auto witness =
     IGF.Builder.CreateLoad(Address(slot, IGF.IGM.getPointerAlignment()));
@@ -396,7 +403,6 @@ static FunctionPointer emitLoadOfValueWitnessFunction(IRGenFunction &IGF,
                                                       llvm::Value *table,
                                                       ValueWitness index) {
   assert(isValueWitnessFunction(index));
-
   WitnessIndex windex = [&] {
     unsigned i = unsigned(index);
     if (i > unsigned(ValueWitness::Flags)) {
@@ -412,14 +418,20 @@ static FunctionPointer emitLoadOfValueWitnessFunction(IRGenFunction &IGF,
     return WitnessIndex(i, false);
   }();
 
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, table, windex);
+  llvm::Value *slot;
+  llvm::Value *witness =
+    emitInvariantLoadOfOpaqueWitness(IGF, table, windex, &slot);
   auto label = getValueWitnessLabel(index);
   auto signature = IGF.IGM.getValueWitnessSignature(index);
 
   auto type = signature.getType()->getPointerTo();
   witness = IGF.Builder.CreateBitCast(witness, type, label);
 
-  return FunctionPointer(witness, signature);
+  auto authInfo = PointerAuthInfo::emit(IGF,
+                                    IGF.getOptions().PointerAuth.ValueWitnesses,
+                                        slot, index);
+
+  return FunctionPointer(witness, authInfo, signature);
 }
 
 /// Given a type metadata pointer, load one of the function
@@ -457,12 +469,26 @@ IRGenFunction::emitValueWitnessFunctionRef(SILType type,
   if (auto witness = tryGetLocalTypeDataForLayout(type, key)) {
     metadataSlot = emitTypeMetadataRefForLayout(type);
     auto signature = IGM.getValueWitnessSignature(index);
-    return FunctionPointer(witness, signature);
+    PointerAuthInfo authInfo;
+    if (auto &schema = getOptions().PointerAuth.ValueWitnesses) {
+      auto discriminator =
+        tryGetLocalTypeDataForLayout(type,
+                        LocalTypeDataKind::forValueWitnessDiscriminator(index));
+      assert(discriminator && "no saved discriminator for value witness fn!");
+      authInfo = PointerAuthInfo(schema.getKey(), discriminator);
+    }
+    return FunctionPointer(witness, authInfo, signature);
   }
   
   auto vwtable = emitValueWitnessTableRef(type, &metadataSlot);
   auto witness = emitLoadOfValueWitnessFunction(*this, vwtable, index);
   setScopedLocalTypeDataForLayout(type, key, witness.getPointer());
+  if (auto &authInfo = witness.getAuthInfo()) {
+    setScopedLocalTypeDataForLayout(type,
+                        LocalTypeDataKind::forValueWitnessDiscriminator(index),
+                                    authInfo.getDiscriminator());
+  }
+
   return witness;
 }
 
@@ -1287,6 +1313,8 @@ irgen::emitGetEnumTagSinglePayloadGenericCall(IRGenFunction &IGF,
   auto getExtraInhabitantTagFn =
     getOrCreateGetExtraInhabitantTagFunction(IGF.IGM, payloadType,
                                              payloadTI, emitter);
+  getExtraInhabitantTagFn =
+    IGF.IGM.getConstantSignedCFunctionPointer(getExtraInhabitantTagFn);      
 
   // We assume this is never a reabstracted type.
   auto type = payloadType.getASTType();
@@ -1359,6 +1387,8 @@ irgen::emitStoreEnumTagSinglePayloadGenericCall(IRGenFunction &IGF,
   auto storeExtraInhabitantTagFn =
     getOrCreateStoreExtraInhabitantTagFunction(IGF.IGM, payloadType,
                                                payloadTI, emitter);
+  storeExtraInhabitantTagFn =
+    IGF.IGM.getConstantSignedCFunctionPointer(storeExtraInhabitantTagFn);      
 
   // We assume this is never a reabstracted type.
   auto type = payloadType.getASTType();

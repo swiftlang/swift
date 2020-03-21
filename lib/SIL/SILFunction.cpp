@@ -237,6 +237,10 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
 
 SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                                                SILType type) const {
+  if (type.hasArchetype()) {
+    llvm::errs() << "TYPE HAS ARCHETYPE\n";
+    type.dump();
+  }
   assert(!type.hasArchetype());
 
   auto genericSig = getGenericSignature().getCanonicalSignature();

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/class_metadata.swift
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/class_metadata.swift -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize -check-prefix CHECK-%target-import-type
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/class_metadata.swift -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize -check-prefix CHECK-%target-import-type -check-prefix=CHECK-%target-cpu
 
 class A {}
 
@@ -32,9 +32,13 @@ class A {}
 // CHECK-64-SAME: i32 10,
 //   V-table length.
 // CHECK-SAME: i32 1,
-// CHECK-SMAE: %swift.method_descriptor {
+// CHECK-SAME: %swift.method_descriptor {
 //   V-table entry #1: flags.
-// CHECK-SAME: i32 1
+// CHECK-i386-SAME: i32 1,
+// CHECK-x86_64-SAME: i32 1,
+// CHECK-armv7k-SAME: i32 1,
+// CHECK-arm64-SAME: i32 1,
+// CHECK-arm64e-SAME: i32 1882783745
 //   V-table entry #1: invocation function.
 // CHECK-SAME: @"$s14class_metadata1ACACycfC"
 // CHECK-SAME: }>, section

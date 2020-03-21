@@ -131,8 +131,12 @@ def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
 
-def enable_descriptive_diagnostics : Flag<["-"], "enable-descriptive-diagnostics">,
-  HelpText<"Show descriptive diagnostic information, if available.">;
+def enable_educational_notes : Flag<["-"], "enable-educational-notes">,
+  HelpText<"Show educational notes, if available.">;
+  
+def enable_experimental_diagnostic_formatting :
+  Flag<["-"], "enable-experimental-diagnostic-formatting">,
+  HelpText<"Enable experimental diagnostic formatting features.">;
   
 def diagnostic_documentation_path
   : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
@@ -547,6 +551,9 @@ def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
 
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
+  
+def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
+  HelpText<"Verify all SubstitutionMaps on construction">;
 
 def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
   HelpText<"Do not eliminate functions in Mandatory Inlining/SILCombine dead "
@@ -677,4 +684,17 @@ def emit_ldadd_cfile_path
 def previous_module_installname_map_file
   : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
     HelpText<"Path to a Json file indicating module name to installname map for @_originallyDefinedIn">;
+
+def enable_type_layouts : Flag<["-"], "enable-type-layout">,
+  HelpText<"Enable type layout based lowering">;
+
+def disable_type_layouts : Flag<["-"], "disable-type-layout">,
+  HelpText<"Disable type layout based lowering">;
+
+def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
+  HelpText<"Don't lock interface file when building module">;
+
+def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
+    HelpText<"Directory for bridging header to be printed in compatibility header">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

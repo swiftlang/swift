@@ -52,28 +52,6 @@ SILValue swift::getUnderlyingObject(SILValue v) {
   }
 }
 
-/// Strip off casts and address projections into the interior of a value. Unlike
-/// getUnderlyingObject, this does not find the root of a heap object--a class
-/// property is itself an address root.
-SILValue swift::getUnderlyingAddressRoot(SILValue v) {
-  while (true) {
-    SILValue v2 = stripIndexingInsts(stripCasts(v));
-    v2 = stripOwnershipInsts(v2);
-    switch (v2->getKind()) {
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::UncheckedTakeEnumDataAddrInst:
-      v2 = cast<SingleValueInstruction>(v2)->getOperand(0);
-      break;
-    default:
-      break;
-    }
-    if (v2 == v)
-      return v2;
-    v = v2;
-  }
-}
-
 SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue v) {
   while (true) {
     SILValue v2 = stripCastsWithoutMarkDependence(v);
@@ -221,18 +199,6 @@ SILValue swift::stripClassCasts(SILValue v) {
     }
 
     return v;
-  }
-}
-
-SILValue swift::stripAddressAccess(SILValue V) {
-  while (true) {
-    switch (V->getKind()) {
-    default:
-      return V;
-    case ValueKind::BeginBorrowInst:
-    case ValueKind::BeginAccessInst:
-      V = cast<SingleValueInstruction>(V)->getOperand(0);
-    }
   }
 }
 

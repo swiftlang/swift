@@ -979,3 +979,29 @@ func test_correct_inference_of_closure_result_in_presence_of_optionals() {
     return;
   }
 }
+
+// rdar://problem/59741308 - inference fails with tuple element has to joined to supertype
+func rdar_59741308() {
+  class Base {
+    func foo(_: Int) {}
+  }
+
+  class A : Base {}
+  class B : Base {}
+
+  func test() {
+    // Note that `0`, and `1` here are going to be type variables
+    // which makes join impossible until it's already to late for
+    // it to be useful.
+    [(A(), 0), (B(), 1)].forEach { base, value in
+      base.foo(value) // Ok
+    }
+  }
+}
+
+func r60074136() {
+  func takesClosure(_ closure: ((Int) -> Void) -> Void) {}
+
+  takesClosure { ((Int) -> Void) -> Void in // expected-warning {{unnamed parameters must be written with the empty name '_'}}
+  }
+}

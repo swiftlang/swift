@@ -197,7 +197,15 @@ bool SILModule::isTypeABIAccessible(SILType type,
          "unexpected SIL lowered-only type with non-fixed layout");
 
   // Otherwise, we need to be able to fetch layout-metadata for the type.
-  return isTypeMetadataForLayoutAccessible(*this, type);
+  return isTypeMetadataForLayoutAccessible(type);
+}
+
+bool SILModule::isTypeMetadataForLayoutAccessible(SILType type) {
+  if (type.is<ReferenceStorageType>() || type.is<SILFunctionType>() ||
+      type.is<AnyMetatypeType>())
+    return false;
+
+  return ::isTypeMetadataForLayoutAccessible(*this, type);
 }
 
 bool AbstractStorageDecl::exportsPropertyDescriptor() const {

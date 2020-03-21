@@ -370,12 +370,14 @@ protected:
     ID : 32
   );
 
-  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+3+1+2,
+  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+3+1+2+1+1,
     ExtInfoBits : NumSILExtInfoBits,
     HasUncommonInfo : 1,
     CalleeConvention : 3,
     HasErrorResult : 1,
-    CoroutineKind : 2
+    CoroutineKind : 2,
+    HasInvocationSubs : 1,
+    HasPatternSubs : 1
   );
 
   SWIFT_INLINE_BITFIELD(AnyMetatypeType, TypeBase, 2,
@@ -787,6 +789,9 @@ public:
 
   /// Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
+  
+  /// Check if this is a nominal type defined at the top level of the Swift module
+  bool isStdlibType();
 
   /// If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
@@ -840,6 +845,10 @@ public:
   /// Return true if the specified type or a super-class/super-protocol has the
   /// @dynamicMemberLookup attribute on it.
   bool hasDynamicMemberLookupAttribute();
+  
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicCallable attribute on it.
+  bool hasDynamicCallableAttribute();
 
   /// Retrieve the superclass of this type.
   ///
@@ -899,14 +908,26 @@ public:
   /// Visit this type and the argument type in parallel, invoking the callback
   /// function with each archetype-to-substituted-type binding. The callback
   /// may return a new type to substitute into the result type, or return
-  /// CanType() to error out of the operation.
+  /// CanType() to error out of the operation. Each invocation of the callback
+  /// receives three arguments:
+  /// - The `orig` archetype from a position in `this` type.
+  /// - The `subst` type in the same structural position of `ty` that is trying to be bound
+  ///  to `orig`.
+  /// - The `upperBound` archetype, which if set, indicates the minimum set of constraints
+  ///  that any type substituted in this structural position must conform to. May be null,
+  ///  indicating an unconstrained context.
+  /// - If `upperBound` is set, then the `substConformances` array will contain the
+  ///  protocol conformances for `subst` to each of the protocol requirements
+  ///  on `upperBound` in `getConformsTo` order.
   ///
   /// Returns the substituted type, or a null CanType() if this type
   /// is not bindable to the substituted type, or the callback returns
   /// CanType().
   CanType substituteBindingsTo(Type ty,
-         llvm::function_ref<CanType(ArchetypeType*, CanType)> substFn);
-
+         llvm::function_ref<CanType(ArchetypeType *orig,
+                CanType subst,
+                ArchetypeType *upperBound,
+                ArrayRef<ProtocolConformanceRef> substConformances)> substFn);
   
   /// Determines whether this type is similar to \p other as defined by
   /// \p matchOptions.
@@ -1168,6 +1189,8 @@ public:
   /// object type.
   TypeTraitResult canBeClass();
 
+  Type replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const; // in SILType.cpp
+  
   /// Return the tangent space of the given type, if it exists. Otherwise,
   /// return `None`.
   Optional<TangentSpace>
@@ -3830,6 +3853,11 @@ public:
     return SILParameterInfo(type, getConvention(), getDifferentiability());
   }
 
+  /// Return a version of this parameter info with the convention replaced.
+  SILParameterInfo getWithConvention(ParameterConvention c) const {
+    return SILParameterInfo(getInterfaceType(), c, getDifferentiability());
+  }
+
   /// Transform this SILParameterInfo by applying the user-provided
   /// function to its type.
   ///
@@ -3838,6 +3866,20 @@ public:
   template<typename F>
   SILParameterInfo map(const F &fn) const {
     return getWithInterfaceType(fn(getInterfaceType()));
+  }
+
+  SILParameterInfo mapTypeOutOfContext() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+                                                  ->getCanonicalType());
+  }
+
+  /// Treating this parameter info as a component of the given function
+  /// type, apply any substitutions from the function type to it to
+  /// get a substituted version of it, as you would get from
+  /// SILFunctionType::getUnsubstitutedType.
+  SILParameterInfo getUnsubstituted(SILModule &M,
+                                    const SILFunctionType *fnType) const {
+    return getWithInterfaceType(getArgumentType(M, fnType));
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
@@ -3942,6 +3984,11 @@ public:
     return SILResultInfo(type, getConvention());
   }
 
+  /// Return a version of this result info with the convention replaced.
+  SILResultInfo getWithConvention(ResultConvention c) const {
+    return SILResultInfo(getInterfaceType(), c);
+  }
+
   // Does this result convention require indirect storage? This reflects a
   // SILFunctionType's formal (immutable) conventions, as opposed to the
   // transient SIL conventions that dictate SILValue types.
@@ -3962,6 +4009,20 @@ public:
     return getWithInterfaceType(fn(getInterfaceType()));
   }
 
+  SILResultInfo mapTypeOutOfContext() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+                                                  ->getCanonicalType());
+  }
+
+  /// Treating this result info as a component of the given function
+  /// type, apply any substitutions from the function type to it to
+  /// get a substituted version of it, as you would get from
+  /// SILFunctionType::getUnsubstitutedType.
+  SILResultInfo getUnsubstituted(SILModule &M,
+                                 const SILFunctionType *fnType) const {
+    return getWithInterfaceType(getReturnValueType(M, fnType));
+  }
+
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(TypeAndConvention.getOpaqueValue());
   }
@@ -3977,7 +4038,7 @@ public:
   }
 
   ValueOwnershipKind
-  getOwnershipKind(SILFunction &) const; // in SILType.cpp
+  getOwnershipKind(SILFunction &, CanSILFunctionType fTy) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;
@@ -4002,9 +4063,33 @@ public:
     return SILYieldInfo(type, getConvention());
   }
 
+  /// Return a version of this yield info with the convention replaced.
+  SILYieldInfo getWithConvention(YieldConvention c) const {
+    return SILYieldInfo(getInterfaceType(), c);
+  }
+
   template<typename F>
   SILYieldInfo map(const F &fn) const {
     return getWithInterfaceType(fn(getInterfaceType()));
+  }
+
+  SILYieldInfo mapTypeOutOfContext() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+                                                  ->getCanonicalType());
+  }
+
+  CanType getYieldValueType(SILModule &M,
+                            const SILFunctionType *fnType) const {
+    return getArgumentType(M, fnType);
+  }
+
+  /// Treating this yield info as a component of the given function
+  /// type, apply any substitutions from the function type to it to
+  /// get a substituted version of it, as you would get from
+  /// SILFunctionType::getUnsubstitutedType.
+  SILYieldInfo getUnsubstituted(SILModule &M,
+                                const SILFunctionType *fnType) const {
+    return getWithInterfaceType(getYieldValueType(M, fnType));
   }
 };
 
@@ -4044,7 +4129,8 @@ namespace Lowering {
 /// function parameter and result types.
 class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
     private llvm::TrailingObjects<SILFunctionType, SILParameterInfo,
-                                  SILResultInfo, SILYieldInfo, CanType> {
+                                  SILResultInfo, SILYieldInfo,
+                                  SubstitutionMap, CanType> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<SILParameterInfo>) const {
@@ -4061,6 +4147,11 @@ class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
 
   size_t numTrailingObjects(OverloadToken<CanType>) const {
     return hasResultCache() ? 2 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
+    return size_t(hasPatternSubstitutions())
+         + size_t(hasInvocationSubstitutions());
   }
 
 public:
@@ -4249,12 +4340,12 @@ private:
   //   SILResultInfo[isCoroutine() ? 0 : NumAnyResults]
   //   SILResultInfo?    // if hasErrorResult()
   //   SILYieldInfo[isCoroutine() ? NumAnyResults : 0]
+  //   SubstitutionMap[HasPatternSubs + HasInvocationSubs]
   //   CanType?          // if !isCoro && NumAnyResults > 1, formal result cache
   //   CanType?          // if !isCoro && NumAnyResults > 1, all result cache
 
-  llvm::PointerIntPair<CanGenericSignature, 1, bool> GenericSigAndIsImplied;
+  CanGenericSignature InvocationGenericSig;
   ProtocolConformanceRef WitnessMethodConformance;
-  SubstitutionMap Substitutions;
 
   MutableArrayRef<SILParameterInfo> getMutableParameters() {
     return {getTrailingObjects<SILParameterInfo>(), NumParameters};
@@ -4271,6 +4362,17 @@ private:
   SILResultInfo &getMutableErrorResult() {
     assert(hasErrorResult());
     return *(getTrailingObjects<SILResultInfo>() + getNumResults());
+  }
+
+  SubstitutionMap &getMutablePatternSubs() {
+    assert(hasPatternSubstitutions());
+    return *getTrailingObjects<SubstitutionMap>();
+  }
+
+  SubstitutionMap &getMutableInvocationSubs() {
+    assert(hasInvocationSubstitutions());
+    return *(getTrailingObjects<SubstitutionMap>()
+               + unsigned(hasPatternSubstitutions()));
   }
 
   /// Do we have slots for caches of the normal-result tuple type?
@@ -4296,7 +4398,8 @@ private:
                   ArrayRef<SILYieldInfo> yieldResults,
                   ArrayRef<SILResultInfo> normalResults,
                   Optional<SILResultInfo> errorResult,
-                  SubstitutionMap substitutions, bool genericSigIsImplied,
+                  SubstitutionMap patternSubs,
+                  SubstitutionMap invocationSubs,
                   const ASTContext &ctx, RecursiveTypeProperties properties,
                   ProtocolConformanceRef witnessMethodConformance);
 
@@ -4308,7 +4411,7 @@ public:
       ArrayRef<SILYieldInfo> interfaceYields,
       ArrayRef<SILResultInfo> interfaceResults,
       Optional<SILResultInfo> interfaceErrorResult,
-      SubstitutionMap substitutions, bool genericSigIsImplied,
+      SubstitutionMap patternSubs, SubstitutionMap invocationSubs,
       const ASTContext &ctx,
       ProtocolConformanceRef witnessMethodConformance =
           ProtocolConformanceRef());
@@ -4500,28 +4603,93 @@ public:
     return llvm::count_if(getParameters(), IndirectMutatingParameterFilter());
   }
 
-  /// Get the generic signature used to apply the substitutions of a substituted function type
+  /// Get the generic signature that the component types are specified
+  /// in terms of, if any.
   CanGenericSignature getSubstGenericSignature() const {
-    return GenericSigAndIsImplied.getPointer();
+    if (hasPatternSubstitutions())
+      return getPatternGenericSignature();
+    return getInvocationGenericSignature();
   }
+
+  /// Return the combined substitutions that need to be applied to the
+  /// component types to render their expected types in the context.
+  SubstitutionMap getCombinedSubstitutions() const {
+    if (hasPatternSubstitutions()) {
+      auto subs = getPatternSubstitutions();
+      if (hasInvocationSubstitutions())
+        subs = subs.subst(getInvocationSubstitutions());
+      return subs;
+    }
+    return getInvocationSubstitutions();
+  }
+
   /// Get the generic signature used by callers to invoke the function.
   CanGenericSignature getInvocationGenericSignature() const {
-    if (isGenericSignatureImplied()) {
-      return CanGenericSignature();
-    } else {
-      return getSubstGenericSignature();
-    }
+    return InvocationGenericSig;
   }
-                                    
-  bool isGenericSignatureImplied() const {
-    return GenericSigAndIsImplied.getInt();
+
+  bool hasInvocationSubstitutions() const {
+    return Bits.SILFunctionType.HasInvocationSubs;
   }
-  SubstitutionMap getSubstitutions() const {
-    return Substitutions;
+
+  /// Return the invocation substitutions.  The presence of invocation
+  /// substitutions means that this is an applied or contextualized generic
+  /// function type.
+  SubstitutionMap getInvocationSubstitutions() const {
+    return hasInvocationSubstitutions()
+             ? const_cast<SILFunctionType*>(this)->getMutableInvocationSubs()
+             : SubstitutionMap();
+  }
+
+  bool hasPatternSubstitutions() const {
+    return Bits.SILFunctionType.HasPatternSubs;
+  }
+
+  /// Return the generic signature which expresses the fine-grained
+  /// abstraction of this function.  See the explanation for
+  /// `getPatternSubstitutions`.
+  ///
+  /// The exact structure of this signature is an implementation detail
+  /// for many function types, and tools must be careful not to expose
+  /// it in ways that must be kept stable.  For example, ptrauth
+  /// discrimination does not distinguish between different generic
+  /// parameter types in this signature.
+  CanGenericSignature getPatternGenericSignature() const  {
+    return hasPatternSubstitutions()
+             ? CanGenericSignature(
+                 getPatternSubstitutions().getGenericSignature())
+             : CanGenericSignature();
+  }
+
+  /// Return the "pattern" substitutions.  The presence of pattern
+  /// substitutions means that the component types of this type are
+  /// abstracted in some additional way.
+  ///
+  /// For example, in the function:
+  ///
+  /// ```
+  ///   func consume<T>(producer: () -> T)
+  /// ```
+  ///
+  /// the argument function `producer` is abstracted differently from
+  /// a function of type `() -> Int`, even when `T` is concretely `Int`.
+  ///
+  /// Similarly, a protocol witness function that returns an `Int` might
+  /// return it differently if original requirement is abstract about its
+  /// return type.
+  ///
+  /// The most important abstraction differences are accounted for in
+  /// the structure and conventions of the function's component types,
+  /// but more subtle differences, like ptrauth discrimination, may
+  /// require more precise information.
+  SubstitutionMap getPatternSubstitutions() const {
+    return hasPatternSubstitutions()
+             ? const_cast<SILFunctionType*>(this)->getMutablePatternSubs()
+             : SubstitutionMap();
   }
 
   bool isPolymorphic() const {
-    return !getInvocationGenericSignature().isNull();
+    return getInvocationGenericSignature() && !getInvocationSubstitutions();
   }
 
   CanType getSelfInstanceType(SILModule &M) const;
@@ -4724,9 +4892,29 @@ public:
 
   bool isNoReturnFunction(SILModule &M) const; // Defined in SILType.cpp
                                     
-  /// Create a SILFunctionType with the same parameters, results, and attributes as this one, but with
-  /// a different set of substitutions.
-  CanSILFunctionType withSubstitutions(SubstitutionMap subs) const;
+  /// Create a SILFunctionType with the same structure as this one,
+  /// but with a different (or new) set of invocation substitutions.
+  /// The substitutions must have the same generic signature as this.
+  CanSILFunctionType
+  withInvocationSubstitutions(SubstitutionMap subs) const;
+
+  /// Create a SILFunctionType with the same structure as this one,
+  /// but with a different set of pattern substitutions.
+  /// This type must already have pattern substitutions, and they
+  /// must have the same signature as the new substitutions.
+  CanSILFunctionType
+  withPatternSubstitutions(SubstitutionMap subs) const;
+
+  /// Create a SILFunctionType with the same structure as this one,
+  /// but replacing the invocation generic signature and pattern
+  /// substitutions.  This type must either be polymorphic or have
+  /// pattern substitutions, and the substitution signature must
+  /// match `getSubstGenericSignature()`.
+  CanSILFunctionType
+  withPatternSpecialization(CanGenericSignature sign,
+                            SubstitutionMap subs,
+                            ProtocolConformanceRef witnessConformance =
+                              ProtocolConformanceRef()) const;
 
   class ABICompatibilityCheckResult {
     friend class SILFunctionType;
@@ -4790,18 +4978,19 @@ public:
   CanSILFunctionType getUnsubstitutedType(SILModule &M) const;
                                     
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getSubstGenericSignature(), getExtInfo(), getCoroutineKind(),
-            getCalleeConvention(), getParameters(), getYields(), getResults(),
+    Profile(ID, getInvocationGenericSignature(),
+            getExtInfo(), getCoroutineKind(), getCalleeConvention(),
+            getParameters(), getYields(), getResults(),
             getOptionalErrorResult(), getWitnessMethodConformanceOrInvalid(),
-            isGenericSignatureImplied(), getSubstitutions());
+            getPatternSubstitutions(), getInvocationSubstitutions());
   }
   static void
   Profile(llvm::FoldingSetNodeID &ID, GenericSignature genericSig, ExtInfo info,
           SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
           ArrayRef<SILParameterInfo> params, ArrayRef<SILYieldInfo> yields,
           ArrayRef<SILResultInfo> results, Optional<SILResultInfo> errorResult,
-          ProtocolConformanceRef conformance, bool isGenericSigImplied,
-          SubstitutionMap substitutions);
+          ProtocolConformanceRef conformance,
+          SubstitutionMap patternSub, SubstitutionMap invocationSubs);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 2630,
+  key.length: 2689,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -1623,6 +1623,28 @@
           key.attribute: source.decl.attribute.objc.name
         }
       ]
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.setter_accessibility: source.lang.swift.accessibility.internal,
+      key.name: "var_with_didset",
+      key.offset: 2631,
+      key.length: 57,
+      key.nameoffset: 2635,
+      key.namelength: 15,
+      key.bodyoffset: 2657,
+      key.bodylength: 30
+    },
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "print",
+      key.offset: 2669,
+      key.length: 15,
+      key.nameoffset: 2669,
+      key.namelength: 5,
+      key.bodyoffset: 2675,
+      key.bodylength: 8
     }
   ],
   key.diagnostics: [

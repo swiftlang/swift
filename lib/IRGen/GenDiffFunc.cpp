@@ -114,6 +114,11 @@ public:
     }
   }
 
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+  }
+
   llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
   llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
     return None;
@@ -250,6 +255,11 @@ public:
       cast<LoadableTypeInfo>(field.getTypeInfo())
           .addToAggLowering(IGM, lowering, fieldOffset);
     }
+  }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
   }
 
   llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }

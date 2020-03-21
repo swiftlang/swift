@@ -428,8 +428,14 @@ ERROR(operator_decl_inner_scope,none,
       "'operator' may only be declared at file scope", ())
 ERROR(expected_operator_name_after_operator,PointsToFirstBadToken,
       "expected operator name in operator declaration", ())
-ERROR(identifier_when_expecting_operator,PointsToFirstBadToken,
-      "%0 is considered to be an identifier, not an operator", (Identifier))
+ERROR(identifier_within_operator_name,PointsToFirstBadToken,
+      "'%0' is considered an identifier and must not "
+      "appear within an operator name", (StringRef))
+ERROR(operator_name_invalid_char,PointsToFirstBadToken,
+      "'%0' is not allowed in operator names", (StringRef))
+ERROR(postfix_operator_name_cannot_start_with_unwrap,PointsToFirstBadToken,
+      "postfix operator names starting with '?' or '!' are disallowed "
+      "to avoid collisions with built-in unwrapping operators", ())
 
 ERROR(deprecated_operator_body,PointsToFirstBadToken,
       "operator should no longer be declared with body", ())
@@ -824,7 +830,15 @@ ERROR(sil_box_expected_r_angle,none,
 ERROR(sil_function_subst_expected_l_angle,none,
       "expected '<' to begin SIL function type substitution list after 'for'", ())
 ERROR(sil_function_subst_expected_r_angle,none,
-      "expected '>' to begin SIL function type substitution list after 'for'", ())
+      "expected '>' to end SIL function type substitution list after 'for <...'", ())
+ERROR(sil_function_subst_expected_generics,none,
+      "expected '<' to begin substituted parameter list after '@substituted'", ())
+ERROR(sil_function_subst_expected_function,none,
+      "expected function type after '@substituted'", ())
+ERROR(sil_function_subst_expected_subs,none,
+      "expected 'for' to begin substitutions after '@substituted' function type", ())
+ERROR(sil_function_subs_without_generics,none,
+      "unexpected 'for' to begin substitutions after non-generic function type", ())
 
 // Opaque types
 ERROR(opaque_mid_composition,none,
@@ -1665,10 +1679,9 @@ ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
-ERROR(where_without_generic_params,none,
-      "'where' clause cannot be attached to "
-      "%select{a non-generic|a protocol|an associated type}0 "
-      "declaration", (unsigned))
+ERROR(where_toplevel_nongeneric,none,
+      "'where' clause cannot be attached to non-generic "
+      "top-level declaration", ())
 ERROR(where_inside_brackets,none,
         "'where' clause next to generic parameters is obsolete, "
         "must be written following the declaration's type", ())

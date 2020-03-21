@@ -133,8 +133,9 @@ def prepareForIncrParse(test_file, test_case, pre_edit_file, post_edit_file,
 
 def serializeIncrParseMarkupFile(test_file, test_case, mode,
                                  serialization_mode, serialization_format,
-                                 omit_node_ids, output_file, temp_dir,
-                                 swift_syntax_test, print_visual_reuse_info):
+                                 omit_node_ids, output_file, diags_output_file,
+                                 temp_dir, swift_syntax_test,
+                                 print_visual_reuse_info):
     test_file_name = os.path.basename(test_file)
     pre_edit_file = temp_dir + '/' + test_file_name + '.' + test_case + \
         '.pre.swift'
@@ -170,6 +171,9 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
             '-serialize-raw-tree',
             '-output-filename', output_file
         ]
+
+        if diags_output_file:
+            command.extend(['-diags-output-filename', diags_output_file])
 
         if omit_node_ids:
             command.extend(['-omit-node-ids'])
@@ -320,6 +324,7 @@ def main():
                                      serialization_format=serialization_format,
                                      omit_node_ids=omit_node_ids,
                                      output_file=output_file,
+                                     diags_output_file=None,
                                      temp_dir=temp_dir,
                                      swift_syntax_test=swift_syntax_test,
                                      print_visual_reuse_info=visual_reuse_info)

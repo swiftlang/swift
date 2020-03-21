@@ -37,10 +37,11 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   return fn;
 }
 
-void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
-                                               DeclAttributes &Attrs,
-                                               SILModule &M,
-                                               SILDeclRef constant) {
+void SILFunctionBuilder::addFunctionAttributes(
+    SILFunction *F, DeclAttributes &Attrs, SILModule &M,
+    llvm::function_ref<SILFunction *(SILLocation loc, SILDeclRef constant)>
+        getOrCreateDeclaration,
+    SILDeclRef constant) {
 
   for (auto *A : Attrs.getAttributes<SemanticsAttr>())
     F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
@@ -115,8 +116,7 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
     return;
 
   SILDeclRef declRef(replacedDecl, constant.kind, false);
-  auto *replacedFunc =
-      getOrCreateFunction(replacedDecl, declRef, NotForDefinition);
+  auto *replacedFunc = getOrCreateDeclaration(replacedDecl, declRef);
 
   assert(replacedFunc->getLoweredFunctionType() ==
              F->getLoweredFunctionType() ||
@@ -125,10 +125,11 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
   F->setDynamicallyReplacedFunction(replacedFunc);
 }
 
-SILFunction *
-SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
-                                        ForDefinition_t forDefinition,
-                                        ProfileCounter entryCount) {
+SILFunction *SILFunctionBuilder::getOrCreateFunction(
+    SILLocation loc, SILDeclRef constant, ForDefinition_t forDefinition,
+    llvm::function_ref<SILFunction *(SILLocation loc, SILDeclRef constant)>
+        getOrCreateDeclaration,
+    ProfileCounter entryCount) {
   auto nameTmp = constant.mangle();
   auto constantType = mod.Types.getConstantFunctionType(
       TypeExpansionContext::minimal(), constant);
@@ -179,7 +180,9 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
                                 inlineStrategy, EK);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
 
-  F->setGlobalInit(constant.isGlobal());
+  if (constant.isGlobal())
+    F->setSpecialPurpose(SILFunction::Purpose::GlobalInit);
+
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
 
@@ -192,9 +195,26 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
       // Add attributes for e.g. computed properties.
-      addFunctionAttributes(F, storage->getAttrs(), mod);
+      addFunctionAttributes(F, storage->getAttrs(), mod,
+                            getOrCreateDeclaration);
+                            
+      auto *varDecl = dyn_cast<VarDecl>(storage);
+      if (varDecl && varDecl->getAttrs().hasAttribute<LazyAttr>() &&
+          accessor->getAccessorKind() == AccessorKind::Get) {
+        F->setSpecialPurpose(SILFunction::Purpose::LazyPropertyGetter);
+        
+        // Lazy property getters should not get inlined because they are usually
+        // non-tivial functions (otherwise the user would not implement it as
+        // lazy property). Inlining such getters would most likely not benefit
+        // other optimizations because the top-level switch_enum cannot be
+        // constant folded in most cases.
+        // Also, not inlining lazy property getters enables optimizing them in
+        // CSE.
+        F->setInlineStrategy(NoInline);
+      }
     }
-    addFunctionAttributes(F, decl->getAttrs(), mod, constant);
+    addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
+                          constant);
   }
 
   return F;

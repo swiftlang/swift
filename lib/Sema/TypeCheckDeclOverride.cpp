@@ -163,14 +163,17 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   //
   // We can still succeed with a subtype match later in
   // OverrideMatcher::match().
-  auto declGenericCtx = decl->getAsGenericContext();
-  auto &ctx = decl->getASTContext();
-  auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
+  if (decl->getDeclContext()->getSelfClassDecl()) {
+    if (auto declGenericCtx = decl->getAsGenericContext()) {
+      auto &ctx = decl->getASTContext();
+      auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
 
-  if (sig && declGenericCtx &&
-      declGenericCtx->getGenericSignature().getCanonicalSignature() !=
-          sig.getCanonicalSignature()) {
-    return false;
+      if (sig &&
+          declGenericCtx->getGenericSignature().getCanonicalSignature() !=
+              sig.getCanonicalSignature()) {
+        return false;
+      }
+    }
   }
 
   // If this is a constructor, let's compare only parameter types.
@@ -689,9 +692,6 @@ static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
         overrides = false;
         break;
       }
-      if (!derivedParameters && !baseParameters) {
-        assert(false);
-      }
     }
     if (overrides)
       return true;
@@ -1063,21 +1063,23 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     emittedMatchError = true;
   }
 
-  auto baseGenericCtx = baseDecl->getAsGenericContext();
-  auto derivedGenericCtx = decl->getAsGenericContext();
+  if (isClassOverride()) {
+    auto baseGenericCtx = baseDecl->getAsGenericContext();
+    auto derivedGenericCtx = decl->getAsGenericContext();
 
-  using Direction = ASTContext::OverrideGenericSignatureReqCheck;
-  if (baseGenericCtx && derivedGenericCtx) {
-    if (!ctx.overrideGenericSignatureReqsSatisfied(
-            baseDecl, decl, Direction::DerivedReqSatisfiedByBase)) {
-      auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl);
-      diags.diagnose(decl, diag::override_method_different_generic_sig,
-                     decl->getBaseName(),
-                     derivedGenericCtx->getGenericSignature()->getAsString(),
-                     baseGenericCtx->getGenericSignature()->getAsString(),
-                     newSig->getAsString());
-      diags.diagnose(baseDecl, diag::overridden_here);
-      emittedMatchError = true;
+    using Direction = ASTContext::OverrideGenericSignatureReqCheck;
+    if (baseGenericCtx && derivedGenericCtx) {
+      if (!ctx.overrideGenericSignatureReqsSatisfied(
+              baseDecl, decl, Direction::DerivedReqSatisfiedByBase)) {
+        auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl);
+        diags.diagnose(decl, diag::override_method_different_generic_sig,
+                       decl->getBaseName(),
+                       derivedGenericCtx->getGenericSignature()->getAsString(),
+                       baseGenericCtx->getGenericSignature()->getAsString(),
+                       newSig->getAsString());
+        diags.diagnose(baseDecl, diag::overridden_here);
+        emittedMatchError = true;
+      }
     }
   }
 
@@ -1774,7 +1776,11 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     bool baseCanBeObjC = canBeRepresentedInObjC(base);
     diags.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
                    !isa<ExtensionDecl>(base->getDeclContext()));
-    if (baseCanBeObjC) {
+    // If the base and the override come from the same module, try to fix
+    // the base declaration. Otherwise we can wind up diagnosing into e.g. the
+    // SDK overlay modules.
+    if (baseCanBeObjC &&
+        base->getModuleContext() == override->getModuleContext()) {
       SourceLoc insertionLoc =
         override->getAttributeInsertionLoc(/*forModifier=*/false);
       diags.diagnose(base, diag::overridden_here_can_be_objc)

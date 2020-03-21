@@ -33,7 +33,7 @@ class SearchPathOptions;
 class DependencyTracker;
 
 class ModuleInterfaceBuilder {
-  llvm::vfs::FileSystem &fs;
+  SourceManager &sourceMgr;
   DiagnosticEngine &diags;
   const StringRef interfacePath;
   const StringRef moduleName;
@@ -42,10 +42,24 @@ class ModuleInterfaceBuilder {
   const bool serializeDependencyHashes;
   const bool trackSystemDependencies;
   const bool remarkOnRebuildFromInterface;
+  const bool disableInterfaceFileLock;
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
   CompilerInvocation subInvocation;
   SmallVector<StringRef, 3> extraDependencies;
+
+  /// Emit a diagnostic tied to this declaration.
+  template<typename ...ArgTypes>
+  InFlightDiagnostic diagnose(
+      Diag<ArgTypes...> ID,
+      typename detail::PassArgument<ArgTypes>::type... Args) const {
+    SourceLoc loc = diagnosticLoc;
+    if (loc.isInvalid()) {
+      // Diagnose this inside the interface file, if possible.
+      loc = sourceMgr.getLocFromExternalSource(interfacePath, 1, 1);
+    }
+    return diags.diagnose(loc, ID, std::move(Args)...);
+  }
 
   void configureSubInvocationInputsAndOutputs(StringRef OutPath);
 
@@ -65,8 +79,8 @@ class ModuleInterfaceBuilder {
       bool IsHashBased);
 
   bool extractSwiftInterfaceVersionAndArgs(
-      version::Version &Vers, llvm::StringSaver &SubArgSaver,
-      SmallVectorImpl<const char *> &SubArgs);
+      version::Version &Vers, StringRef &CompilerVersion,
+      llvm::StringSaver &SubArgSaver, SmallVectorImpl<const char *> &SubArgs);
 
   bool buildSwiftModuleInternal(StringRef OutPath, bool ShouldSerializeDeps,
                                 std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer);
@@ -82,14 +96,16 @@ public:
                             bool serializeDependencyHashes = false,
                             bool trackSystemDependencies = false,
                             bool remarkOnRebuildFromInterface = false,
+                            bool disableInterfaceFileLock = false,
                             SourceLoc diagnosticLoc = SourceLoc(),
                             DependencyTracker *tracker = nullptr)
-    : fs(*sourceMgr.getFileSystem()), diags(diags),
+    : sourceMgr(sourceMgr), diags(diags),
       interfacePath(interfacePath), moduleName(moduleName),
       moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
       serializeDependencyHashes(serializeDependencyHashes),
       trackSystemDependencies(trackSystemDependencies),
       remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
+      disableInterfaceFileLock(disableInterfaceFileLock),
       diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {
     configureSubInvocation(searchPathOpts, langOpts, clangImporter);
   }

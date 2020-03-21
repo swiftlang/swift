@@ -34,6 +34,7 @@
 #include "swift/Basic/LLVM.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/Sema/Sema.h"
 
 using namespace swift;

@@ -19,6 +19,7 @@
 
 #include "swift/AST/AutoDiff.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILBuilder.h"
 
 namespace swift {
 
@@ -112,6 +113,13 @@ getOrCreateSubsetParametersThunkForLinearMap(
     CanSILFunctionType origFnType, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
     SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
+
+/// Reabstracts the given function-typed value `fn` to the target type `toType`.
+/// Remaps substitutions using `remapSubstitutions`.
+SILValue reabstractFunction(
+    SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
+    SILValue fn, CanSILFunctionType toType,
+    std::function<SubstitutionMap(SubstitutionMap)> remapSubstitutions);
 
 } // end namespace autodiff
 

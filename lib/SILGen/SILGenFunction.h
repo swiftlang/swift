@@ -530,6 +530,13 @@ public:
     return F.getTypeLowering(type);
   }
 
+  SILType getSILInterfaceType(SILParameterInfo param) const {
+    return silConv.getSILType(param, CanSILFunctionType());
+  }
+  SILType getSILInterfaceType(SILResultInfo result) const {
+    return silConv.getSILType(result, CanSILFunctionType());
+  }
+
   SILType getSILType(SILParameterInfo param, CanSILFunctionType fnTy) const {
     return silConv.getSILType(param, fnTy);
   }
@@ -645,9 +652,6 @@ public:
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
                                   CleanupLocation cleanupLoc);
 
-  /// Generates code for a curry thunk from one uncurry level
-  /// of a function to another.
-  void emitCurryThunk(SILDeclRef thunk);
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to the conventions.
@@ -1507,6 +1511,7 @@ public:
   RValue emitApplyOfPropertyWrapperBackingInitializer(
       SILLocation loc,
       VarDecl *var,
+      SubstitutionMap subs,
       RValue &&originalValue,
       SGFContext C = SGFContext());
 
@@ -1770,9 +1775,19 @@ public:
                                     AbstractionPattern origType,
                                     CanType substType,
                                     SGFContext ctx = SGFContext());
+  ManagedValue emitOrigToSubstValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern origType,
+                                    CanType substType,
+                                    SILType loweredResultTy,
+                                    SGFContext ctx = SGFContext());
   RValue emitOrigToSubstValue(SILLocation loc, RValue &&input,
                               AbstractionPattern origType,
                               CanType substType,
+                              SGFContext ctx = SGFContext());
+  RValue emitOrigToSubstValue(SILLocation loc, RValue &&input,
+                              AbstractionPattern origType,
+                              CanType substType,
+                              SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
   /// Convert a value with the abstraction patterns of the substituted
@@ -1784,6 +1799,16 @@ public:
   RValue emitSubstToOrigValue(SILLocation loc, RValue &&input,
                               AbstractionPattern origType,
                               CanType substType,
+                              SGFContext ctx = SGFContext());
+  ManagedValue emitSubstToOrigValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern origType,
+                                    CanType substType,
+                                    SILType loweredResultTy,
+                                    SGFContext ctx = SGFContext());
+  RValue emitSubstToOrigValue(SILLocation loc, RValue &&input,
+                              AbstractionPattern origType,
+                              CanType substType,
+                              SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
   /// Transform the AST-level types in the function signature without an
@@ -1799,12 +1824,14 @@ public:
                                     CanType inputSubstType,
                                     AbstractionPattern outputOrigType,
                                     CanType outputSubstType,
+                                    SILType loweredResultTy,
                                     SGFContext ctx = SGFContext());
   RValue emitTransformedValue(SILLocation loc, RValue &&input,
                               AbstractionPattern inputOrigType,
                               CanType inputSubstType,
                               AbstractionPattern outputOrigType,
                               CanType outputSubstType,
+                              SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
   /// Used for emitting SILArguments of bare functions, such as thunks.

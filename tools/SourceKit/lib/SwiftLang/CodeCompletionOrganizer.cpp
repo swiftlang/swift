@@ -398,15 +398,15 @@ static StringRef copyString(llvm::BumpPtrAllocator &allocator, StringRef str) {
 
 static std::unique_ptr<Group> make_group(StringRef name) {
   auto g = std::make_unique<Group>();
-  g->name = name;
-  g->description = name;
+  g->name = name.str();
+  g->description = name.str();
   return g;
 }
 
 static std::unique_ptr<Result> make_result(Completion *result) {
   auto r = std::make_unique<Result>(result);
-  r->name = result->getName();
-  r->description = result->getDescription();
+  r->name = result->getName().str();
+  r->description = result->getDescription().str();
   return r;
 }
 

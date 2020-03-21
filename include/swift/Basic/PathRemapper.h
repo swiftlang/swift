@@ -39,7 +39,7 @@ public:
   /// Adds a mapping such that any paths starting with `FromPrefix` have that
   /// portion replaced with `ToPrefix`.
   void addMapping(StringRef FromPrefix, StringRef ToPrefix) {
-    PathMappings.emplace_back(FromPrefix, ToPrefix);
+    PathMappings.emplace_back(FromPrefix.str(), ToPrefix.str());
   }
 
   /// Returns a remapped `Path` if it starts with a prefix in the map; otherwise

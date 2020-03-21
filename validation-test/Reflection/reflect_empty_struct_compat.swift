@@ -1,16 +1,13 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -lswiftSwiftReflectionTest -I %S/Inputs/EmptyStruct/ %s -o %t/reflect_empty_struct -target x86_64-apple-macosx10.15.0
-// RUN: %target-codesign %t/reflect_empty_struct
-// RUN: %target-run %target-swift-reflection-test %t/reflect_empty_struct | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --dump-input fail
-
-// RUN: %target-build-swift -lswiftSwiftReflectionTest -I %S/Inputs/EmptyStruct/ %s -o %t/reflect_empty_struct -target x86_64-apple-macosx10.14.0
+// RUN: %target-build-swift -lswiftSwiftReflectionTest -I %S/Inputs/EmptyStruct/ %s -o %t/reflect_empty_struct
 // RUN: %target-codesign %t/reflect_empty_struct
 // RUN: %target-run %target-swift-reflection-test %t/reflect_empty_struct | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --dump-input fail
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
+// UNSUPPORTED: use_os_stdlib
 
 import SwiftReflectionTest
 

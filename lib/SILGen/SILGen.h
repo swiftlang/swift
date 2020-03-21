@@ -131,6 +131,9 @@ public:
 
   ASTContext &getASTContext() { return M.getASTContext(); }
 
+  llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>
+    MagicFileStringsByFilePath;
+
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
   
@@ -307,9 +310,6 @@ public:
   /// Emits default argument generators for the given parameter list.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                 ParameterList *paramList);
-
-  /// Emits the curry thunk between two uncurry levels of a function.
-  void emitCurryThunk(SILDeclRef thunk);
   
   /// Emits a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);

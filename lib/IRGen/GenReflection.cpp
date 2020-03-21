@@ -982,8 +982,11 @@ public:
                            SubstitutionMap Subs,
                            const HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM),
-      OrigCalleeType(OrigCalleeType),
-      SubstCalleeType(SubstCalleeType), Subs(Subs),
+      // TODO: Preserve substitutions, since they may affect representation in
+      // the box
+      OrigCalleeType(OrigCalleeType->getUnsubstitutedType(IGM.getSILModule())),
+      SubstCalleeType(SubstCalleeType->getUnsubstitutedType(IGM.getSILModule())),
+      Subs(Subs),
       Layout(Layout) {}
 
   using MetadataSourceMap
@@ -1128,9 +1131,17 @@ public:
           return t;
         })->getCanonicalType();
       }
+      
+      // TODO: We should preserve substitutions in SILFunctionType captures
+      // once the runtime MetadataReader can understand them, since they can
+      // affect representation.
+      //
+      // For now, eliminate substitutions from the capture representation.
+      SwiftType =
+        SwiftType->replaceSubstitutedSILFunctionTypesWithUnsubstituted(IGM.getSILModule())
+                 ->getCanonicalType();
 
-      CaptureTypes.push_back(
-          SILType::getPrimitiveObjectType(SwiftType->getCanonicalType()));
+      CaptureTypes.push_back(SILType::getPrimitiveObjectType(SwiftType));
     }
 
     return CaptureTypes;
@@ -1145,7 +1156,7 @@ public:
     B.addInt32(Layout.getBindings().size());
 
     auto sig =
-        OrigCalleeType->getSubstGenericSignature().getCanonicalSignature();
+      OrigCalleeType->getInvocationGenericSignature().getCanonicalSignature();
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
@@ -1193,7 +1204,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     OS << "__TEXT,__swift5_" << LongName << ", regular, no_dead_strip";
     break;
   }
-  return OS.str();
+  return std::string(OS.str());
 }
 
 const char *IRGenModule::getFieldTypeMetadataSectionName() {

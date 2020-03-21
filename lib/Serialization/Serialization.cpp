@@ -2205,7 +2205,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_RestatedObjCConformance:
     case DAK_ClangImporterSynthesizedType:
     case DAK_PrivateImport:
-    case DAK_TypeEraser:
       llvm_unreachable("cannot serialize attribute");
 
     case DAK_Count:
@@ -2393,6 +2392,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DynamicReplacementDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, false, /*implicit flag*/
           S.addDeclRef(afd), pieces.size(), pieces);
+      return;
+    }
+
+    case DAK_TypeEraser: {
+      auto abbrCode = S.DeclTypeAbbrCodes[TypeEraserDeclAttrLayout::Code];
+      auto attr = cast<TypeEraserAttr>(DA);
+      auto typeEraser = attr->getTypeEraserLoc().getType();
+      TypeEraserDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                           attr->isImplicit(),
+                                           S.addTypeRef(typeEraser));
       return;
     }
 
@@ -4217,8 +4226,12 @@ public:
       variableData.push_back(TypeID(conv));
     }
 
-    auto sigID = S.addGenericSignatureRef(fnTy->getSubstGenericSignature());
-    auto substMapID = S.addSubstitutionMapRef(fnTy->getSubstitutions());
+    auto invocationSigID =
+      S.addGenericSignatureRef(fnTy->getInvocationGenericSignature());
+    auto invocationSubstMapID =
+      S.addSubstitutionMapRef(fnTy->getInvocationSubstitutions());
+    auto patternSubstMapID =
+      S.addSubstitutionMapRef(fnTy->getPatternSubstitutions());
     auto clangTypeID = S.addClangTypeRef(fnTy->getClangFunctionType());
 
     auto stableCoroutineKind =
@@ -4237,8 +4250,8 @@ public:
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
-        fnTy->isGenericSignatureImplied(),
-        sigID, substMapID, clangTypeID, variableData);
+        invocationSigID, invocationSubstMapID, patternSubstMapID,
+        clangTypeID, variableData);
 
     if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
       S.writeConformance(conformance, S.DeclTypeAbbrCodes);

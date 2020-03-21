@@ -152,7 +152,7 @@ public struct Int64 : ExpressibleByIntegerLiteral, _ExpressibleByBuiltinIntegerL
 
 // Test ownership of multi-case Enum values in the context of to @in thunks.
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed FloatingPointSign, @in_guaranteed FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW :
 // CHECK: bb0(%0 : $FloatingPointSign, %1 : $FloatingPointSign, %2 : $@thick FloatingPointSign.Type):
 // CHECK:   %3 = function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
 // CHECK:   %4 = apply %3<FloatingPointSign>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool

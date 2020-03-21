@@ -324,11 +324,11 @@ bb1:
   %6 = alloc_stack $UnfoldSequence<Element, State>
   copy_addr %1 to [initialization] %6 : $*UnfoldSequence<Element, State>
   %8 = struct_element_addr %6 : $*UnfoldSequence<Element, State>, #UnfoldSequence._next
-  %9 = load %8 : $*@callee_guaranteed (@inout State) -> @out Optional<Element>
+  %9 = load %8 : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @out Optional<τ_0_1> for <State, Element>
   %10 = alloc_stack $Optional<Element>
   %11 = struct_element_addr %1 : $*UnfoldSequence<Element, State>, #UnfoldSequence._state
-  strong_retain %9 : $@callee_guaranteed (@inout State) -> @out Optional<Element>
-  %13 = apply %9(%10, %11) : $@callee_guaranteed (@inout State) -> @out Optional<Element>
+  strong_retain %9 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @out Optional<τ_0_1> for <State, Element>
+  %13 = apply %9(%10, %11) : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @out Optional<τ_0_1> for <State, Element>
   switch_enum_addr %10 : $*Optional<Element>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb2
 
 bb2:
@@ -654,4 +654,20 @@ bb0(%0 : $*Builtin.NativeObject):
   dealloc_stack %stk : $*Builtin.NativeObject
   %v = tuple ()
   return %v : $()
+}
+
+// CHECK-LABEL: sil @eliminate_fix_lifetime_on_dest_copyaddr : $@convention(thin) (@inout Klass) -> () {
+// CHECK-NOT: alloc_stack
+// CHECK: fix_lifetime %0
+// CHECK-NOT: alloc_stack
+// CHECK: } // end sil function 'eliminate_fix_lifetime_on_dest_copyaddr'
+sil @eliminate_fix_lifetime_on_dest_copyaddr : $@convention(thin) (@inout Klass) -> () {
+bb0(%0 : $*Klass):
+  %3 = alloc_stack $Klass
+  copy_addr %0 to [initialization] %3 : $*Klass
+  fix_lifetime %3 : $*Klass
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
 }

@@ -68,6 +68,12 @@ static bool isUnmapped(ASTNode N) {
         LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit closure expr\n");
         return true;
       }
+
+      if (isa<AutoClosureExpr>(CE) &&
+          cast<AutoClosureExpr>(CE)->getThunkKind() != AutoClosureExpr::Kind::None) {
+        LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: curry thunk expr\n");
+        return true;
+      }
     }
 
     // Map all other kinds of expressions.
@@ -1076,10 +1082,14 @@ public:
       pushRegion(E);
     }
 
-    if (auto *IE = dyn_cast<IfExpr>(E)) {
-      CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
-      assignCounter(IE->getElseExpr(),
-                    CounterExpr::Sub(getCurrentCounter(), ThenCounter));
+    // If there isn't an active region, we may be visiting a default
+    // initializer for a function argument.
+    if (!RegionStack.empty()) {
+      if (auto *IE = dyn_cast<IfExpr>(E)) {
+        CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
+        assignCounter(IE->getElseExpr(),
+                      CounterExpr::Sub(getCurrentCounter(), ThenCounter));
+      }
     }
 
     if (hasCounter(E) && !Parent.isNull())

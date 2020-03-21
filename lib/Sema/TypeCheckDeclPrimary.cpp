@@ -1166,17 +1166,22 @@ namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
   ASTContext &Ctx;
+  SourceFile *SF;
 
-  explicit DeclChecker(ASTContext &ctx) : Ctx(ctx) {}
+  explicit DeclChecker(ASTContext &ctx, SourceFile *SF) : Ctx(ctx), SF(SF) {}
 
   ASTContext &getASTContext() const { return Ctx; }
+  void addDelayedFunction(AbstractFunctionDecl *AFD) {
+    if (!SF) return;
+    SF->DelayedFunctions.push_back(AFD);
+  }
 
   void visit(Decl *decl) {
-    if (getASTContext().Stats)
-      getASTContext().Stats->getFrontendCounters().NumDeclsTypechecked++;
+    if (auto *Stats = getASTContext().Stats)
+      Stats->getFrontendCounters().NumDeclsTypechecked++;
 
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "typecheck-decl",
-                                    decl);
+    FrontendStatsTracer StatsTracer(getASTContext().Stats,
+                                    "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
@@ -1231,6 +1236,10 @@ public:
   
   void visitImportDecl(ImportDecl *ID) {
     TypeChecker::checkDeclAttributes(ID);
+
+    // Force the lookup of decls referenced by a scoped import in case it emits
+    // diagnostics.
+    (void)ID->getDecls();
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
@@ -1381,7 +1390,7 @@ public:
     TypeChecker::checkDeclAttributes(PBD);
 
     bool isInSILMode = false;
-    if (auto sourceFile = DC->getParentSourceFile())
+    if (auto sourceFile = SF)
       isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
     bool isTypeContext = DC->isTypeContext();
 
@@ -1439,7 +1448,7 @@ public:
         // protocol.
         if (var->isStatic() && !isa<ProtocolDecl>(DC)) {
           // ...but don't enforce this for SIL or module interface files.
-          switch (DC->getParentSourceFile()->Kind) {
+          switch (SF->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
             return;
@@ -1457,7 +1466,7 @@ public:
 
         // Global variables require an initializer in normal source files.
         if (DC->isModuleScopeContext()) {
-          switch (DC->getParentSourceFile()->Kind) {
+          switch (SF->Kind) {
           case SourceFileKind::Main:
           case SourceFileKind::REPL:
           case SourceFileKind::Interface:
@@ -1990,7 +1999,6 @@ public:
     // Check for circular inheritance within the protocol.
     (void)PD->hasCircularInheritedProtocols();
 
-    auto *SF = PD->getParentSourceFile();
     if (SF) {
       if (auto *tracker = SF->getReferencedNameTracker()) {
         bool isNonPrivate = (PD->getFormalAccess() > AccessLevel::FilePrivate);
@@ -2146,9 +2154,7 @@ public:
     } else if (shouldSkipBodyTypechecking(FD)) {
       FD->setBodySkipped(FD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(FD);
+      addDelayedFunction(FD);
     }
 
     checkExplicitAvailability(FD);
@@ -2480,9 +2486,7 @@ public:
     } else if (shouldSkipBodyTypechecking(CD)) {
       CD->setBodySkipped(CD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(CD);
+      addDelayedFunction(CD);
     }
 
     checkDefaultArguments(CD->getParameters());
@@ -2497,14 +2501,13 @@ public:
     } else if (shouldSkipBodyTypechecking(DD)) {
       DD->setBodySkipped(DD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(DD);
+      addDelayedFunction(DD);
     }
   }
 };
 } // end anonymous namespace
 
 void TypeChecker::typeCheckDecl(Decl *D) {
-  DeclChecker(D->getASTContext()).visit(D);
+  auto *SF = D->getDeclContext()->getParentSourceFile();
+  DeclChecker(D->getASTContext(), SF).visit(D);
 }

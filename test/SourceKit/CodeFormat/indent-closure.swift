@@ -9,8 +9,8 @@ func foo() {
 }
 
 class C {
-  private static let durationTimeFormatter: NSDateComponentsFormatter = {
-		return timeFormatter
+    private static let durationTimeFormatter: NSDateComponentsFormatter = {
+		    return timeFormatter
 }()
 }
 
@@ -18,9 +18,9 @@ func foo1(a: Int, handler : () -> ()) {}
 func foo2(handler : () -> ()) {}
 
 func foo3() {
-  foo1(1)
-    {
-  }
+    foo1(1)
+      {
+    }
 }
 
 func foo4() {
@@ -37,19 +37,19 @@ func foo5(input: Int, block: (Int) -> ()) -> Int {
 }
 
 func foo6() {
-  _ = foo5(input: 0, block: { [unowned self] blockInput in
-    foo4()
-  })
+    _ = foo5(input: 0, block: { [unowned self] blockInput in
+        foo4()
+    })
 }
 
 func foo7(A: ()->(), B: ()->()) {}
 
 func foo8() {
-  foo7(A: { _ in
-    print("hello")
-}, B: {
-    print("world")
-  })
+    foo7(A: { _ in
+        print("hello")
+        }, B: {
+        print("world")
+    })
 }
 
 func foo9(input: [Int]){
@@ -70,7 +70,7 @@ func foo10() {
 func foo11() {
     VStack {
     }
-        .onAppear {
+.onAppear {
     }
 }
 
@@ -130,10 +130,10 @@ func foo12() {
 // CHECK: key.sourcetext: "        }()"
 // CHECK: key.sourcetext: "    }"
 
-//                        "  private static let durationTimeFormatter: NSDateComponentsFormatter = {"
-// CHECK: key.sourcetext: "  }()"
-//                        "  foo1(1)"
-// CHECK: key.sourcetext: "  {"
+//                        "    private static let durationTimeFormatter: NSDateComponentsFormatter = {"
+// CHECK: key.sourcetext: "    }()"
+//                        "    foo1(1)"
+// CHECK: key.sourcetext: "    {"
 
 // CHECK: key.sourcetext: "    test = {"
 // CHECK: key.sourcetext: "        return 0"
@@ -144,9 +144,9 @@ func foo12() {
 // CHECK: key.sourcetext: "        return 0"
 // CHECK: key.sourcetext: "    }()"
 
-// CHECK: key.sourcetext: "  })"
+// CHECK: key.sourcetext: "    })"
 
-// CHECK: key.sourcetext: "  }, B: {"
+// CHECK: key.sourcetext: "    }, B: {"
 
 // CHECK: key.sourcetext: "func foo9(input: [Int]){"
 // CHECK: key.sourcetext: "    input.map { (ele) in"
@@ -165,5 +165,5 @@ func foo12() {
 // CHECK: key.sourcetext: "    .onAppear1()"
 // CHECK: key.sourcetext: "    .onAppear2() {}"
 // CHECK: key.sourcetext: "    .onAppear3() {"
-// CHECK: key.sourcetext: "    }"
+// CHECK: key.sourcetext: "        }"
 // CHECK: key.sourcetext: "    .onAppear4() {}"

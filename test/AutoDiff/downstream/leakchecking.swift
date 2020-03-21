@@ -530,8 +530,8 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithNestedLoop") {
     }
     return outer
   }
-  expectEqual((0.5, -0.25), valueWithGradient(at: 2, in: nested_loop))
-  expectEqual((0.25, -0.0625), valueWithGradient(at: 4, in: nested_loop))
+  expectEqual((Tracked<Float>(0.5), Tracked<Float>(-0.25)), valueWithGradient(at: 2, in: nested_loop))
+  expectEqual((Tracked<Float>(0.25), Tracked<Float>(-0.0625)), valueWithGradient(at: 4, in: nested_loop))
 }
 
 LeakCheckingTests.testWithLeakChecking("ControlFlowWithNestedTuples") {

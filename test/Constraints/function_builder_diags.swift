@@ -1,7 +1,12 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking
 
+enum Either<T,U> {
+  case first(T)
+  case second(U)
+}
+
 @_functionBuilder
-struct TupleBuilder { // expected-note 2{{struct 'TupleBuilder' declared here}}
+struct TupleBuilder { // expected-note 3{{struct 'TupleBuilder' declared here}}
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -30,6 +35,13 @@ struct TupleBuilder { // expected-note 2{{struct 'TupleBuilder' declared here}}
 
   static func buildDo<T>(_ value: T) -> T { return value }
   static func buildIf<T>(_ value: T?) -> T? { return value }
+
+  static func buildEither<T,U>(first value: T) -> Either<T,U> {
+    return .first(value)
+  }
+  static func buildEither<T,U>(second value: U) -> Either<T,U> {
+    return .second(value)
+  }
 }
 
 @_functionBuilder
@@ -341,4 +353,190 @@ struct X<T> {
       X(x)
     }
   }
+}
+
+// switch statements don't allow fallthrough
+enum E {
+  case a
+  case b(Int, String?)
+}
+
+func testSwitch(e: E) {
+  tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    case .a:
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+      fallthrough // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilder'}}
+    case .b(let i, nil):
+      "just \(i)"
+    }
+  }
+}
+
+// Ensure that we don't back-propagate constraints to the subject
+// expression. This is a potential avenue for future exploration, but
+// is currently not supported by switch statements outside of function
+// builders. It's better to be consistent for now.
+enum E2 {
+  case b(Int, String?) // expected-note{{'b' declared here}}
+}
+
+func getSomeEnumOverloaded(_: Double) -> E { return .a }
+func getSomeEnumOverloaded(_: Int) -> E2 { return .b(0, nil) }
+
+func testOverloadedSwitch() {
+  tuplify(true) { c in
+    // FIXME: Bad source location.
+    switch getSomeEnumOverloaded(17) { // expected-error{{type 'E2' has no member 'a'; did you mean 'b'?}}
+    case .a:
+      "a"
+    default:
+      "default"
+    }
+  }
+}
+
+// Check exhaustivity.
+func testNonExhaustiveSwitch(e: E) {
+    tuplify(true) { c in
+    "testSwitch"
+    switch e { // expected-error{{switch must be exhaustive}}
+      // expected-note @-1{{add missing case: '.b(_, .none)'}}
+    case .a:
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+    }
+  }
+}
+
+// rdar://problem/59856491
+struct TestConstraintGenerationErrors {
+  @TupleBuilder var buildTupleFnBody: String {
+    String(nothing) // expected-error {{use of unresolved identifier 'nothing'}}
+  }
+
+  func buildTupleClosure() {
+    tuplify(true) { _ in
+      String(nothing) // expected-error {{use of unresolved identifier 'nothing'}}
+    }
+  }
+}
+
+// Check @unknown
+func testUnknownInSwitchSwitch(e: E) {
+    tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    @unknown case .a: // expected-error{{'@unknown' is only supported for catch-all cases ("case _")}}
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+    default:
+      "nothing"
+    }
+  }
+}
+
+// Check for mutability mismatches when there are multiple case items
+// referring to same-named variables.
+enum E3 {
+  case a(Int, String)
+  case b(String, Int)
+  case c(String, Int)
+}
+
+func testCaseMutabilityMismatches(e: E3) {
+    tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    case .a(let x, var y),
+         .b(let y, // expected-error{{'let' pattern binding must match previous 'var' pattern binding}}
+            var x), // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
+         .c(let y, // expected-error{{'let' pattern binding must match previous 'var' pattern binding}}
+            var x): // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
+      x
+      y += "a"
+    }
+  }
+}
+
+// Check for type equivalence among different case variables with the same name.
+func testCaseVarTypes(e: E3) {
+    // FIXME: Terrible diagnostic
+    tuplify(true) { c in  // expected-error{{type of expression is ambiguous without more context}}
+    "testSwitch"
+    switch e {
+    case .a(let x, let y),
+         .c(let x, let y):
+      x
+      y + "a"
+    }
+  }
+}
+
+// Test for buildFinalResult.
+@_functionBuilder
+struct WrapperBuilder {
+  static func buildBlock() -> () { }
+  
+  static func buildBlock<T1>(_ t1: T1) -> T1 {
+    return t1
+  }
+  
+  static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
+    return (t1, t2)
+  }
+  
+  static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
+      -> (T1, T2, T3) {
+    return (t1, t2, t3)
+  }
+
+  static func buildBlock<T1, T2, T3, T4>(_ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4)
+      -> (T1, T2, T3, T4) {
+    return (t1, t2, t3, t4)
+  }
+
+  static func buildBlock<T1, T2, T3, T4, T5>(
+    _ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4, _ t5: T5
+  ) -> (T1, T2, T3, T4, T5) {
+    return (t1, t2, t3, t4, t5)
+  }
+
+  static func buildDo<T>(_ value: T) -> T { return value }
+  static func buildIf<T>(_ value: T?) -> T? { return value }
+
+  static func buildEither<T,U>(first value: T) -> Either<T,U> {
+    return .first(value)
+  }
+  static func buildEither<T,U>(second value: U) -> Either<T,U> {
+    return .second(value)
+  }
+  static func buildFinalResult<T>(_ value: T) -> Wrapper<T> {
+    return Wrapper(value: value)
+  }
+}
+
+struct Wrapper<T> {
+  var value: T
+}
+
+func wrapperify<T>(_ cond: Bool, @WrapperBuilder body: (Bool) -> T) -> T{
+  return body(cond)
+}
+
+func testWrapperBuilder() {
+  let x = wrapperify(true) { c in
+    3.14159
+    "hello"
+  }
+
+  let _: Int = x // expected-error{{cannot convert value of type 'Wrapper<(Double, String)>' to specified type 'Int'}}
 }

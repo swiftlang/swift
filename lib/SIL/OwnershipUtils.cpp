@@ -12,6 +12,8 @@
 
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -40,10 +42,10 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::SelectEnumInst:
   case SILNodeKind::SwitchEnumInst:
   case SILNodeKind::CheckedCastBranchInst:
-  case SILNodeKind::CondBranchInst:
   case SILNodeKind::DestructureStructInst:
   case SILNodeKind::DestructureTupleInst:
   case SILNodeKind::MarkDependenceInst:
+  case SILNodeKind::InitExistentialRefInst:
   // SWIFT_ENABLE_TENSORFLOW
   case SILNodeKind::DifferentiableFunctionInst:
   case SILNodeKind::LinearFunctionInst:
@@ -81,6 +83,27 @@ bool swift::isOwnedForwardingValueKind(SILNodeKind kind) {
   }
 }
 
+bool swift::isOwnedForwardingInstruction(SILInstruction *inst) {
+  auto kind = inst->getKind();
+  switch (kind) {
+  case SILInstructionKind::BranchInst:
+    return true;
+  default:
+    return isOwnershipForwardingValueKind(SILNodeKind(kind));
+  }
+}
+
+bool swift::isOwnedForwardingValue(SILValue value) {
+  switch (value->getKind()) {
+  // Phi arguments always forward ownership.
+  case ValueKind::SILPhiArgument:
+    return true;
+  default:
+    return isOwnedForwardingValueKind(
+        value->getKindOfRepresentativeSILNodeInObject());
+  }
+}
+
 bool swift::isGuaranteedForwardingValue(SILValue value) {
   // If we have an argument from a transforming terminator, we can forward
   // guaranteed.
@@ -91,6 +114,7 @@ bool swift::isGuaranteedForwardingValue(SILValue value) {
       }
     }
   }
+
   return isGuaranteedForwardingValueKind(
       value->getKindOfRepresentativeSILNodeInObject());
 }
@@ -104,10 +128,10 @@ bool swift::isOwnershipForwardingInst(SILInstruction *i) {
 }
 
 //===----------------------------------------------------------------------===//
-//                           Borrow Scope Operand
+//                           Borrowing Operand
 //===----------------------------------------------------------------------===//
 
-void BorrowScopeOperandKind::print(llvm::raw_ostream &os) const {
+void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   switch (value) {
   case Kind::BeginBorrow:
     os << "BeginBorrow";
@@ -123,12 +147,12 @@ void BorrowScopeOperandKind::print(llvm::raw_ostream &os) const {
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     BorrowScopeOperandKind kind) {
+                                     BorrowingOperandKind kind) {
   kind.print(os);
   return os;
 }
 
-void BorrowScopeOperand::print(llvm::raw_ostream &os) const {
+void BorrowingOperand::print(llvm::raw_ostream &os) const {
   os << "BorrowScopeOperand:\n"
         "Kind: " << kind << "\n"
         "Value: " << op->get()
@@ -136,29 +160,29 @@ void BorrowScopeOperand::print(llvm::raw_ostream &os) const {
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     const BorrowScopeOperand &operand) {
+                                     const BorrowingOperand &operand) {
   operand.print(os);
   return os;
 }
 
-void BorrowScopeOperand::visitEndScopeInstructions(
+void BorrowingOperand::visitEndScopeInstructions(
     function_ref<void(Operand *)> func) const {
   switch (kind) {
-  case BorrowScopeOperandKind::BeginBorrow:
+  case BorrowingOperandKind::BeginBorrow:
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
       if (use->isConsumingUse()) {
         func(use);
       }
     }
     return;
-  case BorrowScopeOperandKind::BeginApply: {
+  case BorrowingOperandKind::BeginApply: {
     auto *user = cast<BeginApplyInst>(op->getUser());
     for (auto *use : user->getTokenResult()->getUses()) {
       func(use);
     }
     return;
   }
-  case BorrowScopeOperandKind::Branch:
+  case BorrowingOperandKind::Branch:
     for (auto *succBlock :
          cast<BranchInst>(op->getUser())->getSuccessorBlocks()) {
       auto *arg = succBlock->getArgument(op->getOperandNumber());
@@ -173,21 +197,20 @@ void BorrowScopeOperand::visitEndScopeInstructions(
   llvm_unreachable("Covered switch isn't covered");
 }
 
-void BorrowScopeOperand::visitBorrowIntroducingUserResults(
-    function_ref<void(BorrowScopeIntroducingValue)> visitor) {
+void BorrowingOperand::visitBorrowIntroducingUserResults(
+    function_ref<void(BorrowedValue)> visitor) {
   switch (kind) {
-  case BorrowScopeOperandKind::BeginApply:
+  case BorrowingOperandKind::BeginApply:
     llvm_unreachable("Never has borrow introducer results!");
-  case BorrowScopeOperandKind::BeginBorrow: {
-    auto value =
-        *BorrowScopeIntroducingValue::get(cast<BeginBorrowInst>(op->getUser()));
+  case BorrowingOperandKind::BeginBorrow: {
+    auto value = *BorrowedValue::get(cast<BeginBorrowInst>(op->getUser()));
     return visitor(value);
   }
-  case BorrowScopeOperandKind::Branch: {
+  case BorrowingOperandKind::Branch: {
     auto *bi = cast<BranchInst>(op->getUser());
     for (auto *succBlock : bi->getSuccessorBlocks()) {
-      auto value = *BorrowScopeIntroducingValue::get(
-          succBlock->getArgument(op->getOperandNumber()));
+      auto value =
+          *BorrowedValue::get(succBlock->getArgument(op->getOperandNumber()));
       visitor(value);
     }
     return;
@@ -196,11 +219,11 @@ void BorrowScopeOperand::visitBorrowIntroducingUserResults(
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowScopeOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
+void BorrowingOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
     function_ref<void(Operand *)> func) {
   // First visit all of the results of our user that are borrow introducing
   // values.
-  visitBorrowIntroducingUserResults([&](BorrowScopeIntroducingValue value) {
+  visitBorrowIntroducingUserResults([&](BorrowedValue value) {
     // Visit the scope ending instructions of this value. If any of them are
     // consuming borrow scope operands, visit the consuming uses of the
     // results or successor arguments.
@@ -208,7 +231,7 @@ void BorrowScopeOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
     // This enables one to walk the def-use chain of guaranteed phis for a
     // single guaranteed scope.
     value.visitLocalScopeEndingUses([&](Operand *valueUser) {
-      if (auto subBorrowScopeOp = BorrowScopeOperand::get(valueUser)) {
+      if (auto subBorrowScopeOp = BorrowingOperand::get(valueUser)) {
         if (subBorrowScopeOp->consumesGuaranteedValues()) {
           subBorrowScopeOp->visitUserResultConsumingUses(func);
           return;
@@ -222,7 +245,7 @@ void BorrowScopeOperand::visitConsumingUsesOfBorrowIntroducingUserResults(
   });
 }
 
-void BorrowScopeOperand::visitUserResultConsumingUses(
+void BorrowingOperand::visitUserResultConsumingUses(
     function_ref<void(Operand *)> visitor) {
   auto *ti = dyn_cast<TermInst>(op->getUser());
   if (!ti) {
@@ -250,40 +273,40 @@ void BorrowScopeOperand::visitUserResultConsumingUses(
 //                             Borrow Introducers
 //===----------------------------------------------------------------------===//
 
-void BorrowScopeIntroducingValueKind::print(llvm::raw_ostream &os) const {
+void BorrowedValueKind::print(llvm::raw_ostream &os) const {
   switch (value) {
-  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
+  case BorrowedValueKind::SILFunctionArgument:
     os << "SILFunctionArgument";
     return;
-  case BorrowScopeIntroducingValueKind::BeginBorrow:
+  case BorrowedValueKind::BeginBorrow:
     os << "BeginBorrowInst";
     return;
-  case BorrowScopeIntroducingValueKind::LoadBorrow:
+  case BorrowedValueKind::LoadBorrow:
     os << "LoadBorrowInst";
     return;
-  case BorrowScopeIntroducingValueKind::Phi:
+  case BorrowedValueKind::Phi:
     os << "Phi";
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowScopeIntroducingValue::print(llvm::raw_ostream &os) const {
+void BorrowedValue::print(llvm::raw_ostream &os) const {
   os << "BorrowScopeIntroducingValue:\n"
     "Kind: " << kind << "\n"
     "Value: " << value;
 }
 
-void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
+void BorrowedValue::getLocalScopeEndingInstructions(
     SmallVectorImpl<SILInstruction *> &scopeEndingInsts) const {
   assert(isLocalScope() && "Should only call this given a local scope");
 
   switch (kind) {
-  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
+  case BorrowedValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
-  case BorrowScopeIntroducingValueKind::BeginBorrow:
-  case BorrowScopeIntroducingValueKind::LoadBorrow:
-  case BorrowScopeIntroducingValueKind::Phi:
+  case BorrowedValueKind::BeginBorrow:
+  case BorrowedValueKind::LoadBorrow:
+  case BorrowedValueKind::Phi:
     for (auto *use : value->getUses()) {
       if (use->isConsumingUse()) {
 	scopeEndingInsts.push_back(use->getUser());
@@ -294,15 +317,15 @@ void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowScopeIntroducingValue::visitLocalScopeEndingUses(
+void BorrowedValue::visitLocalScopeEndingUses(
     function_ref<void(Operand *)> visitor) const {
   assert(isLocalScope() && "Should only call this given a local scope");
   switch (kind) {
-  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
+  case BorrowedValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
-  case BorrowScopeIntroducingValueKind::LoadBorrow:
-  case BorrowScopeIntroducingValueKind::BeginBorrow:
-  case BorrowScopeIntroducingValueKind::Phi:
+  case BorrowedValueKind::LoadBorrow:
+  case BorrowedValueKind::BeginBorrow:
+  case BorrowedValueKind::Phi:
     for (auto *use : value->getUses()) {
       if (use->isConsumingUse()) {
         visitor(use);
@@ -313,72 +336,20 @@ void BorrowScopeIntroducingValue::visitLocalScopeEndingUses(
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-bool swift::getUnderlyingBorrowIntroducingValues(
-    SILValue inputValue, SmallVectorImpl<BorrowScopeIntroducingValue> &out) {
-  if (inputValue.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
-    return false;
-
-  SmallVector<SILValue, 32> worklist;
-  worklist.emplace_back(inputValue);
-
-  while (!worklist.empty()) {
-    SILValue v = worklist.pop_back_val();
-
-    // First check if v is an introducer. If so, stash it and continue.
-    if (auto scopeIntroducer = BorrowScopeIntroducingValue::get(v)) {
-      out.push_back(*scopeIntroducer);
-      continue;
-    }
-
-    // If v produces .none ownership, then we can ignore it. It is important
-    // that we put this before checking for guaranteed forwarding instructions,
-    // since we want to ignore guaranteed forwarding instructions that in this
-    // specific case produce a .none value.
-    if (v.getOwnershipKind() == ValueOwnershipKind::None)
-      continue;
-
-    // Otherwise if v is an ownership forwarding value, add its defining
-    // instruction
-    if (isGuaranteedForwardingValue(v)) {
-      if (auto *i = v->getDefiningInstruction()) {
-        llvm::transform(i->getAllOperands(), std::back_inserter(worklist),
-                        [](const Operand &op) -> SILValue { return op.get(); });
-        continue;
-      }
-
-      // Otherwise, we should have a block argument that is defined by a single
-      // predecessor terminator.
-      auto *arg = cast<SILPhiArgument>(v);
-      auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator());
-      llvm::transform(termInst->getAllOperands(), std::back_inserter(worklist),
-                      [](const Operand &op) -> SILValue { return op.get(); });
-      continue;
-    }
-
-    // Otherwise, this is an introducer we do not understand. Bail and return
-    // false.
-    return false;
-  }
-
-  return true;
-}
-
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     BorrowScopeIntroducingValueKind kind) {
+                                     BorrowedValueKind kind) {
   kind.print(os);
   return os;
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     const BorrowScopeIntroducingValue &value) {
+                                     const BorrowedValue &value) {
   value.print(os);
   return os;
 }
 
-bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
-    ArrayRef<SILInstruction *> instructions,
-    SmallVectorImpl<SILInstruction *> &scratchSpace,
+bool BorrowedValue::areUsesWithinScope(
+    ArrayRef<Operand *> uses, SmallVectorImpl<Operand *> &scratchSpace,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
     DeadEndBlocks &deadEndBlocks) const {
   // Make sure that we clear our scratch space/utilities before we exit.
@@ -397,15 +368,14 @@ bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
 
   // Otherwise, gather up our local scope ending instructions, looking through
   // guaranteed phi nodes.
-  visitLocalScopeTransitiveEndingUses([&scratchSpace](Operand *op) {
-    scratchSpace.emplace_back(op->getUser());
-  });
+  visitLocalScopeTransitiveEndingUses(
+      [&scratchSpace](Operand *op) { scratchSpace.emplace_back(op); });
 
   LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-  return checker.validateLifetime(value, scratchSpace, instructions);
+  return checker.validateLifetime(value, scratchSpace, uses);
 }
 
-bool BorrowScopeIntroducingValue::visitLocalScopeTransitiveEndingUses(
+bool BorrowedValue::visitLocalScopeTransitiveEndingUses(
     function_ref<void(Operand *)> visitor) const {
   assert(isLocalScope());
 
@@ -425,7 +395,7 @@ bool BorrowScopeIntroducingValue::visitLocalScopeTransitiveEndingUses(
 
     // See if we have a borrow scope operand. If we do not, then we know we are
     // a final consumer of our borrow scope introducer. Visit it and continue.
-    auto scopeOperand = BorrowScopeOperand::get(op);
+    auto scopeOperand = BorrowingOperand::get(op);
     if (!scopeOperand) {
       visitor(op);
       continue;
@@ -445,4 +415,296 @@ bool BorrowScopeIntroducingValue::visitLocalScopeTransitiveEndingUses(
   }
 
   return foundError;
+}
+
+bool BorrowedValue::visitInteriorPointerOperands(
+    function_ref<void(const InteriorPointerOperand &)> func) const {
+  SmallVector<Operand *, 32> worklist(value->getUses());
+  while (!worklist.empty()) {
+    auto *op = worklist.pop_back_val();
+
+    if (auto interiorPointer = InteriorPointerOperand::get(op)) {
+      func(*interiorPointer);
+      continue;
+    }
+
+    auto *user = op->getUser();
+    if (isa<BeginBorrowInst>(user) || isa<DebugValueInst>(user) ||
+        isa<SuperMethodInst>(user) || isa<ClassMethodInst>(user) ||
+        isa<CopyValueInst>(user) || isa<EndBorrowInst>(user) ||
+        isa<ApplyInst>(user) || isa<StoreBorrowInst>(user) ||
+        isa<StoreInst>(user) || isa<PartialApplyInst>(user) ||
+        isa<UnmanagedRetainValueInst>(user) ||
+        isa<UnmanagedReleaseValueInst>(user) ||
+        isa<UnmanagedAutoreleaseValueInst>(user)) {
+      continue;
+    }
+
+    // These are interior pointers that have not had support yet added for them.
+    if (isa<OpenExistentialBoxInst>(user) ||
+        isa<ProjectExistentialBoxInst>(user)) {
+      continue;
+    }
+
+    // Look through object.
+    if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
+      if (Projection::isObjectProjection(svi)) {
+        for (SILValue result : user->getResults()) {
+          llvm::copy(result->getUses(), std::back_inserter(worklist));
+        }
+        continue;
+      }
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
+//                          Owned Value Introducers
+//===----------------------------------------------------------------------===//
+
+void OwnedValueIntroducerKind::print(llvm::raw_ostream &os) const {
+  switch (value) {
+  case OwnedValueIntroducerKind::Apply:
+    os << "Apply";
+    return;
+  case OwnedValueIntroducerKind::BeginApply:
+    os << "BeginApply";
+    return;
+  case OwnedValueIntroducerKind::TryApply:
+    os << "TryApply";
+    return;
+  case OwnedValueIntroducerKind::Copy:
+    os << "Copy";
+    return;
+  case OwnedValueIntroducerKind::LoadCopy:
+    os << "LoadCopy";
+    return;
+  case OwnedValueIntroducerKind::LoadTake:
+    os << "LoadTake";
+    return;
+  case OwnedValueIntroducerKind::Phi:
+    os << "Phi";
+    return;
+  case OwnedValueIntroducerKind::FunctionArgument:
+    os << "FunctionArgument";
+    return;
+  case OwnedValueIntroducerKind::PartialApplyInit:
+    os << "PartialApplyInit";
+    return;
+  case OwnedValueIntroducerKind::AllocBoxInit:
+    os << "AllocBoxInit";
+    return;
+  case OwnedValueIntroducerKind::AllocRefInit:
+    os << "AllocRefInit";
+    return;
+  }
+  llvm_unreachable("Covered switch isn't covered");
+}
+
+//===----------------------------------------------------------------------===//
+//                       Introducer Searching Routines
+//===----------------------------------------------------------------------===//
+
+bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
+                                          SmallVectorImpl<BorrowedValue> &out) {
+  if (inputValue.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+    return false;
+
+  SmallVector<SILValue, 32> worklist;
+  worklist.emplace_back(inputValue);
+
+  while (!worklist.empty()) {
+    SILValue value = worklist.pop_back_val();
+
+    // First check if v is an introducer. If so, stash it and continue.
+    if (auto scopeIntroducer = BorrowedValue::get(value)) {
+      out.push_back(*scopeIntroducer);
+      continue;
+    }
+
+    // If v produces .none ownership, then we can ignore it. It is important
+    // that we put this before checking for guaranteed forwarding instructions,
+    // since we want to ignore guaranteed forwarding instructions that in this
+    // specific case produce a .none value.
+    if (value.getOwnershipKind() == ValueOwnershipKind::None)
+      continue;
+
+    // Otherwise if v is an ownership forwarding value, add its defining
+    // instruction
+    if (isGuaranteedForwardingValue(value)) {
+      if (auto *i = value->getDefiningInstruction()) {
+        llvm::copy(i->getOperandValues(true /*skip type dependent ops*/),
+                   std::back_inserter(worklist));
+        continue;
+      }
+
+      // Otherwise, we should have a block argument that is defined by a single
+      // predecessor terminator.
+      auto *arg = cast<SILPhiArgument>(value);
+      auto *termInst = arg->getSingleTerminator();
+      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst->getNumOperands() == 1 &&
+             "Transforming terminators should always have a single operand");
+      worklist.push_back(termInst->getAllOperands()[0].get());
+      continue;
+    }
+
+    // Otherwise, this is an introducer we do not understand. Bail and return
+    // false.
+    return false;
+  }
+
+  return true;
+}
+
+Optional<BorrowedValue>
+swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
+  if (inputValue.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+    return None;
+
+  SILValue currentValue = inputValue;
+  while (true) {
+    // First check if our initial value is an introducer. If we have one, just
+    // return it.
+    if (auto scopeIntroducer = BorrowedValue::get(currentValue)) {
+      return scopeIntroducer;
+    }
+
+    // Otherwise if v is an ownership forwarding value, add its defining
+    // instruction
+    if (isGuaranteedForwardingValue(currentValue)) {
+      if (auto *i = currentValue->getDefiningInstruction()) {
+        auto instOps = i->getOperandValues(true /*ignore type dependent ops*/);
+        // If we have multiple incoming values, return .None. We can't handle
+        // this.
+        auto begin = instOps.begin();
+        if (std::next(begin) != instOps.end()) {
+          return None;
+        }
+        // Otherwise, set currentOp to the single operand and continue.
+        currentValue = *begin;
+        continue;
+      }
+
+      // Otherwise, we should have a block argument that is defined by a single
+      // predecessor terminator.
+      auto *arg = cast<SILPhiArgument>(currentValue);
+      auto *termInst = arg->getSingleTerminator();
+      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst->getNumOperands() == 1 &&
+             "Transformation terminators should only have single operands");
+      currentValue = termInst->getAllOperands()[0].get();
+      continue;
+    }
+
+    // Otherwise, this is an introducer we do not understand. Bail and return
+    // None.
+    return None;
+  }
+
+  llvm_unreachable("Should never hit this");
+}
+
+bool swift::getAllOwnedValueIntroducers(
+    SILValue inputValue, SmallVectorImpl<OwnedValueIntroducer> &out) {
+  if (inputValue.getOwnershipKind() != ValueOwnershipKind::Owned)
+    return false;
+
+  SmallVector<SILValue, 32> worklist;
+  worklist.emplace_back(inputValue);
+
+  while (!worklist.empty()) {
+    SILValue value = worklist.pop_back_val();
+
+    // First check if v is an introducer. If so, stash it and continue.
+    if (auto introducer = OwnedValueIntroducer::get(value)) {
+      out.push_back(*introducer);
+      continue;
+    }
+
+    // If v produces .none ownership, then we can ignore it. It is important
+    // that we put this before checking for guaranteed forwarding instructions,
+    // since we want to ignore guaranteed forwarding instructions that in this
+    // specific case produce a .none value.
+    if (value.getOwnershipKind() == ValueOwnershipKind::None)
+      continue;
+
+    // Otherwise if v is an ownership forwarding value, add its defining
+    // instruction
+    if (isOwnedForwardingValue(value)) {
+      if (auto *i = value->getDefiningInstruction()) {
+        llvm::copy(i->getOperandValues(true /*skip type dependent ops*/),
+                   std::back_inserter(worklist));
+        continue;
+      }
+
+      // Otherwise, we should have a block argument that is defined by a single
+      // predecessor terminator.
+      auto *arg = cast<SILPhiArgument>(value);
+      auto *termInst = arg->getSingleTerminator();
+      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst->getNumOperands() == 1 &&
+             "Transforming terminators should always have a single operand");
+      worklist.push_back(termInst->getAllOperands()[0].get());
+      continue;
+    }
+
+    // Otherwise, this is an introducer we do not understand. Bail and return
+    // false.
+    return false;
+  }
+
+  return true;
+}
+
+Optional<OwnedValueIntroducer>
+swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
+  if (inputValue.getOwnershipKind() != ValueOwnershipKind::Owned)
+    return None;
+
+  SILValue currentValue = inputValue;
+  while (true) {
+    // First check if our initial value is an introducer. If we have one, just
+    // return it.
+    if (auto introducer = OwnedValueIntroducer::get(currentValue)) {
+      return introducer;
+    }
+
+    // Otherwise if v is an ownership forwarding value, add its defining
+    // instruction
+    if (isOwnedForwardingValue(currentValue)) {
+      if (auto *i = currentValue->getDefiningInstruction()) {
+        auto instOps = i->getOperandValues(true /*ignore type dependent ops*/);
+        // If we have multiple incoming values, return .None. We can't handle
+        // this.
+        auto begin = instOps.begin();
+        if (std::next(begin) != instOps.end()) {
+          return None;
+        }
+        // Otherwise, set currentOp to the single operand and continue.
+        currentValue = *begin;
+        continue;
+      }
+
+      // Otherwise, we should have a block argument that is defined by a single
+      // predecessor terminator.
+      auto *arg = cast<SILPhiArgument>(currentValue);
+      auto *termInst = arg->getSingleTerminator();
+      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst->getNumOperands() == 1 &&
+             "Transformation terminators should only have single operands");
+      currentValue = termInst->getAllOperands()[0].get();
+      continue;
+    }
+
+    // Otherwise, this is an introducer we do not understand. Bail and return
+    // None.
+    return None;
+  }
+
+  llvm_unreachable("Should never hit this");
 }

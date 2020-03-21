@@ -1,5 +1,4 @@
-@dynamicCallable Implementation Requirements
----
+# @dynamicCallable Implementation Requirements
 If a type is marked with the `@dynamicCallable` attribute, it must provide a valid implementation of `dynamicallyCall(withArguments:)`, `dynamicallyCall(withKeywordArguments:)`, or both. If it fails to do so, an error will be reported at compile-time. Note that an implementation of `dynamicallyCall(withKeywordArguments:)` is required to support calls with keyword arguments.
 
 To be considered valid, an implementation of `dynamicallyCall(withArguments:)` must:

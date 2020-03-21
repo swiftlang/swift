@@ -89,6 +89,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
       [&](CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
+    tanType = tanType->getCanonicalType(witnessCanGenSig);
     Lowering::AbstractionPattern pattern(witnessCanGenSig, tanType);
     auto &tl = context.getTypeConverter().getTypeLowering(
         pattern, tanType, TypeExpansionContext::minimal());
@@ -113,6 +114,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // Given a type, returns its formal SIL result info.
   auto getTangentResultInfoForOriginalParameter =
       [&](CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
+    tanType = tanType->getCanonicalType(witnessCanGenSig);
     Lowering::AbstractionPattern pattern(witnessCanGenSig, tanType);
     auto &tl = context.getTypeConverter().getTypeLowering(
         pattern, tanType, TypeExpansionContext::minimal());
@@ -164,7 +166,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     SILParameterInfo inoutParamTanParam(
         origResult.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getCanonicalType(),
+            ->getType()->getCanonicalType(witnessCanGenSig),
         inoutParamTanConvention);
     pbParams.push_back(inoutParamTanParam);
   } else {
@@ -174,7 +176,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     pbParams.push_back(getTangentParameterInfoForOriginalResult(
         origResult.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getCanonicalType(),
+            ->getType()->getCanonicalType(witnessCanGenSig),
         origResult.getConvention()));
   }
 
@@ -182,7 +184,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // returned pullback's closure context.
   auto *origExit = &*original->findReturnBB();
   auto *pbStruct = pullbackInfo.getLinearMapStruct(origExit);
-  auto pbStructType = pbStruct->getDeclaredInterfaceType()->getCanonicalType();
+  auto pbStructType = pbStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
   pbParams.push_back({pbStructType, ParameterConvention::Direct_Owned});
 
   // Add pullback results for the requested wrt parameters.
@@ -195,7 +197,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     adjResults.push_back(getTangentResultInfoForOriginalParameter(
         origParam.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getCanonicalType(),
+            ->getType()->getCanonicalType(witnessCanGenSig),
         origParam.getConvention()));
   }
 
@@ -214,7 +216,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   auto pbType = SILFunctionType::get(
       pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
-      origTy->getSubstitutions(), origTy->isGenericSignatureImplied(),
+      origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
@@ -264,9 +266,9 @@ void VJPEmitter::visitSILInstruction(SILInstruction *inst) {
 }
 
 SILType VJPEmitter::getLoweredType(Type type) {
+  auto vjpGenSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
   Lowering::AbstractionPattern pattern(
-      vjp->getLoweredFunctionType()->getSubstGenericSignature(),
-      type->getCanonicalType());
+      vjpGenSig, type->getCanonicalType(vjpGenSig));
   return vjp->getLoweredType(pattern, type);
 }
 
@@ -338,11 +340,37 @@ void VJPEmitter::visitReturnInst(ReturnInst *ri) {
   auto *pullbackPartialApply =
       builder.createPartialApply(loc, pullbackRef, vjpSubstMap, {pbStructVal},
                                  ParameterConvention::Direct_Guaranteed);
+  auto pullbackType = vjp->getLoweredFunctionType()
+                          ->getResults()
+                          .back()
+                          .getSILStorageInterfaceType();
+  pullbackType = pullbackType.substGenericArgs(getModule(), vjpSubstMap,
+                                               TypeExpansionContext::minimal());
+  pullbackType = pullbackType.subst(getModule(), vjpSubstMap);
+  auto pullbackFnType = pullbackType.castTo<SILFunctionType>();
+
+  auto pullbackSubstType =
+      pullbackPartialApply->getType().castTo<SILFunctionType>();
+  SILValue pullbackValue;
+  if (pullbackSubstType == pullbackFnType) {
+    pullbackValue = pullbackPartialApply;
+  } else if (pullbackSubstType->isABICompatibleWith(pullbackFnType, *vjp)
+                 .isCompatible()) {
+    pullbackValue =
+        builder.createConvertFunction(loc, pullbackPartialApply, pullbackType,
+                                      /*withoutActuallyEscaping*/ false);
+  } else {
+    // When `diag::autodiff_loadable_value_addressonly_tangent_unsupported`
+    // applies, the return type may be ABI-incomaptible with the type of the
+    // partially applied pullback. In these cases, produce an undef and rely on
+    // other code to emit a diagnostic.
+    pullbackValue = SILUndef::get(pullbackType, *vjp);
+  }
 
   // Return a tuple of the original result and pullback.
   SmallVector<SILValue, 8> directResults;
   directResults.append(origResults.begin(), origResults.end());
-  directResults.push_back(pullbackPartialApply);
+  directResults.push_back(pullbackValue);
   builder.createReturn(ri->getLoc(), joinElements(directResults, builder, loc));
 }
 
@@ -536,10 +564,24 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
         return;
       }
     }
+    auto origFnType = original->getType().castTo<SILFunctionType>();
+    auto origFnUnsubstType = origFnType->getUnsubstitutedType(getModule());
+    if (origFnType != origFnUnsubstType) {
+      original = builder.createConvertFunction(
+          loc, original, SILType::getPrimitiveObjectType(origFnUnsubstType),
+          /*withoutActuallyEscaping*/ false);
+    }
     auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, original);
     vjpValue = builder.createDifferentiableFunctionExtract(
         loc, NormalDifferentiableFunctionTypeComponent::VJP, borrowedDiffFunc);
     vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
+    auto vjpFnType = vjpValue->getType().castTo<SILFunctionType>();
+    auto vjpFnUnsubstType = vjpFnType->getUnsubstitutedType(getModule());
+    if (vjpFnType != vjpFnUnsubstType) {
+      vjpValue = builder.createConvertFunction(
+          loc, vjpValue, SILType::getPrimitiveObjectType(vjpFnUnsubstType),
+          /*withoutActuallyEscaping*/ false);
+    }
   }
 
   // Check and diagnose non-differentiable original function type.
@@ -665,6 +707,16 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
   SILValue originalDirectResult =
       joinElements(originalDirectResults, getBuilder(), vjpCall->getLoc());
   SILValue pullback = vjpDirectResults.back();
+  {
+    auto pullbackFnType = pullback->getType().castTo<SILFunctionType>();
+    auto pullbackUnsubstFnType =
+        pullbackFnType->getUnsubstitutedType(getModule());
+    if (pullbackFnType != pullbackUnsubstFnType) {
+      pullback = builder.createConvertFunction(
+          loc, pullback, SILType::getPrimitiveObjectType(pullbackUnsubstFnType),
+          /*withoutActuallyEscaping*/ false);
+    }
+  }
 
   // Store the original result to the value map.
   mapValue(ai, originalDirectResult);
@@ -683,14 +735,11 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     // Set non-reabstracted original pullback type in nested apply info.
     nestedApplyInfo.originalPullbackType = actualPullbackType;
     SILOptFunctionBuilder fb(context.getTransform());
-    auto *thunk =
-        getOrCreateReabstractionThunk(fb, getModule(), loc, /*caller*/ vjp,
-                                      actualPullbackType, loweredPullbackType);
-    auto *thunkRef = getBuilder().createFunctionRef(loc, thunk);
-    pullback = getBuilder().createPartialApply(
-        ai->getLoc(), thunkRef,
-        getOpSubstitutionMap(thunk->getForwardingSubstitutionMap()), {pullback},
-        actualPullbackType->getCalleeConvention());
+    pullback = reabstractFunction(
+        getBuilder(), fb, ai->getLoc(), pullback, loweredPullbackType,
+        [this](SubstitutionMap subs) -> SubstitutionMap {
+          return this->getOpSubstitutionMap(subs);
+        });
   }
   pullbackValues[ai->getParent()].push_back(pullback);
 

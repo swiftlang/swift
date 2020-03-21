@@ -23,6 +23,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Debug.h"
@@ -46,11 +47,17 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
 
   // FIXME: We used to use "major architecture" names for these files---the
   // names checked in "#if arch(...)". Fall back to that name in the one case
-  // where it's different from what Swift 4.2 supported: 32-bit ARM platforms.
+  // where it's different from what Swift 4.2 supported:
+  // - 32-bit ARM platforms (formerly "arm")
+  // - arm64e (formerly shared with "arm64")
   // We should be able to drop this once there's an Xcode that supports the
   // new names.
   if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm)
     body("arm");
+  else if (Ctx.LangOpts.Target.getSubArch() ==
+           llvm::Triple::SubArchType::AArch64SubArch_E) {
+    body("arm64");
+  }
 }
 
 enum class SearchPathKind {
@@ -433,7 +440,7 @@ std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
   result += '.';
   result += file_types::getExtension(fileTy);
 
-  return result.str();
+  return std::string(result.str());
 }
 
 bool
@@ -738,9 +745,10 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     std::copy_if(
         loadedModuleFile->getDependencies().begin(),
         loadedModuleFile->getDependencies().end(), std::back_inserter(missing),
-        [&duplicates](const ModuleFile::Dependency &dependency) -> bool {
+        [&duplicates, &Ctx](const ModuleFile::Dependency &dependency) -> bool {
           if (dependency.isLoaded() || dependency.isHeader() ||
-              dependency.isImplementationOnly()) {
+              (dependency.isImplementationOnly() &&
+               Ctx.LangOpts.DebuggerSupport)) {
             return false;
           }
           return duplicates.insert(dependency.RawPath).second;

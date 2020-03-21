@@ -108,7 +108,6 @@ public:
   IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
-  IGNORED_ATTR(TypeEraser)
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(DisfavoredOverload)
@@ -240,6 +239,7 @@ public:
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
+  void visitTypeEraserAttr(TypeEraserAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
 
   void visitFrozenAttr(FrozenAttr *attr);
@@ -871,11 +871,10 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     auto declAccess = VD->getFormalAccess();
     if (declAccess < AccessLevel::Public) {
-      diagnose(attr->getLocation(),
-               diag::spi_attribute_on_non_public,
-               declAccess,
-               D->getDescriptiveKind())
-        .fixItRemove(attr->getRange());
+      diagnoseAndRemoveAttr(attr,
+                            diag::spi_attribute_on_non_public,
+                            declAccess,
+                            D->getDescriptiveKind());
     }
   }
 }
@@ -1522,10 +1521,16 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 static bool isBuiltinOperator(StringRef name, DeclAttribute *attr) {
   return ((isa<PrefixAttr>(attr)  && name == "&") ||   // lvalue to inout
           (isa<PostfixAttr>(attr) && name == "!") ||   // optional unwrapping
+          // FIXME: Not actually a builtin operator, but should probably
+          // be allowed and accounted for in Sema?
+          (isa<PrefixAttr>(attr)  && name == "?") ||
           (isa<PostfixAttr>(attr) && name == "?") ||   // optional chaining
-          (isa<InfixAttr>(attr) && name == "?") ||     // ternary operator
+          (isa<InfixAttr>(attr)   && name == "?") ||   // ternary operator
           (isa<PostfixAttr>(attr) && name == ">") ||   // generic argument list
-          (isa<PrefixAttr>(attr)  && name == "<"));    // generic argument list
+          (isa<PrefixAttr>(attr)  && name == "<") ||   // generic argument list
+                                     name == "="  ||   // Assignment
+          // FIXME: Should probably be allowed in expression position?
+                                     name == "->");
 }
 
 void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
@@ -2392,6 +2397,179 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
           attr->getReplacedFunctionName());
     }
   }
+}
+
+llvm::Expected<bool>
+TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
+                                         TypeEraserAttr *attr,
+                                         ProtocolDecl *protocol) const {
+  auto &ctx = protocol->getASTContext();
+  auto &diags = ctx.Diags;
+  TypeLoc &typeEraserLoc = attr->getTypeEraserLoc();
+  TypeRepr *typeEraserRepr = typeEraserLoc.getTypeRepr();
+  DeclContext *dc = protocol->getDeclContext();
+  Type protocolType = protocol->getDeclaredType();
+
+  // Get the NominalTypeDecl for the type eraser.
+  Type typeEraser = typeEraserLoc.getType();
+  if (!typeEraser && typeEraserRepr) {
+    auto resolution = TypeResolution::forContextual(protocol);
+    typeEraser = resolution.resolveType(typeEraserRepr, /*options=*/None);
+    typeEraserLoc.setType(typeEraser);
+  }
+
+  if (typeEraser->hasError())
+    return false;
+
+  // The type eraser must be a concrete nominal type
+  auto nominalTypeDecl = typeEraser->getAnyNominal();
+  if (auto typeAliasDecl = dyn_cast_or_null<TypeAliasDecl>(nominalTypeDecl))
+    nominalTypeDecl = typeAliasDecl->getUnderlyingType()->getAnyNominal();
+
+  if (!nominalTypeDecl || isa<ProtocolDecl>(nominalTypeDecl)) {
+    diags.diagnose(typeEraserLoc.getLoc(), diag::non_nominal_type_eraser);
+    return false;
+  }
+
+  // The nominal type must be accessible wherever the protocol is accessible
+  if (nominalTypeDecl->getFormalAccess() < protocol->getFormalAccess()) {
+    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_not_accessible,
+                   nominalTypeDecl->getFormalAccess(), nominalTypeDecl->getName(),
+                   protocolType, protocol->getFormalAccess());
+    diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
+    return false;
+  }
+
+  // The type eraser must conform to the annotated protocol
+  if (!TypeChecker::conformsToProtocol(typeEraser, protocol, dc, None)) {
+    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_does_not_conform,
+                   typeEraser, protocolType);
+    diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
+    return false;
+  }
+
+  // The type eraser must have an init of the form init<T: Protocol>(erasing: T)
+  auto lookupResult = TypeChecker::lookupMember(dc, typeEraser,
+                                                DeclNameRef::createConstructor());
+
+  // Keep track of unviable init candidates for diagnostics
+  enum class UnviableReason {
+    Failable,
+    UnsatisfiedRequirements,
+    Inaccessible,
+  };
+  SmallVector<std::tuple<ConstructorDecl *, UnviableReason, Type>, 2> unviable;
+
+  bool foundMatch = llvm::any_of(lookupResult, [&](const LookupResultEntry &entry) {
+    auto *init = cast<ConstructorDecl>(entry.getValueDecl());
+    if (!init->isGeneric() || init->getGenericParams()->size() != 1)
+      return false;
+
+    auto genericSignature = init->getGenericSignature();
+    auto genericParamType = genericSignature->getInnermostGenericParams().front();
+
+    // Fow now, only allow one parameter.
+    auto params = init->getParameters();
+    if (params->size() != 1)
+      return false;
+
+    // The parameter must have the form `erasing: T` where T conforms to the protocol.
+    ParamDecl *param = *init->getParameters()->begin();
+    if (param->getArgumentName() != ctx.Id_erasing ||
+        !param->getInterfaceType()->isEqual(genericParamType) ||
+        !genericSignature->conformsToProtocol(genericParamType, protocol))
+      return false;
+
+    // Allow other constraints as long as the init can be called with any
+    // type conforming to the annotated protocol. We will check this by
+    // substituting the protocol's Self type for the generic arg and check that
+    // the requirements in the generic signature are satisfied.
+    auto baseMap =
+        typeEraser->getContextSubstitutionMap(nominalTypeDecl->getParentModule(),
+                                              nominalTypeDecl);
+    QuerySubstitutionMap getSubstitution{baseMap};
+    auto subMap = SubstitutionMap::get(
+        genericSignature,
+        [&](SubstitutableType *type) -> Type {
+          if (type->isEqual(genericParamType))
+            return protocol->getSelfTypeInContext();
+
+          return getSubstitution(type);
+        },
+        TypeChecker::LookUpConformance(dc));
+
+    // Use invalid 'SourceLoc's to suppress diagnostics.
+    auto result = TypeChecker::checkGenericArguments(
+          protocol, SourceLoc(), SourceLoc(), typeEraser,
+          genericSignature->getGenericParams(),
+          genericSignature->getRequirements(),
+          QuerySubstitutionMap{subMap},
+          TypeChecker::LookUpConformance(dc),
+          None);
+
+    if (result != RequirementCheckResult::Success) {
+      unviable.push_back(
+          std::make_tuple(init, UnviableReason::UnsatisfiedRequirements,
+                          genericParamType));
+      return false;
+    }
+
+    if (init->isFailable()) {
+      unviable.push_back(
+          std::make_tuple(init, UnviableReason::Failable, genericParamType));
+      return false;
+    }
+
+    if (init->getFormalAccess() < protocol->getFormalAccess()) {
+      unviable.push_back(
+          std::make_tuple(init, UnviableReason::Inaccessible, genericParamType));
+      return false;
+    }
+
+    return true;
+  });
+
+  if (!foundMatch) {
+    if (unviable.empty()) {
+      diags.diagnose(attr->getLocation(), diag::type_eraser_missing_init,
+                     typeEraser, protocol->getName().str());
+      diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
+      return false;
+    }
+
+    diags.diagnose(attr->getLocation(), diag::type_eraser_unviable_init,
+                   typeEraser, protocol->getName().str());
+    for (auto &candidate: unviable) {
+      auto init = std::get<0>(candidate);
+      auto reason = std::get<1>(candidate);
+      auto genericParamType = std::get<2>(candidate);
+
+      switch (reason) {
+      case UnviableReason::Failable:
+        diags.diagnose(init->getLoc(), diag::type_eraser_failable_init);
+        break;
+      case UnviableReason::UnsatisfiedRequirements:
+        diags.diagnose(init->getLoc(),
+                       diag::type_eraser_init_unsatisfied_requirements,
+                       genericParamType, protocol->getName().str());
+        break;
+      case UnviableReason::Inaccessible:
+        diags.diagnose(init->getLoc(), diag::type_eraser_init_not_accessible,
+                       init->getFormalAccess(), protocolType,
+                       protocol->getFormalAccess());
+        break;
+      }
+    }
+    return false;
+  }
+
+  return true;
+}
+
+void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
+  assert(isa<ProtocolDecl>(D));
+  // Invoke the request.
+  (void)attr->hasViableTypeEraserInit(cast<ProtocolDecl>(D));
 }
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {

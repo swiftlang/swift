@@ -968,6 +968,10 @@ keyPath.test("key path literal closures") {
   // Did we compute the indices once per closure construction, or once per
   // closure application?
   expectEqual(2, callsToComputeIndex)
+
+  // rdar://problem/59445486
+  let variadicFn: (String...) -> Int = \.count
+  expectEqual(3, variadicFn("a", "b", "c"))
 }
 
 // SR-6096

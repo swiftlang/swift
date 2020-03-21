@@ -160,12 +160,13 @@ public:
   /// Returns the lowered SIL type of the linear map struct associated with the
   /// given original block.
   SILType getLinearMapStructLoweredType(SILBasicBlock *origBB) const {
+    auto derivativeGenSig =
+        derivative->getLoweredFunctionType()->getSubstGenericSignature();
     auto *linMapStruct = getLinearMapStruct(origBB);
     auto linMapStructType =
-        linMapStruct->getDeclaredInterfaceType()->getCanonicalType();
-    Lowering::AbstractionPattern pattern(
-        derivative->getLoweredFunctionType()->getSubstGenericSignature(),
-        linMapStructType);
+        linMapStruct->getDeclaredInterfaceType()->getCanonicalType(
+            derivativeGenSig);
+    Lowering::AbstractionPattern pattern(derivativeGenSig, linMapStructType);
     return typeConverter.getLoweredType(pattern, linMapStructType,
                                         TypeExpansionContext::minimal());
   }

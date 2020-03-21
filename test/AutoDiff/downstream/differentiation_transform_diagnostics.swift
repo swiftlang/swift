@@ -261,7 +261,6 @@ func testMultipleDiffAttrsClass<C: MultipleDiffAttrsClass>(_ c: C, _ x: Float) {
 
 class Foo : Differentiable {
   @differentiable
-  // expected-note @+1 {{cannot convert a direct method reference to a '@differentiable' function; use an explicit closure instead}}
   func method(_ x: Float) -> Float {
     return x
   }
@@ -302,8 +301,6 @@ func differentiateClassMethod2(x: Float) -> Float {
 }
 
 let _: @differentiable (Float) -> Float = Foo().method
-
-// expected-error @+1 {{function is not differentiable}}
 _ = gradient(at: .zero, in: Foo().method)
 
 // TF-1149: Test class with loadable type but address-only `TangentVector` type.
@@ -522,17 +519,13 @@ func nondiff(_ f: @differentiable (Float, @noDerivative Float) -> Float) -> Floa
 // Test parameter subset thunk + partially-applied original function.
 struct TF_675 : Differentiable {
   @differentiable
-  // expected-note @+1 {{cannot convert a direct method reference to a '@differentiable' function; use an explicit closure instead}}
   func method(_ x: Float) -> Float {
     return x
   }
 }
-// expected-error @+1 {{function is not differentiable}}
 let _: @differentiable (Float) -> Float = TF_675().method
 
 // TF-918: test parameter subset thunk + partially-applied original function.
-// expected-error @+2 {{function is not differentiable}}
-// expected-note @+1 {{cannot convert a direct method reference to a '@differentiable' function; use an explicit closure instead}}
 _ = gradient(at: Float(1), Float(2), in: (+) as @differentiable (Float, @noDerivative Float) -> Float)
 
 //===----------------------------------------------------------------------===//
@@ -642,4 +635,25 @@ public func fragileDifferentiable(_ x: Float) -> Float {
   // expected-error @+2 {{expression is not differentiable}}
   // expected-note @+1 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'}}
   implicitlyDifferentiableFromFragile(x)
+}
+
+// TF-1208: Test curry thunk differentiation regression.
+public struct TF_1208_Struct<Scalar> {
+  var x: Scalar
+}
+extension TF_1208_Struct: Differentiable where Scalar: Differentiable {
+  @differentiable
+  public static func id(x: Self) -> Self {
+    return x
+  }
+}
+@differentiable(wrt: x)
+public func TF_1208<Scalar: Differentiable>(
+  _ x: TF_1208_Struct<Scalar>,
+  // NOTE(TF-1208): This diagnostic is unexpected because `TF_1208_Struct.id` is marked `@differentiable`.
+  // expected-error @+2 {{function is not differentiable}}
+  // expected-note @+1 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'; this is not possible with a closure, make a top-level function instead}}
+  reduction: @differentiable (TF_1208_Struct<Scalar>) -> TF_1208_Struct<Scalar> = TF_1208_Struct.id
+) -> TF_1208_Struct<Scalar> {
+  reduction(x)
 }

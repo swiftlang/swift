@@ -15,8 +15,8 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -136,9 +136,8 @@ static void fixupReferenceCounts(
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
       LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-      auto error = checker.checkValue(
-          pai, {BranchPropagatedUser(applySite.getCalleeOperand())}, {},
-          errorBehavior, &leakingBlocks);
+      auto error = checker.checkValue(pai, {applySite.getCalleeOperand()}, {},
+                                      errorBehavior, &leakingBlocks);
       if (error.getFoundLeak()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -639,17 +638,23 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     //  $@convention(thin) @noescape () -> () to
     //            $@noescape @callee_guaranteed () -> ()
     // %4 = apply %3() : $@noescape @callee_guaranteed () -> ()
-    if (auto *ThinToNoescapeCast = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
+    if (auto *ConvertFn = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
+      // If the conversion only changes the substitution level of the function,
+      // we can also look through it.
+      if (ConvertFn->onlyConvertsSubstitutions()) {
+        return stripCopiesAndBorrows(ConvertFn->getOperand());
+      }
+      
       auto FromCalleeTy =
-          ThinToNoescapeCast->getOperand()->getType().castTo<SILFunctionType>();
+          ConvertFn->getOperand()->getType().castTo<SILFunctionType>();
       if (FromCalleeTy->getExtInfo().hasContext())
         return CalleeValue;
-      auto ToCalleeTy = ThinToNoescapeCast->getType().castTo<SILFunctionType>();
+      auto ToCalleeTy = ConvertFn->getType().castTo<SILFunctionType>();
       auto EscapingCalleeTy = ToCalleeTy->getWithExtInfo(
           ToCalleeTy->getExtInfo().withNoEscape(false));
       if (FromCalleeTy != EscapingCalleeTy)
         return CalleeValue;
-      return stripCopiesAndBorrows(ThinToNoescapeCast->getOperand());
+      return stripCopiesAndBorrows(ConvertFn->getOperand());
     }
 
     // Ignore mark_dependence users. A partial_apply [stack] uses them to mark
@@ -755,7 +760,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
 
 static SILInstruction *tryDevirtualizeApplyHelper(FullApplySite InnerAI,
                                                   ClassHierarchyAnalysis *CHA) {
-  auto NewInst = tryDevirtualizeApply(InnerAI, CHA);
+  auto NewInst = tryDevirtualizeApply(InnerAI, CHA).first;
   if (!NewInst)
     return InnerAI.getInstruction();
 

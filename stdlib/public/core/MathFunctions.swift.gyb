@@ -97,14 +97,14 @@ extension ${Self}: ElementaryFunctions {
   }
 
   @_alwaysEmitIntoClient
-  public static func atan2(y: ${Self}, x: ${Self}) -> ${Self} {
-    return _swift_stdlib_atan2${type.cFuncSuffix}(y, x)
+  public static func atan2(_ y: ${Self}, _ x: ${Self}) -> ${Self} {
+    return _stdlib_atan2${type.cFuncSuffix}(y, x)
   }
 
 #if !os(Windows)
   @_alwaysEmitIntoClient
   public static func logGamma(_ x: ${Self}) -> ${Self} {
-    return _swift_stdlib_lgamma${type.cFuncSuffix}(x)
+    return _stdlib_lgamma${type.cFuncSuffix}(x)
   }
 
   @_alwaysEmitIntoClient

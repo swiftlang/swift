@@ -622,6 +622,19 @@ struct ImmutableAddressUseVerifier {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
         }
         break;
+      case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+        auto type =
+            cast<UncheckedTakeEnumDataAddrInst>(inst)->getOperand()->getType();
+        if (type.getOptionalObjectType()) {
+          for (auto result : inst->getResults()) {
+            llvm::copy(result->getUses(), std::back_inserter(worklist));
+          }
+          break;
+        }
+        llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
+        llvm_unreachable("invoking standard assertion failure");
+        break;
+      }
       default:
         llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
         llvm_unreachable("invoking standard assertion failure");
@@ -842,7 +855,7 @@ public:
 
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F),
-        fnConv(F.getLoweredFunctionType(), F.getModule()),
+        fnConv(F.getConventionsInContext()),
         TC(F.getModule().Types), OpenedArchetypes(&F), Dominance(nullptr),
         InstNumbers(numInstsInFunction(F)),
         DEBlocks(&F), SingleFunction(SingleFunction) {
@@ -1111,7 +1124,7 @@ public:
       if (VarInfo)
         if (unsigned ArgNo = VarInfo->ArgNo) {
           // It is a function argument.
-          if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty()) {
+          if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty() && !VarInfo->Name.empty()) {
             require(
                 DebugVars[ArgNo] == VarInfo->Name,
                 "Scope contains conflicting debug variables for one function "
@@ -1315,6 +1328,17 @@ public:
       });
     }
 
+    if (subs.getGenericSignature()->getCanonicalSignature() !=
+          fnTy->getInvocationGenericSignature()->getCanonicalSignature()) {
+      llvm::dbgs() << "substitution map's generic signature: ";
+      subs.getGenericSignature()->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      llvm::dbgs() << "callee's generic signature: ";
+      fnTy->getInvocationGenericSignature()->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      require(false,
+              "Substitution map does not match callee in apply instruction");
+    }
     // Apply the substitutions.
     return fnTy->substGenericArgs(F.getModule(), subs, F.getTypeExpansionContext());
   }
@@ -2959,7 +2983,7 @@ public:
                                      methodTy->getYields(),
                                      dynResults,
                                      methodTy->getOptionalErrorResult(),
-                                     SubstitutionMap(), false,
+                                     SubstitutionMap(), SubstitutionMap(),
                                      F.getASTContext());
     return SILType::getPrimitiveObjectType(fnTy);
   }
@@ -3969,9 +3993,7 @@ public:
   void checkThrowInst(ThrowInst *TI) {
     LLVM_DEBUG(TI->print(llvm::dbgs()));
 
-    CanSILFunctionType fnType =
-        F.getLoweredFunctionTypeInContext(F.getTypeExpansionContext());
-    require(fnType->hasErrorResult(),
+    require(fnConv.funcTy->hasErrorResult(),
             "throw in function that doesn't have an error result");
 
     SILType functionResultType =
@@ -3994,13 +4016,11 @@ public:
   }
 
   void checkYieldInst(YieldInst *YI) {
-    CanSILFunctionType fnType =
-        F.getLoweredFunctionTypeInContext(F.getTypeExpansionContext());
-    require(fnType->isCoroutine(),
+    require(fnConv.funcTy->isCoroutine(),
             "yield in non-coroutine function");
 
     auto yieldedValues = YI->getYieldedValues();
-    auto yieldInfos = fnType->getYields();
+    auto yieldInfos = fnConv.funcTy->getYields();
     require(yieldedValues.size() == yieldInfos.size(),
             "wrong number of yielded values for function");
     for (auto i : indices(yieldedValues)) {
@@ -4315,37 +4335,46 @@ public:
             "branch argument types do not match arguments for dest bb");
   }
 
-  void checkCondBranchInst(CondBranchInst *CBI) {
+  void checkCondBranchInst(CondBranchInst *cbi) {
     // It is important that cond_br keeps an i1 type. ARC Sequence Opts assumes
     // that cond_br does not use reference counted values or decrement reference
     // counted values under the assumption that the instruction that computes
     // the i1 is the use/decrement that ARC cares about and that after that
     // instruction is evaluated, the scalar i1 has a different identity and the
     // object can be deallocated.
-    requireSameType(CBI->getCondition()->getType(),
+    requireSameType(cbi->getCondition()->getType(),
                     SILType::getBuiltinIntegerType(
-                        1, CBI->getCondition()->getType().getASTContext()),
+                        1, cbi->getCondition()->getType().getASTContext()),
                     "condition of conditional branch must have Int1 type");
 
-    require(CBI->getTrueArgs().size() == CBI->getTrueBB()->args_size(),
+    require(cbi->getTrueArgs().size() == cbi->getTrueBB()->args_size(),
             "true branch has wrong number of arguments for dest bb");
-    require(CBI->getTrueBB() != CBI->getFalseBB(),
-            "identical destinations");
-    require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
-                       CBI->getTrueBB()->args_begin(),
+    require(cbi->getTrueBB() != cbi->getFalseBB(), "identical destinations");
+    require(std::equal(cbi->getTrueArgs().begin(), cbi->getTrueArgs().end(),
+                       cbi->getTrueBB()->args_begin(),
                        [&](SILValue branchArg, SILArgument *bbArg) {
                          return verifyBranchArgs(branchArg, bbArg);
                        }),
             "true branch argument types do not match arguments for dest bb");
 
-    require(CBI->getFalseArgs().size() == CBI->getFalseBB()->args_size(),
+    require(cbi->getFalseArgs().size() == cbi->getFalseBB()->args_size(),
             "false branch has wrong number of arguments for dest bb");
-    require(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
-                       CBI->getFalseBB()->args_begin(),
+    require(std::equal(cbi->getFalseArgs().begin(), cbi->getFalseArgs().end(),
+                       cbi->getFalseBB()->args_begin(),
                        [&](SILValue branchArg, SILArgument *bbArg) {
                          return verifyBranchArgs(branchArg, bbArg);
                        }),
             "false branch argument types do not match arguments for dest bb");
+    // When we are in ossa, cond_br can not have any arguments that are
+    // non-trivial.
+    if (!F.hasOwnership())
+      return;
+
+    require(llvm::all_of(cbi->getOperandValues(),
+                         [&](SILValue v) -> bool {
+                           return v->getType().isTrivial(*cbi->getFunction());
+                         }),
+            "cond_br must not have a non-trivial value in ossa.");
   }
 
   void checkDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
@@ -4581,6 +4610,10 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void checkDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
+    // FIXME(TF-1197): Re-enable verification after substituted SIL function
+    // types.
+    return;
+#if 0
     auto origTy =
         dfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");
@@ -4593,6 +4626,7 @@ public:
       return;
     if (dfi->hasDerivativeFunctions()) {
       auto jvp = dfi->getJVPFunction();
+      // auto jvpType = jvp->getType().getAs<SILFunctionType>()->getUnsubstitutedType(F.getModule());
       auto jvpType = jvp->getType().getAs<SILFunctionType>();
       require(jvpType, "The JVP function must have a function type");
       require(!jvpType->isDifferentiable(),
@@ -4600,11 +4634,13 @@ public:
       auto expectedJVPType = origTy->getAutoDiffDerivativeFunctionType(
           dfi->getParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::JVP, TC,
+          // LookUpConformanceInModule(M))->getUnsubstitutedType(F.getModule());
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(jvpType),
                       SILType::getPrimitiveObjectType(expectedJVPType),
                       "JVP type does not match expected JVP type");
       auto vjp = dfi->getVJPFunction();
+      // auto vjpType = vjp->getType().getAs<SILFunctionType>()->getUnsubstitutedType(F.getModule());
       auto vjpType = vjp->getType().getAs<SILFunctionType>();
       require(vjpType, "The VJP function must have a function type");
       require(!vjpType->isDifferentiable(),
@@ -4612,11 +4648,13 @@ public:
       auto expectedVJPType = origTy->getAutoDiffDerivativeFunctionType(
           dfi->getParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::VJP, TC,
+          // LookUpConformanceInModule(M))->getUnsubstitutedType(F.getModule());
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(vjpType),
                       SILType::getPrimitiveObjectType(expectedVJPType),
                       "VJP type does not match expected VJP type");
     }
+#endif
   }
 
   void checkLinearFunctionInst(LinearFunctionInst *lfi) {
@@ -4639,9 +4677,14 @@ public:
               "The transpose function must not be differentiable");
       auto expectedTransposeType = origTy->getAutoDiffTransposeFunctionType(
           lfi->getParameterIndices(), TC, LookUpConformanceInModule(M));
-      requireSameType(SILType::getPrimitiveObjectType(transposeType),
-                      SILType::getPrimitiveObjectType(expectedTransposeType),
-                      "Transpose type does not match expected transpose type");
+      // TODO: Consider tightening verification. This requires changes to
+      // `SILFunctionType::getAutoDiffTransposeFunctionType`.
+      requireSameType(
+          SILType::getPrimitiveObjectType(
+              transposeType->getUnsubstitutedType(F.getModule())),
+          SILType::getPrimitiveObjectType(
+              expectedTransposeType->getUnsubstitutedType(F.getModule())),
+          "Transpose type does not match expected transpose type");
     }
   }
 
@@ -4738,7 +4781,7 @@ public:
 
     for (auto result : fnConv.getIndirectSILResults()) {
       assert(fnConv.isSILIndirect(result));
-      check("result", fnConv.getSILType(result));
+      check("indirect result", fnConv.getSILType(result));
     }
     for (auto param : F.getLoweredFunctionType()->getParameters()) {
       check("parameter", fnConv.getSILType(param));
@@ -5000,38 +5043,13 @@ public:
       CurInstruction = TI;
 
       // Check for non-cond_br critical edges.
-      auto *CBI = dyn_cast<CondBranchInst>(TI);
-      if (!CBI) {
-        for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
-          require(!isCriticalEdgePred(TI, Idx),
-                  "non cond_br critical edges not allowed");
-        }
+      if (isa<CondBranchInst>(TI)) {
         continue;
       }
-      // In ownership qualified SIL, ban critical edges from CondBranchInst that
-      // have non-trivial arguments.
-      //
-      // FIXME: it would be far simpler to ban all critical edges in general.
-      if (!F->hasOwnership())
-        continue;
 
-      if (isCriticalEdgePred(CBI, CondBranchInst::TrueIdx)) {
-        require(
-            llvm::all_of(CBI->getTrueArgs(),
-                         [](SILValue V) -> bool {
-                           return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::None;
-                         }),
-            "cond_br with critical edges must not have a non-trivial value");
-      }
-      if (isCriticalEdgePred(CBI, CondBranchInst::FalseIdx)) {
-        require(
-            llvm::all_of(CBI->getFalseArgs(),
-                         [](SILValue V) -> bool {
-                           return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::None;
-                         }),
-            "cond_br with critical edges must not have a non-trivial value");
+      for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
+        require(!isCriticalEdgePred(TI, Idx),
+                "non cond_br critical edges not allowed");
       }
     }
   }
@@ -5443,6 +5461,10 @@ void SILGlobalVariable::verify() const {
 // SWIFT_ENABLE_TENSORFLOW
 /// Verify that a differentiability witness follows invariants.
 void SILDifferentiabilityWitness::verify(const SILModule &M) const {
+  // FIXME(TF-1197): Re-enable verification after substituted SIL function
+  // types.
+  return;
+#if 0
 #ifdef NDEBUG
   if (!M.getOptions().VerifyAll)
     return;
@@ -5496,6 +5518,7 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
     requireSameType(vjp->getLoweredFunctionType(), expectedVJPType,
                     "VJP type does not match expected VJP type");
   }
+#endif
 }
 // SWIFT_ENABLE_TENSORFLOW END
 

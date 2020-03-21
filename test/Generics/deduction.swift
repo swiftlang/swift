@@ -243,11 +243,12 @@ genericInheritsA(C_GI())
 //===----------------------------------------------------------------------===//
 // Deduction for member operators
 //===----------------------------------------------------------------------===//
-protocol Addable { // expected-note {{where 'Self' = 'U'}}
+protocol Addable {
   static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
-  u + u // expected-error{{referencing operator function '+' on 'Addable' requires that 'U' conform to 'Addable'}}
+  // FIXME(diagnostics): This should report the "no exact matches" diagnostic.
+  u + u // expected-error{{referencing operator function '+' on 'RangeReplaceableCollection' requires that 'U' conform to 'RangeReplaceableCollection'}}
   return x+y
 }
 

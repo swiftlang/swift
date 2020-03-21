@@ -155,6 +155,25 @@ public:
     return owningPrinter.shouldInclude(VD);
   }
 
+  bool isEmptyExtensionDecl(const ExtensionDecl *ED) {
+    auto members = ED->getMembers();
+    auto hasMembers = std::any_of(members.begin(), members.end(),
+                                  [this](const Decl *D) -> bool {
+      if (auto VD = dyn_cast<ValueDecl>(D))
+        if (shouldInclude(VD))
+          return true;
+      return false;
+    });
+
+    auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
+    auto hasProtocols = std::any_of(protocols.begin(), protocols.end(),
+                                    [this](const ProtocolDecl *PD) -> bool {
+      return shouldInclude(PD);
+    });
+
+    return (!hasMembers && !hasProtocols);
+  }
+
 private:
   /// Prints a protocol adoption list: <code>&lt;NSCoding, NSCopying&gt;</code>
   ///
@@ -309,25 +328,6 @@ private:
     os << "\n";
     printMembers(CD->getMembers());
     os << "@end\n";
-  }
-
-  bool isEmptyExtensionDecl(ExtensionDecl *ED) {
-    auto members = ED->getMembers();
-    auto hasMembers = std::any_of(members.begin(), members.end(),
-                                  [this](const Decl *D) -> bool {
-      if (auto VD = dyn_cast<ValueDecl>(D))
-        if (shouldInclude(VD))
-          return true;
-      return false;
-    });
-
-    auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
-    auto hasProtocols = std::any_of(protocols.begin(), protocols.end(),
-                                    [this](const ProtocolDecl *PD) -> bool {
-      return shouldInclude(PD);
-    });
-
-    return (!hasMembers && !hasProtocols);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -2061,6 +2061,10 @@ void DeclAndTypePrinter::print(Type ty) {
 void DeclAndTypePrinter::printAdHocCategory(
     iterator_range<const ValueDecl * const *> members) {
   getImpl().printAdHocCategory(members);
+}
+
+bool DeclAndTypePrinter::isEmptyExtensionDecl(const ExtensionDecl *ED) {
+  return getImpl().isEmptyExtensionDecl(ED);
 }
 
 StringRef

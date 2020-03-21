@@ -104,9 +104,9 @@ func testExistentialDispatchClass(cp: CP) {
 func testAnyObjectDispatch(o: AnyObject) {
   // CHECK: dynamic_method_br [[O_OBJ:%[0-9]+]] : $@opened({{.*}}) AnyObject, #ObjC.method!1.foreign, bb1, bb2
 
-  // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject):
+  // CHECK: bb1([[METHOD:%[0-9]+]] : {{.*}}):
   // CHECK:   [[O_OBJ_COPY:%.*]] = copy_value [[O_OBJ]]
-  // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [callee_guaranteed] [[METHOD]]([[O_OBJ_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject
+  // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [callee_guaranteed] [[METHOD]]([[O_OBJ_COPY]]) :
   var _ = o.method
 }
 // CHECK: } // end sil function '$s12dynamic_self21testAnyObjectDispatch1oyyXl_tF'
@@ -266,26 +266,18 @@ class Factory {
 
 // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self22partialApplySelfReturn1c1tyAA7FactoryC_AFmtF : $@convention(thin) (@guaranteed Factory, @thick Factory.Type) -> ()
 func partialApplySelfReturn(c: Factory, t: Factory.Type) {
-  // CHECK: function_ref @$s12dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@guaranteed Factory) -> @owned @callee_guaranteed () -> @owned Factory
   _ = c.newInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@guaranteed Factory) -> @owned @callee_guaranteed () -> @owned Factory
   _ = Factory.newInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@guaranteed Factory) -> @owned @callee_guaranteed () -> @owned Factory
+
   _ = t.newInstance
   _ = type(of: c).newInstance
 
-  // CHECK: function_ref @$s12dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = t.classNewInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = type(of: c).classNewInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = Factory.classNewInstance
 
-  // CHECK: function_ref @$s12dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = t.staticNewInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = type(of: c).staticNewInstance
-  // CHECK: function_ref @$s12dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = Factory.staticNewInstance
 }
 

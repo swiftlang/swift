@@ -70,12 +70,12 @@ func transpose(v: Float) -> Float
 @transpose(of: foo, wrt: (0, v))
 func transpose(v: Float) -> Float
 
-// expected-error @+2 {{expected ')' in 'transpose' attribute}}
+// expected-error @+2 {{expected ',' separator}}
 // expected-error @+1 {{expected declaration}}
 @transpose(of: Swift.Float.+(_:_))
 func transpose(v: Float) -> Float
 
-// expected-error @+2 {{expected ')' in 'transpose' attribute}}
+// expected-error @+2 {{expected ',' separator}}
 // expected-error @+1 {{expected declaration}}
 @transpose(of: Swift.Float.+.a)
 func transpose(v: Float) -> Float

@@ -127,9 +127,9 @@ JVPEmitter::getNextDifferentialLocalAllocationInsertionPoint() {
 }
 
 SILType JVPEmitter::getLoweredType(Type type) {
+  auto jvpGenSig = jvp->getLoweredFunctionType()->getSubstGenericSignature();
   Lowering::AbstractionPattern pattern(
-      jvp->getLoweredFunctionType()->getSubstGenericSignature(),
-      type->getCanonicalType());
+      jvpGenSig, type->getCanonicalType(jvpGenSig));
   return jvp->getLoweredType(pattern, type);
 }
 
@@ -807,15 +807,11 @@ void JVPEmitter::emitTangentForApplyInst(
   // differential.
   if (!differentialType->isEqual(originalDifferentialType)) {
     SILOptFunctionBuilder fb(context.getTransform());
-    auto *thunk = getOrCreateReabstractionThunk(
-        fb, context.getModule(), loc, &getDifferential(), differentialType,
-        originalDifferentialType);
-    auto *thunkRef = diffBuilder.createFunctionRef(loc, thunk);
-    differential = diffBuilder.createPartialApply(
-        loc, thunkRef,
-        remapSubstitutionMapInDifferential(
-            thunk->getForwardingSubstitutionMap()),
-        {differential}, differentialType->getCalleeConvention());
+    differential = reabstractFunction(
+        diffBuilder, fb, loc, differential, originalDifferentialType,
+        [this](SubstitutionMap subs) -> SubstitutionMap {
+          return this->getOpSubstitutionMap(subs);
+        });
   }
 
   // Call the differential.
@@ -933,6 +929,9 @@ void JVPEmitter::prepareForDifferentialGeneration() {
         assert(diffBB->isEntry());
         createEntryArguments(&differential);
         auto *lastArg = diffBB->getArguments().back();
+        llvm::errs() << "LAST ARG TYPE\n";
+        lastArg->getType().dump();
+        diffStructLoweredType.dump();
         assert(lastArg->getType() == diffStructLoweredType);
         differentialStructArguments[&origBB] = lastArg;
       }
@@ -1049,7 +1048,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
     dfResults.push_back(
         SILResultInfo(inoutDiffParam->getInterfaceType()
                           ->getAutoDiffTangentSpace(lookupConformance)
-                          ->getCanonicalType(),
+                          ->getType()->getCanonicalType(witnessCanGenSig),
                       ResultConvention::Indirect));
   } else {
     auto origResult = origTy->getResults()[indices.source];
@@ -1058,7 +1057,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
     dfResults.push_back(
         SILResultInfo(origResult.getInterfaceType()
                           ->getAutoDiffTangentSpace(lookupConformance)
-                          ->getCanonicalType(),
+                          ->getType()->getCanonicalType(witnessCanGenSig),
                       origResult.getConvention()));
   }
 
@@ -1070,7 +1069,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
     dfParams.push_back(SILParameterInfo(
         origParam.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getCanonicalType(),
+            ->getType()->getCanonicalType(witnessCanGenSig),
         origParam.getConvention()));
   }
 
@@ -1078,7 +1077,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
   // the returned differential's closure context.
   auto *origEntry = original->getEntryBlock();
   auto *dfStruct = linearMapInfo->getLinearMapStruct(origEntry);
-  auto dfStructType = dfStruct->getDeclaredInterfaceType()->getCanonicalType();
+  auto dfStructType = dfStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
   dfParams.push_back({dfStructType, ParameterConvention::Direct_Owned});
 
   Mangle::ASTMangler mangler;
@@ -1098,7 +1097,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
   auto diffType = SILFunctionType::get(
       diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
       origTy->getCalleeConvention(), dfParams, {}, dfResults, None,
-      origTy->getSubstitutions(), origTy->isGenericSignatureImplied(),
+      origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
@@ -1400,8 +1399,6 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   auto *differentialDecl = differentialInfo.lookUpLinearMapDecl(ai);
   auto originalDifferentialType =
       getOpType(differential->getType()).getAs<SILFunctionType>();
-  auto differentialType =
-      remapType(differential->getType()).castTo<SILFunctionType>();
   auto loweredDifferentialType =
       getOpType(getLoweredType(differentialDecl->getInterfaceType()))
           .castTo<SILFunctionType>();
@@ -1409,14 +1406,11 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   // reabstract the differential using a thunk.
   if (!loweredDifferentialType->isEqual(originalDifferentialType)) {
     SILOptFunctionBuilder fb(context.getTransform());
-    auto *thunk = getOrCreateReabstractionThunk(
-        fb, context.getModule(), loc, &getDifferential(), differentialType,
-        loweredDifferentialType);
-    auto *thunkRef = builder.createFunctionRef(loc, thunk);
-    differential = builder.createPartialApply(
-        loc, thunkRef,
-        getOpSubstitutionMap(thunk->getForwardingSubstitutionMap()),
-        {differential}, differentialType->getCalleeConvention());
+    differential = reabstractFunction(
+        builder, fb, loc, differential, loweredDifferentialType,
+        [this](SubstitutionMap subs) -> SubstitutionMap {
+          return this->getOpSubstitutionMap(subs);
+        });
   }
   differentialValues[ai->getParent()].push_back(differential);
 
@@ -1446,10 +1440,38 @@ void JVPEmitter::visitReturnInst(ReturnInst *ri) {
       loc, differentialRef, jvpSubstMap, {diffStructVal},
       ParameterConvention::Direct_Guaranteed);
 
-  // Return a tuple of the original result and pullback.
+  auto differentialType = jvp->getLoweredFunctionType()
+                              ->getResults()
+                              .back()
+                              .getSILStorageInterfaceType();
+  differentialType = differentialType.substGenericArgs(
+      getModule(), jvpSubstMap, TypeExpansionContext::minimal());
+  differentialType = differentialType.subst(getModule(), jvpSubstMap);
+  auto differentialFnType = differentialType.castTo<SILFunctionType>();
+
+  auto differentialSubstType =
+      differentialPartialApply->getType().castTo<SILFunctionType>();
+  SILValue differentialValue;
+  if (differentialSubstType == differentialFnType) {
+    differentialValue = differentialPartialApply;
+  } else if (differentialSubstType
+                 ->isABICompatibleWith(differentialFnType, *jvp)
+                 .isCompatible()) {
+    differentialValue = builder.createConvertFunction(
+        loc, differentialPartialApply, differentialType,
+        /*withoutActuallyEscaping*/ false);
+  } else {
+    // When `diag::autodiff_loadable_value_addressonly_tangent_unsupported`
+    // applies, the return type may be ABI-incomaptible with the type of the
+    // partially applied differential. In these cases, produce an undef and rely
+    // on other code to emit a diagnostic.
+    differentialValue = SILUndef::get(differentialType, *jvp);
+  }
+
+  // Return a tuple of the original result and differential.
   SmallVector<SILValue, 8> directResults;
   directResults.append(origResults.begin(), origResults.end());
-  directResults.push_back(differentialPartialApply);
+  directResults.push_back(differentialValue);
   builder.createReturn(ri->getLoc(), joinElements(directResults, builder, loc));
 }
 

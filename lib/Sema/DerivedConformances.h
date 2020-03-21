@@ -27,7 +27,6 @@ class AccessorDecl;
 class NominalTypeDecl;
 class PatternBindingDecl;
 class Type;
-class TypeChecker;
 class ValueDecl;
 class VarDecl;
 

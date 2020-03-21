@@ -149,17 +149,22 @@ void PullbackEmitter::cleanUpTemporariesForBlock(SILBasicBlock *bb,
 //--------------------------------------------------------------------------//
 
 const Lowering::TypeLowering &PullbackEmitter::getTypeLowering(Type type) {
+  auto pbGenSig =
+      getPullback().getLoweredFunctionType()->getSubstGenericSignature();
   Lowering::AbstractionPattern pattern(
-      getPullback().getLoweredFunctionType()->getSubstGenericSignature(),
-      type->getCanonicalType());
+      pbGenSig, type->getCanonicalType(pbGenSig));
   return getPullback().getTypeLowering(pattern, type);
 }
 
 /// Remap any archetypes into the current function's context.
 SILType PullbackEmitter::remapType(SILType ty) {
   if (ty.hasArchetype())
-    return getPullback().mapTypeIntoContext(ty.mapTypeOutOfContext());
-  return getPullback().mapTypeIntoContext(ty);
+    ty = ty.mapTypeOutOfContext();
+  auto remappedType = ty.getASTType()->getCanonicalType(
+      getPullback().getLoweredFunctionType()->getSubstGenericSignature());
+  auto remappedSILType =
+      SILType::getPrimitiveType(remappedType, ty.getCategory());
+  return getPullback().mapTypeIntoContext(remappedSILType);
 }
 
 Optional<TangentSpace> PullbackEmitter::getTangentSpace(CanType type) {
@@ -1234,6 +1239,7 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   auto actualPullbackType = applyInfo.originalPullbackType
                                 ? *applyInfo.originalPullbackType
                                 : pullbackType;
+  actualPullbackType = actualPullbackType->getUnsubstitutedType(getModule());
   for (auto indRes : actualPullbackType->getIndirectFormalResults()) {
     auto *alloc = builder.createAllocStack(
         loc, remapType(indRes.getSILStorageInterfaceType()));
@@ -1244,14 +1250,11 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   // If callee pullback was reabstracted in VJP, reabstract callee pullback.
   if (applyInfo.originalPullbackType) {
     SILOptFunctionBuilder fb(getContext().getTransform());
-    auto *thunk = getOrCreateReabstractionThunk(
-        fb, getContext().getModule(), loc, &getPullback(), pullbackType,
-        *applyInfo.originalPullbackType);
-    auto *thunkRef = builder.createFunctionRef(loc, thunk);
-    pullback = builder.createPartialApply(
-        loc, thunkRef,
-        remapSubstitutionMap(thunk->getForwardingSubstitutionMap()), {pullback},
-        pullbackType->getCalleeConvention());
+    pullback = reabstractFunction(
+        builder, fb, loc, pullback, *applyInfo.originalPullbackType,
+        [this](SubstitutionMap subs) -> SubstitutionMap {
+          return this->remapSubstitutionMap(subs);
+        });
   }
   args.push_back(seed);
 

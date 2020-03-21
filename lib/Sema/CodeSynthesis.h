@@ -33,14 +33,11 @@ class ConstructorDecl;
 class FuncDecl;
 class GenericParamList;
 class NominalTypeDecl;
+class ObjCReason;
 class ParamDecl;
 class Type;
 class ValueDecl;
 class VarDecl;
-
-class TypeChecker;
-
-class ObjCReason;
 
 enum class SelfAccessorKind {
   /// We're building a derived accessor on top of whatever this

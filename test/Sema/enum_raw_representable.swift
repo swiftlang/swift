@@ -229,3 +229,47 @@ enum NotEquatableRawType3: NotEquatableString {
   var rawValue: Int { 0 }
   // expected-note@-1 {{candidate has non-matching type 'Int'}}
 }
+
+enum MismatchedRawValues {
+  enum ExistentialBound: Any? {
+    // expected-error@-1 {{raw type 'Any?' is not expressible}}
+    // expected-error@-2 {{'MismatchedRawValues.ExistentialBound' declares raw type 'Any?'}}
+    // expected-error@-3 {{RawRepresentable conformance cannot be synthesized }}
+    case test = nil
+  }
+
+  public enum StringViaStaticString: StaticString {
+    // expected-error@-1 {{'MismatchedRawValues.StringViaStaticString' declares raw type 'StaticString', but does not conform to RawRepresentable}}
+    // expected-error@-2 {{RawRepresentable conformance cannot be synthesized because}}
+    public typealias RawValue = String
+
+    case TRUE = "TRUE"
+    case FALSE = "FALSE"
+  }
+
+  public enum IntViaString: String {
+    // expected-error@-1 {{'MismatchedRawValues.IntViaString' declares raw type 'String', but does not conform to RawRepresentable}}
+    public typealias RawValue = Int
+
+    case TRUE = "TRUE"
+    case FALSE = "FALSE"
+  }
+
+  public enum ViaNested: String {
+    // expected-error@-1 {{'MismatchedRawValues.ViaNested' declares raw type 'String', but does not conform to RawRepresentable}}
+    struct RawValue: Equatable {
+      let x: String
+    }
+
+    case TRUE = "TRUE"
+    case FALSE = "FALSE"
+  }
+
+  public enum ViaGenericBound<RawValue: Equatable>: String {
+    // expected-error@-1 {{'MismatchedRawValues.ViaGenericBound<RawValue>' declares raw type 'String'}}
+    typealias RawValue = RawValue
+    case TRUE = "TRUE"
+    case FALSE = "FALSE"
+  }
+}
+
