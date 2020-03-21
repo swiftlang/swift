@@ -1,0 +1,257 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/UnsafeAtomicIntegers.swift
+// RUN: %line-directive %t/UnsafeAtomicIntegers.swift -- %target-build-swift %t/UnsafeAtomicIntegers.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %line-directive %t/UnsafeAtomicIntegers.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
+%{
+  atomicTypes = [
+    "Int", "UInt",
+    "Int64", "UInt64",
+    "Int32", "UInt32",
+    "Int16", "UInt16",
+    "Int8", "UInt8",
+  ]
+
+  rmwOrderings = [
+    'relaxed',
+    'acquiring',
+    'releasing',
+    'acquiringAndReleasing',
+    'sequentiallyConsistent',
+  ]
+
+  loadOrderings = [
+    'relaxed',
+    'acquiring',
+    'sequentiallyConsistent',
+  ]
+
+  storeOrderings = [
+    'relaxed',
+    'releasing',
+    'sequentiallyConsistent',
+  ]
+
+  def lowerFirst(str):
+    return str[:1].lower() + str[1:] if str else ""
+
+  def argLabel(label):
+    return label + ": " if label <> "_" else ""
+
+  integerOperations = [
+    # Swift name,         llvm name,  operator, label, doc
+    ('WrappingIncrement', 'add',      '&+',     "by",  "wrapping add"),
+    ('WrappingDecrement', 'sub',      '&-',     "by",  "wrapping subtract"),
+    ('BitwiseAnd',        'and',      '&',      "_",   "bitwise and"),
+    ('BitwiseOr',         'or',       '|',      "_",   "bitwise or"),
+    ('BitwiseXor',        'xor',      '^',      "_",   "bitwise xor")
+  ]
+
+  def argLabel(label):
+    return label + ": " if label <> "_" else ""
+}%
+
+import StdlibUnittest
+import Atomics
+
+defer { runAllTests() }
+let suite = TestSuite("UnsafeAtomicIntegers")
+
+% for type in atomicTypes:
+
+suite.test("UnsafeAtomic${type}.create-destroy") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    return
+  }
+
+  let v = UnsafeAtomic${type}.create(initialValue: 0)
+  defer { v.destroy() }
+  expectEqual(v.address.pointee, 0)
+
+  let w = UnsafeAtomic${type}.create(initialValue: 42)
+  defer { w.destroy() }
+  expectEqual(w.address.pointee, 42)
+}
+
+% for order in loadOrderings:
+suite.test("UnsafeAtomic${type}.load.${order}") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    return
+  }
+
+  let v = UnsafeAtomic${type}.create(initialValue: 0)
+  defer { v.destroy() }
+  expectEqual(v.load(ordering: .${order}), 0)
+
+  let w = UnsafeAtomic${type}.create(initialValue: 23)
+  defer { w.destroy() }
+  expectEqual(w.load(ordering: .${order}), 23)
+}
+% end
+
+% for order in storeOrderings:
+suite.test("UnsafeAtomic${type}.store.${order}") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    return
+  }
+
+  let v = UnsafeAtomic${type}.create(initialValue: 0)
+  defer { v.destroy() }
+
+  v.store(23, ordering: .${order})
+  expectEqual(v.address.pointee, 23)
+
+  v.store(42, ordering: .${order})
+  expectEqual(v.address.pointee, 42)
+}
+% end
+
+% for order in rmwOrderings:
+suite.test("UnsafeAtomic${type}.exchange.${order}") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    return
+  }
+
+  let v = UnsafeAtomic${type}.create(initialValue: 0)
+  defer { v.destroy() }
+
+  expectEqual(v.exchange(42, ordering: .${order}), 0)
+  expectEqual(v.address.pointee, 42)
+
+  expectEqual(v.exchange(23, ordering: .${order}), 42)
+  expectEqual(v.address.pointee, 23)
+}
+% end
+
+% for order in rmwOrderings:
+suite.test("UnsafeAtomic${type}.compareExchange.${order}") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    return
+  }
+
+  let v = UnsafeAtomic${type}.create(initialValue: 0)
+  defer { v.destroy() }
+
+  var (exchanged, original) = v.compareExchange(
+    expected: 0,
+    desired: 1,
+    ordering: .${order})
+  expectTrue(exchanged)
+  expectEqual(original, 0)
+  expectEqual(v.address.pointee, 1)
+
+  (exchanged, original) = v.compareExchange(
+    expected: 0,
+    desired: 2,
+    ordering: .${order})
+  expectFalse(exchanged)
+  expectEqual(original, 1)
+  expectEqual(v.address.pointee, 1)
+
+  (exchanged, original) = v.compareExchange(
+    expected: 1,
+    desired: 2,
+    ordering: .${order})
+  expectTrue(exchanged)
+  expectEqual(original, 1)
+  expectEqual(v.address.pointee, 2)
+}
+% end
+
+% for order in rmwOrderings:
+%   for failorder in loadOrderings:
+suite.test("UnsafeAtomic${type}.compareExchange.${order}.${failorder}") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    return
+  }
+
+  let v = UnsafeAtomic${type}.create(initialValue: 0)
+  defer { v.destroy() }
+
+  var (exchanged, original) = v.compareExchange(
+    expected: 0,
+    desired: 1,
+    ordering: .${order},
+    failureOrdering: .${failorder})
+  expectTrue(exchanged)
+  expectEqual(original, 0)
+  expectEqual(v.address.pointee, 1)
+
+  (exchanged, original) = v.compareExchange(
+    expected: 0,
+    desired: 2,
+    ordering: .${order},
+    failureOrdering: .${failorder})
+  expectFalse(exchanged)
+  expectEqual(original, 1)
+  expectEqual(v.address.pointee, 1)
+
+  (exchanged, original) = v.compareExchange(
+    expected: 1,
+    desired: 2,
+    ordering: .${order},
+    failureOrdering: .${failorder})
+  expectTrue(exchanged)
+  expectEqual(original, 1)
+  expectEqual(v.address.pointee, 2)
+}
+%   end
+% end
+
+% for (name, _, operator, label, _) in integerOperations:
+%   for order in rmwOrderings:
+suite.test("UnsafeAtomic${type}.loadThen${name}.${order}") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    return
+  }
+
+  let a: ${type} = 3
+  let b: ${type} = 8
+  let c: ${type} = 12
+  let result1: ${type} = a ${operator} b
+  let result2: ${type} = result1 ${operator} c
+
+  let v = UnsafeAtomic${type}.create(initialValue: a)
+  defer { v.destroy() }
+
+  let old1 = v.loadThen${name}(${argLabel(label)}b, ordering: .${order})
+  expectEqual(old1, a)
+  expectEqual(v.address.pointee, result1)
+
+  let old2 = v.loadThen${name}(${argLabel(label)}c, ordering: .${order})
+  expectEqual(old2, result1)
+  expectEqual(v.address.pointee, result2)
+}
+%   end
+% end
+
+% for (name, _, operator, label, _) in integerOperations:
+%   for order in rmwOrderings:
+suite.test("UnsafeAtomic${type}.${lowerFirst(name)}ThenLoad.${order}") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    return
+  }
+
+  let a: ${type} = 3
+  let b: ${type} = 8
+  let c: ${type} = 12
+  let result1: ${type} = a ${operator} b
+  let result2: ${type} = result1 ${operator} c
+
+  let v = UnsafeAtomic${type}.create(initialValue: a)
+  defer { v.destroy() }
+
+  let new1 = v.${lowerFirst(name)}ThenLoad(${argLabel(label)}b, ordering: .${order})
+  expectEqual(new1, result1)
+  expectEqual(v.address.pointee, result1)
+
+  let new2 = v.${lowerFirst(name)}ThenLoad(${argLabel(label)}c, ordering: .${order})
+  expectEqual(new2, result2)
+  expectEqual(v.address.pointee, result2)
+}
+%   end
+% end
+
+% end
