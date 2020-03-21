@@ -1609,7 +1609,6 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
 
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
-  auto &ctx = DC->getASTContext();
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
   while (!stack.empty()) {
     auto current = stack.back();

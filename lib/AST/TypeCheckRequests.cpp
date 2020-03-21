@@ -1017,15 +1017,16 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
 }
 
 //----------------------------------------------------------------------------//
-// LookupPrecedenceGroupRequest computation.
+// ValidatePrecedenceGroupRequest computation.
 //----------------------------------------------------------------------------//
 
-SourceLoc LookupPrecedenceGroupRequest::getNearestLoc() const {
+SourceLoc ValidatePrecedenceGroupRequest::getNearestLoc() const {
   auto &desc = std::get<0>(getStorage());
   return desc.getLoc();
 }
 
-void LookupPrecedenceGroupRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+void ValidatePrecedenceGroupRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
   auto &desc = std::get<0>(getStorage());
   if (auto pathDir = desc.pathDirection) {
     diags.diagnose(desc.nameLoc, diag::precedence_group_cycle, (bool)*pathDir);
@@ -1034,7 +1035,8 @@ void LookupPrecedenceGroupRequest::diagnoseCycle(DiagnosticEngine &diags) const 
   }
 }
 
-void LookupPrecedenceGroupRequest::noteCycleStep(DiagnosticEngine &diag) const {
+void ValidatePrecedenceGroupRequest::noteCycleStep(
+    DiagnosticEngine &diag) const {
   auto &desc = std::get<0>(getStorage());
   diag.diagnose(desc.nameLoc,
                  diag::circular_reference_through_precedence_group, desc.ident);

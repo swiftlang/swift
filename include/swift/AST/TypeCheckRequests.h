@@ -1495,8 +1495,8 @@ struct PrecedenceGroupDescriptor {
 
 void simple_display(llvm::raw_ostream &out, const PrecedenceGroupDescriptor &d);
 
-class LookupPrecedenceGroupRequest
-    : public SimpleRequest<LookupPrecedenceGroupRequest,
+class ValidatePrecedenceGroupRequest
+    : public SimpleRequest<ValidatePrecedenceGroupRequest,
                            PrecedenceGroupDecl *(PrecedenceGroupDescriptor),
                            CacheKind::Cached> {
 public:

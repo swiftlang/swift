@@ -12,11 +12,12 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Evaluator.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Subsystems.h"
 
 using namespace swift;
 
@@ -204,6 +205,22 @@ void swift::simple_display(llvm::raw_ostream &out,
 
 SourceLoc swift::extractNearestSourceLoc(const DirectLookupDescriptor &desc) {
   return extractNearestSourceLoc(desc.DC);
+}
+
+//----------------------------------------------------------------------------//
+// LookupOperatorRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const OperatorLookupDescriptor &desc) {
+  out << "looking up operator ";
+  simple_display(out, desc.name);
+  out << " in ";
+  simple_display(out, desc.SF);
+}
+
+SourceLoc swift::extractNearestSourceLoc(const OperatorLookupDescriptor &desc) {
+  return desc.diagLoc;
 }
 
 // Define request evaluation functions for each of the name lookup requests.
