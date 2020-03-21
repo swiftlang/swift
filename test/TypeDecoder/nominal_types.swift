@@ -25,6 +25,7 @@ enum GenericOuter<T, U> {
 
   struct Inner {}
   struct GenericInner<T, U> {}
+  struct InnerWhere where T == GenericOuter<U, U> {}
 }
 
 func blackHole(_: Any...) {}
@@ -59,6 +60,7 @@ enum STSContainer<T : STSTagProtocol> {
   class Superclass {}
   class Subclass<U>: Superclass where T == STSOuter {
     class ExtraNested: Superclass {}
+    class ExtraNestedWhere: Superclass where U: Subclass<T> {}
   }
 
   class GenericSuperclass<U> {}
@@ -122,13 +124,17 @@ extension STSContainer℠ where T == STSOuter {
 
 // DEMANGLE-TYPE: $s13nominal_types12GenericOuterO5InnerVyxq__GD
 // DEMANGLE-TYPE: $s13nominal_types12GenericOuterO0C5InnerVyxq__qd__qd_0_GD
+// DEMANGLE-TYPE: $s13nominal_types12GenericOuterO10InnerWhereVyACyq_q_Gq__GD
 // CHECK-TYPE: GenericOuter<τ_0_0, τ_0_1>.Inner
 // CHECK-TYPE: GenericOuter<τ_0_0, τ_0_1>.GenericInner<τ_1_0, τ_1_1>
+// CHECK-TYPE: GenericOuter<GenericOuter<τ_0_1, τ_0_1>, τ_0_1>.InnerWhere
 
 // DEMANGLE-TYPE: $s13nominal_types12GenericOuterO5InnerVySiSS_GD
 // DEMANGLE-TYPE: $s13nominal_types12GenericOuterO0C5InnerVySiSS_SfSdGD
+// DEMANGLE-TYPE: $s13nominal_types12GenericOuterO10InnerWhereVyACyS2bGSb_GD
 // CHECK-TYPE: GenericOuter<Int, String>.Inner
 // CHECK-TYPE: GenericOuter<Int, String>.GenericInner<Float, Double>
+// CHECK-TYPE: GenericOuter<GenericOuter<Bool, Bool>, Bool>.InnerWhere
 
 // DEMANGLE-TYPE: $s13nominal_types12GenericOuterOyxq_GD
 // DEMANGLE-TYPE: $s13nominal_types12GenericOuterOySiSSGD
@@ -153,6 +159,8 @@ extension STSContainer℠ where T == STSOuter {
 
 // DEMANGLE-TYPE: $s13nominal_types12STSContainerO8SubclassC11ExtraNestedCyAA8STSOuterV_Si_G
 // CHECK-TYPE: STSContainer<STSOuter>.Subclass<Int>.ExtraNested
+// DEMANGLE-TYPE: $s13nominal_types12STSContainerO8SubclassC16ExtraNestedWhereCyAA8STSOuterV_AEyAI_AIG_G
+// CHECK-TYPE: STSContainer<STSOuter>.Subclass<STSContainer<STSOuter>.Subclass<STSOuter>>.ExtraNestedWhere
 // DEMANGLE-TYPE: $s13nominal_types0017STSContainer_swCgOA2A8STSOuterVRszrlE8SubclassC11ExtraNestedCyAE_Si_G
 // CHECK-TYPE: STSContainer℠<STSOuter>.Subclass<Int>.ExtraNested
 
@@ -177,6 +185,7 @@ extension STSContainer℠ where T == STSOuter {
 // DEMANGLE-DECL: $s13nominal_types12GenericOuterO
 // DEMANGLE-DECL: $s13nominal_types12GenericOuterO5InnerV
 // DEMANGLE-DECL: $s13nominal_types12GenericOuterO0C5InnerV
+// DEMANGLE-DECL: $s13nominal_types12GenericOuterO10InnerWhereV
 // DEMANGLE-DECL: $s13nominal_types1PP
 // DEMANGLE-DECL: $s13nominal_types11ConstrainedV
 
@@ -186,5 +195,6 @@ extension STSContainer℠ where T == STSOuter {
 // CHECK-DECL: nominal_types.(file).GenericOuter
 // CHECK-DECL: nominal_types.(file).GenericOuter.Inner
 // CHECK-DECL: nominal_types.(file).GenericOuter.GenericInner
+// CHECK-DECL: nominal_types.(file).GenericOuter.InnerWhere
 // CHECK-DECL: nominal_types.(file).P
 // CHECK-DECL: nominal_types.(file).Constrained
