@@ -702,7 +702,7 @@ void DiagnosticVerifier::printRemainingDiagnostics() const {
   for (const auto &diag : CapturedDiagnostics) {
     SM.getLLVMSourceMgr().PrintMessage(
         llvm::errs(), diag.getLoc(), diag.getKind(),
-        "diagnostic produced by Clang: " + diag.getMessage(),
+        "diagnostic produced elsewhere: " + diag.getMessage(),
         /*Ranges=*/ {}, diag.getFixIts());
   }
 }
