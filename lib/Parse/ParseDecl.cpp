@@ -644,7 +644,7 @@ bool Parser::parseSpecializeAttributeArguments(
           return false;
         }
         if (ParamLabel == "exported") {
-          Exported = isTrue ? true : false;
+          Exported = isTrue;
         }
       }
       if (ParamLabel == "kind") {
