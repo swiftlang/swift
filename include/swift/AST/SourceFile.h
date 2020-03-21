@@ -461,25 +461,6 @@ public:
 
   virtual bool walk(ASTWalker &walker) override;
 
-  /// @{
-
-  /// Look up the given operator in this file.
-  ///
-  /// The file must be name-bound already. If the operator is not found, or if
-  /// there is an ambiguity, returns null.
-  ///
-  /// \param isCascading If true, the lookup of this operator may affect
-  /// downstream files.
-  InfixOperatorDecl *lookupInfixOperator(Identifier name, bool isCascading,
-                                         SourceLoc diagLoc = {});
-  PrefixOperatorDecl *lookupPrefixOperator(Identifier name, bool isCascading,
-                                           SourceLoc diagLoc = {});
-  PostfixOperatorDecl *lookupPostfixOperator(Identifier name, bool isCascading,
-                                             SourceLoc diagLoc = {});
-  PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name, bool isCascading,
-                                             SourceLoc diagLoc = {});
-  /// @}
-
   ReferencedNameTracker *getReferencedNameTracker() {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
