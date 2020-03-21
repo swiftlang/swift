@@ -1435,6 +1435,8 @@ public:
     return SourceRange(WhereLoc,
                        getRequirements().back().getSourceRange().End);
   }
+
+  void print(llvm::raw_ostream &OS, bool printWhereKeyword) const;
 };
 
 // A private class for forcing exact field layout.
