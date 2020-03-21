@@ -129,6 +129,7 @@ public:
   /// Base visitor that does not do anything.
   SILInstruction *visitSILInstruction(SILInstruction *) { return nullptr; }
   SILInstruction *visitApplyInst(ApplyInst *instruction);
+  SILInstruction *visitPartialApplyInst(PartialApplyInst *i);
 };
 
 } // end anonymous namespace
@@ -284,6 +285,12 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
   if (tryDeleteDeadClosure(partialApply, instModCallbacks)) {
     invalidatedStackNesting = true;
   }
+  return nullptr;
+}
+
+/// Try to remove partial applies that are no longer used
+SILInstruction *MandatoryCombiner::visitPartialApplyInst(PartialApplyInst *i) {
+  tryDeleteDeadClosure(i, instModCallbacks, /*needKeepArgsAlive=*/false);
   return nullptr;
 }
 
