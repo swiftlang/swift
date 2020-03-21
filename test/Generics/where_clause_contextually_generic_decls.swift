@@ -1,5 +1,17 @@
 // RUN: %target-typecheck-verify-swift -typecheck %s -verify -swift-version 4
 
+func bet() where A : B {} // expected-error {{'where' clause cannot be applied to a non-generic top-level declaration}}
+
+typealias gimel = Int where A : B // expected-error {{'where' clause cannot be applied to a non-generic top-level declaration}}
+
+class dalet where A : B {} // expected-error {{'where' clause cannot be applied to a non-generic top-level declaration}}
+
+struct Where {
+  func bet() where A == B {}  // expected-error {{'where' clause on non-generic member declaration requires a generic context}}
+  typealias gimel = Int where A : B  // expected-error {{'where' clause on non-generic member declaration requires a generic context}}
+  class dalet where A : B {}  // expected-error {{'where' clause on non-generic member declaration requires a generic context}}
+}
+
 // Make sure Self: ... is correctly diagnosed in classes
 
 class SelfInGenericClass<T> {
