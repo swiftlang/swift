@@ -1588,6 +1588,80 @@ void ModuleDecl::getDeclaredCrossImportBystanders(
     otherModules.push_back(std::get<0>(pair));
 }
 
+using TransitiveOverlays =
+    llvm::SmallDenseMap<ModuleDecl *, std::pair<Identifier, ModuleDecl *>, 1>;
+
+static void populateTransitiveCrossImports(ModuleDecl *base,
+                                           TransitiveOverlays &result) {
+  if (!result.empty() || !base->mightDeclareCrossImportOverlays())
+    return;
+
+  SmallVector<Identifier, 1> bystanders;
+  SmallVector<Identifier, 1> overlays;
+  SmallVector<ModuleDecl *, 1> worklist;
+  SourceLoc diagLoc; // ignored
+
+  worklist.push_back(base);
+  while (!worklist.empty()) {
+    ModuleDecl *current = worklist.back();
+    worklist.pop_back();
+    if (!current->mightDeclareCrossImportOverlays())
+      continue;
+    bystanders.clear();
+    current->getDeclaredCrossImportBystanders(bystanders);
+    for (Identifier bystander: bystanders) {
+      overlays.clear();
+      current->findDeclaredCrossImportOverlays(bystander, overlays, diagLoc);
+      for (Identifier overlay: overlays) {
+        if (!overlay.str().startswith("_"))
+          continue;
+        ModuleDecl *overlayMod =
+            base->getASTContext().getModuleByName(overlay.str());
+        if (!overlayMod)
+          continue;
+        if (result.insert({overlayMod, {bystander, current}}).second)
+          worklist.push_back(overlayMod);
+      }
+    }
+  }
+}
+
+bool ModuleDecl::isUnderlyingModuleOfCrossImportOverlay(
+    const ModuleDecl *overlay) {
+  if (!overlay->getNameStr().startswith("_"))
+    return false;
+
+  populateTransitiveCrossImports(this, declaredCrossImportsTransitive);
+  return declaredCrossImportsTransitive.find(overlay) !=
+      declaredCrossImportsTransitive.end();
+}
+
+void ModuleDecl::getAllBystandersForCrossImportOverlay(
+    ModuleDecl *overlay, SmallVectorImpl<Identifier> &bystanders) {
+  if (!overlay->getNameStr().startswith("_"))
+    return;
+
+  populateTransitiveCrossImports(this, declaredCrossImportsTransitive);
+
+  auto end = declaredCrossImportsTransitive.end();
+  for (auto i = declaredCrossImportsTransitive.find(overlay);
+       i != end;
+       i = declaredCrossImportsTransitive.find(i->second.second)) {
+    bystanders.push_back(i->second.first);
+  }
+}
+
+void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
+    SmallVectorImpl<ModuleDecl *> &overlayModules) {
+  populateTransitiveCrossImports(this, declaredCrossImportsTransitive);
+  std::transform(declaredCrossImportsTransitive.begin(),
+                 declaredCrossImportsTransitive.end(),
+                 std::back_inserter(overlayModules),
+                 [](TransitiveOverlays::iterator::value_type &i) {
+    return i.first;
+  });
+}
+
 namespace {
 struct OverlayFileContents {
   struct Module {

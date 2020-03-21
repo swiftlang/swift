@@ -238,6 +238,141 @@ swift::ide::findGroupNameForUSR(ModuleDecl *M, StringRef USR) {
   return None;
 }
 
+/// Prints a single decl using the \p Printer and \p Options provided.
+///
+/// \returns Whether the given decl was printed.
+static bool printModuleInterfaceDecl(Decl *D,
+                                     ASTPrinter &Printer,
+                                     PrintOptions &Options,
+                                     bool PrintSynthesizedExtensions) {
+  if (!Options.shouldPrint(D)) {
+    Printer.callAvoidPrintDeclPost(D);
+    return false;
+  }
+  if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+    // Clang extensions (categories) are always printed in source order.
+    // Swift extensions are printed with their associated type unless it's
+    // a cross-module extension.
+    if (!extensionHasClangNode(Ext)) {
+      auto ExtendedNominal = Ext->getExtendedNominal();
+      if (Ext->getModuleContext() == ExtendedNominal->getModuleContext())
+        return false;
+    }
+  }
+  std::unique_ptr<SynthesizedExtensionAnalyzer> pAnalyzer;
+  if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
+    if (PrintSynthesizedExtensions) {
+      pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options));
+      Options.BracketOptions = {
+        NTD, true, true,
+        !pAnalyzer->hasMergeGroup(
+          SynthesizedExtensionAnalyzer::MergeGroupKind::MergeableWithTypeDef
+        )
+      };
+    }
+  }
+  if (D->print(Printer, Options)) {
+    if (Options.BracketOptions.shouldCloseNominal(D))
+      Printer << "\n";
+    Options.BracketOptions = BracketOptions();
+    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
+      std::queue<NominalTypeDecl *> SubDecls{{NTD}};
+
+      while (!SubDecls.empty()) {
+        auto NTD = SubDecls.front();
+        SubDecls.pop();
+
+        // Add sub-types of NTD.
+        for (auto Sub : NTD->getMembers())
+          if (auto N = dyn_cast<NominalTypeDecl>(Sub))
+            SubDecls.push(N);
+
+        // Print Ext and add sub-types of Ext.
+        for (auto Ext : NTD->getExtensions()) {
+          if (!PrintSynthesizedExtensions) {
+            if (!Options.shouldPrint(Ext)) {
+              Printer.callAvoidPrintDeclPost(Ext);
+              continue;
+            }
+            if (extensionHasClangNode(Ext))
+              continue; // will be printed in its source location, see above.
+            Printer << "\n";
+            Ext->print(Printer, Options);
+            Printer << "\n";
+          }
+          for (auto Sub : Ext->getMembers())
+            if (auto N = dyn_cast<NominalTypeDecl>(Sub))
+              SubDecls.push(N);
+        }
+        if (!PrintSynthesizedExtensions)
+          continue;
+
+        bool IsTopLevelDecl = D == NTD;
+
+        // If printed Decl is the top-level, merge the constraint-free extensions
+        // into the main body.
+        if (IsTopLevelDecl) {
+          // Print the part that should be merged with the type decl.
+          pAnalyzer->forEachExtensionMergeGroup(
+            SynthesizedExtensionAnalyzer::MergeGroupKind::MergeableWithTypeDef,
+            [&](ArrayRef<ExtensionInfo> Decls) {
+              for (auto ET : Decls) {
+                Options.BracketOptions = {
+                  ET.Ext, false, Decls.back().Ext == ET.Ext, true
+                };
+                if (ET.IsSynthesized)
+                  Options.initForSynthesizedExtension(NTD);
+                ET.Ext->print(Printer, Options);
+                if (ET.IsSynthesized)
+                  Options.clearSynthesizedExtension();
+                if (Options.BracketOptions.shouldCloseExtension(ET.Ext))
+                  Printer << "\n";
+              }
+            });
+        }
+
+        // If the printed Decl is not the top-level one, reset analyzer.
+        if (!IsTopLevelDecl)
+          pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options));
+
+        // Print the rest as synthesized extensions.
+        pAnalyzer->forEachExtensionMergeGroup(
+          // For top-level decls, only constraint extensions need to be
+          // printed, since the rest are merged into the main body.
+          IsTopLevelDecl
+          ? SynthesizedExtensionAnalyzer::MergeGroupKind::UnmergeableWithTypeDef
+          : SynthesizedExtensionAnalyzer::MergeGroupKind::All,
+          [&](ArrayRef<ExtensionInfo> Decls) {
+            // Whether we've started the extension merge group in printing.
+            bool Opened = false;
+            for (auto ET : Decls) {
+              Options.BracketOptions = {
+                ET.Ext, !Opened, Decls.back().Ext == ET.Ext, true
+              };
+              if (Options.BracketOptions.shouldOpenExtension(ET.Ext))
+                Printer << "\n";
+              if (ET.IsSynthesized) {
+                if (ET.EnablingExt)
+                  Options.initForSynthesizedExtension(ET.EnablingExt);
+                else
+                  Options.initForSynthesizedExtension(NTD);
+              }
+              // Set opened if we actually printed this extension.
+              Opened |= ET.Ext->print(Printer, Options);
+              if (ET.IsSynthesized)
+                Options.clearSynthesizedExtension();
+              if (Options.BracketOptions.shouldCloseExtension(ET.Ext))
+                Printer << "\n";
+            }
+          });
+        Options.BracketOptions = BracketOptions();
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
 /// Sorts import declarations for display.
 static bool compareImports(ImportDecl *LHS, ImportDecl *RHS) {
   auto LHSPath = LHS->getFullAccessPath();
@@ -264,172 +399,133 @@ static bool compareSwiftDecls(Decl *LHS, Decl *RHS) {
   return LHS->getKind() < RHS->getKind();
 };
 
-/// Represents a single cross-import overlay of the target module whose
-/// declarations are conditionally available when a bystander module is
-/// imported alongside the target module.
-class OverlayItem {
-  friend class OverlayCollector;
-private:
-  ModuleDecl *Module; ///< The overlay module.
-  StringRef BystanderName; ///< The name of the required bystander module.
-  OverlayItem *Underlying; ///< The underlying overlay, or target module.
+static std::pair<ArrayRef<Decl*>, ArrayRef<Decl*>>
+getDeclsFromOverlay(ModuleDecl *Overlay, ModuleDecl *Underlying,
+                    SmallVectorImpl<Decl *> &Decls, AccessLevel AccessFilter) {
+  Overlay->getDisplayDecls(Decls);
 
-public:
-  OverlayItem(ModuleDecl *Overlay, StringRef BystanderName,
-              OverlayItem *Underlying)
-  : Module(Overlay), BystanderName(BystanderName), Underlying(Underlying) {}
-
-  /// Gets the set of bystander modules that need to be imported along with the
-  /// target module for this overlay to be applied.
-  void getBystanders(SmallVectorImpl<StringRef> &Bystanders) const {
-    if (Underlying)
-      Underlying->getBystanders(Bystanders);
-    if (!BystanderName.empty())
-      Bystanders.push_back(BystanderName);
+  // Collector the imports of the underlying module so we can filter them out.
+  SmallPtrSet<ModuleDecl *, 8> PrevImported;
+  SmallVector<Decl*, 1> UnderlyingDecls;
+  Underlying->getDisplayDecls(UnderlyingDecls);
+  for (auto *D: UnderlyingDecls) {
+    if (auto *ID = dyn_cast<ImportDecl>(D))
+      PrevImported.insert(ID->getModule());
   }
 
-  /// Gets the set of accessible declarations specified in this overlay, divided
-  /// into two groups: the import decls, and everything else.
-  std::pair<ArrayRef<Decl*>, ArrayRef<Decl*>>
-  getDecls(SmallVectorImpl<Decl *> &Decls, AccessLevel AccessFilter) const {
-    Module->getDisplayDecls(Decls);
-
-    // Filter out parent imports and inaccessible decls.
-    SmallPtrSet<ModuleDecl *, 8> PrevImported;
-    getUnderlyingImports(PrevImported);
-    auto NewEnd = std::partition(Decls.begin(), Decls.end(), [&](Decl *D) {
-      if (auto *ID = dyn_cast<ImportDecl>(D)) {
-        if (isUnderlying(ID->getModule()))
-          return false;
-        if (PrevImported.find(ID->getModule()) != PrevImported.end())
-          return false;
-      }
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        if (AccessFilter > AccessLevel::Private &&
-            VD->getFormalAccess() < AccessFilter)
-          return false;
-      }
-      return true;
-    });
-    if (NewEnd != Decls.end())
-      Decls.erase(NewEnd, Decls.end());
-
-    // Separate out the import declarations and sort
-    MutableArrayRef<Decl*> Imports, Remainder;
-    auto ImportsEnd = std::partition(Decls.begin(), Decls.end(), [](Decl *D) {
-      return isa<ImportDecl>(D);
-    });
-    if (ImportsEnd != Decls.begin()) {
-      Imports = {Decls.begin(), ImportsEnd};
-      Remainder = {ImportsEnd, Decls.end()};
-      std::sort(Imports.begin(), Imports.end(), [](Decl *LHS, Decl *RHS) {
-        return compareImports(cast<ImportDecl>(LHS), cast<ImportDecl>(RHS));
-      });
-    } else {
-      Remainder = Decls;
+  // Filter out inaccessible decls and any imports of, or shared with the
+  // underlying module.
+  auto NewEnd = std::partition(Decls.begin(), Decls.end(), [&](Decl *D) {
+    if (auto *ID = dyn_cast<ImportDecl>(D)) {
+      // Ignore imports of the underlying module, or any cross-import
+      // that would map back to it.
+      if (ID->getModule() == Underlying ||
+          Underlying->isUnderlyingModuleOfCrossImportOverlay(ID->getModule()))
+        return false;
+      // Ignore an imports of modules also imported by the underlying module.
+      if (PrevImported.find(ID->getModule()) != PrevImported.end())
+        return false;
     }
-    std::sort(Remainder.begin(), Remainder.end(), compareSwiftDecls);
-    return {Imports, Remainder};
-  }
-
-private:
-  /// Checks whether the given module is an underlying module of this overlay,
-  /// transitively.
-  bool isUnderlying(ModuleDecl *M) const {
-    if (M == Module)
-      return true;
-    return Underlying && Underlying->isUnderlying(M);
-  }
-
-  /// Populates \p Imported with all ModuleDecls directly imported by the base
-  /// underlying module (ignoring those of any intermediate underlying modules).
-  void getUnderlyingImports(SmallPtrSet<ModuleDecl *, 8> &Imported) const {
-    if (Underlying) {
-      Underlying->getUnderlyingImports(Imported);
-    } else {
-      SmallVector<Decl*, 1> Decls;
-      Module->getDisplayDecls(Decls);
-      for (auto *D: Decls) {
-        if (auto *ID = dyn_cast<ImportDecl>(D))
-          Imported.insert(ID->getModule());
-      }
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (AccessFilter > AccessLevel::Private &&
+          VD->getFormalAccess() < AccessFilter)
+        return false;
     }
-  }
-};
+    return true;
+  });
+  if (NewEnd != Decls.end())
+    Decls.erase(NewEnd, Decls.end());
 
-//  Collects the set of underscored cross-import overlay modules of a given
-//  target module, transitively, reporting the set of bystander modules
-//  necessary for their inclusion (on top of the target module).
-//
-// E.g. if module A has a cross-import overlay _ABAdditions that is imported if
-// a bystander module B is also imported, and _ABAdditions has a cross-import
-// overlay __ABAdditionsCAdditions imported when a bystander module C is
-// imported, the collected overlays will include _ABAdditions with bystanders B,
-// and __ABAdditionsCAdditions with bystanders B and C.
-class OverlayCollector {
-  ASTContext &Ctx; ///< ASTContext to use for module lookups.
-  SmallVector<OverlayItem, 1> Overlays; ///< The collected overlays.
-  OverlayItem TargetModuleItem; /// < The initial worklist item.
-
-public:
-  OverlayCollector(ModuleDecl *Target, ASTContext &Ctx)
-  : Ctx(Ctx), TargetModuleItem(Target, StringRef(), nullptr) {
-    SmallVector<OverlayItem *, 1> Worklist;
-    SmallPtrSet<ModuleDecl *, 1> Seen;
-
-    Worklist.push_back(&TargetModuleItem);
-    while(!Worklist.empty()) {
-      OverlayItem &Item = *Worklist.back();
-      Worklist.pop_back();
-      if (!Seen.insert(Item.Module).second)
-        continue;
-      processItem(Item, Worklist);
-    }
-    std::sort(Overlays.begin(), Overlays.end(),
-              [](OverlayItem &LHS, OverlayItem &RHS) {
-      return LHS.Module->getNameStr() < RHS.Module->getNameStr();
+  // Separate out the import declarations and sort
+  MutableArrayRef<Decl*> Imports, Remainder;
+  auto ImportsEnd = std::partition(Decls.begin(), Decls.end(), [](Decl *D) {
+    return isa<ImportDecl>(D);
+  });
+  if (ImportsEnd != Decls.begin()) {
+    Imports = {Decls.begin(), ImportsEnd};
+    Remainder = {ImportsEnd, Decls.end()};
+    std::sort(Imports.begin(), Imports.end(), [](Decl *LHS, Decl *RHS) {
+      return compareImports(cast<ImportDecl>(LHS), cast<ImportDecl>(RHS));
     });
+  } else {
+    Remainder = Decls;
   }
+  std::sort(Remainder.begin(), Remainder.end(), compareSwiftDecls);
+  return {Imports, Remainder};
+}
 
-  /// Gets the underscored cross-import overlays.
-  ArrayRef<OverlayItem> getOverlays() {
-    return Overlays;
-  }
+static void printCrossImportOverlays(ModuleDecl *Underlying, ASTContext &Ctx,
+                                     ASTPrinter &Printer,
+                                     PrintOptions Options,
+                                     bool PrintSynthesizedExtensions) {
+  // If we end up printing decls from any cross-import overlay modules, make
+  // sure we map any qualifying module references to the underlying module.
+  Options.mapModuleToUnderlying = [&](const ModuleDecl *M) {
+    if (Underlying->isUnderlyingModuleOfCrossImportOverlay(M))
+      return const_cast<const ModuleDecl*>(Underlying);
+    return M;
+  };
 
-  /// Maps the given module to the target module if it's one of its underscored
-  /// cross-import overlays.
-  const ModuleDecl *mapToUnderlyingModule(const ModuleDecl *M) {
-    auto i = std::find_if(Overlays.begin(), Overlays.end(),
-                          [M](OverlayItem &Item) {
-      return Item.Module == M;
+  SmallVector<Decl *, 1> OverlayDecls;
+  SmallVector<Identifier, 1> Bystanders;
+
+  auto PrintDecl = [&](Decl *D) {
+    return printModuleInterfaceDecl(D, Printer, Options,
+                                    PrintSynthesizedExtensions);
+  };
+
+  SmallVector<ModuleDecl *, 1> OverlayModules;
+  Underlying->findDeclaredCrossImportOverlaysTransitive(OverlayModules);
+  std::sort(OverlayModules.begin(), OverlayModules.end(),
+            [](ModuleDecl *LHS, ModuleDecl *RHS) {
+    return LHS->getNameStr() < RHS->getNameStr();
+  });
+
+  for (auto *Overlay: OverlayModules) {
+    OverlayDecls.clear();
+    auto DeclLists = getDeclsFromOverlay(Overlay, Underlying, OverlayDecls,
+                                         Options.AccessFilter);
+
+    // Ignore overlays without any decls
+    if (OverlayDecls.empty())
+      continue;
+
+    Bystanders.clear();
+    Underlying->getAllBystandersForCrossImportOverlay(Overlay, Bystanders);
+    assert(!Bystanders.empty() && "Overlay with no bystanders?");
+    std::sort(Bystanders.begin(), Bystanders.end(),
+              [](Identifier LHS, Identifier RHS) {
+      return LHS.str() < RHS.str();
     });
-    return i == Overlays.end() ? M : TargetModuleItem.Module;
-  }
 
-private:
-  void processItem(OverlayItem &Current,
-                   SmallVectorImpl<OverlayItem*> &Worklist) {
-    SmallVector<Identifier, 1> BystanderNames, OverlayNames;
-    Current.Module->getDeclaredCrossImportBystanders(BystanderNames);
-
-    for (Identifier BystanderName: BystanderNames) {
-      OverlayNames.clear();
-      Current.Module->findDeclaredCrossImportOverlays(BystanderName,
-                                                      OverlayNames,
-                                                      SourceLoc());
-      for (Identifier OverlayName: OverlayNames) {
-        StringRef OverlayNameStr = OverlayName.str();
-        if (!OverlayNameStr.startswith("_"))
-          continue;
-        ModuleDecl *Overlay = Ctx.getModuleByName(OverlayNameStr);
-        if (!Overlay)
-          continue;
-        Overlays.emplace_back(Overlay, BystanderName.str(), &Current);
-        Worklist.push_back(&Overlays.back());
+    std::string BystanderList;
+    for (size_t I: range(Bystanders.size())) {
+      if (I == Bystanders.size() - 1) {
+        if (I != 0)
+          BystanderList += " and ";
+      } else if (I != 0) {
+        BystanderList += ", ";
       }
+      BystanderList += Bystanders[I].str();
+    }
+
+    Printer << "\n// MARK: - " << BystanderList << " Additions\n\n";
+    for (auto *Import : DeclLists.first)
+      PrintDecl(Import);
+    Printer << "\n";
+
+    std::string PerDeclComment = "// Available when " + BystanderList;
+    PerDeclComment += Bystanders.size() == 1 ? " is" : " are";
+    PerDeclComment += " imported with " + Underlying->getNameStr().str();
+
+    for (auto *D : DeclLists.second) {
+      // FIXME: only print this comment if the decl is actually printed.
+      Printer << PerDeclComment << "\n";
+      if (PrintDecl(D))
+        Printer << "\n";
     }
   }
-};
+}
 
 void swift::ide::printSubmoduleInterface(
        ModuleDecl *M,
@@ -445,15 +541,6 @@ void swift::ide::printSubmoduleInterface(
 
   auto AdjustedOptions = Options;
   adjustPrintOptions(AdjustedOptions);
-
-  // If we end up printing decls from any cross-import overlay modules, make
-  // sure we map any qualifying module references to the underlying module.
-  Optional<OverlayCollector> OverlayCollector;
-  AdjustedOptions.mapModuleToUnderlying = [&](const ModuleDecl *M) {
-    return OverlayCollector
-      ? OverlayCollector->mapToUnderlyingModule(M)
-      : M;
-  };
 
   SmallVector<Decl *, 1> Decls;
   M->getDisplayDecls(Decls);
@@ -655,136 +742,9 @@ void swift::ide::printSubmoduleInterface(
   if (Options.PrintRegularClangComments)
     PrinterToUse = &RegularCommentPrinter;
 
-  auto PrintDecl = [&](Decl *D) -> bool {
-    ASTPrinter &Printer = *PrinterToUse;
-    if (!AdjustedOptions.shouldPrint(D)) {
-      Printer.callAvoidPrintDeclPost(D);
-      return false;
-    }
-    if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
-      // Clang extensions (categories) are always printed in source order.
-      // Swift extensions are printed with their associated type unless it's
-      // a cross-module extension.
-      if (!extensionHasClangNode(Ext)) {
-        auto ExtendedNominal = Ext->getExtendedNominal();
-        if (Ext->getModuleContext() == ExtendedNominal->getModuleContext())
-          return false;
-      }
-    }
-    std::unique_ptr<SynthesizedExtensionAnalyzer> pAnalyzer;
-    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-      if (PrintSynthesizedExtensions) {
-        pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, AdjustedOptions));
-        AdjustedOptions.BracketOptions = {NTD, true, true,
-          !pAnalyzer->hasMergeGroup(SynthesizedExtensionAnalyzer::
-                                    MergeGroupKind::MergeableWithTypeDef)};
-      }
-    }
-    if (D->print(Printer, AdjustedOptions)) {
-      if (AdjustedOptions.BracketOptions.shouldCloseNominal(D))
-        Printer << "\n";
-      AdjustedOptions.BracketOptions = BracketOptions();
-      if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-        std::queue<NominalTypeDecl *> SubDecls{{NTD}};
-
-        while (!SubDecls.empty()) {
-          auto NTD = SubDecls.front();
-          SubDecls.pop();
-
-          // Add sub-types of NTD.
-          for (auto Sub : NTD->getMembers())
-            if (auto N = dyn_cast<NominalTypeDecl>(Sub))
-              SubDecls.push(N);
-
-          // Print Ext and add sub-types of Ext.
-          for (auto Ext : NTD->getExtensions()) {
-            if (!PrintSynthesizedExtensions) {
-              if (!AdjustedOptions.shouldPrint(Ext)) {
-                Printer.callAvoidPrintDeclPost(Ext);
-                continue;
-              }
-              if (extensionHasClangNode(Ext))
-                continue; // will be printed in its source location, see above.
-              Printer << "\n";
-              Ext->print(Printer, AdjustedOptions);
-              Printer << "\n";
-            }
-            for (auto Sub : Ext->getMembers())
-              if (auto N = dyn_cast<NominalTypeDecl>(Sub))
-                SubDecls.push(N);
-          }
-          if (!PrintSynthesizedExtensions)
-            continue;
-
-          bool IsTopLevelDecl = D == NTD;
-
-          // If printed Decl is the top-level, merge the constraint-free extensions
-          // into the main body.
-          if (IsTopLevelDecl) {
-          // Print the part that should be merged with the type decl.
-          pAnalyzer->forEachExtensionMergeGroup(
-              SynthesizedExtensionAnalyzer::MergeGroupKind::
-                  MergeableWithTypeDef,
-              [&](ArrayRef<ExtensionInfo> Decls) {
-                for (auto ET : Decls) {
-                  AdjustedOptions.BracketOptions = {
-                      ET.Ext, false, Decls.back().Ext == ET.Ext, true};
-                  if (ET.IsSynthesized)
-                    AdjustedOptions.initForSynthesizedExtension(NTD);
-                  ET.Ext->print(Printer, AdjustedOptions);
-                  if (ET.IsSynthesized)
-                    AdjustedOptions.clearSynthesizedExtension();
-                  if (AdjustedOptions.BracketOptions.shouldCloseExtension(
-                          ET.Ext))
-                    Printer << "\n";
-                }
-              });
-          }
-
-          // If the printed Decl is not the top-level one, reset analyzer.
-          if (!IsTopLevelDecl)
-            pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, AdjustedOptions));
-
-          // Print the rest as synthesized extensions.
-          pAnalyzer->forEachExtensionMergeGroup(
-              // For top-level decls, only constraint extensions need to be
-              // printed, since the rest are merged into the main body.
-              IsTopLevelDecl ? SynthesizedExtensionAnalyzer::MergeGroupKind::
-                                   UnmergeableWithTypeDef
-                             :
-                             // For sub-decls, all extensions should be printed.
-                  SynthesizedExtensionAnalyzer::MergeGroupKind::All,
-              [&](ArrayRef<ExtensionInfo> Decls) {
-                // Whether we've started the extension merge group in printing.
-                bool Opened = false;
-                for (auto ET : Decls) {
-                  AdjustedOptions.BracketOptions = { ET.Ext, !Opened,
-                    Decls.back().Ext == ET.Ext, true};
-                  if (AdjustedOptions.BracketOptions.shouldOpenExtension(
-                          ET.Ext))
-                    Printer << "\n";
-                  if (ET.IsSynthesized) {
-                    if (ET.EnablingExt)
-                      AdjustedOptions.initForSynthesizedExtension(
-                          ET.EnablingExt);
-                    else
-                      AdjustedOptions.initForSynthesizedExtension(NTD);
-                  }
-                  // Set opened if we actually printed this extension.
-                  Opened |= ET.Ext->print(Printer, AdjustedOptions);
-                  if (ET.IsSynthesized)
-                    AdjustedOptions.clearSynthesizedExtension();
-                  if (AdjustedOptions.BracketOptions.shouldCloseExtension(
-                          ET.Ext))
-                    Printer << "\n";
-                }
-              });
-          AdjustedOptions.BracketOptions = BracketOptions();
-        }
-      }
-      return true;
-    }
-    return false;
+  auto PrintDecl = [&](Decl *D) {
+    return printModuleInterfaceDecl(D, *PrinterToUse, AdjustedOptions,
+                                    PrintSynthesizedExtensions);
   };
 
   // Imports from the stdlib are internal details that don't need to be exposed.
@@ -824,50 +784,8 @@ void swift::ide::printSubmoduleInterface(
     // also print the decls from any underscored Swift cross-import overlays it
     // is the underlying module of, transitively.
     if (GroupNames.empty()) {
-      OverlayCollector.emplace(M, SwiftContext);
-
-      SmallVector<Decl *, 1> OverlayDecls;
-      SmallVector<StringRef, 1> Bystanders;
-
-      for (auto &Overlay: OverlayCollector->getOverlays()) {
-        OverlayDecls.clear();
-        auto DeclLists = Overlay.getDecls(OverlayDecls, Options.AccessFilter);
-
-        // Ignore overlays without any decls
-        if (OverlayDecls.empty())
-          continue;
-
-        Bystanders.clear();
-        Overlay.getBystanders(Bystanders);
-        assert(!Bystanders.empty() && "Overlay with no bystanders?");
-
-        std::string BystanderList;
-        for (size_t I: range(Bystanders.size())) {
-          if (I == Bystanders.size() - 1) {
-            if (I != 0)
-              BystanderList += " and ";
-          } else if (I != 0) {
-            BystanderList += ", ";
-          }
-          BystanderList += Bystanders[I].str();
-        }
-
-        Printer << "\n// MARK: - " << BystanderList << " Additions\n\n";
-        for (auto *Import : DeclLists.first)
-          PrintDecl(Import);
-        Printer << "\n";
-
-        std::string PerDeclComment = "// Available when " + BystanderList;
-        PerDeclComment += Bystanders.size() == 1 ? " is" : " are";
-        PerDeclComment += " imported with " + M->getNameStr().str();
-
-        for (auto *D : DeclLists.second) {
-          // FIXME: only print this comment if the decl is actually printed.
-          Printer << PerDeclComment << "\n";
-          if (PrintDecl(D))
-            Printer << "\n";
-        }
-      }
+      printCrossImportOverlays(M, SwiftContext, *PrinterToUse, AdjustedOptions,
+                               PrintSynthesizedExtensions);
     }
   }
 }
