@@ -80,6 +80,9 @@ class MandatoryCombiner final
   InstModCallbacks instModCallbacks;
   SmallVectorImpl<SILInstruction *> &createdInstructions;
   SmallVector<SILInstruction *, 16> instructionsPendingDeletion;
+      
+  DominanceAnalysis dominanceAnalysis;
+  std::unique_ptr<DominanceInfo> dominanceInfo;
 
 public:
   MandatoryCombiner(SmallVectorImpl<SILInstruction *> &createdInstructions)
@@ -177,6 +180,8 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
   madeChange = false;
 
   addReachableCodeToWorklist(function);
+
+  dominanceInfo = dominanceAnalysis.newFunctionAnalysis(&function);
 
   while (!worklist.isEmpty()) {
     auto *instruction = worklist.pop_back_val();
