@@ -41,6 +41,24 @@ DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
   }
 }
 
+void SILAutoDiffIndices::print(llvm::raw_ostream &s) const {
+  s << "(source=" << source << " parameters=(";
+  interleave(
+      parameters->getIndices(), [&s](unsigned p) { s << p; },
+      [&s] { s << ' '; });
+  s << "))";
+}
+
+void SILAutoDiffIndices::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+SILAutoDiffIndices AutoDiffConfig::getSILAutoDiffIndices() const {
+  assert(resultIndices->getNumIndices() == 1);
+  return SILAutoDiffIndices(*resultIndices->begin(), parameterIndices);
+}
+
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
   s << "(parameters=";
   parameterIndices->print(s);
@@ -136,6 +154,42 @@ void autodiff::getFunctionSemanticResultTypes(
       if (param.isInOut())
         result.push_back({remap(param.getPlainType()), /*isInout*/ true});
   }
+}
+
+// TODO(TF-874): Simplify this helper. See TF-874 for WIP.
+IndexSubset *
+autodiff::getLoweredParameterIndices(IndexSubset *parameterIndices,
+                                     AnyFunctionType *functionType) {
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  unwrapCurryLevels(functionType, curryLevels);
+
+  // Compute the lowered sizes of all AST parameter types.
+  SmallVector<unsigned, 8> paramLoweredSizes;
+  unsigned totalLoweredSize = 0;
+  auto addLoweredParamInfo = [&](Type type) {
+    unsigned paramLoweredSize = countNumFlattenedElementTypes(type);
+    paramLoweredSizes.push_back(paramLoweredSize);
+    totalLoweredSize += paramLoweredSize;
+  };
+  for (auto *curryLevel : llvm::reverse(curryLevels))
+    for (auto &param : curryLevel->getParams())
+      addLoweredParamInfo(param.getPlainType());
+
+  // Build lowered SIL parameter indices by setting the range of bits that
+  // corresponds to each "set" AST parameter.
+  llvm::SmallVector<unsigned, 8> loweredSILIndices;
+  unsigned currentBitIndex = 0;
+  for (unsigned i : range(parameterIndices->getCapacity())) {
+    auto paramLoweredSize = paramLoweredSizes[i];
+    if (parameterIndices->contains(i)) {
+      auto indices = range(currentBitIndex, currentBitIndex + paramLoweredSize);
+      loweredSILIndices.append(indices.begin(), indices.end());
+    }
+    currentBitIndex += paramLoweredSize;
+  }
+
+  return IndexSubset::get(functionType->getASTContext(), totalLoweredSize,
+                          loweredSILIndices);
 }
 
 GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
