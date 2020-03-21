@@ -374,7 +374,6 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 std::string ASTMangler::mangleAutoDiffDerivativeFunctionHelper(
     StringRef name, AutoDiffDerivativeFunctionKind kind,
     AutoDiffConfig config) {
@@ -425,7 +424,6 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
   Storage.clear();
   return result;
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
     SILDifferentiabilityWitnessKey key) {

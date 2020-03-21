@@ -3507,11 +3507,6 @@ SILFunctionType::SILFunctionType(
     }
 
     if (genericSig && patternSubs) {
-      if (patternSubs.hasArchetypes()) {
-        llvm::errs() << "BAD PATTERN SUBS\n";
-        patternSubs.dump();
-        dump();
-      }
       assert(!patternSubs.hasArchetypes()
              && "pattern substitutions should not contain context archetypes");
     }

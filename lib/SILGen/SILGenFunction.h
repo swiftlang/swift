@@ -1849,7 +1849,14 @@ public:
                                     CanType &dynamicSelfType,
                                     bool withoutActuallyEscaping=false);
 
-  // SWIFT_ENABLE_TENSORFLOW
+  //===--------------------------------------------------------------------===//
+  // NoEscaping to Escaping closure thunk
+  //===--------------------------------------------------------------------===//
+  ManagedValue
+  createWithoutActuallyEscapingClosure(SILLocation loc,
+                                       ManagedValue noEscapingFunctionValue,
+                                       SILType escapingFnTy);
+
   //===--------------------------------------------------------------------===//
   // Differentiation thunks
   //===--------------------------------------------------------------------===//
@@ -1861,18 +1868,11 @@ public:
   /// If `reorderSelf` is true, reorder self so that it appears as:
   /// - The last parameter, for differentials.
   /// - The last result, for pullbacks.
-  ManagedValue getThunkedAutoDiffLinearMap(
-      ManagedValue linearMap, AutoDiffLinearMapKind linearMapKind,
-      CanSILFunctionType fromType, CanSILFunctionType toType,
-      bool reorderSelf);
-
-  //===--------------------------------------------------------------------===//
-  // NoEscaping to Escaping closure thunk
-  //===--------------------------------------------------------------------===//
-  ManagedValue
-  createWithoutActuallyEscapingClosure(SILLocation loc,
-                                       ManagedValue noEscapingFunctionValue,
-                                       SILType escapingFnTy);
+  ManagedValue getThunkedAutoDiffLinearMap(ManagedValue linearMap,
+                                           AutoDiffLinearMapKind linearMapKind,
+                                           CanSILFunctionType fromType,
+                                           CanSILFunctionType toType,
+                                           bool reorderSelf);
 
   //===--------------------------------------------------------------------===//
   // Declarations

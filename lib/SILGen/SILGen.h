@@ -175,19 +175,19 @@ public:
                                            CanSILFunctionType toType,
                                            CanType dynamicSelfType);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Given a user-specified custom derivative, get or create a thunk that calls
-  /// the custom derivative, and that haswith the abstraction pattern and
-  /// parameter ordering required for the SIL derivative of the given original
-  /// function.
+  /// Determine whether the given class has any instance variables that
+  /// need to be destroyed.
+  bool hasNonTrivialIVars(ClassDecl *cd);
+
+  /// Given an original function and a user-specified custom derivative
+  /// function, get or create a derivative thunk with the expected derivative
+  /// function type computed from the original function.
   ///
-  /// To achieve the required SIL derivative, the thunk may perform any subset
-  /// of:
-  /// - Self-reordering.
-  /// - Reabstraction.
+  /// To achieve the expected derivative type, the thunk may perform
+  /// self-reordering, reabstraction, or both.
   ///
   /// Self-reordering is done for canonicalizing the types of derivative
-  /// functions for instance methods wrt self. We want users to define
+  /// functions for instance methods wrt `self`. We want users to define
   /// derivatives with the following AST function types:
   ///
   /// JVP:
@@ -219,24 +219,18 @@ public:
   ///     $(T, ..., Self) -> (R, (R.Tan) -> (Self.Tan, T.Tan, ...))
   ///
   /// This leads to a parameter ordering inconsistency, and would require the
-  /// Differentiation transform to handle "wrt self instance method derivatives"
-  /// specially. However, canonicalization during SILGen makes the parameter
-  /// ordering uniform for "wrt self instance method derivatives" and simplifies
-  /// the transform rules.
+  /// differentiation transform to handle "wrt `self` instance method
+  /// derivatives" specially. However, canonicalization during SILGen makes the
+  /// parameter ordering uniform for "instance method derivatives wrt self" and
+  /// simplifies the transform rules.
   ///
-  /// If self must be reordered, reorder it so that it appears as:
+  /// If `self` must be reordered, reorder it so that it appears as:
   /// - The last parameter in the returned differential.
   /// - The last result in the returned pullback.
-  SILFunction *
-  getOrCreateCustomDerivativeThunk(
-      SILFunction *customDerivativeFn,
-      SILFunction *originalFn, const AutoDiffConfig &config,
-      AutoDiffDerivativeFunctionKind kind);
+  SILFunction *getOrCreateCustomDerivativeThunk(
+      SILFunction *customDerivativeFn, SILFunction *originalFn,
+      const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind);
 
-  /// Determine whether the given class has any instance variables that
-  /// need to be destroyed.
-  bool hasNonTrivialIVars(ClassDecl *cd);
-  
   /// Determine whether we need to emit an ivar destroyer for the given class.
   /// An ivar destroyer is needed if a superclass of this class may define a
   /// failing designated initializer.
@@ -355,17 +349,6 @@ public:
   /// Emit the self-conformance witness table for a protocol.
   void emitSelfConformanceWitnessTable(ProtocolDecl *protocol);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Emit the differentiability witness for the given original function
-  /// declaration and SIL function, autodiff configuration, and JVP and VJP
-  /// functions (null if undefined).
-  void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
-                                    SILFunction *originalFunction,
-                                    const AutoDiffConfig &config,
-                                    SILFunction *jvp, SILFunction *vjp,
-                                    const DeclAttribute *diffAttr);
-  // SWIFT_ENABLE_TENSORFLOW END
-
   /// Emit the lazy initializer function for a global pattern binding
   /// declaration.
   SILFunction *emitLazyGlobalInitializer(StringRef funcName,
@@ -417,6 +400,20 @@ public:
                               CanType baseTy,
                               DeclContext *useDC,
                               bool forPropertyDescriptor);
+
+  /// Emit all differentiability witnesses for the given function, visiting its
+  /// `@differentiable` and `@derivative` attributes.
+  void emitDifferentiabilityWitnessesForFunction(SILDeclRef constant,
+                                                 SILFunction *F);
+
+  /// Emit the differentiability witness for the given original function
+  /// declaration and SIL function, autodiff configuration, and JVP and VJP
+  /// functions (null if undefined).
+  void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
+                                    SILFunction *originalFunction,
+                                    const AutoDiffConfig &config,
+                                    SILFunction *jvp, SILFunction *vjp,
+                                    const DeclAttribute *diffAttr);
 
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();

@@ -153,8 +153,7 @@ public:
                                              Type SelfType,
                                              ModuleDecl *Module);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Mangle the derivative function (JVP/VJP) with the given:
+  /// Mangle the derivative function (JVP/VJP) for the given:
   /// - Mangled original function name.
   /// - Derivative function kind.
   /// - Derivative function configuration: parameter/result indices and
@@ -164,7 +163,7 @@ public:
                                          AutoDiffDerivativeFunctionKind kind,
                                          AutoDiffConfig config);
 
-  /// Mangle the autodiff linear map (differential/pullback) with the given:
+  /// Mangle the linear map (differential/pullback) for the given:
   /// - Mangled original function name.
   /// - Linear map kind.
   /// - Derivative function configuration: parameter/result indices and
@@ -172,7 +171,6 @@ public:
   std::string mangleAutoDiffLinearMapHelper(StringRef name,
                                             AutoDiffLinearMapKind kind,
                                             AutoDiffConfig config);
-  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Mangle a SIL differentiability witness key:
   /// - Mangled original function name.
