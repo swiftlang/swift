@@ -8025,6 +8025,15 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     }
   }
 
+  // If there are no fixes recorded but score indicates that there
+  // should have been at least one, let's fail application and let
+  // fallback diagnostic be produced to indicate the problem.
+  {
+    const auto &score = solution.getFixedScore();
+    if (score.Data[SK_Fix] > 0)
+      return None;
+  }
+
   ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);
   auto resultTarget = walker.rewriteTarget(target);
