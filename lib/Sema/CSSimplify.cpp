@@ -7218,6 +7218,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     return { type, count };
   };
 
+  const auto rawType1 = type1;
   type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
 
@@ -7256,6 +7257,85 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   if (unwrappedToType->isAnyObject()) {
     countOptionalInjections();
     return SolutionKind::Solved;
+  }
+
+  // In a previous version of Swift, we could accidently drop the coercion
+  // constraint in certain cases. In most cases this led to either miscompiles
+  // or crashes later down the pipeline, but for coercions between collections
+  // we generated somewhat reasonable code that performed a force cast. To
+  // maintain compatibility with that behavior, allow the coercion between
+  // two collections, but add a warning fix telling the user to use as! or as?
+  // instead.
+  //
+  // We only need to perform this compatibility logic if the LHS type is a
+  // (potentially optional) type variable, as only such a constraint could have
+  // been previously been left unsolved.
+  //
+  // FIXME: Once we get a new language version, change this condition to only
+  // preserve compatibility for Swift 5.x mode.
+  auto canUseCompatFix =
+      rawType1->lookThroughAllOptionalTypes()->isTypeVariableOrMember();
+
+  // Unless we're allowing the collection compatibility fix, the source cannot
+  // be more optional than the destination.
+  if (!canUseCompatFix && numFromOptionals > numToOptionals)
+    return SolutionKind::Error;
+
+  auto makeCollectionResult = [&](SolutionKind result) -> SolutionKind {
+    // If we encountered an error and can use the compatibility fix, do so.
+    if (canUseCompatFix) {
+      if (numFromOptionals > numToOptionals || result == SolutionKind::Error) {
+        auto *loc = getConstraintLocator(locator);
+        auto *fix = AllowCoercionToForceCast::create(*this, type1, type2, loc);
+        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+      }
+    }
+    return result;
+  };
+
+  // Bridging the elements of an array.
+  if (auto fromElement = isArrayType(unwrappedFromType)) {
+    if (auto toElement = isArrayType(unwrappedToType)) {
+      countOptionalInjections();
+      auto result = simplifyBridgingConstraint(
+          *fromElement, *toElement, subflags,
+          locator.withPathElement(LocatorPathElt::GenericArgument(0)));
+      return makeCollectionResult(result);
+    }
+  }
+
+  // Bridging the keys/values of a dictionary.
+  if (auto fromKeyValue = isDictionaryType(unwrappedFromType)) {
+    if (auto toKeyValue = isDictionaryType(unwrappedToType)) {
+      ConstraintFix *compatFix = nullptr;
+      if (canUseCompatFix) {
+        compatFix = AllowCoercionToForceCast::create(
+            *this, type1, type2, getConstraintLocator(locator));
+      }
+      addExplicitConversionConstraint(fromKeyValue->first, toKeyValue->first,
+                                      ForgetChoice,
+                                      locator.withPathElement(
+                                        LocatorPathElt::GenericArgument(0)),
+                                      compatFix);
+      addExplicitConversionConstraint(fromKeyValue->second, toKeyValue->second,
+                                      ForgetChoice,
+                                      locator.withPathElement(
+                                        LocatorPathElt::GenericArgument(1)),
+                                      compatFix);
+      countOptionalInjections();
+      return makeCollectionResult(SolutionKind::Solved);
+    }
+  }
+
+  // Bridging the elements of a set.
+  if (auto fromElement = isSetType(unwrappedFromType)) {
+    if (auto toElement = isSetType(unwrappedToType)) {
+      countOptionalInjections();
+      auto result = simplifyBridgingConstraint(
+          *fromElement, *toElement, subflags,
+          locator.withPathElement(LocatorPathElt::GenericArgument(0)));
+      return makeCollectionResult(result);
+    }
   }
 
   // The source cannot be more optional than the destination, because bridging
@@ -7345,42 +7425,6 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       countOptionalInjections();
       return matchTypes(unwrappedFromType, objcClass, ConstraintKind::Subtype,
                         subflags, locator);
-    }
-  }
-
-  // Bridging the elements of an array.
-  if (auto fromElement = isArrayType(unwrappedFromType)) {
-    if (auto toElement = isArrayType(unwrappedToType)) {
-      countOptionalInjections();
-      return simplifyBridgingConstraint(
-          *fromElement, *toElement, subflags,
-          locator.withPathElement(LocatorPathElt::GenericArgument(0)));
-    }
-  }
-
-  // Bridging the keys/values of a dictionary.
-  if (auto fromKeyValue = isDictionaryType(unwrappedFromType)) {
-    if (auto toKeyValue = isDictionaryType(unwrappedToType)) {
-      addExplicitConversionConstraint(fromKeyValue->first, toKeyValue->first,
-                                      ForgetChoice,
-                                      locator.withPathElement(
-                                        LocatorPathElt::GenericArgument(0)));
-      addExplicitConversionConstraint(fromKeyValue->second, toKeyValue->second,
-                                      ForgetChoice,
-                                      locator.withPathElement(
-                                        LocatorPathElt::GenericArgument(1)));
-      countOptionalInjections();
-      return SolutionKind::Solved;
-    }
-  }
-
-  // Bridging the elements of a set.
-  if (auto fromElement = isSetType(unwrappedFromType)) {
-    if (auto toElement = isSetType(unwrappedToType)) {
-      countOptionalInjections();
-      return simplifyBridgingConstraint(
-          *fromElement, *toElement, subflags,
-          locator.withPathElement(LocatorPathElt::GenericArgument(0)));
     }
   }
 
@@ -9331,7 +9375,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:
-  case FixKind::SpecifyObjectLiteralTypeImport: {
+  case FixKind::SpecifyObjectLiteralTypeImport:
+  case FixKind::AllowCoercionToForceCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -9795,7 +9840,7 @@ void ConstraintSystem::addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
 
 void ConstraintSystem::addExplicitConversionConstraint(
     Type fromType, Type toType, RememberChoice_t rememberChoice,
-    ConstraintLocatorBuilder locator) {
+    ConstraintLocatorBuilder locator, ConstraintFix *compatFix) {
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
@@ -9813,12 +9858,21 @@ void ConstraintSystem::addExplicitConversionConstraint(
                      fromType, toType, locatorPtr);
   constraints.push_back(bridgingConstraint);
 
+  // If we're allowed to use a compatibility fix that emits a warning on
+  // failure, add it to the disjunction so that it's recorded on failure.
+  if (compatFix) {
+    constraints.push_back(
+        Constraint::createFixed(*this, ConstraintKind::BridgingConversion,
+                                compatFix, fromType, toType, locatorPtr));
+  }
+
   addDisjunctionConstraint(constraints, locator, rememberChoice);
 }
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
-  switch (constraint.getKind()) {
+  auto matchKind = constraint.getKind();
+  switch (matchKind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
@@ -9829,7 +9883,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::OpaqueUnderlyingType: {
     // Relational constraints.
-    auto matchKind = constraint.getKind();
 
     // If there is a fix associated with this constraint, apply it.
     if (auto fix = constraint.getFix()) {
@@ -9853,6 +9906,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 
   case ConstraintKind::BridgingConversion:
+    // If there is a fix associated with this constraint, apply it.
+    if (auto fix = constraint.getFix()) {
+      return simplifyFixConstraint(fix, constraint.getFirstType(),
+                                   constraint.getSecondType(), matchKind, None,
+                                   constraint.getLocator());
+    }
+
     return simplifyBridgingConstraint(constraint.getFirstType(),
                                       constraint.getSecondType(),
                                       None, constraint.getLocator());

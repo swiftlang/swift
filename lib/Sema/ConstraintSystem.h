@@ -2861,9 +2861,12 @@ public:
   /// \param rememberChoice Whether the conversion disjunction should record its
   /// choice.
   /// \param locator The locator.
+  /// \param compatFix A compatibility fix that can be applied if the conversion
+  /// fails.
   void addExplicitConversionConstraint(Type fromType, Type toType,
                                        RememberChoice_t rememberChoice,
-                                       ConstraintLocatorBuilder locator);
+                                       ConstraintLocatorBuilder locator,
+                                       ConstraintFix *compatFix = nullptr);
 
   /// Add a disjunction constraint.
   void
