@@ -620,11 +620,15 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       return cast<SubscriptDecl>(accessor->getStorage())->getGenericSignature();
     }
 
-  // ...or we may have a where clause dependent on outer generic parameters.
+  // ...or we may only have a contextual where clause.
   } else if (const auto *where = GC->getTrailingWhereClause()) {
     // If there is no generic context for the where clause to
     // rely on, diagnose that now and bail out.
-    if (!GC->isGenericContext()) {
+    if (GC->getParent()->isModuleScopeContext()) {
+      GC->getASTContext().Diags.diagnose(where->getWhereLoc(),
+                                         diag::where_nongeneric_toplevel);
+      return nullptr;
+    } else if (!GC->isGenericContext()) {
       GC->getASTContext().Diags.diagnose(where->getWhereLoc(),
                                          diag::where_nongeneric_ctx);
       return nullptr;
