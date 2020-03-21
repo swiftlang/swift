@@ -6,7 +6,8 @@ func returnsUninhabited() -> Uninhabited {}
 func acceptsInt(_ x: Int) {}
 protocol Proto {}
 func acceptsProto(_ x: Proto) {}
-func acceptsGenericParamConstrainedToProto<T: Proto>(_ x: T) {}
+func acceptsIntAutoclosure(_ x: @autoclosure () -> Int) {}
+func acceptsInoutInt(_ x: inout Int) {}
 
 let x: Int = returnsUninhabited()
 let y: (Int, String) = (1, returnsUninhabited())
@@ -17,4 +18,36 @@ acceptsInt(returnsUninhabited())
 let a: Int = returnsUninhabited() + returnsUninhabited()
 
 acceptsProto(returnsUninhabited())
-acceptsGenericParamConstrainedToProto(returnsUninhabited())
+
+(returnsUninhabited() as ()->Void)()
+
+_ = returnsUninhabited() == (returnsUninhabited() as String)
+
+let singleExprClosure: ()->String = { returnsUninhabited() }
+let closure: ()->String = { return returnsUninhabited() }
+
+let ternaryResult: Int = true ? 1 : returnsUninhabited()
+
+_ = "\(returnsUninhabited())"
+
+_ = try! (returnsUninhabited() as (Int) throws -> Int)(42)
+
+let _: [Int?] = [1,2,3, nil, returnsUninhabited()]
+
+let _: [String:Int] = ["" : 1, "a": 2, "b": returnsUninhabited()]
+
+acceptsIntAutoclosure(returnsUninhabited())
+
+var mutableVar = 1
+acceptsInoutInt(&mutableVar)
+
+if returnsUninhabited() {}
+guard returnsUninhabited() else { returnsUninhabited() }
+while returnsUninhabited() {}
+repeat {} while returnsUninhabited()
+switch 1 {
+case returnsUninhabited():
+  break
+default:
+  break
+}
