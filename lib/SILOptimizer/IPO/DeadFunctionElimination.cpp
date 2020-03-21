@@ -591,6 +591,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     // SWIFT_ENABLE_TENSORFLOW
     // Check differentiable function witness entries.
     for (auto &dw : Module->getDifferentiabilityWitnessList()) {
+      ensureAlive(dw.getOriginalFunction());
       if (dw.getJVP())
         ensureAlive(dw.getJVP());
       if (dw.getVJP())
