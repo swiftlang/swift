@@ -1,3 +1,4 @@
+// REQUIRES: tsan_runtime
 // This test verifies that we add the function attributes used by TSan.
 
 // RUN: %target-swift-frontend -emit-ir -sanitize=thread %s | %FileCheck %s -check-prefix=TSAN

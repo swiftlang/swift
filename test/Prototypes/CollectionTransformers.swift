@@ -200,7 +200,7 @@ import Darwin
 import Dispatch
 
 // FIXME: port to Linux.
-// XFAIL: linux, windows
+// XFAIL: linux, windows, openbsd
 
 // A wrapper for pthread_t with platform-independent interface.
 public struct _stdlib_pthread_t : Equatable, Hashable {

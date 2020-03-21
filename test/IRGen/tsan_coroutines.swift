@@ -1,3 +1,4 @@
+// REQUIRES: tsan_runtime
 // This test case used to crash when tsan ran before co-routine lowering.
 // RUN: %target-swift-frontend -emit-ir -sanitize=thread %s | %FileCheck %s
 
