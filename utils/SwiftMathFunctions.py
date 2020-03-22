@@ -3,6 +3,7 @@
 # apple/swift master branch and moved to apple/swift-numerics.
 # TF-1203 tracks eliminating these ad-hoc tensorflow branch changes.
 
+
 class SwiftMathFunction(object):
     def __init__(self, name, kind=None, swiftName=None, args="x", comment=None,
                  platforms=None):
