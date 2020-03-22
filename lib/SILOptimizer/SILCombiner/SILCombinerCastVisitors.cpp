@@ -31,6 +31,9 @@ using namespace swift::PatternMatch;
 
 SILInstruction *
 SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
+  if (RRPI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Ref to raw pointer consumption of other ref casts.
   if (auto *URCI = dyn_cast<UncheckedRefCastInst>(RRPI->getOperand())) {
     // (ref_to_raw_pointer (unchecked_ref_cast x))
@@ -57,6 +60,9 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
 }
 
 SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
+  if (UCI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Ref to raw pointer consumption of other ref casts.
   //
   // (upcast (upcast x)) -> (upcast x)
@@ -72,6 +78,8 @@ SILInstruction *
 SILCombiner::
 visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   auto *F = PTAI->getFunction();
+  if (F->hasOwnership())
+    return nullptr;
 
   Builder.setCurrentDebugScope(PTAI->getDebugScope());
 
@@ -200,6 +208,9 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
 
 SILInstruction *
 SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
+  if (UADCI->getFunction()->hasOwnership())
+    return nullptr;
+
   Builder.setCurrentDebugScope(UADCI->getDebugScope());
 
   // (unchecked-addr-cast (unchecked-addr-cast x X->Y) Y->Z)
@@ -221,6 +232,9 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
 
 SILInstruction *
 SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
+  if (URCI->getFunction()->hasOwnership())
+    return nullptr;
+
   // (unchecked-ref-cast (unchecked-ref-cast x X->Y) Y->Z)
   //   ->
   // (unchecked-ref-cast x X->Z)
@@ -253,6 +267,8 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
 
 SILInstruction *
 SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
+  if (BORI->getFunction()->hasOwnership())
+    return nullptr;
   // Fold noop casts through Builtin.BridgeObject.
   // (bridge_object_to_ref (unchecked-ref-cast x BridgeObject) y)
   //  -> (unchecked-ref-cast x y)
@@ -266,6 +282,9 @@ SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
 
 SILInstruction *
 SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
+  if (URCI->getFunction()->hasOwnership())
+    return nullptr;
+
   SILType SrcTy = URCI->getSrc()->getType();
   if (!SrcTy.isLoadable(*URCI->getFunction()))
     return nullptr;
@@ -301,6 +320,9 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
+  if (UCCAI->getFunction()->hasOwnership())
+    return nullptr;
+
   if (CastOpt.optimizeUnconditionalCheckedCastAddrInst(UCCAI))
     MadeChange = true;
 
@@ -310,6 +332,9 @@ visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
+  if (UCCI->getFunction()->hasOwnership())
+    return nullptr;
+
   if (CastOpt.optimizeUnconditionalCheckedCastInst(UCCI)) {
     MadeChange = true;
     return nullptr;
@@ -338,6 +363,9 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
 SILInstruction *
 SILCombiner::
 visitRawPointerToRefInst(RawPointerToRefInst *RawToRef) {
+  if (RawToRef->getFunction()->hasOwnership())
+    return nullptr;
+
   // (raw_pointer_to_ref (ref_to_raw_pointer x X->Y) Y->Z)
   //   ->
   // (unchecked_ref_cast X->Z)
@@ -353,6 +381,9 @@ visitRawPointerToRefInst(RawPointerToRefInst *RawToRef) {
 SILInstruction *
 SILCombiner::
 visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
+  if (UTBCI->getFunction()->hasOwnership())
+    return nullptr;
+
   // (unchecked_trivial_bit_cast Y->Z
   //                                 (unchecked_trivial_bit_cast X->Y x))
   //   ->
@@ -406,6 +437,9 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
 
 SILInstruction *
 SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
+  if (TTOCMI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Perform the following transformations:
   // (thick_to_objc_metatype (metatype @thick)) ->
   // (metatype @objc_metatype)
@@ -423,6 +457,9 @@ SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
 
 SILInstruction *
 SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
+  if (OCTTMI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Perform the following transformations:
   // (objc_to_thick_metatype (metatype @objc_metatype)) ->
   // (metatype @thick)
@@ -440,6 +477,9 @@ SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
 
 SILInstruction *
 SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
+  if (CBI->getFunction()->hasOwnership())
+    return nullptr;
+
   if (CastOpt.optimizeCheckedCastBranchInst(CBI))
     MadeChange = true;
 
@@ -449,6 +489,9 @@ SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
 SILInstruction *
 SILCombiner::
 visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
+  if (CCABI->getFunction()->hasOwnership())
+    return nullptr;
+
   if (CastOpt.optimizeCheckedCastAddrBranchInst(CCABI))
     MadeChange = true;
 
@@ -457,6 +500,9 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
 
 SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *Cvt) {
+  if (Cvt->getFunction()->hasOwnership())
+    return nullptr;
+
   auto *OrigThinToThick =
       dyn_cast<ThinToThickFunctionInst>(Cvt->getConverted());
   if (!OrigThinToThick)
@@ -470,6 +516,9 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
 }
 
 SILInstruction *SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *CFI) {
+  if (CFI->getFunction()->hasOwnership())
+    return nullptr;
+
   // If this conversion only changes substitutions, then rewrite applications
   // of the converted function as applications of the original.
   //
