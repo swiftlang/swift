@@ -77,6 +77,42 @@ struct AutoDiffDerivativeFunctionKind {
   }
 };
 
+/// A derivative function configuration, uniqued in `ASTContext`.
+/// Identifies a specific derivative function given an original function.
+class AutoDiffDerivativeFunctionIdentifier : public llvm::FoldingSetNode {
+  const AutoDiffDerivativeFunctionKind kind;
+  IndexSubset *const parameterIndices;
+  GenericSignature derivativeGenericSignature;
+
+  AutoDiffDerivativeFunctionIdentifier(
+      AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
+      GenericSignature derivativeGenericSignature)
+      : kind(kind), parameterIndices(parameterIndices),
+        derivativeGenericSignature(derivativeGenericSignature) {}
+
+public:
+  AutoDiffDerivativeFunctionKind getKind() const { return kind; }
+  IndexSubset *getParameterIndices() const {
+    return parameterIndices;
+  }
+  GenericSignature getDerivativeGenericSignature() const {
+    return derivativeGenericSignature;
+  }
+
+  static AutoDiffDerivativeFunctionIdentifier *
+  get(AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
+      GenericSignature derivativeGenericSignature, ASTContext &C);
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    ID.AddInteger(kind);
+    ID.AddPointer(parameterIndices);
+    CanGenericSignature derivativeCanGenSig;
+    if (derivativeGenericSignature)
+      derivativeCanGenSig = derivativeGenericSignature->getCanonicalSignature();
+    ID.AddPointer(derivativeCanGenSig.getPointer());
+  }
+};
+
 /// The kind of a differentiability witness function.
 struct DifferentiabilityWitnessFunctionKind {
   enum innerty : uint8_t {
@@ -566,45 +602,6 @@ struct LinearDifferentiableFunctionTypeComponent {
       : LinearDifferentiableFunctionTypeComponent((innerty)rawValue) {}
   explicit LinearDifferentiableFunctionTypeComponent(StringRef name);
   operator innerty() const { return rawValue; }
-};
-
-/// In conjunction with the original function declaration, identifies an
-/// autodiff derivative function.
-///
-/// Is uniquely allocated within an ASTContext so that it can be hashed and
-/// compared by opaque pointer value.
-class AutoDiffDerivativeFunctionIdentifier : public llvm::FoldingSetNode {
-  const AutoDiffDerivativeFunctionKind kind;
-  IndexSubset *const parameterIndices;
-  GenericSignature derivativeGenericSignature;
-
-  AutoDiffDerivativeFunctionIdentifier(
-      AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
-      GenericSignature derivativeGenericSignature)
-      : kind(kind), parameterIndices(parameterIndices),
-        derivativeGenericSignature(derivativeGenericSignature) {}
-
-public:
-  AutoDiffDerivativeFunctionKind getKind() const { return kind; }
-  IndexSubset *getParameterIndices() const {
-    return parameterIndices;
-  }
-  GenericSignature getDerivativeGenericSignature() const {
-    return derivativeGenericSignature;
-  }
-
-  static AutoDiffDerivativeFunctionIdentifier *
-  get(AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
-      GenericSignature derivativeGenericSignature, ASTContext &C);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    ID.AddInteger(kind);
-    ID.AddPointer(parameterIndices);
-    CanGenericSignature derivativeCanGenSig;
-    if (derivativeGenericSignature)
-      derivativeCanGenSig = derivativeGenericSignature->getCanonicalSignature();
-    ID.AddPointer(derivativeCanGenSig.getPointer());
-  }
 };
 
 /// The key type used for uniquing `SILDifferentiabilityWitness` in

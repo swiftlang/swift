@@ -3089,26 +3089,44 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
     ::getUncachedSILFunctionTypeForConstant(*this, expansion, constant,
                                             loweredInterfaceType);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // For derivative functions, the above computations determine `silFnType`
-  // by first computing the derivative AST function type and then lowering it to
-  // SIL. Unfortunately, the expected derivative SIL function type is determined
-  // by first lowering the original function's AST type, and then computing its
-  // SIL derivative function type. "Lowering" does not commute with "getting the
-  // derivative type", so these two computations produce different results.
-  // Therefore, `silFnType` is not the expected SIL derivative function type.
+  // If the constant refers to a derivative function, get the SIL type of the
+  // original function and use it to compute the derivative SIL type.
   //
-  // We fix this problem by performing the computation in the right order.
-  if (auto *autoDiffFuncId = constant.autoDiffDerivativeFunctionIdentifier) {
+  // This is necessary because the "lowered AST derivative function type" (BC)
+  // may differ from the "derivative type of the lowered original function type"
+  // (AD):
+  //
+  // +--------------------+       lowering      +--------------------+
+  // | AST orig.  fn type |  -------(A)------>  | SIL orig.  fn type |
+  // +--------------------+                     +--------------------+
+  //         |                                                |
+  //    (B, Sema)   getAutoDiffDerivativeFunctionType     (D, here)
+  //         V                                                V
+  // +--------------------+       lowering      +--------------------+
+  // | AST deriv. fn type |  -------(C)------>  | SIL deriv. fn type |
+  // +--------------------+                     +--------------------+
+  //
+  // (AD) does not always commute with (BC):
+  // - (BC) is the result of computing the AST derivative type (Sema), then
+  //   lowering it via SILGen. This is the default lowering behavior, but may
+  //   break SIL typing invariants because expected lowered derivative types are
+  //   computed from lowered original function types.
+  // - (AD) is the result of lowering the original function type, then computing
+  //   its derivative type. This is the expected lowered derivative type,
+  //   preserving SIL typing invariants.
+  //
+  // Always use (AD) to compute lowered derivative function types.
+  if (auto *derivativeId = constant.derivativeFunctionIdentifier) {
+    // Get lowered original function type.
     auto origFnConstantInfo = getConstantInfo(
         TypeExpansionContext::minimal(), constant.asAutoDiffOriginalFunction());
-    auto loweredIndices = autodiff::getLoweredParameterIndices(
-        autoDiffFuncId->getParameterIndices(), formalInterfaceType);
+    // Use it to compute lowered derivative function type.
+    auto *loweredIndices = autodiff::getLoweredParameterIndices(
+        derivativeId->getParameterIndices(), formalInterfaceType);
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
-        loweredIndices, /*resultIndex*/ 0, autoDiffFuncId->getKind(),
+        loweredIndices, /*resultIndex*/ 0, derivativeId->getKind(),
         *this, LookUpConformanceInModule(&M));
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
              constant.print(llvm::dbgs());

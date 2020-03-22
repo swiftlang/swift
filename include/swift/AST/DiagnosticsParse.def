@@ -504,9 +504,9 @@ ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
 ERROR(expected_sil_tuple_index,none,
       "expected tuple element index", ())
-// SWIFT_ENABLE_TENSORFLOW
-ERROR(malformed_autodiff_parameter_indices,none,
-      "malformed autodiff parameter indices", ())
+ERROR(invalid_index_subset,none,
+      "invalid index subset; expected '[SU]+' where 'S' represents set indices "
+      "and 'U' represents unset indices", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,

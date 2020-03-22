@@ -2189,14 +2189,13 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
-  // SWIFT_ENABLE_TENSORFLOW
-  if (auto *autoDiffFuncId = c.autoDiffDerivativeFunctionIdentifier) {
+  if (auto *derivativeId = c.derivativeFunctionIdentifier) {
     auto originalFnTy =
         makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
-    auto *fnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        autoDiffFuncId->getParameterIndices(), autoDiffFuncId->getKind(),
+    auto *derivativeFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
+        derivativeId->getParameterIndices(), derivativeId->getKind(),
         LookUpConformanceInModule(&M));
-    return cast<AnyFunctionType>(fnTy->getCanonicalType());
+    return cast<AnyFunctionType>(derivativeFnTy->getCanonicalType());
   }
 
   auto *vd = c.loc.dyn_cast<ValueDecl *>();

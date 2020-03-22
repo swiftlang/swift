@@ -4573,21 +4573,22 @@ getWitnessFunctionRef(SILGenFunction &SGF,
                       SILLocation loc) {
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
-    if (auto *autoDiffFuncId = witness.autoDiffDerivativeFunctionIdentifier) {
-      auto originalFn = SGF.emitGlobalFunctionRef(
-          loc, witness.asAutoDiffOriginalFunction());
-      auto *loweredIndices = autodiff::getLoweredParameterIndices(
-          autoDiffFuncId->getParameterIndices(),
+    if (auto *derivativeId = witness.derivativeFunctionIdentifier) {
+      auto originalFn =
+          SGF.emitGlobalFunctionRef(loc, witness.asAutoDiffOriginalFunction());
+      auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+          derivativeId->getParameterIndices(),
           witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
-      auto *differentiableFn = SGF.B.createDifferentiableFunction(
-          loc, loweredIndices, originalFn);
+      auto diffFn = SGF.B.createDifferentiableFunction(loc, loweredParamIndices,
+                                                       originalFn);
       return SGF.B.createDifferentiableFunctionExtract(
-          loc, NormalDifferentiableFunctionTypeComponent(autoDiffFuncId->getKind()),
-          differentiableFn);
+          loc,
+          NormalDifferentiableFunctionTypeComponent(derivativeId->getKind()),
+          diffFn);
     }
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
-    assert(!witness.autoDiffDerivativeFunctionIdentifier);
+    assert(!witness.derivativeFunctionIdentifier);
     return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();
   case WitnessDispatchKind::Witness: {
     auto typeAndConf =

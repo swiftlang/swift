@@ -347,11 +347,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
   if (isForeign)
     OS << (isDot ? '.' : '!')  << "foreign";
 
-  // SWIFT_ENABLE_TENSORFLOW
-  if (autoDiffDerivativeFunctionIdentifier) {
-    auto *autoDiffFuncId = autoDiffDerivativeFunctionIdentifier;
+  if (derivativeFunctionIdentifier) {
     OS << ((isDot || isForeign) ? '.' : '!');
-    switch (autoDiffFuncId->getKind()) {
+    switch (derivativeFunctionIdentifier->getKind()) {
     case AutoDiffDerivativeFunctionKind::JVP:
       OS << "jvp.";
       break;
@@ -359,9 +357,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
       OS << "vjp.";
       break;
     }
-    OS << autoDiffFuncId->getParameterIndices()->getString();
+    OS << derivativeFunctionIdentifier->getParameterIndices()->getString();
     if (auto derivativeGenSig =
-            autoDiffFuncId->getDerivativeGenericSignature()) {
+            derivativeFunctionIdentifier->getDerivativeGenericSignature()) {
       OS << "." << derivativeGenSig;
     }
   }

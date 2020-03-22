@@ -34,7 +34,6 @@ namespace swift {
   enum class EffectsKind : uint8_t;
   class AbstractFunctionDecl;
   class AbstractClosureExpr;
-  // SWIFT_ENABLE_TENSORFLOW
   class AutoDiffDerivativeFunctionIdentifier;
   class ValueDecl;
   class FuncDecl;
@@ -149,26 +148,18 @@ struct SILDeclRef {
   unsigned isForeign : 1;
   /// The default argument index for a default argument getter.
   unsigned defaultArgIndex : 10;
-  
-  // SWIFT_ENABLE_TENSORFLOW
-  /// When this is non-null, it modifies the SILDeclRef to refer to the
-  /// corresponding autodiff derivative function.
-  AutoDiffDerivativeFunctionIdentifier *autoDiffDerivativeFunctionIdentifier;
-  // SWIFT_ENABLE_TENSORFLOW END
+  /// The derivative function identifier.
+  AutoDiffDerivativeFunctionIdentifier *derivativeFunctionIdentifier = nullptr;
 
   /// Produces a null SILDeclRef.
   SILDeclRef() : loc(), kind(Kind::Func), isForeign(0), defaultArgIndex(0),
-                 // SWIFT_ENABLE_TENSORFLOW
-                 autoDiffDerivativeFunctionIdentifier(nullptr) {}
-                 // SWIFT_ENABLE_TENSORFLOW END
+                 derivativeFunctionIdentifier(nullptr) {}
   
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
                       bool isForeign = false,
-                      // SWIFT_ENABLE_TENSORFLOW
-                      AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId =
+                      AutoDiffDerivativeFunctionIdentifier *derivativeId =
                           nullptr);
-                      // SWIFT_ENABLE_TENSORFLOW END
   
   /// Produces a SILDeclRef for the given ValueDecl or
   /// AbstractClosureExpr:
@@ -181,8 +172,7 @@ struct SILDeclRef {
   ///   for the containing ClassDecl.
   /// - If 'loc' is a global VarDecl, this returns its GlobalAccessor
   ///   SILDeclRef.
-  explicit SILDeclRef(Loc loc,
-                      bool isForeign = false);
+  explicit SILDeclRef(Loc loc, bool isForeign = false);
 
   /// Produce a SIL constant for a default argument generator.
   static SILDeclRef getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);
@@ -298,10 +288,7 @@ struct SILDeclRef {
       && kind == rhs.kind
       && isForeign == rhs.isForeign
       && defaultArgIndex == rhs.defaultArgIndex
-      // SWIFT_ENABLE_TENSORFLOW
-      && autoDiffDerivativeFunctionIdentifier ==
-             rhs.autoDiffDerivativeFunctionIdentifier;
-      // SWIFT_ENABLE_TENSORFLOW END
+      && derivativeFunctionIdentifier == rhs.derivativeFunctionIdentifier;
   }
   bool operator!=(SILDeclRef rhs) const {
     return !(*this == rhs);
@@ -316,33 +303,28 @@ struct SILDeclRef {
   /// decl.
   SILDeclRef asForeign(bool foreign = true) const {
     return SILDeclRef(loc.getOpaqueValue(), kind,
-                      foreign, defaultArgIndex,
-                      // SWIFT_ENABLE_TENSORFLOW
-                      autoDiffDerivativeFunctionIdentifier);
-                      // SWIFT_ENABLE_TENSORFLOW END
+                      foreign, defaultArgIndex, derivativeFunctionIdentifier);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Returns the entry point for the corresponding autodiff associated
+  /// Returns the entry point for the corresponding autodiff derivative
   /// function.
   SILDeclRef asAutoDiffDerivativeFunction(
-      AutoDiffDerivativeFunctionIdentifier *id) const {
-    assert(!autoDiffDerivativeFunctionIdentifier);
-    SILDeclRef r = *this;
-    r.autoDiffDerivativeFunctionIdentifier = id;
-    return r;
+      AutoDiffDerivativeFunctionIdentifier *derivativeId) const {
+    assert(!derivativeFunctionIdentifier);
+    SILDeclRef declRef = *this;
+    declRef.derivativeFunctionIdentifier = derivativeId;
+    return declRef;
   }
 
   /// Returns the entry point for the original function corresponding to an
   /// autodiff derivative function.
   SILDeclRef asAutoDiffOriginalFunction() const {
-    assert(autoDiffDerivativeFunctionIdentifier);
-    SILDeclRef r = *this;
-    r.autoDiffDerivativeFunctionIdentifier = nullptr;
-    return r;
+    SILDeclRef declRef = *this;
+    declRef.derivativeFunctionIdentifier = nullptr;
+    return declRef;
   }
 
-  /// Returns this `SILDeclRef` with the `loc` replaced with `decl`.
+  /// Returns this `SILDeclRef` replacing `loc` with `decl`.
   SILDeclRef withDecl(ValueDecl *decl) const {
     SILDeclRef result = *this;
     result.loc = decl;
@@ -422,12 +404,10 @@ private:
                       Kind kind,
                       bool isForeign,
                       unsigned defaultArgIndex,
-                      AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId)
+                      AutoDiffDerivativeFunctionIdentifier *derivativeId)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)), kind(kind),
       isForeign(isForeign), defaultArgIndex(defaultArgIndex),
-      // SWIFT_ENABLE_TENSORFLOW
-      autoDiffDerivativeFunctionIdentifier(autoDiffFuncId)
-      // SWIFT_ENABLE_TENSORFLOW END
+      derivativeFunctionIdentifier(derivativeId)
   {}
 
 };
@@ -451,15 +431,11 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
 
   static SILDeclRef getEmptyKey() {
     return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func,
-                      // SWIFT_ENABLE_TENSORFLOW
                       false, 0, nullptr);
-                      // SWIFT_ENABLE_TENSORFLOW END
   }
   static SILDeclRef getTombstoneKey() {
     return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func,
-                      // SWIFT_ENABLE_TENSORFLOW
                       false, 0, nullptr);
-                      // SWIFT_ENABLE_TENSORFLOW END
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
@@ -468,11 +444,9 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
                     ? UnsignedInfo::getHashValue(Val.defaultArgIndex)
                     : 0;
     unsigned h4 = UnsignedInfo::getHashValue(Val.isForeign);
-    // SWIFT_ENABLE_TENSORFLOW
     unsigned h5 =
-        PointerInfo::getHashValue(Val.autoDiffDerivativeFunctionIdentifier);
+        PointerInfo::getHashValue(Val.derivativeFunctionIdentifier);
     return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11);
-    // SWIFT_ENABLE_TENSORFLOW END
   }
   static bool isEqual(swift::SILDeclRef const &LHS,
                       swift::SILDeclRef const &RHS) {

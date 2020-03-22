@@ -1127,7 +1127,6 @@ ForwardModeTests.test("StructMemberwiseInitializer") {
     // Custom initializer with `@differentiable`.
     @differentiable
     init(x: Float) {
-      print(x)
       self.x = x
     }
   }

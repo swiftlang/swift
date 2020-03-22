@@ -1355,7 +1355,6 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 // SWIFT_ENABLE_TENSORFLOW
 ///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)?
 ///                      ('.' sil-decl-autodiff)?
-// SWIFT_ENABLE_TENSORFLOW END
 ///  sil-decl-subref ::= '!' sil-decl-lang
 // SWIFT_ENABLE_TENSORFLOW
 ///  sil-decl-subref ::= '!' sil-decl-autodiff
@@ -1368,40 +1367,33 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 ///  sil-decl-subref-part ::= 'destroyer'
 ///  sil-decl-subref-part ::= 'globalaccessor'
 ///  sil-decl-lang ::= 'foreign'
-// SWIFT_ENABLE_TENSORFLOW
-///  sil-decl-autodiff ::= sil-decl-autodiff-kind '.' sil-decl-autodiff-order
-///                        '.' sil-decl-autodiff-indices
+///  sil-decl-autodiff ::= sil-decl-autodiff-kind '.' sil-decl-autodiff-indices
 ///  sil-decl-autodiff-kind ::= 'jvp'
 ///  sil-decl-autodiff-kind ::= 'vjp'
-///  sil-decl-autodiff-order ::= [0-9]+
-///  sil-decl-autodiff-indices ::= [FM][SU]+
-// SWIFT_ENABLE_TENSORFLOW END
+///  sil-decl-autodiff-indices ::= [SU]+
 bool SILParser::parseSILDeclRef(SILDeclRef &Result,
                                 SmallVectorImpl<ValueDecl *> &values) {
   ValueDecl *VD;
   if (parseSILDottedPath(VD, values))
     return true;
 
-  // Initialize Kind and IsObjC.
+  // Initialize SILDeclRef components.
   SILDeclRef::Kind Kind = SILDeclRef::Kind::Func;
   bool IsObjC = false;
-  // SWIFT_ENABLE_TENSORFLOW
-  AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId = nullptr;
+  AutoDiffDerivativeFunctionIdentifier *DerivativeId = nullptr;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
-    Result = SILDeclRef(VD, Kind, IsObjC);
+    Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
     return false;
   }
 
-  // Handle sil-constant-kind-and-uncurry-level.
-  // ParseState indicates the value we just handled.
-  // 1 means we just handled Kind.
-  // We accept func|getter|setter|...|foreign when ParseState is 0;
-  // accept foreign when ParseState is 1.
-  // SWIFT_ENABLE_TENSORFLOW
-  // accept autodiff identifier when ParseState is 2.
-  // SWIFT_ENABLE_TENSORFLOW END
+  // Handle SILDeclRef components. ParseState tracks the last parsed component.
+  //
+  // When ParseState is 0, accept kind (`func|getter|setter|...`) and set
+  // ParseState to 1.
+  //
+  // Always accept `foreign` and derivative function identifier.
   unsigned ParseState = 0;
   Identifier Id;
   do {
@@ -1470,18 +1462,11 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (Id.str() == "foreign") {
         IsObjC = true;
         break;
-      // SWIFT_ENABLE_TENSORFLOW
       } else if (Id.str() == "jvp" || Id.str() == "vjp") {
-        AutoDiffDerivativeFunctionKind kind;
         IndexSubset *parameterIndices = nullptr;
         GenericSignature derivativeGenSig;
         // Parse derivative function kind.
-        if (Id.str() == "jvp")
-          kind = AutoDiffDerivativeFunctionKind::JVP;
-        else if (Id.str() == "vjp")
-          kind = AutoDiffDerivativeFunctionKind::VJP;
-        else
-          llvm_unreachable("Should only have JVP and VJP here");
+        AutoDiffDerivativeFunctionKind derivativeKind(Id.str());
         if (!P.consumeIf(tok::period)) {
           P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ".");
           return true;
@@ -1490,7 +1475,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         parameterIndices = IndexSubset::getFromString(
             SILMod.getASTContext(), P.Tok.getText());
         if (!parameterIndices) {
-          P.diagnose(P.Tok, diag::malformed_autodiff_parameter_indices);
+          P.diagnose(P.Tok, diag::invalid_index_subset);
           return true;
         }
         P.consumeToken();
@@ -1504,22 +1489,20 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
           auto *derivativeGenEnv = handleSILGenericParams(genericParams, &P.SF);
           derivativeGenSig = derivativeGenEnv->getGenericSignature();
         }
-        autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
-            kind, parameterIndices, derivativeGenSig,
+        DerivativeId = AutoDiffDerivativeFunctionIdentifier::get(
+            derivativeKind, parameterIndices, derivativeGenSig,
             SILMod.getASTContext());
         break;
-      // SWIFT_ENABLE_TENSORFLOW END
-      } else
+      } else {
         break;
+      }
     } else
       break;
 
   } while (P.consumeIf(tok::period));
 
   // Construct SILDeclRef.
-  // SWIFT_ENABLE_TENSORFLOW
-  Result = SILDeclRef(VD, Kind, IsObjC, autoDiffFuncId);
-  // SWIFT_ENABLE_TENSORFLOW END
+  Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
   return false;
 }
 

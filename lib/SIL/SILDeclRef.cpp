@@ -115,20 +115,13 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
                        bool isForeign,
-                       // SWIFT_ENABLE_TENSORFLOW
-                       AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId)
-                       // SWIFT_ENABLE_TENSORFLOW END
+                       AutoDiffDerivativeFunctionIdentifier *derivativeId)
   : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0),
-    // SWIFT_ENABLE_TENSORFLOW
-    autoDiffDerivativeFunctionIdentifier(autoDiffFuncId)
-    // SWIFT_ENABLE_TENSORFLOW END
+    derivativeFunctionIdentifier(derivativeId)
 {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign) 
-  : defaultArgIndex(0),
-    // SWIFT_ENABLE_TENSORFLOW
-    autoDiffDerivativeFunctionIdentifier(nullptr)
-    // SWIFT_ENABLE_TENSORFLOW END
+  : defaultArgIndex(0), derivativeFunctionIdentifier(nullptr)
 {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
@@ -662,18 +655,17 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   using namespace Mangle;
   ASTMangler mangler;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  if (autoDiffDerivativeFunctionIdentifier) {
+  if (derivativeFunctionIdentifier) {
     std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(
-        autoDiffDerivativeFunctionIdentifier->getParameterIndices(),
+        derivativeFunctionIdentifier->getParameterIndices(),
         getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
     auto &ctx = getDecl()->getASTContext();
     auto *resultIndices = IndexSubset::get(ctx, 1, {0});
     AutoDiffConfig silConfig(
         silParameterIndices, resultIndices,
-        autoDiffDerivativeFunctionIdentifier->getDerivativeGenericSignature());
-    auto derivativeFnKind = autoDiffDerivativeFunctionIdentifier->getKind();
+        derivativeFunctionIdentifier->getDerivativeGenericSignature());
+    auto derivativeFnKind = derivativeFunctionIdentifier->getKind();
     return mangler.mangleAutoDiffDerivativeFunctionHelper(
         originalMangled, derivativeFnKind, silConfig);
   }
@@ -789,48 +781,53 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   llvm_unreachable("bad entity kind!");
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
-static bool autoDiffDerivativeFunctionRequiresNewVTableEntry(SILDeclRef ref) {
-  assert(ref.autoDiffDerivativeFunctionIdentifier);
-  auto overridden = ref.getOverridden();
+// FIXME(TF-1213): Also consider derived declaration `@derivative` attributes.
+static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
+  assert(declRef.derivativeFunctionIdentifier &&
+         "Expected a derivative function SILDeclRef");
+  auto overridden = declRef.getOverridden();
   if (!overridden)
     return false;
-  // Get derived `@differentiable` attribute.
-  auto *derivedDA = *llvm::find_if(
-      ref.getDecl()->getAttrs().getAttributes<DifferentiableAttr>(),
-      [&](const DifferentiableAttr *derivedAttr) {
-        return derivedAttr->getParameterIndices() ==
-               ref.autoDiffDerivativeFunctionIdentifier->getParameterIndices();
+  // Get the derived `@differentiable` attribute.
+  auto *derivedDiffAttr = *llvm::find_if(
+      declRef.getDecl()->getAttrs().getAttributes<DifferentiableAttr>(),
+      [&](const DifferentiableAttr *derivedDiffAttr) {
+        return derivedDiffAttr->getParameterIndices() ==
+               declRef.derivativeFunctionIdentifier->getParameterIndices();
       });
-  assert(derivedDA && "Expected `@differentiable` attribute");
-  // If the derived `@differentiable` attribute specifies a JVP/VJP,
-  switch (ref.autoDiffDerivativeFunctionIdentifier->getKind()) {
+  assert(derivedDiffAttr && "Expected `@differentiable` attribute");
+  // If the derived `@differentiable` attribute specifies a derivative function,
+  // then a new vtable entry is needed. Return true.
+  switch (declRef.derivativeFunctionIdentifier->getKind()) {
   case AutoDiffDerivativeFunctionKind::JVP:
-    if (!overridden.requiresNewVTableEntry() && derivedDA->getJVP())
+    if (!overridden.requiresNewVTableEntry() && derivedDiffAttr->getJVP())
       return true;
     break;
   case AutoDiffDerivativeFunctionKind::VJP:
-    if (!overridden.requiresNewVTableEntry() && derivedDA->getVJP())
+    if (!overridden.requiresNewVTableEntry() && derivedDiffAttr->getVJP())
       return true;
     break;
   }
-  auto baseDAs =
+  // Otherwise, if the base `@differentiable` attribute specifies a derivative
+  // function, then the derivative is inherited and no new vtable entry is
+  // needed. Return false.
+  auto baseDiffAttrs =
       overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
-  for (auto *baseDA : baseDAs) {
-    if (baseDA->getParameterIndices() ==
-        ref.autoDiffDerivativeFunctionIdentifier->getParameterIndices())
+  for (auto *baseDiffAttr : baseDiffAttrs) {
+    if (baseDiffAttr->getParameterIndices() ==
+        declRef.derivativeFunctionIdentifier->getParameterIndices())
       return false;
   }
+  // Otherwise, if there is no base `@differentiable` attribute exists, then a
+  // new vtable entry is needed. Return true.
   return true;
 }
 
 bool SILDeclRef::requiresNewVTableEntry() const {
-  // SWIFT_ENABLE_TENSORFLOW
-  if (autoDiffDerivativeFunctionIdentifier)
-    if (autoDiffDerivativeFunctionRequiresNewVTableEntry(*this))
+  if (derivativeFunctionIdentifier)
+    if (derivativeFunctionRequiresNewVTableEntry(*this))
       return true;
-  // SWIFT_ENABLE_TENSORFLOW END
   if (cast<AbstractFunctionDecl>(getDecl())->needsNewVTableEntry())
     return true;
   return false;
@@ -850,11 +847,7 @@ SILDeclRef SILDeclRef::getOverridden() const {
   auto overridden = getDecl()->getOverriddenDecl();
   if (!overridden)
     return SILDeclRef();
-
-  // SWIFT_ENABLE_TENSORFLOW
-  return SILDeclRef(overridden, kind, isForeign,
-                    autoDiffDerivativeFunctionIdentifier);
-  // SWIFT_ENABLE_TENSORFLOW END
+  return SILDeclRef(overridden, kind, isForeign, derivativeFunctionIdentifier);
 }
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
@@ -906,21 +899,19 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (isa<ExtensionDecl>(overridden.getDecl()->getDeclContext()))
       return SILDeclRef();
 
-    // SWIFT_ENABLE_TENSORFLOW
     // JVPs/VJPs are overridden only if the base declaration has a
     // `@differentiable` with the same parameter indices.
-    if (autoDiffDerivativeFunctionIdentifier) {
+    if (derivativeFunctionIdentifier) {
       auto overriddenAttrs =
           overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
       for (const auto *attr : overriddenAttrs) {
         if (attr->getParameterIndices() !=
-            autoDiffDerivativeFunctionIdentifier->getParameterIndices())
+            derivativeFunctionIdentifier->getParameterIndices())
           continue;
 
         // TODO(TF-1056): Do we need to check generic signature requirements?
-        auto *overriddenDerivativeId =
-            overridden.autoDiffDerivativeFunctionIdentifier;
-        overridden.autoDiffDerivativeFunctionIdentifier =
+        auto *overriddenDerivativeId = overridden.derivativeFunctionIdentifier;
+        overridden.derivativeFunctionIdentifier =
             AutoDiffDerivativeFunctionIdentifier::get(
                 overriddenDerivativeId->getKind(),
                 overriddenDerivativeId->getParameterIndices(),
@@ -930,7 +921,6 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
       }
       return SILDeclRef();
     }
-    // SWIFT_ENABLE_TENSORFLOW END
     return overridden;
   }
   return SILDeclRef();
@@ -939,9 +929,8 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
 SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
   auto bestOverridden =
     getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-  // SWIFT_ENABLE_TENSORFLOW
-  return SILDeclRef(bestOverridden, kind, autoDiffDerivativeFunctionIdentifier);
-  // SWIFT_ENABLE_TENSORFLOW END
+  return SILDeclRef(bestOverridden, kind, isForeign,
+                    derivativeFunctionIdentifier);
 }
 
 AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(

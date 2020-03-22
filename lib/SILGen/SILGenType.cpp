@@ -90,15 +90,14 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     implFn = getDynamicThunk(
         derived, Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
                      .SILFnType);
-  // SWIFT_ENABLE_TENSORFLOW
-  } else if (auto *adafi = derived.autoDiffDerivativeFunctionIdentifier) {
+  } else if (auto *derivativeId = derived.derivativeFunctionIdentifier) {
     // For JVP/VJP methods, create a vtable entry thunk. The thunk contains an
     // `differentiable_function` instruction, which is later filled during the
     // differentiation transform.
-    auto derivedFnType = Types.getConstantInfo(
-        TypeExpansionContext::minimal(), derived).SILFnType;
+    auto derivedFnType =
+        Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
+            .SILFnType;
     implFn = getOrCreateAutoDiffClassMethodThunk(derived, derivedFnType);
-  // SWIFT_ENABLE_TENSORFLOW END
   } else {
     implFn = getFunction(derived, NotForDefinition);
   }
@@ -168,17 +167,16 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
         cast<ConstructorDecl>(derivedDecl),
         base.kind == SILDeclRef::Kind::Allocator);
     }
-  }
-  // SWIFT_ENABLE_TENSORFLOW
-  // TODO: Use proper mangling.
-  if (auto *adafi = derived.autoDiffDerivativeFunctionIdentifier) {
-    switch (adafi->getKind()) {
+    // TODO(TF-685): Use proper autodiff thunk mangling.
+    if (auto *derivativeId = derived.derivativeFunctionIdentifier) {
+      switch (derivativeId->getKind()) {
       case AutoDiffDerivativeFunctionKind::JVP:
         name += "_jvp";
         break;
       case AutoDiffDerivativeFunctionKind::VJP:
         name += "_vjp";
         break;
+      }
     }
   }
 
@@ -395,7 +393,6 @@ public:
     if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(requirementRef.getDecl())) {
         return addMethodImplementation(requirementRef,
-                                       // SWIFT_ENABLE_TENSORFLOW
                                        requirementRef.withDecl(
                                            witness.getDecl()),
                                        witness);
@@ -418,7 +415,6 @@ public:
       witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
 
     return addMethodImplementation(requirementRef,
-                                   // SWIFT_ENABLE_TENSORFLOW
                                    requirementRef.withDecl(witnessAccessor),
                                    witness);
   }
@@ -712,12 +708,10 @@ SILFunction *SILGenModule::emitProtocolWitness(
       conformance.isConcrete() ? conformance.getConcrete() : nullptr;
   std::string nameBuffer =
       NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
-  // SWIFT_ENABLE_TENSORFLOW
-  // TODO: Proper mangling for autodiff witness thunks.
-  if (auto *autoDiffFuncId =
-          requirement.autoDiffDerivativeFunctionIdentifier) {
+  // TODO(TF-685): Proper mangling for derivative witness thunks.
+  if (auto *derivativeId = requirement.derivativeFunctionIdentifier) {
     std::string kindString;
-    switch (autoDiffFuncId->getKind()) {
+    switch (derivativeId->getKind()) {
     case AutoDiffDerivativeFunctionKind::JVP:
       kindString = "jvp";
       break;
@@ -726,7 +720,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
       break;
     }
     nameBuffer = "AD__" + nameBuffer + "_" + kindString + "_" +
-                 autoDiffFuncId->getParameterIndices()->getString();
+                 derivativeId->getParameterIndices()->getString();
   }
 
   // If the thunked-to function is set to be always inlined, do the
