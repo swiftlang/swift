@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -268,11 +268,15 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
          realMinimumCapacity._builtinWordValue, Element.self)
 
       let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
-      let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
-      let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
-
-      _initStorageHeader(
-        count: uninitializedCount, capacity: realCapacity)
+      if let allocSize = _mallocSize(ofAllocation: storageAddr) {
+        let endAddr = storageAddr + allocSize
+        let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
+        _initStorageHeader(
+          count: uninitializedCount, capacity: realCapacity)
+      } else {
+        _initStorageHeader(
+          count: uninitializedCount, capacity: realMinimumCapacity)
+      }
     }
   }
 
