@@ -31,7 +31,6 @@
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
-using namespace swift::ownership;
 
 //===----------------------------------------------------------------------===//
 //                                Declarations
@@ -82,7 +81,7 @@ struct State {
   SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
   State(SILValue value, SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-        ErrorBehaviorKind errorBehavior,
+        LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
         SmallVectorImpl<SILBasicBlock *> *leakingBlocks,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(value), beginBlock(value->getParentBlock()), error(errorBehavior),
@@ -91,7 +90,7 @@ struct State {
 
   State(SILBasicBlock *beginBlock,
         SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-        ErrorBehaviorKind errorBehavior,
+        LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
         SmallVectorImpl<SILBasicBlock *> *leakingBlocks,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(), beginBlock(beginBlock), error(errorBehavior),

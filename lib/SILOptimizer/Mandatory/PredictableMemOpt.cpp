@@ -1197,7 +1197,7 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
     //
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
-    auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
+    auto errorKind = LinearLifetimeChecker::ErrorBehaviorKind::ReturnFalse;
     auto *loadOperand = &load->getAllOperands()[0];
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
     auto error =
@@ -1289,7 +1289,7 @@ void AvailableValueAggregator::addMissingDestroysForCopiedValues(
     //
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
-    auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
+    auto errorKind = LinearLifetimeChecker::ErrorBehaviorKind::ReturnFalse;
     auto *loadOperand = &load->getAllOperands()[0];
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
     auto error =

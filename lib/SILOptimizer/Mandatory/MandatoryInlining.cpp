@@ -73,7 +73,7 @@ static void fixupReferenceCounts(
   DeadEndBlocks deadEndBlocks(pai->getFunction());
   SmallVector<SILBasicBlock *, 4> leakingBlocks;
 
-  auto errorBehavior = ownership::ErrorBehaviorKind::ReturnFalse;
+  auto errorBehavior = LinearLifetimeChecker::ErrorBehaviorKind::ReturnFalse;
 
   // Add a copy of each non-address type capture argument to lifetime extend the
   // captured argument over at least the inlined function and till the end of a

@@ -29,54 +29,54 @@ class SILModule;
 class SILValue;
 class DeadEndBlocks;
 
-namespace ownership {
-
-struct ErrorBehaviorKind {
-  enum inner_t {
-    Invalid = 0,
-    ReturnFalse = 1,
-    PrintMessage = 2,
-    Assert = 4,
-    ReturnFalseOnLeak = 8,
-    PrintMessageAndReturnFalse = PrintMessage | ReturnFalse,
-    PrintMessageAndAssert = PrintMessage | Assert,
-    ReturnFalseOnLeakAssertOtherwise = ReturnFalseOnLeak | Assert,
-  } Value;
-
-  ErrorBehaviorKind() : Value(Invalid) {}
-  ErrorBehaviorKind(inner_t Inner) : Value(Inner) { assert(Value != Invalid); }
-
-  bool shouldAssert() const {
-    assert(Value != Invalid);
-    return Value & Assert;
-  }
-
-  bool shouldReturnFalseOnLeak() const {
-    assert(Value != Invalid);
-    return Value & ReturnFalseOnLeak;
-  }
-
-  bool shouldPrintMessage() const {
-    assert(Value != Invalid);
-    return Value & PrintMessage;
-  }
-
-  bool shouldReturnFalse() const {
-    assert(Value != Invalid);
-    return Value & ReturnFalse;
-  }
-};
-
-} // end namespace ownership
-
 class LinearLifetimeError {
-  ownership::ErrorBehaviorKind errorBehavior;
+public:
+  struct ErrorBehaviorKind {
+    enum inner_t {
+      Invalid = 0,
+      ReturnFalse = 1,
+      PrintMessage = 2,
+      Assert = 4,
+      ReturnFalseOnLeak = 8,
+      PrintMessageAndReturnFalse = PrintMessage | ReturnFalse,
+      PrintMessageAndAssert = PrintMessage | Assert,
+      ReturnFalseOnLeakAssertOtherwise = ReturnFalseOnLeak | Assert,
+    } Value;
+
+    ErrorBehaviorKind() : Value(Invalid) {}
+    ErrorBehaviorKind(inner_t Inner) : Value(Inner) {
+      assert(Value != Invalid);
+    }
+
+    bool shouldAssert() const {
+      assert(Value != Invalid);
+      return Value & Assert;
+    }
+
+    bool shouldReturnFalseOnLeak() const {
+      assert(Value != Invalid);
+      return Value & ReturnFalseOnLeak;
+    }
+
+    bool shouldPrintMessage() const {
+      assert(Value != Invalid);
+      return Value & PrintMessage;
+    }
+
+    bool shouldReturnFalse() const {
+      assert(Value != Invalid);
+      return Value & ReturnFalse;
+    }
+  };
+
+private:
+  ErrorBehaviorKind errorBehavior;
   bool foundUseAfterFree = false;
   bool foundLeak = false;
   bool foundOverConsume = false;
 
 public:
-  LinearLifetimeError(ownership::ErrorBehaviorKind errorBehavior)
+  LinearLifetimeError(ErrorBehaviorKind errorBehavior)
       : errorBehavior(errorBehavior) {}
 
   bool getFoundError() const {
@@ -148,6 +148,8 @@ public:
                         DeadEndBlocks &deadEndBlocks)
       : visitedBlocks(visitedBlocks), deadEndBlocks(deadEndBlocks) {}
 
+  using ErrorBehaviorKind = LinearLifetimeError::ErrorBehaviorKind;
+
   /// Returns true if:
   ///
   /// 1. No consuming uses are reachable from any other consuming use, from any
@@ -167,7 +169,7 @@ public:
   LinearLifetimeError
   checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
              ArrayRef<Operand *> nonConsumingUses,
-             ownership::ErrorBehaviorKind errorBehavior,
+             ErrorBehaviorKind errorBehavior,
              SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
 
   /// Returns true that \p value forms a linear lifetime with consuming uses \p
@@ -176,7 +178,7 @@ public:
   bool validateLifetime(SILValue value, ArrayRef<Operand *> consumingUses,
                         ArrayRef<Operand *> nonConsumingUses) {
     return !checkValue(value, consumingUses, nonConsumingUses,
-                       ownership::ErrorBehaviorKind::ReturnFalse,
+                       ErrorBehaviorKind::ReturnFalse,
                        nullptr /*leakingBlocks*/)
                 .getFoundError();
   }
