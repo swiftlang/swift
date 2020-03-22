@@ -1088,8 +1088,9 @@ Declaration References
 ::
 
   sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
-  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)?
+  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)? ('.' sil-decl-autodiff)?
   sil-decl-subref ::= '!' sil-decl-lang
+  sil-decl-subref ::= '!' sil-decl-autodiff
   sil-decl-subref-part ::= 'getter'
   sil-decl-subref-part ::= 'setter'
   sil-decl-subref-part ::= 'allocator'
@@ -1102,6 +1103,10 @@ Declaration References
   sil-decl-subref-part ::= 'ivarinitializer'
   sil-decl-subref-part ::= 'defaultarg' '.' [0-9]+
   sil-decl-lang ::= 'foreign'
+  sil-decl-autodiff ::= sil-decl-autodiff-kind '.' sil-decl-autodiff-indices
+  sil-decl-autodiff-kind ::= 'jvp'
+  sil-decl-autodiff-kind ::= 'vjp'
+  sil-decl-autodiff-indices ::= [SU]+
 
 Some SIL instructions need to reference Swift declarations directly. These
 references are introduced with the ``#`` sigil followed by the fully qualified
