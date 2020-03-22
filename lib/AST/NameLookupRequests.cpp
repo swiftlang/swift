@@ -211,12 +211,20 @@ SourceLoc swift::extractNearestSourceLoc(const DirectLookupDescriptor &desc) {
 // LookupOperatorRequest computation.
 //----------------------------------------------------------------------------//
 
+ArrayRef<FileUnit *> OperatorLookupDescriptor::getFiles() const {
+  if (auto *module = getModule())
+    return module->getFiles();
+
+  // Return an ArrayRef pointing to the FileUnit in the union.
+  return llvm::makeArrayRef(*fileOrModule.getAddrOfPtr1());
+}
+
 void swift::simple_display(llvm::raw_ostream &out,
                            const OperatorLookupDescriptor &desc) {
   out << "looking up operator ";
   simple_display(out, desc.name);
   out << " in ";
-  simple_display(out, desc.SF);
+  simple_display(out, desc.fileOrModule);
 }
 
 SourceLoc swift::extractNearestSourceLoc(const OperatorLookupDescriptor &desc) {

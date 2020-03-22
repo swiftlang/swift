@@ -1154,22 +1154,20 @@ lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name) {
 template <typename OperatorType>
 llvm::Expected<OperatorType *> LookupOperatorRequest<OperatorType>::evaluate(
     Evaluator &evaluator, OperatorLookupDescriptor desc) const {
-  auto result = lookupOperatorDeclForName<OperatorType>(*desc.SF, desc.diagLoc,
+  auto *file = desc.fileOrModule.get<FileUnit *>();
+  auto result = lookupOperatorDeclForName<OperatorType>(*file, desc.diagLoc,
                                                         desc.name,
                                                         /*includePrivate*/ true);
   if (!result.hasValue())
     return nullptr;
-  if (auto *tracker = desc.SF->getReferencedNameTracker()) {
-    if (!result.getValue() ||
-        result.getValue()->getDeclContext()->getModuleScopeContext() !=
-            desc.SF) {
-      tracker->addTopLevelName(desc.name, desc.isCascading);
-    }
+
+  if (!result.getValue() ||
+      result.getValue()->getDeclContext()->getModuleScopeContext() != file) {
+    namelookup::recordLookupOfTopLevelName(file, desc.name, desc.isCascading);
   }
   if (!result.getValue()) {
-    result = lookupOperatorDeclForName<OperatorType>(desc.SF->getParentModule(),
-                                                     desc.diagLoc,
-                                                     desc.name);
+    result = lookupOperatorDeclForName<OperatorType>(file->getParentModule(),
+                                                     desc.diagLoc, desc.name);
   }
   return result.hasValue() ? result.getValue() : nullptr;
 }

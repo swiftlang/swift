@@ -18,6 +18,7 @@
 
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
@@ -518,28 +519,52 @@ private:
 
 class OperatorLookupDescriptor final {
 public:
-  SourceFile *SF;
+  using Storage = llvm::PointerUnion<FileUnit *, ModuleDecl *>;
+  Storage fileOrModule;
   Identifier name;
   bool isCascading;
   SourceLoc diagLoc;
 
-  OperatorLookupDescriptor(SourceFile *SF, Identifier name, bool isCascading,
-                           SourceLoc diagLoc)
-      : SF(SF), name(name), isCascading(isCascading), diagLoc(diagLoc) {}
+private:
+  OperatorLookupDescriptor(Storage fileOrModule, Identifier name,
+                           bool isCascading, SourceLoc diagLoc)
+      : fileOrModule(fileOrModule), name(name), isCascading(isCascading),
+        diagLoc(diagLoc) {}
+
+public:
+  /// Retrieves the files to perform lookup in.
+  ArrayRef<FileUnit *> getFiles() const;
+
+  /// If this is for a module lookup, returns the module. Otherwise returns
+  /// \c nullptr.
+  ModuleDecl *getModule() const {
+    return fileOrModule.dyn_cast<ModuleDecl *>();
+  }
 
   friend llvm::hash_code hash_value(const OperatorLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.SF, desc.name, desc.isCascading);
+    return llvm::hash_combine(desc.fileOrModule, desc.name, desc.isCascading);
   }
 
   friend bool operator==(const OperatorLookupDescriptor &lhs,
                          const OperatorLookupDescriptor &rhs) {
-    return lhs.SF == rhs.SF && lhs.name == rhs.name &&
+    return lhs.fileOrModule == rhs.fileOrModule && lhs.name == rhs.name &&
            lhs.isCascading == rhs.isCascading;
   }
 
   friend bool operator!=(const OperatorLookupDescriptor &lhs,
                          const OperatorLookupDescriptor &rhs) {
     return !(lhs == rhs);
+  }
+
+  static OperatorLookupDescriptor forFile(FileUnit *file, Identifier name,
+                                          bool isCascading, SourceLoc diagLoc) {
+    return OperatorLookupDescriptor(file, name, isCascading, diagLoc);
+  }
+
+  static OperatorLookupDescriptor forModule(ModuleDecl *mod, Identifier name,
+                                            bool isCascading,
+                                            SourceLoc diagLoc) {
+    return OperatorLookupDescriptor(mod, name, isCascading, diagLoc);
   }
 };
 
