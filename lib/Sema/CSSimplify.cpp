@@ -4494,6 +4494,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   }
 
   if (kind >= ConstraintKind::Subtype) {
+
+    if (type1->isUninhabited()) {
+      conversionsOrFixes.push_back(ConversionRestrictionKind::FromUninhabited);
+    }
+
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
         type2->getClassOrBoundGenericClass() &&
@@ -4801,10 +4806,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return getTypeMatchSuccess();
       }
     }
-  }
-
-  if (kind >= ConstraintKind::Conversion && type1->isUninhabited()) {
-    conversionsOrFixes.push_back(ConversionRestrictionKind::FromUninhabited);
   }
 
   if (kind == ConstraintKind::BindParam) {

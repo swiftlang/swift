@@ -11,6 +11,7 @@ func acceptsInoutInt(_ x: inout Int) {}
 
 let x: Int = returnsUninhabited()
 let y: (Int, String) = (1, returnsUninhabited())
+let yy: (Int, String) = returnsUninhabited()
 let z: Int? = nil
 let zz = z ?? returnsUninhabited()
 
@@ -51,3 +52,17 @@ case returnsUninhabited():
 default:
   break
 }
+
+let cc: ()->Uninhabited = { returnsUninhabited() }
+let c: ()->Int = cc
+
+let f: (Int)->Void = {x in }
+let ff: (Uninhabited)->Void = f
+
+let g: (Int)->Uninhabited = {x in returnsUninhabited()}
+let gg: (Uninhabited)->Int = g
+
+func overloaded(_ x: Uninhabited) {}
+func overloaded(_ x: Int) {}
+
+overloaded(returnsUninhabited())

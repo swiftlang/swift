@@ -438,7 +438,7 @@ ManagedValue Transform::transform(ManagedValue v,
     return SGF.emitOptionalToOptional(Loc, v, loweredResultTy,
                                       transformOptionalPayload);
   }
-  
+
   // Abstraction changes:
 
   //  - functions
@@ -470,6 +470,10 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   // Subtype conversions:
+
+  if (inputSubstType->isUninhabited()) {
+    return SGF.emitUndef(outputSubstType);
+  }
 
   // A base class method returning Self can be used in place of a derived
   // class method returning Self.
@@ -2963,11 +2967,12 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   // Plan the results.  This builds argument values for all the
   // inner indirect results.
   ResultPlanner resultPlanner(SGF, loc);
-  resultPlanner.plan(inputOrigType.getFunctionResultType(),
-                     inputSubstType.getResult(),
-                     outputOrigType.getFunctionResultType(),
-                     outputSubstType.getResult(),
-                     fnType, thunkType, argValues);
+  if (!inputSubstType.getResult()->isUninhabited()) {
+    resultPlanner.plan(
+        inputOrigType.getFunctionResultType(), inputSubstType.getResult(),
+        outputOrigType.getFunctionResultType(), outputSubstType.getResult(),
+        fnType, thunkType, argValues);
+  }
 
   // Add the rest of the arguments.
   forwardFunctionArguments(SGF, loc, fnType, args, argValues);
@@ -2980,10 +2985,14 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
                                /*substitutions*/ {}, argValues);
 
   // Reabstract the result.
-  SILValue outerResult = resultPlanner.execute(innerResult);
-
-  scope.pop();
-  SGF.B.createReturn(loc, outerResult);
+  if (!inputSubstType.getResult()->isUninhabited()) {
+    SILValue outerResult = resultPlanner.execute(innerResult);
+    scope.pop();
+    SGF.B.createReturn(loc, outerResult);
+  } else {
+    scope.pop();
+    SGF.B.createUnreachable(loc);
+  }
 }
 
 /// Build a generic signature and environment for a re-abstraction thunk.
