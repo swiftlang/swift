@@ -101,10 +101,10 @@ public protocol CodingKeyPath: CustomStringConvertible,
   var components: [CodingKey] { get }
 }
 
-extension CodingKey {
+extension CodingKeyPath {
   /// A textual representation of this key path.
   public var description: String {
-    components.map { $0.stringValue }.joined(by: ".")
+    components.map { $0.stringValue }.joined(separator: ".")
   }
 
   /// A textual representation of this key path, suitable for debugging.
@@ -118,8 +118,8 @@ extension CodingKey {
 public extension CodingKeyPath where Self: RawRepresentable, RawValue == String {
   var components: [CodingKey] {
     rawValue
-      .components(separatedBy: ".")
-      .map { _CodingKeyPathComponent(stringValue: $0) }
+      .split(separator: ".")
+      .map { _CodingKeyPathComponent(stringValue: String($0)) }
   }
 }
 

@@ -120,6 +120,17 @@ struct UUIDCodingWrapper : Codable, Equatable {
     }
 }
 
+// A type that uses CodingKeyPath to represent nested keys
+struct CodingKeyPathExample : CodingKeyPath, Equatable {
+  let rootValue: String
+  let nestedValue: String
+  
+  enum CodingKeyPaths: String, CodingKeyPath {
+    case rootValue
+    case nestedValue = "nestedContainer.nestedValue"
+  }
+}
+
 // MARK: - Tests
 class TestCodable : TestCodableSuper {
     // MARK: - AffineTransform
@@ -838,6 +849,23 @@ class TestCodable : TestCodableSuper {
             expectRoundTripEqualityThroughPlist(for: UUIDCodingWrapper(uuid), lineNumber: testLine)
         }
     }
+  
+  // MARK: - CodingKeyPathExample
+  lazy var codingKeyPathExampleValues: [Int: UUID] = [
+    #line: CodingKeyPathExample(rootValue: "rootValue", nestedValue: "nestedValue")
+  ]
+  
+  func test_CodingKeyPathExample_JSON() {
+      for (testLine, codingKeyPathExample) in codingKeyPathExampleValues {
+          expectRoundTripEqualityThroughJSON(for: codingKeyPathExample, lineNumber: testLine)
+      }
+  }
+
+  func test_CodingKeyPathExample_Plist() {
+      for (testLine, codingKeyPathExample) in codingKeyPathExampleValues {
+          expectRoundTripEqualityThroughPlist(for: codingKeyPathExample, lineNumber: testLine)
+      }
+  }
 }
 
 // MARK: - Helper Types
@@ -902,6 +930,8 @@ var tests = [
     "test_URL_Plist" : TestCodable.test_URL_Plist,
     "test_UUID_JSON" : TestCodable.test_UUID_JSON,
     "test_UUID_Plist" : TestCodable.test_UUID_Plist,
+    "test_CodingKeyPathExample_JSON": TestCodable.test_CodingKeyPathExample_JSON,
+    "test_CodingKeyPathExample_Plist": TestCodable.test_CodingKeyPathExample_Plist,
 ]
 
 #if os(macOS)
