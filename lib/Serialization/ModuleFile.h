@@ -731,7 +731,7 @@ public:
   /// Searches the module's operators for one with the given name and fixity.
   ///
   /// If none is found, returns null.
-  OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
+  OperatorDecl *lookupOperator(Identifier name, OperatorFixity fixity);
 
   /// Searches the module's precedence groups for one with the given
   /// name and fixity.

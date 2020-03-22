@@ -7063,6 +7063,28 @@ public:
   }
 };
 
+/// The fixity of an OperatorDecl.
+enum class OperatorFixity : uint8_t {
+  Infix,
+  Prefix,
+  Postfix
+};
+
+inline void simple_display(llvm::raw_ostream &out, OperatorFixity fixity) {
+  switch (fixity) {
+  case OperatorFixity::Infix:
+    out << "infix";
+    return;
+  case OperatorFixity::Prefix:
+    out << "prefix";
+    return;
+  case OperatorFixity::Postfix:
+    out << "postfix";
+    return;
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
 /// Abstract base class of operator declarations.
 class OperatorDecl : public Decl {
   SourceLoc OperatorLoc, NameLoc;
@@ -7088,6 +7110,21 @@ public:
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
         DesignatedNominalTypes(DesignatedNominalTypes) {}
 
+  /// Retrieve the operator's fixity, corresponding to the concrete subclass
+  /// of the OperatorDecl.
+  OperatorFixity getFixity() const {
+    switch (getKind()) {
+#define DECL(Id, Name) case DeclKind::Id: llvm_unreachable("Not an operator!");
+#define OPERATOR_DECL(Id, Name)
+#include "swift/AST/DeclNodes.def"
+    case DeclKind::InfixOperator:
+      return OperatorFixity::Infix;
+    case DeclKind::PrefixOperator:
+      return OperatorFixity::Prefix;
+    case DeclKind::PostfixOperator:
+      return OperatorFixity::Postfix;
+    }
+  }
 
   SourceLoc getOperatorLoc() const { return OperatorLoc; }
   SourceLoc getNameLoc() const { return NameLoc; }

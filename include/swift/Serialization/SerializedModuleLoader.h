@@ -329,7 +329,7 @@ public:
                    const NominalTypeDecl *parent) const override;
 
   virtual OperatorDecl *lookupOperator(Identifier name,
-                                       DeclKind fixity) const override;
+                                       OperatorFixity fixity) const override;
 
   virtual PrecedenceGroupDecl *
   lookupPrecedenceGroup(Identifier name) const override;

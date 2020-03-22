@@ -385,19 +385,18 @@ enum class SelfAccessKind : uint8_t {
 };
 using SelfAccessKindField = BCFixed<2>;
   
-/// Translates an operator DeclKind to a Serialization fixity, whose values are
-/// guaranteed to be stable.
-static inline OperatorKind getStableFixity(DeclKind kind) {
-  switch (kind) {
-  case DeclKind::PrefixOperator:
+/// Translates an operator decl fixity to a Serialization fixity, whose values
+/// are guaranteed to be stable.
+static inline OperatorKind getStableFixity(OperatorFixity fixity) {
+  switch (fixity) {
+  case OperatorFixity::Prefix:
     return Prefix;
-  case DeclKind::PostfixOperator:
+  case OperatorFixity::Postfix:
     return Postfix;
-  case DeclKind::InfixOperator:
+  case OperatorFixity::Infix:
     return Infix;
-  default:
-    llvm_unreachable("unknown operator fixity");
   }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 // These IDs must \em not be renumbered or reordered without incrementing

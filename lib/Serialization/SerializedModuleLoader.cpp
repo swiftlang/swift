@@ -1085,7 +1085,7 @@ SerializedASTFile::lookupNestedType(Identifier name,
 }
 
 OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,
-                                                DeclKind fixity) const {
+                                                OperatorFixity fixity) const {
   return File.lookupOperator(name, fixity);
 }
 
