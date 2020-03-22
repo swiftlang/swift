@@ -619,10 +619,6 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   for (auto conformance : conformances)
     SGM.useConformance(conformance);
 
-  if (concreteFormalType->isUninhabited()) {
-    return emitUndef(existentialTL.getLoweredType());
-  }
-
   // If we're erasing to the 'Error' type, we might be able to get an NSError
   // representation more efficiently.
   auto &ctx = getASTContext();
