@@ -324,6 +324,13 @@ struct SILDeclRef {
     return declRef;
   }
 
+  /// Returns this `SILDeclRef` replacing `loc` with `decl`.
+  SILDeclRef withDecl(ValueDecl *decl) const {
+    SILDeclRef result = *this;
+    result.loc = decl;
+    return result;
+  }
+
   /// True if the decl ref references a thunk from a natively foreign
   /// declaration to Swift calling convention.
   bool isForeignToNativeThunk() const;
