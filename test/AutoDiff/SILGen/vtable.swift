@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-differentiable-programming -emit-silgen %s | %FileCheck %s
+// REQUIRES: differentiable_programming
 
 // Test derivative function vtable entries for `@differentiable` class members:
 // - Methods.
