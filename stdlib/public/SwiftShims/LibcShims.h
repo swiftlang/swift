@@ -282,7 +282,7 @@ float _stdlib_lgammaf(float x) {
   return lgammaf_r(x, &dontCare);
 }
 
-#if !defined _WIN32 && (defined __i386__ || defined __x86_64__)
+#if defined(__i386__) || defined(__x86_64__)
 static inline SWIFT_ALWAYS_INLINE
 double _stdlib_tan(double x) {
   return __builtin_tan(x);
@@ -385,6 +385,7 @@ double _stdlib_lgamma(double x) {
   return lgamma_r(x, &dontCare);
 }
 
+#if !defined(_WIN32) && !defined(ANDROID)
 static inline SWIFT_ALWAYS_INLINE
 long double _stdlib_tanl(long double x) {
   return __builtin_tanl(x);
@@ -481,6 +482,7 @@ long double _stdlib_lgammal(long double x) {
   int dontCare;
   return lgammal_r(x, &dontCare);
 }
+#endif // !defined(_WIN32) && !defined(ANDROID)
 #endif
 // SWIFT_ENABLE_TENSORFLOW END
 
