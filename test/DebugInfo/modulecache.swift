@@ -9,7 +9,7 @@ import ClangModule
 
 // RUN: %empty-directory(%t)
 // RUN: %swift-ide-test_plain -print-usrs -target %target-triple -module-cache-path %t  -I %S/Inputs -source-filename %s
-// RUN: head -c 4 %t/*/ClangModule-*.pcm | grep -q CPCH
+// RUN: dd bs=1 count=4 < %t/*/ClangModule-*.pcm 2>/dev/null | grep -q CPCH
 
 // 2. Test that swift is creating clang modules with debug info.
 
