@@ -2705,14 +2705,22 @@ ERROR(broken_decodable_requirement,none,
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
+NOTE(codable_extraneous_codingkeypath_case_here,none,
+    "CodingKeyPath case %0 does not match any stored properties", (Identifier))
 NOTE(codable_non_conforming_property_here,none,
      "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, Type))
-NOTE(codable_non_decoded_property_here,none,
+NOTE(codable_codingkey_non_decoded_property_here,none,
      "cannot automatically synthesize %0 because %1 does not have a matching CodingKey and does not have a default value", (Type, Identifier))
+NOTE(codable_codingkeypath_non_decoded_property_here,none,
+    "cannot automatically synthesize %0 because %1 does not have a matching CodingKeyPath and does not have a default value", (Type, Identifier))
 NOTE(codable_codingkeys_type_is_not_an_enum_here,none,
      "cannot automatically synthesize %0 because 'CodingKeys' is not an enum", (Type))
 NOTE(codable_codingkeys_type_does_not_conform_here,none,
      "cannot automatically synthesize %0 because 'CodingKeys' does not conform to CodingKey", (Type))
+NOTE(codable_codingkeypaths_type_is_not_an_enum_here,none,
+     "cannot automatically synthesize %0 because 'CodingKeyPaths' is not an enum", (Type))
+NOTE(codable_codingkeypaths_type_does_not_conform_here,none,
+     "cannot automatically synthesize %0 because 'CodingKeyPaths' does not conform to CodingKeyPath", (Type))
 NOTE(decodable_no_super_init_here,none,
      "cannot automatically synthesize %0 because superclass does not have a callable %1", (DeclName, DeclName))
 NOTE(decodable_super_init_not_designated_here,none,

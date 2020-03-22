@@ -4631,6 +4631,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::CFObject:
   case KnownProtocolKind::ErrorCodeProtocol:
   case KnownProtocolKind::CodingKey:
+  case KnownProtocolKind::CodingKeyPath:
   case KnownProtocolKind::Encodable:
   case KnownProtocolKind::Decodable:
   case KnownProtocolKind::StringInterpolationProtocol:

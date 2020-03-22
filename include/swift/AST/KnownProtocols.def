@@ -76,6 +76,7 @@ PROTOCOL_(BridgedStoredNSError)
 PROTOCOL_(CFObject)
 PROTOCOL_(SwiftNewtypeWrapper)
 PROTOCOL(CodingKey)
+PROTOCOL(CodingKeyPath)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 
