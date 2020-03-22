@@ -597,6 +597,41 @@ using LookupInfixOperatorRequest = LookupOperatorRequest<InfixOperatorDecl>;
 using LookupPostfixOperatorRequest = LookupOperatorRequest<PostfixOperatorDecl>;
 using LookupPrecedenceGroupRequest = LookupOperatorRequest<PrecedenceGroupDecl>;
 
+/// Looks up an operator in a given file or module without looking through
+/// imports.
+class DirectOperatorLookupRequest
+    : public SimpleRequest<DirectOperatorLookupRequest,
+                           TinyPtrVector<OperatorDecl *>(
+                               OperatorLookupDescriptor, OperatorFixity),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<TinyPtrVector<OperatorDecl *>>
+  evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor,
+           OperatorFixity fixity) const;
+};
+
+/// Looks up an precedencegroup in a given file or module without looking
+/// through imports.
+class DirectPrecedenceGroupLookupRequest
+    : public SimpleRequest<DirectPrecedenceGroupLookupRequest,
+                           TinyPtrVector<PrecedenceGroupDecl *>(
+                               OperatorLookupDescriptor),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<TinyPtrVector<PrecedenceGroupDecl *>>
+  evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor) const;
+};
+
 #define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
