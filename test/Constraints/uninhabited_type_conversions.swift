@@ -66,3 +66,11 @@ func overloaded(_ x: Uninhabited) {}
 func overloaded(_ x: Int) {}
 
 overloaded(returnsUninhabited())
+
+class Super {
+  func f(_ x: Uninhabited) -> Int { 42 }
+}
+
+class Sub: Super {
+  override func f(_ x: Int) -> Uninhabited {}
+}

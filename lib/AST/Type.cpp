@@ -2685,6 +2685,10 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (t2->isExactSuperclassOf(t1))
       return true;
 
+  if (matchMode.contains(TypeMatchFlags::AllowOverride))
+    if (t1->isUninhabited())
+      return true;
+
   if (matchMode.contains(TypeMatchFlags::AllowABICompatible))
     if (isABICompatibleEvenAddingOptional(t1, t2))
       return true;
