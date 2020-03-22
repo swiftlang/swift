@@ -423,6 +423,19 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
     auto func2 = cast<AbstractFunctionDecl>(decl2);
     if (func1->isGeneric() != func2->isGeneric())
       return completeResult(func2->isGeneric());
+    else if (func1->hasParameterList() && func2->hasParameterList()) {
+      // A function declaration with no variadic parameter is more specialized
+      // than a function declaration that have any variadic.
+      auto func1HasVariadicParam =
+          llvm::any_of(func1->getParameters()->getArray(),
+                       [](ParamDecl *param) { return param->isVariadic(); });
+      auto func2HasVariadicParam =
+          llvm::any_of(func2->getParameters()->getArray(),
+                       [](ParamDecl *param) { return param->isVariadic(); });
+
+      if (func1HasVariadicParam != func2HasVariadicParam)
+        return completeResult(func2HasVariadicParam);
+    }
   }
 
   if (auto subscript1 = dyn_cast<SubscriptDecl>(decl1)) {
