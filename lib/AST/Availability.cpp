@@ -304,6 +304,9 @@ AvailabilityContext ASTContext::getSwift52Availability() {
 AvailabilityContext ASTContext::getSwift53Availability() {
   auto target = LangOpts.Target;
 
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
+
   if (target.isMacOSX() ) {
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
