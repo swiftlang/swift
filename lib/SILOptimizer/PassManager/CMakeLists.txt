@@ -3,4 +3,5 @@ silopt_register_sources(
   Passes.cpp
   PassPipeline.cpp
   PrettyStackTrace.cpp
+  SILOptimizerRequests.cpp
 )
