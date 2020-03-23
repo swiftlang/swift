@@ -3795,6 +3795,11 @@ static void recordConformanceDependency(DeclContext *DC,
       Conformance->getDeclContext()->getParentModule())
     return;
 
+  // Register a potential member dependency edge to the adoptee.
+  // This ensures the file containing the conformance rebuilds if the adoptee
+  // makes a change to its members. This is especially important if the
+  // conformance is defined in an extension context: this edge ensures the
+  // extension's file rebuilds when the extended type changes.
   tracker->addUsedMember({Adoptee, Identifier()},
                          DC->isCascadingContextForLookup(InExpression));
 }
