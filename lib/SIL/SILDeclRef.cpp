@@ -293,15 +293,8 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     limit = Limit::NeverPublic;
   }
 
-  // The property wrapper backing initializer is never public for resilient
-  // properties.
-  if (kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
-    if (cast<VarDecl>(d)->isResilient())
-      limit = Limit::NeverPublic;
-  }
-
   // Stored property initializers get the linkage of their containing type.
-  if (isStoredPropertyInitializer()) {
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer()) {
     // Three cases:
     //
     // 1) Type is formally @_fixed_layout/@frozen. Root initializers can be
@@ -483,7 +476,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   // Stored property initializers are inlinable if the type is explicitly
   // marked as @frozen.
-  if (isStoredPropertyInitializer()) {
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer()) {
     auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
@@ -1130,8 +1123,7 @@ bool SILDeclRef::canBeDynamicReplacement() const {
 bool SILDeclRef::isDynamicallyReplaceable() const {
   if (kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
-  if (isStoredPropertyInitializer() ||
-      kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer)
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer())
     return false;
 
   // Class allocators are not dynamic replaceable.
