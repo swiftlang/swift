@@ -269,6 +269,7 @@ extension UnsafeAtomic${swiftType} {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeAtomic${swiftType} {
   % for (name, llvmop, op, label, doc) in integerOperations:
+  % defaultValue = " = 1" if label <> "" else ""
   /// Perform an atomic ${doc} operation and return the original value, with
   /// the specified memory ordering.
   ///
@@ -282,7 +283,7 @@ extension UnsafeAtomic${swiftType} {
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
   public func loadThen${name}(
-    ${label} operand: Value,
+    ${label} operand: Value${defaultValue},
     ordering: AtomicUpdateOrdering
   ) -> Value {
     switch ordering {
@@ -306,7 +307,7 @@ extension UnsafeAtomic${swiftType} {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func ${lowerFirst(name)}ThenLoad(
-    ${label} operand: Value,
+    ${label} operand: Value${defaultValue},
     ordering: AtomicUpdateOrdering
   ) -> Value {
     loadThen${name}(${argLabel(label)}operand, ordering: ordering) ${op} operand
@@ -324,7 +325,7 @@ extension UnsafeAtomic${swiftType} {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func wrappingIncrement(
-    by operand: Value,
+    by operand: Value = 1,
     ordering: AtomicUpdateOrdering
   ) {
     _ = loadThenWrappingIncrement(by: operand, ordering: ordering)
@@ -338,7 +339,7 @@ extension UnsafeAtomic${swiftType} {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func wrappingDecrement(
-    by operand: Value,
+    by operand: Value = 1,
     ordering: AtomicUpdateOrdering
   ) {
     _ = loadThenWrappingDecrement(by: operand, ordering: ordering)
