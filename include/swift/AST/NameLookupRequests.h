@@ -632,6 +632,51 @@ private:
   evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor) const;
 };
 
+class LookupConformanceDescriptor final {
+public:
+  ModuleDecl *Mod;
+  Type Ty;
+  ProtocolDecl *PD;
+
+  LookupConformanceDescriptor(ModuleDecl *Mod, Type Ty, ProtocolDecl *PD)
+      : Mod(Mod), Ty(Ty), PD(PD) {}
+
+  friend llvm::hash_code hash_value(const LookupConformanceDescriptor &desc) {
+    return llvm::hash_combine(desc.Mod, desc.Ty.getPointer(), desc.PD);
+  }
+
+  friend bool operator==(const LookupConformanceDescriptor &lhs,
+                         const LookupConformanceDescriptor &rhs) {
+    return lhs.Mod == rhs.Mod && lhs.Ty.getPointer() == rhs.Ty.getPointer() &&
+           lhs.PD == rhs.PD;
+  }
+
+  friend bool operator!=(const LookupConformanceDescriptor &lhs,
+                         const LookupConformanceDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const LookupConformanceDescriptor &desc);
+
+SourceLoc extractNearestSourceLoc(const LookupConformanceDescriptor &desc);
+
+class LookupConformanceInModuleRequest
+    : public SimpleRequest<LookupConformanceInModuleRequest,
+                           ProtocolConformanceRef(LookupConformanceDescriptor),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ProtocolConformanceRef> evaluate(
+      Evaluator &evaluator, LookupConformanceDescriptor desc) const;
+};
+
 #define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
