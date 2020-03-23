@@ -41,6 +41,10 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
       log.indent(solverState->depth * 2);
     log << "(increasing score due to ";
     switch (kind) {
+    case SK_Hole:
+      log << "hole in the constraint system";
+      break;
+
     case SK_Unavailable:
       log << "use of an unavailable declaration";
       break;

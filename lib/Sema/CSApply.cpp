@@ -8030,7 +8030,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
   // fallback diagnostic be produced to indicate the problem.
   {
     const auto &score = solution.getFixedScore();
-    if (score.Data[SK_Fix] > 0)
+    if (score.Data[SK_Fix] > 0 || score.Data[SK_Hole] > 0)
       return None;
   }
 

@@ -634,6 +634,8 @@ enum ScoreKind {
 
   /// A fix needs to be applied to the source.
   SK_Fix,
+  /// A hole in the constraint system.
+  SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
   /// A use of a disfavored overload.
