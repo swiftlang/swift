@@ -90,9 +90,7 @@ class AutoDiffDerivativeFunctionIdentifier : public llvm::FoldingSetNode {
 
 public:
   AutoDiffDerivativeFunctionKind getKind() const { return kind; }
-  IndexSubset *getParameterIndices() const {
-    return parameterIndices;
-  }
+  IndexSubset *getParameterIndices() const { return parameterIndices; }
   GenericSignature getDerivativeGenericSignature() const {
     return derivativeGenericSignature;
   }
