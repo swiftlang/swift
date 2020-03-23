@@ -114,6 +114,15 @@ DerivativeTests.test("${op}_${T}") {
 %end
     }
   }
+
+  // pow
+  let dpow = ${op}(at: 3 as ${T}, 2 as ${T}, in: pow)
+%if op == 'gradient':
+  expectEqualWithTolerance(6, dpow.0)
+  expectEqualWithTolerance(9.887510598012987222, dpow.1)
+%else: # if op == 'derivative'
+  expectEqualWithTolerance(15.887510598012987222, dpow)
+%end
 }
 
 %if T == 'Float80':
