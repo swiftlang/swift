@@ -348,8 +348,8 @@ FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 FORWARD_ANY_OWNERSHIP_INST(InitExistentialRef)
-// SWIFT_ENABLE_TENSORFLOW
 FORWARD_ANY_OWNERSHIP_INST(DifferentiableFunction)
+// SWIFT_ENABLE_TENSORFLOW
 FORWARD_ANY_OWNERSHIP_INST(LinearFunction)
 // SWIFT_ENABLE_TENSORFLOW END
 #undef FORWARD_ANY_OWNERSHIP_INST
@@ -370,14 +370,14 @@ FORWARD_ANY_OWNERSHIP_INST(LinearFunction)
   }
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, TupleExtract)
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, StructExtract)
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
-                                        MarkUninitialized)
-// SWIFT_ENABLE_TENSORFLOW
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive,
                                         DifferentiableFunctionExtract)
+// SWIFT_ENABLE_TENSORFLOW
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive,
                                         LinearFunctionExtract)
 // SWIFT_ENABLE_TENSORFLOW END
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
+                                        MarkUninitialized)
 #undef CONSTANT_OR_NONE_OWNERSHIP_INST
 
 OperandOwnershipKindMap

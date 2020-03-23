@@ -2,15 +2,13 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// SWIFT_ENABLE_TENSORFLOW
 //
 // This file implements IR generation for `@differentiable` function types in
 // Swift.
@@ -41,6 +39,7 @@ using namespace irgen;
 //----------------------------------------------------------------------------//
 // `@differentiable` (non-linear) function type info
 //----------------------------------------------------------------------------//
+
 namespace {
 class DifferentiableFuncFieldInfo final
     : public RecordField<DifferentiableFuncFieldInfo> {
@@ -75,8 +74,8 @@ public:
       return SILType::getPrimitiveObjectType(origFnTy);
     auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
-        parameterIndices, /*resultIndex*/ 0, kind,
-        IGM.getSILTypes(), LookUpConformanceInModule(IGM.getSwiftModule()));
+        parameterIndices, /*resultIndex*/ 0, kind, IGM.getSILTypes(),
+        LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
 };
@@ -88,10 +87,10 @@ class DifferentiableFuncTypeInfo final
                                DifferentiableFuncFieldInfo>;
 
 public:
-  DifferentiableFuncTypeInfo(
-      ArrayRef<DifferentiableFuncFieldInfo> fields, unsigned explosionSize,
-      llvm::Type *ty, Size size, SpareBitVector &&spareBits, Alignment align,
-      IsPOD_t isPOD, IsFixedSize_t alwaysFixedSize)
+  DifferentiableFuncTypeInfo(ArrayRef<DifferentiableFuncFieldInfo> fields,
+                             unsigned explosionSize, llvm::Type *ty, Size size,
+                             SpareBitVector &&spareBits, Alignment align,
+                             IsPOD_t isPOD, IsFixedSize_t alwaysFixedSize)
       : super(fields, explosionSize, ty, size, std::move(spareBits), align,
               isPOD, alwaysFixedSize) {}
 
@@ -126,7 +125,8 @@ public:
 };
 
 class DifferentiableFuncTypeBuilder
-    : public RecordTypeBuilder<DifferentiableFuncTypeBuilder, DifferentiableFuncFieldInfo,
+    : public RecordTypeBuilder<DifferentiableFuncTypeBuilder,
+                               DifferentiableFuncFieldInfo,
                                NormalDifferentiableFunctionTypeComponent> {
 
   SILFunctionType *originalType;
@@ -145,9 +145,9 @@ public:
     llvm_unreachable("@differentiable functions are always loadable");
   }
 
-  DifferentiableFuncTypeInfo *createLoadable(
-      ArrayRef<DifferentiableFuncFieldInfo> fields, StructLayout &&layout,
-      unsigned explosionSize) {
+  DifferentiableFuncTypeInfo *
+  createLoadable(ArrayRef<DifferentiableFuncFieldInfo> fields,
+                 StructLayout &&layout, unsigned explosionSize) {
     return DifferentiableFuncTypeInfo::create(
         fields, explosionSize, layout.getType(), layout.getSize(),
         std::move(layout.getSpareBits()), layout.getAlignment(), layout.isPOD(),
@@ -160,9 +160,10 @@ public:
     llvm_unreachable("@differentiable functions are always loadable");
   }
 
-  DifferentiableFuncFieldInfo getFieldInfo(
-      unsigned index, NormalDifferentiableFunctionTypeComponent component,
-      const TypeInfo &fieldTI) {
+  DifferentiableFuncFieldInfo
+  getFieldInfo(unsigned index,
+               NormalDifferentiableFunctionTypeComponent component,
+               const TypeInfo &fieldTI) {
     return DifferentiableFuncFieldInfo(component, fieldTI, parameterIndices);
   }
 
@@ -186,6 +187,7 @@ public:
 //----------------------------------------------------------------------------//
 // `@differentiable(linear)` function type info
 //----------------------------------------------------------------------------//
+
 namespace {
 class LinearFuncFieldInfo final : public RecordField<LinearFuncFieldInfo> {
 public:
@@ -231,10 +233,10 @@ class LinearFuncTypeInfo final
       RecordTypeInfo<LinearFuncTypeInfo, LoadableTypeInfo, LinearFuncFieldInfo>;
 
 public:
-  LinearFuncTypeInfo(
-      ArrayRef<LinearFuncFieldInfo> fields, unsigned explosionSize,
-      llvm::Type *ty, Size size, SpareBitVector &&spareBits, Alignment align,
-      IsPOD_t isPOD, IsFixedSize_t alwaysFixedSize)
+  LinearFuncTypeInfo(ArrayRef<LinearFuncFieldInfo> fields,
+                     unsigned explosionSize, llvm::Type *ty, Size size,
+                     SpareBitVector &&spareBits, Alignment align, IsPOD_t isPOD,
+                     IsFixedSize_t alwaysFixedSize)
       : super(fields, explosionSize, ty, size, std::move(spareBits), align,
               isPOD, alwaysFixedSize) {}
 
@@ -303,9 +305,9 @@ public:
     llvm_unreachable("@differentiable functions are always loadable");
   }
 
-  LinearFuncFieldInfo getFieldInfo(
-      unsigned index, LinearDifferentiableFunctionTypeComponent field,
-      const TypeInfo &fieldTI) {
+  LinearFuncFieldInfo
+  getFieldInfo(unsigned index, LinearDifferentiableFunctionTypeComponent field,
+               const TypeInfo &fieldTI) {
     return LinearFuncFieldInfo(field, fieldTI, parameterIndices);
   }
 

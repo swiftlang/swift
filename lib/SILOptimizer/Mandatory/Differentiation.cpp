@@ -478,7 +478,7 @@ emitDerivativeFunctionReference(
     if (auto *dfei = dyn_cast<DifferentiableFunctionExtractInst>(inst))
       if (dfei->getExtractee() ==
           NormalDifferentiableFunctionTypeComponent::Original)
-        functionSource = dfei->getFunctionOperand();
+        functionSource = dfei->getOperand();
 
   // If `functionSource` is a `@differentiable` function, just extract the
   // derivative function.

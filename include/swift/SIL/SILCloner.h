@@ -2830,8 +2830,7 @@ void SILCloner<ImplClass>::visitKeyPathInst(KeyPathInst *Inst) {
                               opValues, getOpType(Inst->getType())));
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-template<typename ImplClass>
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitDifferentiableFunctionInst(
     DifferentiableFunctionInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -2845,6 +2844,20 @@ void SILCloner<ImplClass>::visitDifferentiableFunctionInst(
                 getOpValue(Inst->getOriginalFunction()), derivativeFns));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitDifferentiableFunctionExtractInst(
+    DifferentiableFunctionExtractInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  Optional<SILType> explicitExtracteeType = None;
+  if (Inst->hasExplicitExtracteeType())
+    explicitExtracteeType = Inst->getType();
+  recordClonedInstruction(
+      Inst, getBuilder().createDifferentiableFunctionExtract(
+                getOpLocation(Inst->getLoc()), Inst->getExtractee(),
+                getOpValue(Inst->getOperand()), explicitExtracteeType));
+}
+
+// SWIFT_ENABLE_TENSORFLOW
 template<typename ImplClass>
 void SILCloner<ImplClass>::visitLinearFunctionInst(LinearFunctionInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -2855,19 +2868,6 @@ void SILCloner<ImplClass>::visitLinearFunctionInst(LinearFunctionInst *Inst) {
       Inst, getBuilder().createLinearFunction(
                 getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
                 getOpValue(Inst->getOriginalFunction()), transpose));
-}
-
-template<typename ImplClass>
-void SILCloner<ImplClass>::
-visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  Optional<SILType> explicitExtracteeType = None;
-  if (Inst->hasExplicitExtracteeType())
-    explicitExtracteeType = Inst->getType();
-  recordClonedInstruction(
-      Inst, getBuilder().createDifferentiableFunctionExtract(
-                getOpLocation(Inst->getLoc()), Inst->getExtractee(),
-                getOpValue(Inst->getFunctionOperand()), explicitExtracteeType));
 }
 
 template<typename ImplClass>

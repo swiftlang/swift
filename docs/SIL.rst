@@ -5774,8 +5774,6 @@ The rules on generic substitutions are identical to those of ``apply``.
 Differentiable Programming
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. SWIFT_ENABLE_TENSORFLOW
-
 differentiable_function
 ```````````````````````
 ::
@@ -5784,7 +5782,7 @@ differentiable_function
                       sil-differentiable-function-parameter-indices
                       sil-value ':' sil-type
                       sil-differentiable-function-derivative-functions-clause?
-                      
+
   sil-differentiable-function-parameter-indices ::=
       '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
   sil-differentiable-derivative-functions-clause ::=
@@ -5794,51 +5792,23 @@ differentiable_function
   differentiable_function [parameters 0] %0 : $(T) -> T \
     with_derivative {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
 
-Bundles a function with its derivative functions into a ``@differentiable``
-function. There are two derivative functions: a Jacobian-vector products (JVP)
-function and a vector-Jacobian products (VJP) function.
+Creates a ``@differentiable`` function from an original function operand and
+derivative function operands (optional). There are two derivative function
+kinds: a Jacobian-vector products (JVP) function and a vector-Jacobian products
+(VJP) function.
 
 ``[parameters ...]`` specifies parameter indices that the original function is
 differentiable with respect to.
 
-A ``with_derivative`` clause specifies the differentiation functions associated
-with the original function. When a ``with_derivative`` clause is not specified,
-the first operand will be differentiated to produce derivative functions, and a
-``with_derivative`` clause will be added to the instruction.
+The ``with_derivative`` clause specifies the derivative function operands
+associated with the original function.
 
-In raw SIL, it is optional to provide a derivative function ``with_derivative``
-clause. In canonical SIL, a ``with_derivative`` clause is mandatory.
+The differentiation transformation canonicalizes all `differentiable_function`
+instructions, generating derivative functions if necessary to fill in derivative
+function operands.
 
-
-linear_function
-```````````````
-::
-
-  sil-instruction ::= 'linear_function'
-                      sil-linear-function-parameter-indices
-                      sil-value ':' sil-type
-                      sil-linear-function-transpose-function-clause?
-
-  sil-linear-function-parameter-indices ::=
-      '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
-  sil-linear-transpose-function-clause ::=
-      with_transpose sil-value ':' sil-type
-
-  linear_function [parameters 0] %0 : $(T) -> T with_transpose %1 : $(T) -> T
-
-Bundles a function with its transpose function into a
-``@differentiable(linear)`` function.
-
-``[parameters ...]`` specifies parameter indices that the original function is
-linear with respect to.
-
-A ``with_transpose`` clause specifies the transpose function associated
-with the original function. When a ``with_transpose`` clause is not specified,
-the mandatory differentiation transform  will add a ``with_transpose`` clause to
-the instruction.
-
-In raw SIL, it is optional to provide a transpose function ``with`` clause.
-In canonical SIL, a ``with`` clause is mandatory.
+In raw SIL, the ``with_derivative`` clause is optional. In canonical SIL, the
+``with_derivative`` clause is mandatory.
 
 
 differentiable_function_extract
@@ -5859,31 +5829,12 @@ differentiable_function_extract
     as $(@in_constant T) -> (T, (T.TangentVector) -> T.TangentVector)
 
 Extracts the original function or a derivative function from the given
-``@differentiable`` function. It must be provided with an extractee:
-``[original]``, ``[jvp]`` or ``[vjp]``.
+``@differentiable`` function. The extractee is one of the following:
+``[original]``, ``[jvp]``, or ``[vjp]``.
 
-An explicit extractee type may be provided in lowered SIL. This is currently
+In lowered SIL, an explicit extractee type may be provided. This is currently
 used by the LoadableByAddress transformation, which rewrites function types.
 
-
-linear_function_extract
-```````````````````````
-::
-
-  sil-instruction ::= 'linear_function_extract'
-                      '[' sil-linear-function-extractee ']'
-                      sil-value ':' sil-type
-
-  sil-linear-function-extractee ::= 'original' | 'transpose'
-
-  linear_function_extract [original] %0 : $@differentiable(linear) (T) -> T
-  linear_function_extract [transpose] %0 : $@differentiable(linear) (T) -> T
-
-Extracts the original function or a transpose function from the given
-``@differentiable(linear)`` function. It must be provided with an extractee:
-``[original]`` or ``[transpose]``.
-
-.. SWIFT_ENABLE_TENSORFLOW END
 
 differentiability_witness_function
 ``````````````````````````````````
@@ -5917,6 +5868,58 @@ The remaining components identify the SIL differentiability witness:
 - Witness generic parameter clause (optional). When parsing SIL, the parsed
   witness generic parameter clause is combined with the original function's
   generic signature to form the full witness generic signature.
+
+.. SWIFT_ENABLE_TENSORFLOW
+
+linear_function
+```````````````
+::
+
+  sil-instruction ::= 'linear_function'
+                      sil-linear-function-parameter-indices
+                      sil-value ':' sil-type
+                      sil-linear-function-transpose-function-clause?
+
+  sil-linear-function-parameter-indices ::=
+      '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
+  sil-linear-transpose-function-clause ::=
+      with_transpose sil-value ':' sil-type
+
+  linear_function [parameters 0] %0 : $(T) -> T with_transpose %1 : $(T) -> T
+
+Bundles a function with its transpose function into a
+``@differentiable(linear)`` function.
+
+``[parameters ...]`` specifies parameter indices that the original function is
+linear with respect to.
+
+A ``with_transpose`` clause specifies the transpose function associated
+with the original function. When a ``with_transpose`` clause is not specified,
+the mandatory differentiation transform  will add a ``with_transpose`` clause to
+the instruction.
+
+In raw SIL, it is optional to provide a transpose function ``with`` clause.
+In canonical SIL, a ``with`` clause is mandatory.
+
+
+linear_function_extract
+```````````````````````
+::
+
+  sil-instruction ::= 'linear_function_extract'
+                      '[' sil-linear-function-extractee ']'
+                      sil-value ':' sil-type
+
+  sil-linear-function-extractee ::= 'original' | 'transpose'
+
+  linear_function_extract [original] %0 : $@differentiable(linear) (T) -> T
+  linear_function_extract [transpose] %0 : $@differentiable(linear) (T) -> T
+
+Extracts the original function or a transpose function from the given
+``@differentiable(linear)`` function. The extractee is either ``[original]`` or
+``[transpose]``.
+
+.. SWIFT_ENABLE_TENSORFLOW END
 
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~

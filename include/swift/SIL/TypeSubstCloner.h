@@ -345,7 +345,7 @@ protected:
     //   earlier transforms.
     //
     // If (AD) is not equal to (BC), use (BC) as the explicit type.
-    SILType remappedOrigType = getOpType(dfei->getFunctionOperand()->getType());
+    SILType remappedOrigType = getOpType(dfei->getOperand()->getType());
     auto remappedOrigFnType = remappedOrigType.castTo<SILFunctionType>();
     auto derivativeRemappedFnType =
         remappedOrigFnType
@@ -368,7 +368,7 @@ protected:
         dfei,
         getBuilder().createDifferentiableFunctionExtract(
             getOpLocation(dfei->getLoc()), dfei->getExtractee(),
-            getOpValue(dfei->getFunctionOperand()), remappedDerivativeFnType));
+            getOpValue(dfei->getOperand()), remappedDerivativeFnType));
   }
   // SWIFT_ENABLE_TENSORFLOW END
 

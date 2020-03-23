@@ -455,9 +455,11 @@ void swift::findClosuresForFunctionValue(
         worklistInsert(SVI->getOperand(0));
         continue;
       }
-      // SWIFT_ENABLE_TENSORFLOW
+      // Look through `differentiable_function` operands, which are all
+      // function-typed.
       if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(I)) {
-        worklistInsert(DFI->getOperand(0));
+        for (auto &fn : DFI->getAllOperands())
+          worklistInsert(fn.get());
         continue;
       }
     }

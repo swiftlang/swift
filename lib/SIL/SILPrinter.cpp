@@ -2269,7 +2269,6 @@ public:
     }
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
     *this << "[parameters";
     for (auto i : dfi->getParameterIndices()->getIndices())
@@ -2280,18 +2279,6 @@ public:
       *this << " with_derivative ";
       *this << '{' << getIDAndType(dfi->getJVPFunction()) << ", "
             << getIDAndType(dfi->getVJPFunction()) << '}';
-    }
-  }
-
-  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
-    *this << "[parameters";
-    for (auto i : lfi->getParameterIndices()->getIndices())
-      *this << ' ' << i;
-    *this << "] ";
-    *this << getIDAndType(lfi->getOriginalFunction());
-    if (lfi->hasTransposeFunction()) {
-      *this << " with_transpose ";
-      *this << getIDAndType(lfi->getTransposeFunction());
     }
   }
 
@@ -2310,10 +2297,23 @@ public:
       break;
     }
     *this << "] ";
-    *this << getIDAndType(dfei->getFunctionOperand());
+    *this << getIDAndType(dfei->getOperand());
     if (dfei->hasExplicitExtracteeType()) {
       *this << " as ";
       *this << dfei->getType();
+    }
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
+    *this << "[parameters";
+    for (auto i : lfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    *this << getIDAndType(lfi->getOriginalFunction());
+    if (lfi->hasTransposeFunction()) {
+      *this << " with_transpose ";
+      *this << getIDAndType(lfi->getTransposeFunction());
     }
   }
 

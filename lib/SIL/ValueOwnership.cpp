@@ -159,9 +159,10 @@ CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
   }
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
-// SWIFT_ENABLE_TENSORFLOW
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, DifferentiableFunctionExtract)
+// SWIFT_ENABLE_TENSORFLOW
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, LinearFunctionExtract)
+// SWIFT_ENABLE_TENSORFLOW END
 // OpenExistentialValue opens the boxed value inside an existential
 // CoW box. The semantics of an existential CoW box implies that we
 // can only consume the projected value inside the box if the box is
@@ -266,8 +267,8 @@ FORWARDING_OWNERSHIP_INST(Enum)
 // frame from usage. In such cases, we have been creating unnecessary ref count
 // traffic in code.
 FORWARDING_OWNERSHIP_INST(InitExistentialRef)
-// SWIFT_ENABLE_TENSORFLOW
 FORWARDING_OWNERSHIP_INST(DifferentiableFunction)
+// SWIFT_ENABLE_TENSORFLOW
 FORWARDING_OWNERSHIP_INST(LinearFunction)
 // SWIFT_ENABLE_TENSORFLOW END
 #undef FORWARDING_OWNERSHIP_INST

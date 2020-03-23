@@ -145,7 +145,6 @@ private:
   const TypeInfo *convertEnumType(TypeBase *key, CanType type, EnumDecl *D);
   const TypeInfo *convertStructType(TypeBase *key, CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(SILFunctionType *T);
-  // SWIFT_ENABLE_TENSORFLOW
   const TypeInfo *convertNormalDifferentiableFunctionType(SILFunctionType *T);
   const TypeInfo *convertLinearDifferentiableFunctionType(SILFunctionType *T);
   const TypeInfo *convertBlockStorageType(SILBlockStorageType *T);
