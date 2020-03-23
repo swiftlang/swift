@@ -1745,7 +1745,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       assert(op);
       abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
       auto emptyID = addDeclBaseNameRef(Identifier());
-      auto fixity = getStableFixity(op->getKind());
+      auto fixity = getStableFixity(op->getFixity());
       XRefOperatorOrAccessorPathPieceLayout::emitRecord(Out, ScratchRecord,
                                                         abbrCode, emptyID,
                                                         fixity);
@@ -1765,7 +1765,7 @@ void Serializer::writeCrossReference(const Decl *D) {
 
     abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
     auto nameID = addDeclBaseNameRef(op->getName());
-    auto fixity = getStableFixity(op->getKind());
+    auto fixity = getStableFixity(op->getFixity());
     XRefOperatorOrAccessorPathPieceLayout::emitRecord(Out, ScratchRecord,
                                                       abbrCode, nameID,
                                                       fixity);
@@ -5059,7 +5059,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
           .push_back({ extendedNominal, addDeclRef(D) });
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
         operatorDecls[OD->getName()]
-          .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
+          .push_back({ getStableFixity(OD->getFixity()), addDeclRef(D) });
       } else if (auto PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
         precedenceGroupDecls[PGD->getName()]
           .push_back({ decls_block::PRECEDENCE_GROUP_DECL, addDeclRef(D) });
