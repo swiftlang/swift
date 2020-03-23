@@ -607,6 +607,95 @@ TryApplyInst *TryApplyInst::create(
                                      normalBB, errorBB, specializationInfo);
 }
 
+SILType DifferentiableFunctionInst::getDifferentiableFunctionType(
+    SILValue OriginalFunction, IndexSubset *ParameterIndices) {
+  auto fnTy = OriginalFunction->getType().castTo<SILFunctionType>();
+  auto diffTy = fnTy->getWithDifferentiability(DifferentiabilityKind::Normal,
+                                               ParameterIndices);
+  return SILType::getPrimitiveObjectType(diffTy);
+}
+
+ValueOwnershipKind DifferentiableFunctionInst::getMergedOwnershipKind(
+    SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions) {
+  if (DerivativeFunctions.empty())
+    return OriginalFunction.getOwnershipKind();
+  return *mergeSILValueOwnership(
+      {OriginalFunction, DerivativeFunctions[0], DerivativeFunctions[1]});
+}
+
+DifferentiableFunctionInst::DifferentiableFunctionInst(
+    SILDebugLocation Loc, IndexSubset *ParameterIndices,
+    SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions,
+    bool HasOwnership)
+    : InstructionBaseWithTrailingOperands(
+          OriginalFunction, DerivativeFunctions, Loc,
+          getDifferentiableFunctionType(OriginalFunction, ParameterIndices),
+          HasOwnership
+              ? getMergedOwnershipKind(OriginalFunction, DerivativeFunctions)
+              : ValueOwnershipKind(ValueOwnershipKind::None)),
+      ParameterIndices(ParameterIndices),
+      HasDerivativeFunctions(!DerivativeFunctions.empty()) {
+  assert(DerivativeFunctions.empty() || DerivativeFunctions.size() == 2);
+}
+
+DifferentiableFunctionInst *DifferentiableFunctionInst::create(
+    SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
+    SILValue OriginalFunction,
+    Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
+    bool HasOwnership) {
+  auto derivativeFunctions =
+      VJPAndJVPFunctions.hasValue()
+          ? ArrayRef<SILValue>(
+                reinterpret_cast<SILValue *>(VJPAndJVPFunctions.getPointer()),
+                2)
+          : ArrayRef<SILValue>();
+  size_t size = totalSizeToAlloc<Operand>(1 + derivativeFunctions.size());
+  void *buffer = Module.allocateInst(size, alignof(DifferentiableFunctionInst));
+  return ::new (buffer)
+      DifferentiableFunctionInst(Loc, ParameterIndices, OriginalFunction,
+                                 derivativeFunctions, HasOwnership);
+}
+
+SILType DifferentiableFunctionExtractInst::getExtracteeType(
+    SILValue function, NormalDifferentiableFunctionTypeComponent extractee,
+    SILModule &module) {
+  auto fnTy = function->getType().castTo<SILFunctionType>();
+  assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
+  auto originalFnTy = fnTy->getWithoutDifferentiability();
+  auto kindOpt = extractee.getAsDerivativeFunctionKind();
+  if (!kindOpt) {
+    assert(extractee == NormalDifferentiableFunctionTypeComponent::Original);
+    return SILType::getPrimitiveObjectType(originalFnTy);
+  }
+  auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
+      fnTy->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0, *kindOpt,
+      module.Types, LookUpConformanceInModule(module.getSwiftModule()));
+  return SILType::getPrimitiveObjectType(resultFnTy);
+}
+
+DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
+    SILModule &module, SILDebugLocation debugLoc,
+    NormalDifferentiableFunctionTypeComponent extractee, SILValue function,
+    Optional<SILType> extracteeType)
+    : UnaryInstructionBase(debugLoc, function,
+                           extracteeType
+                               ? *extracteeType
+                               : getExtracteeType(function, extractee, module)),
+      Extractee(extractee), HasExplicitExtracteeType(extracteeType.hasValue()) {
+#ifndef NDEBUG
+  if (extracteeType.hasValue()) {
+    // Note: explicit extractee type is used to avoid inconsistent typing in:
+    // - Canonical SIL, due to generic specialization.
+    // - Lowered SIL, due to LoadableByAddress.
+    // See `TypeSubstCloner::visitDifferentiableFunctionExtractInst` for an
+    // explanation of how explicit extractee type is used.
+    assert((module.getStage() == SILStage::Canonical ||
+            module.getStage() == SILStage::Lowered) &&
+           "Explicit type is valid only in canonical or lowered SIL");
+  }
+#endif
+}
+
 SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
     SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,
     SILDifferentiabilityWitness *witness) {
