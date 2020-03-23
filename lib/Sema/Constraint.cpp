@@ -405,9 +405,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       Out << "dynamic member lookup '" << overload.getName() << "'";
       break;
-    case OverloadChoiceKind::BaseType:
-      Out << "base type";
-      break;
     case OverloadChoiceKind::TupleIndex:
       Out << "tuple index " << overload.getTupleIndex();
       break;
