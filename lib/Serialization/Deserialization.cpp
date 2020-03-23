@@ -527,7 +527,10 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
                                "reading specialized conformance for",
                                conformingType);
 
-    auto subMap = getSubstitutionMap(substitutionMapID);
+    auto subMapOrError = getSubstitutionMapChecked(substitutionMapID);
+    if (!subMapOrError)
+      return subMapOrError.takeError();
+    auto subMap = subMapOrError.get();
 
     ProtocolConformanceRef genericConformance =
       readConformance(Cursor, genericEnv);
@@ -651,7 +654,11 @@ Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
                                               rawIDs);
 
   ASTContext &ctx = getContext();
-  DeclContext *dc = getDeclContext(contextID);
+  auto doOrError = getDeclContextChecked(contextID);
+  if (!doOrError)
+    return doOrError.takeError();
+  DeclContext *dc = doOrError.get();
+
   assert(!isa<ClangModuleUnit>(dc->getModuleScopeContext())
          && "should not have serialized a conformance from a clang module");
   Type conformingType = dc->getDeclaredInterfaceType();
@@ -1077,7 +1084,10 @@ ModuleFile::getSubstitutionMapChecked(serialization::SubstitutionMapID id) {
   conformances.reserve(numConformances);
   for (unsigned i : range(numConformances)) {
     (void)i;
-    conformances.push_back(readConformance(DeclTypeCursor));
+    auto conformanceOrError = readConformanceChecked(DeclTypeCursor);
+    if (!conformanceOrError)
+      return conformanceOrError.takeError();
+    conformances.push_back(conformanceOrError.get());
   }
 
   // Form the substitution map and record it.
@@ -2780,7 +2790,10 @@ public:
     var->setIsSetterMutating(isSetterMutating);
     declOrOffset = var;
 
-    Type interfaceType = MF.getType(interfaceTypeID);
+    auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
+    if (!interfaceTypeOrError)
+      return interfaceTypeOrError.takeError();
+    Type interfaceType = interfaceTypeOrError.get();
     var->setInterfaceType(interfaceType);
     var->setImplicitlyUnwrappedOptional(isIUO);
 
@@ -3203,9 +3216,12 @@ public:
     auto genericSig = MF.getGenericSignature(genericSigID);
     if (genericSig)
       opaqueDecl->setGenericSignature(genericSig);
-    if (underlyingTypeID)
-      opaqueDecl->setUnderlyingTypeSubstitutions(
-                                       MF.getSubstitutionMap(underlyingTypeID));
+    if (underlyingTypeID) {
+      auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeID);
+      if (!subMapOrError)
+        return subMapOrError.takeError();
+      opaqueDecl->setUnderlyingTypeSubstitutions(subMapOrError.get());
+    }
     SubstitutionMap subs;
     if (genericSig) {
       subs = genericSig->getIdentitySubstitutionMap();
@@ -5044,7 +5060,11 @@ public:
     decls_block::OpaqueArchetypeTypeLayout::readRecord(scratch,
                                                        opaqueDeclID, subsID);
 
-    auto opaqueDecl = cast<OpaqueTypeDecl>(MF.getDecl(opaqueDeclID));
+    auto opaqueTypeOrError = MF.getDeclChecked(opaqueDeclID);
+    if (!opaqueTypeOrError)
+      return opaqueTypeOrError.takeError();
+
+    auto opaqueDecl = cast<OpaqueTypeDecl>(opaqueTypeOrError.get());
     auto subs = MF.getSubstitutionMap(subsID);
 
     return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
