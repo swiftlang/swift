@@ -918,6 +918,9 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
       printDiagnostic(SM, *ChildInfo);
     }
   }
+
+  HaveOmittedEducationalNotes |=
+      !PrintEducationalNotes && !Info.EducationalNotePaths.empty();
 }
 
 void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
@@ -947,6 +950,25 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
 bool PrintingDiagnosticConsumer::finishProcessing() {
   // If there's an in-flight snippet, flush it.
   flush(false);
+
+  // If educational notes are disabled AND a note would have been printed if
+  // they were enabled, print a fake remark letting the user know the additional
+  // information is available. We don't route a real remark through the
+  // DiagnosticEngine because this message should only appear in printed output.
+  if (HaveOmittedEducationalNotes) {
+    auto remark = "additional documentation is available for some diagnostics; "
+                  "use '-print-educational-notes' to view\n";
+    if (ForceColors) {
+      ColoredStream colorStream{Stream};
+      colorStream.changeColor(ColoredStream::Colors::CYAN, true) << "remark: ";
+      colorStream.changeColor(ColoredStream::Colors::WHITE, true) << remark;
+      colorStream.resetColor();
+    } else {
+      NoColorStream noColorStream{Stream};
+      noColorStream << "remark: " << remark;
+    }
+  }
+
   return false;
 }
 
