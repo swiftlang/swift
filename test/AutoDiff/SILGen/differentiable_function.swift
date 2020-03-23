@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-differentiable-programming %s | %FileCheck %s
-// REQUIRES: differentiable_programming
 
 // Test SILGen for `@differentiable` function typed values.
 
