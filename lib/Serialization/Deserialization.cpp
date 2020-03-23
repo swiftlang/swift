@@ -1654,7 +1654,7 @@ giveUpFastPath:
           return true;
         if (!fn->getOperatorDecl())
           return true;
-        if (getStableFixity(fn->getOperatorDecl()->getKind()) != rawKind)
+        if (getStableFixity(fn->getOperatorDecl()->getFixity()) != rawKind)
           return true;
         return false;
       });
