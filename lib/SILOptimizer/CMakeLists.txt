@@ -37,7 +37,6 @@ add_subdirectory(Utils/Differentiation)
 # SWIFT_ENABLE_TENSORFLOW END
 
 add_swift_host_library(swiftSILOptimizer STATIC
-  SILOptimizerRequests.cpp
   ${SILOPTIMIZER_SOURCES})
 target_link_libraries(swiftSILOptimizer PRIVATE
   swiftSIL)

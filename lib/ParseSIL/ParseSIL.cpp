@@ -1472,8 +1472,8 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
           return true;
         }
         // Parse parameter indices.
-        parameterIndices = IndexSubset::getFromString(
-            SILMod.getASTContext(), P.Tok.getText());
+        parameterIndices =
+            IndexSubset::getFromString(SILMod.getASTContext(), P.Tok.getText());
         if (!parameterIndices) {
           P.diagnose(P.Tok, diag::invalid_index_subset);
           return true;

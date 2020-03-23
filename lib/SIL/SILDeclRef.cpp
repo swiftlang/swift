@@ -113,16 +113,13 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return false;
 }
 
-SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                       bool isForeign,
+SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-  : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0),
-    derivativeFunctionIdentifier(derivativeId)
-{}
+    : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0),
+      derivativeFunctionIdentifier(derivativeId) {}
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign) 
-  : defaultArgIndex(0), derivativeFunctionIdentifier(nullptr)
-{
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign)
+    : defaultArgIndex(0), derivativeFunctionIdentifier(nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
       // Map FuncDecls directly to Func SILDeclRefs.
@@ -847,7 +844,7 @@ SILDeclRef SILDeclRef::getOverridden() const {
   auto overridden = getDecl()->getOverriddenDecl();
   if (!overridden)
     return SILDeclRef();
-  return SILDeclRef(overridden, kind, isForeign, derivativeFunctionIdentifier);
+  return withDecl(overridden);
 }
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
@@ -900,7 +897,7 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
       return SILDeclRef();
 
     // JVPs/VJPs are overridden only if the base declaration has a
-    // `@differentiable` with the same parameter indices.
+    // `@differentiable` attribute with the same parameter indices.
     if (derivativeFunctionIdentifier) {
       auto overriddenAttrs =
           overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
@@ -908,8 +905,6 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
         if (attr->getParameterIndices() !=
             derivativeFunctionIdentifier->getParameterIndices())
           continue;
-
-        // TODO(TF-1056): Do we need to check generic signature requirements?
         auto *overriddenDerivativeId = overridden.derivativeFunctionIdentifier;
         overridden.derivativeFunctionIdentifier =
             AutoDiffDerivativeFunctionIdentifier::get(
@@ -929,8 +924,7 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
 SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
   auto bestOverridden =
     getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-  return SILDeclRef(bestOverridden, kind, isForeign,
-                    derivativeFunctionIdentifier);
+  return withDecl(bestOverridden);
 }
 
 AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(

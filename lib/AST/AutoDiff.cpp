@@ -19,11 +19,11 @@
 
 using namespace swift;
 
-AutoDiffDerivativeFunctionKind::
-AutoDiffDerivativeFunctionKind(StringRef string) {
-  Optional<innerty> result =
-      llvm::StringSwitch<Optional<innerty>>(string)
-          .Case("jvp", JVP).Case("vjp", VJP);
+AutoDiffDerivativeFunctionKind::AutoDiffDerivativeFunctionKind(
+    StringRef string) {
+  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
+                                 .Case("jvp", JVP)
+                                 .Case("vjp", VJP);
   assert(result && "Invalid string");
   rawValue = *result;
 }

@@ -114,10 +114,8 @@ public:
     entry.MethodEntry = {declRef};
     return entry;
   }
-  
-  bool isFunction() const {
-    return Kind == WitnessKind::MethodKind;
-  }
+
+  bool isFunction() const { return Kind == WitnessKind::MethodKind; }
 
   bool matchesFunction(SILDeclRef declRef) const {
     return isFunction() && MethodEntry.Witness == declRef;
@@ -148,11 +146,11 @@ public:
     return AssociatedTypeEntry.Association;
   }
 
-  static WitnessTableEntry forAssociatedConformance(
-      AssociatedConformance conf) {
+  static WitnessTableEntry
+  forAssociatedConformance(AssociatedConformance conf) {
     WitnessTableEntry entry(WitnessKind::AssociatedConformanceKind);
     entry.AssociatedConformanceEntry = {conf.getAssociation().getPointer(),
-                                   conf.getAssociatedRequirement()};
+                                        conf.getAssociatedRequirement()};
     return entry;
   }
 
@@ -164,7 +162,8 @@ public:
     return isAssociatedConformance() &&
            AssociatedConformanceEntry.AssociatedType ==
                conf.getAssociation().getPointer() &&
-           AssociatedConformanceEntry.Protocol == conf.getAssociatedRequirement();
+           AssociatedConformanceEntry.Protocol ==
+               conf.getAssociatedRequirement();
   }
 
   CanType getAssociatedConformancePath() const {
@@ -185,12 +184,12 @@ public:
       return true;
     case WitnessKind::OutOfLineBaseKind:
       return left.OutOfLineBaseEntry.Protocol ==
-                 right.OutOfLineBaseEntry.Protocol;
+             right.OutOfLineBaseEntry.Protocol;
     case WitnessKind::MethodKind:
       return left.MethodEntry.Witness == right.MethodEntry.Witness;
     case WitnessKind::AssociatedTypeKind:
       return left.AssociatedTypeEntry.Association ==
-                 right.AssociatedTypeEntry.Association;
+             right.AssociatedTypeEntry.Association;
     case WitnessKind::AssociatedConformanceKind:
       return left.AssociatedConformanceEntry.AssociatedType ==
                  right.AssociatedConformanceEntry.AssociatedType &&

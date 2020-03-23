@@ -3124,8 +3124,8 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
     auto *loweredIndices = autodiff::getLoweredParameterIndices(
         derivativeId->getParameterIndices(), formalInterfaceType);
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
-        loweredIndices, /*resultIndex*/ 0, derivativeId->getKind(),
-        *this, LookUpConformanceInModule(&M));
+        loweredIndices, /*resultIndex*/ 0, derivativeId->getKind(), *this,
+        LookUpConformanceInModule(&M));
   }
 
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";

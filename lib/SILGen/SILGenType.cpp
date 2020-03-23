@@ -392,10 +392,9 @@ public:
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(requirementRef.getDecl())) {
-        return addMethodImplementation(requirementRef,
-                                       requirementRef.withDecl(
-                                           witness.getDecl()),
-                                       witness);
+        return addMethodImplementation(
+            requirementRef, requirementRef.withDecl(witness.getDecl()),
+            witness);
       }
 
       return asDerived().addMissingMethod(requirementRef);
@@ -414,9 +413,8 @@ public:
     auto witnessAccessor =
       witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
 
-    return addMethodImplementation(requirementRef,
-                                   requirementRef.withDecl(witnessAccessor),
-                                   witness);
+    return addMethodImplementation(
+        requirementRef, requirementRef.withDecl(witnessAccessor), witness);
   }
 
 private:

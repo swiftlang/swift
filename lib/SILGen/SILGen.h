@@ -150,13 +150,6 @@ public:
   SILFunction *getDynamicThunk(SILDeclRef constant,
                                CanSILFunctionType constantTy);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create an autodiff derivative function vtable entry thunk for the
-  /// given SILDeclRef and derivative function type.
-  SILFunction *
-  getOrCreateAutoDiffClassMethodThunk(SILDeclRef derivativeFnRef,
-                                      CanSILFunctionType derivativeFnTy);
-
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.
@@ -230,6 +223,12 @@ public:
   SILFunction *getOrCreateCustomDerivativeThunk(
       SILFunction *customDerivativeFn, SILFunction *originalFn,
       const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind);
+
+  /// Get or create a derivative function vtable entry thunk for the given
+  /// SILDeclRef and derivative function type.
+  SILFunction *
+  getOrCreateAutoDiffClassMethodThunk(SILDeclRef derivativeFnRef,
+                                      CanSILFunctionType derivativeFnTy);
 
   /// Determine whether we need to emit an ivar destroyer for the given class.
   /// An ivar destroyer is needed if a superclass of this class may define a

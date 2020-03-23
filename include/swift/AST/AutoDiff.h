@@ -92,9 +92,7 @@ class AutoDiffDerivativeFunctionIdentifier : public llvm::FoldingSetNode {
 
 public:
   AutoDiffDerivativeFunctionKind getKind() const { return kind; }
-  IndexSubset *getParameterIndices() const {
-    return parameterIndices;
-  }
+  IndexSubset *getParameterIndices() const { return parameterIndices; }
   GenericSignature getDerivativeGenericSignature() const {
     return derivativeGenericSignature;
   }
@@ -106,9 +104,8 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) {
     ID.AddInteger(kind);
     ID.AddPointer(parameterIndices);
-    CanGenericSignature derivativeCanGenSig;
-    if (derivativeGenericSignature)
-      derivativeCanGenSig = derivativeGenericSignature->getCanonicalSignature();
+    auto derivativeCanGenSig =
+        derivativeGenericSignature.getCanonicalSignature();
     ID.AddPointer(derivativeCanGenSig.getPointer());
   }
 };
