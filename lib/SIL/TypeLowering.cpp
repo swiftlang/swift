@@ -2006,6 +2006,15 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
+  if (auto *derivativeId = c.derivativeFunctionIdentifier) {
+    auto originalFnTy =
+        makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
+    auto *derivativeFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
+        derivativeId->getParameterIndices(), derivativeId->getKind(),
+        LookUpConformanceInModule(&M));
+    return cast<AnyFunctionType>(derivativeFnTy->getCanonicalType());
+  }
+
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
