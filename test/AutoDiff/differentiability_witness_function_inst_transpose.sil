@@ -15,7 +15,6 @@
 // RUN: sed -e 's/import Swift$/import Swift; import _Differentiation/' %t/tmp.sil > %t/tmp_fixed.sil
 // RUN: %target-sil-opt %t/tmp_fixed.sil -module-name main -emit-sorted-sil | %FileCheck %s
 
-// REQUIRES: differentiable_programming
 // NOTE(SR-12090): `shell` is required only to run `sed` as a SR-12090 workaround.
 // REQUIRES: shell
 

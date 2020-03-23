@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
 // RUN: llvm-bcanalyzer %t/differentiable_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/differentiable_attr.swiftmodule -o - | %FileCheck %s
-// REQUIRES: differentiable_programming
 
 // TODO(TF-836): Enable this test.
 // Blocked by TF-828: `@differentiable` attribute type-checking.
