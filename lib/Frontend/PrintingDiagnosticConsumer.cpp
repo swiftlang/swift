@@ -898,9 +898,11 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
       currentSnippet = std::make_unique<AnnotatedSourceSnippet>(SM);
       annotateSnippetWithInfo(SM, Info, *currentSnippet);
     }
-    for (auto path : Info.EducationalNotePaths) {
-      if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
-        BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
+    if (PrintEducationalNotes) {
+      for (auto path : Info.EducationalNotePaths) {
+        if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
+          BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
+      }
     }
   } else {
     printDiagnostic(SM, Info);
@@ -956,16 +958,18 @@ bool PrintingDiagnosticConsumer::finishProcessing() {
   // information is available. We don't route a real remark through the
   // DiagnosticEngine because this message should only appear in printed output.
   if (HaveOmittedEducationalNotes) {
-    auto remark = "additional documentation is available for some diagnostics; "
-                  "use '-print-educational-notes' to view\n";
+    const char *remark =
+        "additional documentation is available for some diagnostics; "
+        "use '-print-educational-notes' to view\n";
     if (ForceColors) {
       ColoredStream colorStream{Stream};
-      colorStream.changeColor(ColoredStream::Colors::CYAN, true) << "remark: ";
-      colorStream.changeColor(ColoredStream::Colors::WHITE, true) << remark;
+      colorStream.changeColor(ColoredStream::Colors::CYAN, /*bold*/ true)
+          << "remark: ";
+      colorStream.changeColor(ColoredStream::Colors::WHITE, /*bold*/ true)
+          << remark;
       colorStream.resetColor();
     } else {
-      NoColorStream noColorStream{Stream};
-      noColorStream << "remark: " << remark;
+      Stream << "remark: " << remark;
     }
   }
 
