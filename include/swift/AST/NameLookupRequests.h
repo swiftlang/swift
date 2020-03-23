@@ -163,6 +163,27 @@ public:
   void cacheResult(ClassDecl *value) const;
 };
 
+class InheritedProtocolsRequest
+    : public SimpleRequest<InheritedProtocolsRequest,
+                           ArrayRef<ProtocolDecl *>(ProtocolDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<ProtocolDecl *>
+  evaluate(Evaluator &evaluator, ProtocolDecl *PD) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+  Optional<ArrayRef<ProtocolDecl *>> getCachedResult() const;
+  void cacheResult(ArrayRef<ProtocolDecl *> decls) const;
+};
+
 /// Requests whether or not this class has designated initializers that are
 /// not public or @usableFromInline.
 class HasMissingDesignatedInitializersRequest :
