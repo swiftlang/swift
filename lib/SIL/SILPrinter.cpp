@@ -346,6 +346,23 @@ void SILDeclRef::print(raw_ostream &OS) const {
 
   if (isForeign)
     OS << (isDot ? '.' : '!')  << "foreign";
+
+  if (derivativeFunctionIdentifier) {
+    OS << ((isDot || isForeign) ? '.' : '!');
+    switch (derivativeFunctionIdentifier->getKind()) {
+    case AutoDiffDerivativeFunctionKind::JVP:
+      OS << "jvp.";
+      break;
+    case AutoDiffDerivativeFunctionKind::VJP:
+      OS << "vjp.";
+      break;
+    }
+    OS << derivativeFunctionIdentifier->getParameterIndices()->getString();
+    if (auto derivativeGenSig =
+            derivativeFunctionIdentifier->getDerivativeGenericSignature()) {
+      OS << "." << derivativeGenSig;
+    }
+  }
 }
 
 void SILDeclRef::dump() const {

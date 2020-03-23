@@ -90,6 +90,14 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     implFn = getDynamicThunk(
         derived, Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
                      .SILFnType);
+  } else if (auto *derivativeId = derived.derivativeFunctionIdentifier) {
+    // For JVP/VJP methods, create a vtable entry thunk. The thunk contains an
+    // `differentiable_function` instruction, which is later filled during the
+    // differentiation transform.
+    auto derivedFnType =
+        Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
+            .SILFnType;
+    implFn = getOrCreateAutoDiffClassMethodThunk(derived, derivedFnType);
   } else {
     implFn = getFunction(derived, NotForDefinition);
   }
@@ -158,6 +166,17 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
         cast<ConstructorDecl>(baseDecl),
         cast<ConstructorDecl>(derivedDecl),
         base.kind == SILDeclRef::Kind::Allocator);
+    }
+    // TODO(TF-685): Use proper autodiff thunk mangling.
+    if (auto *derivativeId = derived.derivativeFunctionIdentifier) {
+      switch (derivativeId->getKind()) {
+      case AutoDiffDerivativeFunctionKind::JVP:
+        name += "_jvp";
+        break;
+      case AutoDiffDerivativeFunctionKind::VJP:
+        name += "_vjp";
+        break;
+      }
     }
   }
 
@@ -373,10 +392,9 @@ public:
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(requirementRef.getDecl())) {
-        return addMethodImplementation(requirementRef,
-                                       SILDeclRef(witness.getDecl(),
-                                                  requirementRef.kind),
-                                       witness);
+        return addMethodImplementation(
+            requirementRef, requirementRef.withDecl(witness.getDecl()),
+            witness);
       }
 
       return asDerived().addMissingMethod(requirementRef);
@@ -395,10 +413,8 @@ public:
     auto witnessAccessor =
       witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
 
-    return addMethodImplementation(requirementRef,
-                                   SILDeclRef(witnessAccessor,
-                                              SILDeclRef::Kind::Func),
-                                   witness);
+    return addMethodImplementation(
+        requirementRef, requirementRef.withDecl(witnessAccessor), witness);
   }
 
 private:
@@ -690,6 +706,20 @@ SILFunction *SILGenModule::emitProtocolWitness(
       conformance.isConcrete() ? conformance.getConcrete() : nullptr;
   std::string nameBuffer =
       NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
+  // TODO(TF-685): Proper mangling for derivative witness thunks.
+  if (auto *derivativeId = requirement.derivativeFunctionIdentifier) {
+    std::string kindString;
+    switch (derivativeId->getKind()) {
+    case AutoDiffDerivativeFunctionKind::JVP:
+      kindString = "jvp";
+      break;
+    case AutoDiffDerivativeFunctionKind::VJP:
+      kindString = "vjp";
+      break;
+    }
+    nameBuffer = "AD__" + nameBuffer + "_" + kindString + "_" +
+                 derivativeId->getParameterIndices()->getString();
+  }
 
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
