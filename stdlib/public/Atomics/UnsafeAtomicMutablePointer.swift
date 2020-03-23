@@ -23,7 +23,7 @@ public struct UnsafeAtomicMutablePointer<Pointee> {
   internal let _ptr: UnsafeMutableRawPointer
 
   @_transparent // Debug performance
-  public init(at address: UnsafeMutablePointer<Value>) {
+  public init(@_nonEphemeral at address: UnsafeMutablePointer<Value>) {
     self._ptr = UnsafeMutableRawPointer(address)
   }
 }
