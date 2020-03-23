@@ -37,8 +37,8 @@ extension AtomicLoadOrdering {
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public static var relaxed: AtomicLoadOrdering {
-    AtomicLoadOrdering(_rawValue: 0)
+  public static var relaxed: Self {
+    Self(_rawValue: 0)
   }
 
   /// An acquiring load prevents the effects of subsequent load and store
@@ -47,25 +47,22 @@ extension AtomicLoadOrdering {
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public static var acquiring: AtomicLoadOrdering {
-    AtomicLoadOrdering(_rawValue: 1)
+  public static var acquiring: Self {
+    Self(_rawValue: 1)
   }
 
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public static var sequentiallyConsistent: AtomicLoadOrdering {
-    AtomicLoadOrdering(_rawValue: 4)
+  public static var sequentiallyConsistent: Self {
+    Self(_rawValue: 4)
   }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AtomicLoadOrdering: Equatable {
   @_transparent // Debug performance
-  public static func ==(
-    left: AtomicLoadOrdering,
-    right: AtomicLoadOrdering
-  ) -> Bool {
+  public static func ==(left: Self, right: Self) -> Bool {
     return left._rawValue == right._rawValue
   }
 }
@@ -117,8 +114,8 @@ extension AtomicStoreOrdering {
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public static var relaxed: AtomicStoreOrdering {
-    AtomicStoreOrdering(_rawValue: 0)
+  public static var relaxed: Self {
+    Self(_rawValue: 0)
   }
 
   /// A releasing store prevents the effects of previous load and store
@@ -127,25 +124,22 @@ extension AtomicStoreOrdering {
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public static var releasing: AtomicStoreOrdering {
-    AtomicStoreOrdering(_rawValue: 2)
+  public static var releasing: Self {
+    Self(_rawValue: 2)
   }
 
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public static var sequentiallyConsistent: AtomicStoreOrdering {
-    AtomicStoreOrdering(_rawValue: 4)
+  public static var sequentiallyConsistent: Self {
+    Self(_rawValue: 4)
   }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AtomicStoreOrdering: Equatable {
   @_transparent // Debug performance
-  public static func ==(
-    left: AtomicStoreOrdering,
-    right: AtomicStoreOrdering
-  ) -> Bool {
+  public static func ==(left: Self, right: Self) -> Bool {
     return left._rawValue == right._rawValue
   }
 }
@@ -198,8 +192,8 @@ extension AtomicUpdateOrdering {
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public static var relaxed: AtomicUpdateOrdering {
-    AtomicUpdateOrdering(_rawValue: 0)
+  public static var relaxed: Self {
+    Self(_rawValue: 0)
   }
 
   /// An acquiring load prevents the effects of subsequent load and store
@@ -208,8 +202,8 @@ extension AtomicUpdateOrdering {
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public static var acquiring: AtomicUpdateOrdering {
-    AtomicUpdateOrdering(_rawValue: 1)
+  public static var acquiring: Self {
+    Self(_rawValue: 1)
   }
 
   /// A releasing store prevents the effects of previous load and store
@@ -218,8 +212,8 @@ extension AtomicUpdateOrdering {
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public static var releasing: AtomicUpdateOrdering {
-    AtomicUpdateOrdering(_rawValue: 2)
+  public static var releasing: Self {
+    Self(_rawValue: 2)
   }
 
   /// An acquiring-and-releasing operation is a combination of `.acquiring` and
@@ -229,25 +223,22 @@ extension AtomicUpdateOrdering {
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public static var acquiringAndReleasing: AtomicUpdateOrdering {
-    AtomicUpdateOrdering(_rawValue: 3)
+  public static var acquiringAndReleasing: Self {
+    Self(_rawValue: 3)
   }
 
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public static var sequentiallyConsistent: AtomicUpdateOrdering {
-    AtomicUpdateOrdering(_rawValue: 4)
+  public static var sequentiallyConsistent: Self {
+    Self(_rawValue: 4)
   }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AtomicUpdateOrdering: Equatable {
   @_transparent // Debug performance
-  public static func ==(
-    left: AtomicUpdateOrdering,
-    right: AtomicUpdateOrdering
-  ) -> Bool {
+  public static func ==(left: Self, right: Self) -> Bool {
     return left._rawValue == right._rawValue
   }
 }

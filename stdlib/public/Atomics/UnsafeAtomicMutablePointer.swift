@@ -35,12 +35,10 @@ extension UnsafeAtomicMutablePointer {
     _ptr.assumingMemoryBound(to: Value.self)
   }
 
-  public static func create(
-    initialValue: Value
-  ) -> UnsafeAtomicMutablePointer {
+  public static func create(initialValue: Value) -> Self {
     let ptr = UnsafeMutablePointer<Value>.allocate(capacity: 1)
     ptr.initialize(to: initialValue)
-    return UnsafeAtomicMutablePointer(at: ptr)
+    return Self(at: ptr)
   }
 
   public func destroy() {

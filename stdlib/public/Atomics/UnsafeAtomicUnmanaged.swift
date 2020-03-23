@@ -36,12 +36,10 @@ extension UnsafeAtomicUnmanaged {
   }
 
   @inlinable
-  public static func create(
-    initialValue: Value
-  ) -> UnsafeAtomicUnmanaged {
+  public static func create(initialValue: Value) -> Self {
     let ptr = UnsafeMutablePointer<Value>.allocate(capacity: 1)
     ptr.initialize(to: initialValue)
-    return UnsafeAtomicUnmanaged(at: ptr)
+    return Self(at: ptr)
   }
 
   public func destroy() {

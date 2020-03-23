@@ -112,10 +112,10 @@ public struct UnsafeAtomic${swiftType} {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeAtomic${swiftType} {
-  public static func create(initialValue: Value) -> UnsafeAtomic${swiftType} {
+  public static func create(initialValue: Value) -> Self {
     let ptr = UnsafeMutablePointer<Value>.allocate(capacity: 1)
     ptr.initialize(to: initialValue)
-    return UnsafeAtomic${swiftType}(at: ptr)
+    return Self(at: ptr)
   }
 
   public func destroy() {

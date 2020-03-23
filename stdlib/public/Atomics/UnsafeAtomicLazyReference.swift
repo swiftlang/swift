@@ -36,10 +36,10 @@ extension UnsafeAtomicLazyReference {
   }
 
   @inlinable
-  public static func create() -> UnsafeAtomicLazyReference {
+  public static func create() -> Self {
     let ptr = UnsafeMutablePointer<Value>.allocate(capacity: 1)
     ptr.initialize(to: nil)
-    return UnsafeAtomicLazyReference(at: ptr)
+    return Self(at: ptr)
   }
 
   public func destroy() {
