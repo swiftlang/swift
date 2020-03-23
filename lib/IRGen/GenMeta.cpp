@@ -4634,6 +4634,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Encodable:
   case KnownProtocolKind::Decodable:
   case KnownProtocolKind::StringInterpolationProtocol:
+  case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::Differentiable:
     return SpecialProtocol::None;
   }

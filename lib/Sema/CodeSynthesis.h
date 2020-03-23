@@ -60,6 +60,12 @@ Expr *buildSelfReference(VarDecl *selfDecl,
 Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                   ASTContext &ctx);
 
+/// Returns the protocol requirement with the specified name.
+ValueDecl *getProtocolRequirement(ProtocolDecl *protocol, Identifier name);
+
+// Returns true if given nominal type has a `let` stored with an initial value.
+bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal);
+
 } // end namespace swift
 
 #endif
