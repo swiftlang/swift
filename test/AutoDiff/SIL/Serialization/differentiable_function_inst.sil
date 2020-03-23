@@ -47,7 +47,7 @@ bb0:
 // CHECK-SIL:   [[EXTRACTED_ORIG_FN:%.*]] = differentiable_function_extract [original] [[DIFF_FN]] : $@differentiable @convention(thin) (Float) -> Float
 // CHECK-SIL:   return [[DIFF_FN]] : $@differentiable @convention(thin) (Float) -> Float
 
-// CHECK-IRGEN-LABEL: define swiftcc { i8*, i8*, i8* } @make_differentiable_function()
+// CHECK-IRGEN-LABEL: define {{.*}}swiftcc { i8*, i8*, i8* } @make_differentiable_function()
 // CHECK-IRGEN-NEXT: entry:
 // CHECK-IRGEN-NEXT:   ret { i8*, i8*, i8* } { i8* bitcast (float (float)* @function to i8*), i8* undef, i8* bitcast ({ float, i8*, %swift.refcounted* } (float)* @function_vjp to i8*) }
 
