@@ -52,7 +52,7 @@ protocol SomeProto {}
 // PROVIDES-NOMINAL-DAG:  nominal implementation  4main10OtherClassC '' true
 // PROVIDES-NOMINAL-2-DAG:  nominal interface  4main10OtherClassC '' true
 // PROVIDES-MEMBER-DAG:  potentialMember interface  4main10OtherClassC '' true
-// DEPENDS-MEMBER-DAG:  member interface  4main10OtherClassC deinit false
+// DEPENDS-MEMBER-DAG:  potentialMember interface  4main10OtherClassC '' true
 extension OtherClass : SomeProto {}
 
 // PROVIDES-NOMINAL-DAG:  nominal implementation  4main11OtherStructV '' true
