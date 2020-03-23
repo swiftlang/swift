@@ -149,6 +149,8 @@ namespace sil_block {
     SIL_PROPERTY,
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SIL_TWO_OPERANDS_EXTRA_ATTR,
+    SIL_INST_DIFFERENTIABLE_FUNCTION,
+    SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -446,6 +448,22 @@ namespace sil_block {
     ValueIDField,          // existential
     BCArray<ValueIDField>  // SILDeclRef
     // may be trailed by an inline protocol conformance
+  >;
+
+  using SILInstDifferentiableFunctionLayout = BCRecordLayout<
+    SIL_INST_DIFFERENTIABLE_FUNCTION,
+    BCVBR<8>,             // number of function parameters
+    BCFixed<1>,           // has derivative functions?
+    BCArray<ValueIDField> // parameter indices and operands
+  >;
+
+  using SILInstDifferentiableFunctionExtractLayout = BCRecordLayout<
+    SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    BCFixed<2>, // extractee
+    BCFixed<1>  // has explicit extractee type?
   >;
 }
 

@@ -4595,6 +4595,59 @@ public:
             "unknown verfication type");
   }
 
+  void checkDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
+    // FIXME(TF-1197): Re-enable verification after substituted SIL function
+    // types.
+    return;
+#if 0
+    auto origTy =
+        dfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
+    require(origTy, "The original function must have a function type");
+    require(!origTy->isDifferentiable(),
+            "The original function must not be @differentiable");
+    // Skip verification in lowered SIL: LoadableByAddress changes
+    // parameter/result conventions.
+    // TODO: Check that derivative function types match excluding
+    // parameter/result conventions in lowered SIL.
+    if (F.getModule().getStage() == SILStage::Lowered)
+      return;
+    if (dfi->hasDerivativeFunctions()) {
+      auto jvp = dfi->getJVPFunction();
+      auto jvpType = jvp->getType().getAs<SILFunctionType>();
+      require(jvpType, "The JVP function must have a function type");
+      require(!jvpType->isDifferentiable(),
+              "The JVP function must not be @differentiable");
+      auto expectedJVPType = origTy->getAutoDiffDerivativeFunctionType(
+          dfi->getParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::JVP, TC,
+          LookUpConformanceInModule(M));
+      requireSameType(SILType::getPrimitiveObjectType(jvpType),
+                      SILType::getPrimitiveObjectType(expectedJVPType),
+                      "JVP type does not match expected JVP type");
+      auto vjp = dfi->getVJPFunction();
+      auto vjpType = vjp->getType().getAs<SILFunctionType>();
+      require(vjpType, "The VJP function must have a function type");
+      require(!vjpType->isDifferentiable(),
+              "The VJP function must not be @differentiable");
+      auto expectedVJPType = origTy->getAutoDiffDerivativeFunctionType(
+          dfi->getParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::VJP, TC,
+          LookUpConformanceInModule(M));
+      requireSameType(SILType::getPrimitiveObjectType(vjpType),
+                      SILType::getPrimitiveObjectType(expectedVJPType),
+                      "VJP type does not match expected VJP type");
+    }
+#endif
+  }
+
+  void checkDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *dfei) {
+    auto fnTy = dfei->getOperand()->getType().getAs<SILFunctionType>();
+    require(fnTy, "The function operand must have a function type");
+    require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal,
+            "The function operand must be a '@differentiable' function");
+  }
+
   void checkDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *dwfi) {
     auto witnessFnTy = dwfi->getType().castTo<SILFunctionType>();

@@ -2164,6 +2164,23 @@ public:
   // Differentiable programming instructions
   //===--------------------------------------------------------------------===//
 
+  DifferentiableFunctionInst *createDifferentiableFunction(
+      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
+    return insert(DifferentiableFunctionInst::create(
+        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
+  }
+
+  /// Note: explicit extractee type may be specified only in lowered SIL.
+  DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
+      SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
+      SILValue Function, Optional<SILType> ExtracteeType = None) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc), Extractee, Function,
+        ExtracteeType));
+  }
+
   /// Note: explicit function type may be specified only in lowered SIL.
   DifferentiabilityWitnessFunctionInst *createDifferentiabilityWitnessFunction(
       SILLocation Loc, DifferentiabilityWitnessFunctionKind WitnessKind,

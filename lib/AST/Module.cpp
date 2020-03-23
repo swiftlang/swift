@@ -945,39 +945,50 @@ namespace {
   template <>
   struct OperatorLookup<PrefixOperatorDecl> {
     constexpr static auto map_ptr = &SourceFile::PrefixOperators;
-    template <typename T>
-    static PrefixOperatorDecl *lookup(T &container, Identifier name) {
-      return cast_or_null<PrefixOperatorDecl>(
-               container.lookupOperator(name, DeclKind::PrefixOperator));
+    static PrefixOperatorDecl *lookup(Evaluator &eval,
+                                      const OperatorLookupDescriptor &desc) {
+      // We can return the first prefix operator. All prefix operators of the
+      // same name are equivalent.
+      DirectOperatorLookupRequest req{desc, OperatorFixity::Prefix};
+      auto results = evaluateOrDefault(eval, req, {});
+      return results.empty() ? nullptr : cast<PrefixOperatorDecl>(results[0]);
     }
   };
 
   template <>
   struct OperatorLookup<InfixOperatorDecl> {
     constexpr static auto map_ptr = &SourceFile::InfixOperators;
-    template <typename T>
-    static InfixOperatorDecl *lookup(T &container, Identifier name) {
-      return cast_or_null<InfixOperatorDecl>(
-               container.lookupOperator(name, DeclKind::InfixOperator));
+    static InfixOperatorDecl *lookup(Evaluator &eval,
+                                     const OperatorLookupDescriptor &desc) {
+      // Return the first result if it exists.
+      DirectOperatorLookupRequest req{desc, OperatorFixity::Infix};
+      auto results = evaluateOrDefault(eval, req, {});
+      return results.empty() ? nullptr : cast<InfixOperatorDecl>(results[0]);
     }
   };
 
   template <>
   struct OperatorLookup<PostfixOperatorDecl> {
     constexpr static auto map_ptr = &SourceFile::PostfixOperators;
-    template <typename T>
-    static PostfixOperatorDecl *lookup(T &container, Identifier name) {
-      return cast_or_null<PostfixOperatorDecl>(
-               container.lookupOperator(name, DeclKind::PostfixOperator));
+    static PostfixOperatorDecl *lookup(Evaluator &eval,
+                                       const OperatorLookupDescriptor &desc) {
+      // We can return the first postfix operator. All postfix operators of the
+      // same name are equivalent.
+      DirectOperatorLookupRequest req{desc, OperatorFixity::Postfix};
+      auto results = evaluateOrDefault(eval, req, {});
+      return results.empty() ? nullptr : cast<PostfixOperatorDecl>(results[0]);
     }
   };
 
   template <>
   struct OperatorLookup<PrecedenceGroupDecl> {
     constexpr static auto map_ptr = &SourceFile::PrecedenceGroups;
-    template <typename T>
-    static PrecedenceGroupDecl *lookup(T &container, Identifier name) {
-      return container.lookupPrecedenceGroup(name);
+    static PrecedenceGroupDecl *lookup(Evaluator &eval,
+                                       const OperatorLookupDescriptor &desc) {
+      // Return the first result if it exists.
+      auto results =
+          evaluateOrDefault(eval, DirectPrecedenceGroupLookupRequest{desc}, {});
+      return results.empty() ? nullptr : results[0];
     }
   };
 } // end anonymous namespace
@@ -1014,7 +1025,8 @@ void SourceFile::setSyntaxRoot(syntax::SourceFileSyntax &&Root) {
 
 template<typename OP_DECL>
 static Optional<OP_DECL *>
-lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name);
+lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
+                          bool isCascading);
 
 template<typename OP_DECL>
 using ImportedOperatorsMap = llvm::SmallDenseMap<OP_DECL*, bool, 16>;
@@ -1031,9 +1043,8 @@ checkOperatorConflicts(const SourceFile &SF, SourceLoc loc,
       if (loc.isValid()) {
         ASTContext &C = SF.getASTContext();
         C.Diags.diagnose(loc, diag::ambiguous_operator_decls);
-        C.Diags.diagnose(start->first->getLoc(),
-                         diag::found_this_operator_decl);
-        C.Diags.diagnose(i->first->getLoc(), diag::found_this_operator_decl);
+        start->first->diagnose(diag::found_this_operator_decl);
+        i->first->diagnose(diag::found_this_operator_decl);
       }
       return end;
     }
@@ -1053,8 +1064,7 @@ checkOperatorConflicts(const SourceFile &SF, SourceLoc loc,
     ASTContext &C = SF.getASTContext();
     C.Diags.diagnose(loc, diag::ambiguous_precedence_groups);
     for (auto &entry : importedGroups) {
-      C.Diags.diagnose(entry.first->getLoc(),
-                       diag::found_this_precedence_group);
+      entry.first->diagnose(diag::found_this_precedence_group);
     }
   }
   return importedGroups.end();
@@ -1065,7 +1075,8 @@ checkOperatorConflicts(const SourceFile &SF, SourceLoc loc,
 template <typename OP_DECL>
 static Optional<OP_DECL *>
 lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
-                          Identifier Name, bool includePrivate) {
+                          Identifier Name, bool includePrivate,
+                          bool isCascading) {
   switch (File.getKind()) {
   case FileUnitKind::Builtin:
     // The Builtin module declares no operators.
@@ -1074,8 +1085,13 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
     break;
   case FileUnitKind::SerializedAST:
   case FileUnitKind::ClangModule:
-  case FileUnitKind::DWARFModule:
-    return OperatorLookup<OP_DECL>::lookup(cast<LoadedFile>(File), Name);
+  case FileUnitKind::DWARFModule: {
+    auto &eval = File.getASTContext().evaluator;
+    auto desc = OperatorLookupDescriptor::forFile(const_cast<FileUnit *>(&File),
+                                                  Name, isCascading,
+                                                  /*diagLoc*/ SourceLoc());
+    return OperatorLookup<OP_DECL>::lookup(eval, desc);
+  }
   }
 
   auto &SF = cast<SourceFile>(File);
@@ -1104,7 +1120,8 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
       continue;
 
     Optional<OP_DECL *> maybeOp =
-        lookupOperatorDeclForName<OP_DECL>(imported.module.second, Loc, Name);
+        lookupOperatorDeclForName<OP_DECL>(imported.module.second, Loc, Name,
+                                           isCascading);
     if (!maybeOp)
       return None;
     
@@ -1137,10 +1154,12 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
 
 template<typename OP_DECL>
 static Optional<OP_DECL *>
-lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name) {
+lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
+                          bool isCascading) {
   OP_DECL *result = nullptr;
   for (const FileUnit *File : M->getFiles()) {
-    auto next = lookupOperatorDeclForName<OP_DECL>(*File, Loc, Name, false);
+    auto next = lookupOperatorDeclForName<OP_DECL>(*File, Loc, Name, false,
+                                                   isCascading);
     if (!next.hasValue())
       return next;
 
@@ -1156,31 +1175,31 @@ lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name) {
 template <typename OperatorType>
 llvm::Expected<OperatorType *> LookupOperatorRequest<OperatorType>::evaluate(
     Evaluator &evaluator, OperatorLookupDescriptor desc) const {
-  auto result = lookupOperatorDeclForName<OperatorType>(*desc.SF, desc.diagLoc,
-                                                        desc.name,
-                                                        /*includePrivate*/ true);
+  auto *file = desc.fileOrModule.get<FileUnit *>();
+  auto result =
+      lookupOperatorDeclForName<OperatorType>(*file, desc.diagLoc, desc.name,
+                                              /*includePrivate*/ true,
+                                              desc.isCascading);
   if (!result.hasValue())
     return nullptr;
-  if (auto *tracker = desc.SF->getReferencedNameTracker()) {
-    if (!result.getValue() ||
-        result.getValue()->getDeclContext()->getModuleScopeContext() !=
-            desc.SF) {
-      tracker->addTopLevelName(desc.name, desc.isCascading);
-    }
+
+  if (!result.getValue() ||
+      result.getValue()->getDeclContext()->getModuleScopeContext() != file) {
+    namelookup::recordLookupOfTopLevelName(file, desc.name, desc.isCascading);
   }
   if (!result.getValue()) {
-    result = lookupOperatorDeclForName<OperatorType>(desc.SF->getParentModule(),
-                                                     desc.diagLoc,
-                                                     desc.name);
+    result = lookupOperatorDeclForName<OperatorType>(file->getParentModule(),
+                                                     desc.diagLoc, desc.name,
+                                                     desc.isCascading);
   }
   return result.hasValue() ? result.getValue() : nullptr;
 }
 
-
 #define LOOKUP_OPERATOR(Kind)                                                  \
   Kind##Decl *ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) {       \
     auto result =                                                              \
-        lookupOperatorDeclForName<Kind##Decl>(this, loc, name);                \
+        lookupOperatorDeclForName<Kind##Decl>(this, loc, name,                 \
+                                              /*isCascading*/ false);          \
     return result ? *result : nullptr;                                         \
   }                                                                            \
   template llvm::Expected<Kind##Decl *>                                        \
@@ -1192,6 +1211,75 @@ LOOKUP_OPERATOR(InfixOperator)
 LOOKUP_OPERATOR(PostfixOperator)
 LOOKUP_OPERATOR(PrecedenceGroup)
 #undef LOOKUP_OPERATOR
+
+llvm::Expected<TinyPtrVector<OperatorDecl *>>
+DirectOperatorLookupRequest::evaluate(Evaluator &evaluator,
+                                      OperatorLookupDescriptor descriptor,
+                                      OperatorFixity fixity) const {
+  // Query each file.
+  // TODO: Module-level caching.
+  TinyPtrVector<OperatorDecl *> results;
+  for (auto *file : descriptor.getFiles())
+    file->lookupOperatorDirect(descriptor.name, fixity, results);
+
+  return std::move(results);
+}
+
+void SourceFile::lookupOperatorDirect(
+    Identifier name, OperatorFixity fixity,
+    TinyPtrVector<OperatorDecl *> &results) const {
+  OperatorDecl *op = nullptr;
+  switch (fixity) {
+  case OperatorFixity::Infix: {
+    auto result = InfixOperators.find(name);
+    if (result != InfixOperators.end())
+      op = result->second.getPointer();
+    break;
+  }
+  case OperatorFixity::Postfix: {
+    auto result = PostfixOperators.find(name);
+    if (result != PostfixOperators.end())
+      op = result->second.getPointer();
+    break;
+  }
+  case OperatorFixity::Prefix: {
+    auto result = PrefixOperators.find(name);
+    if (result != PrefixOperators.end())
+      op = result->second.getPointer();
+    break;
+  }
+  }
+
+  // We currently can use the operator maps to cache lookup results from other
+  // modules. Make sure we only return results from the source file.
+  if (op && op->getDeclContext()->getParentSourceFile() == this)
+    results.push_back(op);
+}
+
+llvm::Expected<TinyPtrVector<PrecedenceGroupDecl *>>
+DirectPrecedenceGroupLookupRequest::evaluate(
+    Evaluator &evaluator, OperatorLookupDescriptor descriptor) const {
+  // Query each file.
+  // TODO: Module-level caching.
+  TinyPtrVector<PrecedenceGroupDecl *> results;
+  for (auto *file : descriptor.getFiles())
+    file->lookupPrecedenceGroupDirect(descriptor.name, results);
+
+  return std::move(results);
+}
+
+void SourceFile::lookupPrecedenceGroupDirect(
+    Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) const {
+  auto result = PrecedenceGroups.find(name);
+  if (result == PrecedenceGroups.end())
+    return;
+
+  // We currently can use the operator maps to cache lookup results from other
+  // modules. Make sure we only return results from the source file.
+  auto *group = result->second.getPointer();
+  if (group->getDeclContext()->getParentSourceFile() == this)
+    results.push_back(group);
+}
 
 void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
                                     ModuleDecl::ImportFilter filter) const {

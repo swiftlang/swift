@@ -159,6 +159,7 @@ CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
   }
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
+CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, DifferentiableFunctionExtract)
 // OpenExistentialValue opens the boxed value inside an existential
 // CoW box. The semantics of an existential CoW box implies that we
 // can only consume the projected value inside the box if the box is
@@ -263,6 +264,7 @@ FORWARDING_OWNERSHIP_INST(Enum)
 // frame from usage. In such cases, we have been creating unnecessary ref count
 // traffic in code.
 FORWARDING_OWNERSHIP_INST(InitExistentialRef)
+FORWARDING_OWNERSHIP_INST(DifferentiableFunction)
 #undef FORWARDING_OWNERSHIP_INST
 
 ValueOwnershipKind

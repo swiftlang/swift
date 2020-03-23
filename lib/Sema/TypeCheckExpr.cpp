@@ -130,12 +130,9 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
 static PrecedenceGroupDecl *lookupPrecedenceGroupForOperator(DeclContext *DC,
                                                              Identifier name,
                                                              SourceLoc loc) {
-  OperatorLookupDescriptor desc{
-    DC->getParentSourceFile(),
-    name,
-    DC->isCascadingContextForLookup(true),
-    loc
-  };
+  auto desc = OperatorLookupDescriptor::forFile(
+      DC->getParentSourceFile(), name, DC->isCascadingContextForLookup(true),
+      loc);
   auto &Ctx = DC->getASTContext();
   if (auto op = evaluateOrDefault(Ctx.evaluator,
                                   LookupInfixOperatorRequest{desc},
