@@ -344,6 +344,19 @@ class ThisDerived1 : ThisBase1 {
   }
 }
 
+protocol Crawlable {}
+extension Crawlable {
+   static func crawl() {}
+}
+struct GenericChameleon<U>: Crawlable {
+  static func chameleon() {}
+
+  func testStaticOnInstance(arg: GenericChameleon<Never>) {
+    arg.chameleon() // expected-error {{static member 'chameleon' cannot be used on instance of type 'GenericChameleon<Never>'}} {{5-8=GenericChameleon<Never>}}
+    arg.crawl() // expected-error {{static member 'crawl' cannot be used on instance of type 'GenericChameleon<Never>'}} {{5-8=GenericChameleon<Never>}}
+  }
+}
+
 extension ThisBase1 {
   var baseExtProp : Int {
     get {
