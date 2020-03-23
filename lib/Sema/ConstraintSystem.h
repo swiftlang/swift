@@ -4645,6 +4645,10 @@ public:
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
 
+  /// If we aren't certain that we've emitted a diagnostic, emit a fallback
+  /// diagnostic.
+  void maybeProduceFallbackDiagnostic(SolutionApplicationTarget target) const;
+
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
 
