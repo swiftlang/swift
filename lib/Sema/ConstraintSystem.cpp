@@ -1552,7 +1552,6 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
     // Declaration choices are handled below.
     break;
 
-  case OverloadChoiceKind::BaseType:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
@@ -1921,7 +1920,6 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::TupleIndex:
-  case OverloadChoiceKind::BaseType:
   case OverloadChoiceKind::KeyPathApplication:
     return {refType, bindConstraintCreated};
   case OverloadChoiceKind::DeclViaDynamic: {
@@ -2023,7 +2021,6 @@ void ConstraintSystem::bindOverloadType(
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::TupleIndex:
-  case OverloadChoiceKind::BaseType:
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::DeclViaDynamic:
     bindTypeOrIUO(openedType);
@@ -2274,10 +2271,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         adjustTypeOfOverloadReference(choice, locator, boundType, refType);
     break;
   }
-
-  case OverloadChoiceKind::BaseType:
-    refType = choice.getBaseType();
-    break;
 
   case OverloadChoiceKind::TupleIndex:
     if (auto lvalueTy = choice.getBaseType()->getAs<LValueType>()) {
@@ -2535,7 +2528,6 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       return DeclName(DynamicMember.getPointer());
 
-    case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::TupleIndex:
       llvm_unreachable("no name!");
   }
@@ -3264,7 +3256,6 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
         // want them to noise up unrelated subscript diagnostics.
         break;
 
-      case OverloadChoiceKind::BaseType:
       case OverloadChoiceKind::TupleIndex:
         // FIXME: Actually diagnose something here.
         break;

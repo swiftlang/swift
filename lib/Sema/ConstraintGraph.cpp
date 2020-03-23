@@ -428,6 +428,9 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
 }
 
 void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
+  assert(!fixed->is<TypeVariableType>() &&
+         "Cannot bind to type variable; merge equivalence classes instead");
+
   // If there are no type variables in the fixed type, there's nothing to do.
   if (!fixed->hasTypeVariable())
     return;
