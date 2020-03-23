@@ -15,7 +15,6 @@
 
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck --check-prefix=IRGEN %s
 
-// REQUIRES: differentiable_programming
 // NOTE(SR-12090): `shell` is required only to run `sed` as a SR-12090 workaround.
 // REQUIRES: shell
 

@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-differentiable-programming %s | %target-sil-opt -enable-experimental-differentiable-programming | %FileCheck %s
-// REQUIRES: differentiable_programming
 
 // Test SIL differentiability witness SIL generation.
 
@@ -31,9 +30,9 @@ public func foo_vjp(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
 }
 
 // CHECK-LABEL: // differentiability witness for foo(_:)
-// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s36sil_differentiability_witness_silgen3fooyS2fF : $@convention(thin) (Float) -> Float {
-// CHECK-NEXT:   jvp: @AD__$s36sil_differentiability_witness_silgen3fooyS2fF__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK-NEXT:   vjp: @AD__$s36sil_differentiability_witness_silgen3fooyS2fF__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s29sil_differentiability_witness3fooyS2fF : $@convention(thin) (Float) -> Float {
+// CHECK-NEXT:   jvp: @AD__$s29sil_differentiability_witness3fooyS2fF__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-NEXT:   vjp: @AD__$s29sil_differentiability_witness3fooyS2fF__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK-NEXT: }
 
 // Test internal non-generic function.
@@ -50,8 +49,8 @@ public func bar_jvp<T>(_ x: Float, _ y: T) -> (value: Float, differential: (Floa
 }
 
 // CHECK-LABEL: // differentiability witness for bar<A>(_:_:)
-// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] <τ_0_0> @$s36sil_differentiability_witness_silgen3baryS2f_xtlF : $@convention(thin) <T> (Float, @in_guaranteed T) -> Float {
-// CHECK-NEXT:   jvp: @AD__$s36sil_differentiability_witness_silgen3baryS2f_xtlF__jvp_src_0_wrt_0_l : $@convention(thin) <τ_0_0> (Float, @in_guaranteed τ_0_0) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] <τ_0_0> @$s29sil_differentiability_witness3baryS2f_xtlF : $@convention(thin) <T> (Float, @in_guaranteed T) -> Float {
+// CHECK-NEXT:   jvp: @AD__$s29sil_differentiability_witness3baryS2f_xtlF__jvp_src_0_wrt_0_l : $@convention(thin) <τ_0_0> (Float, @in_guaranteed τ_0_0) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK-NEXT: }
 
 // Test internal generic function.
@@ -76,9 +75,9 @@ func generic_vjp<T: Differentiable>(_ x: T, _ y: Float) -> (
 }
 
 // CHECK-LABEL: // differentiability witness for generic<A>(_:_:)
-// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @$s36sil_differentiability_witness_silgen7genericyxx_SftlF : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T {
-// CHECK-NEXT:   jvp: @AD__$s36sil_differentiability_witness_silgen7genericyxx_SftlF__jvp_src_0_wrt_0_1_{{s|16_Differentiation}}14DifferentiableRzl : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, Float) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>)
-// CHECK-NEXT:   vjp: @AD__$s36sil_differentiability_witness_silgen7genericyxx_SftlF__vjp_src_0_wrt_0_1_{{s|16_Differentiation}}14DifferentiableRzl : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_1, Float) for <τ_0_0.TangentVector, τ_0_0.TangentVector>)
+// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @$s29sil_differentiability_witness7genericyxx_SftlF : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T {
+// CHECK-NEXT:   jvp: @AD__$s29sil_differentiability_witness7genericyxx_SftlF__jvp_src_0_wrt_0_1_{{s|16_Differentiation}}14DifferentiableRzl : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, Float) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>)
+// CHECK-NEXT:   vjp: @AD__$s29sil_differentiability_witness7genericyxx_SftlF__vjp_src_0_wrt_0_1_{{s|16_Differentiation}}14DifferentiableRzl : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_1, Float) for <τ_0_0.TangentVector, τ_0_0.TangentVector>)
 // CHECK-NEXT: }
 
 public struct Foo: Differentiable {
@@ -89,7 +88,7 @@ public struct Foo: Differentiable {
   public var x: Float
 
 // CHECK-LABEL: // differentiability witness for Foo.x.getter
-// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s36sil_differentiability_witness_silgen3FooV1xSfvg : $@convention(method) (Foo) -> Float {
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s29sil_differentiability_witness3FooV1xSfvg : $@convention(method) (Foo) -> Float {
 // CHECK-NEXT: }
 
   @differentiable
@@ -98,7 +97,7 @@ public struct Foo: Differentiable {
   }
 
 // CHECK-LABEL: // differentiability witness for Foo.init(_:)
-// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s36sil_differentiability_witness_silgen3FooVyACSfcfC : $@convention(method) (Float, @thin Foo.Type) -> Foo {
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s29sil_differentiability_witness3FooVyACSfcfC : $@convention(method) (Float, @thin Foo.Type) -> Foo {
 // CHECK-NEXT: }
 
   @differentiable
@@ -107,7 +106,7 @@ public struct Foo: Differentiable {
   }
 
 // CHECK-LABEL: // differentiability witness for Foo.method()
-// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s36sil_differentiability_witness_silgen3FooV6methodSfyF : $@convention(method) (Foo) -> Float {
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s29sil_differentiability_witness3FooV6methodSfyF : $@convention(method) (Foo) -> Float {
 // CHECK-NEXT: }
 
   @differentiable
@@ -116,7 +115,7 @@ public struct Foo: Differentiable {
   }
 
 // CHECK-LABEL: // differentiability witness for Foo.computedProperty.getter
-// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s36sil_differentiability_witness_silgen3FooV16computedPropertySfvg : $@convention(method) (Foo) -> Float {
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s29sil_differentiability_witness3FooV16computedPropertySfvg : $@convention(method) (Foo) -> Float {
 // CHECK-NEXT: }
 
   @differentiable
@@ -125,7 +124,7 @@ public struct Foo: Differentiable {
   }
 
 // CHECK-LABEL: // differentiability witness for Foo.subscript.getter
-// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s36sil_differentiability_witness_silgen3FooVSfycig : $@convention(method) (Foo) -> Float {
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s29sil_differentiability_witness3FooVSfycig : $@convention(method) (Foo) -> Float {
 // CHECK-NEXT: }
 }
 
@@ -161,17 +160,17 @@ public func wrt_subset_vjp_wrt_x_y(_ tup: (Int, Int), _ x: Float, _ y: Float) ->
 }
 
 // CHECK-LABEL: // differentiability witness for wrt_subset(_:_:_:)
-// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 2] [results 0] @$s36sil_differentiability_witness_silgen10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 2] [results 0] @$s29sil_differentiability_witness10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: // differentiability witness for wrt_subset(_:_:_:)
-// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 3] [results 0] @$s36sil_differentiability_witness_silgen10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 3] [results 0] @$s29sil_differentiability_witness10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
 // CHECK-NEXT:   jvp:
 // CHECK-NEXT:   vjp:
 // CHECK-NEXT: }
 
 // CHECK-LABEL: // differentiability witness for wrt_subset(_:_:_:)
-// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 2 3] [results 0] @$s36sil_differentiability_witness_silgen10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 2 3] [results 0] @$s29sil_differentiability_witness10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
 // CHECK-NEXT:   jvp:
 // CHECK-NEXT:   vjp:
 // CHECK-NEXT: }
@@ -191,8 +190,8 @@ extension P1 {
 }
 
 // CHECK-LABEL: // differentiability witness for P1.foo()
-// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] <τ_0_0 where τ_0_0 : P1> @$s36sil_differentiability_witness_silgen2P1PAAE3fooSfyF : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> Float {
-// CHECK-NEXT:   vjp: @AD__$s36sil_differentiability_witness_silgen2P1PAAE3fooSfyF__vjp_src_0_wrt_0_36sil_differentiability_witness_silgen2P1Rzl : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float) -> @out τ_0_0 for <τ_0_0.TangentVector>)
+// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] <τ_0_0 where τ_0_0 : P1> @$s29sil_differentiability_witness2P1PAAE3fooSfyF : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> Float {
+// CHECK-NEXT:   vjp: @AD__$s29sil_differentiability_witness2P1PAAE3fooSfyF__vjp_src_0_wrt_0_29sil_differentiability_witness2P1Rzl : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float) -> @out τ_0_0 for <τ_0_0.TangentVector>)
 // CHECK-NEXT: }
 
 // Test custom derivatives of functions with generic signatures and `@differentiable` attributes.
