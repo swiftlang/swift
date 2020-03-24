@@ -2429,17 +2429,17 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       assert(attr->getOriginalDeclaration() &&
              "`@differentiable` attribute should have original declaration set "
              "during construction or parsing");
-      auto paramIndices = attr->getParameterIndices();
-      assert(paramIndices && "Checked parameter indices must be resolved");
-      SmallVector<bool, 4> indices;
+      auto *paramIndices = attr->getParameterIndices();
+      assert(paramIndices && "Parameter indices must be resolved");
+      SmallVector<bool, 4> paramIndicesVector;
       for (unsigned i : range(paramIndices->getCapacity()))
-        indices.push_back(paramIndices->contains(i));
+        paramIndicesVector.push_back(paramIndices->contains(i));
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
           attr->isLinear(),
           S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
-          indices);
+          paramIndicesVector);
       return;
     }
 
@@ -2456,12 +2456,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
       auto *parameterIndices = attr->getParameterIndices();
       assert(parameterIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> indices;
+      SmallVector<bool, 4> paramIndicesVector;
       for (unsigned i : range(parameterIndices->getCapacity()))
-        indices.push_back(parameterIndices->contains(i));
+        paramIndicesVector.push_back(parameterIndices->contains(i));
       DerivativeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
-          origDeclID, derivativeKind, indices);
+          origDeclID, derivativeKind, paramIndicesVector);
       return;
     }
 
@@ -2476,12 +2476,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
       auto *parameterIndices = attr->getParameterIndices();
       assert(parameterIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> indices;
+      SmallVector<bool, 4> paramIndicesVector;
       for (unsigned i : range(parameterIndices->getCapacity()))
-        indices.push_back(parameterIndices->contains(i));
+        paramIndicesVector.push_back(parameterIndices->contains(i));
       TransposeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
-          origDeclID, indices);
+          origDeclID, paramIndicesVector);
       return;
     }
     }

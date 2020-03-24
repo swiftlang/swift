@@ -2268,7 +2268,6 @@ static bool attributeChainContains(DeclAttribute *attr) {
   return tempAttrs.hasAttribute<DERIVED>();
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 // Set original declaration and parameter indices in `@differentiable`
 // attributes.
 //
@@ -2277,7 +2276,8 @@ static bool attributeChainContains(DeclAttribute *attr) {
 // `@differentiable` attribute deserialization to enter an infinite loop.
 //
 // Instead, call this ad-hoc function after deserializing a declaration to set
-// it as the original declaration in its `@differentiable` attributes.
+// the original declaration and parameter indices for its `@differentiable`
+// attributes.
 static void setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(
     Decl *decl, DeclAttribute *attrs,
     llvm::DenseMap<DifferentiableAttr *, IndexSubset *>
@@ -2290,7 +2290,6 @@ static void setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(
     diffAttr->setParameterIndices(diffAttrParamIndicesMap[diffAttr]);
   }
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 Decl *ModuleFile::getDecl(DeclID DID) {
   Expected<Decl *> deserialized = getDeclChecked(DID);
@@ -2314,11 +2313,12 @@ class DeclDeserializer {
   DeclAttribute *DAttrs = nullptr;
   DeclAttribute **AttrsNext = &DAttrs;
 
-  llvm::DenseMap<DifferentiableAttr *, IndexSubset *> diffAttrParamIndicesMap;
-
   Identifier privateDiscriminator;
   unsigned localDiscriminator = 0;
   StringRef filenameForPrivate;
+
+  // Auxiliary map for deserializing `@differentiable` attributes.
+  llvm::DenseMap<DifferentiableAttr *, IndexSubset *> diffAttrParamIndicesMap;
 
   void AddAttribute(DeclAttribute *Attr) {
     // Advance the linked list.
@@ -4283,6 +4283,36 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::Differentiable_DECL_ATTR: {
+        bool isImplicit;
+        bool linear;
+        GenericSignatureID derivativeGenSigId;
+        ArrayRef<uint64_t> parameters;
+
+        serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
+            scratch, isImplicit, linear, derivativeGenSigId, parameters);
+
+        auto derivativeGenSig = MF.getGenericSignature(derivativeGenSigId);
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = IndexSubset::get(ctx, parametersBitVector);
+        auto *diffAttr = DifferentiableAttr::create(
+            ctx, isImplicit, SourceLoc(), SourceRange(), linear,
+            /*parsedParameters*/ {}, /*trailingWhereClause*/ nullptr);
+
+        // Cache parameter indices so that they can set later.
+        // `DifferentiableAttr::setParameterIndices` cannot be called here
+        // because it requires `DifferentiableAttr::setOriginalDeclaration` to
+        // be called first. `DifferentiableAttr::setOriginalDeclaration` cannot
+        // be called here because the original declaration is not accessible in
+        // this function (`DeclDeserializer::deserializeDeclAttributes`).
+        diffAttrParamIndicesMap[diffAttr] = indices;
+        diffAttr->setDerivativeGenericSignature(derivativeGenSig);
+        Attr = diffAttr;
+        break;
+      }
+
       case decls_block::Derivative_DECL_ATTR: {
         bool isImplicit;
         uint64_t origNameId;
@@ -4316,35 +4346,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
       }
 
       // SWIFT_ENABLE_TENSORFLOW
-      case decls_block::Differentiable_DECL_ATTR: {
-        bool isImplicit;
-        bool linear;
-        GenericSignatureID derivativeGenSigId;
-        ArrayRef<uint64_t> parameters;
-
-        serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, linear, derivativeGenSigId, parameters);
-
-        auto derivativeGenSig = MF.getGenericSignature(derivativeGenSigId);
-
-        llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i : indices(parameters))
-          parametersBitVector[i] = parameters[i];
-        auto *indices = IndexSubset::get(ctx, parametersBitVector);
-
-        auto *diffAttr = DifferentiableAttr::create(
-            ctx, isImplicit, SourceLoc(), SourceRange(), linear,
-            /*parsedParameters*/ {}, /*trailingWhereClause*/ nullptr);
-        // Cache parameter indices so that they can set later.
-        // `DifferentiableAttr::setParameterIndices` cannot be called here
-        // because it requires `DifferentiableAttr::setOriginalDeclaration` to
-        // be called first.
-        diffAttrParamIndicesMap[diffAttr] = indices;
-        diffAttr->setDerivativeGenericSignature(derivativeGenSig);
-        Attr = diffAttr;
-        break;
-      }
-
       case decls_block::Transpose_DECL_ATTR: {
         bool isImplicit;
         uint64_t origNameId;
@@ -4471,18 +4472,19 @@ DeclDeserializer::getDeclCheckedImpl(
      &MF, declOrOffset, static_cast<decls_block::RecordKind>(recordID));
 
   switch (recordID) {
-  // SWIFT_ENABLE_TENSORFLOW
-  // Set original declaration and parameter indices in `@differentiable`
-  // attributes.
 #define CASE(RECORD_NAME) \
   case decls_block::RECORD_NAME##Layout::Code: {\
     auto decl = deserialize##RECORD_NAME(scratch, blobData); \
-    if (decl) \
+    if (decl) { \
+      /* \
+      // Set original declaration and parameter indices in `@differentiable` \
+      // attributes. \
+      */ \
       setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(\
           decl.get(), DAttrs, diffAttrParamIndicesMap); \
+    } \
     return decl; \
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   CASE(TypeAlias)
   CASE(GenericTypeParamDecl)

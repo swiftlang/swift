@@ -965,6 +965,11 @@ bool CSE::canHandle(SILInstruction *Inst) {
     
     if (isLazyPropertyGetter(AI))
       return true;
+      
+    if (SILFunction *callee = AI->getReferencedFunctionOrNull()) {
+      if (callee->isGlobalInit())
+        return true;
+    }
     
     return false;
   }
