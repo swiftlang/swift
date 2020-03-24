@@ -655,8 +655,7 @@ static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
     // Get `@differentiable` attribute description.
     std::string baseDiffAttrString;
     llvm::raw_string_ostream os(baseDiffAttrString);
-    baseDA->print(os, derivedDecl, omitWrtClause,
-                  /*omitDerivativeFunctions*/ true);
+    baseDA->print(os, derivedDecl, omitWrtClause);
     os.flush();
     diags
         .diagnose(derivedDecl,

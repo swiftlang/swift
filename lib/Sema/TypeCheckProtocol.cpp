@@ -391,8 +391,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         auto *newAttr = DifferentiableAttr::create(
             witnessAFD, /*implicit*/ true, reqDiffAttr->AtLoc,
             reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
-            reqDiffAttr->getParameterIndices(), /*jvp*/ None,
-            /*vjp*/ None, supersetConfig->derivativeGenericSignature);
+            reqDiffAttr->getParameterIndices(),
+            supersetConfig->derivativeGenericSignature);
         auto insertion = ctx.DifferentiableAttrs.try_emplace(
             {witnessAFD, newAttr->getParameterIndices()}, newAttr);
         // Valid `@differentiable` attributes are uniqued by original function
@@ -2334,7 +2334,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
                          inferredParameters->getNumIndices();
     std::string reqDiffAttrString;
     llvm::raw_string_ostream os(reqDiffAttrString);
-    reqAttr->print(os, req, omitWrtClause, /*omitDerivativeFunctions*/ true);
+    reqAttr->print(os, req, omitWrtClause);
     os.flush();
     diags
         .diagnose(match.Witness,

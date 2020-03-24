@@ -1816,10 +1816,6 @@ namespace decls_block {
     Differentiable_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
     BCFixed<1>, // Linear flag.
-    IdentifierIDField, // JVP name.
-    DeclIDField, // JVP function declaration.
-    IdentifierIDField, // VJP name.
-    DeclIDField, // VJP function declaration.
     GenericSignatureIDField, // Derivative generic signature.
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
