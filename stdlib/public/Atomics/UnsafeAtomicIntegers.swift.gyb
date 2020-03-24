@@ -129,7 +129,9 @@ extension UnsafeAtomic${swiftType} {
   /// with the specified memory ordering.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
-  public func load(ordering: AtomicLoadOrdering) -> Value {
+  public func load(
+    ordering: AtomicLoadOrdering = .sequentiallyConsistent
+  ) -> Value {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder) in loadOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
@@ -145,7 +147,7 @@ extension UnsafeAtomic${swiftType} {
   @_transparent @_alwaysEmitIntoClient
   public func store(
     _ desired: Value,
-    ordering: AtomicStoreOrdering
+    ordering: AtomicStoreOrdering = .sequentiallyConsistent
   ) {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder) in storeOrderings():
@@ -165,7 +167,7 @@ extension UnsafeAtomic${swiftType} {
   @_transparent @_alwaysEmitIntoClient
   public func exchange(
     _ desired: Value,
-    ordering: AtomicUpdateOrdering
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
   ) -> Value {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder, _) in rmwOrderings():
@@ -196,7 +198,7 @@ extension UnsafeAtomic${swiftType} {
   public func compareExchange(
     expected: Value,
     desired: Value,
-    ordering: AtomicUpdateOrdering
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
   ) -> (exchanged: Bool, original: Value) {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder, failureOrder) in rmwOrderings():
@@ -246,8 +248,8 @@ extension UnsafeAtomic${swiftType} {
   public func compareExchange(
     expected: Value,
     desired: Value,
-    ordering: AtomicUpdateOrdering,
-    failureOrdering: AtomicLoadOrdering
+    ordering: AtomicUpdateOrdering, // Note: no default
+    failureOrdering: AtomicLoadOrdering // Note: no default
   ) -> (exchanged: Bool, original: Value) {
     switch (ordering, failureOrdering) {
 % for (swiftSuccess, _, _, llvmSuccess, _) in rmwOrderings():
@@ -284,7 +286,7 @@ extension UnsafeAtomic${swiftType} {
   @discardableResult
   public func loadThen${name}(
     ${label} operand: Value${defaultValue},
-    ordering: AtomicUpdateOrdering
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
   ) -> Value {
     switch ordering {
     % for (swiftOrder, _, _, llvmOrder, failureOrder) in rmwOrderings():
@@ -308,7 +310,7 @@ extension UnsafeAtomic${swiftType} {
   @_transparent @_alwaysEmitIntoClient
   public func ${lowerFirst(name)}ThenLoad(
     ${label} operand: Value${defaultValue},
-    ordering: AtomicUpdateOrdering
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
   ) -> Value {
     loadThen${name}(${argLabel(label)}operand, ordering: ordering) ${op} operand
   }
@@ -326,7 +328,7 @@ extension UnsafeAtomic${swiftType} {
   @_transparent @_alwaysEmitIntoClient
   public func wrappingIncrement(
     by operand: Value = 1,
-    ordering: AtomicUpdateOrdering
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
   ) {
     _ = loadThenWrappingIncrement(by: operand, ordering: ordering)
   }
@@ -340,7 +342,7 @@ extension UnsafeAtomic${swiftType} {
   @_transparent @_alwaysEmitIntoClient
   public func wrappingDecrement(
     by operand: Value = 1,
-    ordering: AtomicUpdateOrdering
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
   ) {
     _ = loadThenWrappingDecrement(by: operand, ordering: ordering)
   }

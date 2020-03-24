@@ -53,7 +53,9 @@ extension UnsafeAtomicUnmanaged {
   /// with the specified memory ordering.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
-  public func load(ordering: AtomicLoadOrdering) -> Value {
+  public func load(
+    ordering: AtomicLoadOrdering = .sequentiallyConsistent
+  ) -> Value {
     let value = _ptr._atomicLoadWord(ordering: ordering)
     guard let p = UnsafeRawPointer(bitPattern: value) else { return nil }
     return Unmanaged.fromOpaque(p)
@@ -69,7 +71,7 @@ extension UnsafeAtomicUnmanaged {
   @_transparent @_alwaysEmitIntoClient
   public func store(
     _ desired: Value,
-    ordering: AtomicStoreOrdering
+    ordering: AtomicStoreOrdering = .sequentiallyConsistent
   ) {
     let desiredWord = UInt(bitPattern: desired?.toOpaque())
     _ptr._atomicStoreWord(desiredWord, ordering: ordering)
@@ -117,7 +119,7 @@ extension UnsafeAtomicUnmanaged {
   public func compareExchange(
     expected: Value,
     desired: Value,
-    ordering: AtomicUpdateOrdering
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
   ) -> (exchanged: Bool, original: Value) {
     let expectedWord = UInt(bitPattern: expected?.toOpaque())
     let desiredWord = UInt(bitPattern: desired?.toOpaque())
@@ -175,8 +177,8 @@ extension UnsafeAtomicUnmanaged {
   public func compareExchange(
     expected: Value,
     desired: Value,
-    ordering: AtomicUpdateOrdering,
-    failureOrdering: AtomicLoadOrdering
+    ordering: AtomicUpdateOrdering, // Note: no default
+    failureOrdering: AtomicLoadOrdering // Note: no default
   ) -> (exchanged: Bool, original: Value) {
     let expectedWord = UInt(bitPattern: expected?.toOpaque())
     let desiredWord = UInt(bitPattern: desired?.toOpaque())
