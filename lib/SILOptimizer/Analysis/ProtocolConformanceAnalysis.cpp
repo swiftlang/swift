@@ -28,18 +28,22 @@ namespace {
 /// A helper class to collect all nominal type declarations.
 class NominalTypeWalker : public ASTWalker {
   ProtocolConformanceAnalysis::ProtocolConformanceMap &ProtocolConformanceCache;
+  bool isWholeModule;
 
 public:
   NominalTypeWalker(ProtocolConformanceAnalysis::ProtocolConformanceMap
-                    &ProtocolConformanceCache)
-      : ProtocolConformanceCache(ProtocolConformanceCache) {}
+                        &ProtocolConformanceCache,
+                    bool isWholeModule)
+      : ProtocolConformanceCache(ProtocolConformanceCache),
+        isWholeModule(isWholeModule) {}
 
   bool walkToDeclPre(Decl *D) override {
     /// (1) Walk over all NominalTypeDecls to determine conformances.
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       auto Protocols = NTD->getAllProtocols();
       for (auto &Protocol : Protocols) {
-        if (Protocol->getEffectiveAccess() <= AccessLevel::Internal) {
+        if (isWholeModule ||
+            Protocol->getEffectiveAccess() <= AccessLevel::Internal) {
           ProtocolConformanceCache[Protocol].push_back(NTD);
         }
       }
@@ -51,7 +55,8 @@ public:
         for (auto *conformance : e->getLocalConformances()) {
           if (isa<NormalProtocolConformance>(conformance)) {
             auto *proto = conformance->getProtocol();
-            if (proto->getEffectiveAccess() <= AccessLevel::Internal) {
+            if (isWholeModule ||
+                proto->getEffectiveAccess() <= AccessLevel::Internal) {
               ProtocolConformanceCache[proto].push_back(ntd);
             }
           }
@@ -77,7 +82,7 @@ void ProtocolConformanceAnalysis::init() {
 
   /// This operation is quadratic and should only be performed
   /// in whole module compilation!
-  NominalTypeWalker Walker(ProtocolConformanceCache);
+  NominalTypeWalker Walker(ProtocolConformanceCache, true);
   for (auto *D : Decls) {
     D->walk(Walker);
   }
@@ -100,7 +105,8 @@ ProtocolConformanceAnalysis::findSoleConformingType(ProtocolDecl *Protocol) {
   while (!PDWorkList.empty()) {
     auto *PD = PDWorkList.pop_back_val();
     // Protocols must have internal or lower access.
-    if (PD->getEffectiveAccess() > AccessLevel::Internal) {
+    if (PD->getEffectiveAccess() > AccessLevel::Internal &&
+        !M->isWholeModule()) {
       return nullptr;
     }
     VisitedPDs.insert(PD);
