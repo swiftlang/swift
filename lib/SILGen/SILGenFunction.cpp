@@ -732,7 +732,15 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     SILFunction *mainFunction =
         SGM.getFunction(mainFunctionDeclRef, NotForDefinition);
 
-    NominalTypeDecl *mainType = cast<NominalTypeDecl>(mainFunc->getDeclContext());
+    ExtensionDecl *mainExtension =
+        dyn_cast<ExtensionDecl>(mainFunc->getDeclContext());
+
+    NominalTypeDecl *mainType;
+    if (mainExtension) {
+      mainType = mainExtension->getExtendedNominal();
+    } else {
+      mainType = cast<NominalTypeDecl>(mainFunc->getDeclContext());
+    }
     auto metatype = B.createMetatype(mainType, getLoweredType(mainType->getInterfaceType()));
 
     auto mainFunctionRef = B.createFunctionRef(mainFunc, mainFunction);
