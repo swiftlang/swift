@@ -1028,7 +1028,7 @@ public:
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
-                               ConformanceLookupKind::NonInherited, nullptr)) {
+                               ConformanceLookupKind::NonInherited)) {
       if (conformance->isComplete()) {
         if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
           SGM.getWitnessTable(normal);
@@ -1152,8 +1152,7 @@ public:
       // Emit witness tables for protocol conformances introduced by the
       // extension.
       for (auto *conformance : e->getLocalConformances(
-                                 ConformanceLookupKind::All,
-                                 nullptr)) {
+                                 ConformanceLookupKind::All)) {
         if (conformance->isComplete()) {
           if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
             SGM.getWitnessTable(normal);
