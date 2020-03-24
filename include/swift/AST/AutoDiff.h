@@ -441,6 +441,33 @@ GenericSignature getConstrainedDerivativeGenericSignature(
     GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
     bool isTranspose = false);
 
+/// Retrieve config from the function name of a variant of
+/// `Builtin.applyDerivative`, e.g. `Builtin.applyDerivative_jvp_arity2`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinApplyDerivativeConfig(
+    StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
+    unsigned &arity, bool &rethrows);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.applyTranspose`, e.g. `Builtin.applyTranspose_arity2`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinApplyTransposeConfig(
+  StringRef operationName, unsigned &arity, bool &rethrows);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
+/// `Builtin.differentiableFunction_arity1_throws`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinDifferentiableOrLinearFunctionConfig(
+    StringRef operationName, unsigned &arity, bool &throws);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
+/// `Builtin.differentiableFunction_arity1_throws`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinDifferentiableOrLinearFunctionConfig(
+    StringRef operationName, unsigned &arity, bool &throws);
+
 } // end namespace autodiff
 
 } // end namespace swift

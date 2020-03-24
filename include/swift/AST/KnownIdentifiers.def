@@ -133,6 +133,8 @@ IDENTIFIER(withKeywordArguments)
 IDENTIFIER(wrapped)
 IDENTIFIER(wrappedValue)
 IDENTIFIER(wrapperValue)
+IDENTIFIER(differential)
+IDENTIFIER(pullback)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")
