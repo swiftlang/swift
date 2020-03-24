@@ -70,6 +70,8 @@ code of conduct defined by the Contributor Covenant. This document is used
 across many open source communities, and we think it articulates our values
 well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-conduct).
 
+If this is your first time contributing to Swift, make sure to check out our [Contribution Starter Guide](docs/ContributionStarterGuide.md) as you might find it helpful. 
+
 ## Getting Started
 
 These instructions give the most direct path to a working Swift development
