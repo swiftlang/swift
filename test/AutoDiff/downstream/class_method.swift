@@ -23,14 +23,18 @@ ClassMethodTests.test("Final") {
 
 ClassMethodTests.test("Simple") {
   class Super {
-    @differentiable(wrt: x, jvp: jvpf, vjp: vjpf)
+    @differentiable(wrt: x)
     func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 2 * x
     }
-    final func jvpf(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
+
+    @derivative(of: f)
+    final func jvpf(_ x: Tracked<Float>) -> (value: Tracked<Float>, differential: (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 2 * v })
     }
-    final func vjpf(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
+
+    @derivative(of: f)
+    final func vjpf(_ x: Tracked<Float>) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 2 * v })
     }
   }
@@ -43,14 +47,18 @@ ClassMethodTests.test("Simple") {
   }
 
   class SubOverrideCustomDerivatives: Super {
-    @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
+    @differentiable(wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
-    final func jvpf2(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
+
+    @derivative(of: f)
+    final func jvpf2(_ x: Tracked<Float>) -> (value: Tracked<Float>, differential: (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 3 * v })
     }
-    final func vjpf2(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
+
+    @derivative(of: f)
+    final func vjpf2(_ x: Tracked<Float>) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 3 * v })
     }
   }
@@ -73,18 +81,22 @@ ClassMethodTests.test("SimpleWrtSelf") {
       self.base = base
     }
 
-    @differentiable(wrt: (self, x), jvp: jvpf, vjp: vjpf)
+    @differentiable(wrt: (self, x))
     func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return base * x
     }
+
+    @derivative(of: f)
     final func jvpf(
       _ x: Tracked<Float>
-    ) -> (Tracked<Float>, (TangentVector, Tracked<Float>) -> Tracked<Float>) {
+    ) -> (value: Tracked<Float>, differential: (TangentVector, Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { (dself, dx) in dself.base * dx })
     }
+
+    @derivative(of: f)
     final func vjpf(
       _ x: Tracked<Float>
-    ) -> (Tracked<Float>, (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
+    ) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
       let base = self.base
       return (f(x), { v in
         (TangentVector(base: v * x, _nontrivial: []), base * v)
@@ -112,25 +124,28 @@ ClassMethodTests.test("SimpleWrtSelf") {
   }
 
   final class SubOverrideCustomDerivatives: Super {
-    @differentiable(vjp: vjpInit)
+    @differentiable
     override init(base: Tracked<Float>) {
       super.init(base: base)
     }
+    @derivative(of: init)
     static func vjpInit(base: Tracked<Float>) -> (
-      SubOverrideCustomDerivatives, (Super.TangentVector) -> Tracked<Float>
+      value: SubOverrideCustomDerivatives, pullback: (Super.TangentVector) -> Tracked<Float>
     ) {
       return (SubOverrideCustomDerivatives(base: base), { x in x.base * 2 })
     }
 
     @differentiable(wrt: (self, x))
-    @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
+    @differentiable(wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
-    final func jvpf2(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
+    @derivative(of: f, wrt: x)
+    final func jvpf2(_ x: Tracked<Float>) -> (value: Tracked<Float>, differential: (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 3 * v })
     }
-    final func vjpf2(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
+    @derivative(of: f, wrt: x)
+    final func vjpf2(_ x: Tracked<Float>) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 3 * v })
     }
   }
@@ -155,18 +170,20 @@ ClassMethodTests.test("SimpleWrtSelf") {
 
 ClassMethodTests.test("Generics") {
   class Super<T: Differentiable & FloatingPoint> where T == T.TangentVector {
-    @differentiable(wrt: x, jvp: jvpf, vjp: vjpf)
+    @differentiable(wrt: x)
     func f(_ x: Tracked<T>) -> Tracked<T> {
       return Tracked<T>(2) * x
     }
+    @derivative(of: f)
     final func jvpf(
       _ x: Tracked<T>
-    ) -> (Tracked<T>, (Tracked<T>.TangentVector) -> Tracked<T>.TangentVector) {
+    ) -> (value: Tracked<T>, differential: (Tracked<T>.TangentVector) -> Tracked<T>.TangentVector) {
       return (f(x), { v in Tracked<T>(2) * v })
     }
+    @derivative(of: f)
     final func vjpf(
       _ x: Tracked<T>
-    ) -> (Tracked<T>, (Tracked<T>.TangentVector) -> Tracked<T>.TangentVector) {
+    ) -> (value: Tracked<T>, pullback: (Tracked<T>.TangentVector) -> Tracked<T>.TangentVector) {
       return (f(x), { v in Tracked<T>(2) * v })
     }
   }
@@ -187,35 +204,39 @@ ClassMethodTests.test("Generics") {
 
   class SubOverrideCustomDerivatives<T: Differentiable & FloatingPoint>: Super<T>
   where T == T.TangentVector {
-    @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
+    @differentiable(wrt: x)
     override func f(_ x: Tracked<T>) -> Tracked<T> {
       return Tracked<T>(3) * x
     }
+    @derivative(of: f)
     final func jvpf2(
       _ x: Tracked<T>
-    ) -> (Tracked<T>, (Tracked<T>.TangentVector) -> Tracked<T>.TangentVector) {
+    ) -> (value: Tracked<T>, differential: (Tracked<T>.TangentVector) -> Tracked<T>.TangentVector) {
       return (f(x), { v in Tracked<T>(3) * v })
     }
+    @derivative(of: f)
     final func vjpf2(
       _ x: Tracked<T>
-    ) -> (Tracked<T>, (Tracked<T>.TangentVector) -> Tracked<T>.TangentVector) {
+    ) -> (value: Tracked<T>, pullback: (Tracked<T>.TangentVector) -> Tracked<T>.TangentVector) {
       return (f(x), { v in Tracked<T>(3) * v })
     }
   }
 
   class SubSpecializeOverrideCustomDerivatives: Super<Float80> {
-    @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
+    @differentiable(wrt: x)
     override func f(_ x: Tracked<Float80>) -> Tracked<Float80> {
       return 3 * x
     }
+    @derivative(of: f)
     final func jvpf2(
       _ x: Tracked<Float80>
-    ) -> (Tracked<Float80>, (Tracked<Float80>) -> Tracked<Float80>) {
+    ) -> (value: Tracked<Float80>, differential: (Tracked<Float80>) -> Tracked<Float80>) {
       return (f(x), { v in 3 * v })
     }
+    @derivative(of: f)
     final func vjpf2(
       _ x: Tracked<Float80>
-    ) -> (Tracked<Float80>, (Tracked<Float80>) -> Tracked<Float80>) {
+    ) -> (value: Tracked<Float80>, pullback: (Tracked<Float80>) -> Tracked<Float80>) {
       return (f(x), { v in 3 * v })
     }
   }
@@ -244,10 +265,11 @@ ClassMethodTests.test("Methods") {
       self.base = base
     }
 
-    @differentiable(vjp: vjpSquared)
+    @differentiable
     func squared() -> Tracked<Float> { base * base }
 
-    final func vjpSquared() -> (Tracked<Float>, (Tracked<Float>) -> TangentVector) {
+    @derivative(of: squared)
+    final func vjpSquared() -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> TangentVector) {
       let base = self.base
       return (base * base, { v in
         TangentVector(base: 2 * base * v, _nontrivial: [])
@@ -256,9 +278,10 @@ ClassMethodTests.test("Methods") {
   }
 
   class Sub1: Super {
-    @differentiable(vjp: vjpSquared2)
+    @differentiable
     override func squared() -> Tracked<Float> { base * base }
-    final func vjpSquared2() -> (Tracked<Float>, (Tracked<Float>) -> TangentVector) {
+    @derivative(of: squared)
+    final func vjpSquared2() -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> TangentVector) {
       let base = self.base
       return (base * base, { v in
         TangentVector(base: 2 * base * v, _nontrivial: [])
@@ -286,10 +309,11 @@ ClassMethodTests.test("Properties") {
 
     init(base: Tracked<Float>) { self.base = base }
 
-    @differentiable(vjp: vjpSquared)
+    @differentiable
     var squared: Tracked<Float> { base * base }
 
-    final func vjpSquared() -> (Tracked<Float>, (Tracked<Float>) -> TangentVector) {
+    @derivative(of: squared)
+    final func vjpSquared() -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> TangentVector) {
       let base = self.base
       return (base * base, { v in TangentVector(base: 2 * base * v) })
     }
@@ -323,24 +347,26 @@ ClassMethodTests.test("Capturing") {
     }
 
     // Case 2: custom VJP capturing `self`.
-    @differentiable(wrt: (x), vjp: vjpApply2)
+    @differentiable(wrt: (x))
     func apply2(to x: Tracked<Float>) -> Tracked<Float> {
       return coefficient * x
     }
+    @derivative(of: apply2)
     final func vjpApply2(
       to x: Tracked<Float>
-    ) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
+    ) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Tracked<Float>) {
       return (coefficient * x, { v in self.coefficient * v })
     }
 
     // Case 3: custom VJP capturing `self.coefficient`.
-    @differentiable(wrt: x, vjp: vjpApply3)
+    @differentiable(wrt: x)
     func apply3(to x: Tracked<Float>) -> Tracked<Float> {
       return coefficient * x
     }
+    @derivative(of: apply3)
     final func vjpApply3(
       to x: Tracked<Float>
-    ) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
+    ) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Tracked<Float>) {
       let coefficient = self.coefficient
       return (coefficient * x, { v in coefficient * v })
     }

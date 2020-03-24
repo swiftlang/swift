@@ -1,14 +1,16 @@
 class OtherModuleSuper {
-  @differentiable(jvp: jvpf, vjp: vjpf)
+  @differentiable
   func f(_ x: Float) -> Float {
     return 2 * x
   }
 
-  final func jvpf(_ x: Float) -> (Float, (Float) -> Float) {
+  @derivative(of: f)
+  final func jvpf(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
     return (f(x), { v in 2 * v })
   }
 
-  final func vjpf(_ x: Float) -> (Float, (Float) -> Float) {
+  @derivative(of: f)
+  final func vjpf(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     return (f(x), { v in 2 * v })
   }
 }
@@ -21,16 +23,18 @@ class OtherModuleSubOverride : OtherModuleSuper {
 }
 
 class OtherModuleSubOverrideCustomDerivatives : OtherModuleSuper {
-  @differentiable(jvp: jvpf2, vjp: vjpf2)
+  @differentiable
   override func f(_ x: Float) -> Float {
     return 3 * x
   }
 
-  final func jvpf2(_ x: Float) -> (Float, (Float) -> Float) {
+  @derivative(of: f)
+  final func jvpf2(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
     return (f(x), { v in 3 * v })
   }
 
-  final func vjpf2(_ x: Float) -> (Float, (Float) -> Float) {
+  @derivative(of: f)
+  final func vjpf2(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     return (f(x), { v in 3 * v })
   }
 }

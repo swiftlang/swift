@@ -421,7 +421,7 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         auto *newAttr = DifferentiableAttr::create(
             witnessAFD, /*implicit*/ true, witness->getLoc(), witness->getLoc(),
             reqDiffAttr->isLinear(), reqDiffAttr->getParameterIndices(),
-            /*jvp*/ None, /*vjp*/ None, derivativeGenSig);
+            derivativeGenSig);
         // If the implicit attribute is inherited from a protocol requirement's
         // attribute, store the protocol requirement attribute's location for
         // use in diagnostics.
@@ -2371,7 +2371,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
                          inferredParameters->getNumIndices();
     std::string reqDiffAttrString;
     llvm::raw_string_ostream os(reqDiffAttrString);
-    reqAttr->print(os, req, omitWrtClause, /*omitDerivativeFunctions*/ true);
+    reqAttr->print(os, req, omitWrtClause);
     os.flush();
     // If the witness has less-than-public visibility and is declared in a
     // different file than the conformance, emit a specialized diagnostic.

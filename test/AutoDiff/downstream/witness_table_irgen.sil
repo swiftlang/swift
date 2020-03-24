@@ -12,10 +12,12 @@ protocol DifferentiableRequirement {
 }
 
 struct DifferentiableConformance : DifferentiableRequirement {
-  @differentiable(wrt: x, jvp: df, vjp: pf)
+  @differentiable(wrt: x)
   func f(_ x: Float) -> Float
-  func df(_ x: Float) -> (Float, (Float) -> Float)
-  func pf(_ x: Float) -> (Float, (Float) -> Float)
+  @derivative(of: f)
+  func df(_ x: Float) -> (value: Float, differential: (Float) -> Float)
+  @derivative(of: f)
+  func pf(_ x: Float) -> (value: Float, pullback: (Float) -> Float)
 }
 
 struct AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0 {

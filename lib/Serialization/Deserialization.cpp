@@ -4319,30 +4319,11 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
       case decls_block::Differentiable_DECL_ATTR: {
         bool isImplicit;
         bool linear;
-        uint64_t jvpNameId;
-        DeclID jvpDeclId;
-        uint64_t vjpNameId;
-        DeclID vjpDeclId;
         GenericSignatureID derivativeGenSigId;
         ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, linear, jvpNameId, jvpDeclId, vjpNameId,
-            vjpDeclId, derivativeGenSigId, parameters);
-
-        Optional<DeclNameRefWithLoc> jvp;
-        FuncDecl *jvpDecl = nullptr;
-        if (jvpNameId != 0)
-          jvp = {DeclNameRef(MF.getDeclBaseName(jvpNameId)), DeclNameLoc()};
-        if (jvpDeclId != 0)
-          jvpDecl = cast<FuncDecl>(MF.getDecl(jvpDeclId));
-
-        Optional<DeclNameRefWithLoc> vjp;
-        FuncDecl *vjpDecl = nullptr;
-        if (vjpNameId != 0)
-          vjp = {DeclNameRef(MF.getDeclBaseName(vjpNameId)), DeclNameLoc()};
-        if (vjpDeclId != 0)
-          vjpDecl = cast<FuncDecl>(MF.getDecl(vjpDeclId));
+            scratch, isImplicit, linear, derivativeGenSigId, parameters);
 
         auto derivativeGenSig = MF.getGenericSignature(derivativeGenSigId);
 
@@ -4353,15 +4334,13 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
         auto *diffAttr = DifferentiableAttr::create(
             ctx, isImplicit, SourceLoc(), SourceRange(), linear,
-            /*parsedParameters*/ {}, jvp, vjp, /*trailingWhereClause*/ nullptr);
+            /*parsedParameters*/ {}, /*trailingWhereClause*/ nullptr);
         // Cache parameter indices so that they can set later.
         // `DifferentiableAttr::setParameterIndices` cannot be called here
         // because it requires `DifferentiableAttr::setOriginalDeclaration` to
         // be called first.
         diffAttrParamIndicesMap[diffAttr] = indices;
         diffAttr->setDerivativeGenericSignature(derivativeGenSig);
-        diffAttr->setJVPFunction(jvpDecl);
-        diffAttr->setVJPFunction(vjpDecl);
         Attr = diffAttr;
         break;
       }

@@ -396,24 +396,6 @@ extension Class {
   }
 }
 
-// Old: test consistent usages of `@differentiable` and `@derivative` where
-// both attributes register the same derivatives. This was previously valid
-// but is now rejected.
-
-// expected-warning @+1 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated; use '@derivative' attribute for derivative registration instead}}
-@differentiable(jvp: jvpConsistent, vjp: vjpConsistent)
-func consistentSpecifiedDerivatives(_ x: Float) -> Float {
-  return x
-}
-@derivative(of: consistentSpecifiedDerivatives)
-func jvpConsistent(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
-  return (x, { $0 })
-}
-@derivative(of: consistentSpecifiedDerivatives(_:))
-func vjpConsistent(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
-  return (x, { $0 })
-}
-
 // Index based 'wrt:'
 
 func add2(x: Float, y: Float) -> Float {

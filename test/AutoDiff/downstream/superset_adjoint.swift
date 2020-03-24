@@ -6,7 +6,7 @@ import DifferentiationUnittest
 
 var SupersetVJPTests = TestSuite("SupersetVJP")
 
-@differentiable(wrt: (x, y), vjp: dmulxy)
+@differentiable(wrt: (x, y))
 func mulxy(_ x: Tracked<Float>, _ y: Tracked<Float>) -> Tracked<Float> {
   // use control flow to prevent AD; NB fix when control flow is supported
   if x > 1000 {
@@ -14,10 +14,11 @@ func mulxy(_ x: Tracked<Float>, _ y: Tracked<Float>) -> Tracked<Float> {
   }
   return x * y
 }
+@derivative(of: mulxy)
 func dmulxy(
   _ x: Tracked<Float>,
   _ y: Tracked<Float>
-) -> (Tracked<Float>, (Tracked<Float>) -> (Tracked<Float>, Tracked<Float>)) {
+) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (Tracked<Float>, Tracked<Float>)) {
   return (mulxy(x, y), { v in (y * v, x * v) })
 }
 
@@ -63,14 +64,15 @@ SupersetVJPTests.test("ApplySubset") {
 //   expectEqual(Float(1), grad)
 // }
 
-@differentiable(wrt: (x, y), vjp: dx_T)
+@differentiable(wrt: (x, y))
 func x_T<T : Differentiable>(_ x: Tracked<Float>, _ y: T) -> Tracked<Float> {
   if x > 1000 { return x }
   return x
 }
+@derivative(of: x_T)
 func dx_T<T : Differentiable>(
   _ x: Tracked<Float>, _ y: T
-) -> (Tracked<Float>, (Tracked<Float>) -> (Tracked<Float>, T.TangentVector)) {
+) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (Tracked<Float>, T.TangentVector)) {
   return (x_T(x, y), { v in (x * v, .zero) })
 }
 SupersetVJPTests.testWithLeakChecking("IndirectResults") {

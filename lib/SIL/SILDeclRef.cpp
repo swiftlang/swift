@@ -794,18 +794,6 @@ static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
                declRef.derivativeFunctionIdentifier->getParameterIndices();
       });
   assert(derivedDiffAttr && "Expected `@differentiable` attribute");
-  // If the derived `@differentiable` attribute specifies a derivative function,
-  // then a new vtable entry is needed. Return true.
-  switch (declRef.derivativeFunctionIdentifier->getKind()) {
-  case AutoDiffDerivativeFunctionKind::JVP:
-    if (!overridden.requiresNewVTableEntry() && derivedDiffAttr->getJVP())
-      return true;
-    break;
-  case AutoDiffDerivativeFunctionKind::VJP:
-    if (!overridden.requiresNewVTableEntry() && derivedDiffAttr->getVJP())
-      return true;
-    break;
-  }
   // Otherwise, if the base `@differentiable` attribute specifies a derivative
   // function, then the derivative is inherited and no new vtable entry is
   // needed. Return false.
