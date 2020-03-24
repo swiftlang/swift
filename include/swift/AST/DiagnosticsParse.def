@@ -1586,14 +1586,10 @@ ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
-ERROR(attr_differentiable_expected_label,none,"expected 'wrt:' or 'where'", ())
+ERROR(attr_differentiable_expected_label,none,
+      "expected 'wrt:' or 'where' in '@differentiable' attribute", ())
 ERROR(attr_differentiable_unexpected_argument,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
-// TODO(TF-893): Remove this error after the 0.8 release.
-ERROR(attr_differentiable_jvp_vjp_deprecated_error,none,
-        "'jvp:' and 'vjp:' arguments in '@differentiable' attribute are "
-        "deprecated; use '@derivative' attribute for derivative registration "
-        "instead", ())
 
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,

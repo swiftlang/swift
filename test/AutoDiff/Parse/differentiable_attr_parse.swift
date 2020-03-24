@@ -180,56 +180,9 @@ func slope5(_ x: Float) -> Float {
   return 5 * x
 }
 
-// expected-error @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(jvp: foo)
+// Test removed `jvp:' and 'vjp:' arguments.
+// expected-error @+1 {{expected 'wrt:' or 'where' in '@differentiable' attribute}}
+@differentiable(jvp: foo, vjp: foo)
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
-}
-
-// expected-error @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(vjp: foo)
-func bar(_ x: Float, _: Float) -> Float {
-  return 1 + x
-}
-
-// expected-error @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(vjp: foo, jvp: foo)
-func bar(_ x: Float, _: Float) -> Float {
-  return 1 + x
-}
-
-// expected-error @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(wrt: (self, x, y), jvp: foo)
-func bar(_ x: Float, _ y: Float) -> Float {
-  return 1 + x
-}
-
-// expected-error @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(wrt: (self, x, y), vjp: foo)
-func bar(_ x: Float, _ y: Float) -> Float {
-  return 1 + x
-}
-
-// expected-error @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(wrt: (self, x, y), jvp: foo, vjp: foo)
-func bar(_ x: Float, _ y: Float) -> Float {
-  return 1 + x
-}
-
-// expected-error @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(wrt: (x), jvp: foo where T : FloatingPoint)
-func bar<T : Numeric>(_ x: T, _: T) -> T {
-    return 1 + x
-}
-
-// expected-error @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(wrt: (x), vjp: foo where T : FloatingPoint)
-func bar<T : Numeric>(_ x: T, _: T) -> T {
-    return 1 + x
-}
-
-// expected-error @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
-@differentiable(wrt: (x), jvp: foo, vjp: foo where T : FloatingPoint)
-func bar<T : Numeric>(_ x: T, _: T) -> T {
-    return 1 + x
 }
