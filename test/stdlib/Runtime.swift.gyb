@@ -12,7 +12,7 @@ import SwiftShims
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
@@ -603,7 +603,7 @@ Runtime.test("SwiftError layout constants for LLDB") {
   expectEqual(40, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(72, sizeof_SwiftError.load(as: UInt.self))
 #endif
-#elseif os(Linux) || os(Android) || os(Windows)
+#elseif os(Linux) || os(Android) || os(Windows) || os(OpenBSD)
   expectEqual(16, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(32, sizeof_SwiftError.load(as: UInt.self))
 #else
