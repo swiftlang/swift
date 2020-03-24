@@ -231,6 +231,25 @@ SourceLoc swift::extractNearestSourceLoc(const OperatorLookupDescriptor &desc) {
   return desc.diagLoc;
 }
 
+//----------------------------------------------------------------------------//
+// LookupConformanceInModuleRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const LookupConformanceDescriptor &desc) {
+  out << "looking up conformance to ";
+  simple_display(out, desc.PD);
+  out << " for ";
+  out << desc.Ty.getString();
+  out << " in ";
+  simple_display(out, desc.Mod);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const LookupConformanceDescriptor &desc) {
+  return SourceLoc();
+}
+
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
