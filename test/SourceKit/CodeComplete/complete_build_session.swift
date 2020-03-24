@@ -4,6 +4,8 @@ func test() {
 
 }
 
+// UNSUPPORTED: OS=windows-msvc
+
 // -----------------------------------------------------------------------------
 // Test that modifications for frameworks in '-Fsystem' doesn't affect the result.
 
