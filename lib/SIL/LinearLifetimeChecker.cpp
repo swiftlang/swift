@@ -21,7 +21,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-linear-lifetime-checker"
-#include "swift/SIL/LinearLifetimeChecker.h"
+#include "LinearLifetimeCheckerPrivate.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -31,7 +31,6 @@
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
-using namespace swift::ownership;
 
 //===----------------------------------------------------------------------===//
 //                                Declarations
@@ -51,7 +50,7 @@ struct State {
 
   /// The result error object that use to signal either that no errors were
   /// found or if errors are found the specific type of error that was found.
-  LinearLifetimeError error;
+  LinearLifetimeChecker::Error error;
 
   /// The blocks that we have already visited.
   SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
@@ -82,7 +81,7 @@ struct State {
   SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
   State(SILValue value, SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-        ErrorBehaviorKind errorBehavior,
+        LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
         SmallVectorImpl<SILBasicBlock *> *leakingBlocks,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(value), beginBlock(value->getParentBlock()), error(errorBehavior),
@@ -91,7 +90,7 @@ struct State {
 
   State(SILBasicBlock *beginBlock,
         SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-        ErrorBehaviorKind errorBehavior,
+        LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
         SmallVectorImpl<SILBasicBlock *> *leakingBlocks,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(), beginBlock(beginBlock), error(errorBehavior),
@@ -495,7 +494,7 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-LinearLifetimeError LinearLifetimeChecker::checkValue(
+LinearLifetimeChecker::Error LinearLifetimeChecker::checkValue(
     SILValue value, ArrayRef<Operand *> consumingUses,
     ArrayRef<Operand *> nonConsumingUses, ErrorBehaviorKind errorBehavior,
     SmallVectorImpl<SILBasicBlock *> *leakingBlocks) {
@@ -587,4 +586,31 @@ LinearLifetimeError LinearLifetimeChecker::checkValue(
   // typed value.
   state.checkDataflowEndState(deadEndBlocks);
   return state.error;
+}
+
+bool LinearLifetimeChecker::completeConsumingUseSet(
+    SILValue value, Operand *consumingUse,
+    SmallVectorImpl<SILBasicBlock *> &scratch,
+    function_ref<void(SILBasicBlock::iterator)> visitor) {
+  auto error = checkValue(value, {consumingUse}, {},
+                          ErrorBehaviorKind::ReturnFalse, &scratch);
+
+  if (!error.getFoundError()) {
+    return false;
+  }
+
+  while (!scratch.empty()) {
+    visitor(scratch.pop_back_val()->begin());
+  }
+
+  // Return true if we found an over consume (meaning our use is in a loop).
+  return error.getFoundOverConsume();
+}
+
+bool LinearLifetimeChecker::validateLifetime(
+    SILValue value, ArrayRef<Operand *> consumingUses,
+    ArrayRef<Operand *> nonConsumingUses) {
+  return !checkValue(value, consumingUses, nonConsumingUses,
+                     ErrorBehaviorKind::ReturnFalse, nullptr /*leakingBlocks*/)
+              .getFoundError();
 }
