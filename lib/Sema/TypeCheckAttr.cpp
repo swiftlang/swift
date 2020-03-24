@@ -3602,103 +3602,6 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   return originalType;
 }
 
-// Computes the original function type corresponding to the given transpose
-// function type. Used for `@transpose` attribute type-checking.
-static AnyFunctionType *
-getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
-                                 IndexSubset *linearParamIndices,
-                                 bool wrtSelf) {
-  unsigned transposeParamsIndex = 0;
-
-  // Get the transpose function's parameters and result type.
-  auto transposeParams = transposeFnType->getParams();
-  auto transposeResult = transposeFnType->getResult();
-  bool isCurried = transposeResult->is<AnyFunctionType>();
-  if (isCurried) {
-    auto methodType = transposeResult->castTo<AnyFunctionType>();
-    transposeParams = methodType->getParams();
-    transposeResult = methodType->getResult();
-  }
-
-  // Get the original function's result type.
-  // The original result type is always equal to the type of the last
-  // parameter of the transpose function type.
-  auto originalResult = transposeParams.back().getPlainType();
-
-  // Get transposed result types.
-  // The transpose function result type may be a singular type or a tuple type.
-  SmallVector<TupleTypeElt, 4> transposeResultTypes;
-  if (auto transposeResultTupleType = transposeResult->getAs<TupleType>()) {
-    transposeResultTypes.append(transposeResultTupleType->getElements().begin(),
-                                transposeResultTupleType->getElements().end());
-  } else {
-    transposeResultTypes.push_back(transposeResult);
-  }
-
-  // Get the `Self` type, if the transpose function type is curried.
-  // - If `self` is a linearity parameter, use the first transpose result type.
-  // - Otherwise, use the first transpose parameter type.
-  unsigned transposeResultTypesIndex = 0;
-  Type selfType;
-  if (isCurried && wrtSelf) {
-    selfType = transposeResultTypes.front().getType();
-    transposeResultTypesIndex++;
-  } else if (isCurried) {
-    selfType = transposeFnType->getParams().front().getPlainType();
-  }
-
-  // Get the original function's parameters.
-  SmallVector<AnyFunctionType::Param, 8> originalParams;
-  // The number of original parameters is equal to the sum of:
-  // - The number of original non-transposed parameters.
-  //   - This is the number of transpose parameters minus one. All transpose
-  //     parameters come from the original function, except the last parameter
-  //     (the transposed original result).
-  // - The number of original transposed parameters.
-  //   - This is the number of linearity parameters.
-  unsigned originalParameterCount =
-      transposeParams.size() - 1 + linearParamIndices->getNumIndices();
-  // Iterate over all original parameter indices.
-  for (auto i : range(originalParameterCount)) {
-    // Skip `self` parameter if `self` is a linearity parameter.
-    // The `self` is handled specially later to form a curried function type.
-    bool isSelfParameterAndWrtSelf =
-        wrtSelf && i == linearParamIndices->getCapacity() - 1;
-    if (isSelfParameterAndWrtSelf)
-      continue;
-    // If `i` is a linearity parameter index, the next original parameter is
-    // the next transpose result.
-    if (linearParamIndices->contains(i)) {
-      auto resultType =
-          transposeResultTypes[transposeResultTypesIndex++].getType();
-      originalParams.push_back(AnyFunctionType::Param(resultType));
-    }
-    // Otherwise, the next original parameter is the next transpose parameter.
-    else {
-      originalParams.push_back(transposeParams[transposeParamsIndex++]);
-    }
-  }
-
-  // Compute the original function type.
-  AnyFunctionType *originalType;
-  // If the transpose type is curried, the original function type is:
-  // `(Self) -> (<original parameters>) -> <original result>`.
-  if (isCurried) {
-    assert(selfType && "`Self` type should be resolved");
-    originalType = makeFunctionType(originalParams, originalResult, nullptr);
-    originalType =
-        makeFunctionType(AnyFunctionType::Param(selfType), originalType,
-                         transposeFnType->getOptGenericSignature());
-  }
-  // Otherwise, the original function type is simply:
-  // `(<original parameters>) -> <original result>`.
-  else {
-    originalType = makeFunctionType(originalParams, originalResult,
-                                    transposeFnType->getOptGenericSignature());
-  }
-  return originalType;
-}
-
 /// Given a `@differentiable` attribute, attempts to resolve the original
 /// `AbstractFunctionDecl` for which it is registered, using the declaration
 /// on which it is actually declared. On error, emits diagnostic and returns
@@ -4605,6 +4508,103 @@ static bool checkLinearityParameters(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// Computes the original function type corresponding to the given transpose
+// function type. Used for `@transpose` attribute type-checking.
+static AnyFunctionType *
+getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
+                                 IndexSubset *linearParamIndices,
+                                 bool wrtSelf) {
+  unsigned transposeParamsIndex = 0;
+
+  // Get the transpose function's parameters and result type.
+  auto transposeParams = transposeFnType->getParams();
+  auto transposeResult = transposeFnType->getResult();
+  bool isCurried = transposeResult->is<AnyFunctionType>();
+  if (isCurried) {
+    auto methodType = transposeResult->castTo<AnyFunctionType>();
+    transposeParams = methodType->getParams();
+    transposeResult = methodType->getResult();
+  }
+
+  // Get the original function's result type.
+  // The original result type is always equal to the type of the last
+  // parameter of the transpose function type.
+  auto originalResult = transposeParams.back().getPlainType();
+
+  // Get transposed result types.
+  // The transpose function result type may be a singular type or a tuple type.
+  SmallVector<TupleTypeElt, 4> transposeResultTypes;
+  if (auto transposeResultTupleType = transposeResult->getAs<TupleType>()) {
+    transposeResultTypes.append(transposeResultTupleType->getElements().begin(),
+                                transposeResultTupleType->getElements().end());
+  } else {
+    transposeResultTypes.push_back(transposeResult);
+  }
+
+  // Get the `Self` type, if the transpose function type is curried.
+  // - If `self` is a linearity parameter, use the first transpose result type.
+  // - Otherwise, use the first transpose parameter type.
+  unsigned transposeResultTypesIndex = 0;
+  Type selfType;
+  if (isCurried && wrtSelf) {
+    selfType = transposeResultTypes.front().getType();
+    transposeResultTypesIndex++;
+  } else if (isCurried) {
+    selfType = transposeFnType->getParams().front().getPlainType();
+  }
+
+  // Get the original function's parameters.
+  SmallVector<AnyFunctionType::Param, 8> originalParams;
+  // The number of original parameters is equal to the sum of:
+  // - The number of original non-transposed parameters.
+  //   - This is the number of transpose parameters minus one. All transpose
+  //     parameters come from the original function, except the last parameter
+  //     (the transposed original result).
+  // - The number of original transposed parameters.
+  //   - This is the number of linearity parameters.
+  unsigned originalParameterCount =
+      transposeParams.size() - 1 + linearParamIndices->getNumIndices();
+  // Iterate over all original parameter indices.
+  for (auto i : range(originalParameterCount)) {
+    // Skip `self` parameter if `self` is a linearity parameter.
+    // The `self` is handled specially later to form a curried function type.
+    bool isSelfParameterAndWrtSelf =
+        wrtSelf && i == linearParamIndices->getCapacity() - 1;
+    if (isSelfParameterAndWrtSelf)
+      continue;
+    // If `i` is a linearity parameter index, the next original parameter is
+    // the next transpose result.
+    if (linearParamIndices->contains(i)) {
+      auto resultType =
+          transposeResultTypes[transposeResultTypesIndex++].getType();
+      originalParams.push_back(AnyFunctionType::Param(resultType));
+    }
+    // Otherwise, the next original parameter is the next transpose parameter.
+    else {
+      originalParams.push_back(transposeParams[transposeParamsIndex++]);
+    }
+  }
+
+  // Compute the original function type.
+  AnyFunctionType *originalType;
+  // If the transpose type is curried, the original function type is:
+  // `(Self) -> (<original parameters>) -> <original result>`.
+  if (isCurried) {
+    assert(selfType && "`Self` type should be resolved");
+    originalType = makeFunctionType(originalParams, originalResult, nullptr);
+    originalType =
+        makeFunctionType(AnyFunctionType::Param(selfType), originalType,
+                         transposeFnType->getOptGenericSignature());
+  }
+  // Otherwise, the original function type is simply:
+  // `(<original parameters>) -> <original result>`.
+  else {
+    originalType = makeFunctionType(originalParams, originalResult,
+                                    transposeFnType->getOptGenericSignature());
+  }
+  return originalType;
+}
+
 // Given a transpose function type where `self` is a linearity parameter,
 // sets `staticSelfType` and `instanceSelfType` and returns true if they are
 // equals. Otherwise, returns false.

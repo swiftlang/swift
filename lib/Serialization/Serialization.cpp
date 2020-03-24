@@ -2429,7 +2429,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       assert(attr->getOriginalDeclaration() &&
              "`@differentiable` attribute should have original declaration set "
              "during construction or parsing");
-
       auto paramIndices = attr->getParameterIndices();
       assert(paramIndices && "Checked parameter indices must be resolved");
       SmallVector<bool, 4> indices;
