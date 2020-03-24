@@ -4249,8 +4249,6 @@ class ProtocolDecl final : public NominalTypeDecl {
     Bits.ProtocolDecl.ExistentialTypeSupported = supported;
   }
 
-  ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
-
   bool hasLazyRequirementSignature() const {
     return Bits.ProtocolDecl.HasLazyRequirementSignature;
   }
@@ -4261,7 +4259,8 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
   friend class ExistentialTypeSupportedRequest;
-
+  friend class InheritedProtocolsRequest;
+  
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name, MutableArrayRef<TypeLoc> Inherited,
@@ -4270,12 +4269,7 @@ public:
   using Decl::getASTContext;
 
   /// Retrieve the set of protocols inherited from this protocol.
-  ArrayRef<ProtocolDecl *> getInheritedProtocols() const {
-    if (Bits.ProtocolDecl.InheritedProtocolsValid)
-      return InheritedProtocols;
-
-    return const_cast<ProtocolDecl *>(this)->getInheritedProtocolsSlow();
-  }
+  ArrayRef<ProtocolDecl *> getInheritedProtocols() const;
 
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
@@ -4369,6 +4363,13 @@ public:
 
 private:
   void computeKnownProtocolKind() const;
+
+  bool areInheritedProtocolsValid() const {
+    return Bits.ProtocolDecl.InheritedProtocolsValid;
+  }
+  void setInheritedProtocolsValid() {
+    Bits.ProtocolDecl.InheritedProtocolsValid = true;
+  }
 
 public:
   /// If this is known to be a compiler-known protocol, returns the kind.
