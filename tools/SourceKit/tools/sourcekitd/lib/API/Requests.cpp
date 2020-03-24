@@ -1579,11 +1579,15 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
   // while GenericParams is empty.
   if (!Info.GenericRequirements.empty()) {
     auto ReqArray = Elem.setArray(KeyGenericRequirements);
+
     for (auto &Req : Info.GenericRequirements) {
       auto ReqElem = ReqArray.appendDictionary();
       ReqElem.set(KeyDescription, Req);
     }
   }
+
+  if (!Info.RequiredBystanders.empty())
+    Elem.set(KeyRequiredBystanders, Info.RequiredBystanders);
 }
 
 void SKDocConsumer::failed(StringRef ErrDescription) {
