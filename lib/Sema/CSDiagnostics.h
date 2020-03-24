@@ -1490,7 +1490,7 @@ public:
 
   DescriptiveDeclKind getKind() const { return Member->getDescriptiveKind(); }
 
-  DeclName getName() const { return Member->getFullName(); }
+  DeclName getName() const { return Member->getName(); }
 
   bool diagnoseAsError() override = 0;
 
@@ -1834,7 +1834,7 @@ protected:
   /// \returns The full name of the callee, or a null decl name if there is no
   /// callee.
   DeclName getCalleeFullName() const {
-    return getCallee() ? getCallee()->getFullName() : DeclName();
+    return getCallee() ? getCallee()->getName() : DeclName();
   }
 
   /// Returns the type of the parameter involved in the mismatch, including any

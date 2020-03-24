@@ -336,7 +336,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
   if (VD && VD->hasName()) {
     llvm::SmallString<64> SS;
     llvm::raw_svector_ostream NameOS(SS);
-    NameOS << VD->getFullName();
+    NameOS << VD->getName();
     appendWithXMLEscaping(OS, NameOS.str());
   }
   OS << "</Name>";

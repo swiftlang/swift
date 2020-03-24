@@ -825,7 +825,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
 
     if (decls.size() == 1)
       ctx.Diags.diagnose(decls.front(), diag::decl_declared_here,
-                         decls.front()->getFullName());
+                         decls.front()->getName());
   }
   return ctx.AllocateCopy(decls);
 }

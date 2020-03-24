@@ -3940,7 +3940,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
             if (genReq->getGenericParams())
               continue;
 
-          inheritedTypeDecls[typeReq->getFullName()].push_back(typeReq);
+          inheritedTypeDecls[typeReq->getName()].push_back(typeReq);
         }
       }
       return TypeWalker::Action::Continue;
@@ -3967,7 +3967,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       llvm::raw_string_ostream out(result);
       out << start;
       interleave(assocType->getInherited(), [&](TypeLoc inheritedType) {
-        out << assocType->getFullName() << ": ";
+        out << assocType->getName() << ": ";
         if (auto inheritedTypeRepr = inheritedType.getTypeRepr())
           inheritedTypeRepr->print(out);
         else
@@ -3994,7 +3994,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     {
       llvm::raw_string_ostream out(result);
       out << start;
-      out << type->getFullName() << " == ";
+      out << type->getName() << " == ";
       if (auto typealias = dyn_cast<TypeAliasDecl>(type)) {
         if (auto underlyingTypeRepr = typealias->getUnderlyingTypeRepr())
           underlyingTypeRepr->print(out);
@@ -4053,7 +4053,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
     // Check whether we inherited any types with the same name.
     auto knownInherited =
-      inheritedTypeDecls.find(assocTypeDecl->getFullName());
+      inheritedTypeDecls.find(assocTypeDecl->getName());
     if (knownInherited == inheritedTypeDecls.end()) continue;
 
     bool shouldWarnAboutRedeclaration =
@@ -4074,7 +4074,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
           auto fixItWhere = getProtocolWhereLoc();
           Diags.diagnose(assocTypeDecl,
                          diag::inherited_associated_type_redecl,
-                         assocTypeDecl->getFullName(),
+                         assocTypeDecl->getName(),
                          inheritedFromProto->getDeclaredInterfaceType())
             .fixItInsertAfter(
                       fixItWhere.Loc,
@@ -4082,7 +4082,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
             .fixItRemove(assocTypeDecl->getSourceRange());
 
           Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
-                         inheritedAssocTypeDecl->getFullName());
+                         inheritedAssocTypeDecl->getName());
 
           shouldWarnAboutRedeclaration = false;
         }
@@ -4097,7 +4097,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
             inheritedType->getDeclContext()->getSelfNominalTypeDecl();
         Diags.diagnose(assocTypeDecl,
                        diag::associated_type_override_typealias,
-                       assocTypeDecl->getFullName(),
+                       assocTypeDecl->getName(),
                        inheritedOwningDecl->getDescriptiveKind(),
                        inheritedOwningDecl->getDeclaredInterfaceType());
       }
@@ -4157,7 +4157,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
                                   getConcreteTypeReq(type, fixItWhere.Item))
                 .fixItRemove(type->getSourceRange());
               Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
-                             inheritedAssocTypeDecl->getFullName());
+                             inheritedAssocTypeDecl->getName());
 
               shouldWarnAboutRedeclaration = false;
             }

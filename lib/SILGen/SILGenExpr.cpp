@@ -1305,7 +1305,7 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
   if (inExclusiveBorrowSelfSection(SGF.SelfInitDelegationState)) {
     if (auto *dre = dyn_cast<DeclRefExpr>(E->getSubExpr())) {
       if (isa<ParamDecl>(dre->getDecl()) &&
-          dre->getDecl()->getFullName() == SGF.getASTContext().Id_self &&
+          dre->getDecl()->getName() == SGF.getASTContext().Id_self &&
           dre->getDecl()->isImplicit()) {
         return visitDerivedToBaseExprOfSelf(SGF, dre, E, C);
       }
@@ -2373,7 +2373,7 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
     if (inExclusiveBorrowSelfSection(SelfInitDelegationState)) {
       if (auto *dre = dyn_cast<DeclRefExpr>(baseExpr)) {
         if (isa<ParamDecl>(dre->getDecl()) &&
-            dre->getDecl()->getFullName() == getASTContext().Id_self &&
+            dre->getDecl()->getName() == getASTContext().Id_self &&
             dre->getDecl()->isImplicit()) {
           return emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
               *this, loc, dre, metaTy);

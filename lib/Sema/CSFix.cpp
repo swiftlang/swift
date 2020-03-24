@@ -663,7 +663,7 @@ bool RemoveExtraneousArguments::isMinMaxNameShadowing(
     if (auto *baseExpr = dyn_cast<DeclRefExpr>(UDE->getBase())) {
       auto *decl = baseExpr->getDecl();
       if (baseExpr->isImplicit() && decl &&
-          decl->getFullName() == cs.getASTContext().Id_self) {
+          decl->getName() == cs.getASTContext().Id_self) {
         auto memberName = UDE->getName();
         return memberName.isSimpleName("min") || memberName.isSimpleName("max");
       }
