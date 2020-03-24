@@ -4296,6 +4296,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       llvm_unreachable("type variables should have already been handled by now");
 
     case TypeKind::DependentMember: {
+      // If one of the dependent member types has no type variables,
+      // this comparison is effectively illformed, because dependent
+      // member couldn't be simplified down to the actual type, and
+      // we wouldn't be able to solve this constraint, so let's just fail.
+      if (!desugar1->hasTypeVariable() || !desugar2->hasTypeVariable())
+        return getTypeMatchFailure(locator);
+
       // Nothing we can solve yet, since we need to wait until
       // type variables will get resolved.
       return formUnsolvedResult();

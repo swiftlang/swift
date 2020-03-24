@@ -354,6 +354,10 @@ StepResult ComponentStep::take(bool prevFailed) {
     return finalize(/*isSuccess=*/false);
   }
 
+  assert(CS.ActiveConstraints.empty());
+  assert((CS.InactiveConstraints.empty() && !CS.hasFreeTypeVariables()) ||
+         CS.solverState->allowsFreeTypeVariables());
+
   // If this solution is worse than the best solution we've seen so far,
   // skip it.
   if (CS.worseThanBestSolution())
