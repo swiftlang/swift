@@ -1700,13 +1700,32 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
 }
 
 void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
-  auto *nominal = dyn_cast<NominalTypeDecl>(D);
+  auto *extension = dyn_cast<ExtensionDecl>(D);
+
+  IterableDeclContext *iterableDeclContext;
+  DeclContext *declContext;
+  NominalTypeDecl *nominal;
+  SourceRange braces;
+
+  if (extension) {
+    nominal = extension->getExtendedNominal();
+    iterableDeclContext = extension;
+    declContext = extension;
+    braces = extension->getBraces();
+  } else {
+    nominal = dyn_cast<NominalTypeDecl>(D);
+    iterableDeclContext = nominal;
+    declContext = nominal;
+    braces = nominal->getBraces();
+  }
 
   if (!nominal) {
     assert(false && "Should have already recognized that the MainType decl "
                     "isn't applicable to decls other than NominalTypeDecls");
     return;
   }
+  assert(iterableDeclContext);
+  assert(declContext);
 
   // The type cannot be generic.
   if (nominal->isGenericContext()) {
@@ -1716,7 +1735,8 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
     return;
   }
 
-  auto *file = cast<SourceFile>(nominal->getModuleScopeContext());
+  SourceFile *file = cast<SourceFile>(declContext->getModuleScopeContext());
+  assert(file);
 
   // Create a function
   //
@@ -1729,11 +1749,11 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   // usual type-checking.  The alternative would be to directly call
   // mainType.main() from the entry point, and that would require fully
   // type-checking the call to mainType.main().
-  auto &context = nominal->getASTContext();
+  auto &context = D->getASTContext();
   auto location = attr->getLocation();
 
-  auto resolution = resolveValueMember(*nominal, nominal->getInterfaceType(),
-                                       context.Id_main);
+  auto resolution = resolveValueMember(
+      *declContext, nominal->getInterfaceType(), context.Id_main);
 
   FuncDecl *mainFunction = nullptr;
 
@@ -1769,14 +1789,14 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   auto voidToVoidFunctionType = FunctionType::get({}, context.TheEmptyTupleType);
   auto nominalToVoidToVoidFunctionType = FunctionType::get({AnyFunctionType::Param(nominal->getInterfaceType())}, voidToVoidFunctionType);
   auto *func = FuncDecl::create(
-      context, /*StaticLoc*/ nominal->getBraces().End, StaticSpellingKind::KeywordStatic,
+      context, /*StaticLoc*/ braces.End, StaticSpellingKind::KeywordStatic,
       /*FuncLoc*/ location,
       DeclName(context, DeclBaseName(context.Id_MainEntryPoint),
                ParameterList::createEmpty(context)),
-      /*NameLoc*/ nominal->getBraces().End, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*NameLoc*/ braces.End, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
       /*FnRetType=*/TypeLoc::withoutLoc(TupleType::getEmpty(context)),
-      nominal);
+      declContext);
   func->setImplicit(true);
   func->setSynthesized(true);
 
@@ -1817,7 +1837,8 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   func->setBodyParsed(body);
   func->setInterfaceType(nominalToVoidToVoidFunctionType);
 
-  nominal->addMember(func);
+  iterableDeclContext->addMember(func);
+
   // This function must be type-checked. Why?  Consider the following scenario:
   //
   //     protocol AlmostMainable {}
