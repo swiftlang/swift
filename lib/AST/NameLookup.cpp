@@ -2235,6 +2235,23 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
+ArrayRef<ProtocolDecl *>
+InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
+                                    ProtocolDecl *PD) const {
+  llvm::SmallVector<ProtocolDecl *, 2> result;
+  SmallPtrSet<const ProtocolDecl *, 2> known;
+  known.insert(PD);
+  bool anyObject = false;
+  for (const auto found : getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
+      if (known.insert(proto).second)
+        result.push_back(proto);
+    }
+  }
+
+  return PD->getASTContext().AllocateCopy(result);
+}
+
 llvm::Expected<NominalTypeDecl *>
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                                  ExtensionDecl *ext) const {
