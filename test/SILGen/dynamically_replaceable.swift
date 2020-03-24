@@ -414,7 +414,7 @@ struct WrapperWithInitialValue<T> {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s23dynamically_replaceable10SomeStructV1tSbvpfP
+// CHECK-NOT: sil hidden [ossa] @$s23dynamically_replaceable10SomeStructV1tSbvpfP
 public struct SomeStruct {
   @WrapperWithInitialValue var t = false
 }
