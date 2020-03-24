@@ -2235,7 +2235,7 @@ void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx,
       if (auto call = dyn_cast<CallExpr>(expr)) {
         DeclName name;
         if (auto fn = call->getCalledValue()) {
-          name = fn->getFullName();
+          name = fn->getName();
         } else if (auto unresolvedDot =
                       dyn_cast<UnresolvedDotExpr>(call->getFn())) {
           name = unresolvedDot->getName().getFullName();

@@ -775,7 +775,7 @@ static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
                                llvm::SmallVectorImpl<DeclContext *> &Scopes) {
   Scopes.clear();
   if (!getAvailableRenameForDecl(VD, RefInfo).hasValue()) {
-    Diags.diagnose(SourceLoc(), diag::value_decl_no_loc, VD->getFullName());
+    Diags.diagnose(SourceLoc(), diag::value_decl_no_loc, VD->getName());
     return;
   }
 
@@ -888,7 +888,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
   if (It != Declared.end()) {
     DiagEngine.diagnose(It->VD->getLoc(),
                         diag::value_decl_referenced_out_of_range,
-                        It->VD->getFullName());
+                        It->VD->getName());
     return ExtractCheckResult();
   }
 
@@ -2560,8 +2560,8 @@ struct ConvertToTernaryExprInfo {
         if (!ThenRef || !ThenRef->getDecl() || !ElseRef || !ElseRef->getDecl())
           return nullptr;
 
-        auto ThenName = ThenRef->getDecl()->getFullName();
-        auto ElseName = ElseRef->getDecl()->getFullName();
+        const auto ThenName = ThenRef->getDecl()->getName();
+        const auto ElseName = ElseRef->getDecl()->getName();
 
         if (ThenName.compare(ElseName) != 0)
           return nullptr;

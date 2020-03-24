@@ -179,7 +179,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   // Note: whenever you update this function, also update
   // TypeChecker::deriveProtocolRequirement.
   ASTContext &ctx = nominal->getASTContext();
-  auto name = requirement->getFullName();
+  const auto name = requirement->getName();
 
   // Local function that retrieves the requirement with the same name as
   // the provided requirement, but within the given known protocol.
@@ -415,7 +415,7 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
         isa<ExtensionDecl>(ConformanceDecl)) {
       ConformanceDecl->diagnose(
           diag::cannot_synthesize_init_in_extension_of_nonfinal,
-          getProtocolType(), synthesizing->getFullName());
+          getProtocolType(), synthesizing->getName());
       return true;
     }
   }

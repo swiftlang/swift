@@ -456,7 +456,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 
       EnumElementDecl *E =
           getCaseValueForBB<SwitchEnumInst, EnumElementDecl *>(SEIB, Succ);
-      OS << E->getFullName();
+      OS << E->getName();
       return OS.str();
     }
 
@@ -466,7 +466,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 
       EnumElementDecl *E =
           getCaseValueForBB<SwitchEnumAddrInst, EnumElementDecl *>(SEIB, Succ);
-      OS << E->getFullName();
+      OS << E->getName();
       return OS.str();
     }
 

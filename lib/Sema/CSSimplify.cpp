@@ -6400,7 +6400,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
       auto &ctx = cs.getASTContext();
       if (auto *DRE =
               dyn_cast<DeclRefExpr>(baseExpr->getSemanticsProvidingExpr())) {
-        if (DRE->getDecl()->getFullName() == ctx.Id_self) {
+        if (DRE->getDecl()->getName() == ctx.Id_self) {
           if (getType(DRE)->is<ArchetypeType>())
             applicable = true;
         }

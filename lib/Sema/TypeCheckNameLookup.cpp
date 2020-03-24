@@ -606,7 +606,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     if (!isPlausibleTypo(refKind, corrections.WrittenName, decl))
       return;
 
-    auto candidateName = decl->getFullName();
+    const auto candidateName = decl->getName();
 
     // Don't waste time computing edit distances that are more than
     // the worst in our collection.
@@ -706,7 +706,7 @@ void TypoCorrectionResults::noteAllCandidates() const {
     // diagnostic.
     if (!ClaimedCorrection) {
       SyntacticTypoCorrection correction(WrittenName, Loc,
-                                         candidate->getFullName());
+                                         candidate->getName());
       correction.addFixits(diagnostic);
     }
   }

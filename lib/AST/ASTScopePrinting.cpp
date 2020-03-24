@@ -67,7 +67,7 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
     llvm::errs() << "Local bindings: ";
     llvm::interleave(
         gatherer.getDecls().begin(), gatherer.getDecls().end(),
-        [&](ValueDecl *value) { llvm::errs() << value->getFullName(); },
+        [&](ValueDecl *value) { llvm::errs() << value->getName(); },
         [&]() { llvm::errs() << " "; });
     llvm::errs() << "\n";
   }
@@ -169,7 +169,7 @@ void GenericParamScope::printSpecifics(llvm::raw_ostream &out) const {
 }
 
 void AbstractFunctionDeclScope::printSpecifics(llvm::raw_ostream &out) const {
-  out << "'" << decl->getFullName() << "'";
+  out << "'" << decl->getName() << "'";
 }
 
 void AbstractPatternEntryScope::printSpecifics(llvm::raw_ostream &out) const {
