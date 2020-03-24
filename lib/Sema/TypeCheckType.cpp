@@ -880,7 +880,9 @@ Type TypeChecker::applyUnboundGenericArguments(
     auto genericSig = genericEnv->getGenericSignature();
     for (auto gp : genericSig->getGenericParams()) {
       subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-        genericEnv->mapTypeIntoContext(gp);
+        (resolution.usesArchetypes()
+         ? genericEnv->mapTypeIntoContext(gp)
+         : gp);
     }
   }
 
