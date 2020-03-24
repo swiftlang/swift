@@ -1154,7 +1154,7 @@ static ManagedValue emitBuiltinApplyDerivative(
   auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
       cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
           ->getDecl());
-  auto builtinName = builtinDecl->getName().str();
+  const auto builtinName = builtinDecl->getBaseIdentifier().str();
   AutoDiffDerivativeFunctionKind kind;
   unsigned arity;
   bool throws;
@@ -1172,7 +1172,7 @@ static ManagedValue emitBuiltinApplyTranspose(
   auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
       cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
           ->getDecl());
-  auto builtinName = builtinDecl->getName().str();
+  const auto builtinName = builtinDecl->getBaseIdentifier().str();
   unsigned arity;
   bool throws;
   auto successfullyParsed = autodiff::getBuiltinApplyTransposeConfig(

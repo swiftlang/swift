@@ -395,7 +395,7 @@ private:
       // name.
       os << "  ";
       if (printSwiftEnumElemNameInObjC(Elt, os)) {
-        os << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
+        os << " SWIFT_COMPILE_NAME(\"" << Elt->getBaseIdentifier() << "\")";
       }
 
       // Print the raw values, even the ones that we synthesize.

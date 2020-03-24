@@ -4819,7 +4819,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
     // because certain decls will have empty name (like setters).
     if (FD->getBodyResultTypeLoc().getLoc().isInvalid() &&
         FD->getParameters()->getStartLoc().isValid() &&
-        !FD->getName().empty()) {
+        !FD->getBaseIdentifier().empty()) {
       auto fixItLoc = Lexer::getLocForEndOfToken(
           getASTContext().SourceMgr, FD->getParameters()->getEndLoc());
       emitDiagnostic(anchor->getLoc(), diag::add_return_type_note)
@@ -5725,7 +5725,7 @@ bool ExtraneousCallFailure::diagnoseAsError() {
       if (auto *enumCase = dyn_cast<EnumElementDecl>(decl)) {
         auto diagnostic = emitDiagnostic(
             anchor->getLoc(), diag::unexpected_arguments_in_enum_case,
-            enumCase->getName());
+            enumCase->getBaseIdentifier());
         removeParensFixIt(diagnostic);
         return true;
       }

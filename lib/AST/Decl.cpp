@@ -6833,7 +6833,7 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
     return destructor->getObjCSelector();
   } else if (auto func = dyn_cast<FuncDecl>(this)) {
     // Otherwise cast this to be able to access getName()
-    baseNameStr = func->getName().str();
+    baseNameStr = func->getBaseIdentifier().str();
   } else if (isa<ConstructorDecl>(this)) {
     baseNameStr = "init";
   } else {
@@ -7341,7 +7341,8 @@ SelfAccessKind FuncDecl::getSelfAccessKind() const {
 }
 
 bool FuncDecl::isCallAsFunctionMethod() const {
-  return getName() == getASTContext().Id_callAsFunction && isInstanceMember();
+  return getBaseIdentifier() == getASTContext().Id_callAsFunction &&
+         isInstanceMember();
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
@@ -7838,7 +7839,7 @@ PrecedenceGroupDecl *InfixOperatorDecl::getPrecedenceGroup() const {
 }
 
 bool FuncDecl::isDeferBody() const {
-  return getName() == getASTContext().getIdentifier("$defer");
+  return getBaseIdentifier() == getASTContext().getIdentifier("$defer");
 }
 
 bool FuncDecl::isPotentialIBActionTarget() const {

@@ -3834,7 +3834,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
           if (!FD->getResultInterfaceType()->isVoid()) {
             diags.diagnose(diagLoc, diag::downcast_to_unrelated_fixit,
-                           FD->getName())
+                           FD->getBaseIdentifier())
                 .fixItInsertAfter(fromExpr->getEndLoc(), "()");
           }
         }

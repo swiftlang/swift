@@ -154,10 +154,10 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
 
   bool propertiesAreValid = true;
   for (auto elt : codingKeysDecl->getAllElements()) {
-    auto it = properties.find(elt->getName());
+    auto it = properties.find(elt->getBaseIdentifier());
     if (it == properties.end()) {
       elt->diagnose(diag::codable_extraneous_codingkey_case_here,
-                    elt->getName());
+                    elt->getBaseIdentifier());
       // TODO: Investigate typo-correction here; perhaps the case name was
       //       misspelled and we can provide a fix-it.
       propertiesAreValid = false;
@@ -493,7 +493,8 @@ static std::tuple<VarDecl *, Type, bool>
 lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
                                EnumElementDecl *elt,
                                NominalTypeDecl *targetDecl) {
-  for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
+  for (auto decl : targetDecl->lookupDirect(
+                                   DeclName(elt->getBaseIdentifier()))) {
     if (auto *vd = dyn_cast<VarDecl>(decl)) {
       // If we found a property with an attached wrapper, retrieve the
       // backing property.

@@ -2496,6 +2496,10 @@ public:
   /// names.
   DeclBaseName getBaseName() const { return Name.getBaseName(); }
 
+  Identifier getBaseIdentifier() const {
+    return getFullName().getBaseIdentifier();
+  }
+
   /// Generates a DeclNameRef referring to this declaration with as much
   /// specificity as possible.
   DeclNameRef createNameRef() const {
@@ -6239,8 +6243,6 @@ public:
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
 
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
-
   bool isStatic() const;
 
   /// \returns the way 'static'/'class' was spelled in the source.
@@ -6582,8 +6584,6 @@ public:
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,
                   DeclContext *DC);
-
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {

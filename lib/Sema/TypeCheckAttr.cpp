@@ -161,7 +161,7 @@ public:
       // An indirect case should have a payload.
       if (!caseDecl->hasAssociatedValues())
         diagnose(attr->getLocation(), diag::indirect_case_without_payload,
-                 caseDecl->getName());
+                 caseDecl->getBaseIdentifier());
       // If the enum is already indirect, its cases don't need to be.
       else if (caseDecl->getParentEnum()->getAttrs()
                  .hasAttribute<IndirectAttr>())
@@ -1562,9 +1562,9 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
   }
 
   // Reject attempts to define builtin operators.
-  if (isBuiltinOperator(FD->getName().str(), attr)) {
+  if (isBuiltinOperator(FD->getBaseIdentifier().str(), attr)) {
     diagnose(D->getStartLoc(), diag::redefining_builtin_operator,
-             attr->getAttrName(), FD->getName().str());
+             attr->getAttrName(), FD->getBaseIdentifier().str());
     attr->setInvalid();
     return;
   }

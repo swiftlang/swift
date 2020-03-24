@@ -254,7 +254,7 @@ ProvidesEmitter::emitTopLevelNames() const {
   for (const Decl *D : SF->getTopLevelDecls())
     emitTopLevelDecl(D, cpd);
   for (auto *operatorFunction : cpd.memberOperatorDecls)
-    out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
+    out << "- \"" << escape(operatorFunction->getBaseIdentifier()) << "\"\n";
   return cpd;
 }
 

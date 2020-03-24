@@ -7056,7 +7056,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 static bool isValidDynamicCallableMethod(FuncDecl *method,
                                          AnyFunctionType *methodType) {
   auto &ctx = method->getASTContext();
-  if (method->getName() != ctx.Id_dynamicallyCall)
+  if (method->getBaseIdentifier() != ctx.Id_dynamicallyCall)
     return false;
   if (methodType->getParams().size() != 1)
     return false;
