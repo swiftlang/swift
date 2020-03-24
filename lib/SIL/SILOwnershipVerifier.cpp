@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-ownership-verifier"
 
+#include "LinearLifetimeCheckerPrivate.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
@@ -25,7 +26,6 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/Projection.h"
@@ -45,7 +45,6 @@
 #include <algorithm>
 
 using namespace swift;
-using namespace swift::ownership;
 
 // This is an option to put the SILOwnershipVerifier in testing mode. This
 // causes the following:
@@ -73,7 +72,7 @@ static llvm::cl::opt<bool>
 //                         SILValueOwnershipChecker
 //===----------------------------------------------------------------------===//
 
-namespace {
+namespace swift {
 
 // TODO: This class uses a bunch of global state like variables. It should be
 // refactored into a large state object that is used by functions.
@@ -89,7 +88,7 @@ class SILValueOwnershipChecker {
   SILValue value;
 
   /// The action that the checker should perform on detecting an error.
-  ErrorBehaviorKind errorBehavior;
+  LinearLifetimeChecker::ErrorBehaviorKind errorBehavior;
 
   /// The list of lifetime ending users that we found. Only valid if check is
   /// successful.
@@ -113,7 +112,7 @@ class SILValueOwnershipChecker {
 public:
   SILValueOwnershipChecker(
       DeadEndBlocks &deadEndBlocks, SILValue value,
-      ErrorBehaviorKind errorBehavior,
+      LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
       llvm::SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks)
       : result(), deadEndBlocks(deadEndBlocks), value(value),
         errorBehavior(errorBehavior), visitedBlocks(visitedBlocks) {
@@ -173,7 +172,7 @@ private:
       SmallVectorImpl<Operand *> &implicitRegularUsers);
 };
 
-} // end anonymous namespace
+} // namespace swift
 
 bool SILValueOwnershipChecker::check() {
   if (result.hasValue())
@@ -879,11 +878,11 @@ void SILInstruction::verifyOperandOwnership() const {
   if (isa<TermInst>(this))
     return;
 
-  ErrorBehaviorKind errorBehavior;
+  LinearLifetimeChecker::ErrorBehaviorKind errorBehavior;
   if (IsSILOwnershipVerifierTestingEnabled) {
-    errorBehavior = ErrorBehaviorKind::PrintMessageAndReturnFalse;
+    errorBehavior = decltype(errorBehavior)::PrintMessageAndReturnFalse;
   } else {
-    errorBehavior = ErrorBehaviorKind::PrintMessageAndAssert;
+    errorBehavior = decltype(errorBehavior)::PrintMessageAndAssert;
   }
   for (const Operand &op : getAllOperands()) {
     // Skip type dependence operands.
@@ -954,11 +953,11 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   if (!f->hasOwnership() || !f->shouldVerifyOwnership())
     return;
 
-  ErrorBehaviorKind errorBehavior;
+  LinearLifetimeChecker::ErrorBehaviorKind errorBehavior;
   if (IsSILOwnershipVerifierTestingEnabled) {
-    errorBehavior = ErrorBehaviorKind::PrintMessageAndReturnFalse;
+    errorBehavior = decltype(errorBehavior)::PrintMessageAndReturnFalse;
   } else {
-    errorBehavior = ErrorBehaviorKind::PrintMessageAndAssert;
+    errorBehavior = decltype(errorBehavior)::PrintMessageAndAssert;
   }
 
   SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
