@@ -32,8 +32,6 @@
             "remote": { "id": "tensorflow/tensorflow" } },
         "tensorflow-swift-apis": {
             "remote": { "id": "tensorflow/swift-apis" } },
-        "tensorflow-swift-quote": {
-            "remote": { "id": "tensorflow/swift" } },
         "icu": {
             "remote": { "id": "unicode-org/icu" },
             "platforms": [ "Linux" ]
@@ -334,8 +332,7 @@
                 "PythonKit": "master",
                 "swift-format": "master",
                 "tensorflow": "v2.2.0-rc0",
-                "tensorflow-swift-apis": "master",
-                "tensorflow-swift-quote": "46c3d2996541d0ea902630eda11be5a9ccdeaba3"
+                "tensorflow-swift-apis": "master"
             }
         }
     }
