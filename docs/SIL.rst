@@ -772,14 +772,6 @@ types. Function types are transformed in order to encode additional attributes:
     a way as to guarantee that it is polymorphic across all possible
     implementors of the protocol.
 
-- The **fully uncurried representation** of the function type, with
-  all of the curried argument clauses flattened into a single argument
-  clause. For instance, a curried function ``func foo(_ x:A)(y:B) -> C``
-  might be emitted as a function of type ``((y:B), (x:A)) -> C``.  The
-  exact representation depends on the function's `calling
-  convention`_, which determines the exact ordering of currying
-  clauses.  Methods are treated as a form of curried function.
-
 Layout Compatible Types
 ```````````````````````
 
