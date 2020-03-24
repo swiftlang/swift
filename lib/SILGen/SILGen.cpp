@@ -757,8 +757,8 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 
 void SILGenModule::emitDifferentiabilityWitnessesForFunction(
     SILDeclRef constant, SILFunction *F) {
-  // Visit `@differentiable` amd `@derivative` attributes and generate SIL
-  // differentiability witnesses.
+  // Visit `@derivative` attributes and generate SIL differentiability
+  // witnesses.
   // Skip if the SILDeclRef is a:
   // - Default argument generator function.
   // - Thunk.
@@ -770,12 +770,6 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
   auto *AFD = constant.getAbstractFunctionDecl();
   auto emitWitnesses = [&](DeclAttributes &Attrs) {
     for (auto *diffAttr : Attrs.getAttributes<DifferentiableAttr>()) {
-      SILFunction *jvp = nullptr;
-      SILFunction *vjp = nullptr;
-      if (auto *jvpDecl = diffAttr->getJVPFunction())
-        jvp = getFunction(SILDeclRef(jvpDecl), ForDefinition);
-      if (auto *vjpDecl = diffAttr->getVJPFunction())
-        vjp = getFunction(SILDeclRef(vjpDecl), ForDefinition);
       auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
       assert((!F->getLoweredFunctionType()->getSubstGenericSignature() ||
               diffAttr->getDerivativeGenericSignature()) &&
@@ -783,7 +777,8 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
              "all original SIL functions with generic signatures");
       AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
                             diffAttr->getDerivativeGenericSignature());
-      emitDifferentiabilityWitness(AFD, F, config, jvp, vjp, diffAttr);
+      emitDifferentiabilityWitness(AFD, F, config, /*jvp*/ nullptr,
+                                   /*vjp*/ nullptr, diffAttr);
     }
     for (auto *derivAttr : Attrs.getAttributes<DerivativeAttr>()) {
       SILFunction *jvp = nullptr;
