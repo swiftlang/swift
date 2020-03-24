@@ -549,15 +549,17 @@ SILValue DestroyHoisting::createAddress(unsigned locIdx, SILBuilder &builder) {
   assert(!isa<BeginAccessInst>(loc->representativeValue) &&
          "only a root location can be a begin_access");
 
-  SingleValueInstruction *&cachedProj = addressProjections[locIdx];
-  if (cachedProj)
-    return cachedProj;
-
   if (!domTree)
     domTree = DA->get(function);
+    
+  SILInstruction *ip = &*builder.getInsertionPoint();
+
+  SingleValueInstruction *&cachedProj = addressProjections[locIdx];
+  if (cachedProj && domTree->properlyDominates(cachedProj, ip))
+    return cachedProj;
 
   auto *projInst = cast<SingleValueInstruction>(loc->representativeValue);
-  if (domTree->properlyDominates(projInst, &*builder.getInsertionPoint())) {
+  if (domTree->properlyDominates(projInst, ip)) {
     cachedProj = projInst;
     return projInst;
   }
@@ -580,7 +582,7 @@ SILValue DestroyHoisting::createAddress(unsigned locIdx, SILBuilder &builder) {
     newProj = projBuilder.createTupleElementAddr(TEA->getLoc(), baseAddr,
                                             TEA->getFieldNo(), TEA->getType());
   }
-  assert(domTree->properlyDominates(newProj, &*builder.getInsertionPoint()) &&
+  assert(domTree->properlyDominates(newProj, ip) &&
          "new projection does not dominate insert point");
   // We need to remember the new projection instruction because in tailMerging
   // we might call locations.getLocationIdx() on such a new instruction.
