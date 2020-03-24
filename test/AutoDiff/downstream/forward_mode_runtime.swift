@@ -495,7 +495,6 @@ protocol TF_508_Proto {
 }
 extension TF_508_Proto where Scalar : FloatingPoint {
   @differentiable(
-    jvp: jvpAdd
     where Self : Differentiable, Scalar : Differentiable,
           // Conformance requirement with dependent member type.
           Self.TangentVector : TF_508_Proto
@@ -505,7 +504,6 @@ extension TF_508_Proto where Scalar : FloatingPoint {
   }
 
   @differentiable(
-    jvp: jvpSubtract
     where Self : Differentiable, Scalar : Differentiable,
           // Same-type requirement with dependent member type.
           Self.TangentVector == Float
@@ -517,16 +515,18 @@ extension TF_508_Proto where Scalar : FloatingPoint {
 extension TF_508_Proto where Self : Differentiable,
                              Scalar : FloatingPoint & Differentiable,
                              Self.TangentVector : TF_508_Proto {
+  @derivative(of: +)
   static func jvpAdd(lhs: Self, rhs: Self)
-      -> (Self, (TangentVector, TangentVector) -> TangentVector) {
+      -> (value: Self, differential: (TangentVector, TangentVector) -> TangentVector) {
     return (lhs, { (dlhs, drhs) in dlhs })
   }
 }
 extension TF_508_Proto where Self : Differentiable,
                              Scalar : FloatingPoint & Differentiable,
                              Self.TangentVector == Float {
+  @derivative(of: -)
   static func jvpSubtract(lhs: Self, rhs: Self)
-      -> (Self, (TangentVector, TangentVector) -> TangentVector) {
+      -> (value: Self, differential: (TangentVector, TangentVector) -> TangentVector) {
     return (lhs, { (dlhs, drhs) in dlhs })
   }
 }
@@ -698,14 +698,16 @@ ForwardModeTests.test("Final") {
 
 ForwardModeTests.test("Simple") {
   class Super {
-    @differentiable(wrt: x, jvp: jvpf, vjp: vjpf)
+    @differentiable(wrt: x)
     func f(_ x: Float) -> Float {
       return 2 * x
     }
-    final func jvpf(_ x: Float) -> (Float, (Float) -> Float) {
+    @derivative(of: f)
+    final func jvpf(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
       return (f(x), { v in 2 * v })
     }
-    final func vjpf(_ x: Float) -> (Float, (Float) -> Float) {
+    @derivative(of: f)
+    final func vjpf(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
       return (f(x), { v in 2 * v })
     }
   }
@@ -718,14 +720,16 @@ ForwardModeTests.test("Simple") {
   }
 
   class SubOverrideCustomDerivatives : Super {
-    @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
+    @differentiable(wrt: x)
     override func f(_ x: Float) -> Float {
       return 3 * x
     }
-    final func jvpf2(_ x: Float) -> (Float, (Float) -> Float) {
+    @derivative(of: f)
+    final func jvpf2(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
       return (f(x), { v in 3 * v })
     }
-    final func vjpf2(_ x: Float) -> (Float, (Float) -> Float) {
+    @derivative(of: f)
+    final func vjpf2(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
       return (f(x), { v in 3 * v })
     }
   }
@@ -751,14 +755,16 @@ ForwardModeTests.test("SimpleWrtSelf") {
       self.base = base
     }
 
-    @differentiable(wrt: (self, x), jvp: jvpf, vjp: vjpf)
+    @differentiable(wrt: (self, x))
     func f(_ x: Float) -> Float {
       return base * x
     }
-    final func jvpf(_ x: Float) -> (Float, (TangentVector, Float) -> Float) {
+    @derivative(of: f)
+    final func jvpf(_ x: Float) -> (value: Float, differential: (TangentVector, Float) -> Float) {
       return (f(x), { (dself, dx) in dself.base * dx })
     }
-    final func vjpf(_ x: Float) -> (Float, (Float) -> (TangentVector, Float)) {
+    @derivative(of: f)
+    final func vjpf(_ x: Float) -> (value: Float, pullback: (Float) -> (TangentVector, Float)) {
       let base = self.base
       return (f(x), { v in
         (TangentVector(base: v * x, _nontrivial: []), base * v)
@@ -775,14 +781,16 @@ ForwardModeTests.test("SimpleWrtSelf") {
 
   class SubOverrideCustomDerivatives : Super {
     @differentiable(wrt: (self, x))
-    @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
+    @differentiable(wrt: x)
     override func f(_ x: Float) -> Float {
       return 3 * x
     }
-    final func jvpf2(_ x: Float) -> (Float, (Float) -> Float) {
+    @derivative(of: f, wrt: x)
+    final func jvpf2(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
       return (f(x), { v in 3 * v })
     }
-    final func vjpf2(_ x: Float) -> (Float, (Float) -> Float) {
+    @derivative(of: f, wrt: x)
+    final func vjpf2(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
       return (f(x), { v in 3 * v })
     }
   }

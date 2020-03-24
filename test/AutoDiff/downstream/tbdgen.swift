@@ -13,9 +13,10 @@
 @differentiable(wrt: (x)) public func publicDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
 
 // Tests SILGen derivative "forwarding thunk" (no derivative reabstraction/self-reordering).
-@differentiable(vjp: publicNoDerivativeReabstractionVJP)
+@differentiable
 public func publicNoDerivativeReabstraction<T: Differentiable>(_ x: T) -> T { return x }
-public func publicNoDerivativeReabstractionVJP<T: Differentiable>(_ x: T) -> (T, (T.TangentVector) -> T.TangentVector) {
+@derivative(of: publicNoDerivativeReabstraction)
+public func publicNoDerivativeReabstractionVJP<T: Differentiable>(_ x: T) -> (value: T, pullback: (T.TangentVector) -> T.TangentVector) {
   return (x, { $0 })
 }
 
@@ -33,12 +34,13 @@ public extension Float {
   }
 
   // This should generate public symbols for JVP but not VJP, because VJP is user-defined.
-  @differentiable(vjp: vjpY)
+  @differentiable
   var y: Float {
     return .zero
   }
 
-  func vjpY() -> (Float, (Float) -> Float) {
+  @derivative(of: y)
+  func vjpY() -> (value: Float, pullback: (Float) -> Float) {
     return (.zero, { $0 })
   }
 
@@ -50,21 +52,23 @@ public extension Float {
 
   // This should generate public symbols for both JVP and VJP.
   // Tests self-reordering-method thunking.
-  @differentiable(jvp: jvpMethod)
+  @differentiable
   func method(x: Float, y: Float) -> Float {
     return x
   }
-  func jvpMethod(x: Float, y: Float) -> (Float, (Float, Float, Float) -> Float) {
+  @derivative(of: method)
+  func jvpMethod(x: Float, y: Float) -> (value: Float, differential: (Float, Float, Float) -> Float) {
     return (x, { dself, dx, dy in dx })
   }
 
   // This should generate public symbols for both JVP and VJP.
   // Tests self-reordering-method thunking.
-  @differentiable(vjp: vjpSubscript)
+  @differentiable
   subscript(x: Float) -> Float {
     return x
   }
-  func vjpSubscript(x: Float) -> (Float, (Float) -> (Float, Float)) {
+  @derivative(of: subscript)
+  func vjpSubscript(x: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
     return (x, { v in (0, v) })
   }
 }
@@ -74,38 +78,42 @@ struct Nontrivial : Differentiable {
 
   // This should generate public symbols for both JVP and VJP.
   // Tests differential/pullback thunking.
-  @differentiable(jvp: jvpInit, vjp: vjpInit)
+  @differentiable
   init(_ base: [Float]) {
     self.base = base
   }
+  @derivative(of: init)
   static func jvpInit(_ base: [Float])
-    -> (Nontrivial, (Array<Float>.TangentVector) -> Nontrivial.TangentVector) {
+    -> (value: Nontrivial, differential: (Array<Float>.TangentVector) -> Nontrivial.TangentVector) {
     return (Nontrivial(base), { v in Nontrivial.TangentVector(base: v) })
   }
+  @derivative(of: init)
   static func vjpInit(_ base: [Float])
-    -> (Nontrivial, (Nontrivial.TangentVector) -> Array<Float>.TangentVector) {
+    -> (value: Nontrivial, pullback: (Nontrivial.TangentVector) -> Array<Float>.TangentVector) {
     return (Nontrivial(base), { v in v.base })
   }
 
   // This should generate public symbols for both JVP and VJP.
   // Tests differential/pullback thunking.
-  @differentiable(vjp: vjpOwnedParameterMismatch)
+  @differentiable
   func ownedParameter(_ x: __owned [Float]) -> [Float] {
     return x
   }
+  @derivative(of: ownedParameter)
   func vjpOwnedParameterMismatch(_ x: __shared [Float])
-    -> ([Float], (Array<Float>.TangentVector) -> (Nontrivial.TangentVector, Array<Float>.TangentVector)) {
+    -> (value: [Float], pullback: (Array<Float>.TangentVector) -> (Nontrivial.TangentVector, Array<Float>.TangentVector)) {
     return (ownedParameter(x), { v in (.zero, v) })
   }
 
   // This should generate public symbols for both JVP and VJP.
   // Tests differential/pullback thunking.
-  @differentiable(vjp: vjpSharedParameterMismatch)
+  @differentiable
   func sharedParameter(_ x: __shared [Float]) -> [Float] {
     return x
   }
+  @derivative(of: sharedParameter)
   func vjpSharedParameterMismatch(_ x: __owned [Float])
-    -> ([Float], (Array<Float>.TangentVector) -> (Nontrivial.TangentVector, Array<Float>.TangentVector)) {
+    -> (value: [Float], pullback: (Array<Float>.TangentVector) -> (Nontrivial.TangentVector, Array<Float>.TangentVector)) {
     return (sharedParameter(x), { v in (.zero, v) })
   }
 }

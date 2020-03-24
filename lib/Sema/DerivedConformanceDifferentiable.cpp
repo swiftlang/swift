@@ -631,7 +631,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       auto *diffableAttr = DifferentiableAttr::create(
           getter, /*implicit*/ true, SourceLoc(), SourceLoc(),
           /*linear*/ false, /*parameterIndices*/ IndexSubset::get(C, 1, {0}),
-          /*jvp*/ None, /*vjp*/ None, derivativeGenericSignature);
+          derivativeGenericSignature);
       member->getAttrs().add(diffableAttr);
     }
   }

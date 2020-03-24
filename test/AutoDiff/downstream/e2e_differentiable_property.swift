@@ -20,12 +20,13 @@ extension TangentSpace : Differentiable {
 struct Space {
   /// `x` is a computed property with a custom vjp.
   var x: Tracked<Float> {
-    @differentiable(vjp: vjpX)
+    @differentiable
     get { storedX }
     set { storedX = newValue }
   }
 
-  func vjpX() -> (Tracked<Float>, (Tracked<Float>) -> TangentSpace) {
+  @derivative(of: x)
+  func vjpX() -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> TangentSpace) {
     return (x, { v in TangentSpace(x: v, y: 0) } )
   }
 

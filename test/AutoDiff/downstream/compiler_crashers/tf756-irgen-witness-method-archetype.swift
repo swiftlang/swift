@@ -10,13 +10,14 @@ extension Tensor: Differentiable where Scalar == Float {}
 extension Tensor where Scalar == Float {
   // Arbitrary `@differentiable` operation with >1 parameter, so that index
   // subset thunk may be generated.
-  @differentiable(vjp: _vjpAdd)
+  @differentiable
   static func + (_ lhs: Tensor, _ rhs: Tensor) -> Tensor {
     return lhs
   }
 
+  @derivative(of: +)
   static func _vjpAdd(lhs: Tensor, rhs: Tensor)
-    -> (Tensor, (TangentVector) -> (TangentVector, TangentVector)) {
+    -> (value: Tensor, pullback: (TangentVector) -> (TangentVector, TangentVector)) {
     return (lhs + rhs, { v in (v, v) })
   }
 }

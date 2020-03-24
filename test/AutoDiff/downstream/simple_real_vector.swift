@@ -14,12 +14,12 @@ public struct Vector : AdditiveArithmetic, Differentiable {
     self.y = scalar
   }
 
-  @differentiable(vjp: fakeVJP)
+  @differentiable
   public static func + (lhs: Vector, rhs: Vector) -> Vector {
     abort()
   }
 
-  @differentiable(vjp: fakeVJP)
+  @differentiable
   public static func - (lhs: Vector, rhs: Vector) -> Vector {
     abort()
   }
@@ -28,7 +28,9 @@ public struct Vector : AdditiveArithmetic, Differentiable {
     abort()
   }
 
-  public static func fakeVJP(lhs: Vector, rhs: Vector) -> (Vector, (Vector) -> (Vector, Vector)) {
+  @derivative(of: +)
+  @derivative(of: -)
+  public static func fakeVJP(lhs: Vector, rhs: Vector) -> (value: Vector, pullback: (Vector) -> (Vector, Vector)) {
     abort()
   }
 }

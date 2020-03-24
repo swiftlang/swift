@@ -10,20 +10,22 @@ var MethodTests = TestSuite("Method")
 
 struct Parameter : Equatable {
   private let storedX: Tracked<Float>
-  @differentiable(wrt: (self), jvp: jvpX, vjp: vjpX)
+  @differentiable(wrt: (self))
   var x: Tracked<Float> {
       return storedX
   }
-  
+
   init(x: Tracked<Float>) {
     storedX = x
   }
 
-  func vjpX() -> (Tracked<Float>, (Tracked<Float>) -> Parameter) {
+  @derivative(of: x)
+  func vjpX() -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Parameter) {
     return (x, { dx in Parameter(x: dx) } )
   }
 
-  func jvpX() -> (Tracked<Float>, (Parameter) -> Tracked<Float>) {
+  @derivative(of: x)
+  func jvpX() -> (value: Tracked<Float>, differential: (Parameter) -> Tracked<Float>) {
     return (x, { $0.x })
   }
 }
@@ -158,32 +160,35 @@ MethodTests.testWithLeakChecking("static method with generated adjoint, wrt all 
 
 // Test self-reordering thunk for jvp/vjp methods.
 struct DiffWrtSelf : Differentiable {
-  @differentiable(wrt: (self, x, y), jvp: _jvpCall, vjp: _vjpCall)
+  @differentiable(wrt: (self, x, y))
   func call<T : Differentiable, U : Differentiable>(_ x: T, _ y: U) -> T {
     return x
   }
+  @derivative(of: call)
   func _jvpCall<T : Differentiable, U : Differentiable>(_ x: T, _ y: U)
-    -> (T, (DiffWrtSelf.TangentVector, T.TangentVector, U.TangentVector) -> T.TangentVector) {
+    -> (value: T, differential: (DiffWrtSelf.TangentVector, T.TangentVector, U.TangentVector) -> T.TangentVector) {
     return (x, { (dself, dx, dy) in dx })
   }
+  @derivative(of: call)
   func _vjpCall<T : Differentiable, U : Differentiable>(_ x: T, _ y: U)
-    -> (T, (T.TangentVector) -> (DiffWrtSelf.TangentVector, T.TangentVector, U.TangentVector)) {
+    -> (value: T, pullback: (T.TangentVector) -> (DiffWrtSelf.TangentVector, T.TangentVector, U.TangentVector)) {
     return (x, { (.zero, $0, .zero) })
   }
 }
 
 struct CustomParameter : Equatable {
   let storedX: Tracked<Float>
-  @differentiable(wrt: (self), vjp: vjpX)
+  @differentiable(wrt: (self))
   var x: Tracked<Float> {
       return storedX
   }
-  
+
   init(x: Tracked<Float>) {
     storedX = x
   }
 
-  func vjpX() -> (Tracked<Float>, (Tracked<Float>) -> CustomParameter) {
+  @derivative(of: x)
+  func vjpX() -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> CustomParameter) {
     return (x, { dx in CustomParameter(x: dx) })
   }
 }
@@ -214,86 +219,93 @@ extension Tracked where T : FloatingPoint {
 }
 
 extension CustomParameter {
-  @differentiable(wrt: (self), vjp: dSquared)
+  @differentiable(wrt: (self))
   func squared() -> Tracked<Float> {
     return x * x
   }
 
-  func dSquared() -> (Tracked<Float>, (Tracked<Float>) -> CustomParameter) {
+  @derivative(of: squared)
+  func dSquared() -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> CustomParameter) {
     return (squared(), { [x] v in CustomParameter(x: (2 * x).clamped(to: -10.0...10.0) * v) })
   }
 
-  @differentiable(vjp: dSquared)
+  @differentiable
   static func squared(p: CustomParameter) -> Tracked<Float> {
     return p.x * p.x
   }
 
+  @derivative(of: squared)
   static func dSquared(
     _ p: CustomParameter
-  ) -> (Tracked<Float>, (Tracked<Float>) -> CustomParameter) {
+  ) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> CustomParameter) {
     return (p.x * p.x, { v in CustomParameter(x: (2 * p.x).clamped(to: -10.0...10.0) * v) })
   }
 
   // There is currently no way to define multiple custom VJPs wrt different
   // parameters on the same func, so we define a copy of this func per adjoint.
 
-  @differentiable(wrt: (self, other), vjp: dMultiplied_wrtAll)
+  @differentiable(wrt: (self, other))
   func multiplied(with other: Tracked<Float>) -> Tracked<Float> {
     return x * other
   }
 
-  @differentiable(wrt: (other), vjp: dMultiplied_wrtOther)
+  @differentiable(wrt: (other))
   func multiplied_constSelf(with other: Tracked<Float>) -> Tracked<Float> {
     return x * other
   }
 
-  @differentiable(wrt: (self), vjp: dMultiplied_wrtSelf)
+  @differentiable(wrt: (self))
   func multiplied_constOther(with other: Tracked<Float>) -> Tracked<Float> {
     return x * other
   }
 
+  @derivative(of: multiplied)
   func dMultiplied_wrtAll(
     with other: Tracked<Float>
-  ) -> (Tracked<Float>, (Tracked<Float>) -> (CustomParameter, Tracked<Float>)) {
+  ) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (CustomParameter, Tracked<Float>)) {
     return (multiplied(with: other),
       { [x] v in (CustomParameter(x: other.clamped(to: -10.0...10.0) * v),
                   x.clamped(to: -10.0...10.0) * v) })
   }
 
+  @derivative(of: multiplied_constSelf, wrt: other)
   func dMultiplied_wrtOther(
     with other: Tracked<Float>
-  ) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
+  ) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Tracked<Float>) {
     let (r, pb) = dMultiplied_wrtAll(with: other)
     return (r, { v in pb(v).1 })
   }
 
+  @derivative(of: multiplied_constOther, wrt: self)
   func dMultiplied_wrtSelf(
     with other: Tracked<Float>
-  ) -> (Tracked<Float>, (Tracked<Float>) -> CustomParameter) {
+  ) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> CustomParameter) {
     let (r, pb) = dMultiplied_wrtAll(with: other)
     return (r, { v in pb(v).0 })
   }
 
-  @differentiable(vjp: dMultiply_wrtAll)
+  @differentiable
   static func multiply(_ lhs: CustomParameter, _ rhs: CustomParameter)
       -> Tracked<Float> {
     return lhs.x * rhs.x
   }
 
-  @differentiable(wrt: (rhs), vjp: dMultiply_wrtRhs)
+  @differentiable(wrt: (rhs))
   static func multiply_constLhs(_ lhs: CustomParameter, _ rhs: CustomParameter) -> Tracked<Float> {
     return lhs.x * rhs.x
   }
 
+  @derivative(of: multiply)
   static func dMultiply_wrtAll(_ lhs: CustomParameter,_ rhs: CustomParameter)
-      -> (Tracked<Float>, (Tracked<Float>) -> (CustomParameter, CustomParameter)) {
+      -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (CustomParameter, CustomParameter)) {
     let result = multiply(lhs, rhs)
     return (result, { v in (CustomParameter(x: rhs.x.clamped(to: -10.0...10.0) * v),
                             CustomParameter(x: lhs.x.clamped(to: -10.0...10.0) * v)) })
   }
 
+  @derivative(of: multiply_constLhs, wrt: rhs)
   static func dMultiply_wrtRhs(_ lhs: CustomParameter, _ rhs: CustomParameter)
-      -> (Tracked<Float>, (Tracked<Float>) -> CustomParameter) {
+      -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> CustomParameter) {
     let (r, pb) = dMultiply_wrtAll(lhs, rhs)
     return (r, { v in pb(v).1 })
   }
