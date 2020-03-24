@@ -69,6 +69,25 @@ void SuperclassDeclRequest::cacheResult(ClassDecl *value) const {
 }
 
 //----------------------------------------------------------------------------//
+// InheritedProtocolsRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<ArrayRef<ProtocolDecl *>>
+InheritedProtocolsRequest::getCachedResult() const {
+  auto proto = std::get<0>(getStorage());
+  if (!proto->areInheritedProtocolsValid())
+    return None;
+
+  return proto->InheritedProtocols;
+}
+
+void InheritedProtocolsRequest::cacheResult(ArrayRef<ProtocolDecl *> PDs) const {
+  auto proto = std::get<0>(getStorage());
+  proto->InheritedProtocols = PDs;
+  proto->setInheritedProtocolsValid();
+}
+
+//----------------------------------------------------------------------------//
 // Missing designated initializers computation
 //----------------------------------------------------------------------------//
 
