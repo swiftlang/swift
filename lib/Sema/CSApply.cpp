@@ -2844,7 +2844,7 @@ namespace {
           // assigned case comes from Optional<T>
           if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
             isOptional = EED->getParentEnum()->isOptionalDecl();
-            memberName = EED->getBaseName().getIdentifier();
+            memberName = EED->getBaseIdentifier();
           }
           
           // Return if the enum case doesn't come from Optional<T>

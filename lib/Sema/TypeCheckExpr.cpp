@@ -178,12 +178,12 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    Identifier name = DRE->getDecl()->getBaseName().getIdentifier();
+    Identifier name = DRE->getDecl()->getBaseIdentifier();
     return lookupPrecedenceGroupForOperator(DC, name, DRE->getLoc());
   }
 
   if (auto *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
-    Identifier name = OO->getDecls()[0]->getBaseName().getIdentifier();
+    Identifier name = OO->getDecls()[0]->getBaseIdentifier();
     return lookupPrecedenceGroupForOperator(DC, name, OO->getLoc());
   }
 
@@ -204,7 +204,7 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
   }
 
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    Identifier name = MRE->getDecl().getDecl()->getBaseName().getIdentifier();
+    Identifier name = MRE->getDecl().getDecl()->getBaseIdentifier();
     return lookupPrecedenceGroupForOperator(DC, name, MRE->getLoc());
   }
 

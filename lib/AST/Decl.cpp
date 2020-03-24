@@ -760,7 +760,7 @@ bool Decl::hasUnderscoredNaming() const {
   }
 
   if (!VD->getBaseName().isSpecial() &&
-      VD->getBaseName().getIdentifier().str().startswith("_")) {
+      VD->getBaseIdentifier().str().startswith("_")) {
     return true;
   }
 
@@ -3167,7 +3167,7 @@ bool ValueDecl::shouldHideFromEditor() const {
 
   // '$__' names are reserved by compiler internal.
   if (!getBaseName().isSpecial() &&
-      getBaseName().getIdentifier().str().startswith("$__"))
+      getBaseIdentifier().str().startswith("$__"))
     return true;
 
   return false;
@@ -3586,8 +3586,8 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
       return result;
   }
 
-  if (int result = type1->getBaseName().getIdentifier().str().compare(
-                                  type2->getBaseName().getIdentifier().str()))
+  if (int result = type1->getBaseIdentifier().str().compare(
+                                  type2->getBaseIdentifier().str()))
     return result;
 
   // Error case: two type declarations that cannot be distinguished.

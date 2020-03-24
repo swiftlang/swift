@@ -479,7 +479,7 @@ void AttributeChecker::visitIBSegueActionAttr(IBSegueActionAttr *attr) {
   // explicit selector.
   if (!FD->getAttrs().hasAttribute<ObjCAttr>() ||
       !FD->getAttrs().getAttribute<ObjCAttr>()->hasName()) {
-    auto newSwiftBaseName = replacingPrefix(FD->getBaseName().getIdentifier());
+    auto newSwiftBaseName = replacingPrefix(FD->getBaseIdentifier());
     auto argumentNames = FD->getFullName().getArgumentNames();
     DeclName newSwiftName(Ctx, newSwiftBaseName, argumentNames);
 

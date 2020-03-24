@@ -1355,7 +1355,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   if (!isa<BuiltinUnit>(decl->getDeclContext()))
     return None;
 
-  auto name = decl->getBaseName().getIdentifier();
+  const auto name = decl->getBaseIdentifier();
   const BuiltinInfo &builtin = SGM.M.getBuiltinInfo(name);
   switch (builtin.ID) {
   // All the non-SIL, non-type-trait builtins should use the

@@ -693,7 +693,7 @@ private:
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
-      auto name = value->getBaseName().getIdentifier().str();
+      auto name = value->getBaseIdentifier().str();
       auto fieldName = IGM.getAddrOfFieldName(name);
       B.addRelativeAddress(fieldName);
     } else {
