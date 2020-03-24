@@ -130,9 +130,7 @@ enum class TypeNameKind {
 
 using TypeNameCacheKey = llvm::PointerIntPair<const Metadata *, 2, TypeNameKind>;
 
-#if SWIFT_CASTING_SUPPORTS_MUTEX
 static StaticReadWriteLock TypeNameCacheLock;
-#endif
 
 /// Cache containing rendered names for Metadata.
 /// Access MUST be protected using `TypeNameCacheLock`.
@@ -188,9 +186,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
 
   // Attempt read-only lookup of cache entry.
   {
-#if SWIFT_CASTING_SUPPORTS_MUTEX
     StaticScopedReadLock guard(TypeNameCacheLock);
-#endif
 
     auto found = cache.find(key);
     if (found != cache.end()) {
@@ -201,9 +197,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
 
   // Read-only cache lookup failed, we may need to create it.
   {
-#if SWIFT_CASTING_SUPPORTS_MUTEX
     StaticScopedWriteLock guard(TypeNameCacheLock);
-#endif
 
     // Do lookup again just to make sure it wasn't created by another
     // thread before we acquired the write lock.
