@@ -177,10 +177,12 @@ namespace irgen {
                                                CanSILFunctionType invokeTy);
   
   /// Produces extended encoding of method type.
-  /// \returns the encoded type.
-  llvm::Constant *getMethodTypeExtendedEncoding(IRGenModule &IGM,
-                                                AbstractFunctionDecl *method);
-  
+  /// \returns the encoded type or null if it is a duplicate (exists in
+  /// \p uniqueSelectors).
+  llvm::Constant *
+  getMethodTypeExtendedEncoding(IRGenModule &IGM, AbstractFunctionDecl *method,
+                                llvm::StringSet<> &uniqueSelectors);
+
   /// Build an Objective-C method descriptor for the given getter method.
   void emitObjCGetterDescriptor(IRGenModule &IGM,
                                 ConstantArrayBuilder &descriptors,
