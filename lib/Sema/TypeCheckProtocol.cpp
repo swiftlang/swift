@@ -5011,6 +5011,12 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
   }
 }
 
+llvm::Expected<SmallVector<ProtocolConformance *, 2>>
+LookupAllConformancesInContextRequest::evaluate(
+    Evaluator &eval, const DeclContext *DC) const {
+  return DC->getLocalConformances(ConformanceLookupKind::All);
+}
+
 void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                              IterableDeclContext *idc) {
   // For anything imported from Clang, lazily check conformances.
@@ -5037,7 +5043,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     tracker = SF->getReferencedNameTracker();
 
   // Check each of the conformances associated with this context.
-  auto conformances = dc->getLocalConformances(ConformanceLookupKind::All);
+  auto conformances =
+      evaluateOrDefault(dc->getASTContext().evaluator,
+                        LookupAllConformancesInContextRequest{dc}, {});
 
   // The conformance checker bundle that checks all conformances in the context.
   auto &Context = dc->getASTContext();

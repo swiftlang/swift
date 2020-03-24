@@ -1335,7 +1335,7 @@ DeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
   if (!nominal) {
     return result;
   }
-  
+
   // Update to record all potential conformances.
   nominal->prepareConformanceTable();
   nominal->ConformanceTable->lookupConformances(
@@ -1361,9 +1361,12 @@ DeclContext::getLocalConformances(ConformanceLookupKind lookupKind) const {
 
   // Protocols only have self-conformances.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
-    if (protocol->requiresSelfConformanceWitnessTable())
-      return { protocol->getASTContext().getSelfConformance(protocol) };
-    return { };
+    if (protocol->requiresSelfConformanceWitnessTable()) {
+      return SmallVector<ProtocolConformance *, 2>{
+        protocol->getASTContext().getSelfConformance(protocol)
+      };
+    }
+    return SmallVector<ProtocolConformance *, 2>();
   }
 
   // Update to record all potential conformances.
