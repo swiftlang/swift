@@ -1199,46 +1199,25 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
     // no further work to do.
     auto *loadOperand = &load->getAllOperands()[0];
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-    bool didInsertDestroy = false;
     bool consumedInLoop = checker.completeConsumingUseSet(
         phi, loadOperand, leakingBlocks, [&](SILBasicBlock::iterator iter) {
           SILBuilderWithScope builder(iter);
           builder.emitDestroyValueOperation(loc, phi);
-          didInsertDestroy = true;
         });
 
-    // If we did not insert any destroy_values, we either:
-    //
-    // 1. Are consuming the value in a loop, but the loop is an infinite loop
-    //    so we shouldn't insert a destroy.
-    //
-    // 2. Are not consuming the value in the loop and our phi is strongly
-    //    control equivalent with the load_borrow, so we insert a destroy
-    //    /after/ the load_borrow.
-    if (!didInsertDestroy) {
-      if (!consumedInLoop) {
-        auto next = std::next(load->getIterator());
-        SILBuilderWithScope builder(next);
-        builder.emitDestroyValueOperation(next->getLoc(), phi);
-      }
-      continue;
-    }
-
     // Ok, we found some leaking blocks and potentially that our load is
     // "consumed" inside a different loop in the loop nest from cvi. If we are
     // consumed in the loop, then our visit should have inserted all of the
     // necessary destroys for us by inserting the destroys on the loop
-    // boundaries. So, exit now.
-    // Ok, we found some leaking blocks and potentially that our load is
-    // "consumed" inside a different loop in the loop nest from cvi. If we are
-    // consumed in the loop, then our visit should have inserted all of the
-    // necessary destroys for us by inserting the destroys on the loop
-    // boundaries. So, exit now.
+    // boundaries. So, continue.
+    //
+    // NOTE: This includes cases where due to an infinite loop, we did not
+    // insert /any/ destroys since the loop has no boundary in a certain sense.
     if (consumedInLoop) {
       continue;
     }
 
-    // Otherwise, we had a branching case,
+    // Otherwise, we need to insert one last destroy after the load for our phi.
     auto next = std::next(load->getIterator());
     SILBuilderWithScope builder(next);
     builder.emitDestroyValueOperation(next->getLoc(), phi);
@@ -1304,41 +1283,25 @@ void AvailableValueAggregator::addMissingDestroysForCopiedValues(
     // no further work to do.
     auto *loadOperand = &load->getAllOperands()[0];
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-    bool didInsertDestroy = false;
     bool consumedInLoop = checker.completeConsumingUseSet(
         cvi, loadOperand, leakingBlocks, [&](SILBasicBlock::iterator iter) {
           SILBuilderWithScope builder(iter);
           builder.emitDestroyValueOperation(loc, cvi);
-          didInsertDestroy = true;
         });
-
-    // If we did not insert any destroy_values, we either:
-    //
-    // 1. Are consuming the value in a loop, but the loop is an infinite loop
-    //    so we shouldn't insert a destroy.
-    //
-    // 2. Are not consuming the value in the loop and our phi is strongly
-    //    control equivalent with the load_borrow, so we insert a destroy
-    //    /after/ the load_borrow.
-    if (!didInsertDestroy) {
-      if (!consumedInLoop) {
-        auto next = std::next(load->getIterator());
-        SILBuilderWithScope builder(next);
-        builder.emitDestroyValueOperation(next->getLoc(), cvi);
-      }
-      continue;
-    }
 
     // Ok, we found some leaking blocks and potentially that our load is
     // "consumed" inside a different loop in the loop nest from cvi. If we are
     // consumed in the loop, then our visit should have inserted all of the
     // necessary destroys for us by inserting the destroys on the loop
-    // boundaries. So, exit now.
+    // boundaries. So, continue.
+    //
+    // NOTE: This includes cases where due to an infinite loop, we did not
+    // insert /any/ destroys since the loop has no boundary in a certain sense.
     if (consumedInLoop) {
       continue;
     }
 
-    // Otherwise, we had a branching case,
+    // Otherwise, we need to insert one last destroy after the load for our phi.
     auto next = std::next(load->getIterator());
     SILBuilderWithScope builder(next);
     builder.emitDestroyValueOperation(next->getLoc(), cvi);
