@@ -21,6 +21,7 @@
 namespace swift {
   class CompilerInvocation;
   class ValueDecl;
+  class ModuleDecl;
 }
 
 namespace SourceKit {
@@ -58,6 +59,7 @@ public:
   StringRef getDocumentName() const;
   StringRef getModuleOrHeaderName() const;
   bool isModule() const;
+  swift::ModuleDecl *getModuleDecl() const;
 
   bool matches(StringRef ModuleName, const swift::CompilerInvocation &Invok);
 
