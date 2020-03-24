@@ -438,6 +438,9 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           continue;
         }
         if (auto *VD = dyn_cast<ValueDecl>(Member)) {
+          if (!isDeclVisibleInLookupMode(VD, LS, FromContext))
+            continue;
+
           if (!VD->isProtocolRequirement())
             continue;
 

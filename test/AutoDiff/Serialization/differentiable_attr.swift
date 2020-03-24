@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
 // RUN: llvm-bcanalyzer %t/differentiable_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/differentiable_attr.swiftmodule -o - | %FileCheck %s
-// REQUIRES: differentiable_programming
 
 // SWIFT_ENABLE_TENSORFLOW
 // This test is enabled on `tensorflow` branch.

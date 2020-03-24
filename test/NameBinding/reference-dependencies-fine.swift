@@ -464,7 +464,6 @@ struct Sentinel2 {}
 
 
 // CHECK-MEMBER-DAG: member interface  4main10IntWrapperV Int false
-// CHECK-MEMBER-DAG: member interface  4main10IntWrapperV deinit false
 // CHECK-POTENTIALMEMBER-DAG: potentialMember interface  SL '' false
 // CHECK-POTENTIALMEMBER-DAG: potentialMember interface  4main18ClassFromOtherFileC '' false
 // CHECK-MEMBER-DAG: member interface  Si max false
@@ -472,13 +471,13 @@ struct Sentinel2 {}
 // CHECK-POTENTIALMEMBER-DAG: potentialMember interface  s33ExpressibleByUnicodeScalarLiteralP '' false
 // CHECK-MEMBER-DAG: member interface  Sx Stride false
 // CHECK-MEMBER-DAG: member interface  Sa reduce false
-// CHECK-MEMBER-DAG: member interface  4main17OtherFileIntArrayV deinit false
+// CHECK-POTENTIALMEMBER-DAG: potentialMember interface 4main17OtherFileIntArrayV '' false
 // CHECK-MEMBER-DAG: member interface  4main18OtherFileOuterTypeV InnerType false
 // CHECK-MEMBER-DAG: member interface  4main18OtherFileOuterTypeV05InnerE0V init false
 // CHECK-MEMBER-DAG: member interface  4main18OtherFileOuterTypeV05InnerE0V sharedConstant false
 // CHECK-MEMBER-DAG: member interface  4main26OtherFileSecretTypeWrapperV0dE0V constant false
-// CHECK-MEMBER-DAG: member interface  4main25OtherFileProtoImplementorV deinit false
-// CHECK-MEMBER-DAG: member interface  4main26OtherFileProtoImplementor2V deinit false
+// CHECK-POTENTIALMEMBER-DAG: potentialMember interface 4main25OtherFileProtoImplementorV '' false
+// CHECK-POTENTIALMEMBER-DAG: potentialMember interface  4main26OtherFileProtoImplementor2V '' false
 // CHECK-MEMBER-DAG: member interface  s15EmptyCollectionV8IteratorV init false
 // CHECK-MEMBER-DAG: member interface  4main13OtherFileEnumO Value false
 // CHECK-MEMBER-DAG: member interface  4main20OtherFileEnumWrapperV Enum false
