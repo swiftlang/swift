@@ -1644,12 +1644,15 @@ namespace {
     void buildExtMethodTypes(ConstantArrayBuilder &array,
                              ArrayRef<MethodDescriptor> methods) {
       assert(isBuildingProtocol());
-
+      llvm::StringSet<> uniqueSelectors;
       for (auto descriptor : methods) {
         assert(descriptor.getKind() == MethodDescriptor::Kind::Method &&
                "cannot emit descriptor for non-method");
         auto method = descriptor.getMethod();
-        array.add(getMethodTypeExtendedEncoding(IGM, method));
+        auto *encodingOrNullIfDuplicate =
+            getMethodTypeExtendedEncoding(IGM, method, uniqueSelectors);
+        if (encodingOrNullIfDuplicate != nullptr)
+          array.add(encodingOrNullIfDuplicate);
       }
     }
 
