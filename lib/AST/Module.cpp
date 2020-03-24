@@ -821,7 +821,19 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
 ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
                                                      ProtocolDecl *protocol) {
-  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      LookupConformanceInModuleRequest{{this, type, protocol}},
+      ProtocolConformanceRef::forInvalid());
+}
+
+llvm::Expected<ProtocolConformanceRef>
+LookupConformanceInModuleRequest::evaluate(
+    Evaluator &evaluator, LookupConformanceDescriptor desc) const {
+  auto *mod = desc.Mod;
+  auto type = desc.Ty;
+  auto protocol = desc.PD;
+  ASTContext &ctx = mod->getASTContext();
 
   // A dynamic Self type conforms to whatever its underlying type
   // conforms to.
@@ -839,7 +851,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     // able to be resolved by a substitution that makes the archetype
     // concrete.
     if (auto super = archetype->getSuperclass()) {
-      if (auto inheritedConformance = lookupConformance(super, protocol)) {
+      if (auto inheritedConformance = mod->lookupConformance(super, protocol)) {
         return ProtocolConformanceRef(ctx.getInheritedConformance(
             type, inheritedConformance.getConcrete()));
       }
@@ -857,7 +869,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType())
-    return lookupExistentialConformance(type, protocol);
+    return mod->lookupExistentialConformance(type, protocol);
 
   // Type variables have trivial conformances.
   if (type->isTypeVariableOrMember())
@@ -877,7 +889,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
-  if (!nominal->lookupConformance(this, protocol, conformances))
+  if (!nominal->lookupConformance(mod, protocol, conformances))
     return ProtocolConformanceRef::forInvalid();
 
   // FIXME: Ambiguity resolution.
@@ -897,7 +909,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     auto superclassTy = type->getSuperclassForDecl(conformingClass);
 
     // Compute the conformance for the inherited type.
-    auto inheritedConformance = lookupConformance(superclassTy, protocol);
+    auto inheritedConformance = mod->lookupConformance(superclassTy, protocol);
     assert(inheritedConformance &&
            "We already found the inherited conformance");
 
@@ -918,7 +930,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     if (!explicitConformanceType->isEqual(type)) {
       // Gather the substitutions we need to map the generic conformance to
       // the specialized conformance.
-      auto subMap = type->getContextSubstitutionMap(this, explicitConformanceDC);
+      auto subMap = type->getContextSubstitutionMap(mod, explicitConformanceDC);
 
       // Create the specialized conformance entry.
       auto result = ctx.getSpecializedConformance(type, conformance, subMap);
