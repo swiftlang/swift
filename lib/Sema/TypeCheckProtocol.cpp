@@ -5591,6 +5591,9 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::Decodable:
     return derived.deriveDecodable(Requirement);
 
+  case KnownProtocolKind::AdditiveArithmetic:
+    return derived.deriveAdditiveArithmetic(Requirement);
+
   default:
     return nullptr;
   }

@@ -133,8 +133,6 @@ IDENTIFIER(withKeywordArguments)
 IDENTIFIER(wrapped)
 IDENTIFIER(wrappedValue)
 IDENTIFIER(wrapperValue)
-IDENTIFIER(differential)
-IDENTIFIER(pullback)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")
@@ -206,7 +204,10 @@ IDENTIFIER_(nsError)
 IDENTIFIER(OSLogMessage)
 
 // Differentiable programming
+IDENTIFIER(differential)
+IDENTIFIER(pullback)
 IDENTIFIER(TangentVector)
+IDENTIFIER(zero)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

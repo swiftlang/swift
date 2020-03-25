@@ -327,6 +327,10 @@ namespace swift {
     /// `@differentiable` declaration attribute, etc.
     bool EnableExperimentalDifferentiableProgramming = false;
 
+    /// Whether to enable experimental `AdditiveArithmetic` derived
+    /// conformances.
+    bool EnableExperimentalAdditiveArithmeticDerivedConformances = false;
+
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
 

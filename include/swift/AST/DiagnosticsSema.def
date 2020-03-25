@@ -2674,6 +2674,8 @@ ERROR(cannot_synthesize_in_crossfile_extension,none,
       "implementation of %0 cannot be automatically synthesized in an extension "
       "in a different file to the type", (Type))
 
+ERROR(broken_additive_arithmetic_requirement,none,
+      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
 ERROR(broken_case_iterable_requirement,none,
       "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,

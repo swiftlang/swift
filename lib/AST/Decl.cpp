@@ -4059,6 +4059,14 @@ ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() const {
       ctx.evaluator, SynthesizeMemberwiseInitRequest{mutableThis}, nullptr);
 }
 
+ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ResolveEffectiveMemberwiseInitRequest{mutableThis},
+                           nullptr);
+}
+
 bool NominalTypeDecl::hasDefaultInitializer() const {
   // Currently only structs and classes can have default initializers.
   if (!isa<StructDecl>(this) && !isa<ClassDecl>(this))
