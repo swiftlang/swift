@@ -20,6 +20,7 @@ add_swift_unittest(SwiftBasicTests
   JSONSerialization.cpp
   OptionSetTest.cpp
   OwnedStringTest.cpp
+  MultiMapCacheTest.cpp
   PointerIntEnumTest.cpp
   PrefixMapTest.cpp
   RangeTest.cpp
