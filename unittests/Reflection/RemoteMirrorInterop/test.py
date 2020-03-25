@@ -22,11 +22,13 @@ if len(args) == 0:
 absoluteArgs = [os.path.abspath(arg) for arg in args]
 swiftcs = [os.path.join(arg, 'bin', 'swiftc') for arg in absoluteArgs]
 
+
 def libPath(path):
     libPath = os.path.join(path, 'lib', 'swift', 'macosx')
     if not os.path.isdir(libPath):
         libPath = os.path.join(path, 'lib', 'swift')
     return libPath
+
 
 swiftlibs = [libPath(arg) for arg in absoluteArgs]
 mirrorlibs = [os.path.join(lib, 'libswiftRemoteMirror.dylib')
