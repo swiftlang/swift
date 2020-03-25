@@ -676,6 +676,15 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       }
       break;
     }
+    
+    case ConstraintLocator::OptionalPayload: {
+      // If we have an inout expression, this comes from an
+      // InoutToPointer argument mismatch failure.
+      if (isa<InOutExpr>(anchor)) {
+        diagnostic = diag::cannot_convert_argument_value;
+      }
+      break;
+    }
 
     case ConstraintLocator::TupleElement: {
       auto *anchor = getRawAnchor();
