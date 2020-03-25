@@ -618,8 +618,7 @@ public:
   }
 
   Demangle::NodePointer visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
-    assert(false && "not implemented");
-    return nullptr;
+    return Dem.demangleType(F->getName());
   }
 
   Demangle::NodePointer visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
