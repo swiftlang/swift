@@ -91,9 +91,9 @@ public class C<R> {
 // IR-LABEL: ret void
 
 // IR: ![[BOOL:[0-9]+]] = !DICompositeType({{.*}}name: "Bool"
-// IR: ![[LET_BOOL:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[BOOL]])
 // IR: ![[INT:[0-9]+]] = !DICompositeType({{.*}}name: "Int"
 // IR: ![[LET_INT:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[INT]])
+// IR: ![[LET_BOOL:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[BOOL]])
 // IR: ![[TAU_0_0:[0-9]+]] = {{.*}}DW_TAG_structure_type, name: "$sxD",
 // IR: ![[LET_TAU_0_0:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[TAU_0_0]])
 // IR: ![[TAU_1_0:[0-9]+]] = {{.*}}DW_TAG_structure_type, name: "$sqd__D",
