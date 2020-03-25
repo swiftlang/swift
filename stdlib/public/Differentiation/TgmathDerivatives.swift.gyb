@@ -274,7 +274,7 @@ func _${derivative_kind}Erfc(_ x: ${T}) -> (value: ${T}, ${linear_map_kind}: (${
 %end # for derivative_kind in ['jvp', 'vjp']:
 
 // Binary functions
-%for T in ['Float', 'Double', 'Float80']:
+%for T in ['Float', 'Float80']:
 %  if T == 'Float80':
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %  end
