@@ -18,6 +18,9 @@
 // NOTE(SR-12090): `shell` is required only to run `sed` as a SR-12090 workaround.
 // REQUIRES: shell
 
+// Would need to update for arm64e.
+// UNSUPPORTED: CPU=arm64e
+
 sil_stage raw
 
 import Swift
@@ -57,20 +60,20 @@ sil @examplemethod : $@convention(method) (Float, Float, Float) -> Float
 sil @test_roundtrip_parse : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @examplefunc : $@convention(thin) (Float, Float, Float) -> Float
-  %1 = differentiable_function [parameters 0 1 2] %0 : $@convention(thin) (Float, Float, Float) -> Float
+  %1 = differentiable_function [parameters 0 1 2] %0 : $@convention(thin) (Float, Float, Float) -> Float with_derivative {undef : $@convention(thin) (Float, Float, Float) -> (Float, @owned @callee_guaranteed (Float, Float, Float) -> Float), undef : $@convention(thin) (Float, Float, Float) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float, Float))}
 
   // CHECK-SIL: %2 = differentiable_function_extract [vjp] %1 : $@differentiable @convention(thin) (Float, Float, Float) -> Float
   %2 = differentiable_function_extract [vjp] %1 : $@differentiable @convention(thin) (Float, Float, Float) -> Float
-  %3 = differentiable_function [parameters 0] %0 : $@convention(thin) (Float, Float, Float) -> Float
+  %3 = differentiable_function [parameters 0] %0 : $@convention(thin) (Float, Float, Float) -> Float with_derivative {undef : $@convention(thin) (Float, Float, Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), undef : $@convention(thin) (Float, Float, Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
 
   // CHECK-SIL: %4 = differentiable_function_extract [vjp] %3 : $@differentiable @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
   %4 = differentiable_function_extract [vjp] %3 : $@differentiable @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
   %5 = function_ref @examplemethod : $@convention(method) (Float, Float, Float) -> Float
-  %6 = differentiable_function [parameters 0 1 2] %5 : $@convention(method) (Float, Float, Float) -> Float
+  %6 = differentiable_function [parameters 0 1 2] %5 : $@convention(method) (Float, Float, Float) -> Float with_derivative {undef : $@convention(method) (Float, Float, Float) -> (Float, @owned @callee_guaranteed (Float, Float, Float) -> Float), undef : $@convention(method) (Float, Float, Float) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float, Float))}
 
   // CHECK-SIL: %7 = differentiable_function_extract [vjp] %6 : $@differentiable @convention(method) (Float, Float, Float) -> Float
   %7 = differentiable_function_extract [vjp] %6 : $@differentiable @convention(method) (Float, Float, Float) -> Float
-  %8 = differentiable_function [parameters 0] %5 : $@convention(method) (Float, Float, Float) -> Float
+  %8 = differentiable_function [parameters 0] %5 : $@convention(method) (Float, Float, Float) -> Float with_derivative {undef : $@convention(method) (Float, Float, Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), undef : $@convention(method) (Float, Float, Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
 
   // CHECK-SIL: %9 = differentiable_function_extract [vjp] %8 : $@differentiable @convention(method) (Float, @noDerivative Float, @noDerivative Float) -> Float
   %9 = differentiable_function_extract [vjp] %8 : $@differentiable @convention(method) (Float, @noDerivative Float, @noDerivative Float) -> Float

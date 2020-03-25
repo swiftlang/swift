@@ -46,6 +46,7 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::DestructureTupleInst:
   case SILNodeKind::MarkDependenceInst:
   case SILNodeKind::InitExistentialRefInst:
+  case SILNodeKind::DifferentiableFunctionInst:
     return true;
   default:
     return false;
@@ -60,6 +61,7 @@ bool swift::isGuaranteedForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::StructExtractInst:
   case SILNodeKind::OpenExistentialValueInst:
   case SILNodeKind::OpenExistentialBoxValueInst:
+  case SILNodeKind::DifferentiableFunctionExtractInst:
     return true;
   default:
     return isOwnershipForwardingValueKind(kind);

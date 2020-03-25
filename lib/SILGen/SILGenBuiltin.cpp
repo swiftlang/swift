@@ -1023,6 +1023,200 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(val);
 }
 
+static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
+    AutoDiffDerivativeFunctionKind kind, unsigned arity,
+    bool throws, SILGenFunction &SGF, SILLocation loc,
+    SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
+  // FIXME(SR-11853): Support throwing functions.
+  assert(!throws && "Throwing functions are not yet supported");
+
+  auto origFnVal = args[0].getValue();
+  SmallVector<SILValue, 2> origFnArgVals;
+  for (auto& arg : args.drop_front(1))
+    origFnArgVals.push_back(arg.getValue());
+
+  auto origFnType = origFnVal->getType().castTo<SILFunctionType>();
+  auto origFnUnsubstType = origFnType->getUnsubstitutedType(SGF.getModule());
+  if (origFnType != origFnUnsubstType) {
+    origFnVal = SGF.B.createConvertFunction(
+        loc, origFnVal, SILType::getPrimitiveObjectType(origFnUnsubstType),
+        /*withoutActuallyEscaping*/ false);
+  }
+
+  // Get the derivative function.
+  SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
+      loc, kind, origFnVal);
+  auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
+  assert(derivativeFnType->getNumResults() == 2);
+  assert(derivativeFnType->getNumParameters() == origFnArgVals.size());
+
+  auto derivativeFnUnsubstType =
+      derivativeFnType->getUnsubstitutedType(SGF.getModule());
+  if (derivativeFnType != derivativeFnUnsubstType) {
+    derivativeFn = SGF.B.createConvertFunction(
+        loc, derivativeFn,
+        SILType::getPrimitiveObjectType(derivativeFnUnsubstType),
+        /*withoutActuallyEscaping*/ false);
+  }
+
+  // We don't need to destroy the original function or retain the
+  // `derivativeFn`, because they are trivial (because they are @noescape).
+  assert(origFnVal->getType().isTrivial(SGF.F));
+  assert(derivativeFn->getType().isTrivial(SGF.F));
+
+  // Do the apply for the indirect result case.
+  if (derivativeFnType->hasIndirectFormalResults()) {
+    auto indResBuffer = SGF.getBufferForExprResult(
+        loc, derivativeFnType->getAllResultsInterfaceType(), C);
+    SmallVector<SILValue, 3> applyArgs;
+    applyArgs.push_back(SGF.B.createTupleElementAddr(loc, indResBuffer, 0));
+    for (auto origFnArgVal : origFnArgVals)
+      applyArgs.push_back(origFnArgVal);
+    auto differential = SGF.B.createApply(loc, derivativeFn, SubstitutionMap(),
+                                          applyArgs, /*isNonThrowing*/ false);
+
+    derivativeFn = SILValue();
+
+    SGF.B.createStore(loc, differential,
+                      SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
+                      StoreOwnershipQualifier::Init);
+    return SGF.manageBufferForExprResult(
+        indResBuffer, SGF.getTypeLowering(indResBuffer->getType()), C);
+  }
+
+  // Do the apply for the direct result case.
+  auto resultTuple = SGF.B.createApply(
+      loc, derivativeFn, SubstitutionMap(), origFnArgVals,
+      /*isNonThrowing*/ false);
+
+  derivativeFn = SILValue();
+
+  return SGF.emitManagedRValueWithCleanup(resultTuple);
+}
+
+static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
+    unsigned arity, bool throws, SILGenFunction &SGF, SILLocation loc,
+    SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
+  // FIXME(SR-11853): Support throwing functions.
+  assert(!throws && "Throwing functions are not yet supported");
+
+  auto origFnVal = args.front().getValue();
+  SmallVector<SILValue, 2> origFnArgVals;
+  for (auto &arg : args.drop_front(1))
+    origFnArgVals.push_back(arg.getValue());
+
+  // Get the transpose function.
+  // TODO(TF-1142): Create a linear_function_extract instead of an undef.
+  auto fnTy = origFnVal->getType().castTo<SILFunctionType>();
+  auto transposeFnType =
+      fnTy->getWithoutDifferentiability()->getAutoDiffTransposeFunctionType(
+      fnTy->getDifferentiabilityParameterIndices(), SGF.SGM.M.Types,
+      LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+  SILValue transposeFn =
+      SILUndef::get(SILType::getPrimitiveObjectType(transposeFnType), SGF.F);
+  auto transposeFnUnsubstType =
+      transposeFnType->getUnsubstitutedType(SGF.getModule());
+  if (transposeFnType != transposeFnUnsubstType) {
+    transposeFn = SGF.B.createConvertFunction(
+        loc, transposeFn,
+        SILType::getPrimitiveObjectType(transposeFnUnsubstType),
+        /*withoutActuallyEscaping*/ false);
+    transposeFnType = transposeFn->getType().castTo<SILFunctionType>();
+  }
+
+  SmallVector<SILValue, 2> applyArgs;
+  if (transposeFnType->hasIndirectFormalResults())
+    applyArgs.push_back(
+        SGF.getBufferForExprResult(
+            loc, transposeFnType->getAllResultsInterfaceType(), C));
+  for (auto paramArg : args.drop_front()) {
+    applyArgs.push_back(paramArg.getValue());
+  }
+  auto *apply = SGF.B.createApply(
+      loc, transposeFn, SubstitutionMap(), applyArgs);
+  if (transposeFnType->hasIndirectFormalResults()) {
+    auto resultAddress = applyArgs.front();
+    AbstractionPattern pattern(
+        SGF.F.getLoweredFunctionType()->getSubstGenericSignature(),
+        resultAddress->getType().getASTType());
+    auto &tl =
+        SGF.getTypeLowering(pattern, resultAddress->getType().getASTType());
+    return SGF.manageBufferForExprResult(resultAddress, tl, C);
+  } else {
+    return SGF.emitManagedRValueWithCleanup(apply);
+  }
+}
+
+static ManagedValue emitBuiltinApplyDerivative(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  auto *callExpr = loc.castToASTNode<CallExpr>();
+  auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
+      cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
+          ->getDecl());
+  auto builtinName = builtinDecl->getName().str();
+  AutoDiffDerivativeFunctionKind kind;
+  unsigned arity;
+  bool throws;
+  auto successfullyParsed = autodiff::getBuiltinApplyDerivativeConfig(
+      builtinName, kind, arity, throws);
+  assert(successfullyParsed);
+  return emitBuiltinAutoDiffApplyDerivativeFunction(
+      kind, arity, throws, SGF, loc, substitutions, args, C);
+}
+
+static ManagedValue emitBuiltinApplyTranspose(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  auto *callExpr = loc.castToASTNode<CallExpr>();
+  auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
+      cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
+          ->getDecl());
+  auto builtinName = builtinDecl->getName().str();
+  unsigned arity;
+  bool throws;
+  auto successfullyParsed = autodiff::getBuiltinApplyTransposeConfig(
+      builtinName, arity, throws);
+  assert(successfullyParsed);
+  return emitBuiltinAutoDiffApplyTransposeFunction(
+      arity, throws, SGF, loc, substitutions, args, C);
+}
+
+static ManagedValue emitBuiltinDifferentiableFunction(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 3);
+  auto origFn = args.front();
+  auto origType = origFn.getType().castTo<SILFunctionType>();
+  auto diffFn = SGF.B.createDifferentiableFunction(
+      loc,
+      IndexSubset::getDefault(
+          SGF.getASTContext(), origType->getNumParameters(),
+          /*includeAll*/ true),
+      origFn.forward(SGF),
+      std::make_pair(args[1].forward(SGF), args[2].forward(SGF)));
+  return SGF.emitManagedRValueWithCleanup(diffFn);
+}
+
+static ManagedValue emitBuiltinLinearFunction(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 2);
+  auto origFn = args.front();
+  auto origType = origFn.getType().castTo<SILFunctionType>();
+  // TODO(TF-1142): Create a linear_function instead of an undef.
+  auto linearFnTy = origType->getWithDifferentiability(
+      DifferentiabilityKind::Linear,
+      IndexSubset::getDefault(
+          SGF.getASTContext(), origType->getNumParameters(),
+          /*includeAll*/ true));
+  SILValue linearFn = SILUndef::get(
+      SILType::getPrimitiveObjectType(linearFnTy), SGF.F);
+  return SGF.emitManagedRValueWithCleanup(linearFn);
+}
+
+
+
 /// Emit SIL for the named builtin: globalStringTablePointer. Unlike the default
 /// ownership convention for named builtins, which is to take (non-trivial)
 /// arguments as Owned, this builtin accepts owned as well as guaranteed

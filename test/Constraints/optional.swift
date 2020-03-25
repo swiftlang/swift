@@ -439,9 +439,10 @@ func sr_12309() {
   _ = (nil!) // expected-error {{'nil' literal cannot be force unwrapped}}
   _ = (nil)! // expected-error {{'nil' literal cannot be force unwrapped}}
   _ = ((nil))! // expected-error {{'nil' literal cannot be force unwrapped}}
-  _ = nil? // expected-error {{value of optional type 'Optional<_>' must be unwrapped to a value of type '_'}}
-           // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-           // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  _ = nil? // expected-error {{'nil' requires a contextual type}}
+  _ = ((nil?)) // expected-error {{'nil' requires a contextual type}}
+  _ = ((nil))? // expected-error {{'nil' requires a contextual type}}
+  _ = ((nil)?) // expected-error {{'nil' requires a contextual type}}
   _ = nil // expected-error {{'nil' requires a contextual type}}
   _ = (nil) // expected-error {{'nil' requires a contextual type}}
   _ = ((nil)) // expected-error {{'nil' requires a contextual type}}

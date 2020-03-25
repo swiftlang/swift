@@ -389,6 +389,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       ModuleCachePath = InputArg->getValue();
       break;
 
+    case OPT_shell:
+      ShellExecution = true;
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'

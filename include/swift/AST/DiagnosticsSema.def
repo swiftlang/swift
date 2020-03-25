@@ -2916,6 +2916,8 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
       "attribute for transpose registration instead", ())
+ERROR(differentiable_attr_void_result,none,
+      "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclNameRef, Type))
 // TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
@@ -2940,12 +2942,6 @@ ERROR(differentiable_attr_result_not_differentiable,none,
 ERROR(differentiable_attr_protocol_req_where_clause,none,
       "'@differentiable' attribute on protocol requirement cannot specify "
       "'where' clause", ())
-ERROR(differentiable_attr_protocol_req_assoc_func,none,
-      "'@differentiable' attribute on protocol requirement cannot specify "
-      "'jvp:' or 'vjp:'", ())
-ERROR(differentiable_attr_stored_property_variable_unsupported,none,
-      "'@differentiable' attribute on stored property cannot specify "
-      "'jvp:' or 'vjp:'", ())
 ERROR(differentiable_attr_class_member_dynamic_self_result_unsupported,none,
       "'@differentiable' attribute cannot be declared on class members "
       "returning 'Self'", ())

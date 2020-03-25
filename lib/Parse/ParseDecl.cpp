@@ -816,12 +816,8 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 /// \verbatim
 ///   differentiable-attribute-arguments:
 ///     '(' (differentiability-params-clause ',')?
-///         (differentiable-attr-func-specifier ',')?
-///         differentiable-attr-func-specifier?
 ///         where-clause?
 ///     ')'
-///   differentiable-attr-func-specifier:
-///     ('jvp' | 'vjp') ':' decl-name
 /// \endverbatim
 ParserResult<DifferentiableAttr>
 Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
@@ -829,15 +825,12 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   bool linear = false;
   SmallVector<ParsedAutoDiffParameter, 8> parameters;
-  Optional<DeclNameRefWithLoc> jvpSpec;
-  Optional<DeclNameRefWithLoc> vjpSpec;
   TrailingWhereClause *whereClause = nullptr;
 
   // Parse '('.
   if (consumeIf(tok::l_paren, lParenLoc)) {
     // Parse @differentiable attribute arguments.
-    if (parseDifferentiableAttributeArguments(linear, parameters, jvpSpec,
-                                              vjpSpec, whereClause))
+    if (parseDifferentiableAttributeArguments(linear, parameters, whereClause))
       return makeParserError();
     // Parse ')'.
     if (!consumeIf(tok::r_paren, rParenLoc)) {
@@ -849,7 +842,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 
   return ParserResult<DifferentiableAttr>(DifferentiableAttr::create(
       Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), linear,
-      parameters, jvpSpec, vjpSpec, whereClause));
+      parameters, whereClause));
 }
 
 // Attribute parsing error helper.
@@ -963,8 +956,7 @@ bool Parser::parseDifferentiabilityParametersClause(
 
 bool Parser::parseDifferentiableAttributeArguments(
     bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &parameters,
-    Optional<DeclNameRefWithLoc> &jvpSpec,
-    Optional<DeclNameRefWithLoc> &vjpSpec, TrailingWhereClause *&whereClause) {
+    TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
 
   // Parse trailing comma, if it exists, and check for errors.
@@ -975,9 +967,8 @@ bool Parser::parseDifferentiableAttributeArguments(
       diagnose(Tok, diag::unexpected_separator, ",");
       return true;
     }
-    // Check that token after comma is 'wrt' or a function specifier label.
-    if (isIdentifier(Tok, "wrt") || isIdentifier(Tok, "jvp") ||
-        isIdentifier(Tok, "vjp")) {
+    // Check that token after comma is 'wrt'.
+    if (isIdentifier(Tok, "wrt")) {
       return false;
     }
     diagnose(Tok, diag::attr_differentiable_expected_label);
@@ -1017,66 +1008,6 @@ bool Parser::parseDifferentiableAttributeArguments(
     // If no trailing comma or 'where' clause, terminate parsing arguments.
     if (Tok.isNot(tok::comma, tok::kw_where))
       return false;
-    if (consumeIfTrailingComma())
-      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
-  }
-
-  // Function that parses a label and a function specifier, e.g. 'vjp: foo(_:)'.
-  // Return true on error.
-  auto parseFuncSpec = [&](StringRef label, DeclNameRefWithLoc &result,
-                           bool &terminateParsingArgs) -> bool {
-    // Parse label.
-    if (parseSpecificIdentifier(label, diag::attr_missing_label, label,
-                                AttrName) ||
-        parseToken(tok::colon, diag::expected_colon_after_label, label))
-      return true;
-    // Parse the name of the function.
-    SyntaxParsingContext FuncDeclNameContext(
-         SyntaxContext, SyntaxKind::FunctionDeclName);
-    Diagnostic funcDiag(diag::attr_differentiable_expected_function_name.ID,
-                        { label });
-    result.Name = parseDeclNameRef(result.Loc, funcDiag,
-        DeclNameFlag::AllowZeroArgCompoundNames | DeclNameFlag::AllowOperators);
-    // Emit warning for deprecated `jvp:` and `vjp:` arguments.
-    // TODO(TF-1001): Remove deprecated `jvp:` and `vjp:` arguments.
-    if (result.Loc.isValid()) {
-      diagnose(result.Loc.getStartLoc(),
-               diag::attr_differentiable_jvp_vjp_deprecated_warning)
-          .highlight(result.Loc.getSourceRange());
-    }
-    // If no trailing comma or 'where' clause, terminate parsing arguments.
-    if (Tok.isNot(tok::comma, tok::kw_where))
-      terminateParsingArgs = true;
-    return !result.Name;
-  };
-
-  // Store whether to terminate parsing arguments.
-  bool terminateParsingArgs = false;
-
-  // Parse 'jvp: <func_name>' (optional).
-  if (isIdentifier(Tok, "jvp")) {
-    SyntaxParsingContext JvpContext(
-        SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    jvpSpec = DeclNameRefWithLoc();
-    if (parseFuncSpec("jvp", *jvpSpec, terminateParsingArgs))
-      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
-    if (terminateParsingArgs)
-      return false;
-    if (consumeIfTrailingComma())
-      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
-  }
-
-  // Parse 'vjp: <func_name>' (optional).
-  if (isIdentifier(Tok, "vjp")) {
-    SyntaxParsingContext VjpContext(
-        SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    vjpSpec = DeclNameRefWithLoc();
-    if (parseFuncSpec("vjp", *vjpSpec, terminateParsingArgs))
-      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
-    if (terminateParsingArgs)
-      return false;
-    // Note: intentionally parse trailing comma here, even though it's the last
-    // function specifier. `consumeIfTrailingComma` will emit an error.
     if (consumeIfTrailingComma())
       return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }

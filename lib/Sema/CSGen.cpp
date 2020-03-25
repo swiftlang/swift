@@ -1155,7 +1155,18 @@ namespace {
       while (parentExpr && isa<ParenExpr>(parentExpr))
         parentExpr = CS.getParentExpr(parentExpr);
 
+      // In cases like `_ = nil?` AST would have `nil`
+      // wrapped in `BindOptionalExpr`.
+      if (parentExpr && isa<BindOptionalExpr>(parentExpr))
+        parentExpr = CS.getParentExpr(parentExpr);
+
       if (parentExpr) {
+        // `_ = nil as? ...`
+        if (isa<ConditionalCheckedCastExpr>(parentExpr)) {
+          DE.diagnose(expr->getLoc(), diag::conditional_cast_from_nil);
+          return Type();
+        }
+
         // `_ = nil!`
         if (isa<ForceValueExpr>(parentExpr)) {
           DE.diagnose(expr->getLoc(), diag::cannot_force_unwrap_nil_literal);
@@ -1167,13 +1178,13 @@ namespace {
           DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
           return Type();
         }
-      }
 
-      // `_ = nil`
-      if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
-        if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
-          DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-          return Type();
+        // `_ = nil`
+        if (auto *assignment = dyn_cast<AssignExpr>(parentExpr)) {
+          if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
+            DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
+            return Type();
+          }
         }
       }
 
@@ -2981,26 +2992,6 @@ namespace {
       auto fromExpr = expr->getSubExpr();
       if (!fromExpr) // Either wasn't constructed correctly or wasn't folded.
         return nullptr;
-
-      std::function<Expr *(Expr *)> nilLiteralExpr = [&](Expr *expr) -> Expr * {
-        expr = expr->getSemanticsProvidingExpr();
-        if (expr->getKind() == ExprKind::NilLiteral)
-          return expr;
-
-        if (auto *optionalEvalExpr = dyn_cast<OptionalEvaluationExpr>(expr))
-          return nilLiteralExpr(optionalEvalExpr->getSubExpr());
-
-        if (auto *bindOptionalExpr = dyn_cast<BindOptionalExpr>(expr))
-          return nilLiteralExpr(bindOptionalExpr->getSubExpr());
-
-        return nullptr;
-      };
-
-      if (auto nilLiteral = nilLiteralExpr(fromExpr)) {
-        ctx.Diags.diagnose(nilLiteral->getLoc(),
-                           diag::conditional_cast_from_nil);
-        return nullptr;
-      }
 
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);

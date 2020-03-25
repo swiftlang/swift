@@ -1,0 +1,237 @@
+import SwiftOnoneSupport
+
+func fromA()
+
+
+// MARK: - B Additions
+
+import B
+
+// Available when B is imported with A
+struct From_ABAdditionsType {
+}
+
+// Available when B is imported with A
+func from_ABAdditions()
+
+
+// MARK: - B and C Additions
+
+import C
+
+// Available when B and C are imported with A
+func from__ABAdditionsCAdditions()
+
+// Available when B and C are imported with A
+func other(x x: A.From_ABAdditionsType)
+
+
+[
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 0,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 7,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 26,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 31,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.comment,
+    key.offset: 41,
+    key.length: 23
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.comment.mark,
+    key.offset: 44,
+    key.length: 19
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 65,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 72,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.comment,
+    key.offset: 75,
+    key.length: 39
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 114,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 121,
+    key.length: 20
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.comment,
+    key.offset: 147,
+    key.length: 39
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 186,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 191,
+    key.length: 16
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.comment,
+    key.offset: 212,
+    key.length: 29
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.comment.mark,
+    key.offset: 215,
+    key.length: 25
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 242,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 249,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.comment,
+    key.offset: 252,
+    key.length: 46
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 298,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 303,
+    key.length: 27
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.comment,
+    key.offset: 334,
+    key.length: 46
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 380,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 385,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 391,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 393,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 396,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "From_ABAdditionsType",
+    key.usr: "s:12_ABAdditions05From_A4TypeV",
+    key.offset: 398,
+    key.length: 20
+  }
+]
+[
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "fromA()",
+    key.usr: "s:1A5fromAyyF",
+    key.offset: 26,
+    key.length: 12,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fromA</decl.name>()</decl.function.free>"
+  },
+  {
+    key.kind: source.lang.swift.decl.struct,
+    key.name: "From_ABAdditionsType",
+    key.usr: "s:12_ABAdditions05From_A4TypeV",
+    key.offset: 114,
+    key.length: 31,
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>From_ABAdditionsType</decl.name></decl.struct>",
+    key.required_bystanders: [
+      "B"
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "from_ABAdditions()",
+    key.usr: "s:12_ABAdditions05from_A0yyF",
+    key.offset: 186,
+    key.length: 23,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>from_ABAdditions</decl.name>()</decl.function.free>",
+    key.required_bystanders: [
+      "B"
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "from__ABAdditionsCAdditions()",
+    key.usr: "s:23__ABAdditionsCAdditions06from__aB0yyF",
+    key.offset: 298,
+    key.length: 34,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>from__ABAdditionsCAdditions</decl.name>()</decl.function.free>",
+    key.required_bystanders: [
+      "C",
+      "B"
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "other(x:)",
+    key.usr: "s:23__ABAdditionsCAdditions5other1xy01_A005From_A4TypeV_tF",
+    key.offset: 380,
+    key.length: 39,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>other</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:12_ABAdditions05From_A4TypeV\">From_ABAdditionsType</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.var.local,
+        key.keyword: "x",
+        key.name: "x",
+        key.offset: 396,
+        key.length: 22
+      }
+    ],
+    key.required_bystanders: [
+      "C",
+      "B"
+    ]
+  }
+]

@@ -3353,6 +3353,8 @@ public:
       IndexSubset *parameterIndices, AutoDiffLinearMapKind kind,
       LookupConformanceFn lookupConformance, bool makeSelfParamFirst = false);
 
+  AnyFunctionType *getWithoutDifferentiability() const;
+
   /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {

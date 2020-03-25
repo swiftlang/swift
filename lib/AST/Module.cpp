@@ -821,7 +821,19 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
 ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
                                                      ProtocolDecl *protocol) {
-  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      LookupConformanceInModuleRequest{{this, type, protocol}},
+      ProtocolConformanceRef::forInvalid());
+}
+
+llvm::Expected<ProtocolConformanceRef>
+LookupConformanceInModuleRequest::evaluate(
+    Evaluator &evaluator, LookupConformanceDescriptor desc) const {
+  auto *mod = desc.Mod;
+  auto type = desc.Ty;
+  auto protocol = desc.PD;
+  ASTContext &ctx = mod->getASTContext();
 
   // A dynamic Self type conforms to whatever its underlying type
   // conforms to.
@@ -839,7 +851,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     // able to be resolved by a substitution that makes the archetype
     // concrete.
     if (auto super = archetype->getSuperclass()) {
-      if (auto inheritedConformance = lookupConformance(super, protocol)) {
+      if (auto inheritedConformance = mod->lookupConformance(super, protocol)) {
         return ProtocolConformanceRef(ctx.getInheritedConformance(
             type, inheritedConformance.getConcrete()));
       }
@@ -857,7 +869,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType())
-    return lookupExistentialConformance(type, protocol);
+    return mod->lookupExistentialConformance(type, protocol);
 
   // Type variables have trivial conformances.
   if (type->isTypeVariableOrMember())
@@ -877,7 +889,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
-  if (!nominal->lookupConformance(this, protocol, conformances))
+  if (!nominal->lookupConformance(mod, protocol, conformances))
     return ProtocolConformanceRef::forInvalid();
 
   // FIXME: Ambiguity resolution.
@@ -897,7 +909,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     auto superclassTy = type->getSuperclassForDecl(conformingClass);
 
     // Compute the conformance for the inherited type.
-    auto inheritedConformance = lookupConformance(superclassTy, protocol);
+    auto inheritedConformance = mod->lookupConformance(superclassTy, protocol);
     assert(inheritedConformance &&
            "We already found the inherited conformance");
 
@@ -918,7 +930,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     if (!explicitConformanceType->isEqual(type)) {
       // Gather the substitutions we need to map the generic conformance to
       // the specialized conformance.
-      auto subMap = type->getContextSubstitutionMap(this, explicitConformanceDC);
+      auto subMap = type->getContextSubstitutionMap(mod, explicitConformanceDC);
 
       // Create the specialized conformance entry.
       auto result = ctx.getSpecializedConformance(type, conformance, subMap);
@@ -1683,6 +1695,80 @@ void ModuleDecl::getDeclaredCrossImportBystanders(
     SmallVectorImpl<Identifier> &otherModules) {
   for (auto &pair : declaredCrossImports)
     otherModules.push_back(std::get<0>(pair));
+}
+
+using TransitiveOverlays =
+    llvm::SmallDenseMap<ModuleDecl *, std::pair<Identifier, ModuleDecl *>, 1>;
+
+static void populateTransitiveCrossImports(ModuleDecl *base,
+                                           TransitiveOverlays &result) {
+  if (!result.empty() || !base->mightDeclareCrossImportOverlays())
+    return;
+
+  SmallVector<Identifier, 1> bystanders;
+  SmallVector<Identifier, 1> overlays;
+  SmallVector<ModuleDecl *, 1> worklist;
+  SourceLoc diagLoc; // ignored
+
+  worklist.push_back(base);
+  while (!worklist.empty()) {
+    ModuleDecl *current = worklist.back();
+    worklist.pop_back();
+    if (!current->mightDeclareCrossImportOverlays())
+      continue;
+    bystanders.clear();
+    current->getDeclaredCrossImportBystanders(bystanders);
+    for (Identifier bystander: bystanders) {
+      overlays.clear();
+      current->findDeclaredCrossImportOverlays(bystander, overlays, diagLoc);
+      for (Identifier overlay: overlays) {
+        if (!overlay.str().startswith("_"))
+          continue;
+        ModuleDecl *overlayMod =
+            base->getASTContext().getModuleByName(overlay.str());
+        if (!overlayMod)
+          continue;
+        if (result.insert({overlayMod, {bystander, current}}).second)
+          worklist.push_back(overlayMod);
+      }
+    }
+  }
+}
+
+bool ModuleDecl::isUnderlyingModuleOfCrossImportOverlay(
+    const ModuleDecl *overlay) {
+  if (!overlay->getNameStr().startswith("_"))
+    return false;
+
+  populateTransitiveCrossImports(this, declaredCrossImportsTransitive);
+  return declaredCrossImportsTransitive.find(overlay) !=
+      declaredCrossImportsTransitive.end();
+}
+
+void ModuleDecl::getAllBystandersForCrossImportOverlay(
+    ModuleDecl *overlay, SmallVectorImpl<Identifier> &bystanders) {
+  if (!overlay->getNameStr().startswith("_"))
+    return;
+
+  populateTransitiveCrossImports(this, declaredCrossImportsTransitive);
+
+  auto end = declaredCrossImportsTransitive.end();
+  for (auto i = declaredCrossImportsTransitive.find(overlay);
+       i != end;
+       i = declaredCrossImportsTransitive.find(i->second.second)) {
+    bystanders.push_back(i->second.first);
+  }
+}
+
+void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
+    SmallVectorImpl<ModuleDecl *> &overlayModules) {
+  populateTransitiveCrossImports(this, declaredCrossImportsTransitive);
+  std::transform(declaredCrossImportsTransitive.begin(),
+                 declaredCrossImportsTransitive.end(),
+                 std::back_inserter(overlayModules),
+                 [](TransitiveOverlays::iterator::value_type &i) {
+    return i.first;
+  });
 }
 
 namespace {
