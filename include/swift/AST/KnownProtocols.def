@@ -78,13 +78,13 @@ PROTOCOL_(SwiftNewtypeWrapper)
 PROTOCOL(CodingKey)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
-PROTOCOL(AdditiveArithmetic)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)
 
 PROTOCOL(StringInterpolationProtocol)
 
+PROTOCOL(AdditiveArithmetic)
 PROTOCOL(Differentiable)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
