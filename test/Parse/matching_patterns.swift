@@ -28,20 +28,17 @@ case square(9):
 // 'var' and 'let' patterns.
 case var a:
   a = 1
-case let a: // expected-warning {{case is already handled by previous patterns; consider removing it}}
+case let a:
   a = 1         // expected-error {{cannot assign}}
 case var var a: // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
-                // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
   a += 1
 case var let a: // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
-                // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
   print(a, terminator: "")
 case var (var b): // expected-error {{'var' cannot appear nested inside another 'var'}}
-                  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
   b += 1
 
 // 'Any' pattern.
-case _: // expected-warning {{case is already handled by previous patterns; consider removing it}}
+case _:
   ()
 
 // patterns are resolved in expression-only positions are errors.
@@ -283,14 +280,12 @@ case (1, 2, 3):
 // patterns in expression-only positions are errors.
 case +++(_, var d, 3):
 // expected-error@-1{{'_' can only appear in a pattern or on the left side of an assignment}}
-// expected-error@-2{{'var' binding pattern cannot appear in an expression}}
   ()
 case (_, var e, 3) +++ (1, 2, 3):
-// expected-error@-1{{'_' can only appear in a pattern}}
-// expected-error@-2{{'var' binding pattern cannot appear in an expression}}
+// expected-error@-1{{'_' can only appear in a pattern or on the left side of an assignment}}
   ()
 case (let (_, _, _)) + 1:
-// expected-error@-1 {{expression pattern of type 'Int' cannot match values of type '(Int, Int, Int)'}}
+// expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
   ()
 }
 
