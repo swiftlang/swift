@@ -133,7 +133,6 @@ IDENTIFIER(withKeywordArguments)
 IDENTIFIER(wrapped)
 IDENTIFIER(wrappedValue)
 IDENTIFIER(wrapperValue)
-// SWIFT_ENABLE_TENSORFLOW
 IDENTIFIER(differential)
 IDENTIFIER(pullback)
 
@@ -164,6 +163,7 @@ IDENTIFIER(x)
 // Differentiable
 IDENTIFIER(move)
 IDENTIFIER(differentiableVectorView)
+// SWIFT_ENABLE_TENSORFLOW END
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")

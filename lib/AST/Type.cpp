@@ -5013,8 +5013,6 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
   return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
 
-
-// SWIFT_ENABLE_TENSORFLOW
 AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
   SmallVector<Param, 8> newParams;
   for (auto &param : getParams()) {
@@ -5030,7 +5028,6 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
   return GenericFunctionType::get(getOptGenericSignature(), newParams,
                                   getResult(), nonDiffExtInfo);
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 Optional<TangentSpace>
 TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {

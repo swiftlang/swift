@@ -1023,7 +1023,6 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(val);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     AutoDiffDerivativeFunctionKind kind, unsigned arity,
     bool throws, SILGenFunction &SGF, SILLocation loc,
@@ -1095,7 +1094,6 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   return SGF.emitManagedRValueWithCleanup(resultTuple);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
     unsigned arity, bool throws, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
@@ -1162,7 +1160,6 @@ static ManagedValue emitBuiltinApplyDerivative(
       kind, arity, throws, SGF, loc, substitutions, args, C);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 static ManagedValue emitBuiltinApplyTranspose(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
     ArrayRef<ManagedValue> args, SGFContext C) {
@@ -1180,7 +1177,6 @@ static ManagedValue emitBuiltinApplyTranspose(
       arity, throws, SGF, loc, substitutions, args, C);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 static ManagedValue emitBuiltinDifferentiableFunction(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
     ArrayRef<ManagedValue> args, SGFContext C) {
@@ -1197,7 +1193,6 @@ static ManagedValue emitBuiltinDifferentiableFunction(
   return SGF.emitManagedRValueWithCleanup(diffFn);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 static ManagedValue emitBuiltinLinearFunction(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
     ArrayRef<ManagedValue> args, SGFContext C) {

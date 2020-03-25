@@ -4612,7 +4612,7 @@ public:
     // FIXME(TF-1197): Re-enable verification after substituted SIL function
     // types.
     return;
-// #if 0
+#if 0
     auto origTy =
         dfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");
@@ -4650,7 +4650,7 @@ public:
                       SILType::getPrimitiveObjectType(expectedVJPType),
                       "VJP type does not match expected VJP type");
     }
-// #endif
+#endif
   }
 
   void checkDifferentiableFunctionExtractInst(

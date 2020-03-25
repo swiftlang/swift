@@ -78,8 +78,8 @@ PROTOCOL_(SwiftNewtypeWrapper)
 PROTOCOL(CodingKey)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
+
 // SWIFT_ENABLE_TENSORFLOW
-PROTOCOL(AdditiveArithmetic)
 PROTOCOL(PointwiseMultiplicative)
 PROTOCOL(ElementaryFunctions)
 PROTOCOL(KeyPathIterable)
@@ -88,12 +88,14 @@ PROTOCOL(TensorGroup)
 PROTOCOL(VectorProtocol)
 PROTOCOL(EuclideanDifferentiable)
 PROTOCOL(Expression)
+// SWIFT_ENABLE_TENSORFLOW END
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)
 
 PROTOCOL(StringInterpolationProtocol)
 
+PROTOCOL(AdditiveArithmetic)
 PROTOCOL(Differentiable)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)

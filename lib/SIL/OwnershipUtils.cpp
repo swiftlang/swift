@@ -46,8 +46,8 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::DestructureTupleInst:
   case SILNodeKind::MarkDependenceInst:
   case SILNodeKind::InitExistentialRefInst:
-  // SWIFT_ENABLE_TENSORFLOW
   case SILNodeKind::DifferentiableFunctionInst:
+  // SWIFT_ENABLE_TENSORFLOW
   case SILNodeKind::LinearFunctionInst:
   // SWIFT_ENABLE_TENSORFLOW END
     return true;
@@ -64,8 +64,8 @@ bool swift::isGuaranteedForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::StructExtractInst:
   case SILNodeKind::OpenExistentialValueInst:
   case SILNodeKind::OpenExistentialBoxValueInst:
-  // SWIFT_ENABLE_TENSORFLOW
   case SILNodeKind::DifferentiableFunctionExtractInst:
+  // SWIFT_ENABLE_TENSORFLOW
   case SILNodeKind::LinearFunctionExtractInst:
   // SWIFT_ENABLE_TENSORFLOW END
     return true;

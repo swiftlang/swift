@@ -311,7 +311,6 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
     Info.ID = BuiltinValueKind::AtomicStore;
   else if (OperationName.startswith("allocWithTailElems_"))
     Info.ID = BuiltinValueKind::AllocWithTailElems;
-  // SWIFT_ENABLE_TENSORFLOW
   else if (OperationName.startswith("applyDerivative_"))
     Info.ID = BuiltinValueKind::ApplyDerivative;
   else if (OperationName.startswith("applyTranspose_"))
