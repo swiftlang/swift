@@ -8057,6 +8057,45 @@ public:
   }
 };
 
+/// LinearFunctionInst - given a function, its derivative and traspose functions,
+/// create an `@differentiable(linear)` function that represents a bundle of these.
+class LinearFunctionInst final :
+    public InstructionBaseWithTrailingOperands<
+               SILInstructionKind::LinearFunctionInst,
+               LinearFunctionInst, OwnershipForwardingSingleValueInst> {
+private:
+  friend SILBuilder;
+  /// Parameters to differentiate with respect to.
+  IndexSubset *ParameterIndices;
+  /// Indicates whether a transpose function exists.
+  bool HasTransposeFunction;
+
+  static SILType getLinearFunctionType(
+      SILValue OriginalFunction, IndexSubset *ParameterIndices);
+
+public:
+  LinearFunctionInst(SILDebugLocation Loc, IndexSubset *ParameterIndices,
+                     SILValue OriginalFunction,
+                     Optional<SILValue> TransposeFunction, bool HasOwnership);
+
+  static LinearFunctionInst *create(SILModule &Module, SILDebugLocation Loc,
+                                    IndexSubset *ParameterIndices,
+                                    SILValue OriginalFunction,
+                                    Optional<SILValue> TransposeFunction,
+                                    bool HasOwnership);
+
+  IndexSubset *getParameterIndices() const { return ParameterIndices; }
+  bool hasTransposeFunction() const { return HasTransposeFunction; }
+  SILValue getOriginalFunction() const { return getOperand(0); }
+  Optional<SILValue> getOptionalTransposeFunction() const {
+    return HasTransposeFunction ? Optional<SILValue>(getOperand(1)) : None;
+  }
+  SILValue getTransposeFunction() const {
+    assert(HasTransposeFunction);
+    return getOperand(1);
+  }
+};
+
 /// DifferentiableFunctionExtractInst - extracts either the original or
 /// derivative function value from a `@differentiable` function.
 class DifferentiableFunctionExtractInst
@@ -8092,6 +8131,39 @@ public:
   }
 
   bool hasExplicitExtracteeType() const { return HasExplicitExtracteeType; }
+};
+
+/// LinearFunctionExtractInst - given an `@differentiable(linear)` function
+/// representing a bundle of the original function and the transpose function,
+/// extract the specified function.
+class LinearFunctionExtractInst
+    : public InstructionBase<
+          SILInstructionKind::LinearFunctionExtractInst,
+          SingleValueInstruction> {
+private:
+  /// The extractee.
+  LinearDifferentiableFunctionTypeComponent extractee;
+  /// The list containing the `@differentiable(linear)` function operand.
+  FixedOperandList<1> operands;
+
+  static SILType
+  getExtracteeType(SILValue function,
+                   LinearDifferentiableFunctionTypeComponent extractee,
+                   SILModule &module);
+
+public:
+  explicit LinearFunctionExtractInst(
+      SILModule &module, SILDebugLocation debugLoc,
+      LinearDifferentiableFunctionTypeComponent extractee,
+      SILValue theFunction);
+
+  LinearDifferentiableFunctionTypeComponent getExtractee() const {
+    return extractee;
+  }
+
+  SILValue getFunctionOperand() const { return operands[0].get(); }
+  ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
 };
 
 /// DifferentiabilityWitnessFunctionInst - Looks up a differentiability witness
