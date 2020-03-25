@@ -1045,8 +1045,10 @@ public:
   void visitKeyPathInst(KeyPathInst *I);
 
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
+  void visitLinearFunctionInst(LinearFunctionInst *i);
   void
   visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *i);
+  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
   void visitDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *i);
 
@@ -1856,6 +1858,16 @@ void IRGenSILFunction::visitDifferentiableFunctionInst(
   setLoweredExplosion(i, e);
 }
 
+void IRGenSILFunction::
+visitLinearFunctionInst(LinearFunctionInst *i) {
+  auto origExp = getLoweredExplosion(i->getOriginalFunction());
+  Explosion e;
+  e.add(origExp.claimAll());
+  assert(i->hasTransposeFunction());
+  e.add(getLoweredExplosion(i->getTransposeFunction()).claimAll());
+  setLoweredExplosion(i, e);
+}
+
 void IRGenSILFunction::visitDifferentiableFunctionExtractInst(
     DifferentiableFunctionExtractInst *i) {
   unsigned structFieldOffset = i->getExtractee().rawValue;
@@ -1867,6 +1879,23 @@ void IRGenSILFunction::visitDifferentiableFunctionExtractInst(
   }
   auto diffFnExp = getLoweredExplosion(i->getOperand());
   assert(diffFnExp.size() == fieldSize * 3);
+  Explosion e;
+  e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
+  (void)diffFnExp.claimAll();
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::
+visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
+  unsigned structFieldOffset = i->getExtractee().rawValue;
+  unsigned fieldSize = 1;
+  auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
+  if (fnRepr == SILFunctionTypeRepresentation::Thick) {
+    structFieldOffset *= 2;
+    fieldSize = 2;
+  }
+  auto diffFnExp = getLoweredExplosion(i->getFunctionOperand());
+  assert(diffFnExp.size() == fieldSize * 2);
   Explosion e;
   e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
   (void)diffFnExp.claimAll();
