@@ -74,21 +74,9 @@ public:
   /// Returns true if we completed the consuming use set and discovered that \p
   /// consumingUse is not strongly control equivalent to value (meaning
   /// consumingUse is not in the same loop in the loop nest as value).
-  ///
-  /// \p scratch A scratch buffer to be used during our computation. If nullptr,
-  /// routine will create its own small vector.
   bool completeConsumingUseSet(
       SILValue value, Operand *consumingUse,
-      SmallVectorImpl<SILBasicBlock *> &scratch,
       function_ref<void(SILBasicBlock::iterator insertPt)> visitor);
-
-  /// Overload without scratch space.
-  bool completeConsumingUseSet(
-      SILValue value, Operand *consumingUse,
-      function_ref<void(SILBasicBlock::iterator insertPt)> visitor) {
-    SmallVector<SILBasicBlock *, 4> scratch;
-    return completeConsumingUseSet(value, consumingUse, scratch, visitor);
-  }
 
 private:
   /// Returns true if:
@@ -109,8 +97,17 @@ private:
   /// to leak. Can be used to insert missing destroys.
   Error checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
                    ArrayRef<Operand *> nonConsumingUses,
+                   ErrorBehaviorKind errorBehavior);
+
+  Error checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
+                   ArrayRef<Operand *> nonConsumingUses,
                    ErrorBehaviorKind errorBehavior,
-                   SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
+                   function_ref<void(SILBasicBlock *)> leakingBlockCallback);
+
+  Error checkValueImpl(
+      SILValue value, ArrayRef<Operand *> consumingUses,
+      ArrayRef<Operand *> nonConsumingUses, ErrorBehaviorKind errorBehavior,
+      Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback);
 };
 
 } // namespace swift
