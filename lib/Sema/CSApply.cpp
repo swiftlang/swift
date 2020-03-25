@@ -1966,14 +1966,19 @@ namespace {
 
       // Looks like there is a chain of implicit `subscript(dynamicMember:)`
       // calls necessary to resolve a member reference.
-      if (overload.choice.getKind() ==
-          OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+      switch (overload.choice.getKind()) {
+      case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
         buildKeyPathSubscriptComponent(overload, dotLoc, /*indexExpr=*/nullptr,
                                        ctx.Id_dynamicMember, componentLoc,
                                        components);
         keyPath->resolveComponents(ctx, components);
         cs.cacheExprTypes(keyPath);
         return keyPath;
+      }
+
+      default:
+        break;
       }
 
       // We can't reuse existing expression because type-check
