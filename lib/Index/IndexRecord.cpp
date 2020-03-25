@@ -372,6 +372,19 @@ getModuleInfoFromOpaqueModule(clang::index::writer::OpaqueModule mod,
   return info;
 }
 
+/// Gets the module name of the given module, or its underlying module if it's a
+/// cross import overlay implicitly imported in \p initialFile.
+static StringRef getUnderlyingModuleName(ModuleDecl *module,
+                                         SourceFile *initialFile) {
+  if (initialFile) {
+    ModuleDecl *underlying =
+      initialFile->getModuleShadowedBySeparatelyImportedOverlay(module);
+    if (underlying)
+      module = underlying;
+  }
+  return module->getNameStr();
+}
+
 static bool
 emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  StringRef indexStorePath,
@@ -379,7 +392,8 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
-                                 IndexUnitWriter &parentUnitWriter);
+                                 IndexUnitWriter &parentUnitWriter,
+                                 SourceFile *initialFile);
 
 static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
                                   StringRef indexStorePath,
@@ -388,7 +402,8 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
                                   const clang::CompilerInstance &clangCI,
                                   DiagnosticEngine &diags,
                                   IndexUnitWriter &unitWriter,
-                                  StringScratchSpace &moduleNameScratch) {
+                                  StringScratchSpace &moduleNameScratch,
+                                  SourceFile *initialFile = nullptr) {
   auto &fileMgr = clangCI.getFileManager();
 
   for (auto &import : imports) {
@@ -430,9 +445,13 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
               emitDataForSwiftSerializedModule(mod, indexStorePath,
                                                indexSystemModules,
                                                targetTriple, clangCI, diags,
-                                               unitWriter);
+                                               unitWriter, initialFile);
               withoutUnitName = false;
             }
+
+            // If this is a cross-import overlay, make sure we use the name of
+            // the underlying module instead.
+            moduleName = getUnderlyingModuleName(mod, initialFile);
           }
           clang::index::writer::OpaqueModule opaqMod =
               moduleNameScratch.createString(moduleName);
@@ -454,9 +473,12 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
-                                 IndexUnitWriter &parentUnitWriter) {
+                                 IndexUnitWriter &parentUnitWriter,
+                                 SourceFile *initialFile) {
   StringRef filename = module->getModuleFilename();
-  std::string moduleName = module->getNameStr().str();
+  // If this is a cross-import overlay, make sure we use the name of the
+  // underlying module instead.
+  std::string moduleName = getUnderlyingModuleName(module, initialFile);
 
   std::string error;
   auto isUptodateOpt = parentUnitWriter.isUnitUpToDateForOutputFile(/*FilePath=*/filename,
@@ -565,12 +587,12 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   ModuleDecl::ImportFilter importFilter;
   importFilter |= ModuleDecl::ImportFilterKind::Public;
   importFilter |= ModuleDecl::ImportFilterKind::Private;
-  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   module->getImportedModules(imports, importFilter);
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules,
-                        targetTriple, clangCI, diags, unitWriter, moduleNameScratch);
+                        targetTriple, clangCI, diags, unitWriter,
+                        moduleNameScratch, initialFile);
 
   if (unitWriter.write(error)) {
     diags.diagnose(SourceLoc(), diag::error_write_index_unit, error);
@@ -611,7 +633,8 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   primarySourceFile->getImportedModules(imports, importFilter);
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules,
-                        targetTriple, clangCI, diags, unitWriter, moduleNameScratch);
+                        targetTriple, clangCI, diags, unitWriter,
+                        moduleNameScratch, primarySourceFile);
 
   // File dependencies.
   for (auto *F : fileDependencies)
