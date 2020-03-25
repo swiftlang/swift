@@ -2643,7 +2643,7 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 }
 
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
-  auto dc = D->getInnermostDeclContext();
+  auto dc = D->getDeclContext();
 
   // Figure out which nominal declaration this custom attribute refers to.
   auto nominal = evaluateOrDefault(
