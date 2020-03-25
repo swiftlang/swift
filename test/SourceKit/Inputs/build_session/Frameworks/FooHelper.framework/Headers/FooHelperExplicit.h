@@ -1,0 +1,1 @@
+int fooHelperExplicitFunc(int a);

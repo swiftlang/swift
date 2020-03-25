@@ -124,6 +124,7 @@ struct TestOptions {
   llvm::StringMap<VFSFile> VFSFiles;
   llvm::Optional<std::string> VFSName;
   llvm::Optional<bool> CancelOnSubsequentRequest;
+  bool ShellExecution = false;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;
 };
