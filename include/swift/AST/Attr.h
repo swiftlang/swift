@@ -1709,6 +1709,13 @@ class DifferentiableAttr final
   /// attribute's where clause requirements. This is set only if the attribute
   /// has a where clause.
   GenericSignature DerivativeGenericSignature;
+  /// The source location of the implicitly inherited protocol requirement
+  /// `@differentiable` attribute. Used for diagnostics, not serialized.
+  ///
+  /// This is set during conformance type-checking, only for implicit
+  /// `@differentiable` attributes created for non-public protocol witnesses of
+  /// protocol requirements with `@differentiable` attributes.
+  SourceLoc ImplicitlyInheritedDifferentiableAttrLocation;
 
   explicit DifferentiableAttr(bool implicit, SourceLoc atLoc,
                               SourceRange baseRange, bool linear,
@@ -1769,6 +1776,14 @@ public:
   }
   void setDerivativeGenericSignature(GenericSignature derivativeGenSig) {
     DerivativeGenericSignature = derivativeGenSig;
+  }
+
+  SourceLoc getImplicitlyInheritedDifferentiableAttrLocation() const {
+    return ImplicitlyInheritedDifferentiableAttrLocation;
+  }
+  void getImplicitlyInheritedDifferentiableAttrLocation(SourceLoc loc) {
+    assert(isImplicit());
+    ImplicitlyInheritedDifferentiableAttrLocation = loc;
   }
 
   /// Get the derivative generic environment for the given `@differentiable`
