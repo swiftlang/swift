@@ -5013,6 +5013,22 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
   return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
 
+AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
+  SmallVector<Param, 8> newParams;
+  for (auto &param : getParams()) {
+    Param newParam(param.getPlainType(), param.getLabel(),
+                   param.getParameterFlags().withNoDerivative(false));
+    newParams.push_back(newParam);
+  }
+  auto nonDiffExtInfo = getExtInfo()
+      .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
+  if (isa<FunctionType>(this))
+    return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
+  assert(isa<GenericFunctionType>(this));
+  return GenericFunctionType::get(getOptGenericSignature(), newParams,
+                                  getResult(), nonDiffExtInfo);
+}
+
 Optional<TangentSpace>
 TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   assert(lookupConformance);
