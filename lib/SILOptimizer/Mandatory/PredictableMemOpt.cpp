@@ -1200,7 +1200,7 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
     auto *loadOperand = &load->getAllOperands()[0];
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
     bool consumedInLoop = checker.completeConsumingUseSet(
-        phi, loadOperand, leakingBlocks, [&](SILBasicBlock::iterator iter) {
+        phi, loadOperand, [&](SILBasicBlock::iterator iter) {
           SILBuilderWithScope builder(iter);
           builder.emitDestroyValueOperation(loc, phi);
         });
@@ -1284,7 +1284,7 @@ void AvailableValueAggregator::addMissingDestroysForCopiedValues(
     auto *loadOperand = &load->getAllOperands()[0];
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
     bool consumedInLoop = checker.completeConsumingUseSet(
-        cvi, loadOperand, leakingBlocks, [&](SILBasicBlock::iterator iter) {
+        cvi, loadOperand, [&](SILBasicBlock::iterator iter) {
           SILBuilderWithScope builder(iter);
           builder.emitDestroyValueOperation(loc, cvi);
         });
