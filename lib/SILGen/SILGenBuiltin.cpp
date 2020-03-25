@@ -1024,8 +1024,6 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// FIXME(SR-11852): This should not perform curry-level unwrapping. Clean up
-// this function.
 static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     AutoDiffDerivativeFunctionKind kind, unsigned arity,
     bool throws, SILGenFunction &SGF, SILLocation loc,
@@ -1050,6 +1048,9 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
       loc, kind, origFnVal);
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
+  assert(derivativeFnType->getNumResults() == 2);
+  assert(derivativeFnType->getNumParameters() == origFnArgVals.size());
+
   auto derivativeFnUnsubstType =
       derivativeFnType->getUnsubstitutedType(SGF.getModule());
   if (derivativeFnType != derivativeFnUnsubstType) {
@@ -1063,66 +1064,14 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   // `derivativeFn`, because they are trivial (because they are @noescape).
   assert(origFnVal->getType().isTrivial(SGF.F));
   assert(derivativeFn->getType().isTrivial(SGF.F));
-  bool derivativeFnNeedsDestroy = false;
 
-  // Unwrap curry levels.
-  SmallVector<SILFunctionType *, 2> curryLevels;
-  SILFunctionType *currentLevel = derivativeFnType;
-  unsigned numParameters = 0;
-  while (currentLevel != nullptr) {
-    curryLevels.push_back(currentLevel);
-    numParameters += currentLevel->getNumParameters();
-    if (currentLevel->getNumResults() != 1)
-      break;
-    currentLevel = currentLevel->getSingleResult()
-                       .getInterfaceType()
-                       ->getAs<SILFunctionType>();
-  }
-  assert(numParameters == origFnArgVals.size());
-
-#ifndef NDEBUG
-  // Assert that all curry level arguments are not consumed, indicating that we
-  // have to destroy them ourselves.
-  for (auto *curryLevel : curryLevels)
-    for (auto &parameter : curryLevel->getParameters())
-      assert(!isConsumedParameter(parameter.getConvention()));
-#endif
-
-  // Apply all the curry levels except the last one, whose results we handle
-  // specially. We overwrite `derivativeFn` with the application results.
-  unsigned currentParameter = 0;
-  auto curryLevelsWithoutLast =
-      ArrayRef<SILFunctionType *>(curryLevels).drop_back(1);
-  for (auto *curryLevel : curryLevelsWithoutLast) {
-    auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
-        currentParameter, curryLevel->getNumParameters());
-    auto applyResult = SGF.B.createApply(
-        loc, derivativeFn, SubstitutionMap(), curryLevelArgVals,
-        /*isNonThrowing*/ false);
-    currentParameter += curryLevel->getNumParameters();
-
-    derivativeFn = applyResult;
-
-    // Our new `derivativeFn` needs to be released because it's an owned result
-    // from a function call.
-    assert(curryLevel->getSingleResult().getConvention() ==
-           ResultConvention::Owned);
-    derivativeFnNeedsDestroy = true;
-  }
-
-  assert(curryLevels.back()->getNumResults() == 2);
-  assert(currentParameter + curryLevels.back()->getNumParameters() ==
-             origFnArgVals.size());
-
-  // Apply the last curry level, in the case where it has indirect results.
-  if (curryLevels.back()->hasIndirectFormalResults()) {
+  // Do the apply for the indirect result case.
+  if (derivativeFnType->hasIndirectFormalResults()) {
     auto indResBuffer = SGF.getBufferForExprResult(
-        loc, curryLevels.back()->getAllResultsInterfaceType(), C);
+        loc, derivativeFnType->getAllResultsInterfaceType(), C);
     SmallVector<SILValue, 3> applyArgs;
     applyArgs.push_back(SGF.B.createTupleElementAddr(loc, indResBuffer, 0));
-    auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
-        currentParameter);
-    for (auto origFnArgVal : curryLevelArgVals)
+    for (auto origFnArgVal : origFnArgVals)
       applyArgs.push_back(origFnArgVal);
     auto differential = SGF.B.createApply(loc, derivativeFn, SubstitutionMap(),
                                           applyArgs, /*isNonThrowing*/ false);
@@ -1134,21 +1083,11 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
                       StoreOwnershipQualifier::Init);
     return SGF.manageBufferForExprResult(
         indResBuffer, SGF.getTypeLowering(indResBuffer->getType()), C);
-#if 0
-    AbstractionPattern pattern(
-        SGF.F.getLoweredFunctionType()->getSubstGenericSignature(),
-        indResBuffer->getType().getASTType());
-    auto &tl =
-        SGF.getTypeLowering(pattern, indResBuffer->getType().getASTType());
-    return SGF.manageBufferForExprResult(indResBuffer, tl, C);
-#endif
   }
 
-  // Apply the last curry level, in the case where it only has direct results.
-  auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
-      currentParameter);
+  // Do the apply for the direct result case.
   auto resultTuple = SGF.B.createApply(
-      loc, derivativeFn, SubstitutionMap(), curryLevelArgVals,
+      loc, derivativeFn, SubstitutionMap(), origFnArgVals,
       /*isNonThrowing*/ false);
 
   derivativeFn = SILValue();
