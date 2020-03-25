@@ -3068,8 +3068,7 @@ namespace {
       }
 
       auto locator = CS.getConstraintLocator(expr);
-      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToNoEscape |
-                                                    TVO_CanBindToHole);
+      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
       return LValueType::get(typeVar);
     }
 
