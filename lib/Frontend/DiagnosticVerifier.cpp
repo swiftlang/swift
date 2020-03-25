@@ -530,7 +530,7 @@ DiagnosticVerifier::verifyFile(unsigned BufferID, bool shouldAutoApplyFixes) {
       // fixit to add them in.
       auto actual = renderFixits(FoundDiagnostic.getFixIts(), InputFile);
       auto replStartLoc = SMLoc::getFromPointer(expected.ExpectedEnd - 8); // {{none}} length
-      auto replEndLoc = SMLoc::getFromPointer(expected.ExpectedEnd - 1);
+      auto replEndLoc = SMLoc::getFromPointer(expected.ExpectedEnd);
 
       llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
       addError(replStartLoc.getPointer(), "expected no fix-its; actual fix-it seen: " + actual, fix);

@@ -26,6 +26,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/StringExtras.h"
 
 namespace swift {
 
@@ -74,6 +75,74 @@ struct AutoDiffDerivativeFunctionKind {
   }
 };
 
+/// A component of a SIL `@differentiable` function-typed value.
+struct NormalDifferentiableFunctionTypeComponent {
+  enum innerty : unsigned { Original = 0, JVP = 1, VJP = 2 } rawValue;
+
+  NormalDifferentiableFunctionTypeComponent() = default;
+  NormalDifferentiableFunctionTypeComponent(innerty rawValue)
+      : rawValue(rawValue) {}
+  NormalDifferentiableFunctionTypeComponent(
+      AutoDiffDerivativeFunctionKind kind);
+  explicit NormalDifferentiableFunctionTypeComponent(unsigned rawValue)
+      : NormalDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit NormalDifferentiableFunctionTypeComponent(StringRef name);
+  operator innerty() const { return rawValue; }
+
+  /// Returns the derivative function kind, if the component is a derivative
+  /// function.
+  Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
+};
+
+/// A component of a SIL `@differentiable(linear)` function-typed value.
+struct LinearDifferentiableFunctionTypeComponent {
+  enum innerty : unsigned {
+    Original = 0,
+    Transpose = 1,
+  } rawValue;
+
+  LinearDifferentiableFunctionTypeComponent() = default;
+  LinearDifferentiableFunctionTypeComponent(innerty rawValue)
+      : rawValue(rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(unsigned rawValue)
+      : LinearDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(StringRef name);
+  operator innerty() const { return rawValue; }
+};
+
+/// A derivative function configuration, uniqued in `ASTContext`.
+/// Identifies a specific derivative function given an original function.
+class AutoDiffDerivativeFunctionIdentifier : public llvm::FoldingSetNode {
+  const AutoDiffDerivativeFunctionKind kind;
+  IndexSubset *const parameterIndices;
+  GenericSignature derivativeGenericSignature;
+
+  AutoDiffDerivativeFunctionIdentifier(
+      AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
+      GenericSignature derivativeGenericSignature)
+      : kind(kind), parameterIndices(parameterIndices),
+        derivativeGenericSignature(derivativeGenericSignature) {}
+
+public:
+  AutoDiffDerivativeFunctionKind getKind() const { return kind; }
+  IndexSubset *getParameterIndices() const { return parameterIndices; }
+  GenericSignature getDerivativeGenericSignature() const {
+    return derivativeGenericSignature;
+  }
+
+  static AutoDiffDerivativeFunctionIdentifier *
+  get(AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
+      GenericSignature derivativeGenericSignature, ASTContext &C);
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    ID.AddInteger(kind);
+    ID.AddPointer(parameterIndices);
+    auto derivativeCanGenSig =
+        derivativeGenericSignature.getCanonicalSignature();
+    ID.AddPointer(derivativeCanGenSig.getPointer());
+  }
+};
+
 /// The kind of a differentiability witness function.
 struct DifferentiabilityWitnessFunctionKind {
   enum innerty : uint8_t {
@@ -95,6 +164,45 @@ struct DifferentiabilityWitnessFunctionKind {
   Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
 };
 
+/// SIL-level automatic differentiation indices. Consists of:
+/// - Parameter indices: indices of parameters to differentiate with respect to.
+/// - Result index: index of the result to differentiate from.
+// TODO(TF-913): Remove `SILAutoDiffIndices` in favor of `AutoDiffConfig`.
+// `AutoDiffConfig` supports multiple result indices.
+struct SILAutoDiffIndices {
+  /// The index of the dependent result to differentiate from.
+  unsigned source;
+  /// The indices for independent parameters to differentiate with respect to.
+  IndexSubset *parameters;
+
+  /*implicit*/ SILAutoDiffIndices(unsigned source, IndexSubset *parameters)
+      : source(source), parameters(parameters) {}
+
+  bool operator==(const SILAutoDiffIndices &other) const;
+
+  bool operator!=(const SILAutoDiffIndices &other) const {
+    return !(*this == other);
+  };
+
+  /// Returns true if `parameterIndex` is a differentiability parameter index.
+  bool isWrtParameter(unsigned parameterIndex) const {
+    return parameterIndex < parameters->getCapacity() &&
+           parameters->contains(parameterIndex);
+  }
+
+  void print(llvm::raw_ostream &s = llvm::outs()) const;
+  SWIFT_DEBUG_DUMP;
+
+  std::string mangle() const {
+    std::string result = "src_" + llvm::utostr(source) + "_wrt_";
+    interleave(
+        parameters->getIndices(),
+        [&](unsigned idx) { result += llvm::utostr(idx); },
+        [&] { result += '_'; });
+    return result;
+  }
+};
+
 /// Identifies an autodiff derivative function configuration:
 /// - Parameter indices.
 /// - Result indices.
@@ -109,6 +217,11 @@ struct AutoDiffConfig {
                               GenericSignature derivativeGenericSignature)
       : parameterIndices(parameterIndices), resultIndices(resultIndices),
         derivativeGenericSignature(derivativeGenericSignature) {}
+
+  /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
+  // TODO(TF-913): This is a temporary shim for incremental removal of
+  // `SILAutoDiffIndices`. Eventually remove this.
+  SILAutoDiffIndices getSILAutoDiffIndices() const;
 
   void print(llvm::raw_ostream &s = llvm::outs()) const;
   SWIFT_DEBUG_DUMP;
@@ -282,6 +395,37 @@ void getFunctionSemanticResultTypes(
     SmallVectorImpl<AutoDiffSemanticFunctionResultType> &result,
     GenericEnvironment *genericEnv = nullptr);
 
+/// Returns the lowered SIL parameter indices for the given AST parameter
+/// indices and `AnyfunctionType`.
+///
+/// Notable lowering-related changes:
+/// - AST tuple parameter types are exploded when lowered to SIL.
+/// - AST curried `Self` parameter types become the last parameter when lowered
+///   to SIL.
+///
+/// Examples:
+///
+///   AST function type: (A, B, C) -> R
+///   AST parameter indices: 101, {A, C}
+///   Lowered SIL function type: $(A, B, C) -> R
+///   Lowered SIL parameter indices: 101
+///
+///   AST function type: (Self) -> (A, B, C) -> R
+///   AST parameter indices: 1010, {Self, B}
+///   Lowered SIL function type: $(A, B, C, Self) -> R
+///   Lowered SIL parameter indices: 0101
+///
+///   AST function type: (A, (B, C), D) -> R
+///   AST parameter indices: 110, {A, (B, C)}
+///   Lowered SIL function type: $(A, B, C, D) -> R
+///   Lowered SIL parameter indices: 1110
+///
+/// Note:
+/// - The AST function type must not be curried unless it is a method.
+///   Otherwise, the behavior is undefined.
+IndexSubset *getLoweredParameterIndices(IndexSubset *astParameterIndices,
+                                        AnyFunctionType *functionType);
+
 /// "Constrained" derivative generic signatures require all differentiability
 /// parameters to conform to the `Differentiable` protocol.
 ///
@@ -296,6 +440,33 @@ GenericSignature getConstrainedDerivativeGenericSignature(
     SILFunctionType *originalFnTy, IndexSubset *diffParamIndices,
     GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
     bool isTranspose = false);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.applyDerivative`, e.g. `Builtin.applyDerivative_jvp_arity2`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinApplyDerivativeConfig(
+    StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
+    unsigned &arity, bool &rethrows);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.applyTranspose`, e.g. `Builtin.applyTranspose_arity2`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinApplyTransposeConfig(
+  StringRef operationName, unsigned &arity, bool &rethrows);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
+/// `Builtin.differentiableFunction_arity1_throws`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinDifferentiableOrLinearFunctionConfig(
+    StringRef operationName, unsigned &arity, bool &throws);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
+/// `Builtin.differentiableFunction_arity1_throws`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinDifferentiableOrLinearFunctionConfig(
+    StringRef operationName, unsigned &arity, bool &throws);
 
 } // end namespace autodiff
 

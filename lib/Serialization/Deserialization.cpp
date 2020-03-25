@@ -527,7 +527,10 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
                                "reading specialized conformance for",
                                conformingType);
 
-    auto subMap = getSubstitutionMap(substitutionMapID);
+    auto subMapOrError = getSubstitutionMapChecked(substitutionMapID);
+    if (!subMapOrError)
+      return subMapOrError.takeError();
+    auto subMap = subMapOrError.get();
 
     ProtocolConformanceRef genericConformance =
       readConformance(Cursor, genericEnv);
@@ -571,7 +574,11 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
   case NORMAL_PROTOCOL_CONFORMANCE_ID: {
     NormalConformanceID conformanceID;
     NormalProtocolConformanceIdLayout::readRecord(scratch, conformanceID);
-    return ProtocolConformanceRef(readNormalConformance(conformanceID));
+
+    auto conformance = readNormalConformanceChecked(conformanceID);
+    if (!conformance)
+      return conformance.takeError();
+    return ProtocolConformanceRef(conformance.get());
   }
 
   case PROTOCOL_CONFORMANCE_XREF: {
@@ -614,7 +621,7 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
   }
 }
 
-NormalProtocolConformance *ModuleFile::readNormalConformance(
+Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
                              NormalConformanceID conformanceID) {
   auto &conformanceEntry = NormalConformances[conformanceID-1];
   if (conformanceEntry.isComplete()) {
@@ -647,13 +654,21 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
                                               rawIDs);
 
   ASTContext &ctx = getContext();
-  DeclContext *dc = getDeclContext(contextID);
+  auto doOrError = getDeclContextChecked(contextID);
+  if (!doOrError)
+    return doOrError.takeError();
+  DeclContext *dc = doOrError.get();
+
   assert(!isa<ClangModuleUnit>(dc->getModuleScopeContext())
          && "should not have serialized a conformance from a clang module");
   Type conformingType = dc->getDeclaredInterfaceType();
   PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
 
-  auto proto = cast<ProtocolDecl>(getDecl(protoID));
+  auto protoOrError = getDeclChecked(protoID);
+  if (!protoOrError)
+    return protoOrError.takeError();
+  auto proto = cast<ProtocolDecl>(protoOrError.get());
+
   PrettyStackTraceDecl traceTo("... to", proto);
   ++NumNormalProtocolConformancesLoaded;
 
@@ -1069,7 +1084,10 @@ ModuleFile::getSubstitutionMapChecked(serialization::SubstitutionMapID id) {
   conformances.reserve(numConformances);
   for (unsigned i : range(numConformances)) {
     (void)i;
-    conformances.push_back(readConformance(DeclTypeCursor));
+    auto conformanceOrError = readConformanceChecked(DeclTypeCursor);
+    if (!conformanceOrError)
+      return conformanceOrError.takeError();
+    conformances.push_back(conformanceOrError.get());
   }
 
   // Form the substitution map and record it.
@@ -1654,7 +1672,7 @@ giveUpFastPath:
           return true;
         if (!fn->getOperatorDecl())
           return true;
-        if (getStableFixity(fn->getOperatorDecl()->getKind()) != rawKind)
+        if (getStableFixity(fn->getOperatorDecl()->getFixity()) != rawKind)
           return true;
         return false;
       });
@@ -2268,6 +2286,29 @@ static bool attributeChainContains(DeclAttribute *attr) {
   return tempAttrs.hasAttribute<DERIVED>();
 }
 
+// Set original declaration and parameter indices in `@differentiable`
+// attributes.
+//
+// Serializing/deserializing the original declaration DeclID in
+// `@differentiable` attributes does not work because it causes
+// `@differentiable` attribute deserialization to enter an infinite loop.
+//
+// Instead, call this ad-hoc function after deserializing a declaration to set
+// the original declaration and parameter indices for its `@differentiable`
+// attributes.
+static void setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(
+    Decl *decl, DeclAttribute *attrs,
+    llvm::DenseMap<DifferentiableAttr *, IndexSubset *>
+        &diffAttrParamIndicesMap) {
+  DeclAttributes tempAttrs;
+  tempAttrs.setRawAttributeChain(attrs);
+  for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>()) {
+    auto *diffAttr = const_cast<DifferentiableAttr *>(attr);
+    diffAttr->setOriginalDeclaration(decl);
+    diffAttr->setParameterIndices(diffAttrParamIndicesMap[diffAttr]);
+  }
+}
+
 Decl *ModuleFile::getDecl(DeclID DID) {
   Expected<Decl *> deserialized = getDeclChecked(DID);
   if (!deserialized) {
@@ -2293,6 +2334,9 @@ class DeclDeserializer {
   Identifier privateDiscriminator;
   unsigned localDiscriminator = 0;
   StringRef filenameForPrivate;
+
+  // Auxiliary map for deserializing `@differentiable` attributes.
+  llvm::DenseMap<DifferentiableAttr *, IndexSubset *> diffAttrParamIndicesMap;
 
   void AddAttribute(DeclAttribute *Attr) {
     // Advance the linked list.
@@ -2772,7 +2816,10 @@ public:
     var->setIsSetterMutating(isSetterMutating);
     declOrOffset = var;
 
-    Type interfaceType = MF.getType(interfaceTypeID);
+    auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
+    if (!interfaceTypeOrError)
+      return interfaceTypeOrError.takeError();
+    Type interfaceType = interfaceTypeOrError.get();
     var->setInterfaceType(interfaceType);
     var->setImplicitlyUnwrappedOptional(isIUO);
 
@@ -3195,9 +3242,12 @@ public:
     auto genericSig = MF.getGenericSignature(genericSigID);
     if (genericSig)
       opaqueDecl->setGenericSignature(genericSig);
-    if (underlyingTypeID)
-      opaqueDecl->setUnderlyingTypeSubstitutions(
-                                       MF.getSubstitutionMap(underlyingTypeID));
+    if (underlyingTypeID) {
+      auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeID);
+      if (!subMapOrError)
+        return subMapOrError.takeError();
+      opaqueDecl->setUnderlyingTypeSubstitutions(subMapOrError.get());
+    }
     SubstitutionMap subs;
     if (genericSig) {
       subs = genericSig->getIdentitySubstitutionMap();
@@ -4257,6 +4307,36 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::Differentiable_DECL_ATTR: {
+        bool isImplicit;
+        bool linear;
+        GenericSignatureID derivativeGenSigId;
+        ArrayRef<uint64_t> parameters;
+
+        serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
+            scratch, isImplicit, linear, derivativeGenSigId, parameters);
+
+        auto derivativeGenSig = MF.getGenericSignature(derivativeGenSigId);
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = IndexSubset::get(ctx, parametersBitVector);
+        auto *diffAttr = DifferentiableAttr::create(
+            ctx, isImplicit, SourceLoc(), SourceRange(), linear,
+            /*parsedParameters*/ {}, /*trailingWhereClause*/ nullptr);
+
+        // Cache parameter indices so that they can set later.
+        // `DifferentiableAttr::setParameterIndices` cannot be called here
+        // because it requires `DifferentiableAttr::setOriginalDeclaration` to
+        // be called first. `DifferentiableAttr::setOriginalDeclaration` cannot
+        // be called here because the original declaration is not accessible in
+        // this function (`DeclDeserializer::deserializeDeclAttributes`).
+        diffAttrParamIndicesMap[diffAttr] = indices;
+        diffAttr->setDerivativeGenericSignature(derivativeGenSig);
+        Attr = diffAttr;
+        break;
+      }
+
       case decls_block::Derivative_DECL_ATTR: {
         bool isImplicit;
         uint64_t origNameId;
@@ -4391,8 +4471,18 @@ DeclDeserializer::getDeclCheckedImpl(
 
   switch (recordID) {
 #define CASE(RECORD_NAME) \
-  case decls_block::RECORD_NAME##Layout::Code: \
-    return deserialize##RECORD_NAME(scratch, blobData);
+  case decls_block::RECORD_NAME##Layout::Code: {\
+    auto decl = deserialize##RECORD_NAME(scratch, blobData); \
+    if (decl) { \
+      /* \
+      // Set original declaration and parameter indices in `@differentiable` \
+      // attributes. \
+      */ \
+      setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(\
+          decl.get(), DAttrs, diffAttrParamIndicesMap); \
+    } \
+    return decl; \
+  }
 
   CASE(TypeAlias)
   CASE(GenericTypeParamDecl)
@@ -5036,7 +5126,11 @@ public:
     decls_block::OpaqueArchetypeTypeLayout::readRecord(scratch,
                                                        opaqueDeclID, subsID);
 
-    auto opaqueDecl = cast<OpaqueTypeDecl>(MF.getDecl(opaqueDeclID));
+    auto opaqueTypeOrError = MF.getDeclChecked(opaqueDeclID);
+    if (!opaqueTypeOrError)
+      return opaqueTypeOrError.takeError();
+
+    auto opaqueDecl = cast<OpaqueTypeDecl>(opaqueTypeOrError.get());
     auto subs = MF.getSubstitutionMap(subsID);
 
     return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
@@ -5761,9 +5855,22 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(bitPosition));
 
   while (numConformances--) {
-    auto conf = readConformance(DeclTypeCursor);
-    if (conf.isConcrete())
-      conformances.push_back(conf.getConcrete());
+    auto conformance = readConformanceChecked(DeclTypeCursor);
+
+    if (!conformance) {
+      // Missing module errors are most likely caused by an
+      // implementation-only import hiding types and decls.
+      // rdar://problem/60291019
+      if (conformance.errorIsA<XRefNonLoadedModuleError>()) {
+        consumeError(conformance.takeError());
+        return;
+      }
+      else
+        fatal(conformance.takeError());
+    }
+
+    if (conformance.get().isConcrete())
+      conformances.push_back(conformance.get().getConcrete());
   }
 }
 

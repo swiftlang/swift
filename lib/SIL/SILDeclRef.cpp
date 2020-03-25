@@ -113,14 +113,13 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return false;
 }
 
-SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                       bool isForeign)
-  : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0)
-{}
+SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
+                       AutoDiffDerivativeFunctionIdentifier *derivativeId)
+    : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0),
+      derivativeFunctionIdentifier(derivativeId) {}
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign) 
-  : defaultArgIndex(0)
-{
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign)
+    : defaultArgIndex(0), derivativeFunctionIdentifier(nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
       // Map FuncDecls directly to Func SILDeclRefs.
@@ -294,15 +293,8 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     limit = Limit::NeverPublic;
   }
 
-  // The property wrapper backing initializer is never public for resilient
-  // properties.
-  if (kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
-    if (cast<VarDecl>(d)->isResilient())
-      limit = Limit::NeverPublic;
-  }
-
   // Stored property initializers get the linkage of their containing type.
-  if (isStoredPropertyInitializer()) {
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer()) {
     // Three cases:
     //
     // 1) Type is formally @_fixed_layout/@frozen. Root initializers can be
@@ -484,7 +476,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   // Stored property initializers are inlinable if the type is explicitly
   // marked as @frozen.
-  if (isStoredPropertyInitializer()) {
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer()) {
     auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
@@ -653,6 +645,21 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   using namespace Mangle;
   ASTMangler mangler;
 
+  if (derivativeFunctionIdentifier) {
+    std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
+    auto *silParameterIndices = autodiff::getLoweredParameterIndices(
+        derivativeFunctionIdentifier->getParameterIndices(),
+        getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
+    auto &ctx = getDecl()->getASTContext();
+    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+    AutoDiffConfig silConfig(
+        silParameterIndices, resultIndices,
+        derivativeFunctionIdentifier->getDerivativeGenericSignature());
+    auto derivativeFnKind = derivativeFunctionIdentifier->getKind();
+    return mangler.mangleAutoDiffDerivativeFunctionHelper(
+        originalMangled, derivativeFnKind, silConfig);
+  }
+
   // As a special case, Clang functions and globals don't get mangled at all.
   if (hasDecl()) {
     if (auto clangDecl = getDecl()->getClangDecl()) {
@@ -764,7 +771,41 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   llvm_unreachable("bad entity kind!");
 }
 
+// Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
+// FIXME(TF-1213): Also consider derived declaration `@derivative` attributes.
+static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
+  assert(declRef.derivativeFunctionIdentifier &&
+         "Expected a derivative function SILDeclRef");
+  auto overridden = declRef.getOverridden();
+  if (!overridden)
+    return false;
+  // Get the derived `@differentiable` attribute.
+  auto *derivedDiffAttr = *llvm::find_if(
+      declRef.getDecl()->getAttrs().getAttributes<DifferentiableAttr>(),
+      [&](const DifferentiableAttr *derivedDiffAttr) {
+        return derivedDiffAttr->getParameterIndices() ==
+               declRef.derivativeFunctionIdentifier->getParameterIndices();
+      });
+  assert(derivedDiffAttr && "Expected `@differentiable` attribute");
+  // Otherwise, if the base `@differentiable` attribute specifies a derivative
+  // function, then the derivative is inherited and no new vtable entry is
+  // needed. Return false.
+  auto baseDiffAttrs =
+      overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
+  for (auto *baseDiffAttr : baseDiffAttrs) {
+    if (baseDiffAttr->getParameterIndices() ==
+        declRef.derivativeFunctionIdentifier->getParameterIndices())
+      return false;
+  }
+  // Otherwise, if there is no base `@differentiable` attribute exists, then a
+  // new vtable entry is needed. Return true.
+  return true;
+}
+
 bool SILDeclRef::requiresNewVTableEntry() const {
+  if (derivativeFunctionIdentifier)
+    if (derivativeFunctionRequiresNewVTableEntry(*this))
+      return true;
   if (cast<AbstractFunctionDecl>(getDecl())->needsNewVTableEntry())
     return true;
   return false;
@@ -784,8 +825,7 @@ SILDeclRef SILDeclRef::getOverridden() const {
   auto overridden = getDecl()->getOverriddenDecl();
   if (!overridden)
     return SILDeclRef();
-
-  return SILDeclRef(overridden, kind);
+  return withDecl(overridden);
 }
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
@@ -837,6 +877,26 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (isa<ExtensionDecl>(overridden.getDecl()->getDeclContext()))
       return SILDeclRef();
 
+    // JVPs/VJPs are overridden only if the base declaration has a
+    // `@differentiable` attribute with the same parameter indices.
+    if (derivativeFunctionIdentifier) {
+      auto overriddenAttrs =
+          overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
+      for (const auto *attr : overriddenAttrs) {
+        if (attr->getParameterIndices() !=
+            derivativeFunctionIdentifier->getParameterIndices())
+          continue;
+        auto *overriddenDerivativeId = overridden.derivativeFunctionIdentifier;
+        overridden.derivativeFunctionIdentifier =
+            AutoDiffDerivativeFunctionIdentifier::get(
+                overriddenDerivativeId->getKind(),
+                overriddenDerivativeId->getParameterIndices(),
+                attr->getDerivativeGenericSignature(),
+                getDecl()->getASTContext());
+        return overridden;
+      }
+      return SILDeclRef();
+    }
     return overridden;
   }
   return SILDeclRef();
@@ -845,7 +905,7 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
 SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
   auto bestOverridden =
     getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-  return SILDeclRef(bestOverridden, kind);
+  return withDecl(bestOverridden);
 }
 
 AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(
@@ -1051,8 +1111,7 @@ bool SILDeclRef::canBeDynamicReplacement() const {
 bool SILDeclRef::isDynamicallyReplaceable() const {
   if (kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
-  if (isStoredPropertyInitializer() ||
-      kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer)
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer())
     return false;
 
   // Class allocators are not dynamic replaceable.

@@ -751,6 +751,127 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
              F->print(llvm::dbgs()));
   F->verify();
+
+  emitDifferentiabilityWitnessesForFunction(constant, F);
+}
+
+void SILGenModule::emitDifferentiabilityWitnessesForFunction(
+    SILDeclRef constant, SILFunction *F) {
+  // Visit `@derivative` attributes and generate SIL differentiability
+  // witnesses.
+  // Skip if the SILDeclRef is a:
+  // - Default argument generator function.
+  // - Thunk.
+  if (!constant.hasDecl() || !constant.getAbstractFunctionDecl())
+    return;
+  if (constant.kind == SILDeclRef::Kind::DefaultArgGenerator ||
+      constant.isThunk())
+    return;
+  auto *AFD = constant.getAbstractFunctionDecl();
+  auto emitWitnesses = [&](DeclAttributes &Attrs) {
+    for (auto *diffAttr : Attrs.getAttributes<DifferentiableAttr>()) {
+      auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
+      assert((!F->getLoweredFunctionType()->getSubstGenericSignature() ||
+              diffAttr->getDerivativeGenericSignature()) &&
+             "Type-checking should resolve derivative generic signatures for "
+             "all original SIL functions with generic signatures");
+      AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
+                            diffAttr->getDerivativeGenericSignature());
+      emitDifferentiabilityWitness(AFD, F, config, /*jvp*/ nullptr,
+                                   /*vjp*/ nullptr, diffAttr);
+    }
+    for (auto *derivAttr : Attrs.getAttributes<DerivativeAttr>()) {
+      SILFunction *jvp = nullptr;
+      SILFunction *vjp = nullptr;
+      switch (derivAttr->getDerivativeKind()) {
+      case AutoDiffDerivativeFunctionKind::JVP:
+        jvp = F;
+        break;
+      case AutoDiffDerivativeFunctionKind::VJP:
+        vjp = F;
+        break;
+      }
+      auto *origAFD = derivAttr->getOriginalFunction();
+      auto origDeclRef =
+          SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
+      auto *origFn = getFunction(origDeclRef, NotForDefinition);
+      auto derivativeGenSig = AFD->getGenericSignature();
+      auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
+      AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
+                            derivativeGenSig);
+      emitDifferentiabilityWitness(origAFD, origFn, config, jvp, vjp,
+                                   derivAttr);
+    }
+  };
+  if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
+    if (accessor->isGetter())
+      emitWitnesses(accessor->getStorage()->getAttrs());
+  emitWitnesses(AFD->getAttrs());
+}
+
+void SILGenModule::emitDifferentiabilityWitness(
+    AbstractFunctionDecl *originalAFD, SILFunction *originalFunction,
+    const AutoDiffConfig &config, SILFunction *jvp, SILFunction *vjp,
+    const DeclAttribute *attr) {
+  assert(isa<DifferentiableAttr>(attr) || isa<DerivativeAttr>(attr));
+  auto *origFnType = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
+  auto origSilFnType = originalFunction->getLoweredFunctionType();
+  auto *silParamIndices =
+      autodiff::getLoweredParameterIndices(config.parameterIndices, origFnType);
+  // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
+  // parameters corresponding to captured variables. These parameters do not
+  // appear in the type of `origFnType`.
+  // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
+  // take `CaptureInfo` into account.
+  if (origSilFnType->getNumParameters() > silParamIndices->getCapacity())
+    silParamIndices = silParamIndices->extendingCapacity(
+        getASTContext(), origSilFnType->getNumParameters());
+
+  // Get or create new SIL differentiability witness.
+  // Witness already exists when there are two `@derivative` attributes
+  // (registering JVP and VJP functions) for the same derivative function
+  // configuration.
+  // Witness JVP and VJP are set below.
+  AutoDiffConfig silConfig(silParamIndices, config.resultIndices,
+                           config.derivativeGenericSignature);
+  SILDifferentiabilityWitnessKey key{originalFunction->getName(), silConfig};
+  auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
+  if (!diffWitness) {
+    // Strip external from linkage of original function.
+    // Necessary for Clang-imported functions, which have external linkage.
+    auto linkage = stripExternalFromLinkage(originalFunction->getLinkage());
+    diffWitness = SILDifferentiabilityWitness::createDefinition(
+        M, linkage, originalFunction, silConfig.parameterIndices,
+        silConfig.resultIndices, config.derivativeGenericSignature,
+        /*jvp*/ nullptr, /*vjp*/ nullptr,
+        /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),
+        attr);
+  }
+
+  // Set derivative function in differentiability witness.
+  auto setDerivativeInDifferentiabilityWitness =
+      [&](AutoDiffDerivativeFunctionKind kind, SILFunction *derivative) {
+        auto derivativeThunk = getOrCreateCustomDerivativeThunk(
+            derivative, originalFunction, silConfig, kind);
+        // Check for existing same derivative.
+        // TODO(TF-835): Remove condition below and simplify assertion to
+        // `!diffWitness->getDerivative(kind)` after `@derivative` attribute
+        // type-checking no longer generates implicit `@differentiable`
+        // attributes.
+        auto *existingDerivative = diffWitness->getDerivative(kind);
+        if (existingDerivative && existingDerivative == derivativeThunk)
+          return;
+        assert(!existingDerivative &&
+               "SIL differentiability witness already has a different existing "
+               "derivative");
+        diffWitness->setDerivative(kind, derivativeThunk);
+      };
+  if (jvp)
+    setDerivativeInDifferentiabilityWitness(AutoDiffDerivativeFunctionKind::JVP,
+                                            jvp);
+  if (vjp)
+    setDerivativeInDifferentiabilityWitness(AutoDiffDerivativeFunctionKind::VJP,
+                                            vjp);
 }
 
 void SILGenModule::

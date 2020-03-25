@@ -519,6 +519,10 @@ bool SwiftInterfaceGenContext::isModule() const {
   return Impl.IsModule;
 }
 
+ModuleDecl *SwiftInterfaceGenContext::getModuleDecl() const {
+  return Impl.Mod;
+};
+
 bool SwiftInterfaceGenContext::matches(StringRef ModuleName,
                                        const swift::CompilerInvocation &Invok) {
   if (!Impl.IsModule)

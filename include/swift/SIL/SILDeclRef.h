@@ -34,6 +34,7 @@ namespace swift {
   enum class EffectsKind : uint8_t;
   class AbstractFunctionDecl;
   class AbstractClosureExpr;
+  class AutoDiffDerivativeFunctionIdentifier;
   class ValueDecl;
   class FuncDecl;
   class ClosureExpr;
@@ -147,14 +148,19 @@ struct SILDeclRef {
   unsigned isForeign : 1;
   /// The default argument index for a default argument getter.
   unsigned defaultArgIndex : 10;
-  
+  /// The derivative function identifier.
+  AutoDiffDerivativeFunctionIdentifier *derivativeFunctionIdentifier = nullptr;
+
   /// Produces a null SILDeclRef.
-  SILDeclRef() : loc(), kind(Kind::Func), isForeign(0), defaultArgIndex(0) {}
-  
+  SILDeclRef()
+      : loc(), kind(Kind::Func), isForeign(0), defaultArgIndex(0),
+        derivativeFunctionIdentifier(nullptr) {}
+
   /// Produces a SILDeclRef of the given kind for the given decl.
-  explicit SILDeclRef(ValueDecl *decl, Kind kind,
-                      bool isForeign = false);
-  
+  explicit SILDeclRef(
+      ValueDecl *decl, Kind kind, bool isForeign = false,
+      AutoDiffDerivativeFunctionIdentifier *derivativeId = nullptr);
+
   /// Produces a SILDeclRef for the given ValueDecl or
   /// AbstractClosureExpr:
   /// - If 'loc' is a func or closure, this returns a Func SILDeclRef.
@@ -166,8 +172,7 @@ struct SILDeclRef {
   ///   for the containing ClassDecl.
   /// - If 'loc' is a global VarDecl, this returns its GlobalAccessor
   ///   SILDeclRef.
-  explicit SILDeclRef(Loc loc,
-                      bool isForeign = false);
+  explicit SILDeclRef(Loc loc, bool isForeign = false);
 
   /// Produce a SIL constant for a default argument generator.
   static SILDeclRef getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);
@@ -279,10 +284,10 @@ struct SILDeclRef {
   }
 
   bool operator==(SILDeclRef rhs) const {
-    return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
-      && kind == rhs.kind
-      && isForeign == rhs.isForeign
-      && defaultArgIndex == rhs.defaultArgIndex;
+    return loc.getOpaqueValue() == rhs.loc.getOpaqueValue() &&
+           kind == rhs.kind && isForeign == rhs.isForeign &&
+           defaultArgIndex == rhs.defaultArgIndex &&
+           derivativeFunctionIdentifier == rhs.derivativeFunctionIdentifier;
   }
   bool operator!=(SILDeclRef rhs) const {
     return !(*this == rhs);
@@ -296,8 +301,34 @@ struct SILDeclRef {
   /// Returns the foreign (or native) entry point corresponding to the same
   /// decl.
   SILDeclRef asForeign(bool foreign = true) const {
-    return SILDeclRef(loc.getOpaqueValue(), kind,
-                      foreign, defaultArgIndex);
+    return SILDeclRef(loc.getOpaqueValue(), kind, foreign, defaultArgIndex,
+                      derivativeFunctionIdentifier);
+  }
+
+  /// Returns the entry point for the corresponding autodiff derivative
+  /// function.
+  SILDeclRef asAutoDiffDerivativeFunction(
+      AutoDiffDerivativeFunctionIdentifier *derivativeId) const {
+    assert(!derivativeFunctionIdentifier);
+    SILDeclRef declRef = *this;
+    declRef.derivativeFunctionIdentifier = derivativeId;
+    return declRef;
+  }
+
+  /// Returns the entry point for the original function corresponding to an
+  /// autodiff derivative function.
+  SILDeclRef asAutoDiffOriginalFunction() const {
+    assert(derivativeFunctionIdentifier);
+    SILDeclRef declRef = *this;
+    declRef.derivativeFunctionIdentifier = nullptr;
+    return declRef;
+  }
+
+  /// Returns this `SILDeclRef` replacing `loc` with `decl`.
+  SILDeclRef withDecl(ValueDecl *decl) const {
+    SILDeclRef result = *this;
+    result.loc = decl;
+    return result;
   }
 
   /// True if the decl ref references a thunk from a natively foreign
@@ -369,14 +400,12 @@ struct SILDeclRef {
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
   /// Produces a SILDeclRef from an opaque value.
-  explicit SILDeclRef(void *opaqueLoc,
-                      Kind kind,
-                      bool isForeign,
-                      unsigned defaultArgIndex)
-    : loc(Loc::getFromOpaqueValue(opaqueLoc)), kind(kind),
-      isForeign(isForeign), defaultArgIndex(defaultArgIndex)
-  {}
-
+  explicit SILDeclRef(void *opaqueLoc, Kind kind, bool isForeign,
+                      unsigned defaultArgIndex,
+                      AutoDiffDerivativeFunctionIdentifier *derivativeId)
+      : loc(Loc::getFromOpaqueValue(opaqueLoc)), kind(kind),
+        isForeign(isForeign), defaultArgIndex(defaultArgIndex),
+        derivativeFunctionIdentifier(derivativeId) {}
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILDeclRef C) {
@@ -397,12 +426,12 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
   using UnsignedInfo = DenseMapInfo<unsigned>;
 
   static SILDeclRef getEmptyKey() {
-    return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func,
-                      false, 0);
+    return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, false, 0,
+                      nullptr);
   }
   static SILDeclRef getTombstoneKey() {
-    return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func,
-                      false, 0);
+    return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func, false, 0,
+                      nullptr);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
@@ -411,7 +440,8 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
                     ? UnsignedInfo::getHashValue(Val.defaultArgIndex)
                     : 0;
     unsigned h4 = UnsignedInfo::getHashValue(Val.isForeign);
-    return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7);
+    unsigned h5 = PointerInfo::getHashValue(Val.derivativeFunctionIdentifier);
+    return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11);
   }
   static bool isEqual(swift::SILDeclRef const &LHS,
                       swift::SILDeclRef const &RHS) {

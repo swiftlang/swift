@@ -455,6 +455,13 @@ void swift::findClosuresForFunctionValue(
         worklistInsert(SVI->getOperand(0));
         continue;
       }
+      // Look through `differentiable_function` operands, which are all
+      // function-typed.
+      if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(I)) {
+        for (auto &fn : DFI->getAllOperands())
+          worklistInsert(fn.get());
+        continue;
+      }
     }
     // Look through Optionals.
     if (V->getType().getOptionalObjectType()) {

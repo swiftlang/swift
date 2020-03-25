@@ -1341,6 +1341,7 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 
 ///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
 ///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)?
+///                      ('.' sil-decl-autodiff)?
 ///  sil-decl-subref ::= '!' sil-decl-lang
 ///  sil-decl-subref-part ::= 'getter'
 ///  sil-decl-subref-part ::= 'setter'
@@ -1350,27 +1351,33 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 ///  sil-decl-subref-part ::= 'destroyer'
 ///  sil-decl-subref-part ::= 'globalaccessor'
 ///  sil-decl-lang ::= 'foreign'
+///  sil-decl-autodiff ::= sil-decl-autodiff-kind '.' sil-decl-autodiff-indices
+///  sil-decl-autodiff-kind ::= 'jvp'
+///  sil-decl-autodiff-kind ::= 'vjp'
+///  sil-decl-autodiff-indices ::= [SU]+
 bool SILParser::parseSILDeclRef(SILDeclRef &Result,
                                 SmallVectorImpl<ValueDecl *> &values) {
   ValueDecl *VD;
   if (parseSILDottedPath(VD, values))
     return true;
 
-  // Initialize Kind and IsObjC.
+  // Initialize SILDeclRef components.
   SILDeclRef::Kind Kind = SILDeclRef::Kind::Func;
   bool IsObjC = false;
+  AutoDiffDerivativeFunctionIdentifier *DerivativeId = nullptr;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
-    Result = SILDeclRef(VD, Kind, IsObjC);
+    Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
     return false;
   }
 
-  // Handle sil-constant-kind-and-uncurry-level.
-  // ParseState indicates the value we just handled.
-  // 1 means we just handled Kind.
-  // We accept func|getter|setter|...|foreign when ParseState is 0;
-  // accept foreign when ParseState is 1.
+  // Handle SILDeclRef components. ParseState tracks the last parsed component.
+  //
+  // When ParseState is 0, accept kind (`func|getter|setter|...`) and set
+  // ParseState to 1.
+  //
+  // Always accept `foreign` and derivative function identifier.
   unsigned ParseState = 0;
   Identifier Id;
   do {
@@ -1439,15 +1446,47 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (Id.str() == "foreign") {
         IsObjC = true;
         break;
-      } else
+      } else if (Id.str() == "jvp" || Id.str() == "vjp") {
+        IndexSubset *parameterIndices = nullptr;
+        GenericSignature derivativeGenSig;
+        // Parse derivative function kind.
+        AutoDiffDerivativeFunctionKind derivativeKind(Id.str());
+        if (!P.consumeIf(tok::period)) {
+          P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ".");
+          return true;
+        }
+        // Parse parameter indices.
+        parameterIndices =
+            IndexSubset::getFromString(SILMod.getASTContext(), P.Tok.getText());
+        if (!parameterIndices) {
+          P.diagnose(P.Tok, diag::invalid_index_subset);
+          return true;
+        }
+        P.consumeToken();
+        // Parse derivative generic signature (optional).
+        if (P.Tok.is(tok::oper_binary_unspaced) && P.Tok.getText() == ".<") {
+          P.consumeStartingCharacterOfCurrentToken(tok::period);
+          // Create a new scope to avoid type redefinition errors.
+          Scope genericsScope(&P, ScopeKind::Generics);
+          auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
+          assert(genericParams);
+          auto *derivativeGenEnv = handleSILGenericParams(genericParams, &P.SF);
+          derivativeGenSig = derivativeGenEnv->getGenericSignature();
+        }
+        DerivativeId = AutoDiffDerivativeFunctionIdentifier::get(
+            derivativeKind, parameterIndices, derivativeGenSig,
+            SILMod.getASTContext());
         break;
+      } else {
+        break;
+      }
     } else
       break;
 
   } while (P.consumeIf(tok::period));
 
   // Construct SILDeclRef.
-  Result = SILDeclRef(VD, Kind, IsObjC);
+  Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
   return false;
 }
 
@@ -4981,6 +5020,88 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
       ResultVal = B.createInitBlockStorageHeader(InstLoc, Val, invokeVal,
                                                  blockType, subMap);
+      break;
+    }
+    case SILInstructionKind::DifferentiableFunctionInst: {
+      // e.g. differentiable_function [parameters 0 1 2] %0 : $T
+      //
+      // e.g. differentiable_function [parameters 0 1 2] %0 : $T with_derivative
+      //      {%1 : $T, %2 : $T}
+      //       ^~ jvp   ^~ vjp
+      // Parse `[parameters <integer_literal>...]`.
+      SmallVector<unsigned, 8> parameterIndices;
+      if (parseIndexList(P, "parameters", parameterIndices,
+                         diag::sil_autodiff_expected_parameter_index))
+        return true;
+      // Parse the original function value.
+      SILValue original;
+      SourceLoc originalOperandLoc;
+      if (parseTypedValueRef(original, originalOperandLoc, B))
+        return true;
+      auto fnType = original->getType().getAs<SILFunctionType>();
+      if (!fnType) {
+        P.diagnose(originalOperandLoc,
+                   diag::sil_inst_autodiff_expected_function_type_operand);
+        return true;
+      }
+      Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
+      // Parse an optional operand list
+      //   `with_derivative { <operand> , <operand> }`.
+      if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_derivative") {
+        P.consumeToken(tok::identifier);
+        // Parse derivative function values as an operand list.
+        // FIXME(rxwei): Change this to *not* require a type signature once
+        // we can infer derivative function types.
+        derivativeFunctions = std::make_pair(SILValue(), SILValue());
+        if (P.parseToken(
+                tok::l_brace,
+                diag::sil_inst_autodiff_operand_list_expected_lbrace) ||
+            parseTypedValueRef(derivativeFunctions->first, B) ||
+            P.parseToken(tok::comma,
+                         diag::sil_inst_autodiff_operand_list_expected_comma) ||
+            parseTypedValueRef(derivativeFunctions->second, B) ||
+            P.parseToken(tok::r_brace,
+                         diag::sil_inst_autodiff_operand_list_expected_rbrace))
+          return true;
+      }
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      auto *parameterIndicesSubset = IndexSubset::get(
+          P.Context, fnType->getNumParameters(), parameterIndices);
+      ResultVal = B.createDifferentiableFunction(
+          InstLoc, parameterIndicesSubset, original, derivativeFunctions);
+      break;
+    }
+    case SILInstructionKind::DifferentiableFunctionExtractInst: {
+      // Parse the rest of the instruction: an extractee, a differentiable
+      // function operand, an optional explicit extractee type, and a debug
+      // location.
+      NormalDifferentiableFunctionTypeComponent extractee;
+      StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
+      SILValue functionOperand;
+      SourceLoc lastLoc;
+      if (P.parseToken(
+              tok::l_square,
+              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
+          parseSILIdentifierSwitch(
+              extractee, extracteeNames,
+              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
+          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "extractee kind"))
+        return true;
+      if (parseTypedValueRef(functionOperand, B))
+        return true;
+      // Parse an optional explicit extractee type.
+      Optional<SILType> extracteeType = None;
+      if (P.consumeIf(tok::kw_as)) {
+        extracteeType = SILType();
+        if (parseSILType(*extracteeType))
+          return true;
+      }
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createDifferentiableFunctionExtract(
+          InstLoc, extractee, functionOperand, extracteeType);
       break;
     }
     case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {

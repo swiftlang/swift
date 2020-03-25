@@ -557,3 +557,32 @@ class MoreGenericSub2<TT, T> : GenericBase<T> {
 // CHECK-NEXT:   #GenericBase.init!allocator: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$s27vtable_thunks_reabstraction15MoreGenericSub2C1t1uACyxq_Gq__qd__tclufC [override]
 // CHECK-NEXT:   #MoreGenericSub2.deinit!deallocator: @$s27vtable_thunks_reabstraction15MoreGenericSub2CfD     // MoreGenericSub2.__deallocating_deinit
 // CHECK-NEXT: }
+
+protocol SE_0267_P1 {}
+
+class SE_0267_Base1<T> {
+  func foo() where T: SE_0267_P1 {}
+}
+class SE_0267_Derived1<T>: SE_0267_Base1<T> {
+  override func foo() {}
+}
+
+// CHECK-LABEL: sil_vtable SE_0267_Derived1 {
+// CHECK-NEXT:   #SE_0267_Base1.foo: <T where T : SE_0267_P1> (SE_0267_Base1<T>) -> () -> () : @$s27vtable_thunks_reabstraction16SE_0267_Derived1C3fooyyFAA0D11_0267_Base1CADyyAA0D8_0267_P1RzlFTV [override]
+// CHECK-NEXT:   #SE_0267_Base1.init
+// CHECK-NEXT:   #SE_0267_Derived1.foo: <T> (SE_0267_Derived1<T>) -> () -> () : @$s27vtable_thunks_reabstraction16SE_0267_Derived1C3fooyyF
+// CHECK-NEXT:   #SE_0267_Derived1.deinit
+// CHECK-NEXT:   }
+
+class SE_0267_Base2<T> {
+  func foo() -> T where T: FixedWidthInteger { fatalError() }
+}
+class SE_0267_Derived2: SE_0267_Base2<Int> {
+  override func foo() -> Int { return .zero }
+}
+
+// CHECK-LABEL: sil_vtable SE_0267_Derived2 {
+// CHECK-NEXT:   #SE_0267_Base2.foo: <T where T : FixedWidthInteger> (SE_0267_Base2<T>) -> () -> T : @$s27vtable_thunks_reabstraction16SE_0267_Derived2C3fooSiyFAA0D11_0267_Base2CADxys17FixedWidthIntegerRzlFTV [override]
+// CHECK-NEXT:   #SE_0267_Base2.init
+// CHECK-NEXT:   #SE_0267_Derived2.deinit
+// CHECK-NEXT:   }

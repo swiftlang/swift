@@ -1575,7 +1575,7 @@ NOTE(unstable_mangled_name_add_objc,none,
      "for compatibility with existing archives, use '@objc' "
      "to record the Swift 3 runtime name", ())
 
-// Generic types
+// Generic declarations
 ERROR(unsupported_type_nested_in_generic_function,none,
       "type %0 cannot be nested in generic function %1",
       (Identifier, DeclName))
@@ -1591,6 +1591,12 @@ ERROR(unsupported_type_nested_in_protocol_extension,none,
 ERROR(unsupported_nested_protocol,none,
       "protocol %0 cannot be nested inside another declaration",
       (Identifier))
+ERROR(where_nongeneric_ctx,none,
+      "'where' clause on non-generic member declaration requires a "
+      "generic context", ())
+ERROR(where_nongeneric_toplevel,none,
+      "'where' clause cannot be applied to a non-generic top-level "
+      "declaration", ())
 
 // Type aliases
 ERROR(type_alias_underlying_type_access,none,
@@ -2668,6 +2674,8 @@ ERROR(cannot_synthesize_in_crossfile_extension,none,
       "implementation of %0 cannot be automatically synthesized in an extension "
       "in a different file to the type", (Type))
 
+ERROR(broken_additive_arithmetic_requirement,none,
+      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
 ERROR(broken_case_iterable_requirement,none,
       "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,
@@ -2754,10 +2762,6 @@ ERROR(dynamic_self_stored_property_init,none,
       "covariant 'Self' type cannot be referenced from a stored property initializer", ())
 ERROR(dynamic_self_default_arg,none,
       "covariant 'Self' type cannot be referenced from a default argument expression", ())
-
-ERROR(where_nongeneric_ctx,none,
-      "'where' clause on non-generic member declaration requires a "
-      "generic context", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
@@ -2912,6 +2916,8 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
       "attribute for transpose registration instead", ())
+ERROR(differentiable_attr_void_result,none,
+      "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclNameRef, Type))
 // TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
@@ -2936,12 +2942,6 @@ ERROR(differentiable_attr_result_not_differentiable,none,
 ERROR(differentiable_attr_protocol_req_where_clause,none,
       "'@differentiable' attribute on protocol requirement cannot specify "
       "'where' clause", ())
-ERROR(differentiable_attr_protocol_req_assoc_func,none,
-      "'@differentiable' attribute on protocol requirement cannot specify "
-      "'jvp:' or 'vjp:'", ())
-ERROR(differentiable_attr_stored_property_variable_unsupported,none,
-      "'@differentiable' attribute on stored property cannot specify "
-      "'jvp:' or 'vjp:'", ())
 ERROR(differentiable_attr_class_member_dynamic_self_result_unsupported,none,
       "'@differentiable' attribute cannot be declared on class members "
       "returning 'Self'", ())
@@ -2960,6 +2960,12 @@ ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
+NOTE(protocol_witness_missing_differentiable_attr_nonpublic_other_file,none,
+     "non-public %1 %2 must have explicit '%0' attribute to satisfy "
+     "requirement %3 %4 (in protocol %6) because it is declared in a different "
+     "file than the conformance of %5 to %6",
+     (StringRef, DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName,
+      Type, Type))
 
 // @derivative
 ERROR(derivative_attr_expected_result_tuple,none,

@@ -153,6 +153,25 @@ public:
                                              Type SelfType,
                                              ModuleDecl *Module);
 
+  /// Mangle the derivative function (JVP/VJP) for the given:
+  /// - Mangled original function name.
+  /// - Derivative function kind.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string
+  mangleAutoDiffDerivativeFunctionHelper(StringRef name,
+                                         AutoDiffDerivativeFunctionKind kind,
+                                         AutoDiffConfig config);
+
+  /// Mangle the linear map (differential/pullback) for the given:
+  /// - Mangled original function name.
+  /// - Linear map kind.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string mangleAutoDiffLinearMapHelper(StringRef name,
+                                            AutoDiffLinearMapKind kind,
+                                            AutoDiffConfig config);
+
   /// Mangle a SIL differentiability witness key:
   /// - Mangled original function name.
   /// - Parameter indices.
@@ -351,6 +370,9 @@ protected:
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
   void appendProtocolConformanceRef(const RootProtocolConformance *conformance);
+  void appendAnyProtocolConformance(CanGenericSignature genericSig,
+                                    CanType conformingType,
+                                    ProtocolConformanceRef conformance);
   void appendConcreteProtocolConformance(
                                         const ProtocolConformance *conformance);
   void appendDependentProtocolConformance(const ConformanceAccessPath &path);

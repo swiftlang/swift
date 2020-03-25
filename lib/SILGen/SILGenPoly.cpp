@@ -82,9 +82,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Initialization.h"
+#include "LValue.h"
+#include "RValue.h"
 #include "SILGen.h"
 #include "SILGenFunction.h"
+#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -95,9 +100,6 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
-#include "Initialization.h"
-#include "LValue.h"
-#include "RValue.h"
 #include "llvm/Support/Compiler.h"
 
 using namespace swift;
@@ -1619,6 +1621,10 @@ static ManagedValue applyTrivialConversions(SILGenFunction &SGF,
                                             SILType outerType) {
   auto innerASTTy = innerValue.getType().getASTType();
   auto outerASTTy = outerType.getASTType();
+  if (innerASTTy->hasArchetype())
+    innerASTTy = innerASTTy->mapTypeOutOfContext()->getCanonicalType();
+  if (outerASTTy->hasArchetype())
+    outerASTTy = outerASTTy->mapTypeOutOfContext()->getCanonicalType();
 
   if (innerASTTy == outerASTTy) {
     return innerValue;
@@ -3475,6 +3481,501 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   return thunkedFn;
 }
 
+/// Given a value, extracts all elements to `result` from this value if it's a
+/// tuple. Otherwise, add this value directly to `result`.
+static void extractAllElements(SILValue val, SILLocation loc,
+                               SILBuilder &builder,
+                               SmallVectorImpl<SILValue> &result) {
+  auto &fn = builder.getFunction();
+  auto tupleType = val->getType().getAs<TupleType>();
+  if (!tupleType) {
+    result.push_back(val);
+    return;
+  }
+  if (!fn.hasOwnership()) {
+    for (auto i : range(tupleType->getNumElements()))
+      result.push_back(builder.createTupleExtract(loc, val, i));
+    return;
+  }
+  if (tupleType->getNumElements() == 0)
+    return;
+  builder.emitDestructureValueOperation(loc, val, result);
+}
+
+/// Given a range of elements, joins these into a single value. If there's
+/// exactly one element, returns that element. Otherwise, creates a tuple using
+/// a `tuple` instruction.
+static SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
+                             SILLocation loc) {
+  if (elements.size() == 1)
+    return elements.front();
+  return builder.createTuple(loc, elements);
+}
+
+/// Adapted from `SILGenModule::getOrCreateReabstractionThunk`.
+ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
+    ManagedValue linearMap, AutoDiffLinearMapKind linearMapKind,
+    CanSILFunctionType fromType, CanSILFunctionType toType, bool reorderSelf) {
+  // Compute the thunk type.
+  SubstitutionMap interfaceSubs;
+  GenericEnvironment *genericEnv = nullptr;
+  // Ignore subst types.
+  CanType inputSubstType, outputSubstType;
+  CanType dynamicSelfType;
+  fromType = fromType->getUnsubstitutedType(getModule());
+  toType = toType->getUnsubstitutedType(getModule());
+  auto thunkType =
+      buildThunkType(fromType, toType, inputSubstType, outputSubstType,
+                     genericEnv, interfaceSubs, dynamicSelfType);
+  assert(!dynamicSelfType && "Dynamic self type not handled");
+  auto thunkDeclType =
+      thunkType->getWithExtInfo(thunkType->getExtInfo().withNoEscape(false));
+
+  // Get the thunk name.
+  auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
+  auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
+  Mangle::ASTMangler mangler;
+  std::string name = mangler.mangleReabstractionThunkHelper(
+      thunkType, fromInterfaceType, toInterfaceType, Type(),
+      getModule().getSwiftModule());
+  // TODO(TF-685): Use principled thunk mangling.
+  switch (linearMapKind) {
+  case AutoDiffLinearMapKind::Differential:
+    name += "_differential";
+    break;
+  case AutoDiffLinearMapKind::Pullback:
+    name += "_pullback";
+    break;
+  }
+  name = "AD__" + name;
+  if (reorderSelf)
+    name += "_self_reordering";
+  name += "_thunk";
+
+  // Create the thunk.
+  auto loc = F.getLocation();
+  SILGenFunctionBuilder fb(SGM);
+  auto *thunk = fb.getOrCreateSharedFunction(
+      loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
+
+  // Partially-apply the thunk to `linearMap` and return the thunked value.
+  auto getThunkedResult = [&]() {
+    auto linearMapFnType = linearMap.getType().castTo<SILFunctionType>();
+    auto linearMapUnsubstFnType =
+        linearMapFnType->getUnsubstitutedType(getModule());
+    if (linearMapFnType != linearMapUnsubstFnType) {
+      auto unsubstType =
+          SILType::getPrimitiveObjectType(linearMapUnsubstFnType);
+      linearMap = B.createConvertFunction(loc, linearMap, unsubstType,
+                                          /*withoutActuallyEscaping*/ false);
+    }
+    auto thunkedFn = createPartialApplyOfThunk(
+        *this, loc, thunk, interfaceSubs, dynamicSelfType, toType, linearMap);
+    if (!toType->isNoEscape())
+      return thunkedFn;
+    // Handle escaping to noescape conversion.
+    return B.createConvertEscapeToNoEscape(
+        loc, thunkedFn, SILType::getPrimitiveObjectType(toType));
+  };
+
+  if (!thunk->empty())
+    return getThunkedResult();
+  thunk->setGenericEnvironment(genericEnv);
+
+  SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
+  SmallVector<ManagedValue, 4> params;
+  SmallVector<SILArgument *, 4> thunkIndirectResults;
+  thunkSGF.collectThunkParams(loc, params, &thunkIndirectResults);
+
+  SILFunctionConventions fromConv(fromType, getModule());
+  SILFunctionConventions toConv(toType, getModule());
+  assert(toConv.useLoweredAddresses());
+
+  SmallVector<ManagedValue, 4> thunkArguments;
+  for (auto *indRes : thunkIndirectResults)
+    thunkArguments.push_back(ManagedValue::forLValue(indRes));
+  thunkArguments.append(params.begin(), params.end());
+  SmallVector<SILParameterInfo, 4> toParameters(toConv.getParameters().begin(),
+                                                toConv.getParameters().end());
+  SmallVector<SILResultInfo, 4> toResults(toConv.getResults().begin(),
+                                          toConv.getResults().end());
+  // Handle self reordering.
+  // - For pullbacks: reorder result infos.
+  //   - If self is indirect, reorder indirect results.
+  //   - If self is direct, reorder direct results after `apply` is generated.
+  // - For differentials: reorder parameter infos and arguments.
+  auto numIndirectResults = thunkIndirectResults.size();
+  if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Pullback &&
+      toResults.size() > 1) {
+    auto toSelfResult = toResults.back();
+    if (toSelfResult.isFormalIndirect() && numIndirectResults > 1) {
+      // Before: [ind_res1, ind_res2, ..., ind_res_self, arg1, arg2, ..., pb]
+      //  After: [ind_res_self, ind_res1, ind_res2, ..., arg1, arg2, ..., pb]
+      std::rotate(thunkArguments.begin(),
+                  thunkArguments.begin() + numIndirectResults - 1,
+                  thunkArguments.begin() + numIndirectResults);
+      // Before: [ind_res1, ind_res2, ..., ind_res_self]
+      //  After: [ind_res_self, ind_res1, ind_res2, ...]
+      std::rotate(thunkIndirectResults.begin(), thunkIndirectResults.end() - 1,
+                  thunkIndirectResults.end());
+    }
+    std::rotate(toResults.begin(), toResults.end() - 1, toResults.end());
+  }
+  if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Differential &&
+      thunkArguments.size() > 1) {
+    // Before: [ind_res1, ind_res2, ..., arg1, arg2, ..., arg_self, df]
+    //  After: [ind_res1, ind_res2, ..., arg_self, arg1, arg2, ..., df]
+    std::rotate(thunkArguments.begin() + numIndirectResults,
+                thunkArguments.end() - 2, thunkArguments.end() - 1);
+    // Before: [arg1, arg2, ..., arg_self]
+    //  After: [arg_self, arg1, arg2, ...]
+    std::rotate(toParameters.begin(), toParameters.end() - 1,
+                toParameters.end());
+  }
+
+  // Correctness assertions.
+#ifndef NDEBUG
+  assert(toType->getNumParameters() == fromType->getNumParameters());
+  for (unsigned paramIdx : range(toType->getNumParameters())) {
+    auto fromParam = fromConv.getParameters()[paramIdx];
+    auto toParam = toParameters[paramIdx];
+    assert(fromParam.getInterfaceType() == toParam.getInterfaceType());
+  }
+  assert(fromType->getNumResults() == toType->getNumResults());
+  for (unsigned resIdx : range(toType->getNumResults())) {
+    auto fromRes = fromConv.getResults()[resIdx];
+    auto toRes = toResults[resIdx];
+    assert(fromRes.getInterfaceType() == toRes.getInterfaceType());
+  }
+#endif // NDEBUG
+
+  // Gather arguments.
+  SmallVector<SILValue, 4> arguments;
+  auto toArgIter = thunkArguments.begin();
+  auto useNextArgument = [&]() {
+    auto nextArgument = *toArgIter++;
+    arguments.push_back(nextArgument.getValue());
+  };
+
+  SmallVector<AllocStackInst *, 4> localAllocations;
+  auto createAllocStack = [&](SILType type) {
+    auto *alloc = thunkSGF.B.createAllocStack(loc, type);
+    localAllocations.push_back(alloc);
+    return alloc;
+  };
+
+  // Handle indirect results.
+  for (unsigned resIdx : range(toType->getNumResults())) {
+    auto fromRes = fromConv.getResults()[resIdx];
+    auto toRes = toResults[resIdx];
+    // No abstraction mismatch.
+    if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
+      // If result types are indirect, directly pass as next argument.
+      if (toRes.isFormalIndirect())
+        useNextArgument();
+      continue;
+    }
+    // Convert indirect result to direct result.
+    if (fromRes.isFormalIndirect()) {
+      SILType resultTy = fromConv.getSILType(fromRes);
+      assert(resultTy.isAddress());
+      auto *indRes = createAllocStack(resultTy);
+      arguments.push_back(indRes);
+      continue;
+    }
+    // Convert direct result to indirect result.
+    // Increment thunk argument iterator; reabstraction handled later.
+    toArgIter++;
+  }
+
+  // Reabstract parameters.
+  for (unsigned paramIdx : range(toType->getNumParameters())) {
+    auto fromParam = fromConv.getParameters()[paramIdx];
+    auto toParam = toParameters[paramIdx];
+    // No abstraction mismatch. Directly use next argument.
+    if (fromParam.isFormalIndirect() == toParam.isFormalIndirect()) {
+      useNextArgument();
+      continue;
+    }
+    // Convert indirect parameter to direct parameter.
+    if (fromParam.isFormalIndirect()) {
+      auto paramTy = fromConv.getSILType(fromType->getParameters()[paramIdx]);
+      if (!paramTy.hasArchetype())
+        paramTy = thunk->mapTypeIntoContext(paramTy);
+      assert(paramTy.isAddress());
+      auto toArg = (*toArgIter++).getValue();
+      auto *buf = createAllocStack(toArg->getType());
+      thunkSGF.B.createStore(loc, toArg, buf, StoreOwnershipQualifier::Init);
+      arguments.push_back(buf);
+      continue;
+    }
+    // Convert direct parameter to indirect parameter.
+    assert(toParam.isFormalIndirect());
+    auto toArg = (*toArgIter++).getValue();
+    auto load = thunkSGF.emitManagedLoadBorrow(loc, toArg);
+    arguments.push_back(load.getValue());
+  }
+
+  auto *linearMapArg = thunk->getArgumentsWithoutIndirectResults().back();
+  auto *apply = thunkSGF.B.createApply(loc, linearMapArg, SubstitutionMap(),
+                                       arguments, /*isNonThrowing*/ false);
+
+  // Get return elements.
+  SmallVector<SILValue, 4> results;
+  // Extract all direct results.
+  SmallVector<SILValue, 4> directResults;
+  extractAllElements(apply, loc, thunkSGF.B, directResults);
+
+  // Handle self reordering.
+  // For pullbacks: rotate direct results if self is direct.
+  if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Pullback) {
+    auto fromSelfResult = fromConv.getResults().front();
+    auto toSelfResult = toConv.getResults().back();
+    assert(fromSelfResult.getInterfaceType() ==
+           toSelfResult.getInterfaceType());
+    // Before: [dir_res_self, dir_res1, dir_res2, ...]
+    //  After: [dir_res1, dir_res2, ..., dir_res_self]
+    if (toSelfResult.isFormalDirect() && fromSelfResult.isFormalDirect() &&
+        directResults.size() > 1) {
+      std::rotate(directResults.begin(), directResults.begin() + 1,
+                  directResults.end());
+    }
+  }
+
+  auto fromDirResultsIter = directResults.begin();
+  auto fromIndResultsIter = apply->getIndirectSILResults().begin();
+  auto toIndResultsIter = thunkIndirectResults.begin();
+  // Reabstract results.
+  for (unsigned resIdx : range(toType->getNumResults())) {
+    auto fromRes = fromConv.getResults()[resIdx];
+    auto toRes = toResults[resIdx];
+    // No abstraction mismatch.
+    if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
+      // If result types are direct, add call result as direct thunk result.
+      if (toRes.isFormalDirect())
+        results.push_back(*fromDirResultsIter++);
+      // If result types are indirect, increment indirect result iterators.
+      else {
+        ++fromIndResultsIter;
+        ++toIndResultsIter;
+      }
+      continue;
+    }
+    // Load direct results from indirect results.
+    if (fromRes.isFormalIndirect()) {
+      auto indRes = *fromIndResultsIter++;
+      auto *load = thunkSGF.B.createLoad(loc, indRes,
+                                         LoadOwnershipQualifier::Unqualified);
+      results.push_back(load);
+      continue;
+    }
+    // Store direct results to indirect results.
+    assert(toRes.isFormalIndirect());
+    SILType resultTy = toConv.getSILType(toRes);
+    assert(resultTy.isAddress());
+    auto indRes = *toIndResultsIter++;
+    thunkSGF.emitSemanticStore(loc, *fromDirResultsIter++, indRes,
+                               thunkSGF.getTypeLowering(resultTy),
+                               IsInitialization);
+  }
+  auto retVal = joinElements(results, thunkSGF.B, loc);
+
+  // Emit cleanups.
+  thunkSGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc),
+                                          NotForUnwind);
+
+  // Deallocate local allocations.
+  for (auto *alloc : llvm::reverse(localAllocations))
+    thunkSGF.B.createDeallocStack(loc, alloc);
+
+  // Create return.
+  thunkSGF.B.createReturn(loc, retVal);
+  return getThunkedResult();
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
+    SILFunction *customDerivativeFn, SILFunction *originalFn,
+    const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind) {
+  auto indices = config.getSILAutoDiffIndices();
+
+  auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
+  auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature()
+                              ? customDerivativeFnTy->getSubstGenericSignature()
+                                    ->getGenericEnvironment()
+                              : nullptr;
+
+  auto origFnTy = originalFn->getLoweredFunctionType();
+  CanGenericSignature derivativeCanGenSig;
+  if (auto derivativeGenSig = config.derivativeGenericSignature)
+    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+  auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
+      indices.parameters, indices.source, kind, Types,
+      LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
+  assert(!thunkFnTy->getExtInfo().hasContext());
+
+  // TODO(TF-685): Use principled thunk mangling.
+  // Do not simply reuse reabstraction thunk mangling.
+  Mangle::ASTMangler mangler;
+  auto name = getASTContext()
+                  .getIdentifier(mangler.mangleAutoDiffDerivativeFunctionHelper(
+                      originalFn->getName(), kind, config))
+                  .str();
+
+  auto loc = customDerivativeFn->getLocation();
+  SILGenFunctionBuilder fb(*this);
+  // This thunk is publicly exposed and cannot be transparent.
+  // Instead, mark it as "always inline" for optimization.
+  auto *thunk = fb.getOrCreateFunction(
+      loc, name, customDerivativeFn->getLinkage(), thunkFnTy, IsBare,
+      IsNotTransparent, customDerivativeFn->isSerialized(),
+      customDerivativeFn->isDynamicallyReplaceable(),
+      customDerivativeFn->getEntryCount(), IsThunk,
+      customDerivativeFn->getClassSubclassScope());
+  thunk->setInlineStrategy(AlwaysInline);
+  if (!thunk->empty())
+    return thunk;
+  thunk->setGenericEnvironment(thunkGenericEnv);
+
+  SILGenFunction thunkSGF(*this, *thunk, customDerivativeFn->getDeclContext());
+  SmallVector<ManagedValue, 4> params;
+  SmallVector<SILArgument *, 4> indirectResults;
+  thunkSGF.collectThunkParams(loc, params, &indirectResults);
+
+  auto *fnRef = thunkSGF.B.createFunctionRef(loc, customDerivativeFn);
+  auto fnRefType =
+      thunkSGF.F.mapTypeIntoContext(fnRef->getType().mapTypeOutOfContext())
+          .castTo<SILFunctionType>()
+          ->getUnsubstitutedType(M);
+
+  // Special support for thunking class initializer derivatives.
+  //
+  // User-defined custom derivatives take a metatype as the last parameter:
+  // - `$(Param0, Param1, ..., @thick Class.Type) -> (...)`
+  // But class initializers take an allocated instance as the last parameter:
+  // - `$(Param0, Param1, ..., @owned Class) -> (...)`
+  //
+  // Adjust forwarded arguments:
+  // - Pop the last `@owned Class` argument.
+  // - Create a `@thick Class.Type` value and pass it as the last argument.
+  auto *origAFD =
+      cast<AbstractFunctionDecl>(originalFn->getDeclContext()->getAsDecl());
+  bool isClassInitializer =
+      isa<ConstructorDecl>(origAFD) &&
+      origAFD->getDeclContext()->getSelfClassDecl() &&
+      SILDeclRef(origAFD, SILDeclRef::Kind::Initializer).mangle() ==
+          originalFn->getName();
+  if (isClassInitializer) {
+    params.pop_back();
+    auto *classDecl = thunkFnTy->getParameters()
+                          .back()
+                          .getInterfaceType()
+                          ->getClassOrBoundGenericClass();
+    assert(classDecl && "Expected last argument to have class type");
+    auto classMetatype = MetatypeType::get(
+        classDecl->getDeclaredInterfaceType(), MetatypeRepresentation::Thick);
+    auto canClassMetatype = classMetatype->getCanonicalType();
+    auto *metatype = thunkSGF.B.createMetatype(
+        loc, SILType::getPrimitiveObjectType(canClassMetatype));
+    params.push_back(ManagedValue::forUnmanaged(metatype));
+  }
+
+  // Collect thunk arguments, converting ownership.
+  SmallVector<SILValue, 8> arguments;
+  for (auto *indRes : indirectResults)
+    arguments.push_back(indRes);
+  forwardFunctionArguments(thunkSGF, loc, fnRefType, params, arguments);
+
+  // Apply function argument.
+  auto apply = thunkSGF.emitApplyWithRethrow(
+      loc, fnRef, /*substFnType*/ fnRef->getType(),
+      thunk->getForwardingSubstitutionMap(), arguments);
+
+  // Self reordering thunk is necessary if wrt at least two parameters,
+  // including self.
+  auto shouldReorderSelf = [&]() {
+    if (!originalFn->hasSelfParam())
+      return false;
+    auto selfParamIndex = origFnTy->getNumParameters() - 1;
+    if (!indices.isWrtParameter(selfParamIndex))
+      return false;
+    return indices.parameters->getNumIndices() > 1;
+  };
+  bool reorderSelf = shouldReorderSelf();
+
+  // If self ordering is not necessary and linear map types are unchanged,
+  // return the `apply` instruction.
+  auto linearMapFnType = cast<SILFunctionType>(
+      thunk
+          ->mapTypeIntoContext(
+              fnRefType->getResults().back().getInterfaceType())
+          ->getCanonicalType());
+  auto targetLinearMapFnType =
+      thunk
+          ->mapTypeIntoContext(
+              thunkFnTy->getResults().back().getSILStorageInterfaceType())
+          .castTo<SILFunctionType>();
+  SILFunctionConventions conv(thunkFnTy, thunkSGF.getModule());
+
+  // Create return instruction in the thunk, first deallocating local
+  // allocations and freeing arguments-to-free.
+  auto createReturn = [&](SILValue retValue) {
+    // Emit cleanups.
+    thunkSGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc),
+                                            NotForUnwind);
+    // Create return.
+    thunkSGF.B.createReturn(loc, retValue);
+  };
+
+  if (!reorderSelf && linearMapFnType == targetLinearMapFnType) {
+    createReturn(apply);
+    return thunk;
+  }
+
+  // Otherwise, apply reabstraction/self reordering thunk to linear map.
+  SmallVector<SILValue, 8> directResults;
+  extractAllElements(apply, loc, thunkSGF.B, directResults);
+  auto linearMap = thunkSGF.emitManagedRValueWithCleanup(directResults.back());
+  assert(linearMap.getType().castTo<SILFunctionType>() == linearMapFnType);
+  auto linearMapKind = kind.getLinearMapKind();
+  linearMap = thunkSGF.getThunkedAutoDiffLinearMap(
+      linearMap, linearMapKind, linearMapFnType, targetLinearMapFnType,
+      reorderSelf);
+
+  SILType linearMapResultType =
+      thunk
+          ->getLoweredType(
+              thunk->mapTypeIntoContext(conv.getSILResultType()).getASTType())
+          .getCategoryType(conv.getSILResultType().getCategory());
+  if (auto tupleType = linearMapResultType.getAs<TupleType>()) {
+    linearMapResultType = SILType::getPrimitiveType(
+        tupleType->getElementTypes().back()->getCanonicalType(),
+        conv.getSILResultType().getCategory());
+  }
+
+  auto targetLinearMapUnsubstFnType =
+      SILType::getPrimitiveObjectType(targetLinearMapFnType);
+  if (linearMap.getType() != targetLinearMapUnsubstFnType) {
+    linearMap = thunkSGF.B.createConvertFunction(
+        loc, linearMap, targetLinearMapUnsubstFnType,
+        /*withoutActuallyEscaping*/ false);
+  }
+
+  // Return original results and thunked differential/pullback.
+  if (directResults.size() > 1) {
+    auto originalDirectResults = ArrayRef<SILValue>(directResults).drop_back(1);
+    auto originalDirectResult =
+        joinElements(originalDirectResults, thunkSGF.B, apply.getLoc());
+    auto thunkResult = joinElements(
+        {originalDirectResult, linearMap.forward(thunkSGF)}, thunkSGF.B, loc);
+    createReturn(thunkResult);
+  } else {
+    createReturn(linearMap.forward(thunkSGF));
+  }
+  return thunk;
+}
+
 ManagedValue Transform::transformFunction(ManagedValue fn,
                                           AbstractionPattern inputOrigType,
                                           CanAnyFunctionType inputSubstType,
@@ -3953,8 +4454,22 @@ getWitnessFunctionRef(SILGenFunction &SGF,
                       SILLocation loc) {
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
+    if (auto *derivativeId = witness.derivativeFunctionIdentifier) {
+      auto originalFn =
+          SGF.emitGlobalFunctionRef(loc, witness.asAutoDiffOriginalFunction());
+      auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+          derivativeId->getParameterIndices(),
+          witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
+      auto diffFn = SGF.B.createDifferentiableFunction(loc, loweredParamIndices,
+                                                       originalFn);
+      return SGF.B.createDifferentiableFunctionExtract(
+          loc,
+          NormalDifferentiableFunctionTypeComponent(derivativeId->getKind()),
+          diffFn);
+    }
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
+    assert(!witness.derivativeFunctionIdentifier);
     return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();
   case WitnessDispatchKind::Witness: {
     auto typeAndConf =

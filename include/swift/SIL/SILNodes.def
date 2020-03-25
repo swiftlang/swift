@@ -692,6 +692,11 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
 
   // Differentiable programming
+  SINGLE_VALUE_INST(DifferentiableFunctionInst, differentiable_function,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(DifferentiableFunctionExtractInst,
+                    differentiable_function_extract,
+                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(DifferentiabilityWitnessFunctionInst,
                     differentiability_witness_function,
                     SingleValueInstruction, None, DoesNotRelease)

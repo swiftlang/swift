@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "LinearLifetimeCheckerPrivate.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILInstruction.h"
@@ -19,7 +19,6 @@
 #include "swift/SIL/SILVisitor.h"
 
 using namespace swift;
-using namespace swift::ownership;
 
 //===----------------------------------------------------------------------===//
 //                      OperandOwnershipKindClassifier
@@ -37,7 +36,7 @@ private:
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
 
   const Operand &op;
-  ErrorBehaviorKind errorBehavior;
+  LinearLifetimeChecker::ErrorBehaviorKind errorBehavior;
   bool checkingSubObject;
 
 public:
@@ -48,9 +47,10 @@ public:
   /// should be the subobject and Value should be the parent object. An example
   /// of where one would want to do this is in the case of value projections
   /// like struct_extract.
-  OperandOwnershipKindClassifier(SILModule &mod, const Operand &op,
-                                 ErrorBehaviorKind errorBehavior,
-                                 bool checkingSubObject)
+  OperandOwnershipKindClassifier(
+      SILModule &mod, const Operand &op,
+      LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
+      bool checkingSubObject)
       : mod(mod), op(op), errorBehavior(errorBehavior),
         checkingSubObject(checkingSubObject) {}
 
@@ -348,6 +348,7 @@ FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 FORWARD_ANY_OWNERSHIP_INST(InitExistentialRef)
+FORWARD_ANY_OWNERSHIP_INST(DifferentiableFunction)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
@@ -366,6 +367,8 @@ FORWARD_ANY_OWNERSHIP_INST(InitExistentialRef)
   }
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, TupleExtract)
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, StructExtract)
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive,
+                                        DifferentiableFunctionExtract)
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
                                         MarkUninitialized)
 #undef CONSTANT_OR_NONE_OWNERSHIP_INST
@@ -1042,8 +1045,9 @@ OperandOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *bi) {
 
 OperandOwnershipKindMap
 Operand::getOwnershipKindMap(bool isForwardingSubValue) const {
-  OperandOwnershipKindClassifier classifier(getUser()->getModule(), *this,
-                                            ErrorBehaviorKind::ReturnFalse,
-                                            isForwardingSubValue);
+  OperandOwnershipKindClassifier classifier(
+      getUser()->getModule(), *this,
+      LinearLifetimeChecker::ErrorBehaviorKind::ReturnFalse,
+      isForwardingSubValue);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }

@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
@@ -129,12 +130,16 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
 static PrecedenceGroupDecl *lookupPrecedenceGroupForOperator(DeclContext *DC,
                                                              Identifier name,
                                                              SourceLoc loc) {
-  SourceFile *SF = DC->getParentSourceFile();
-  bool isCascading = DC->isCascadingContextForLookup(true);
-  if (auto op = SF->lookupInfixOperator(name, isCascading, loc)) {
+  auto desc = OperatorLookupDescriptor::forFile(
+      DC->getParentSourceFile(), name, DC->isCascadingContextForLookup(true),
+      loc);
+  auto &Ctx = DC->getASTContext();
+  if (auto op = evaluateOrDefault(Ctx.evaluator,
+                                  LookupInfixOperatorRequest{desc},
+                                  nullptr)) {
     return op->getPrecedenceGroup();
   } else {
-    DC->getASTContext().Diags.diagnose(loc, diag::unknown_binop);
+    Ctx.Diags.diagnose(loc, diag::unknown_binop);
   }
   return nullptr;
 }

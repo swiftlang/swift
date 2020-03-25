@@ -3080,6 +3080,45 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
     ::getUncachedSILFunctionTypeForConstant(*this, expansion, constant,
                                             loweredInterfaceType);
 
+  // If the constant refers to a derivative function, get the SIL type of the
+  // original function and use it to compute the derivative SIL type.
+  //
+  // This is necessary because the "lowered AST derivative function type" (BC)
+  // may differ from the "derivative type of the lowered original function type"
+  // (AD):
+  //
+  // +--------------------+       lowering      +--------------------+
+  // | AST orig.  fn type |  -------(A)------>  | SIL orig.  fn type |
+  // +--------------------+                     +--------------------+
+  //         |                                                |
+  //    (B, Sema)   getAutoDiffDerivativeFunctionType     (D, here)
+  //         V                                                V
+  // +--------------------+       lowering      +--------------------+
+  // | AST deriv. fn type |  -------(C)------>  | SIL deriv. fn type |
+  // +--------------------+                     +--------------------+
+  //
+  // (AD) does not always commute with (BC):
+  // - (BC) is the result of computing the AST derivative type (Sema), then
+  //   lowering it via SILGen. This is the default lowering behavior, but may
+  //   break SIL typing invariants because expected lowered derivative types are
+  //   computed from lowered original function types.
+  // - (AD) is the result of lowering the original function type, then computing
+  //   its derivative type. This is the expected lowered derivative type,
+  //   preserving SIL typing invariants.
+  //
+  // Always use (AD) to compute lowered derivative function types.
+  if (auto *derivativeId = constant.derivativeFunctionIdentifier) {
+    // Get lowered original function type.
+    auto origFnConstantInfo = getConstantInfo(
+        TypeExpansionContext::minimal(), constant.asAutoDiffOriginalFunction());
+    // Use it to compute lowered derivative function type.
+    auto *loweredIndices = autodiff::getLoweredParameterIndices(
+        derivativeId->getParameterIndices(), formalInterfaceType);
+    silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
+        loweredIndices, /*resultIndex*/ 0, derivativeId->getKind(), *this,
+        LookUpConformanceInModule(&M));
+  }
+
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
              constant.print(llvm::dbgs());
              llvm::dbgs() << "\n  formal type: ";

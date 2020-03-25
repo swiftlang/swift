@@ -651,30 +651,25 @@ static Type checkContextualRequirements(Type type,
     return type;
   }
 
-  // We are interested in either a contextual where clause or
-  // a constrained extension context.
-  TypeSubstitutionMap subMap;
-  GenericSignature genericSig;
   SourceLoc noteLoc;
-  if (decl->getTrailingWhereClause()) {
-    subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
-    genericSig = decl->getGenericSignature();
-    noteLoc = decl->getLoc();
-  } else {
+  {
+    // We are interested in either a contextual where clause or
+    // a constrained extension context.
     const auto ext = dyn_cast<ExtensionDecl>(decl->getDeclContext());
-    if (ext && ext->isConstrainedExtension()) {
-      subMap = parentTy->getContextSubstitutions(ext);
-      genericSig = ext->getGenericSignature();
+    if (decl->getTrailingWhereClause())
+      noteLoc = decl->getLoc();
+    else if (ext && ext->isConstrainedExtension())
       noteLoc = ext->getLoc();
-    } else {
+    else
       return type;
-    }
+
+    if (noteLoc.isInvalid())
+      noteLoc = loc;
   }
 
-  if (noteLoc.isInvalid())
-    noteLoc = loc;
-
-  auto result =
+  const auto subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
+  const auto genericSig = decl->getGenericSignature();
+  const auto result =
     TypeChecker::checkGenericArguments(
         dc, loc, noteLoc, type,
         genericSig->getGenericParams(),
@@ -885,7 +880,9 @@ Type TypeChecker::applyUnboundGenericArguments(
     auto genericSig = genericEnv->getGenericSignature();
     for (auto gp : genericSig->getGenericParams()) {
       subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-        genericEnv->mapTypeIntoContext(gp);
+        (resolution.usesArchetypes()
+         ? genericEnv->mapTypeIntoContext(gp)
+         : gp);
     }
   }
 

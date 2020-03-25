@@ -1,3 +1,4 @@
+// REQUIRES: rdar60050653
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t)
@@ -15,6 +16,7 @@ import Foundation
 // expected-private-conformance {{Swift.CustomDebugStringConvertible}}
 // expected-private-conformance {{Swift.CVarArg}}
 // expected-private-conformance {{Swift.CustomStringConvertible}}
+// expected-cascading-superclass {{main.LookupFactory}}
 @objc private class LookupFactory: NSObject {
   // expected-provides {{AssignmentPrecedence}}
   // expected-provides {{IntegerLiteralType}}
@@ -29,7 +31,7 @@ import Foundation
 
   // expected-cascading-member {{__C.NSObject.init}}
   // expected-cascading-member {{main.LookupFactory.init}}
-  // expected-cascading-member {{main.LookupFactory.deinit}}
+  // expected-private-member {{main.LookupFactory.deinit}}
   // expected-cascading-member {{main.LookupFactory.someMember}}
   // expected-cascading-member {{main.LookupFactory.someMethod}}
 }
