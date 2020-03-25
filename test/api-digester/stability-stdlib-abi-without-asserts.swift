@@ -4,6 +4,7 @@
 // attributes. Some of these APIs will be usptreamed to the
 // UNSUPPORTED: tensorflow
 
+// REQUIRES: rdar60088553
 // REQUIRES: OS=macosx
 // REQUIRES: swift_stdlib_no_asserts
 // RUN: %empty-directory(%t.tmp)
