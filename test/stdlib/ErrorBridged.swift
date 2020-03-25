@@ -770,7 +770,7 @@ ErrorBridgingTests.test("@objc error domains for nested types") {
 ErrorBridgingTests.test("error-to-NSObject casts") {
   let error = MyCustomizedError(code: 12345)
 
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
     // Unconditional cast
     let nsErrorAsObject1 = unconditionalCast(error, to: NSObject.self)
     let nsError1 = unconditionalCast(nsErrorAsObject1, to: NSError.self)
@@ -800,7 +800,7 @@ ErrorBridgingTests.test("NSError-to-Error casts") {
     expectTrue(something is Error)
   }
 
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
     // TODO: Wrap some leak checking around this
     // Until then, this is a helpful debug tool
 		should_not_leak_nserror()
@@ -813,7 +813,7 @@ ErrorBridgingTests.test("CFError-to-Error casts") {
     expectTrue(something is Error)
   }
 
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
     // TODO: Wrap some leak checking around this
     // Until then, this is a helpful debug tool
 		should_not_leak_cferror()
@@ -826,7 +826,7 @@ enum MyError: Error {
 
 ErrorBridgingTests.test("SR-9207 crash in failed cast to NSError") {
 
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
     let error = MyError.someThing
     let foundationError = error as NSError
 

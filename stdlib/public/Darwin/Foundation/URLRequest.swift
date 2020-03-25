@@ -122,6 +122,30 @@ public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
         }
     }
     
+    /// `true` if the receiver is allowed to use an interface marked as expensive to
+    /// satify the request, `false` otherwise.
+    @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+    public var allowsExpensiveNetworkAccess: Bool {
+        get {
+            return _handle.map { $0.allowsExpensiveNetworkAccess }
+        }
+        set {
+            _applyMutation { $0.allowsExpensiveNetworkAccess = newValue }
+        }
+    }
+    
+    /// `true` if the receiver is allowed to use an interface marked as constrained to
+    /// satify the request, `false` otherwise.
+    @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+    public var allowsConstrainedNetworkAccess: Bool {
+        get {
+            return _handle.map { $0.allowsConstrainedNetworkAccess }
+        }
+        set {
+            _applyMutation { $0.allowsConstrainedNetworkAccess = newValue }
+        }
+    }
+    
     /// The HTTP request method of the receiver.
     public var httpMethod: String? {
         get {

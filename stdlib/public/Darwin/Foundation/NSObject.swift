@@ -12,6 +12,7 @@
 
 @_exported import Foundation // Clang module
 import ObjectiveC
+import _SwiftFoundationOverlayShims
 
 // This exists to allow for dynamic dispatch on KVO methods added to NSObject.
 // Extending NSObject with these methods would disallow overrides.
@@ -173,6 +174,9 @@ public class NSKeyValueObservation : NSObject {
         // workaround for <rdar://problem/31640524> Erroneous (?) error when using bridging in the Foundation overlay
         // specifically, overriding observeValue(forKeyPath:of:change:context:) complains that it's not Obj-C-compatible
         @nonobjc static let swizzler: () = {
+            let cls = NSClassFromString("_NSKVOCompatibility") as? _NSKVOCompatibilityShim.Type
+            cls?._noteProcessHasUsedKVOSwiftOverlay()
+            
             let bridgeClass: AnyClass = Helper.self
             let observeSel = #selector(NSObject.observeValue(forKeyPath:of:change:context:))
             let swapSel = #selector(Helper._swizzle_me_observeValue(forKeyPath:of:change:context:))
