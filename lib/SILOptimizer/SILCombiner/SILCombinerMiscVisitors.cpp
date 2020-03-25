@@ -257,10 +257,6 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
   return I;
 }
 
-SILInstruction *SILCombiner::visitSelectValueInst(SelectValueInst *SVI) {
-  return nullptr;
-}
-
 SILInstruction *SILCombiner::visitSwitchValueInst(SwitchValueInst *SVI) {
   if (SVI->getFunction()->hasOwnership())
     return nullptr;
@@ -869,16 +865,6 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
       }
   }
 
-  return nullptr;
-}
-
-SILInstruction *
-SILCombiner::visitReleaseValueAddrInst(ReleaseValueAddrInst *RVI) {
-  return nullptr;
-}
-
-SILInstruction *
-SILCombiner::visitRetainValueAddrInst(RetainValueAddrInst *RVI) {
   return nullptr;
 }
 
@@ -1797,10 +1783,6 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     NewInst = Builder.createUpcast(ARDI->getLoc(), NewInst, ARDI->getType());
   }
   return NewInst;
-}
-
-SILInstruction *SILCombiner::visitEnumInst(EnumInst *EI) {
-  return nullptr;
 }
 
 SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
