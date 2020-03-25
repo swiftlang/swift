@@ -389,6 +389,7 @@ static bool
 emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  StringRef indexStorePath,
                                  bool indexSystemModules,
+                                 bool skipStdlib,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
@@ -398,6 +399,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
 static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
                                   StringRef indexStorePath,
                                   bool indexSystemModules,
+                                  bool skipStdlib,
                                   StringRef targetTriple,
                                   const clang::CompilerInstance &clangCI,
                                   DiagnosticEngine &diags,
@@ -441,9 +443,10 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
             // We don't officially support binary swift modules, so normally
             // the index data for user modules would get generated while
             // building them.
-            if (mod->isSystemModule() && indexSystemModules) {
+            if (mod->isSystemModule() && indexSystemModules &&
+                (!skipStdlib || !mod->isStdlibModule())) {
               emitDataForSwiftSerializedModule(mod, indexStorePath,
-                                               indexSystemModules,
+                                               indexSystemModules, skipStdlib,
                                                targetTriple, clangCI, diags,
                                                unitWriter, initialFile);
               withoutUnitName = false;
@@ -470,6 +473,7 @@ static bool
 emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  StringRef indexStorePath,
                                  bool indexSystemModules,
+                                 bool skipStdlib,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
@@ -590,7 +594,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   module->getImportedModules(imports, importFilter);
   StringScratchSpace moduleNameScratch;
-  addModuleDependencies(imports, indexStorePath, indexSystemModules,
+  addModuleDependencies(imports, indexStorePath, indexSystemModules, skipStdlib,
                         targetTriple, clangCI, diags, unitWriter,
                         moduleNameScratch, initialFile);
 
@@ -605,7 +609,8 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
 static bool
 recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      StringRef indexStorePath, bool indexSystemModules,
-                     bool isDebugCompilation, StringRef targetTriple,
+                     bool skipStdlib, bool isDebugCompilation,
+                     StringRef targetTriple,
                      ArrayRef<const clang::FileEntry *> fileDependencies,
                      const clang::CompilerInstance &clangCI,
                      DiagnosticEngine &diags) {
@@ -628,11 +633,11 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   importFilter |= ModuleDecl::ImportFilterKind::Public;
   importFilter |= ModuleDecl::ImportFilterKind::Private;
   importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
+
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   primarySourceFile->getImportedModules(imports, importFilter);
   StringScratchSpace moduleNameScratch;
-  addModuleDependencies(imports, indexStorePath, indexSystemModules,
+  addModuleDependencies(imports, indexStorePath, indexSystemModules, skipStdlib,
                         targetTriple, clangCI, diags, unitWriter,
                         moduleNameScratch, primarySourceFile);
 
@@ -685,6 +690,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
                            StringRef indexUnitToken,
                            StringRef indexStorePath,
                            bool indexSystemModules,
+                           bool skipStdlib,
                            bool isDebugCompilation,
                            StringRef targetTriple,
                            const DependencyTracker &dependencyTracker) {
@@ -712,7 +718,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
 #endif
 
   return recordSourceFileUnit(primarySourceFile, indexUnitToken,
-                              indexStorePath, indexSystemModules,
+                              indexStorePath, indexSystemModules, skipStdlib,
                               isDebugCompilation, targetTriple,
                               fileDependencies.getArrayRef(),
                               clangCI, diags);
@@ -723,6 +729,7 @@ bool index::indexAndRecord(ModuleDecl *module,
                            StringRef moduleUnitToken,
                            StringRef indexStorePath,
                            bool indexSystemModules,
+                           bool skipStdlib,
                            bool isDebugCompilation,
                            StringRef targetTriple,
                            const DependencyTracker &dependencyTracker) {
@@ -758,7 +765,7 @@ bool index::indexAndRecord(ModuleDecl *module,
         return true;
       }
       if (recordSourceFileUnit(SF, indexUnitTokens[unitIndex],
-                               indexStorePath, indexSystemModules,
+                               indexStorePath, indexSystemModules, skipStdlib,
                                isDebugCompilation, targetTriple,
                                fileDependencies.getArrayRef(),
                                clangCI, diags))

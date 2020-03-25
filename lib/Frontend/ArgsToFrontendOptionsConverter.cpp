@@ -67,6 +67,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.BridgingHeaderDirForPrint = A->getValue();
   }
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
+  Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
 
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
