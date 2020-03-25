@@ -221,7 +221,7 @@ func process(p: Any?) {
 func compare<T>(_: T, _: T) {} // expected-note {{'compare' declared here}}
 func compare<T>(_: T?, _: T?) {}
 
-_ = nil? as? Int?? // expected-error {{nil literal cannot be the source of a conditional cast}}
+_ = nil? as? Int?? // expected-error {{'nil' requires a contextual type}}
 
 func test_tuple_casts_no_warn() {
   struct Foo {}
