@@ -1730,7 +1730,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       assert(op);
       abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
       auto emptyID = addDeclBaseNameRef(Identifier());
-      auto fixity = getStableFixity(op->getKind());
+      auto fixity = getStableFixity(op->getFixity());
       XRefOperatorOrAccessorPathPieceLayout::emitRecord(Out, ScratchRecord,
                                                         abbrCode, emptyID,
                                                         fixity);
@@ -1750,7 +1750,7 @@ void Serializer::writeCrossReference(const Decl *D) {
 
     abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
     auto nameID = addDeclBaseNameRef(op->getName());
-    auto fixity = getStableFixity(op->getKind());
+    auto fixity = getStableFixity(op->getFixity());
     XRefOperatorOrAccessorPathPieceLayout::emitRecord(Out, ScratchRecord,
                                                       abbrCode, nameID,
                                                       fixity);
@@ -2395,37 +2395,20 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_Differentiable: {
       auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
       auto *attr = cast<DifferentiableAttr>(DA);
-
-      IdentifierID jvpName = 0;
-      DeclID jvpRef = 0;
-      if (auto jvp = attr->getJVP())
-        jvpName = S.addDeclBaseNameRef(jvp->Name.getBaseName());
-      if (auto jvpFunction = attr->getJVPFunction())
-        jvpRef = S.addDeclRef(jvpFunction);
-
-      IdentifierID vjpName = 0;
-      DeclID vjpRef = 0;
-      if (auto vjp = attr->getVJP())
-        vjpName = S.addDeclBaseNameRef(vjp->Name.getBaseName());
-      if (auto vjpFunction = attr->getVJPFunction())
-        vjpRef = S.addDeclRef(vjpFunction);
-
-      auto paramIndices = attr->getParameterIndices();
-      // NOTE(TF-836): `@differentiable` attribute serialization is blocked by
-      // `@differentiable` attribute type-checking (TF-828), which resolves
-      // parameter indices (`IndexSubset *`).
-      if (!paramIndices)
-        return;
+      assert(attr->getOriginalDeclaration() &&
+             "`@differentiable` attribute should have original declaration set "
+             "during construction or parsing");
+      auto *paramIndices = attr->getParameterIndices();
       assert(paramIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> indices;
+      SmallVector<bool, 4> paramIndicesVector;
       for (unsigned i : range(paramIndices->getCapacity()))
-        indices.push_back(paramIndices->contains(i));
+        paramIndicesVector.push_back(paramIndices->contains(i));
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef,
+          attr->isLinear(),
           S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
-          indices);
+          paramIndicesVector);
       return;
     }
 
@@ -2442,12 +2425,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
       auto *parameterIndices = attr->getParameterIndices();
       assert(parameterIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> indices;
+      SmallVector<bool, 4> paramIndicesVector;
       for (unsigned i : range(parameterIndices->getCapacity()))
-        indices.push_back(parameterIndices->contains(i));
+        paramIndicesVector.push_back(parameterIndices->contains(i));
       DerivativeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
-          origDeclID, derivativeKind, indices);
+          origDeclID, derivativeKind, paramIndicesVector);
       return;
     }
 
@@ -2467,12 +2450,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
       auto *parameterIndices = attr->getParameterIndices();
       assert(parameterIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> indices;
+      SmallVector<bool, 4> paramIndicesVector;
       for (unsigned i : range(parameterIndices->getCapacity()))
-        indices.push_back(parameterIndices->contains(i));
+        paramIndicesVector.push_back(parameterIndices->contains(i));
       TransposeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
-          origDeclID, indices);
+          origDeclID, paramIndicesVector);
       return;
     }
     }
@@ -4924,7 +4907,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
           .push_back({ extendedNominal, addDeclRef(D) });
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
         operatorDecls[OD->getName()]
-          .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
+          .push_back({ getStableFixity(OD->getFixity()), addDeclRef(D) });
       } else if (auto PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
         precedenceGroupDecls[PGD->getName()]
           .push_back({ decls_block::PRECEDENCE_GROUP_DECL, addDeclRef(D) });

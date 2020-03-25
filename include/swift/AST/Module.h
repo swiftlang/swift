@@ -335,6 +335,31 @@ public:
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
 
+  /// A lazily populated  mapping from each declared cross import overlay this
+  /// module transitively underlies to its bystander and immediate underlying
+  /// module.
+  llvm::SmallDenseMap<ModuleDecl *, std::pair<Identifier, ModuleDecl *>, 1>
+  declaredCrossImportsTransitive;
+
+  /// Determines if the given \p overlay is a declarared cross-import overlay of
+  /// this module, or an of its transitively declared overlay modules.
+  ///
+  /// This is used by tooling to map overlays to their underlying modules, and t
+  bool isUnderlyingModuleOfCrossImportOverlay(const ModuleDecl *overlay);
+
+  /// If \p overlay is a transitively declared cross-import overlay of this
+  /// module, gets the list of bystander modules that need to be imported
+  /// alongside this module for the overlay to be loaded.
+  void getAllBystandersForCrossImportOverlay(
+      ModuleDecl *overlay, SmallVectorImpl<Identifier> &bystanders);
+
+  /// Walks and loads the declared cross-import overlays of this module,
+  /// transitively, to find all overlays this module underlies.
+  ///
+  /// This is used by tooling to present these overlays as part of this module.
+  void findDeclaredCrossImportOverlaysTransitive(
+      SmallVectorImpl<ModuleDecl *> &overlays);
+
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
   SourceFile &getMainSourceFile(SourceFileKind expectedKind) const;

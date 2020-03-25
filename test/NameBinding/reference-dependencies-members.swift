@@ -52,7 +52,7 @@ protocol SomeProto {}
 // DEPENDS-NOMINAL-DAG: 10OtherClassC"
 // DEPENDS-NOMINAL-DAG: 9SomeProtoP"
 // DEPENDS-MEMBER-DAG: - ["{{.+}}9SomeProtoP", ""]
-// DEPENDS-MEMBER-DAG: - ["{{.+}}10OtherClassC", "deinit"]
+// DEPENDS-MEMBER-DAG: - ["{{.+}}10OtherClassC", ""]
 extension OtherClass : SomeProto {}
 
 // PROVIDES-NOMINAL-NEGATIVE-NOT: 11OtherStructV"{{$}}

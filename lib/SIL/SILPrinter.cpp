@@ -2269,6 +2269,41 @@ public:
     }
   }
 
+  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
+    *this << "[parameters";
+    for (auto i : dfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    *this << getIDAndType(dfi->getOriginalFunction());
+    if (dfi->hasDerivativeFunctions()) {
+      *this << " with_derivative ";
+      *this << '{' << getIDAndType(dfi->getJVPFunction()) << ", "
+            << getIDAndType(dfi->getVJPFunction()) << '}';
+    }
+  }
+
+  void visitDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *dfei) {
+    *this << '[';
+    switch (dfei->getExtractee()) {
+    case NormalDifferentiableFunctionTypeComponent::Original:
+      *this << "original";
+      break;
+    case NormalDifferentiableFunctionTypeComponent::JVP:
+      *this << "jvp";
+      break;
+    case NormalDifferentiableFunctionTypeComponent::VJP:
+      *this << "vjp";
+      break;
+    }
+    *this << "] ";
+    *this << getIDAndType(dfei->getOperand());
+    if (dfei->hasExplicitExtracteeType()) {
+      *this << " as ";
+      *this << dfei->getType();
+    }
+  }
+
   void visitDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *dwfi) {
     auto *witness = dwfi->getWitness();

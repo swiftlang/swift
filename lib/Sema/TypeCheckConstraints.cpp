@@ -3175,10 +3175,6 @@ void Solution::dump(raw_ostream &out) const {
           << ovl.second.openedType->getString(PO) << "\n";
       break;
 
-    case OverloadChoiceKind::BaseType:
-      out << "base type " << choice.getBaseType()->getString(PO) << "\n";
-      break;
-
     case OverloadChoiceKind::KeyPathApplication:
       out << "key path application root "
           << choice.getBaseType()->getString(PO) << "\n";
@@ -3379,10 +3375,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
         out << choice.getDecl()->getBaseName() << ": "
             << resolved.boundType->getString(PO) << " == "
             << resolved.openedType->getString(PO) << "\n";
-        break;
-
-      case OverloadChoiceKind::BaseType:
-        out << "base type " << choice.getBaseType()->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::KeyPathApplication:

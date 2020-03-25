@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift
-// REQUIRES: differentiable_programming
 
 import _Differentiation
 

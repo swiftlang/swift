@@ -3516,6 +3516,27 @@ public:
   /// or \c nullptr if it does not have one.
   ConstructorDecl *getMemberwiseInitializer() const;
 
+  /// Retrieves the effective memberwise initializer for this declaration, or
+  /// \c nullptr if it does not have one.
+  ///
+  /// An effective memberwise initializer is either a synthesized memberwise
+  /// initializer or a user-defined initializer with the same type.
+  ///
+  /// The access level of the memberwise initializer is set to the minimum of:
+  /// - Public, by default. This enables public nominal types to have public
+  ///   memberwise initializers.
+  ///   - The `public` default is important for synthesized member types, e.g.
+  ///     `TangentVector` structs synthesized during `Differentiable` derived
+  ///     conformances. Manually extending these types to define a public
+  ///     memberwise initializer causes a redeclaration error.
+  /// - The minimum access level of memberwise-initialized properties in the
+  ///   nominal type declaration.
+  ///
+  /// Effective memberwise initializers are used only by derived conformances
+  /// for `Self`-returning protocol requirements like `AdditiveArithmetic.+`.
+  /// Such derived conformances require memberwise initialization.
+  ConstructorDecl *getEffectiveMemberwiseInitializer();
+
   /// Whether this declaration has a synthesized zero parameter default
   /// initializer.
   bool hasDefaultInitializer() const;
@@ -4249,8 +4270,6 @@ class ProtocolDecl final : public NominalTypeDecl {
     Bits.ProtocolDecl.ExistentialTypeSupported = supported;
   }
 
-  ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
-
   bool hasLazyRequirementSignature() const {
     return Bits.ProtocolDecl.HasLazyRequirementSignature;
   }
@@ -4261,7 +4280,8 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
   friend class ExistentialTypeSupportedRequest;
-
+  friend class InheritedProtocolsRequest;
+  
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name, MutableArrayRef<TypeLoc> Inherited,
@@ -4270,12 +4290,7 @@ public:
   using Decl::getASTContext;
 
   /// Retrieve the set of protocols inherited from this protocol.
-  ArrayRef<ProtocolDecl *> getInheritedProtocols() const {
-    if (Bits.ProtocolDecl.InheritedProtocolsValid)
-      return InheritedProtocols;
-
-    return const_cast<ProtocolDecl *>(this)->getInheritedProtocolsSlow();
-  }
+  ArrayRef<ProtocolDecl *> getInheritedProtocols() const;
 
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
@@ -4369,6 +4384,13 @@ public:
 
 private:
   void computeKnownProtocolKind() const;
+
+  bool areInheritedProtocolsValid() const {
+    return Bits.ProtocolDecl.InheritedProtocolsValid;
+  }
+  void setInheritedProtocolsValid() {
+    Bits.ProtocolDecl.InheritedProtocolsValid = true;
+  }
 
 public:
   /// If this is known to be a compiler-known protocol, returns the kind.
@@ -7063,6 +7085,28 @@ public:
   }
 };
 
+/// The fixity of an OperatorDecl.
+enum class OperatorFixity : uint8_t {
+  Infix,
+  Prefix,
+  Postfix
+};
+
+inline void simple_display(llvm::raw_ostream &out, OperatorFixity fixity) {
+  switch (fixity) {
+  case OperatorFixity::Infix:
+    out << "infix";
+    return;
+  case OperatorFixity::Prefix:
+    out << "prefix";
+    return;
+  case OperatorFixity::Postfix:
+    out << "postfix";
+    return;
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
 /// Abstract base class of operator declarations.
 class OperatorDecl : public Decl {
   SourceLoc OperatorLoc, NameLoc;
@@ -7088,6 +7132,21 @@ public:
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
         DesignatedNominalTypes(DesignatedNominalTypes) {}
 
+  /// Retrieve the operator's fixity, corresponding to the concrete subclass
+  /// of the OperatorDecl.
+  OperatorFixity getFixity() const {
+    switch (getKind()) {
+#define DECL(Id, Name) case DeclKind::Id: llvm_unreachable("Not an operator!");
+#define OPERATOR_DECL(Id, Name)
+#include "swift/AST/DeclNodes.def"
+    case DeclKind::InfixOperator:
+      return OperatorFixity::Infix;
+    case DeclKind::PrefixOperator:
+      return OperatorFixity::Prefix;
+    case DeclKind::PostfixOperator:
+      return OperatorFixity::Postfix;
+    }
+  }
 
   SourceLoc getOperatorLoc() const { return OperatorLoc; }
   SourceLoc getNameLoc() const { return NameLoc; }

@@ -674,6 +674,15 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       }
       break;
     }
+    
+    case ConstraintLocator::OptionalPayload: {
+      // If we have an inout expression, this comes from an
+      // InoutToPointer argument mismatch failure.
+      if (isa<InOutExpr>(anchor)) {
+        diagnostic = diag::cannot_convert_argument_value;
+      }
+      break;
+    }
 
     case ConstraintLocator::TupleElement: {
       auto *anchor = getRawAnchor();
@@ -3710,15 +3719,19 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // Fall back to a fix-it with a full type qualifier
-    if (auto *NTD = Member->getDeclContext()->getSelfNominalTypeDecl()) {
-      auto type = NTD->getSelfInterfaceType();
-      if (auto *SE = dyn_cast<SubscriptExpr>(getRawAnchor())) {
-        auto *baseExpr = SE->getBase();
-        Diag->fixItReplace(baseExpr->getSourceRange(), diag::replace_with_type,
-                           type);
-      } else {
-        Diag->fixItInsert(loc, diag::insert_type_qualification, type);
-      }
+    const Expr *baseExpr = nullptr;
+    if (const auto SE = dyn_cast<SubscriptExpr>(getRawAnchor()))
+      baseExpr = SE->getBase();
+    else if (const auto UDE = dyn_cast<UnresolvedDotExpr>(getRawAnchor()))
+      baseExpr = UDE->getBase();
+
+    // An implicit 'self' reference base expression means we should
+    // prepend with qualification.
+    if (baseExpr && !baseExpr->isImplicit()) {
+      Diag->fixItReplace(baseExpr->getSourceRange(),
+                         diag::replace_with_type, baseTy);
+    } else {
+      Diag->fixItInsert(loc, diag::insert_type_qualification, baseTy);
     }
 
     return true;

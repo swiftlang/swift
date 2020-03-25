@@ -3132,9 +3132,6 @@ namespace {
                                              nameLoc.getBaseNameLoc(), toType));
       }
 
-      case OverloadChoiceKind::BaseType:
-        return base;
-
       case OverloadChoiceKind::KeyPathApplication:
         llvm_unreachable("should only happen in a subscript");
 
@@ -8024,6 +8021,17 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
       // If we didn't manage to diagnose anything well, so fall back to
       // diagnosing mining the system to construct a reasonable error message.
       diagnoseFailureFor(target);
+      return None;
+    }
+  }
+
+  // If there are no fixes recorded but score indicates that there
+  // should have been at least one, let's fail application and
+  // produce a fallback diagnostic to highlight the problem.
+  {
+    const auto &score = solution.getFixedScore();
+    if (score.Data[SK_Fix] > 0 || score.Data[SK_Hole] > 0) {
+      maybeProduceFallbackDiagnostic(target);
       return None;
     }
   }

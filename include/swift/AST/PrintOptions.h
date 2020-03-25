@@ -432,6 +432,13 @@ struct PrintOptions {
   /// The information for converting archetypes to specialized types.
   llvm::Optional<TypeTransformContext> TransformContext;
 
+  /// Before printing the name of a ModuleDecl, this callback will be called and
+  /// the name of the ModuleDecl it returns will be printed instead. This is
+  /// currently used to present cross import overlays as if they were their
+  /// underlying module.
+  std::function<const ModuleDecl*(const ModuleDecl *)> mapModuleToUnderlying =
+    [] (const ModuleDecl *D) { return D; };
+
   bool PrintAsMember = false;
   
   /// Whether to print parameter specifiers as 'let' and 'var'.

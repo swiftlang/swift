@@ -510,6 +510,8 @@ public protocol TestProtocol {}
 public class TestClass<T> {
   @WrapperWithInitialValue var value: T
 
+  // CHECK-LABEL: sil [ossa] @$s17property_wrappers9TestClassC5valuexvpfP : $@convention(thin) <T> (@in T) -> @out WrapperWithInitialValue<T>
+
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers9TestClassC5value8protocolACyxGx_qd__tcAA0C8ProtocolRd__lufc
   // CHECK: [[BACKING_INIT:%.*]] = function_ref @$s17property_wrappers9TestClassC5valuexvpfP : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out WrapperWithInitialValue<τ_0_0>
   // CHECK-NEXT: partial_apply [callee_guaranteed] [[BACKING_INIT]]<T>()

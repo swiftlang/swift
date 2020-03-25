@@ -4059,6 +4059,14 @@ ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() const {
       ctx.evaluator, SynthesizeMemberwiseInitRequest{mutableThis}, nullptr);
 }
 
+ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ResolveEffectiveMemberwiseInitRequest{mutableThis},
+                           nullptr);
+}
+
 bool NominalTypeDecl::hasDefaultInitializer() const {
   // Currently only structs and classes can have default initializers.
   if (!isa<StructDecl>(this) && !isa<ClassDecl>(this))
@@ -4627,26 +4635,11 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
     setTrailingWhereClause(TrailingWhere);
 }
 
-ArrayRef<ProtocolDecl *>
-ProtocolDecl::getInheritedProtocolsSlow() {
-  Bits.ProtocolDecl.InheritedProtocolsValid = true;
-
-  llvm::SmallVector<ProtocolDecl *, 2> result;
-  SmallPtrSet<const ProtocolDecl *, 2> known;
-  known.insert(this);
-  bool anyObject = false;
-  for (const auto found :
-           getDirectlyInheritedNominalTypeDecls(
-             const_cast<ProtocolDecl *>(this), anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
-      if (known.insert(proto).second)
-        result.push_back(proto);
-    }
-  }
-
-  auto &ctx = getASTContext();
-  InheritedProtocols = ctx.AllocateCopy(result);
-  return InheritedProtocols;
+ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
+  auto *mutThis = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           InheritedProtocolsRequest{mutThis},
+                           {});
 }
 
 llvm::TinyPtrVector<AssociatedTypeDecl *>

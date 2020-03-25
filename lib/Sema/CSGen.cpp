@@ -931,6 +931,9 @@ namespace {
       = { nullptr, nullptr };
     unsigned currentEditorPlaceholderVariable = 0;
 
+    /// Keep track of acceptable DiscardAssignmentExpr's.
+    llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
+
     /// Returns false and emits the specified diagnostic if the member reference
     /// base is a nil literal. Returns true otherwise.
     bool isValidBaseOfMemberRef(Expr *base, Diag<> diagnostic) {
@@ -1155,7 +1158,18 @@ namespace {
       while (parentExpr && isa<ParenExpr>(parentExpr))
         parentExpr = CS.getParentExpr(parentExpr);
 
+      // In cases like `_ = nil?` AST would have `nil`
+      // wrapped in `BindOptionalExpr`.
+      if (parentExpr && isa<BindOptionalExpr>(parentExpr))
+        parentExpr = CS.getParentExpr(parentExpr);
+
       if (parentExpr) {
+        // `_ = nil as? ...`
+        if (isa<ConditionalCheckedCastExpr>(parentExpr)) {
+          DE.diagnose(expr->getLoc(), diag::conditional_cast_from_nil);
+          return Type();
+        }
+
         // `_ = nil!`
         if (isa<ForceValueExpr>(parentExpr)) {
           DE.diagnose(expr->getLoc(), diag::cannot_force_unwrap_nil_literal);
@@ -1167,13 +1181,13 @@ namespace {
           DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
           return Type();
         }
-      }
 
-      // `_ = nil`
-      if (auto *assignment = dyn_cast_or_null<AssignExpr>(parentExpr)) {
-        if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
-          DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
-          return Type();
+        // `_ = nil`
+        if (auto *assignment = dyn_cast<AssignExpr>(parentExpr)) {
+          if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
+            DE.diagnose(expr->getLoc(), diag::unresolved_nil_literal);
+            return Type();
+          }
         }
       }
 
@@ -2982,26 +2996,6 @@ namespace {
       if (!fromExpr) // Either wasn't constructed correctly or wasn't folded.
         return nullptr;
 
-      std::function<Expr *(Expr *)> nilLiteralExpr = [&](Expr *expr) -> Expr * {
-        expr = expr->getSemanticsProvidingExpr();
-        if (expr->getKind() == ExprKind::NilLiteral)
-          return expr;
-
-        if (auto *optionalEvalExpr = dyn_cast<OptionalEvaluationExpr>(expr))
-          return nilLiteralExpr(optionalEvalExpr->getSubExpr());
-
-        if (auto *bindOptionalExpr = dyn_cast<BindOptionalExpr>(expr))
-          return nilLiteralExpr(bindOptionalExpr->getSubExpr());
-
-        return nullptr;
-      };
-
-      if (auto nilLiteral = nilLiteralExpr(fromExpr)) {
-        ctx.Diags.diagnose(nilLiteral->getLoc(),
-                           diag::conditional_cast_from_nil);
-        return nullptr;
-      }
-
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
@@ -3066,9 +3060,15 @@ namespace {
     }
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
+      /// Diagnose a '_' that isn't on the immediate LHS of an assignment.
+      if (!CorrectDiscardAssignmentExprs.count(expr)) {
+        auto &DE = CS.getASTContext().Diags;
+        DE.diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment);
+        return Type();
+      }
+
       auto locator = CS.getConstraintLocator(expr);
-      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToNoEscape |
-                                                    TVO_CanBindToHole);
+      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
       return LValueType::get(typeVar);
     }
 
@@ -3102,6 +3102,25 @@ namespace {
                          exprType, locator);
         return destTy;
       }
+    }
+
+    /// Scout out the specified destination of an AssignExpr to recursively
+    /// identify DiscardAssignmentExpr in legal places.  We can only allow them
+    /// in simple pattern-like expressions, so we reject anything complex here.
+    void markAcceptableDiscardExprs(Expr *E) {
+      if (!E) return;
+
+      if (auto *PE = dyn_cast<ParenExpr>(E))
+        return markAcceptableDiscardExprs(PE->getSubExpr());
+      if (auto *TE = dyn_cast<TupleExpr>(E)) {
+        for (auto &elt : TE->getElements())
+          markAcceptableDiscardExprs(elt);
+        return;
+      }
+      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E))
+        CorrectDiscardAssignmentExprs.insert(DAE);
+
+      // Otherwise, we can't support this.
     }
 
     Type visitAssignExpr(AssignExpr *expr) {
@@ -3932,6 +3951,9 @@ namespace {
         if (!ifExpr->getThenExpr() || !ifExpr->getElseExpr())
           return { false, expr };
       }
+
+      if (auto *assignment = dyn_cast<AssignExpr>(expr))
+        CG.markAcceptableDiscardExprs(assignment->getDest());
 
       return { true, expr };
     }

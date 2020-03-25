@@ -21,7 +21,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-linear-lifetime-checker"
-#include "swift/SIL/LinearLifetimeChecker.h"
+#include "LinearLifetimeCheckerPrivate.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -31,7 +31,6 @@
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
-using namespace swift::ownership;
 
 //===----------------------------------------------------------------------===//
 //                                Declarations
@@ -51,15 +50,15 @@ struct State {
 
   /// The result error object that use to signal either that no errors were
   /// found or if errors are found the specific type of error that was found.
-  LinearLifetimeError error;
+  LinearLifetimeChecker::Error error;
 
   /// The blocks that we have already visited.
   SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
 
-  /// If non-null a list that we should place any detected leaking blocks for
+  /// If non-null a callback that we should pass any detected leaking blocks for
   /// our caller. The intention is that this can be used in a failing case to
   /// put in missing destroys.
-  SmallVectorImpl<SILBasicBlock *> *leakingBlocks;
+  Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback;
 
   /// The list of passed in consuming uses.
   ArrayRef<Operand *> consumingUses;
@@ -82,20 +81,22 @@ struct State {
   SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
   State(SILValue value, SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-        ErrorBehaviorKind errorBehavior,
-        SmallVectorImpl<SILBasicBlock *> *leakingBlocks,
+        LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
+        Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(value), beginBlock(value->getParentBlock()), error(errorBehavior),
-        visitedBlocks(visitedBlocks), leakingBlocks(leakingBlocks),
+        visitedBlocks(visitedBlocks),
+        leakingBlockCallback(leakingBlockCallback),
         consumingUses(consumingUses), nonConsumingUses(nonConsumingUses) {}
 
   State(SILBasicBlock *beginBlock,
         SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-        ErrorBehaviorKind errorBehavior,
-        SmallVectorImpl<SILBasicBlock *> *leakingBlocks,
+        LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
+        Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(), beginBlock(beginBlock), error(errorBehavior),
-        visitedBlocks(visitedBlocks), leakingBlocks(leakingBlocks),
+        visitedBlocks(visitedBlocks),
+        leakingBlockCallback(leakingBlockCallback),
         consumingUses(consumingUses), nonConsumingUses(nonConsumingUses) {}
 
   void initializeAllNonConsumingUses(ArrayRef<Operand *> nonConsumingUsers);
@@ -429,9 +430,10 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
   if (!successorBlocksThatMustBeVisited.empty()) {
     // If we are asked to store any leaking blocks, put them in the leaking
     // blocks array.
-    if (leakingBlocks) {
-      llvm::copy(successorBlocksThatMustBeVisited,
-                 std::back_inserter(*leakingBlocks));
+    if (leakingBlockCallback) {
+      for (auto *block : successorBlocksThatMustBeVisited) {
+        (*leakingBlockCallback)(block);
+      }
     }
 
     // If we are supposed to error on leaks, do so now.
@@ -495,15 +497,15 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-LinearLifetimeError LinearLifetimeChecker::checkValue(
+LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     SILValue value, ArrayRef<Operand *> consumingUses,
     ArrayRef<Operand *> nonConsumingUses, ErrorBehaviorKind errorBehavior,
-    SmallVectorImpl<SILBasicBlock *> *leakingBlocks) {
+    Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback) {
   assert((!consumingUses.empty() || !deadEndBlocks.empty()) &&
          "Must have at least one consuming user?!");
 
-  State state(value, visitedBlocks, errorBehavior, leakingBlocks, consumingUses,
-              nonConsumingUses);
+  State state(value, visitedBlocks, errorBehavior, leakingBlockCallback,
+              consumingUses, nonConsumingUses);
 
   // First add our non-consuming uses and their blocks to the
   // blocksWithNonConsumingUses map. While we do this, if we have multiple uses
@@ -587,4 +589,42 @@ LinearLifetimeError LinearLifetimeChecker::checkValue(
   // typed value.
   state.checkDataflowEndState(deadEndBlocks);
   return state.error;
+}
+
+LinearLifetimeChecker::Error LinearLifetimeChecker::checkValue(
+    SILValue value, ArrayRef<Operand *> consumingUses,
+    ArrayRef<Operand *> nonConsumingUses, ErrorBehaviorKind errorBehavior) {
+  return checkValueImpl(value, consumingUses, nonConsumingUses, errorBehavior,
+                        None);
+}
+
+LinearLifetimeChecker::Error LinearLifetimeChecker::checkValue(
+    SILValue value, ArrayRef<Operand *> consumingUses,
+    ArrayRef<Operand *> nonConsumingUses, ErrorBehaviorKind errorBehavior,
+    function_ref<void(SILBasicBlock *)> leakingBlocksCallback) {
+  return checkValueImpl(value, consumingUses, nonConsumingUses, errorBehavior,
+                        leakingBlocksCallback);
+}
+
+bool LinearLifetimeChecker::completeConsumingUseSet(
+    SILValue value, Operand *consumingUse,
+    function_ref<void(SILBasicBlock::iterator)> visitor) {
+  auto error =
+      checkValue(value, {consumingUse}, {}, ErrorBehaviorKind::ReturnFalse,
+                 [&](SILBasicBlock *block) { return visitor(block->begin()); });
+
+  if (!error.getFoundError()) {
+    return false;
+  }
+
+  // Return true if we found an over consume (meaning our use is in a loop).
+  return error.getFoundOverConsume();
+}
+
+bool LinearLifetimeChecker::validateLifetime(
+    SILValue value, ArrayRef<Operand *> consumingUses,
+    ArrayRef<Operand *> nonConsumingUses) {
+  return !checkValue(value, consumingUses, nonConsumingUses,
+                     ErrorBehaviorKind::ReturnFalse)
+              .getFoundError();
 }

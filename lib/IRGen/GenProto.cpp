@@ -2737,12 +2737,8 @@ static void addAbstractConditionalRequirements(
     SpecializedProtocolConformance *specializedConformance,
     llvm::SetVector<GenericRequirement> &requirements) {
   auto subMap = specializedConformance->getSubstitutionMap();
-  auto condRequirements =
-      specializedConformance->getConditionalRequirementsIfAvailable();
-  if (!condRequirements)
-    return;
-
-  for (auto req : *condRequirements) {
+  auto condRequirements = specializedConformance->getConditionalRequirements();
+  for (auto req : condRequirements) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
     auto *proto =
