@@ -2838,6 +2838,15 @@ ParserResult<Expr> Parser::parseExprClosure() {
   ParserStatus Status;
   Status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
 
+  if (SourceMgr.rangeContainsCodeCompletionLoc({leftBrace, PreviousLoc})) {
+    // Ignore 'CodeCompletionDelayedDeclState' inside closures.
+    // Completions inside functions body inside closures at top level should
+    // be considered top-level completions.
+    if (State->hasCodeCompletionDelayedDeclState())
+      (void)State->takeCodeCompletionDelayedDeclState();
+    Status.setHasCodeCompletion();
+  }
+
   // Parse the closing '}'.
   SourceLoc rightBrace;
   bool missingRBrace = parseMatchingToken(tok::r_brace, rightBrace,
