@@ -28,7 +28,8 @@ using namespace swift;
 
 /// The kind of property initializer to look for
 enum class PropertyWrapperInitKind {
-  /// An initial-value initializer (i.e. `init(initialValue:)`)
+  /// An initial-value initializer (i.e. `init(initialValue:)`), which is
+  /// deprecated.
   InitialValue,
   /// An wrapped-value initializer (i.e. `init(wrappedValue:)`)
   WrappedValue,
@@ -684,7 +685,7 @@ static bool isOpaquePlaceholderClosure(const Expr *value) {
   return false;
 }
 
-Expr *swift::buildPropertyWrapperInitialValueCall(
+Expr *swift::buildPropertyWrapperWrappedValueCall(
     VarDecl *var, Type backingStorageType, Expr *value,
     bool ignoreAttributeArgs) {
   // From the innermost wrapper type out, form init(wrapperValue:) calls.

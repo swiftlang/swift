@@ -4182,7 +4182,7 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   if (Expr *initializer = expression.expression) {
     // Form init(wrappedValue:) call(s).
     Expr *wrappedInitializer =
-        buildPropertyWrapperInitialValueCall(
+        buildPropertyWrapperWrappedValueCall(
             singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
     if (!wrappedInitializer)
       return;
