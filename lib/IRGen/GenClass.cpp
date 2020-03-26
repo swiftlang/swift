@@ -1521,33 +1521,27 @@ namespace {
     }
 
     void buildMethod(ConstantArrayBuilder &descriptors,
-                     MethodDescriptor descriptor,
-                     llvm::StringSet<> &uniqueSelectors) {
+                     MethodDescriptor descriptor) {
       switch (descriptor.getKind()) {
       case MethodDescriptor::Kind::Method:
-        return buildMethod(descriptors, descriptor.getMethod(),
-                           uniqueSelectors);
+        return buildMethod(descriptors, descriptor.getMethod());
       case MethodDescriptor::Kind::IVarInitializer:
         emitObjCIVarInitDestroyDescriptor(IGM, descriptors, getClass(),
-                                          descriptor.getImpl(), false,
-                                          uniqueSelectors);
+                                          descriptor.getImpl(), false);
         return;
       case MethodDescriptor::Kind::IVarDestroyer:
         emitObjCIVarInitDestroyDescriptor(IGM, descriptors, getClass(),
-                                          descriptor.getImpl(), true,
-                                          uniqueSelectors);
+                                          descriptor.getImpl(), true);
         return;
       }
       llvm_unreachable("bad method descriptor kind");
     }
 
     void buildMethod(ConstantArrayBuilder &descriptors,
-                     AbstractFunctionDecl *method,
-                     llvm::StringSet<> &uniqueSelectors) {
+                     AbstractFunctionDecl *method) {
       auto accessor = dyn_cast<AccessorDecl>(method);
       if (!accessor)
-        return emitObjCMethodDescriptor(IGM, descriptors, method,
-                                        uniqueSelectors);
+        return emitObjCMethodDescriptor(IGM, descriptors, method);
 
       switch (accessor->getAccessorKind()) {
       case AccessorKind::Get:
@@ -1616,9 +1610,7 @@ namespace {
         namePrefix = "_PROTOCOL_INSTANCE_METHODS_OPT_";
         break;
       }
-      llvm::StringSet<> uniqueSelectors;
-      llvm::Constant *methodListPtr =
-          buildMethodList(methods, namePrefix, uniqueSelectors);
+      llvm::Constant *methodListPtr = buildMethodList(methods, namePrefix);
       builder.add(methodListPtr);
     }
 
@@ -1644,15 +1636,12 @@ namespace {
     void buildExtMethodTypes(ConstantArrayBuilder &array,
                              ArrayRef<MethodDescriptor> methods) {
       assert(isBuildingProtocol());
-      llvm::StringSet<> uniqueSelectors;
+
       for (auto descriptor : methods) {
         assert(descriptor.getKind() == MethodDescriptor::Kind::Method &&
                "cannot emit descriptor for non-method");
         auto method = descriptor.getMethod();
-        auto *encodingOrNullIfDuplicate =
-            getMethodTypeExtendedEncoding(IGM, method, uniqueSelectors);
-        if (encodingOrNullIfDuplicate != nullptr)
-          array.add(encodingOrNullIfDuplicate);
+        array.add(getMethodTypeExtendedEncoding(IGM, method));
       }
     }
 
@@ -1664,12 +1653,11 @@ namespace {
     ///
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildMethodList(ArrayRef<MethodDescriptor> methods,
-                                    StringRef name,
-                                    llvm::StringSet<> &uniqueSelectors) {
+                                    StringRef name) {
       return buildOptionalList(methods, 3 * IGM.getPointerSize(), name,
                                [&](ConstantArrayBuilder &descriptors,
                                    MethodDescriptor descriptor) {
-        buildMethod(descriptors, descriptor, uniqueSelectors);
+        buildMethod(descriptors, descriptor);
       });
     }
 
