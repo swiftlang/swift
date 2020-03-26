@@ -1217,6 +1217,21 @@ struct GenericParams1<
 // FIXME: in protocol compositions protocols are listed in reverse order.
 //
 // PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  func genericParams1<GenericFoo, GenericFooX, GenericBar, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz) where GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : BarProtocol, GenericBar : FooProtocol{{$}}
+
+  func contextualWhereClause1() where StructGenericBaz == Never {}
+  // PASS_PRINT_AST: func contextualWhereClause1() where StructGenericBaz == Never{{$}}
+
+  subscript(index: Int) -> Never where StructGenericBaz: FooProtocol {
+    return fatalError()
+  }
+  // PASS_PRINT_AST: subscript(index: Int) -> Never where StructGenericBaz : FooProtocol { get }{{$}}
+}
+extension GenericParams1 where StructGenericBaz: FooProtocol {
+  static func contextualWhereClause2() where StructGenericBaz: FooClass {}
+  // PASS_PRINT_AST: static func contextualWhereClause2() where StructGenericBaz : FooClass{{$}}
+
+  typealias ContextualWhereClause3 = Never where StructGenericBaz: QuxProtocol, StructGenericBaz.Qux == Void
+  // PASS_PRINT_AST: typealias ContextualWhereClause3 = Never where StructGenericBaz : QuxProtocol, StructGenericBaz.Qux == Void{{$}}
 }
 
 struct GenericParams2<T : FooProtocol> where T : BarProtocol {}
