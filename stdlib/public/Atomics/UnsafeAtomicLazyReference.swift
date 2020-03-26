@@ -20,21 +20,16 @@ public struct UnsafeAtomicLazyReference<Instance: AnyObject> {
   public typealias Value = Instance?
 
   @usableFromInline
-  internal let _ptr: UnsafeMutableRawPointer
+  internal let _ptr: UnsafeMutablePointer<Value>
 
   @_transparent // Debug performance
   public init(@_nonEphemeral at address: UnsafeMutablePointer<Value>) {
-    self._ptr = UnsafeMutableRawPointer(address)
+    self._ptr = address
   }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeAtomicLazyReference {
-  @inlinable
-  public var address: UnsafeMutablePointer<Value> {
-    _ptr.assumingMemoryBound(to: Value.self)
-  }
-
   @inlinable
   public static func create() -> Self {
     let ptr = UnsafeMutablePointer<Value>.allocate(capacity: 1)
@@ -43,8 +38,8 @@ extension UnsafeAtomicLazyReference {
   }
 
   public func destroy() {
-    address.deinitialize(count: 1)
-    address.deallocate()
+    _ptr.deinitialize(count: 1)
+    _ptr.deallocate()
   }
 }
 
@@ -79,21 +74,21 @@ extension UnsafeAtomicLazyReference {
     to desired: __owned Instance
   ) -> Instance {
     let desiredUnmanaged = Unmanaged.passRetained(desired)
-    let desiredWord = UInt(bitPattern: desiredUnmanaged.toOpaque())
-    var currentWord: UInt = 0
-    var success: Bool
-    (success, currentWord) =
-      _ptr._atomicAcquiringAndReleasingCompareExchangeWord(
-        expected: currentWord,
-        desired: desiredWord)
-    if !success {
+    let desiredPtr = desiredUnmanaged.toOpaque()
+    let (current, won) = Builtin.cmpxchg_acqrel_acquire_Word(
+      _ptr._rawValue,
+      // Note: this assumes nil is mapped to 0
+      0._builtinWordValue,
+      Int(bitPattern: desiredPtr)._builtinWordValue)
+    if !Bool(_builtinBooleanLiteral: won) {
       // The reference has already been initialized. Balance the retain that
       // we performed on `desired`.
       desiredUnmanaged.release()
+      let raw = UnsafeRawPointer(bitPattern: Int(current)).unsafelyUnwrapped
+      let result = Unmanaged<Instance>.fromOpaque(raw)
+      return result.takeUnretainedValue()
     }
-    let result = Unmanaged<Instance>.fromOpaque(
-      UnsafeRawPointer(bitPattern: currentWord)!)
-    return result.takeUnretainedValue()
+    return desiredUnmanaged.takeUnretainedValue()
   }
 }
 
@@ -105,8 +100,8 @@ extension UnsafeAtomicLazyReference {
   /// `AtomicLoadOrdering.acquiring`.
   @_transparent
   public func load() -> Instance? {
-    let value = _ptr._atomicAcquiringLoadWord()
-    guard let ptr = UnsafeRawPointer(bitPattern: value) else { return nil }
+    let value = Builtin.atomicload_acquire_Word(_ptr._rawValue)
+    guard let ptr = UnsafeRawPointer(bitPattern: Int(value)) else { return nil }
     return Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   }
 }

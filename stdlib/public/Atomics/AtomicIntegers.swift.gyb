@@ -59,16 +59,17 @@
       return "case .{}".format(ordering)
 
   # FIXME: Swift should provide intrinsics for arbitrary ordering pairs
-  def llvmCmpXchgFailureOrder(rmw, load): # See llvm/Support/AtomicOrdering.h
-    if load == "monotonic":
-      return "monotonic"
-    if rmw == "monotonic" or rmw == "release":
-      return "monotonic"
-    if rmw == "acquire" or rmw == "acqrel":
-      return "acquire"
-    if rmw == "seqcst":
-      return load
-    return "INVALID"
+  def llvmOrders(rmw, load): # See llvm/Support/AtomicOrdering.h
+    def max(rmw, load):
+      if load == "acquire":
+        if rmw == "monotonic":
+          return "acquire"
+        if rmw == "release":
+          return "acqrel"
+      if load == "seqcst":
+        return "seqcst"
+      return rmw
+    return max(rmw, load) + "_" + load
 
   def lowerFirst(str):
     return str[:1].lower() + str[1:] if str else ""
@@ -77,66 +78,35 @@
     return label + ": " if label <> "_" else ""
 
   integerOperations = [
-    # Swift name,         llvm name,  operator, label, doc
-    ('WrappingIncrement', 'add',      '&+',     "by",  "wrapping add"),
-    ('WrappingDecrement', 'sub',      '&-',     "by",  "wrapping subtract"),
-    ('BitwiseAnd',        'and',      '&',      "_",   "bitwise and"),
-    ('BitwiseOr',         'or',       '|',      "_",   "bitwise or"),
-    ('BitwiseXor',        'xor',      '^',      "_",   "bitwise xor")
+    # Swift name,         llvm name,  operator, label,  doc
+    ('WrappingIncrement', 'add',      '&+',     "by",   "wrapping add"),
+    ('WrappingDecrement', 'sub',      '&-',     "by",   "wrapping subtract"),
+    ('BitwiseAnd',        'and',      '&',      "with", "bitwise and"),
+    ('BitwiseOr',         'or',       '|',      "with", "bitwise or"),
+    ('BitwiseXor',        'xor',      '^',      "with", "bitwise xor")
   ]
-
-  def argLabel(label):
-    return label + ": " if label <> "_" else ""
 }%
 
 import Swift
 
 % for (swiftType, builtinType, getter) in atomicTypes():
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-@frozen
-public struct UnsafeAtomic${swiftType} {
-  public typealias Value = ${swiftType}
+extension ${swiftType}: AtomicProtocol {
+  public typealias AtomicStorage = ${swiftType}
 
-  @usableFromInline
-  internal let _ptr: UnsafeMutableRawPointer
-
-  @_transparent // Debug performance
-  public init(@_nonEphemeral at address: UnsafeMutablePointer<Value>) {
-    self._ptr = UnsafeMutableRawPointer(address)
-  }
-
-  public var address: UnsafeMutablePointer<Value> {
-    _ptr.assumingMemoryBound(to: Value.self)
-  }
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomic${swiftType} {
-  public static func create(initialValue: Value) -> Self {
-    let ptr = UnsafeMutablePointer<Value>.allocate(capacity: 1)
-    ptr.initialize(to: initialValue)
-    return Self(at: ptr)
-  }
-
-  public func destroy() {
-    address.deallocate()
-  }
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomic${swiftType} {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
-  public func load(
+  public static func atomicLoad(
+    at address: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicLoadOrdering = .sequentiallyConsistent
-  ) -> Value {
+  ) -> ${swiftType} {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder) in loadOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
-      return Value(Builtin.atomicload_${llvmOrder}_${builtinType}(
-          _ptr._rawValue))
+      return ${swiftType}(Builtin.atomicload_${llvmOrder}_${builtinType}(
+          address._rawValue))
 %   end
     }
   }
@@ -145,15 +115,16 @@ extension UnsafeAtomic${swiftType} {
   /// with the specified memory ordering.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
-  public func store(
-    _ desired: Value,
+  public static func atomicStore(
+    at address: UnsafeMutablePointer<${swiftType}>,
+    _ desired: ${swiftType},
     ordering: AtomicStoreOrdering = .sequentiallyConsistent
   ) {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder) in storeOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       Builtin.atomicstore_${llvmOrder}_${builtinType}(
-        _ptr._rawValue,
+        address._rawValue,
         desired.${getter})
 %   end
     }
@@ -165,15 +136,16 @@ extension UnsafeAtomic${swiftType} {
   /// - Returns: The original value.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
-  public func exchange(
-    _ desired: Value,
+  public static func atomicExchange(
+    at address: UnsafeMutablePointer<${swiftType}>,
+    _ desired: ${swiftType},
     ordering: AtomicUpdateOrdering = .sequentiallyConsistent
-  ) -> Value {
+  ) -> ${swiftType} {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder, _) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
-      return Value(Builtin.atomicrmw_xchg_${llvmOrder}_${builtinType}(
-          _ptr._rawValue, desired.${getter}))
+      return ${swiftType}(Builtin.atomicrmw_xchg_${llvmOrder}_${builtinType}(
+          address._rawValue, desired.${getter}))
 %   end
     }
   }
@@ -195,17 +167,18 @@ extension UnsafeAtomic${swiftType} {
   /// that does not permit spurious failures.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
-  public func compareExchange(
-    expected: Value,
-    desired: Value,
+  public static func atomicCompareExchange(
+    at address: UnsafeMutablePointer<${swiftType}>,
+    expected: ${swiftType},
+    desired: ${swiftType},
     ordering: AtomicUpdateOrdering = .sequentiallyConsistent
-  ) -> (exchanged: Bool, original: Value) {
+  ) -> (exchanged: Bool, original: ${swiftType}) {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder, failureOrder) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       let (oldValue, won) = Builtin.cmpxchg_${llvmOrder}_${failureOrder}_${builtinType}(
-        _ptr._rawValue, expected.${getter}, desired.${getter})
-      return (Bool(_builtinBooleanLiteral: won), Value(oldValue))
+        address._rawValue, expected.${getter}, desired.${getter})
+      return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
 %   end
     }
   }
@@ -245,31 +218,32 @@ extension UnsafeAtomic${swiftType} {
   /// ```
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
-  public func compareExchange(
-    expected: Value,
-    desired: Value,
+  public static func atomicCompareExchange(
+    at address: UnsafeMutablePointer<${swiftType}>,
+    expected: ${swiftType},
+    desired: ${swiftType},
     ordering: AtomicUpdateOrdering, // Note: no default
     failureOrdering: AtomicLoadOrdering // Note: no default
-  ) -> (exchanged: Bool, original: Value) {
+  ) -> (exchanged: Bool, original: ${swiftType}) {
     switch (ordering, failureOrdering) {
 % for (swiftSuccess, _, _, llvmSuccess, _) in rmwOrderings():
 %   for (swiftFailure, _, _, llvmFailure) in loadOrderings():
     case (.${swiftSuccess}, .${swiftFailure}):
-      let (oldValue, won) = Builtin.cmpxchg_${llvmSuccess}_${llvmCmpXchgFailureOrder(llvmSuccess, llvmFailure)}_${builtinType}(
-        _ptr._rawValue, expected.${getter}, desired.${getter})
-      return (Bool(_builtinBooleanLiteral: won), Value(oldValue))
+      let (oldValue, won) = Builtin.cmpxchg_${llvmOrders(llvmSuccess, llvmFailure)}_${builtinType}(
+        address._rawValue, expected.${getter}, desired.${getter})
+      return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
 %   end
 % end
     default:
       let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_${builtinType}(
-        _ptr._rawValue, expected.${getter}, desired.${getter})
-      return (Bool(_builtinBooleanLiteral: won), Value(oldValue))
+        address._rawValue, expected.${getter}, desired.${getter})
+      return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
     }
   }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomic${swiftType} {
+extension ${swiftType}: AtomicInteger {
   % for (name, llvmop, op, label, doc) in integerOperations:
   % defaultValue = " = 1" if label <> "" else ""
   /// Perform an atomic ${doc} operation and return the original value, with
@@ -284,67 +258,18 @@ extension UnsafeAtomic${swiftType} {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
-  public func loadThen${name}(
-    ${label} operand: Value${defaultValue},
+  public static func atomicLoadThen${name}(
+    at address: UnsafeMutablePointer<Self>,
+    ${label} operand: Self${defaultValue},
     ordering: AtomicUpdateOrdering = .sequentiallyConsistent
-  ) -> Value {
+  ) -> Self {
     switch ordering {
     % for (swiftOrder, _, _, llvmOrder, failureOrder) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
-      return Value(Builtin.atomicrmw_${llvmop}_${llvmOrder}_${builtinType}(
-        _ptr._rawValue, operand.${getter}))
+      return Self(Builtin.atomicrmw_${llvmop}_${llvmOrder}_${builtinType}(
+        address._rawValue, operand.${getter}))
     % end
     }
   }
-
-  /// Perform an atomic ${doc} operation and return the new value, with
-  /// the specified memory ordering.
-  ///
-  % if "Wrapping" in name:
-  /// Note: This operation silently wraps around on overflow, like the
-  /// `${op}` operator does on `Int` values.
-  ///
-  % end
-  /// - Returns: The new value after the operation.
-  @_semantics("has_constant_evaluable_arguments")
-  @_transparent @_alwaysEmitIntoClient
-  public func ${lowerFirst(name)}ThenLoad(
-    ${label} operand: Value${defaultValue},
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
-  ) -> Value {
-    loadThen${name}(${argLabel(label)}operand, ordering: ordering) ${op} operand
-  }
   % end
 }
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomic${swiftType} {
-  /// Perform an atomic wrapping increment operation with the specified memory
-  /// ordering.
-  ///
-  /// Note: This operation silently wraps around on overflow, like the
-  /// `&+=` operator does on `Int` values.
-  @_semantics("has_constant_evaluable_arguments")
-  @_transparent @_alwaysEmitIntoClient
-  public func wrappingIncrement(
-    by operand: Value = 1,
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
-  ) {
-    _ = loadThenWrappingIncrement(by: operand, ordering: ordering)
-  }
-
-  /// Perform an atomic wrapping decrement operation with the specified memory
-  /// ordering.
-  ///
-  /// Note: This operation silently wraps around on overflow, like the
-  /// `&-=` operator does on `Int` values.
-  @_semantics("has_constant_evaluable_arguments")
-  @_transparent @_alwaysEmitIntoClient
-  public func wrappingDecrement(
-    by operand: Value = 1,
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
-  ) {
-    _ = loadThenWrappingDecrement(by: operand, ordering: ordering)
-  }
-}
-% end

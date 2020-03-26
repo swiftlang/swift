@@ -272,9 +272,9 @@ public func atomicMemoryFence(
 ) {
   switch ordering {
   case .relaxed: break
-  case .acquiring: _atomicAcquiringMemoryFence()
-  case .releasing: _atomicReleasingMemoryFence()
-  case .acquiringAndReleasing: _atomicAcquiringAndReleasingMemoryFence()
-  default: _atomicSerializedMemoryFence()
+  case .acquiring: Builtin.fence_acquire()
+  case .releasing: Builtin.fence_release()
+  case .acquiringAndReleasing: Builtin.fence_acqrel()
+  default: Builtin.fence_seqcst()
   }
 }

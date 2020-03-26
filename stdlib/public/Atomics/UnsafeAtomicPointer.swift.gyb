@@ -1,0 +1,244 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+  def lowerFirst(str):
+    return str[:1].lower() + str[1:] if str else ""
+
+  def argLabel(label):
+    return label + ": " if label <> "_" else ""
+
+  integerOperations = [
+    # Swift name,         llvm name,  operator, label,  doc
+    ('WrappingIncrement', 'add',      '&+',     "by",   "wrapping add"),
+    ('WrappingDecrement', 'sub',      '&-',     "by",   "wrapping subtract"),
+    ('BitwiseAnd',        'and',      '&',      "with", "bitwise and"),
+    ('BitwiseOr',         'or',       '|',      "with", "bitwise or"),
+    ('BitwiseXor',        'xor',      '^',      "with", "bitwise xor")
+  ]
+
+  def argLabel(label):
+    return label + ": " if label <> "_" else ""
+
+  def defaultValue(name):
+    return " = 1" if "crement" in name else ""
+}%
+
+import Swift
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@frozen
+public struct UnsafeAtomicPointer<Value: AtomicProtocol> {
+  @usableFromInline
+  internal let _ptr: UnsafeMutablePointer<Value.AtomicStorage>
+
+  @_transparent // Debug performance
+  public init(
+    @_nonEphemeral at address: UnsafeMutablePointer<Value.AtomicStorage>
+  ) {
+    self._ptr = address
+  }
+
+  @inlinable
+  public static func create(initialValue: Value) -> Self {
+    let ptr = UnsafeMutablePointer<Value.AtomicStorage>.allocate(capacity: 1)
+    ptr.initialize(to: Value.atomicStorage(for: initialValue))
+    return Self(at: ptr)
+  }
+
+  @inlinable
+  public func destroy() {
+    Value.deinitializeAtomicStorage(at: _ptr)
+    _ptr.deallocate()
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicPointer {
+  /// Atomically loads and returns the current value,
+  /// with the specified memory ordering.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public func load(
+    ordering: AtomicLoadOrdering = .sequentiallyConsistent
+  ) -> Value {
+    Value.atomicLoad(at: _ptr, ordering: ordering)
+  }
+
+  /// Atomically sets the current value to `desired`,
+  /// with the specified memory ordering.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public func store(
+    _ desired: Value,
+    ordering: AtomicStoreOrdering = .sequentiallyConsistent
+  ) {
+    Value.atomicStore(at: _ptr, desired, ordering: ordering)
+  }
+
+  /// Atomically sets the current value to `desired` and returns the previous
+  /// value, with the specified memory ordering.
+  ///
+  /// - Returns: The original value.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public func exchange(
+    _ desired: Value,
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+  ) -> Value {
+    Value.atomicExchange(at: _ptr, desired, ordering: ordering)
+  }
+
+  /// Perform an atomic compare and exchange operation with
+  /// the specified memory ordering.
+  ///
+  /// This operation is equivalent to the following pseudocode:
+  ///
+  /// ```
+  /// atomic(self, ordering: ordering) { value in
+  ///   guard value == expected else { return (false, value) }
+  ///   value = desired
+  ///   return (true, expected)
+  /// }
+  /// ```
+  ///
+  /// This method implements a "strong" compare and exchange operation
+  /// that does not permit spurious failures.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public func compareExchange(
+    expected: Value,
+    desired: Value,
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+  ) -> (exchanged: Bool, original: Value) {
+    Value.atomicCompareExchange(
+      at: _ptr,
+      expected: expected,
+      desired: desired,
+      ordering: ordering)
+  }
+
+  /// Perform an atomic compare and exchange operation with the specified
+  /// success/failure memory orderings.
+  ///
+  /// This operation is equivalent to the following pseudocode:
+  ///
+  /// ```
+  /// atomic(self) { currentValue in
+  ///   let original = currentValue
+  ///   guard original == expected else { return (false, original) }
+  ///   currentValue = desired
+  ///   return (true, original)
+  /// }
+  /// ```
+  ///
+  /// The `ordering` argument specifies the memory ordering to use when the
+  /// operation manages to update the current value, while `failureOrdering`
+  /// will be used when the operation leaves the value intact.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public func compareExchange(
+    expected: Value,
+    desired: Value,
+    ordering: AtomicUpdateOrdering, // Note: no default
+    failureOrdering: AtomicLoadOrdering // Note: no default
+  ) -> (exchanged: Bool, original: Value) {
+    Value.atomicCompareExchange(
+      at: _ptr,
+      expected: expected,
+      desired: desired,
+      ordering: ordering,
+      failureOrdering: failureOrdering)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicPointer where Value: AtomicInteger {
+  % for (name, _, op, label, doc) in integerOperations:
+  /// Perform an atomic ${doc} operation and return the original value, with
+  /// the specified memory ordering.
+  ///
+  % if "Wrapping" in name:
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `${op}` operator does on `Int` values.
+  ///
+  % end
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public func loadThen${name}(
+    ${label} operand: Value${defaultValue(name)},
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+  ) -> Value {
+    Value.atomicLoadThen${name}(
+      at: _ptr,
+      ${argLabel(label)}operand,
+      ordering: ordering)
+  }
+  % end
+
+  % for (name, _, op, label, doc) in integerOperations:
+  /// Perform an atomic ${doc} operation and return the new value, with
+  /// the specified memory ordering.
+  ///
+  % if "Wrapping" in name:
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `${op}` operator does on `Int` values.
+  ///
+  % end
+  /// - Returns: The new value after the operation.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public func ${lowerFirst(name)}ThenLoad(
+    ${label} operand: Value${defaultValue(name)},
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+  ) -> Value {
+    Value.atomicLoadThen${name}(
+      at: _ptr,
+      ${argLabel(label)}operand,
+      ordering: ordering) ${op} operand
+  }
+  % end
+
+  /// Perform an atomic wrapping increment operation with the specified memory
+  /// ordering.
+  ///
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `&+=` operator does on `Int` values.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public func wrappingIncrement(
+    by operand: Value = 1,
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+  ) {
+    _ = Value.atomicLoadThenWrappingIncrement(
+      at: _ptr,
+      by: operand,
+      ordering: ordering)
+  }
+
+  /// Perform an atomic wrapping decrement operation with the specified memory
+  /// ordering.
+  ///
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `&-=` operator does on `Int` values.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public func wrappingDecrement(
+    by operand: Value = 1,
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+  ) {
+    _ = Value.atomicLoadThenWrappingDecrement(
+      at: _ptr,
+      by: operand,
+      ordering: ordering)
+  }
+}

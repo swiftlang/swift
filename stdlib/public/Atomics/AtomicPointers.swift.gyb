@@ -1,0 +1,514 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+  def atomicTypes():
+    return [
+      # Swift                     AtomicStorage              Builtin
+      ("UnsafeMutableRawPointer", "UnsafeMutableRawPointer", "RawPointer"),
+      ("UnsafeMutablePointer",    "UnsafeMutablePointer",    "RawPointer"),
+      ("Unmanaged",               "UnsafeMutableRawPointer", "RawPointer"),
+    ]
+
+  def nullableAtomicTypes():
+    return [
+      # Swift                     AtomicStorage                Builtin
+      ("UnsafeMutableRawPointer", "UnsafeMutableRawPointer?",  "RawPointer"),
+      ("UnsafeMutablePointer",    "UnsafeMutablePointer?",     "RawPointer"),
+      ("Unmanaged",               "UnsafeMutableRawPointer?",  "RawPointer"),
+    ]
+
+  def rmwOrderings():
+    return [
+      # Swift enum case,         API name,                 documentation name,        llvm name,   failure name
+      ('relaxed',                'Relaxed',                'relaxed',                 'monotonic', 'monotonic'),
+      ('acquiring',              'Acquiring',              'acquiring',               'acquire',   'acquire'),
+      ('releasing',              'Releasing',              'releasing',               'release',   'monotonic'),
+      ('acquiringAndReleasing',  'AcquiringAndReleasing',  'acquiring-and-releasing', 'acqrel',    'acquire'),
+      ('sequentiallyConsistent', 'Serialized',             'sequentially consistent', 'seqcst',    'seqcst'),
+    ]
+
+  def loadOrderings():
+    return [
+      # Swift enum case,         API name,     doc name,                  llvm name
+      ('relaxed',                'Relaxed',    'relaxed',                 'monotonic'),
+      ('acquiring',              'Acquiring',  'acquiring',               'acquire'),
+      ('sequentiallyConsistent', 'Serialized', 'sequentially consistent', 'seqcst'),
+    ]
+
+  def storeOrderings():
+    return [
+      # Swift enum case,         API name,     doc name,                  llvm name
+      ('relaxed',                'Relaxed',    'relaxed',                 'monotonic'),
+      ('releasing',              'Releasing',  'releasing',               'release'),
+      ('sequentiallyConsistent', 'Serialized', 'sequentially consistent', 'seqcst'),
+    ]
+
+  def caseStatementForOrdering(ordering):
+    if ordering == 'sequentiallyConsistent':
+      return "default"
+    else:
+      return "case .{}".format(ordering)
+
+  # FIXME: Swift should provide intrinsics for arbitrary ordering pairs
+  def llvmOrders(rmw, load): # See llvm/Support/AtomicOrdering.h
+    def max(rmw, load):
+      if load == "acquire":
+        if rmw == "monotonic":
+          return "acquire"
+        if rmw == "release":
+          return "acqrel"
+      if load == "seqcst":
+        return "seqcst"
+      return rmw
+    return max(rmw, load) + "_" + load
+}%
+
+import Swift
+
+
+% for (swiftType, atomicType, builtinType) in atomicTypes():
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension ${swiftType}: AtomicProtocol {
+  public typealias AtomicStorage = ${atomicType}
+
+  % if swiftType == "Unmanaged":
+  @_transparent @_alwaysEmitIntoClient
+  internal init(_atomicRawValue raw: Builtin.${builtinType}) {
+    self = Unmanaged.fromOpaque(UnsafeRawPointer(raw))
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  internal var _atomicRawValue: Builtin.${builtinType} {
+    toOpaque()._rawValue
+  }
+  % else:
+  @_transparent @_alwaysEmitIntoClient
+  internal init(_atomicRawValue raw: Builtin.${builtinType}) {
+    self.init(raw)
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  internal var _atomicRawValue: Builtin.${builtinType} {
+    self._rawValue
+  }
+  % end
+
+  @inlinable
+  public static func atomicStorage(for value: Self) -> AtomicStorage {
+    % if swiftType == "Unmanaged":
+    return value.toOpaque()
+    % else:
+    return value
+    % end
+  }
+
+  @inlinable
+  public static func deinitializeAtomicStorage(
+    at address: UnsafeMutablePointer<AtomicStorage>
+  ) {
+    address.deinitialize(count: 1)
+  }
+
+  /// Atomically loads and returns the current value,
+  /// with the specified memory ordering.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicLoad(
+    at address: UnsafeMutablePointer<AtomicStorage>,
+    ordering: AtomicLoadOrdering = .sequentiallyConsistent
+  ) -> Self {
+    let raw: Builtin.${builtinType}
+    switch ordering {
+%   for (swiftOrder, _, _, llvmOrder) in loadOrderings():
+    ${caseStatementForOrdering(swiftOrder)}:
+      raw = Builtin.atomicload_${llvmOrder}_${builtinType}(
+        address._atomicRawValue)
+%   end
+    }
+    return Self(_atomicRawValue: raw)
+  }
+
+  /// Atomically sets the current value to `desired`,
+  /// with the specified memory ordering.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicStore(
+    at address: UnsafeMutablePointer<AtomicStorage>,
+    _ desired: Self,
+    ordering: AtomicStoreOrdering = .sequentiallyConsistent
+  ) {
+    switch ordering {
+%   for (swiftOrder, _, _, llvmOrder) in storeOrderings():
+    ${caseStatementForOrdering(swiftOrder)}:
+      Builtin.atomicstore_${llvmOrder}_${builtinType}(
+        address._rawValue,
+        desired._atomicRawValue)
+%   end
+    }
+  }
+
+  /// Atomically sets the current value to `desired` and returns the previous
+  /// value, with the specified memory ordering.
+  ///
+  /// - Returns: The original value.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicExchange(
+    at address: UnsafeMutablePointer<AtomicStorage>,
+    _ desired: Self,
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+  ) -> Self {
+    let rawResult: Builtin.${builtinType}
+    switch ordering {
+%   for (swiftOrder, _, _, llvmOrder, _) in rmwOrderings():
+    ${caseStatementForOrdering(swiftOrder)}:
+      rawResult = Builtin.atomicrmw_xchg_${llvmOrder}_${builtinType}(
+        address._rawValue,
+        desired._atomicRawValue)
+%   end
+    }
+    return Self(_atomicRawValue: rawResult)
+  }
+
+  /// Perform an atomic compare and exchange operation with
+  /// the specified memory ordering.
+  ///
+  /// This operation is equivalent to the following pseudocode:
+  ///
+  /// ```
+  /// atomic(self, ordering: ordering) { value in
+  ///   guard value == expected else { return (false, value) }
+  ///   value = desired
+  ///   return (true, expected)
+  /// }
+  /// ```
+  ///
+  /// This method implements a "strong" compare and exchange operation
+  /// that does not permit spurious failures.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicCompareExchange(
+    at address: UnsafeMutablePointer<AtomicStorage>,
+    expected: Self,
+    desired: Self,
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+  ) -> (exchanged: Bool, original: Self) {
+    let old: Builtin.${builtinType}
+    let won: Builtin.Int1
+    switch ordering {
+%   for (swiftOrder, _, _, llvmOrder, failureOrder) in rmwOrderings():
+    ${caseStatementForOrdering(swiftOrder)}:
+      (old, won) = Builtin.cmpxchg_${llvmOrder}_${failureOrder}_${builtinType}(
+        address._rawValue,
+        expected._atomicRawValue,
+        desired._atomicRawValue)
+%   end
+    }
+    return (
+      Bool(_builtinBooleanLiteral: won),
+      Self(_atomicRawValue: old))
+  }
+
+  /// Perform an atomic compare and exchange operation with the specified
+  /// success/failure memory orderings.
+  ///
+  /// This operation is equivalent to the following pseudocode:
+  ///
+  /// ```
+  /// atomic(self) { currentValue in
+  ///   let original = currentValue
+  ///   guard original == expected else { return (false, original) }
+  ///   currentValue = desired
+  ///   return (true, original)
+  /// }
+  /// ```
+  ///
+  /// The `ordering` argument specifies the memory ordering to use when the
+  /// operation manages to update the current value, while `failureOrdering`
+  /// will be used when the operation leaves the value intact.
+  ///
+  /// The `failureOrdering` argument currently isn't allowed to introduce a
+  /// synchronization constraint that isn't also guaranteed by `ordering`.
+  /// (This limitation may be lifted in the future.) For example:
+  ///
+  /// ```
+  /// // OK
+  /// ptr._atomicCompareExchangeWord(
+  ///   expected: 1, desired: 2,
+  ///   ordering: .acquiringAndReleasing, failureOrdering: .relaxed)
+  ///
+  /// // Not supported:
+  /// ptr._atomicCompareExchangeWord(
+  ///   expected: 3, desired: 0,
+  ///   ordering: .releasing, failureOrdering: .acquiring)
+  /// ```
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicCompareExchange(
+    at address: UnsafeMutablePointer<AtomicStorage>,
+    expected: Self,
+    desired: Self,
+    ordering: AtomicUpdateOrdering, // Note: no default
+    failureOrdering: AtomicLoadOrdering // Note: no default
+  ) -> (exchanged: Bool, original: Self) {
+    let old: Builtin.${builtinType}
+    let won: Builtin.Int1
+    switch (ordering, failureOrdering) {
+% for (swiftSuccess, _, _, llvmSuccess, _) in rmwOrderings():
+%   for (swiftFailure, _, _, llvmFailure) in loadOrderings():
+    case (.${swiftSuccess}, .${swiftFailure}):
+      (old, won) = Builtin.cmpxchg_${llvmOrders(llvmSuccess, llvmFailure)}_${builtinType}(
+        address._rawValue,
+        expected._atomicRawValue,
+        desired._atomicRawValue)
+%   end
+% end
+    default:
+      (old, won) = Builtin.cmpxchg_seqcst_seqcst_${builtinType}(
+        address._rawValue,
+        expected._atomicRawValue,
+        desired._atomicRawValue)
+    }
+    return (
+      Bool(_builtinBooleanLiteral: won),
+      Self(_atomicRawValue: old))
+  }
+}
+% end
+
+% for (swiftType, atomicType, builtinType) in nullableAtomicTypes():
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension ${swiftType}: NullableAtomic {
+  public typealias NullableAtomicStorage = ${atomicType}
+
+  % if swiftType == "Unmanaged":
+  @_transparent @_alwaysEmitIntoClient
+  internal init?(_atomicOptionalRawValue raw: Builtin.${builtinType}) {
+    // FIXME: This assumes the nil value is represented by all zero bits.
+    if Int(Builtin.ptrtoint_Word(raw)) == 0 { return nil }
+    self = Unmanaged.fromOpaque(UnsafeRawPointer(raw))
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  internal static func _atomicOptionalRawValue(
+    for value: Self?
+  ) -> Builtin.${builtinType} {
+    // FIXME: This assumes the nil value is represented by all zero bits.
+    guard let value = value else {
+      return Builtin.inttoptr_Word(0._builtinWordValue)
+    }
+    return value.toOpaque()._rawValue
+  }
+  % else:
+  @_transparent @_alwaysEmitIntoClient
+  internal init?(_atomicOptionalRawValue raw: Builtin.${builtinType}) {
+    // FIXME: This assumes the nil value is represented by all zero bits.
+    if Int(Builtin.ptrtoint_Word(raw)) == 0 { return nil }
+    self.init(raw)
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  internal static func _atomicOptionalRawValue(
+    for value: Self?
+  ) -> Builtin.${builtinType} {
+    // FIXME: This assumes the nil value is represented by all zero bits.
+    guard let value = value else {
+      return Builtin.inttoptr_Word(0._builtinWordValue)
+    }
+    return value._rawValue
+  }
+  % end
+
+  @inlinable
+  public static func nullableAtomicStorage(
+    for value: Self?
+  ) -> NullableAtomicStorage {
+    % if swiftType == "Unmanaged":
+    return value?.toOpaque()
+    % else:
+    return value
+    % end
+  }
+
+  @inlinable
+  public static func deinitializeNullableAtomicStorage(
+    at address: UnsafeMutablePointer<NullableAtomicStorage>
+  ) {
+    address.deinitialize(count: 1)
+  }
+
+  /// Atomically loads and returns the current value,
+  /// with the specified memory ordering.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicOptionalLoad(
+    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    ordering: AtomicLoadOrdering = .sequentiallyConsistent
+  ) -> Self? {
+    let raw: Builtin.${builtinType}
+    switch ordering {
+%   for (swiftOrder, _, _, llvmOrder) in loadOrderings():
+    ${caseStatementForOrdering(swiftOrder)}:
+      raw = Builtin.atomicload_${llvmOrder}_${builtinType}(
+        address._rawValue)
+%   end
+    }
+    return ${swiftType}(_atomicOptionalRawValue: raw)
+  }
+
+  /// Atomically sets the current value to `desired`,
+  /// with the specified memory ordering.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicOptionalStore(
+    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    _ desired: Self?,
+    ordering: AtomicStoreOrdering = .sequentiallyConsistent
+  ) {
+    switch ordering {
+%   for (swiftOrder, _, _, llvmOrder) in storeOrderings():
+    ${caseStatementForOrdering(swiftOrder)}:
+      Builtin.atomicstore_${llvmOrder}_${builtinType}(
+        address._rawValue,
+        Self._atomicOptionalRawValue(for: desired))
+%   end
+    }
+  }
+
+  /// Atomically sets the current value to `desired` and returns the previous
+  /// value, with the specified memory ordering.
+  ///
+  /// - Returns: The original value.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicOptionalExchange(
+    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    _ desired: Self?,
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+  ) -> Self? {
+    let rawResult: Builtin.${builtinType}
+    switch ordering {
+%   for (swiftOrder, _, _, llvmOrder, _) in rmwOrderings():
+    ${caseStatementForOrdering(swiftOrder)}:
+      rawResult = Builtin.atomicrmw_xchg_${llvmOrder}_${builtinType}(
+        address._rawValue,
+        Self._atomicOptionalRawValue(for: desired))
+%   end
+    }
+    return Self(_atomicOptionalRawValue: rawResult)
+  }
+
+  /// Perform an atomic compare and exchange operation with
+  /// the specified memory ordering.
+  ///
+  /// This operation is equivalent to the following pseudocode:
+  ///
+  /// ```
+  /// atomic(self, ordering: ordering) { value in
+  ///   guard value == expected else { return (false, value) }
+  ///   value = desired
+  ///   return (true, expected)
+  /// }
+  /// ```
+  ///
+  /// This method implements a "strong" compare and exchange operation
+  /// that does not permit spurious failures.
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicOptionalCompareExchange(
+    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    expected: Self?,
+    desired: Self?,
+    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+  ) -> (exchanged: Bool, original: Self?) {
+    let old: Builtin.${builtinType}
+    let won: Builtin.Int1
+    switch ordering {
+%   for (swiftOrder, _, _, llvmOrder, failureOrder) in rmwOrderings():
+    ${caseStatementForOrdering(swiftOrder)}:
+      (old, won) = Builtin.cmpxchg_${llvmOrder}_${failureOrder}_${builtinType}(
+        address._rawValue,
+        Self._atomicOptionalRawValue(for: expected),
+        Self._atomicOptionalRawValue(for: desired))
+%   end
+    }
+    return (
+      Bool(_builtinBooleanLiteral: won),
+      Self(_atomicOptionalRawValue: old))
+  }
+
+  /// Perform an atomic compare and exchange operation with the specified
+  /// success/failure memory orderings.
+  ///
+  /// This operation is equivalent to the following pseudocode:
+  ///
+  /// ```
+  /// atomic(self) { currentValue in
+  ///   let original = currentValue
+  ///   guard original == expected else { return (false, original) }
+  ///   currentValue = desired
+  ///   return (true, original)
+  /// }
+  /// ```
+  ///
+  /// The `ordering` argument specifies the memory ordering to use when the
+  /// operation manages to update the current value, while `failureOrdering`
+  /// will be used when the operation leaves the value intact.
+  ///
+  /// The `failureOrdering` argument currently isn't allowed to introduce a
+  /// synchronization constraint that isn't also guaranteed by `ordering`.
+  /// (This limitation may be lifted in the future.) For example:
+  ///
+  /// ```
+  /// // OK
+  /// ptr._atomicCompareExchangeWord(
+  ///   expected: 1, desired: 2,
+  ///   ordering: .acquiringAndReleasing, failureOrdering: .relaxed)
+  ///
+  /// // Not supported:
+  /// ptr._atomicCompareExchangeWord(
+  ///   expected: 3, desired: 0,
+  ///   ordering: .releasing, failureOrdering: .acquiring)
+  /// ```
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicOptionalCompareExchange(
+    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    expected: Self?,
+    desired: Self?,
+    ordering: AtomicUpdateOrdering, // Note: no default
+    failureOrdering: AtomicLoadOrdering // Note: no default
+  ) -> (exchanged: Bool, original: Self?) {
+    let old: Builtin.${builtinType}
+    let won: Builtin.Int1
+    switch (ordering, failureOrdering) {
+% for (swiftSuccess, _, _, llvmSuccess, _) in rmwOrderings():
+%   for (swiftFailure, _, _, llvmFailure) in loadOrderings():
+    case (.${swiftSuccess}, .${swiftFailure}):
+      (old, won) = Builtin.cmpxchg_${llvmOrders(llvmSuccess, llvmFailure)}_${builtinType}(
+        address._rawValue,
+        Self._atomicOptionalRawValue(for: expected),
+        Self._atomicOptionalRawValue(for: desired))
+%   end
+% end
+    default:
+      (old, won) = Builtin.cmpxchg_seqcst_seqcst_${builtinType}(
+        address._rawValue,
+        Self._atomicOptionalRawValue(for: expected),
+        Self._atomicOptionalRawValue(for: desired))
+    }
+    return (
+      Bool(_builtinBooleanLiteral: won),
+      Self(_atomicOptionalRawValue: old))
+  }
+}
