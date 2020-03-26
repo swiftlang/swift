@@ -265,3 +265,10 @@ func rdar_60185506() {
     let _ = (x?.foo ?? 0) <= 0.5 // Ok
   }
 }
+
+// rdar://problem/60727310
+func rdar60727310() {
+  func myAssertion<T>(_ a: T, _ op: ((T,T)->Bool), _ b: T) {}
+  var e: Error? = nil
+  myAssertion(e, ==, nil) // expected-error {{binary operator '==' cannot be applied to two 'Error?' operands}}
+}

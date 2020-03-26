@@ -82,6 +82,9 @@ public:
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
+  /// If indexing system modules, don't index the stdlib.
+  bool IndexIgnoreStdlib = false;
+
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 

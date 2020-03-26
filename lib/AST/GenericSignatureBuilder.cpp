@@ -3659,8 +3659,14 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
       // Check whether this associated type references a protocol to which
       // the base conforms. If not, it's unresolved.
       if (baseEquivClass->conformsTo.find(assocType->getProtocol())
-            == baseEquivClass->conformsTo.end())
-        return ResolvedType::forUnresolved(baseEquivClass);
+          == baseEquivClass->conformsTo.end()) {
+        if (!baseEquivClass->concreteType ||
+            !lookupConformance(type->getCanonicalType(),
+                               baseEquivClass->concreteType,
+                               assocType->getProtocol())) {
+          return ResolvedType::forUnresolved(baseEquivClass);
+        }
+      }
 
       nestedTypeDecl = assocType;
     } else {
