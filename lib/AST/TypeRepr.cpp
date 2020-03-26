@@ -298,10 +298,7 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@autoclosure") << " ";
   if (hasAttr(TAK_escaping))
     Printer.printSimpleAttr("@escaping") << " ";
-  // SWIFT_ENABLE_TENSORFLOW
-  // `@nondiff` is deprecated; it is renamed to `@noDerivative`.
-  if (hasAttr(TAK_noDerivative) || hasAttr(TAK_nondiff))
-  // SWIFT_ENABLE_TENSORFLOW END
+  if (hasAttr(TAK_noDerivative))
     Printer.printSimpleAttr("@noDerivative") << " ";
   if (hasAttr(TAK_differentiable)) {
     if (Attrs.isLinear()) {

@@ -81,9 +81,6 @@ func differentiableToLinear(_ f: @escaping @differentiable (Float) -> Float) {
 // Parameter selection (@noDerivative)
 //===----------------------------------------------------------------------===//
 
-// expected-warning @+1 {{'@nondiff' is deprecated; use '@noDerivative' instead}}
-let _: @differentiable (@nondiff Float, Float) -> Float
-
 // expected-error @+1 {{'@noDerivative' may only be used on parameters of '@differentiable' function types}}
 let _: (@noDerivative Float, Float) -> Float
 

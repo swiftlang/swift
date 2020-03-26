@@ -2458,25 +2458,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.clearAttribute(TAK_noDerivative);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // `@nondiff` is deprecated; it is renamed to `@noDerivative`.
-  if (attrs.has(TAK_nondiff)) {
-    diagnose(attrs.getLoc(TAK_nondiff), diag::nondiff_attr_deprecated);
-    if (!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-      diagnose(attrs.getLoc(TAK_nondiff),
-               diag::experimental_differentiable_programming_disabled);
-    } else if (!isParam) {
-      // @nondiff is only valid on parameters.
-      diagnose(attrs.getLoc(TAK_nondiff),
-               (isVariadicFunctionParam
-                    ? diag::attr_not_on_variadic_parameters
-                    : diag::attr_only_on_parameters_of_differentiable),
-               "@nondiff");
-    }
-    attrs.clearAttribute(TAK_nondiff);
-  }
-  // SWIFT_ENABLE_TENSORFLOW END
-
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
     if (!ty->isExistentialType()) {
@@ -2608,18 +2589,6 @@ bool TypeResolver::resolveASTFunctionTypeParams(
         else
           noDerivative = true;
       }
-      // SWIFT_ENABLE_TENSORFLOW
-      if (attrTypeRepr->getAttrs().has(TAK_nondiff)) {
-        if (diffKind == DifferentiabilityKind::NonDifferentiable &&
-            Context.LangOpts.EnableExperimentalDifferentiableProgramming)
-          diagnose(eltTypeRepr->getLoc(),
-                   diag::attr_only_on_parameters_of_differentiable,
-                   "@nondiff")
-              .highlight(eltTypeRepr->getSourceRange());
-        else
-          noDerivative = true;
-      }
-      // SWIFT_ENABLE_TENSORFLOW END
     }
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
@@ -3142,17 +3111,6 @@ SILParameterInfo TypeResolver::resolveSILParameter(
       attrs.clearAttribute(TAK_noDerivative);
       differentiability = SILParameterDifferentiability::NotDifferentiable;
     }
-
-    // SWIFT_ENABLE_TENSORFLOW
-    if (attrs.has(TAK_noDerivative)) {
-      attrs.clearAttribute(TAK_noDerivative);
-      differentiability = SILParameterDifferentiability::NotDifferentiable;
-    }
-    if (attrs.has(TAK_nondiff)) {
-      attrs.clearAttribute(TAK_nondiff);
-      differentiability = SILParameterDifferentiability::NotDifferentiable;
-    }
-
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
   } else {
     type = resolveType(repr, options);
