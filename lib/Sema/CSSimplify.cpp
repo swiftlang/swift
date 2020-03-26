@@ -5073,6 +5073,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // func foo<T: BinaryInteger>(_: T) {}
     // foo(Foo.bar) <- if `Foo` doesn't have `bar` there is
     //                 no reason to complain about missing conformance.
+    increaseScore(SK_Fix);
     return SolutionKind::Solved;
   }
 
@@ -6465,6 +6466,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                baseObjTy->isHole()) {
       // If base type is a "hole" there is no reason to record any
       // more "member not found" fixes for chained member references.
+      increaseScore(SK_Fix);
       markMemberTypeAsPotentialHole(memberTy);
       return SolutionKind::Solved;
     }

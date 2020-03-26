@@ -1139,6 +1139,23 @@ static bool debugConstraintSolverForTarget(
   return startBound != endBound;
 }
 
+/// If we aren't certain that we've emitted a diagnostic, emit a fallback
+/// diagnostic.
+static void maybeProduceFallbackDiagnostic(
+    ConstraintSystem &cs, SolutionApplicationTarget target) {
+  if (cs.Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
+    return;
+
+  // Before producing fatal error here, let's check if there are any "error"
+  // diagnostics already emitted or waiting to be emitted. Because they are
+  // a better indication of the problem.
+  ASTContext &ctx = cs.getASTContext();
+  if (ctx.Diags.hadAnyError() || ctx.hasDelayedConformanceErrors())
+    return;
+
+  ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+}
+
 Optional<std::vector<Solution>> ConstraintSystem::solve(
     SolutionApplicationTarget &target,
     ExprTypeCheckListener *listener,
@@ -1184,7 +1201,7 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
     }
 
     case SolutionResult::Error:
-      maybeProduceFallbackDiagnostic(target);
+      maybeProduceFallbackDiagnostic(*this, target);
       return None;
 
     case SolutionResult::TooComplex:

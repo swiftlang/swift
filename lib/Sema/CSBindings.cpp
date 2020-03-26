@@ -1086,10 +1086,6 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     cs.DefaultedConstraints.push_back(srcLocator);
 
     if (type->isHole()) {
-      // Reflect in the score that this type variable couldn't be
-      // resolved and had to be bound to a placeholder "hole" type.
-      cs.increaseScore(SK_Hole);
-
       if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
         auto path = dstLocator->getPath();
         // Drop `generic parameter` locator element so that all missing

@@ -634,8 +634,6 @@ enum ScoreKind {
 
   /// A fix needs to be applied to the source.
   SK_Fix,
-  /// A hole in the constraint system.
-  SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
   /// A use of a disfavored overload.
@@ -4644,10 +4642,6 @@ public:
   void partitionDisjunction(ArrayRef<Constraint *> Choices,
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
-
-  /// If we aren't certain that we've emitted a diagnostic, emit a fallback
-  /// diagnostic.
-  void maybeProduceFallbackDiagnostic(SolutionApplicationTarget target) const;
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
