@@ -1881,9 +1881,10 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
 
     // Then in the extended nominal type.
     if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
-      auto extended = extension->getExtendedNominal();
-      auto extSPIs = extended->getSPIGroups();
-      if (!extSPIs.empty()) return extSPIs;
+      if (auto extended = extension->getExtendedNominal()) {
+        auto extSPIs = extended->getSPIGroups();
+        if (!extSPIs.empty()) return extSPIs;
+      }
     }
 
     // And finally in the parent context.
