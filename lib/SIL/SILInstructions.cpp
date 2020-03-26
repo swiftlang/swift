@@ -656,45 +656,6 @@ DifferentiableFunctionInst *DifferentiableFunctionInst::create(
                                  derivativeFunctions, HasOwnership);
 }
 
-SILType LinearFunctionInst::getLinearFunctionType(
-    SILValue OriginalFunction, IndexSubset *ParameterIndices) {
-  auto fnTy = OriginalFunction->getType().castTo<SILFunctionType>();
-  auto diffTy = fnTy->getWithDifferentiability(
-      DifferentiabilityKind::Linear, ParameterIndices);
-  return SILType::getPrimitiveObjectType(diffTy);
-}
-
-LinearFunctionInst::LinearFunctionInst(
-    SILDebugLocation Loc, IndexSubset *ParameterIndices,
-    SILValue OriginalFunction, Optional<SILValue> TransposeFunction,
-    bool HasOwnership)
-    : InstructionBaseWithTrailingOperands(
-          OriginalFunction,
-          TransposeFunction.hasValue()
-              ? ArrayRef<SILValue>(TransposeFunction.getPointer(), 1)
-              : ArrayRef<SILValue>(),
-          Loc, getLinearFunctionType(OriginalFunction, ParameterIndices),
-          HasOwnership ? (
-            TransposeFunction
-                ? *mergeSILValueOwnership(
-                       {OriginalFunction, *TransposeFunction})
-                : *mergeSILValueOwnership({OriginalFunction})
-          ) : ValueOwnershipKind(ValueOwnershipKind::None)),
-      ParameterIndices(ParameterIndices),
-      HasTransposeFunction(TransposeFunction.hasValue()) {
-}
-
-LinearFunctionInst *LinearFunctionInst::create(
-    SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
-    SILValue OriginalFunction, Optional<SILValue> TransposeFunction,
-    bool HasOwnership) {
-  size_t size = totalSizeToAlloc<Operand>(TransposeFunction.hasValue() ? 2 : 1);
-  void *buffer = Module.allocateInst(size, alignof(DifferentiableFunctionInst));
-  return ::new (buffer) LinearFunctionInst(
-      Loc, ParameterIndices, OriginalFunction, TransposeFunction,
-      HasOwnership);
-}
-
 SILType DifferentiableFunctionExtractInst::getExtracteeType(
     SILValue function, NormalDifferentiableFunctionTypeComponent extractee,
     SILModule &module) {
@@ -734,31 +695,6 @@ DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
   }
 #endif
 }
-
-SILType LinearFunctionExtractInst::
-getExtracteeType(
-    SILValue function, LinearDifferentiableFunctionTypeComponent extractee,
-    SILModule &module) {
-  auto fnTy = function->getType().castTo<SILFunctionType>();
-  assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Linear);
-  auto originalFnTy = fnTy->getWithoutDifferentiability();
-  switch (extractee) {
-  case LinearDifferentiableFunctionTypeComponent::Original:
-    return SILType::getPrimitiveObjectType(originalFnTy);
-  case LinearDifferentiableFunctionTypeComponent::Transpose:
-    auto transposeFnTy = originalFnTy->getAutoDiffTransposeFunctionType(
-        fnTy->getDifferentiabilityParameterIndices(), module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
-    return SILType::getPrimitiveObjectType(transposeFnTy);
-  }
-}
-
-LinearFunctionExtractInst::LinearFunctionExtractInst(
-    SILModule &module, SILDebugLocation debugLoc,
-    LinearDifferentiableFunctionTypeComponent extractee, SILValue theFunction)
-    : InstructionBase(debugLoc,
-                      getExtracteeType(theFunction, extractee, module)),
-      extractee(extractee), operands(this, theFunction) {}
 
 SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
     SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,

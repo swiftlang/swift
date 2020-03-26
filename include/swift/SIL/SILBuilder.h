@@ -2172,14 +2172,6 @@ public:
         OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
   }
 
-  LinearFunctionInst *createLinearFunction(
-      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
-      Optional<SILValue> TransposeFunction = None) {
-    return insert(LinearFunctionInst::create(
-        getModule(), getSILDebugLocation(Loc), ParameterIndices,
-        OriginalFunction, TransposeFunction, hasOwnership()));
-  }
-
   /// Note: explicit extractee type may be specified only in lowered SIL.
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
       SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
@@ -2187,13 +2179,6 @@ public:
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
         getModule(), getSILDebugLocation(Loc), Extractee, Function,
         ExtracteeType));
-  }
-
-  LinearFunctionExtractInst *createLinearFunctionExtract(
-      SILLocation Loc, LinearDifferentiableFunctionTypeComponent Extractee,
-      SILValue TheFunction) {
-    return insert(new (getModule()) LinearFunctionExtractInst(
-        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
   }
 
   /// Note: explicit function type may be specified only in lowered SIL.

@@ -1627,9 +1627,6 @@ ERROR(sil_inst_autodiff_operand_list_expected_rbrace,PointsToFirstBadToken,
 ERROR(sil_inst_autodiff_expected_differentiable_extractee_kind,PointsToFirstBadToken,
       "expected an extractee kind attribute, which can be one of '[original]', "
       "'[jvp]', and '[vjp]'", ())
-ERROR(sil_inst_autodiff_expected_linear_extractee_kind,PointsToFirstBadToken,
-      "expected an extractee kind attribute, which can be one of '[original]' "
-      "and '[transpose]'", ())
 ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
       "expected an operand of a function type", ())
 ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBadToken,

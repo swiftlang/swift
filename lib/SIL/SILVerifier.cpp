@@ -4640,51 +4640,12 @@ public:
 #endif
   }
 
-  void checkLinearFunctionInst(LinearFunctionInst *lfi) {
-    auto origTy =
-        lfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
-    require(origTy, "The original function must have a function type");
-    require(!origTy->isDifferentiable(),
-            "The original function must not be differentiable");
-    // Skip lowered SIL: LoadableByAddress changes parameter/result conventions.
-    // TODO: Check that transpose function type matches excluding
-    // parameter/result conventions in lowered SIL.
-    if (F.getModule().getStage() == SILStage::Lowered)
-      return;
-    if (lfi->hasTransposeFunction()) {
-      auto transpose = lfi->getTransposeFunction();
-      auto transposeType = transpose->getType().getAs<SILFunctionType>();
-      require(transposeType,
-              "The transpose function must have a function type");
-      require(!transposeType->isDifferentiable(),
-              "The transpose function must not be differentiable");
-      auto expectedTransposeType = origTy->getAutoDiffTransposeFunctionType(
-          lfi->getParameterIndices(), TC, LookUpConformanceInModule(M));
-      // TODO: Consider tightening verification. This requires changes to
-      // `SILFunctionType::getAutoDiffTransposeFunctionType`.
-      requireSameType(
-          SILType::getPrimitiveObjectType(
-              transposeType->getUnsubstitutedType(F.getModule())),
-          SILType::getPrimitiveObjectType(
-              expectedTransposeType->getUnsubstitutedType(F.getModule())),
-          "Transpose type does not match expected transpose type");
-    }
-  }
-
   void checkDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *dfei) {
     auto fnTy = dfei->getOperand()->getType().getAs<SILFunctionType>();
     require(fnTy, "The function operand must have a function type");
     require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal,
             "The function operand must be a '@differentiable' function");
-  }
-
-  void checkLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
-    auto fnTy = lfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
-    require(fnTy, "The function operand must have a function type");
-    require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Linear,
-            "The function operand must be a '@differentiable(linear)' "
-            "function");
   }
 
   void checkDifferentiabilityWitnessFunctionInst(
