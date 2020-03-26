@@ -2152,6 +2152,38 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     break;
   }
+  case SILInstructionKind::DifferentiableFunctionInst: {
+    auto *dfi = cast<DifferentiableFunctionInst>(&SI);
+    SmallVector<ValueID, 4> trailingInfo;
+    auto *paramIndices = dfi->getParameterIndices();
+    for (unsigned idx : paramIndices->getIndices())
+      trailingInfo.push_back(idx);
+    for (auto &op : dfi->getAllOperands()) {
+      auto val = op.get();
+      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
+      trailingInfo.push_back((unsigned)val->getType().getCategory());
+      trailingInfo.push_back(addValueRef(val));
+    }
+    SILInstDifferentiableFunctionLayout::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiableFunctionLayout::Code],
+        paramIndices->getCapacity(), dfi->hasDerivativeFunctions(),
+        trailingInfo);
+    break;
+  }
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto *dfei = cast<DifferentiableFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(dfei->getOperand());
+    auto operandType = dfei->getOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto rawExtractee = (unsigned)dfei->getExtractee();
+    SILInstDifferentiableFunctionExtractLayout::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
+        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
+        rawExtractee, (unsigned)dfei->hasExplicitExtracteeType());
+    break;
+  }
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
     auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
     auto *witness = dwfi->getWitness();
@@ -2541,6 +2573,10 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstNoOperandLayout>();
   registerSILAbbr<SILOneOperandLayout>();
   registerSILAbbr<SILTwoOperandsLayout>();
+  registerSILAbbr<SILInstWitnessMethodLayout>();
+  registerSILAbbr<SILSpecializeAttrLayout>();
+  registerSILAbbr<SILInstDifferentiableFunctionLayout>();
+  registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();
@@ -2555,9 +2591,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
   registerSILAbbr<PropertyLayout>();
   registerSILAbbr<DifferentiabilityWitnessLayout>();
-
-  registerSILAbbr<SILInstWitnessMethodLayout>();
-  registerSILAbbr<SILSpecializeAttrLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.

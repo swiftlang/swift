@@ -1044,6 +1044,9 @@ public:
   
   void visitKeyPathInst(KeyPathInst *I);
 
+  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
+  void
+  visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *i);
   void visitDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *i);
 
@@ -1812,6 +1815,62 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   }
 
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
+}
+
+void IRGenSILFunction::visitDifferentiableFunctionInst(
+    DifferentiableFunctionInst *i) {
+  auto origFnExp = getLoweredExplosion(i->getOriginalFunction());
+  Explosion e;
+  e.add(origFnExp.claimAll());
+  // TODO(TF-1211): Uncomment assertions after upstreaming differentiation
+  // transform.
+  // The mandatory differentiation transform canonicalizes
+  // `differentiable_function` instructions and ensures that derivative operands
+  // are populated.
+  /*
+  assert(i->hasDerivativeFunctions());
+  for (auto &derivFnOperand : i->getDerivativeFunctionArray())
+    e.add(getLoweredExplosion(derivFnOperand.get()).claimAll());
+  setLoweredExplosion(i, e);
+  */
+  // Note: code below is a temporary measure until TF-1211. Derivative function
+  // operands should always exist after the differentiation transform.
+  auto getDerivativeExplosion = [&](AutoDiffDerivativeFunctionKind kind) {
+    // If the derivative value exists, get its explosion.
+    if (i->hasDerivativeFunctions())
+      return getLoweredExplosion(i->getDerivativeFunction(kind));
+    // Otherwise, create an undef explosion.
+    auto origFnType =
+        i->getOriginalFunction()->getType().castTo<SILFunctionType>();
+    auto derivativeFnType = origFnType->getAutoDiffDerivativeFunctionType(
+        i->getParameterIndices(), /*resultIndex*/ 0, kind, i->getModule().Types,
+        LookUpConformanceInModule(i->getModule().getSwiftModule()));
+    auto *undef = SILUndef::get(
+        SILType::getPrimitiveObjectType(derivativeFnType), *i->getFunction());
+    return getLoweredExplosion(undef);
+  };
+  auto jvpExp = getDerivativeExplosion(AutoDiffDerivativeFunctionKind::JVP);
+  e.add(jvpExp.claimAll());
+  auto vjpExp = getDerivativeExplosion(AutoDiffDerivativeFunctionKind::VJP);
+  e.add(vjpExp.claimAll());
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::visitDifferentiableFunctionExtractInst(
+    DifferentiableFunctionExtractInst *i) {
+  unsigned structFieldOffset = i->getExtractee().rawValue;
+  unsigned fieldSize = 1;
+  auto fnRepr = i->getOperand()->getType().getFunctionRepresentation();
+  if (fnRepr == SILFunctionTypeRepresentation::Thick) {
+    structFieldOffset *= 2;
+    fieldSize = 2;
+  }
+  auto diffFnExp = getLoweredExplosion(i->getOperand());
+  assert(diffFnExp.size() == fieldSize * 3);
+  Explosion e;
+  e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
+  (void)diffFnExp.claimAll();
+  setLoweredExplosion(i, e);
 }
 
 void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(

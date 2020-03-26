@@ -2801,6 +2801,35 @@ void ASTMangler::appendDependentProtocolConformance(
   }
 }
 
+void ASTMangler::appendAnyProtocolConformance(
+                                           CanGenericSignature genericSig,
+                                           CanType conformingType,
+                                           ProtocolConformanceRef conformance) {
+  if (conformingType->isTypeParameter()) {
+    assert(genericSig && "Need a generic signature to resolve conformance");
+    auto path = genericSig->getConformanceAccessPath(conformingType,
+                                                     conformance.getAbstract());
+    appendDependentProtocolConformance(path);
+  } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
+    GenericSignature opaqueSignature = opaqueType->getBoundSignature();
+    GenericTypeParamType *opaqueTypeParam = opaqueSignature->getGenericParams().back();
+    ConformanceAccessPath conformanceAccessPath =
+        opaqueSignature->getConformanceAccessPath(opaqueTypeParam,
+                                                  conformance.getAbstract());
+
+    // Append the conformance access path with the signature of the opaque type.
+    {
+      llvm::SaveAndRestore<CanGenericSignature> savedSignature(
+          CurGenericSignature, opaqueSignature.getCanonicalSignature());
+      appendDependentProtocolConformance(conformanceAccessPath);
+    }
+    appendType(conformingType);
+    appendOperator("HO");
+  } else {
+    appendConcreteProtocolConformance(conformance.getConcrete());
+  }
+}
+
 void ASTMangler::appendConcreteProtocolConformance(
                                       const ProtocolConformance *conformance) {
   auto module = conformance->getDeclContext()->getParentModule();
@@ -2841,30 +2870,15 @@ void ASTMangler::appendConcreteProtocolConformance(
       CanType canType = type->getCanonicalType(CurGenericSignature);
       auto proto =
         conditionalReq.getSecondType()->castTo<ProtocolType>()->getDecl();
-      if (canType->isTypeParameter()) {
-        assert(CurGenericSignature &&
-               "Need a generic signature to resolve conformance");
-        auto conformanceAccessPath =
-            CurGenericSignature->getConformanceAccessPath(type, proto);
-        appendDependentProtocolConformance(conformanceAccessPath);
-      } else if (auto opaqueType = canType->getAs<OpaqueTypeArchetypeType>()) {
-        GenericSignature opaqueSignature = opaqueType->getBoundSignature();
-        GenericTypeParamType *opaqueTypeParam = opaqueSignature->getGenericParams().back();
-        ConformanceAccessPath conformanceAccessPath =
-            opaqueSignature->getConformanceAccessPath(opaqueTypeParam, proto);
-
-        // Append the conformance access path with the signature of the opaque type.
-        {
-          llvm::SaveAndRestore<CanGenericSignature> savedSignature(
-              CurGenericSignature, opaqueSignature.getCanonicalSignature());
-          appendDependentProtocolConformance(conformanceAccessPath);
-        }
-        appendType(canType);
-        appendOperator("HO");
+      
+      ProtocolConformanceRef conformance;
+      
+      if (canType->isTypeParameter() || canType->is<OpaqueTypeArchetypeType>()){
+        conformance = ProtocolConformanceRef(proto);
       } else {
-        auto conditionalConf = module->lookupConformance(canType, proto);
-        appendConcreteProtocolConformance(conditionalConf.getConcrete());
+        conformance = module->lookupConformance(canType, proto);
       }
+      appendAnyProtocolConformance(CurGenericSignature, canType, conformance);
       appendListSeparator(firstRequirement);
       break;
     }

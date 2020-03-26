@@ -135,7 +135,6 @@ static bool areConservativelyCompatibleArgumentLabels(
     decl = choice.getDecl();
     break;
 
-  case OverloadChoiceKind::BaseType:
   // KeyPath application is not filtered in `performMemberLookup`.
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::DynamicMemberLookup:
@@ -2395,10 +2394,7 @@ ConstraintSystem::matchTypesBindTypeVar(
     TypeMatchOptions flags, ConstraintLocatorBuilder locator,
     llvm::function_ref<TypeMatchResult()> formUnsolvedResult) {
   assert(typeVar->is<TypeVariableType>() && "Expected a type variable!");
-  // FIXME: Due to some SE-0110 related code farther up we can end
-  // up with type variables wrapped in parens that will trip this
-  // assert. For now, maintain the existing behavior.
-  // assert(!type->is<TypeVariableType>() && "Expected a non-type variable!");
+  assert(!type->is<TypeVariableType>() && "Expected a non-type variable!");
 
   // Simplify the right-hand type and perform the "occurs" check.
   typeVar = getRepresentative(typeVar);
@@ -4105,14 +4101,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return getTypeMatchSuccess();
       }
 
-      assert((type1->is<TypeVariableType>() || type2->is<TypeVariableType>()) &&
-             "Expected a type variable!");
-      // FIXME: Due to some SE-0110 related code farther up we can end
-      // up with type variables wrapped in parens that will trip this
-      // assert. For now, maintain the existing behavior.
-      // assert(
-      //     (!type1->is<TypeVariableType>() || !type2->is<TypeVariableType>())
-      //     && "Expected a non-type variable!");
+      assert((type1->is<TypeVariableType>() != type2->is<TypeVariableType>()) &&
+             "Expected a type variable and a non type variable!");
 
       auto *typeVar = typeVar1 ? typeVar1 : typeVar2;
       auto type = typeVar1 ? type2 : type1;
@@ -5083,7 +5073,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // func foo<T: BinaryInteger>(_: T) {}
     // foo(Foo.bar) <- if `Foo` doesn't have `bar` there is
     //                 no reason to complain about missing conformance.
-    increaseScore(SK_Fix);
     return SolutionKind::Solved;
   }
 
@@ -6476,7 +6465,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                baseObjTy->isHole()) {
       // If base type is a "hole" there is no reason to record any
       // more "member not found" fixes for chained member references.
-      increaseScore(SK_Fix);
       markMemberTypeAsPotentialHole(memberTy);
       return SolutionKind::Solved;
     }

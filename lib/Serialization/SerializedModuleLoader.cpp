@@ -1084,14 +1084,17 @@ SerializedASTFile::lookupNestedType(Identifier name,
   return File.lookupNestedType(name, parent);
 }
 
-OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,
-                                                DeclKind fixity) const {
-  return File.lookupOperator(name, fixity);
+void SerializedASTFile::lookupOperatorDirect(
+    Identifier name, OperatorFixity fixity,
+    TinyPtrVector<OperatorDecl *> &results) const {
+  if (auto *op = File.lookupOperator(name, fixity))
+    results.push_back(op);
 }
 
-PrecedenceGroupDecl *
-SerializedASTFile::lookupPrecedenceGroup(Identifier name) const {
-  return File.lookupPrecedenceGroup(name);
+void SerializedASTFile::lookupPrecedenceGroupDirect(
+    Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) const {
+  if (auto *group = File.lookupPrecedenceGroup(name))
+    results.push_back(group);
 }
 
 void SerializedASTFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,

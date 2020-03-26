@@ -2156,7 +2156,8 @@ TypeDecl *ModuleFile::lookupNestedType(Identifier name,
   return nullptr;
 }
 
-OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
+OperatorDecl *ModuleFile::lookupOperator(Identifier name,
+                                         OperatorFixity fixity) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
   if (!OperatorDecls)

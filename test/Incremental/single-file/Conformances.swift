@@ -10,7 +10,7 @@ private protocol PrivateProtocol { } // expected-provides {{PrivateProtocol}}
 public struct PublicConformance { } // expected-provides {{PublicConformance}}
 // expected-cascading-member {{main.PublicConformance.init}}
 
-// expected-cascading-member {{main.PublicConformance.deinit}}
+// expected-cascading-conformance {{main.PublicConformance}}
 extension PublicConformance: PublicProtocol { }
 extension PublicConformance: InternalProtocol { }
 extension PublicConformance: FilePrivateProtocol { }
@@ -20,8 +20,7 @@ extension PublicConformance: PrivateProtocol { }
 private struct PrivateConformance { } // expected-provides {{PrivateConformance}}
 // expected-cascading-member {{main.PrivateConformance.init}}
 
-// FIXME: This could be a private dependency...
-// expected-cascading-member {{main.PrivateConformance.deinit}}
+// expected-cascading-conformance {{main.PrivateConformance}}
 extension PrivateConformance: PublicProtocol { } // expected-cascading-conformance {{main.PublicProtocol}}
 extension PrivateConformance: InternalProtocol { } // expected-cascading-conformance {{main.InternalProtocol}}
 extension PrivateConformance: FilePrivateProtocol { } // expected-cascading-conformance {{main.FilePrivateProtocol}}

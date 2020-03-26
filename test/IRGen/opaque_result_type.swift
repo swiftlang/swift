@@ -37,7 +37,7 @@ extension String: P {
   // -- mangled underlying type
   // CHECK-SAME:         @"symbolic Si"
   // -- conformance to O
-  // CHECK-SAME:         @"get_witness_table S2i18opaque_result_type1OHpyHC
+  // CHECK-SAME:         @"get_witness_table Si18opaque_result_type1OHpyHC
   // CHECK-SAME:  }>
   func poo() -> some O {
     return 0
@@ -68,7 +68,7 @@ public class C: P, Q {
   // -- mangled underlying type
   // CHECK-SAME:         @"symbolic Si"
   // -- conformance to O
-  // CHECK-SAME:         @"get_witness_table S2i18opaque_result_type1OHpyHC
+  // CHECK-SAME:         @"get_witness_table Si18opaque_result_type1OHpyHC
   // CHECK-SAME:  }>
   func poo() -> some O {
     return 0
@@ -82,9 +82,9 @@ public class C: P, Q {
   // -- mangled underlying type
   // CHECK-SAME:         @"symbolic Si"
   // -- conformance to O
-  // CHECK-SAME:         @"get_witness_table S2i18opaque_result_type1OHpyHC
+  // CHECK-SAME:         @"get_witness_table Si18opaque_result_type1OHpyHC
   // -- conformance to O2
-  // CHECK-SAME:         @"get_witness_table S2i18opaque_result_type2O2HpyHC
+  // CHECK-SAME:         @"get_witness_table Si18opaque_result_type2O2HpyHC
   // CHECK-SAME:  }>
   func qoo() -> some O & O2 {
     return 0
@@ -99,7 +99,7 @@ public class C: P, Q {
 // -- mangled underlying type
 // CHECK-SAME:         @"symbolic SS"
 // -- conformance to P
-// CHECK-SAME:         @"get_witness_table S2S18opaque_result_type1PHpyHC
+// CHECK-SAME:         @"get_witness_table SS18opaque_result_type1PHpyHC
 // CHECK-SAME:  }>
 func foo(x: String) -> some P {
   return x
@@ -113,7 +113,7 @@ func foo(x: String) -> some P {
 // -- mangled underlying type
 // CHECK-SAME:         @"symbolic _____ 18opaque_result_type1CC"
 // -- conformance to Q
-// CHECK-SAME:         @"get_witness_table 18opaque_result_type1CCAcA1QHPyHC
+// CHECK-SAME:         @"get_witness_table 18opaque_result_type1CCAA1QHPyHC
 // CHECK-SAME:  }>
 func bar(y: C) -> some Q {
   return y

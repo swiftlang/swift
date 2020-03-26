@@ -75,6 +75,41 @@ struct AutoDiffDerivativeFunctionKind {
   }
 };
 
+/// A component of a SIL `@differentiable` function-typed value.
+struct NormalDifferentiableFunctionTypeComponent {
+  enum innerty : unsigned { Original = 0, JVP = 1, VJP = 2 } rawValue;
+
+  NormalDifferentiableFunctionTypeComponent() = default;
+  NormalDifferentiableFunctionTypeComponent(innerty rawValue)
+      : rawValue(rawValue) {}
+  NormalDifferentiableFunctionTypeComponent(
+      AutoDiffDerivativeFunctionKind kind);
+  explicit NormalDifferentiableFunctionTypeComponent(unsigned rawValue)
+      : NormalDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit NormalDifferentiableFunctionTypeComponent(StringRef name);
+  operator innerty() const { return rawValue; }
+
+  /// Returns the derivative function kind, if the component is a derivative
+  /// function.
+  Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
+};
+
+/// A component of a SIL `@differentiable(linear)` function-typed value.
+struct LinearDifferentiableFunctionTypeComponent {
+  enum innerty : unsigned {
+    Original = 0,
+    Transpose = 1,
+  } rawValue;
+
+  LinearDifferentiableFunctionTypeComponent() = default;
+  LinearDifferentiableFunctionTypeComponent(innerty rawValue)
+      : rawValue(rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(unsigned rawValue)
+      : LinearDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(StringRef name);
+  operator innerty() const { return rawValue; }
+};
+
 /// A derivative function configuration, uniqued in `ASTContext`.
 /// Identifies a specific derivative function given an original function.
 class AutoDiffDerivativeFunctionIdentifier : public llvm::FoldingSetNode {
@@ -405,6 +440,33 @@ GenericSignature getConstrainedDerivativeGenericSignature(
     SILFunctionType *originalFnTy, IndexSubset *diffParamIndices,
     GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
     bool isTranspose = false);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.applyDerivative`, e.g. `Builtin.applyDerivative_jvp_arity2`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinApplyDerivativeConfig(
+    StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
+    unsigned &arity, bool &rethrows);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.applyTranspose`, e.g. `Builtin.applyTranspose_arity2`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinApplyTransposeConfig(
+  StringRef operationName, unsigned &arity, bool &rethrows);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
+/// `Builtin.differentiableFunction_arity1_throws`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinDifferentiableOrLinearFunctionConfig(
+    StringRef operationName, unsigned &arity, bool &throws);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
+/// `Builtin.differentiableFunction_arity1_throws`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinDifferentiableOrLinearFunctionConfig(
+    StringRef operationName, unsigned &arity, bool &throws);
 
 } // end namespace autodiff
 

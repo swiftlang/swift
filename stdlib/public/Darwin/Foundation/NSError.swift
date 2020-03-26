@@ -1978,6 +1978,26 @@ extension URLError.Code {
 }
 
 extension URLError {
+  /// Reasons used by URLError to indicate why a background URLSessionTask was cancelled.
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  public enum BackgroundTaskCancelledReason : Int {
+    case userForceQuitApplication
+    case backgroundUpdatesDisabled
+    case insufficientSystemResources
+  }
+}
+
+extension URLError {
+  /// Reasons used by URLError to indicate that a URLSessionTask failed because of unsatisfiable network constraints.
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  public enum NetworkUnavailableReason : Int {
+    case cellular
+    case expensive
+    case constrained
+  }
+}
+
+extension URLError {
   private var _nsUserInfo: [AnyHashable : Any] {
     return (self as NSError).userInfo
   }
@@ -1999,6 +2019,24 @@ extension URLError {
     }
 
     return nil
+  }
+
+  /// The reason why a background URLSessionTask was cancelled.
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  public var backgroundTaskCancelledReason: BackgroundTaskCancelledReason? {
+    return (_nsUserInfo[NSURLErrorBackgroundTaskCancelledReasonKey] as? Int).flatMap(BackgroundTaskCancelledReason.init(rawValue:))
+  }
+
+  /// The reason why the network is unavailable when the task failed due to unsatisfiable network constraints.
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  public var networkUnavailableReason: NetworkUnavailableReason? {
+    return (_nsUserInfo[NSURLErrorNetworkUnavailableReasonKey] as? Int).flatMap(NetworkUnavailableReason.init(rawValue:))
+  }
+
+  /// An opaque data blob to resume a failed download task.
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  public var downloadTaskResumeData: Data? {
+    return _nsUserInfo[NSURLSessionDownloadTaskResumeData] as? Data
   }
 }
 

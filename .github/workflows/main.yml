@@ -14,6 +14,14 @@ jobs:
     runs-on: ubuntu-18.04
 
     steps:
+      - name: Free disk space
+        run: |
+          df -h
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
       - uses: actions/checkout@v1
         with:
           path: swift

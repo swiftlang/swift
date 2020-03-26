@@ -1,0 +1,2 @@
+
+precedencegroup DeclaredInModuleD {}

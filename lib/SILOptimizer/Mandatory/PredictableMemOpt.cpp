@@ -1197,38 +1197,30 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
     //
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
-    auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
     auto *loadOperand = &load->getAllOperands()[0];
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-    auto error =
-        checker.checkValue(phi, {loadOperand}, {}, errorKind, &leakingBlocks);
+    bool consumedInLoop = checker.completeConsumingUseSet(
+        phi, loadOperand, [&](SILBasicBlock::iterator iter) {
+          SILBuilderWithScope builder(iter);
+          builder.emitDestroyValueOperation(loc, phi);
+        });
 
-    if (!error.getFoundError()) {
-      // If we did not find an error, then our copy_value must be strongly
-      // control equivalent as our load_borrow. So just insert a destroy_value
-      // for the copy_value.
-      auto next = std::next(load->getIterator());
-      SILBuilderWithScope builder(next);
-      builder.emitDestroyValueOperation(next->getLoc(), phi);
+    // Ok, we found some leaking blocks and potentially that our load is
+    // "consumed" inside a different loop in the loop nest from cvi. If we are
+    // consumed in the loop, then our visit should have inserted all of the
+    // necessary destroys for us by inserting the destroys on the loop
+    // boundaries. So, continue.
+    //
+    // NOTE: This includes cases where due to an infinite loop, we did not
+    // insert /any/ destroys since the loop has no boundary in a certain sense.
+    if (consumedInLoop) {
       continue;
     }
 
-    // Ok, we found some leaking blocks and potentially a loop. If we do not
-    // find a loop, insert the destroy_value after the load_borrow. We do not do
-    // this if we found a loop since our leaking blocks will lifetime extend the
-    // value over the loop.
-    if (!error.getFoundOverConsume()) {
-      auto next = std::next(load->getIterator());
-      SILBuilderWithScope builder(next);
-      builder.emitDestroyValueOperation(next->getLoc(), phi);
-    }
-
-    // Ok, we found some leaking blocks. Insert destroys at the beginning of
-    // these blocks for our copy_value.
-    for (auto *bb : leakingBlocks) {
-      SILBuilderWithScope b(bb->begin());
-      b.emitDestroyValueOperation(loc, phi);
-    }
+    // Otherwise, we need to insert one last destroy after the load for our phi.
+    auto next = std::next(load->getIterator());
+    SILBuilderWithScope builder(next);
+    builder.emitDestroyValueOperation(next->getLoc(), phi);
   }
 
   // Alright! In summary, we just lifetime extended all of our phis,
@@ -1289,38 +1281,30 @@ void AvailableValueAggregator::addMissingDestroysForCopiedValues(
     //
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
-    auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
     auto *loadOperand = &load->getAllOperands()[0];
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-    auto error =
-        checker.checkValue(cvi, {loadOperand}, {}, errorKind, &leakingBlocks);
+    bool consumedInLoop = checker.completeConsumingUseSet(
+        cvi, loadOperand, [&](SILBasicBlock::iterator iter) {
+          SILBuilderWithScope builder(iter);
+          builder.emitDestroyValueOperation(loc, cvi);
+        });
 
-    if (!error.getFoundError()) {
-      // If we did not find an error, then our copy_value must be strongly
-      // control equivalent as our load_borrow. So just insert a destroy_value
-      // for the copy_value.
-      auto next = std::next(load->getIterator());
-      SILBuilderWithScope builder(next);
-      builder.emitDestroyValueOperation(next->getLoc(), cvi);
+    // Ok, we found some leaking blocks and potentially that our load is
+    // "consumed" inside a different loop in the loop nest from cvi. If we are
+    // consumed in the loop, then our visit should have inserted all of the
+    // necessary destroys for us by inserting the destroys on the loop
+    // boundaries. So, continue.
+    //
+    // NOTE: This includes cases where due to an infinite loop, we did not
+    // insert /any/ destroys since the loop has no boundary in a certain sense.
+    if (consumedInLoop) {
       continue;
     }
 
-    // Ok, we found some leaking blocks and potentially a loop. If we do not
-    // find a loop, insert the destroy_value after the load_borrow. We do not do
-    // this if we found a loop since our leaking blocks will lifetime extend the
-    // value over the loop.
-    if (!error.getFoundOverConsume()) {
-      auto next = std::next(load->getIterator());
-      SILBuilderWithScope builder(next);
-      builder.emitDestroyValueOperation(next->getLoc(), cvi);
-    }
-
-    // Ok, we found some leaking blocks. Insert destroys at the beginning of
-    // these blocks for our copy_value.
-    for (auto *bb : leakingBlocks) {
-      SILBuilderWithScope b(bb->begin());
-      b.emitDestroyValueOperation(loc, cvi);
-    }
+    // Otherwise, we need to insert one last destroy after the load for our phi.
+    auto next = std::next(load->getIterator());
+    SILBuilderWithScope builder(next);
+    builder.emitDestroyValueOperation(next->getLoc(), cvi);
   }
 }
 

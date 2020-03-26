@@ -397,6 +397,9 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
     const llvm::Triple &Triple) {
   unsigned Major, Minor, Micro;
 
+  if (Triple.getArchName() == "arm64e")
+    return llvm::VersionTuple(5, 3);
+
   if (Triple.isMacOSX()) {
     Triple.getMacOSXVersion(Major, Minor, Micro);
     if (Major == 10) {

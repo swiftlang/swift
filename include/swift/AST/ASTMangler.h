@@ -370,6 +370,9 @@ protected:
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
   void appendProtocolConformanceRef(const RootProtocolConformance *conformance);
+  void appendAnyProtocolConformance(CanGenericSignature genericSig,
+                                    CanType conformingType,
+                                    ProtocolConformanceRef conformance);
   void appendConcreteProtocolConformance(
                                         const ProtocolConformance *conformance);
   void appendDependentProtocolConformance(const ConformanceAccessPath &path);

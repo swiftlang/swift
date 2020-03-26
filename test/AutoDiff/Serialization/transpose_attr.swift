@@ -4,7 +4,6 @@
 // RUN: %target-sil-opt -enable-experimental-differentiable-programming -disable-sil-linking -enable-sil-verify-all %t/transpose_attr.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
-// REQUIRES: differentiable_programming
 
 // TODO(TF-838): Enable this test.
 // Blocked by TF-830: `@transpose` attribute type-checking.

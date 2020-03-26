@@ -1253,12 +1253,9 @@ static PrecedenceGroupDecl *
 lookupPrecedenceGroup(const PrecedenceGroupDescriptor &descriptor) {
   auto *dc = descriptor.dc;
   if (auto sf = dc->getParentSourceFile()) {
-    OperatorLookupDescriptor desc{
-      sf,
-      descriptor.ident,
-      dc->isCascadingContextForLookup(false),
-      descriptor.nameLoc
-    };
+    auto desc = OperatorLookupDescriptor::forFile(
+        sf, descriptor.ident, dc->isCascadingContextForLookup(false),
+        descriptor.nameLoc);
     return evaluateOrDefault(sf->getASTContext().evaluator,
                              LookupPrecedenceGroupRequest{desc}, nullptr);
   } else {
@@ -1730,12 +1727,9 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     FD->diagnose(diag::operator_in_local_scope);
   }
 
-  OperatorLookupDescriptor desc{
-    FD->getDeclContext()->getParentSourceFile(),
-    operatorName,
-    FD->isCascadingContextForLookup(false),
-    FD->getLoc()
-  };
+  auto desc = OperatorLookupDescriptor::forFile(
+      FD->getDeclContext()->getParentSourceFile(), operatorName,
+      FD->isCascadingContextForLookup(false), FD->getLoc());
   OperatorDecl *op = nullptr;
   if (FD->isUnaryOperator()) {
     if (FD->getAttrs().hasAttribute<PrefixAttr>()) {

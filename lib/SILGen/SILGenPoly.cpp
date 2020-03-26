@@ -4455,10 +4455,17 @@ getWitnessFunctionRef(SILGenFunction &SGF,
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
     if (auto *derivativeId = witness.derivativeFunctionIdentifier) {
-      // TODO(TF-1139, TF-1140): Replace `undef` with `differentiable_function`
-      // and `differentiable_function_extract`.
-      auto derivativeFnSilType = SILType::getPrimitiveObjectType(witnessFTy);
-      return SILUndef::get(derivativeFnSilType, SGF.F);
+      auto originalFn =
+          SGF.emitGlobalFunctionRef(loc, witness.asAutoDiffOriginalFunction());
+      auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+          derivativeId->getParameterIndices(),
+          witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
+      auto diffFn = SGF.B.createDifferentiableFunction(loc, loweredParamIndices,
+                                                       originalFn);
+      return SGF.B.createDifferentiableFunctionExtract(
+          loc,
+          NormalDifferentiableFunctionTypeComponent(derivativeId->getKind()),
+          diffFn);
     }
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
