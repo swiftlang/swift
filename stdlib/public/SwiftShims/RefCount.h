@@ -805,6 +805,13 @@ class RefCounts {
   // Increment the reference count.
   void increment(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    
+    // constant propagation will remove this in swift_retain, it should only
+    // be present in swift_retain_n
+    if (inc != 1 && oldbits.isImmortal(true)) {
+      return;
+    }
+    
     RefCountBits newbits;
     do {
       newbits = oldbits;
@@ -820,6 +827,13 @@ class RefCounts {
 
   void incrementNonAtomic(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    
+    // constant propagation will remove this in swift_retain, it should only
+    // be present in swift_retain_n
+    if (inc != 1 && oldbits.isImmortal(true)) {
+      return;
+    }
+    
     auto newbits = oldbits;
     bool fast = newbits.incrementStrongExtraRefCount(inc);
     if (SWIFT_UNLIKELY(!fast)) {
@@ -982,6 +996,12 @@ class RefCounts {
   bool doDecrementSlow(RefCountBits oldbits, uint32_t dec) {
     RefCountBits newbits;
     
+    // constant propagation will remove this in swift_release, it should only
+    // be present in swift_release_n
+    if (dec != 1 && oldbits.isImmortal(true)) {
+      return false;
+    }
+    
     bool deinitNow;
     do {
       newbits = oldbits;
@@ -1024,6 +1044,12 @@ class RefCounts {
   bool doDecrementNonAtomicSlow(RefCountBits oldbits, uint32_t dec) {
     bool deinitNow;
     auto newbits = oldbits;
+    
+    // constant propagation will remove this in swift_release, it should only
+    // be present in swift_release_n
+    if (dec != 1 && oldbits.isImmortal(true)) {
+      return false;
+    }
 
     bool fast =
       newbits.decrementStrongExtraRefCount(dec);
@@ -1065,6 +1091,12 @@ class RefCounts {
   bool doDecrement(uint32_t dec) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
+    
+    // constant propagation will remove this in swift_release, it should only
+    // be present in swift_release_n
+    if (dec != 1 && oldbits.isImmortal(true)) {
+      return false;
+    }
     
     do {
       newbits = oldbits;
@@ -1248,7 +1280,15 @@ class RefCounts {
   // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getWeakCount() const;
-  
+
+  // DO NOT TOUCH.
+  // This exists for the benefits of the Refcounting.cpp tests. Do not use it
+  // elsewhere.
+  auto getBitsValue()
+    -> decltype(auto) {
+    return refCounts.load(std::memory_order_relaxed).getBitsValue();
+  }
+
   private:
   HeapObject *getHeapObject();
   
@@ -1449,13 +1489,14 @@ inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
   // Use slow path if we can't guarantee atomicity.
   if (oldbits.hasSideTable() || oldbits.getUnownedRefCount() != 1)
     return doDecrementNonAtomicSlow<performDeinit>(oldbits, dec);
+    
+  if (oldbits.isImmortal(true)) {
+    return false;
+  }
 
   auto newbits = oldbits;
   bool fast = newbits.decrementStrongExtraRefCount(dec);
   if (!fast) {
-    if (oldbits.isImmortal(false)) {
-      return false;
-    }
     return doDecrementNonAtomicSlow<performDeinit>(oldbits, dec);
   }
 
