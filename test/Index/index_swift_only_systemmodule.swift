@@ -34,6 +34,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -66,6 +67,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -95,6 +97,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -123,6 +126,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \
