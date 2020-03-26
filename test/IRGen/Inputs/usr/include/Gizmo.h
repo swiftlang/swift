@@ -162,6 +162,14 @@ __attribute__((swift_name("OuterType.InnerType")))
 
 @protocol P
 - (oneway void)stuff;
++ (void) classStuff;
 @property (nonatomic, readonly, getter=isValid) signed char valid;
 @property (nonatomic) NSString *name;
+@property (class, nonatomic, readonly) NSString *className;
+
+@optional
+- (oneway void)optionalStuff;
++ (void) optionalClassStuff;
+@property (nonatomic, readonly) NSString *optionalName;
+@property (class, nonatomic, readonly) NSString *optionalClassName;
 @end

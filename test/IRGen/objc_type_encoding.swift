@@ -168,6 +168,7 @@ import gizmo
 
 class C: P {
   func stuff() {}
+  static func classStuff() {}
 
   var valid: Int8 { return 0 }
   var name: String? {
@@ -176,13 +177,53 @@ class C: P {
     }
     set {}
   }
+  static var className : String {
+    return ""
+  }
 }
 
+@objc protocol Q {
+  func stuff()
+  static func classStuff()
+  var valid: Int8 { get }
+  var name: String? {
+    get set
+  }
+  static var className : String {
+    get
+  }
+  @objc optional static func optionalClassStuff()
+  @objc optional var optionalValid: Int8 { get }
+  @objc optional var optionalName: String? {
+    get
+  }
+  @objc optional static var optionalClassName : String {
+    get
+  }
+}
+
+class K: Q {
+  func stuff() {}
+  static func classStuff() {}
+  var valid: Int8 { return 0 }
+  var name: String? {
+    get {
+      return ""
+    }
+    set {}
+  }
+  static var className : String {
+    return ""
+  }
+}
 // Make sure that the protocol method list's number of entries and the
 // protocols's method extended type encoding list agree in the presence of
 // properties.
+// 4 (_PROTOCOL_INSTANCE_METHODS_P) + 2 (_PROTOCOL_CLASS_METHODS_P) + 2(_PROTOCOL_INSTANCE_METHODS_OPT_P) + 2 (_PROTOCOL_CLASS_METHODS_OPT_P) == 10 (_PROTOCOL_METHOD_TYPES_P)
 
-// CHECK-macosx: @_PROTOCOL_P = private constant {{.*}} { i32, i32, [4 x { i8*, i8*, i8* }] }* @_PROTOCOL_INSTANCE_METHODS_P,  {{.*}} [4 x i8*]* @_PROTOCOL_METHOD_TYPES_P
+// CHECK-macosx: @_PROTOCOL_P = private constant {{.*}} [4 x { i8*, i8*, i8* }] }* @_PROTOCOL_INSTANCE_METHODS_P, { i32, i32, [2 x { i8*, i8*, i8* }] }* @_PROTOCOL_CLASS_METHODS_P, { i32, i32, [2 x { i8*, i8*, i8* }] }* @_PROTOCOL_INSTANCE_METHODS_OPT_P, { i32, i32, [2 x { i8*, i8*, i8* }] }* @_PROTOCOL_CLASS_METHODS_OPT_P, { i32, i32, [3 x { i8*, i8* }] }* @_PROTOCOL_PROPERTIES_P, i32 96, i32 0, [10 x i8*]* @_PROTOCOL_METHOD_TYPES_P
+
+// CHECK-macosx: @_PROTOCOL__TtP18objc_type_encoding1Q_ = {{.*}} { i32, i32, [4 x { i8*, i8*, i8* }] }* @_PROTOCOL_INSTANCE_METHODS__TtP18objc_type_encoding1Q_, { i32, i32, [2 x { i8*, i8*, i8* }] }* @_PROTOCOL_CLASS_METHODS__TtP18objc_type_encoding1Q_, { i32, i32, [2 x { i8*, i8*, i8* }] }* @_PROTOCOL_INSTANCE_METHODS_OPT__TtP18objc_type_encoding1Q_, { i32, i32, [2 x { i8*, i8*, i8* }] }* @_PROTOCOL_CLASS_METHODS_OPT__TtP18objc_type_encoding1Q_, { i32, i32, [4 x { i8*, i8* }] }* @_PROTOCOL_PROPERTIES__TtP18objc_type_encoding1Q_, i32 96, i32 1, [10 x i8*]* @_PROTOCOL_METHOD_TYPES__TtP18objc_type_encoding1Q_
 
 // CHECK-macosx: [[ENC1:@.*]] = private unnamed_addr constant [35 x i8] c"v24@0:8@\22<NSFunging><NSRuncing>\2216\00"
 // CHECK-macosx: [[ENC2:@.*]] = private unnamed_addr constant [46 x i8] c"v32@0:8@\22Gizmo\2216@?<v@?@\22NSView\22@\22NSSpoon\22>24\00"
