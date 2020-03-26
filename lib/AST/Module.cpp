@@ -2105,10 +2105,15 @@ SourceFile::getModuleShadowedBySeparatelyImportedOverlay(const ModuleDecl *overl
       }
     }
   }
-  auto i = separatelyImportedOverlaysReversed.find(overlay);
-  return i != separatelyImportedOverlaysReversed.end()
-    ? std::get<1>(*i)
-    : nullptr;
+
+  ModuleDecl *underlying = const_cast<ModuleDecl *>(overlay);
+  while (underlying->getNameStr().startswith("_")) {
+    auto next = separatelyImportedOverlaysReversed.find(underlying);
+    if (next == separatelyImportedOverlaysReversed.end())
+      return nullptr;
+    underlying = std::get<1>(*next);
+  }
+  return underlying;
 };
 
 void ModuleDecl::clearLookupCache() {

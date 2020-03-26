@@ -1729,7 +1729,8 @@ static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
             PrimarySourceFile->getFilename());
     if (index::indexAndRecord(PrimarySourceFile, PSPs.OutputFilename,
                               opts.IndexStorePath, opts.IndexSystemModules,
-                              isDebugCompilation, Invocation.getTargetTriple(),
+                              opts.IndexIgnoreStdlib, isDebugCompilation,
+                              Invocation.getTargetTriple(),
                               *Instance.getDependencyTracker())) {
       return true;
     }
@@ -1741,7 +1742,7 @@ static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
 
     if (index::indexAndRecord(Instance.getMainModule(), opts.InputsAndOutputs.copyOutputFilenames(),
                               moduleToken, opts.IndexStorePath,
-                              opts.IndexSystemModules,
+                              opts.IndexSystemModules, opts.IndexIgnoreStdlib,
                               isDebugCompilation, Invocation.getTargetTriple(),
                               *Instance.getDependencyTracker())) {
       return true;
