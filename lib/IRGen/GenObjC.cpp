@@ -1407,14 +1407,33 @@ void irgen::emitObjCIVarInitDestroyDescriptor(
 }
 
 
+static Selector getSelectorForMethodDescriptor(AbstractFunctionDecl *method) {
+  if (auto accessor = dyn_cast<AccessorDecl>(method)) {
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::Get:
+      return Selector(accessor->getStorage(), Selector::ForGetter);
+    case AccessorKind::Set:
+      return Selector(accessor->getStorage(), Selector::ForSetter);
+#define OBJC_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
+      llvm_unreachable("shouldn't be trying to build this accessor");
+    }
+    llvm_unreachable("bad accessor kind");
+  } else {
+    return Selector(method);
+  }
+}
+
 llvm::Constant *
 irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
                                      AbstractFunctionDecl *method,
                                      llvm::StringSet<> &uniqueSelectors) {
   // Don't emit a selector twice.
-  Selector selector(method);
-  if (!uniqueSelectors.insert(selector.str()).second)
+  Selector selector = getSelectorForMethodDescriptor(method);
+  if (!uniqueSelectors.insert(selector.str()).second) {
     return nullptr;
+  }
 
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
   return getObjCEncodingForMethod(IGM, methodType, true /*Extended*/, method);
@@ -1434,14 +1453,28 @@ irgen::getBlockTypeExtendedEncoding(IRGenModule &IGM,
 
 void irgen::emitObjCGetterDescriptor(IRGenModule &IGM,
                                      ConstantArrayBuilder &descriptors,
-                                     AbstractStorageDecl *storage) {
+                                     AbstractStorageDecl *storage,
+                                     llvm::StringSet<> &uniqueSelectors) {
+  // Don't emit a selector twice.
+  Selector selector(storage, Selector::ForGetter);
+  if (!uniqueSelectors.insert(selector.str()).second) {
+    return;
+  }
+
   ObjCMethodDescriptor descriptor(emitObjCGetterDescriptorParts(IGM, storage));
   emitObjCDescriptor(IGM, descriptors, descriptor);
 }
 
 void irgen::emitObjCSetterDescriptor(IRGenModule &IGM,
                                      ConstantArrayBuilder &descriptors,
-                                     AbstractStorageDecl *storage) {
+                                     AbstractStorageDecl *storage,
+                                     llvm::StringSet<> &uniqueSelectors) {
+  // Don't emit a selector twice.
+  Selector selector(storage, Selector::ForSetter);
+  if (!uniqueSelectors.insert(selector.str()).second) {
+    return;
+  }
+
   ObjCMethodDescriptor descriptor(emitObjCSetterDescriptorParts(IGM, storage));
   emitObjCDescriptor(IGM, descriptors, descriptor);
 }

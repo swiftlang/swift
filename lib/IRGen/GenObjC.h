@@ -186,12 +186,14 @@ namespace irgen {
   /// Build an Objective-C method descriptor for the given getter method.
   void emitObjCGetterDescriptor(IRGenModule &IGM,
                                 ConstantArrayBuilder &descriptors,
-                                AbstractStorageDecl *storage);
+                                AbstractStorageDecl *storage,
+                                llvm::StringSet<> &uniqueSelectors);
 
   /// Build an Objective-C method descriptor for the given setter method.
   void emitObjCSetterDescriptor(IRGenModule &IGM,
                                 ConstantArrayBuilder &descriptors,
-                                AbstractStorageDecl *storage);
+                                AbstractStorageDecl *storage,
+                                llvm::StringSet<> &uniqueSelectors);
 
   /// True if the FuncDecl requires an ObjC method descriptor.
   bool requiresObjCMethodDescriptor(FuncDecl *method);

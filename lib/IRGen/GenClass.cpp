@@ -1551,12 +1551,12 @@ namespace {
 
       switch (accessor->getAccessorKind()) {
       case AccessorKind::Get:
-        return emitObjCGetterDescriptor(IGM, descriptors,
-                                        accessor->getStorage());
+        return emitObjCGetterDescriptor(
+            IGM, descriptors, accessor->getStorage(), uniqueSelectors);
 
       case AccessorKind::Set:
-        return emitObjCSetterDescriptor(IGM, descriptors,
-                                        accessor->getStorage());
+        return emitObjCSetterDescriptor(
+            IGM, descriptors, accessor->getStorage(), uniqueSelectors);
 
 #define OBJC_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \

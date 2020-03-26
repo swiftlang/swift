@@ -160,6 +160,9 @@ __attribute__((swift_name("OuterType.InnerType")))
 @interface OuterTypeInnerType : NSObject<NSRuncing>
 @end
 
+typedef signed char BOOL;
 @protocol P
 - (oneway void)stuff;
+@property (nonatomic, readonly, getter=isValid) BOOL valid;
+@property (nonatomic) NSString *name;
 @end

@@ -166,6 +166,23 @@ import gizmo
   func subclassComposition(_: MyCustomObject & NSRuncing & NSFunging)
 }
 
+class C: P {
+  func stuff() {}
+
+  var isValid: Bool { return false }
+  var name: String? {
+    get {
+      return ""
+    }
+    set {}
+  }
+}
+
+// Make sure that the protocol method list's number of entries and the
+// protocols's method extended type encoding list agree in the presence of
+// properties.
+
+// CHECK-macosx: @_PROTOCOL_P = private constant {{.*}} { i32, i32, [4 x { i8*, i8*, i8* }] }* @_PROTOCOL_INSTANCE_METHODS_P,  {{.*}} [4 x i8*]* @_PROTOCOL_METHOD_TYPES_P
 
 // CHECK-macosx: [[ENC1:@.*]] = private unnamed_addr constant [35 x i8] c"v24@0:8@\22<NSFunging><NSRuncing>\2216\00"
 // CHECK-macosx: [[ENC2:@.*]] = private unnamed_addr constant [46 x i8] c"v32@0:8@\22Gizmo\2216@?<v@?@\22NSView\22@\22NSSpoon\22>24\00"
@@ -183,9 +200,6 @@ import gizmo
 // CHECK-tvos: [[ENC4:@.*]] = private unnamed_addr constant [75 x i8] c"v24@0:8@\22_TtC18objc_type_encoding14MyCustomObject<NSFunging><NSRuncing>\2216\00"
 // CHECK-tvos: @_PROTOCOL_METHOD_TYPES__TtP18objc_type_encoding10MyProtocol_ = private constant [4 x i8*] [i8* getelementptr inbounds ([35 x i8], [35 x i8]* [[ENC1]], i64 0, i64 0), i8* getelementptr inbounds ([46 x i8], [46 x i8]* [[ENC2]], i64 0, i64 0), i8* getelementptr inbounds ([53 x i8], [53 x i8]* [[ENC3]], i64 0, i64 0), i8* getelementptr inbounds ([75 x i8], [75 x i8]* [[ENC4]], i64 0, i64 0)]
 
-class C: P {
-  func stuff() {}
-}
 
 // CHECK-macosx: [[ENC5:@.*]] = private unnamed_addr constant [9 x i8] c"Vv16@0:8\00"
 // CHECK-macosx: @_PROTOCOL_INSTANCE_METHODS_P = {{.*}}@"\01L_selector_data(stuff)"{{.*}}[[ENC5]]{{.*}}, section "__DATA, __objc_const", align 8
