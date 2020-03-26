@@ -885,7 +885,11 @@ public:
 
   /// Return a description of the layout of a value with the given type.
   const TypeInfo *getTypeInfo(const TypeRef *TR) {
-    return getBuilder().getTypeConverter().getTypeInfo(TR);
+    if (TR == nullptr) {
+      return nullptr;
+    } else {
+      return getBuilder().getTypeConverter().getTypeInfo(TR);
+    }
   }
 
 private:
