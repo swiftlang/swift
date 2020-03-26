@@ -169,7 +169,7 @@ import gizmo
 class C: P {
   func stuff() {}
 
-  var isValid: Bool { return false }
+  var valid: Int8 { return 0 }
   var name: String? {
     get {
       return ""
