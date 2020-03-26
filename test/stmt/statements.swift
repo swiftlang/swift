@@ -39,12 +39,12 @@ func funcdecl5(_ a: Int, y: Int) {
   x = y
   (x) = y
 
-  1 = x        // expected-error {{cannot assign to a literal value}}
-  (1) = x      // expected-error {{cannot assign to a literal value}}
-  "string" = "other"    // expected-error {{cannot assign to a literal value}}
+  1 = x        // expected-error {{cannot assign to value: literals are not mutable}}
+  (1) = x      // expected-error {{cannot assign to value: literals are not mutable}}
+  "string" = "other"    // expected-error {{cannot assign to value: literals are not mutable}}
   [1, 1, 1, 1] = [1, 1] // expected-error {{cannot assign to immutable expression of type '[Int]}}
-  1.0 = x               // expected-error {{cannot assign to a literal value}}
-  nil = 1               // expected-error {{cannot assign to a literal value}}
+  1.0 = x               // expected-error {{cannot assign to value: literals are not mutable}}
+  nil = 1               // expected-error {{cannot assign to value: literals are not mutable}}
 
   (x:1).x = 1 // expected-error {{cannot assign to immutable expression of type 'Int'}}
   var tup : (x:Int, y:Int)
@@ -59,7 +59,7 @@ func funcdecl5(_ a: Int, y: Int) {
   }
 
   // This diagnostic is terrible - rdar://12939553
-  if x {}   // expected-error {{'Int' is not convertible to 'Bool'}}
+  if x {}   // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
   if true {
     if (B) {
@@ -99,7 +99,7 @@ struct infloopbool {
 }
 
 func infloopbooltest() {
-  if (infloopbool()) {} // expected-error {{'infloopbool' is not convertible to 'Bool'}}
+  if (infloopbool()) {} // expected-error {{cannot convert value of type 'infloopbool' to expected condition type 'Bool'}}
 }
 
 // test "builder" API style
@@ -158,6 +158,7 @@ func tuple_assign() {
   (a,b) = (1,2)
   func f() -> (Int,Int) { return (1,2) }
   ((a,b), (c,d)) = (f(), f())
+  _ = (a,b,c,d)
 }
 
 func missing_semicolons() {
@@ -165,6 +166,7 @@ func missing_semicolons() {
   func g() {}
   g() w += 1             // expected-error{{consecutive statements}} {{6-6=;}}
   var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}} expected-warning {{string literal is unused}}
+  // expected-warning@-1 {{initialization of variable 'z' was never used; consider replacing with assignment to '_' or removing it}}
   class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   func j() {}func k() {}  // expected-error{{consecutive statements}} {{14-14=;}}
@@ -233,9 +235,26 @@ func DoStmt() {
   }
 }
 
-func DoWhileStmt() {
-  do { // expected-error {{'do-while' statement is not allowed; use 'repeat-while' instead}} {{3-5=repeat}}
+
+func DoWhileStmt1() {
+  do { // expected-error {{'do-while' statement is not allowed}}
+  // expected-note@-1 {{did you mean 'repeat-while' statement?}} {{3-5=repeat}}
+  // expected-note@-2 {{did you mean separate 'do' and 'while' statements?}} {{5-5=\n}}
   } while true
+}
+
+func DoWhileStmt2() {
+  do {
+
+  }
+  while true {
+
+  }
+}
+
+func LabeledDoStmt() {
+  LABEL: { // expected-error {{labeled block needs 'do'}} {{10-10=do }}
+  }
 }
 
 //===--- Repeat-while statement.
@@ -369,12 +388,39 @@ enum DeferThrowError: Error {
 }
 
 func throwInDefer() {
-  defer { throw DeferThrowError.someError } // expected-error {{'throw' cannot transfer control out of a defer statement}}
+  defer { throw DeferThrowError.someError } // expected-error {{errors cannot be thrown out of a defer body}}
   print("Foo")
+}
+
+func throwInDeferOK1() {
+  defer {
+    do {
+      throw DeferThrowError.someError
+    } catch {}
+  }
+  print("Bar")
+}
+
+func throwInDeferOK2() throws {
+  defer {
+    do {
+      throw DeferThrowError.someError
+    } catch {}
+  }
+  print("Bar")
 }
 
 func throwingFuncInDefer1() throws {
   defer { try throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
+  print("Bar")
+}
+
+func throwingFuncInDefer1a() throws {
+  defer {
+    do {
+      try throwingFunctionCalledInDefer()
+    } catch {}
+  }
   print("Bar")
 }
 
@@ -383,13 +429,48 @@ func throwingFuncInDefer2() throws {
   print("Bar")
 }
 
+func throwingFuncInDefer2a() throws {
+  defer {
+    do {
+      throwingFunctionCalledInDefer()
+      // expected-error@-1 {{call can throw but is not marked with 'try'}}
+      // expected-note@-2 {{did you mean to use 'try'?}}
+      // expected-note@-3 {{did you mean to handle error as optional value?}}
+      // expected-note@-4 {{did you mean to disable error propagation?}}
+    } catch {}
+  }
+  print("Bar")
+}
+
 func throwingFuncInDefer3() {
   defer { try throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
   print("Bar")
 }
 
+func throwingFuncInDefer3a() {
+  defer {
+    do {
+      try throwingFunctionCalledInDefer()
+    } catch {}
+  }
+  print("Bar")
+}
+
 func throwingFuncInDefer4() {
   defer { throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
+  print("Bar")
+}
+
+func throwingFuncInDefer4a() {
+  defer {
+    do {
+      throwingFunctionCalledInDefer()
+      // expected-error@-1 {{call can throw but is not marked with 'try'}}
+      // expected-note@-2 {{did you mean to use 'try'?}}
+      // expected-note@-3 {{did you mean to handle error as optional value?}}
+      // expected-note@-4 {{did you mean to disable error propagation?}}
+    } catch {}
+  }
   print("Bar")
 }
 
@@ -473,8 +554,7 @@ func testThrowNil() throws {
 // Even if the condition fails to typecheck, save it in the AST anyway; the old
 // condition may have contained a SequenceExpr.
 func r23684220(_ b: Any) {
-  if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any'}}
-  // expected-warning@-1 {{left side of nil coalescing operator '??' has non-optional type 'Any', so the right side is never used}}
+  if let _ = b ?? b {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'Any', so the right side is never used}}
 }
 
 
@@ -564,9 +644,10 @@ func fn(x: Int) {
 }
 
 func bad_if() {
-  if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
-  if (x: false) {} // expected-error {{'(x: Bool)' is not convertible to 'Bool'}}
-  if (x: 1) {} // expected-error {{'(x: Int)' is not convertible to 'Bool'}}
+  if 1 {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  if (x: false) {} // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
+  if (x: 1) {} // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
+  if nil {} // expected-error {{'nil' is not compatible with expected condition type 'Bool'}}
 }
 
 // Typo correction for loop labels
@@ -635,6 +716,6 @@ outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=out
 
 // Errors in case syntax
 class
-case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected pattern}}
-case  // expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}} expected-error {{expected pattern}}
+case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected identifier after comma in enum 'case' declaration}}
+case  // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}}
 // NOTE: EOF is important here to properly test a code path that used to crash the parser

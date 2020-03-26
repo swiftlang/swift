@@ -18,6 +18,6 @@ func test<X>(value: S<X>) {
 }
 
 // RUN: %sourcekitd-test -req=conformingmethods -pos=12:10 %s -req-opts=expectedtypes='$s8MyModule5ProtoPD' -- -module-name MyModule %s > %t.response.1
-// RUN: diff -u %s.response.1 %t.response.1
+// RUN: diff --strip-trailing-cr -u %s.response.1 %t.response.1
 // RUN: %sourcekitd-test -req=conformingmethods -pos=17:8 %s -req-opts=expectedtypes='$s8MyModule5ProtoPD' -- -module-name MyModule %s > %t.response.2
-// RUN: diff -u %s.response.2 %t.response.2
+// RUN: diff --strip-trailing-cr -u %s.response.2 %t.response.2

@@ -329,76 +329,73 @@ public:
     llvm_unreachable("covered switch");
   }
 
-  CanType getSourceType() const {
+  CanType getSourceFormalType() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
-      return cast<CheckedCastAddrBranchInst>(inst)->getSourceType();
+      return cast<CheckedCastAddrBranchInst>(inst)->getSourceFormalType();
     case SILDynamicCastKind::CheckedCastBranchInst:
-      return cast<CheckedCastBranchInst>(inst)->getSourceType();
+      return cast<CheckedCastBranchInst>(inst)->getSourceFormalType();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      return cast<CheckedCastValueBranchInst>(inst)->getSourceType();
+      return cast<CheckedCastValueBranchInst>(inst)->getSourceFormalType();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
-      return cast<UnconditionalCheckedCastAddrInst>(inst)->getSourceType();
+      return cast<UnconditionalCheckedCastAddrInst>(inst)->getSourceFormalType();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
-      return cast<UnconditionalCheckedCastInst>(inst)->getSourceType();
+      return cast<UnconditionalCheckedCastInst>(inst)->getSourceFormalType();
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
-      llvm_unreachable("unsupported");
+      return cast<UnconditionalCheckedCastValueInst>(inst)->getSourceFormalType();
     }
     llvm_unreachable("covered switch");
   }
 
-  SILType getLoweredSourceType() const {
+  SILType getSourceLoweredType() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getSourceLoweredType();
     case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getSourceLoweredType();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      llvm_unreachable("unsupported");
-    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst: {
-      auto *uccai = cast<UnconditionalCheckedCastAddrInst>(inst);
-      return uccai->getSrc()->getType();
-    }
+      return cast<CheckedCastValueBranchInst>(inst)->getSourceLoweredType();
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+      return cast<UnconditionalCheckedCastAddrInst>(inst)->getSourceLoweredType();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
-      return cast<UnconditionalCheckedCastInst>(inst)->getOperand()->getType();
+      return cast<UnconditionalCheckedCastInst>(inst)->getSourceLoweredType();
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
-      llvm_unreachable("unsupported");
+      return cast<UnconditionalCheckedCastValueInst>(inst)->getSourceLoweredType();
     }
   }
 
-  CanType getTargetType() const {
+  CanType getTargetFormalType() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
-      return cast<CheckedCastAddrBranchInst>(inst)->getTargetType();
+      return cast<CheckedCastAddrBranchInst>(inst)->getTargetFormalType();
     case SILDynamicCastKind::CheckedCastBranchInst:
-      return cast<CheckedCastBranchInst>(inst)->getTargetType();
+      return cast<CheckedCastBranchInst>(inst)->getTargetFormalType();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      return cast<CheckedCastValueBranchInst>(inst)->getTargetType();
+      return cast<CheckedCastValueBranchInst>(inst)->getTargetFormalType();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
-      return cast<UnconditionalCheckedCastAddrInst>(inst)->getTargetType();
+      return cast<UnconditionalCheckedCastAddrInst>(inst)->getTargetFormalType();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
-      return cast<UnconditionalCheckedCastInst>(inst)->getTargetType();
+      return cast<UnconditionalCheckedCastInst>(inst)->getTargetFormalType();
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
-      llvm_unreachable("unimplemented");
+      return cast<UnconditionalCheckedCastValueInst>(inst)->getTargetFormalType();
     }
     llvm_unreachable("covered switch");
   }
 
-  SILType getLoweredTargetType() const {
+  SILType getTargetLoweredType() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
-      llvm_unreachable("unsupported");
+      return cast<CheckedCastAddrBranchInst>(inst)->getDest()->getType();
     case SILDynamicCastKind::CheckedCastBranchInst:
-      return cast<CheckedCastBranchInst>(inst)->getCastType();
+      return cast<CheckedCastBranchInst>(inst)->getTargetLoweredType();
     case SILDynamicCastKind::CheckedCastValueBranchInst:
-      return cast<CheckedCastValueBranchInst>(inst)->getCastType();
-    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst: {
-      auto *uccai = dyn_cast<UnconditionalCheckedCastAddrInst>(inst);
-      return uccai->getDest()->getType();
-    }
-    case SILDynamicCastKind::UnconditionalCheckedCastInst: {
-      return cast<UnconditionalCheckedCastInst>(inst)->getType();
-    }
+      return cast<CheckedCastValueBranchInst>(inst)->getTargetLoweredType();
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+      return cast<UnconditionalCheckedCastAddrInst>(inst)->getDest()->getType();
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return cast<UnconditionalCheckedCastInst>(inst)->getTargetLoweredType();
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
-      llvm_unreachable("unsupported");
+      return cast<UnconditionalCheckedCastValueInst>(inst)->getTargetLoweredType();
     }
     llvm_unreachable("covered switch");
   }
@@ -424,14 +421,15 @@ public:
 
   DynamicCastFeasibility classifyFeasibility(bool allowWholeModule) const {
     return swift::classifyDynamicCast(
-        getModule().getSwiftModule(), getSourceType(), getTargetType(),
+        getModule().getSwiftModule(),
+        getSourceFormalType(), getTargetFormalType(),
         isSourceTypeExact(), allowWholeModule && getModule().isWholeModule());
   }
 
   bool isBridgingCast() const {
     // Bridging casts cannot be further simplified.
-    auto TargetIsBridgeable = getTargetType()->isBridgeableObjectType();
-    auto SourceIsBridgeable = getSourceType()->isBridgeableObjectType();
+    auto TargetIsBridgeable = getTargetFormalType()->isBridgeableObjectType();
+    auto SourceIsBridgeable = getSourceFormalType()->isBridgeableObjectType();
     return TargetIsBridgeable != SourceIsBridgeable;
   }
 
@@ -441,7 +439,7 @@ public:
   CanType getBridgedSourceType() const {
     SILModule &mod = getModule();
     Type t = mod.getASTContext().getBridgedToObjC(mod.getSwiftModule(),
-                                                  getSourceType());
+                                                  getSourceFormalType());
     if (!t)
       return CanType();
     return t->getCanonicalType();
@@ -453,7 +451,7 @@ public:
   CanType getBridgedTargetType() const {
     SILModule &mod = getModule();
     Type t = mod.getASTContext().getBridgedToObjC(mod.getSwiftModule(),
-                                                  getTargetType());
+                                                  getTargetFormalType());
     if (!t)
       return CanType();
     return t->getCanonicalType();
@@ -491,7 +489,7 @@ public:
 
   bool canUseScalarCheckedCastInstructions() const {
     return swift::canUseScalarCheckedCastInstructions(
-        getModule(), getSourceType(), getTargetType());
+        getModule(), getSourceFormalType(), getTargetFormalType());
   }
 };
 

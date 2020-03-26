@@ -18,6 +18,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -52,7 +53,8 @@ namespace {
     // This is the message string with escapes expanded.
     std::string MessageStr;
     unsigned LineNo = ~0U;
-    
+    Optional<unsigned> ColumnNo;
+
     std::vector<ExpectedFixIt> Fixits;
 
     ExpectedDiagnosticInfo(const char *ExpectedStart,
@@ -90,13 +92,25 @@ namespace {
       CapturedDiagnostics.push_back(Diag);
     }
 
+    /// Result of verifying a file.
+    struct Result {
+      /// Were there any errors? All of the following are considered errors:
+      /// - Expected diagnostics that were not present
+      /// - Unexpected diagnostics that were present
+      /// - Errors in the definition of expected diagnostics
+      bool HadError;
+      bool HadUnexpectedDiag;
+    };
+
     /// verifyFile - After the file has been processed, check to see if we
     /// got all of the expected diagnostics and check to see if there were any
     /// unexpected ones.
-    bool verifyFile(unsigned BufferID, bool autoApplyFixes);
+    Result verifyFile(unsigned BufferID, bool autoApplyFixes);
 
     /// diagnostics for '<unknown>:0' should be considered as unexpected.
     bool verifyUnknown();
+
+    void printRemainingDiagnostics() const;
 
     /// If there are any -verify errors (e.g. differences between expectations
     /// and actual diagnostics produced), apply fixits to the original source
@@ -125,6 +139,12 @@ DiagnosticVerifier::findDiagnostic(const ExpectedDiagnosticInfo &Expected,
     // Verify the file and line of the diagnostic.
     if (I->getLineNo() != (int)Expected.LineNo ||
         I->getFilename() != BufferName)
+      continue;
+
+    // If a specific column was expected, verify it. Add one to the captured
+    // index so expected column numbers correspond to printed output.
+    if (Expected.ColumnNo.hasValue() &&
+        I->getColumnNo() + 1 != (int)*Expected.ColumnNo)
       continue;
 
     // Verify the classification and string.
@@ -202,8 +222,8 @@ static std::string renderFixits(ArrayRef<llvm::SMFixIt> fixits,
 /// After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
-bool DiagnosticVerifier::verifyFile(unsigned BufferID,
-                                    bool shouldAutoApplyFixes) {
+DiagnosticVerifier::Result
+DiagnosticVerifier::verifyFile(unsigned BufferID, bool shouldAutoApplyFixes) {
   using llvm::SMLoc;
   
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
@@ -262,10 +282,14 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       continue;
     }
 
+    ExpectedDiagnosticInfo Expected(DiagnosticLoc, ExpectedClassification);
     int LineOffset = 0;
+
     if (TextStartIdx > 0 && MatchStart[0] == '@') {
-      if (MatchStart[1] != '+' && MatchStart[1] != '-') {
-        addError(MatchStart.data(), "expected '+'/'-' for line offset");
+      if (MatchStart[1] != '+' && MatchStart[1] != '-' &&
+          MatchStart[1] != ':') {
+        addError(MatchStart.data(),
+                 "expected '+'/'-' for line offset, or ':' for column");
         continue;
       }
       StringRef Offs;
@@ -285,13 +309,27 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
         TextStartIdx = 0;
       }
 
-      if (Offs.getAsInteger(10, LineOffset)) {
-        addError(MatchStart.data(), "expected line offset before '{{'");
-        continue;
+      size_t ColonIndex = Offs.find(':');
+      // Check whether a line offset was provided
+      if (ColonIndex != 0) {
+        StringRef LineOffs = Offs.slice(0, ColonIndex);
+        if (LineOffs.getAsInteger(10, LineOffset)) {
+          addError(MatchStart.data(), "expected line offset before '{{'");
+          continue;
+        }
+      }
+
+      // Check whether a column was provided
+      if (ColonIndex != StringRef::npos) {
+        Offs = Offs.slice(ColonIndex + 1, Offs.size());
+        int Column = 0;
+        if (Offs.getAsInteger(10, Column)) {
+          addError(MatchStart.data(), "expected column before '{{'");
+          continue;
+        }
+        Expected.ColumnNo = Column;
       }
     }
-
-    ExpectedDiagnosticInfo Expected(DiagnosticLoc, ExpectedClassification);
 
     unsigned Count = 1;
     if (TextStartIdx > 0) {
@@ -324,7 +362,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     llvm::SmallString<256> Buf;
     Expected.MessageRange = MatchStart.slice(2, End);
     Expected.MessageStr =
-      Lexer::getEncodedStringSegment(Expected.MessageRange, Buf);
+        Lexer::getEncodedStringSegment(Expected.MessageRange, Buf).str();
     if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else
@@ -492,7 +530,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       // fixit to add them in.
       auto actual = renderFixits(FoundDiagnostic.getFixIts(), InputFile);
       auto replStartLoc = SMLoc::getFromPointer(expected.ExpectedEnd - 8); // {{none}} length
-      auto replEndLoc = SMLoc::getFromPointer(expected.ExpectedEnd - 1);
+      auto replEndLoc = SMLoc::getFromPointer(expected.ExpectedEnd);
 
       llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
       addError(replStartLoc.getPointer(), "expected no fix-its; actual fix-it seen: " + actual, fix);
@@ -532,12 +570,22 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     }
 
     if (I == CapturedDiagnostics.end()) continue;
-    
-    auto StartLoc = SMLoc::getFromPointer(expected.MessageRange.begin());
-    auto EndLoc = SMLoc::getFromPointer(expected.MessageRange.end());
-    
-    llvm::SMFixIt fixIt(llvm::SMRange{ StartLoc, EndLoc }, I->getMessage());
-    addError(expected.MessageRange.begin(), "incorrect message found", fixIt);
+
+    if (I->getMessage().find(expected.MessageStr) == StringRef::npos) {
+      auto StartLoc = SMLoc::getFromPointer(expected.MessageRange.begin());
+      auto EndLoc = SMLoc::getFromPointer(expected.MessageRange.end());
+
+      llvm::SMFixIt fixIt(llvm::SMRange{StartLoc, EndLoc}, I->getMessage());
+      addError(expected.MessageRange.begin(), "incorrect message found", fixIt);
+    } else if (I->getColumnNo() + 1 != (int)*expected.ColumnNo) {
+      // The difference must be only in the column
+      addError(expected.MessageRange.begin(),
+               llvm::formatv("message found at column {0} but was expected to "
+                             "appear at column {1}",
+                             I->getColumnNo() + 1, *expected.ColumnNo));
+    } else {
+      llvm_unreachable("unhandled difference from expected diagnostic");
+    }
     CapturedDiagnostics.erase(I);
     ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
   }
@@ -596,15 +644,20 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
   }
   
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
-  for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
-    if (CapturedDiagnostics[i].getFilename() != BufferName)
+  bool HadUnexpectedDiag = false;
+  for (unsigned i = CapturedDiagnostics.size(); i != 0; ) {
+    --i;
+    if (CapturedDiagnostics[i].getFilename() != BufferName) {
       continue;
+    }
 
+    HadUnexpectedDiag = true;
     std::string Message =
       "unexpected "+getDiagKindString(CapturedDiagnostics[i].getKind())+
       " produced: "+CapturedDiagnostics[i].getMessage().str();
     addError(CapturedDiagnostics[i].getLoc().getPointer(),
              Message);
+    CapturedDiagnostics.erase(CapturedDiagnostics.begin() + i);
   }
 
   // Sort the diagnostics by their address in the memory buffer as the primary
@@ -623,8 +676,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
   // If auto-apply fixits is on, rewrite the original source file.
   if (shouldAutoApplyFixes)
     autoApplyFixes(BufferID, Errors);
-  
-  return !Errors.empty();
+
+  return Result{!Errors.empty(), HadUnexpectedDiag};
 }
 
 bool DiagnosticVerifier::verifyUnknown() {
@@ -643,6 +696,15 @@ bool DiagnosticVerifier::verifyUnknown() {
     SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), diag);
   }
   return HadError;
+}
+
+void DiagnosticVerifier::printRemainingDiagnostics() const {
+  for (const auto &diag : CapturedDiagnostics) {
+    SM.getLLVMSourceMgr().PrintMessage(
+        llvm::errs(), diag.getLoc(), diag.getKind(),
+        "diagnostic produced by Clang: " + diag.getMessage(),
+        /*Ranges=*/ {}, diag.getFixIts());
+  }
 }
 
 /// If there are any -verify errors (e.g. differences between expectations
@@ -740,15 +802,26 @@ bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
   auto *Verifier = (DiagnosticVerifier*)SM.getLLVMSourceMgr().getDiagContext();
   SM.getLLVMSourceMgr().setDiagHandler(nullptr, nullptr);
   
-  bool HadError = false;
+  DiagnosticVerifier::Result Result = {false, false};
 
-  for (auto &BufferID : BufferIDs)
-    HadError |= Verifier->verifyFile(BufferID, autoApplyFixes);
-  if (!ignoreUnknown)
-    HadError |= Verifier->verifyUnknown();
+  for (auto &BufferID : BufferIDs) {
+    DiagnosticVerifier::Result FileResult =
+        Verifier->verifyFile(BufferID, autoApplyFixes);
+    Result.HadError |= FileResult.HadError;
+    Result.HadUnexpectedDiag |= FileResult.HadUnexpectedDiag;
+  }
+  if (!ignoreUnknown) {
+    bool HadError = Verifier->verifyUnknown();
+    Result.HadError |= HadError;
+    // For <unknown>, all errors are unexpected.
+    Result.HadUnexpectedDiag |= HadError;
+  }
+
+  if (Result.HadUnexpectedDiag)
+    Verifier->printRemainingDiagnostics();
 
   delete Verifier;
 
-  return HadError;
+  return Result.HadError;
 }
 

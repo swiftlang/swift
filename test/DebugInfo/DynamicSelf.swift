@@ -16,7 +16,7 @@ extension C {
     // CHECK: ![[SELFTY]] = !DIDerivedType(tag: DW_TAG_typedef,
     // CHECK-SAME:                         name: "$s11DynamicSelf1CCXDD",
     // CHECK-SAME:                         baseType: ![[BASE]])
-    let r = self.init(number: 0)
+    var r = self.init(number: 0)
     return r
   }
 }

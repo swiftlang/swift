@@ -12,12 +12,12 @@
 
 #define DEBUG_TYPE "merge-cond_fail"
 
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 #include "llvm/Support/Debug.h"
 

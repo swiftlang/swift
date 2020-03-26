@@ -36,7 +36,7 @@ func test1a() -> unionSearchFlags {
 
 func test1b(_ b : Bool) {
   _ = 123
-  _ = .description == 1 // expected-error {{ambiguous reference to member '=='}} 
+  _ = .description == 1 // expected-error {{cannot infer contextual base in reference to member 'description'}}
 }
 
 enum MaybeInt {
@@ -99,7 +99,8 @@ func test3a(_ a: ZeroOneTwoThree) {
   // Overload resolution can resolve this to the right constructor.
   var h = ZeroOneTwoThree(1)
   
-  var i = 0 > 3 ? .none : .some(3) // expected-error {{reference to member 'none' cannot be resolved without a contextual type}}
+  var i = 0 > 3 ? .none : .some(3) // expected-error {{cannot infer contextual base in reference to member 'none'}}
+  // expected-error@-1 {{cannot infer contextual base in reference to member 'some'}}
   
   test3a;  // expected-error {{unused function}}
   .Zero   // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}
@@ -275,7 +276,8 @@ func testDirection() {
     i = x
     break
 
-  case .NorthEast(let x):
+  case .NorthEast(let x): // expected-warning {{enum case 'NorthEast' has 2 associated values; matching them as a tuple is deprecated}}
+                          // expected-note@-14 {{'NorthEast(distanceNorth:distanceEast:)' declared here}}
     i = x.distanceEast
     break
   }
@@ -442,3 +444,175 @@ protocol P {}
 
 enum E : C & P {}
 // expected-error@-1 {{inheritance from class-constrained protocol composition type 'C & P'}}
+
+// SR-11522
+
+enum EnumWithStaticNone1 {
+  case a
+  static let none = 1
+}
+
+enum EnumWithStaticNone2 {
+  case a
+  static let none = EnumWithStaticNone2.a
+}
+
+enum EnumWithStaticNone3 {
+  case a
+  static let none = EnumWithStaticNone3.a
+  var none: EnumWithStaticNone3 { return .a }
+}
+
+enum EnumWithStaticNone4 {
+  case a
+  var none: EnumWithStaticNone4 { return .a }
+  static let none = EnumWithStaticNone4.a
+}
+
+enum EnumWithStaticFuncNone1 {
+  case a
+  static func none() -> Int { return 1 }
+}
+
+enum EnumWithStaticFuncNone2 {
+  case a
+  static func none() -> EnumWithStaticFuncNone2 { return .a }
+}
+
+/// Make sure we don't diagnose 'static let none = 1', but do diagnose 'static let none = TheEnum.anotherCase' ///
+
+let _: EnumWithStaticNone1? = .none // Okay
+let _: EnumWithStaticNone2? = .none // expected-warning {{assuming you mean 'Optional<EnumWithStaticNone2>.none'; did you mean 'EnumWithStaticNone2.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{31-31=Optional}}
+// expected-note@-2 {{use 'EnumWithStaticNone2.none' instead}}{{31-31=EnumWithStaticNone2}}
+
+/// Make sure we diagnose if we have both static and instance 'none' member regardless of source order ///
+
+let _: EnumWithStaticNone3? = .none // expected-warning {{assuming you mean 'Optional<EnumWithStaticNone3>.none'; did you mean 'EnumWithStaticNone3.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{31-31=Optional}}
+// expected-note@-2 {{use 'EnumWithStaticNone3.none' instead}}{{31-31=EnumWithStaticNone3}}
+let _: EnumWithStaticNone4? = .none // expected-warning {{assuming you mean 'Optional<EnumWithStaticNone4>.none'; did you mean 'EnumWithStaticNone4.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{31-31=Optional}}
+// expected-note@-2 {{use 'EnumWithStaticNone4.none' instead}}{{31-31=EnumWithStaticNone4}}
+
+/// Make sure we don't diagnose 'static func none -> T' ///
+
+let _: EnumWithStaticFuncNone1? = .none // Okay
+let _: EnumWithStaticFuncNone2? = .none // Okay
+
+/// Make sure we diagnose generic ones as well including conditional ones ///
+
+enum GenericEnumWithStaticNone<T> {
+  case a
+  static var none: GenericEnumWithStaticNone<Int> { .a }
+}
+
+let _: GenericEnumWithStaticNone<Int>? = .none // expected-warning {{assuming you mean 'Optional<GenericEnumWithStaticNone<Int>>.none'; did you mean 'GenericEnumWithStaticNone<Int>.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{42-42=Optional}}
+// expected-note@-2 {{use 'GenericEnumWithStaticNone<Int>.none' instead}}{{42-42=GenericEnumWithStaticNone<Int>}}
+let _: GenericEnumWithStaticNone<String>? = .none // Okay
+let _: GenericEnumWithStaticNone? = .none // FIXME(SR-11535): This should be diagnosed
+
+enum GenericEnumWithoutNone<T> {
+  case a
+}
+
+extension GenericEnumWithoutNone where T == Int {
+  static var none: GenericEnumWithoutNone<Int> { .a }
+}
+
+let _: GenericEnumWithoutNone<Int>? = .none // expected-warning {{assuming you mean 'Optional<GenericEnumWithoutNone<Int>>.none'; did you mean 'GenericEnumWithoutNone<Int>.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{39-39=Optional}}
+// expected-note@-2 {{use 'GenericEnumWithoutNone<Int>.none' instead}}{{39-39=GenericEnumWithoutNone<Int>}}
+let _: GenericEnumWithoutNone<String>? = .none // Okay
+
+// A couple of edge cases that shouldn't trigger the warning //
+
+enum EnumWithStructNone {
+  case bar
+  struct none {}
+}
+
+enum EnumWithTypealiasNone {
+  case bar
+  typealias none = EnumWithTypealiasNone
+}
+
+enum EnumWithBothStructAndComputedNone {
+  case bar
+  struct none {}
+  var none: EnumWithBothStructAndComputedNone { . bar }
+}
+
+enum EnumWithBothTypealiasAndComputedNone {
+  case bar
+  typealias none = EnumWithBothTypealiasAndComputedNone
+  var none: EnumWithBothTypealiasAndComputedNone { . bar }
+}
+
+let _: EnumWithStructNone? = .none // Okay
+let _: EnumWithTypealiasNone? = .none // Okay
+let _: EnumWithBothStructAndComputedNone? = .none // Okay
+let _: EnumWithBothTypealiasAndComputedNone? = .none // Okay
+
+// SR-12063
+
+let foo1: Foo? = Foo.none
+let foo2: Foo?? = Foo.none
+
+switch foo1 {
+  case .none: break 
+  // expected-warning@-1 {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+  // expected-note@-2 {{use 'nil' to silence this warning}}{{8-13=nil}}
+  // expected-note@-3 {{use 'none?' instead}}{{9-13=none?}}
+  case .bar: break
+  default: break
+}
+
+switch foo2 {
+  case .none: break 
+  // expected-warning@-1 {{assuming you mean 'Optional<Optional<Foo>>.none'; did you mean 'Foo.none' instead?}}
+  // expected-note@-2 {{use 'nil' to silence this warning}}{{8-13=nil}}
+  // expected-note@-3 {{use 'none??' instead}}{{9-13=none??}}
+  case .bar: break
+  default: break
+}
+
+if case .none = foo1 {}
+// expected-warning@-1 {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+// expected-note@-2 {{use 'nil' to silence this warning}}{{9-14=nil}}
+// expected-note@-3 {{use 'none?' instead}}{{10-14=none?}}
+
+if case .none = foo2 {}
+// expected-warning@-1 {{assuming you mean 'Optional<Optional<Foo>>.none'; did you mean 'Foo.none' instead?}}
+// expected-note@-2 {{use 'nil' to silence this warning}}{{9-14=nil}}
+// expected-note@-3 {{use 'none??' instead}}{{10-14=none??}}
+
+switch foo1 {
+  case nil: break // Okay
+  case .bar: break
+  default: break
+}
+
+switch foo1 {
+  case .none?: break // Okay
+  case .bar: break
+  default: break
+}
+
+switch foo2 {
+  case nil: break // Okay
+  case .bar: break
+  default: break
+}
+
+switch foo2 {
+  case .none??: break // Okay
+  case .bar: break
+  default: break
+}
+
+if case nil = foo1 {} // Okay
+if case .none? = foo1 {} // Okay
+if case nil = foo2 {} // Okay
+if case .none?? = foo2 {} // Okay

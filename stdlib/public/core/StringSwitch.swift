@@ -92,7 +92,8 @@ internal func _createStringTableCache(_ cacheRawPtr: Builtin.RawPointer) {
   let context = UnsafePointer<_StringSwitchContext>(cacheRawPtr).pointee
   var cache = _StringSwitchCache()
   cache.reserveCapacity(context.cases.count)
-  assert(MemoryLayout<_StringSwitchCache>.size <= MemoryLayout<Builtin.Word>.size)
+  _internalInvariant(
+    MemoryLayout<_StringSwitchCache>.size <= MemoryLayout<Builtin.Word>.size)
 
   for (idx, s) in context.cases.enumerated() {
     let key = String(_builtinStringLiteral: s.utf8Start._rawValue,

@@ -21,6 +21,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
@@ -40,7 +41,7 @@ using namespace swift;
 using namespace ide;
 
 static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
-  SmallVector<std::pair<Identifier, SourceLoc>, 4>
+  SmallVector<Located<Identifier>, 4>
       AccessPath;
   while (!ModuleName.empty()) {
     StringRef SubModuleName;
@@ -51,7 +52,7 @@ static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
-  return Ctx.getModule(std::make_pair(ModuleName, SourceLoc()));
+  return Ctx.getModule({ Located<Identifier>(ModuleName, SourceLoc()) });
 }
 
 namespace {
@@ -64,6 +65,7 @@ struct TextEntity {
   const Decl *Dcl = nullptr;
   TypeOrExtensionDecl SynthesizeTarget;
   const Decl *DefaultImplementationOf = nullptr;
+  ModuleDecl *UnderlyingModIfFromOverlay = nullptr;
   StringRef Argument;
   TextRange Range;
   unsigned LocOffset = 0;
@@ -241,10 +243,12 @@ public:
     deinitDefaultMapToUse(D);
   }
 
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
     unsigned StartOffset = OS.tell();
     References.emplace_back(TD, StartOffset, Name.str().size());
-    StreamPrinter::printTypeRef(T, TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name, NameContext);
   }
 };
 
@@ -261,7 +265,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
   if (DC == nullptr || !DC->isInnermostContextGeneric())
     return;
 
-  GenericSignature *GenericSig = DC->getGenericSignatureOfContext();
+  GenericSignature GenericSig = DC->getGenericSignatureOfContext();
 
   if (!GenericSig)
     return;
@@ -271,7 +275,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
     if (GP->getDecl()->isImplicit())
       continue;
     DocGenericParam Param;
-    Param.Name = GP->getName().str();
+    Param.Name = std::string(GP->getName());
     Info.GenericParams.push_back(Param);
   }
 
@@ -300,7 +304,8 @@ static bool initDocEntityInfo(const Decl *D,
                               TypeOrExtensionDecl SynthesizedTarget,
                               const Decl *DefaultImplementationOf, bool IsRef,
                               bool IsSynthesizedExtension, DocEntityInfo &Info,
-                              StringRef Arg = StringRef()) {
+                              StringRef Arg = StringRef(),
+                              ModuleDecl *ModIfFromOverlay = nullptr){
   if (!IsRef && D->isImplicit())
     return true;
   if (!D || isa<ParamDecl>(D) ||
@@ -398,13 +403,22 @@ static bool initDocEntityInfo(const Decl *D,
       else
         SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
     } else if (auto *E = dyn_cast<ExtensionDecl>(D)) {
-      if (auto *Sig = E->getGenericSignature()) {
+      if (auto Sig = E->getGenericSignature()) {
         // The extension under printing is potentially part of a synthesized
         // extension. Thus it's hard to print the fully annotated decl. We
         // need to at least print the generic signature here.
         llvm::raw_svector_ostream OS(Info.FullyAnnotatedGenericSig);
         SwiftLangSupport::printFullyAnnotatedGenericReq(Sig, OS);
       }
+    }
+
+    if (ModIfFromOverlay) {
+      ModuleDecl *MD = D->getModuleContext();
+      SmallVector<Identifier, 1> Bystanders;
+      ModIfFromOverlay->getAllBystandersForCrossImportOverlay(MD, Bystanders);
+      std::transform(Bystanders.begin(), Bystanders.end(),
+                     std::back_inserter(Info.RequiredBystanders),
+                     [](Identifier Bystander){ return Bystander.str().str(); });
     }
   }
 
@@ -443,7 +457,8 @@ static bool initDocEntityInfo(const TextEntity &Entity,
   if (initDocEntityInfo(Entity.Dcl, Entity.SynthesizeTarget,
                         Entity.DefaultImplementationOf,
                         /*IsRef=*/false, Entity.IsSynthesizedExtension,
-                        Info, Entity.Argument))
+                        Info, Entity.Argument,
+                        Entity.UnderlyingModIfFromOverlay))
     return true;
   Info.Offset = Entity.Range.Offset;
   Info.Length = Entity.Range.Length;
@@ -531,10 +546,9 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
 
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
 
-    if (TAD->hasInterfaceType()) {
+    if (auto Ty = TAD->getDeclaredInterfaceType()) {
       // If underlying type exists, report the inheritance and conformance of the
       // underlying type.
-      auto Ty = TAD->getDeclaredInterfaceType();
       if (auto NM = Ty->getAnyNominal()) {
         passInherits(NM->getInherited(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
@@ -582,10 +596,12 @@ static void reportAttributes(ASTContext &Ctx,
                              DocInfoConsumer &Consumer) {
   static UIdent AvailableAttrKind("source.lang.swift.attribute.availability");
   static UIdent PlatformIOS("source.availability.platform.ios");
+  static UIdent PlatformMacCatalyst("source.availability.platform.maccatalyst");
   static UIdent PlatformOSX("source.availability.platform.osx");
   static UIdent PlatformtvOS("source.availability.platform.tvos");
   static UIdent PlatformWatchOS("source.availability.platform.watchos");
   static UIdent PlatformIOSAppExt("source.availability.platform.ios_app_extension");
+  static UIdent PlatformMacCatalystAppExt("source.availability.platform.maccatalyst_app_extension");
   static UIdent PlatformOSXAppExt("source.availability.platform.osx_app_extension");
   static UIdent PlatformtvOSAppExt("source.availability.platform.tvos_app_extension");
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
@@ -599,6 +615,8 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = UIdent(); break;
       case PlatformKind::iOS:
         PlatformUID = PlatformIOS; break;
+      case PlatformKind::macCatalyst:
+        PlatformUID = PlatformIOS; break;
       case PlatformKind::OSX:
         PlatformUID = PlatformOSX; break;
       case PlatformKind::tvOS:
@@ -607,6 +625,8 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformWatchOS; break;
       case PlatformKind::iOSApplicationExtension:
         PlatformUID = PlatformIOSAppExt; break;
+      case PlatformKind::macCatalystApplicationExtension:
+        PlatformUID = PlatformMacCatalystAppExt; break;
       case PlatformKind::OSXApplicationExtension:
         PlatformUID = PlatformOSXAppExt; break;
       case PlatformKind::tvOSApplicationExtension:
@@ -812,8 +832,8 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
       ArgNames = ArgNames.slice(1);
     }
 
-    if (auto typeRepr = param->getTypeLoc().getTypeRepr()) {
-      SourceRange TypeRange = param->getTypeLoc().getSourceRange();
+    if (auto typeRepr = param->getTypeRepr()) {
+      SourceRange TypeRange = typeRepr->getSourceRange();
       if (auto InOutTyR = dyn_cast_or_null<InOutTypeRepr>(typeRepr))
         TypeRange = InOutTyR->getBase()->getSourceRange();
       if (TypeRange.isInvalid())
@@ -951,9 +971,19 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   AnnotatingPrinter Printer(OS);
   printModuleInterface(M, None, TraversalOptions, Printer, Options,
                        true);
-  Info.Text = OS.str();
+  Info.Text = std::string(OS.str());
   Info.TopEntities = std::move(Printer.TopEntities);
   Info.References = std::move(Printer.References);
+
+  // Add a reference to the main module on any entities from cross-import
+  // overlay modules (used to determine their bystanders later).
+  for (auto &Entity: Info.TopEntities) {
+    auto *EntityMod = Entity.Dcl->getModuleContext();
+    if (!EntityMod || EntityMod == M)
+      continue;
+    if (M->isUnderlyingModuleOfCrossImportOverlay(EntityMod))
+      Entity.UnderlyingModIfFromOverlay = M;
+  }
   return false;
 }
 
@@ -969,7 +999,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
     return true;
 
   ASTContext &Ctx = CI.getASTContext();
-  (void)createTypeChecker(Ctx);
+  registerIDERequestFunctions(Ctx.evaluator);
 
   SourceTextInfo IFaceInfo;
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))
@@ -1071,7 +1101,7 @@ static bool getSourceTextInfo(CompilerInstance &CI,
   Walker.walk(*CI.getMainModule());
 
   CharSourceRange FullRange = SM.getRangeForBuffer(BufID);
-  Info.Text = SM.extractText(FullRange);
+  Info.Text = SM.extractText(FullRange).str();
   Info.TopEntities = std::move(Walker.TopEntities);
   Info.References = std::move(Walker.References);
   return false;
@@ -1096,9 +1126,6 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   ASTContext &Ctx = CI.getASTContext();
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
   CI.performSema();
-
-  // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(Ctx);
 
   SourceTextInfo SourceInfo;
   if (getSourceTextInfo(CI, SourceInfo))
@@ -1159,8 +1186,8 @@ public:
                          R.StartLine, R.StartColumn, R.EndLine, R.EndColumn,
                          R.ArgIndex
                        }; });
-      return {Start.first, Start.second, End.first, End.second, R.Text,
-        std::move(SubRanges)};
+      return {Start.first, Start.second, End.first,
+              End.second,  R.Text.str(), std::move(SubRanges)};
     });
     unsigned End = AllEdits.size();
     StartEnds.emplace_back(Start, End);
@@ -1182,12 +1209,8 @@ accept(SourceManager &SM, RegionType RegionType,
 }
 
 void RequestRefactoringEditConsumer::handleDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
-  Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info, bufferIndirectlyCausingDiagnostic);
+    SourceManager &SM, const DiagnosticInfo &Info) {
+  Impl.DiagConsumer.handleDiagnostic(SM, Info);
 }
 
 class RequestRenameRangeConsumer::Implementation {
@@ -1241,13 +1264,9 @@ void RequestRenameRangeConsumer::accept(
   Impl.accept(SM, RegionType, Ranges);
 }
 
-void RequestRenameRangeConsumer::handleDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
-  Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info, bufferIndirectlyCausingDiagnostic);
+void RequestRenameRangeConsumer::handleDiagnostic(SourceManager &SM,
+                                                  const DiagnosticInfo &Info) {
+  Impl.DiagConsumer.handleDiagnostic(SM, Info);
 }
 
 static NameUsage getNameUsage(RenameType Type) {
@@ -1455,11 +1474,8 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
     return;
   }
 
-  ASTContext &Ctx = CI.getASTContext();
-  // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(Ctx);
-
   // Load standard library so that Clang importer can use it.
+  ASTContext &Ctx = CI.getASTContext();
   auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
   if (!Stdlib) {
     Error = "Cannot load stdlib.";

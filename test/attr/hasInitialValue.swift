@@ -9,7 +9,7 @@ class C {
 
     // CHECK: {{^}}  @_hasInitialValue var option: Int
     var option: Int?
-    // CHECK: {{^}}  @_implicitly_unwrapped_optional @_hasInitialValue var iuo: Int!
+    // CHECK: {{^}}  @_hasInitialValue var iuo: Int!
     var iuo: Int!
 
     // CHECK: {{^}}  lazy var lazyIsntARealInit: Int

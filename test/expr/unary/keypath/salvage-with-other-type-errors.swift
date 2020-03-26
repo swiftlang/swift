@@ -6,18 +6,18 @@
 struct P<T: K> { }
 
 struct S {
-    init<B>(_ a: P<B>) { // expected-note {{where 'B' = 'String'}}
+    init<B>(_ a: P<B>) {
         fatalError()
     }
 }
 
 protocol K { }
 
-func + <Object>(lhs: KeyPath<A, Object>, rhs: String) -> P<Object> {
+func + <Object>(lhs: KeyPath<A, Object>, rhs: String) -> P<Object> { // expected-note {{where 'Object' = 'String'}}
     fatalError()
 }
 
-// expected-error@+1{{}}
+// expected-error@+1{{type 'String' does not conform to protocol 'K'}}
 func + (lhs: KeyPath<A, String>, rhs: String) -> P<String> {
     fatalError()
 }
@@ -27,7 +27,7 @@ struct A {
 }
 
 extension A: K {
-    static let j = S(\A.id + "id") // expected-error {{initializer 'init(_:)' requires that 'String' conform to 'K'}}
+    static let j = S(\A.id + "id") // expected-error {{operator function '+' requires that 'String' conform to 'K'}}
 }
 
 // SR-5034

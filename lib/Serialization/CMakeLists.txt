@@ -6,7 +6,12 @@ add_swift_host_library(swiftSerialization STATIC
   SerializedModuleLoader.cpp
   SerializedSILLoader.cpp
   SerializeDoc.cpp
-  SerializeSIL.cpp)
+  SerializeSIL.cpp
+
+  LLVM_LINK_COMPONENTS
+    BitstreamReader
+  )
 target_link_libraries(swiftSerialization PRIVATE
-  swiftClangImporter)
+  swiftClangImporter
+  swiftSIL)
 

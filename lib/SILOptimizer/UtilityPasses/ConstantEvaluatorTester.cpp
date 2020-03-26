@@ -59,7 +59,8 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
     llvm::errs() << "@" << fun->getName() << "\n";
 
     SymbolicValueBumpAllocator allocator;
-    ConstExprStepEvaluator stepEvaluator(allocator, fun);
+    ConstExprStepEvaluator stepEvaluator(allocator, fun,
+                                         getOptions().AssertConfig);
 
     for (auto currI = fun->getEntryBlock()->begin();;) {
       auto *inst = &(*currI);

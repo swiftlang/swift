@@ -5,6 +5,8 @@ add_swift_host_library(swiftImmediate STATIC
     executionengine
     linker
     mcjit
+    orcjit
+    jitlink
     transformutils)
 target_link_libraries(swiftImmediate PRIVATE
   swiftFrontend
@@ -12,7 +14,9 @@ target_link_libraries(swiftImmediate PRIVATE
   swiftIRGen
   swiftSILGen
   swiftSILOptimizer)
-
-if(HAVE_UNICODE_LIBEDIT)
-  target_link_libraries(swiftImmediate PRIVATE edit)
+if(LibEdit_FOUND AND LibEdit_HAS_UNICODE)
+  target_compile_definitions(swiftImmediate PRIVATE
+    HAVE_LIBEDIT)
+  target_link_libraries(swiftImmediate PRIVATE
+    libedit)
 endif()

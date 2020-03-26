@@ -22,7 +22,6 @@
     "StringObject.swift",
     "StringGuts.swift",
     "StringGutsSlice.swift",
-    "StringGutsVisitor.swift",
     "StringGraphemeBreaking.swift",
     "StringHashable.swift",
     "StringIndex.swift",
@@ -71,6 +70,8 @@
     "Sort.swift",
     "Range.swift",
     "ClosedRange.swift",
+    "RangeSet.swift",
+    "RangeSetStorage.swift",
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
     "Sequence.swift",
@@ -97,6 +98,7 @@
         "Filter.swift",
         "Reverse.swift",
         "Slice.swift",
+        "DiscontiguousSlice.swift",
         "DropWhile.swift",
         "PrefixWhile.swift",
         "LazyCollection.swift",
@@ -157,7 +159,7 @@
   ],
   "Math": [
     "SetAlgebra.swift",
-    "MathFunctions.swift",
+    "BuiltinMath.swift",
     {
     "Integers": [
       "Integers.swift",
@@ -199,6 +201,7 @@
   "Misc": [
     "AtomicInt.swift",
     "ErrorType.swift",
+    "Identifiable.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
     "ManagedBuffer.swift",
@@ -223,7 +226,8 @@
     "Comparable.swift",
     "Codable.swift",
     "LegacyABI.swift",
-    "MigrationSupport.swift"
+    "MigrationSupport.swift",
+    "PtrAuth.swift"
   ],
   "Result": [
     "Result.swift"

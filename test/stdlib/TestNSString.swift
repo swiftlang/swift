@@ -16,6 +16,7 @@
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
 // REQUIRES: objc_interop
+// REQUIRES: rdar55727144
 
 import Foundation
 import FoundationBridgeObjC

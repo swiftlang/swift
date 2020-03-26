@@ -46,6 +46,7 @@
 #include "GenFunc.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -165,6 +166,8 @@ namespace {
 
     ClassMetadataOptions Options;
 
+    Size HeaderSize;
+
   public:
     ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
                        ReferenceCounting refcounting,
@@ -178,11 +181,13 @@ namespace {
       case ReferenceCounting::Native:
         // For native classes, place a full object header.
         addHeapHeader();
+        HeaderSize = CurSize;
         break;
       case ReferenceCounting::ObjC:
         // For ObjC-inheriting classes, we don't reliably know the size of the
         // base class, but NSObject only has an `isa` pointer at most.
         addNSObjectHeader();
+        HeaderSize = CurSize;
         break;
       case ReferenceCounting::Block:
       case ReferenceCounting::Unknown:
@@ -222,7 +227,7 @@ namespace {
       auto allElements = IGM.Context.AllocateCopy(Elements);
 
       return ClassLayout(*this, Options, classTy,
-                         allStoredProps, allFieldAccesses, allElements);
+                         allStoredProps, allFieldAccesses, allElements, HeaderSize);
     }
 
   private:
@@ -297,7 +302,8 @@ namespace {
                                   SILType classType,
                                   bool superclass) {
       for (VarDecl *var : theClass->getStoredProperties()) {
-        SILType type = classType.getFieldType(var, IGM.getSILModule());
+        SILType type = classType.getFieldType(var, IGM.getSILModule(),
+                                              TypeExpansionContext::minimal());
 
         // Lower the field type.
         auto *eltType = &IGM.getTypeInfo(type);
@@ -500,23 +506,20 @@ Address IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
 }
 
 /// Emit a field l-value by applying the given offset to the given base.
-static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
-                                        SILType baseType,
-                                        llvm::Value *base,
-                                        llvm::Value *offset,
+static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF, SILType baseType,
+                                        llvm::Value *base, llvm::Value *offset,
                                         VarDecl *field) {
-  auto &fieldTI =
-    IGF.getTypeInfo(baseType.getFieldType(field, IGF.getSILModule()));
+  auto &fieldTI = IGF.getTypeInfo(baseType.getFieldType(
+      field, IGF.getSILModule(), IGF.IGM.getMaximalTypeExpansionContext()));
   auto addr = IGF.emitByteOffsetGEP(base, offset, fieldTI,
                               base->getName() + "." + field->getName().str());
   return OwnedAddress(addr, base);
 }
 
-llvm::Constant *
-irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
-                                                       SILType baseType,
-                                                       VarDecl *field) {
-  auto fieldType = baseType.getFieldType(field, IGM.getSILModule());
+llvm::Constant *irgen::tryEmitConstantClassFragilePhysicalMemberOffset(
+    IRGenModule &IGM, SILType baseType, VarDecl *field) {
+  auto fieldType = baseType.getFieldType(field, IGM.getSILModule(),
+                                         IGM.getMaximalTypeExpansionContext());
   // If the field is empty, its address doesn't matter.
   auto &fieldTI = IGM.getTypeInfo(fieldType);
   if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
@@ -1231,9 +1234,9 @@ namespace {
       //   const class_t *theClass;
       fields.add(getClassMetadataRef());
       //   const method_list_t *instanceMethods;
-      fields.add(buildInstanceMethodList());
+      emitAndAddMethodList(fields, MethodListKind::InstanceMethods);
       //   const method_list_t *classMethods;
-      fields.add(buildClassMethodList());
+      emitAndAddMethodList(fields, MethodListKind::ClassMethods);
       //   const protocol_list_t *baseProtocols;
       fields.add(buildProtocolList());
       //   const property_list_t *properties;
@@ -1266,13 +1269,13 @@ namespace {
       //   const protocol_list_t *baseProtocols;
       fields.add(buildProtocolList());
       //   const method_list_t *requiredInstanceMethods;
-      fields.add(buildInstanceMethodList());
+      emitAndAddMethodList(fields, MethodListKind::InstanceMethods);
       //   const method_list_t *requiredClassMethods;
-      fields.add(buildClassMethodList());
+      emitAndAddMethodList(fields, MethodListKind::ClassMethods);
       //   const method_list_t *optionalInstanceMethods;
-      fields.add(buildOptInstanceMethodList());
+      emitAndAddMethodList(fields, MethodListKind::OptionalInstanceMethods);
       //   const method_list_t *optionalClassMethods;
-      fields.add(buildOptClassMethodList());
+      emitAndAddMethodList(fields, MethodListKind::OptionalClassMethods);
       //   const property_list_t *properties;
       fields.add(buildPropertyList(ForClass));
 
@@ -1350,7 +1353,8 @@ namespace {
       b.add(buildName());
 
       //   const method_list_t *baseMethods;
-      b.add(forMeta ? buildClassMethodList() : buildInstanceMethodList());
+      emitAndAddMethodList(b, forMeta ? MethodListKind::ClassMethods
+                                      : MethodListKind::InstanceMethods);
 
       //   const protocol_list_t *baseProtocols;
       // Apparently, this list is the same in the class and the metaclass.
@@ -1374,9 +1378,12 @@ namespace {
       if (hasUpdater) {
         //   Class _Nullable (*metadataUpdateCallback)(Class _Nonnull cls,
         //                                             void * _Nullable arg);
-        b.add(IGM.getAddrOfObjCMetadataUpdateFunction(
+        auto *impl = IGM.getAddrOfObjCMetadataUpdateFunction(
                 TheEntity.get<ClassDecl *>(),
-                NotForDefinition));
+                NotForDefinition);
+        const auto &schema =
+          IGM.getOptions().PointerAuth.ObjCMethodListFunctionPointers;
+        b.addSignedPointer(impl, schema, PointerAuthEntity());
       }
 
       // };
@@ -1466,7 +1473,7 @@ namespace {
       // If we have the destructor body, we know whether SILGen
       // generated a -dealloc body.
       if (auto braceStmt = destructor->getBody())
-        return braceStmt->getNumElements() != 0;
+        return !braceStmt->empty();
 
       // We don't have a destructor body, so hunt for the SIL function
       // for it.
@@ -1514,27 +1521,33 @@ namespace {
     }
 
     void buildMethod(ConstantArrayBuilder &descriptors,
-                     MethodDescriptor descriptor) {
+                     MethodDescriptor descriptor,
+                     llvm::StringSet<> &uniqueSelectors) {
       switch (descriptor.getKind()) {
       case MethodDescriptor::Kind::Method:
-        return buildMethod(descriptors, descriptor.getMethod());
+        return buildMethod(descriptors, descriptor.getMethod(),
+                           uniqueSelectors);
       case MethodDescriptor::Kind::IVarInitializer:
         emitObjCIVarInitDestroyDescriptor(IGM, descriptors, getClass(),
-                                          descriptor.getImpl(), false);
+                                          descriptor.getImpl(), false,
+                                          uniqueSelectors);
         return;
       case MethodDescriptor::Kind::IVarDestroyer:
         emitObjCIVarInitDestroyDescriptor(IGM, descriptors, getClass(),
-                                          descriptor.getImpl(), true);
+                                          descriptor.getImpl(), true,
+                                          uniqueSelectors);
         return;
       }
       llvm_unreachable("bad method descriptor kind");
     }
 
     void buildMethod(ConstantArrayBuilder &descriptors,
-                     AbstractFunctionDecl *method) {
+                     AbstractFunctionDecl *method,
+                     llvm::StringSet<> &uniqueSelectors) {
       auto accessor = dyn_cast<AccessorDecl>(method);
       if (!accessor)
-        return emitObjCMethodDescriptor(IGM, descriptors, method);
+        return emitObjCMethodDescriptor(IGM, descriptors, method,
+                                        uniqueSelectors);
 
       switch (accessor->getAccessorKind()) {
       case AccessorKind::Get:
@@ -1568,28 +1581,45 @@ namespace {
       llvm_unreachable("not a class, category, or protocol?!");
     }
     
-    llvm::Constant *buildClassMethodList() {
-      return buildMethodList(ClassMethods,
-                             chooseNamePrefix("_CLASS_METHODS_",
-                                              "_CATEGORY_CLASS_METHODS_",
-                                              "_PROTOCOL_CLASS_METHODS_"));
-    }
 
-    llvm::Constant *buildInstanceMethodList() {
-      return buildMethodList(InstanceMethods,
-                             chooseNamePrefix("_INSTANCE_METHODS_",
-                                              "_CATEGORY_INSTANCE_METHODS_",
-                                              "_PROTOCOL_INSTANCE_METHODS_"));
-    }
+    enum class MethodListKind : uint8_t {
+      ClassMethods,
+      InstanceMethods,
+      OptionalClassMethods,
+      OptionalInstanceMethods
+    };
 
-    llvm::Constant *buildOptClassMethodList() {
-      return buildMethodList(OptClassMethods,
-                             "_PROTOCOL_CLASS_METHODS_OPT_");
-    }
-
-    llvm::Constant *buildOptInstanceMethodList() {
-      return buildMethodList(OptInstanceMethods,
-                             "_PROTOCOL_INSTANCE_METHODS_OPT_");
+    /// Emit the method list and add the pointer to the `builder`.
+    void emitAndAddMethodList(ConstantInitBuilder::StructBuilder &builder,
+                              MethodListKind kind) {
+      ArrayRef<MethodDescriptor> methods;
+      StringRef namePrefix;
+      switch (kind) {
+      case MethodListKind::ClassMethods:
+        methods = ClassMethods;
+        namePrefix = chooseNamePrefix("_CLASS_METHODS_",
+                                      "_CATEGORY_CLASS_METHODS_",
+                                      "_PROTOCOL_CLASS_METHODS_");
+        break;
+      case MethodListKind::InstanceMethods:
+        methods = InstanceMethods;
+        namePrefix = chooseNamePrefix("_INSTANCE_METHODS_",
+                                      "_CATEGORY_INSTANCE_METHODS_",
+                                      "_PROTOCOL_INSTANCE_METHODS_");
+        break;
+      case MethodListKind::OptionalClassMethods:
+        methods = OptClassMethods;
+        namePrefix = "_PROTOCOL_CLASS_METHODS_OPT_";
+        break;
+      case MethodListKind::OptionalInstanceMethods:
+        methods = OptInstanceMethods;
+        namePrefix = "_PROTOCOL_INSTANCE_METHODS_OPT_";
+        break;
+      }
+      llvm::StringSet<> uniqueSelectors;
+      llvm::Constant *methodListPtr =
+          buildMethodList(methods, namePrefix, uniqueSelectors);
+      builder.add(methodListPtr);
     }
 
     llvm::Constant *buildOptExtendedMethodTypes() {
@@ -1614,12 +1644,15 @@ namespace {
     void buildExtMethodTypes(ConstantArrayBuilder &array,
                              ArrayRef<MethodDescriptor> methods) {
       assert(isBuildingProtocol());
-
+      llvm::StringSet<> uniqueSelectors;
       for (auto descriptor : methods) {
         assert(descriptor.getKind() == MethodDescriptor::Kind::Method &&
                "cannot emit descriptor for non-method");
         auto method = descriptor.getMethod();
-        array.add(getMethodTypeExtendedEncoding(IGM, method));
+        auto *encodingOrNullIfDuplicate =
+            getMethodTypeExtendedEncoding(IGM, method, uniqueSelectors);
+        if (encodingOrNullIfDuplicate != nullptr)
+          array.add(encodingOrNullIfDuplicate);
       }
     }
 
@@ -1631,11 +1664,12 @@ namespace {
     ///
     /// This method does not return a value of a predictable type.
     llvm::Constant *buildMethodList(ArrayRef<MethodDescriptor> methods,
-                                    StringRef name) {
+                                    StringRef name,
+                                    llvm::StringSet<> &uniqueSelectors) {
       return buildOptionalList(methods, 3 * IGM.getPointerSize(), name,
                                [&](ConstantArrayBuilder &descriptors,
                                    MethodDescriptor descriptor) {
-        buildMethod(descriptors, descriptor);
+        buildMethod(descriptors, descriptor, uniqueSelectors);
       });
     }
 
@@ -1789,7 +1823,7 @@ namespace {
         }
 
         // Don't emit descriptors for properties without accessors.
-        auto getter = var->getGetter();
+        auto getter = var->getOpaqueAccessor(AccessorKind::Get);
         if (!getter)
           return;
 
@@ -1800,7 +1834,7 @@ namespace {
         auto &methods = getMethodList(var);
         methods.push_back(getter);
 
-        if (auto setter = var->getSetter())
+        if (auto setter = var->getOpaqueAccessor(AccessorKind::Set))
           methods.push_back(setter);
       }
     }
@@ -1998,6 +2032,7 @@ namespace {
       case llvm::Triple::MachO:
         var->setSection("__DATA, __objc_const");
         break;
+      case llvm::Triple::XCOFF:
       case llvm::Triple::COFF:
         var->setSection(".data");
         break;
@@ -2026,13 +2061,13 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *subscript) {
       if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
 
-      auto getter = subscript->getGetter();
+      auto getter = subscript->getOpaqueAccessor(AccessorKind::Get);
       if (!getter) return;
 
       auto &methods = getMethodList(subscript);
       methods.push_back(getter);
 
-      if (auto setter = subscript->getSetter())
+      if (auto setter = subscript->getOpaqueAccessor(AccessorKind::Set))
         methods.push_back(setter);
     }
   };
@@ -2238,7 +2273,6 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
                                            MutableArrayRef<TypeLoc>(),
                                            /*generics*/ nullptr,
                                            Context.TheBuiltinModule);
-  SwiftRootClass->computeType();
   SwiftRootClass->setIsObjC(Context.LangOpts.EnableObjCInterop);
   SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
     /*isNameImplicit=*/true));
@@ -2329,7 +2363,10 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
 
     // If the Objective-C runtime is new enough, we can just use the update
     // pattern unconditionally.
-    if (Context.LangOpts.doesTargetSupportObjCMetadataUpdateCallback())
+    auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(Context);
+    if (deploymentAvailability.isContainedIn(
+          Context.getObjCMetadataUpdateCallbackAvailability()))
       return ClassMetadataStrategy::Update;
 
     // Otherwise, check if we have legacy type info for backward deployment.
@@ -2420,15 +2457,20 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                       IGF.IGM.getPointerAlignment());
   auto fnPtr = IGF.emitInvariantLoad(slot);
 
-  return FunctionPointer(fnPtr, signature);
+  auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
+  auto authInfo =
+    PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
+
+  return FunctionPointer(fnPtr, authInfo, signature);
 }
 
-FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
-                                              llvm::Value *base,
-                                              SILType baseType,
-                                              SILDeclRef method,
-                                              CanSILFunctionType methodType,
-                                              bool useSuperVTable) {
+FunctionPointer
+irgen::emitVirtualMethodValue(IRGenFunction &IGF,
+                              llvm::Value *base,
+                              SILType baseType,
+                              SILDeclRef method,
+                              CanSILFunctionType methodType,
+                              bool useSuperVTable) {
   // Find the metadata.
   llvm::Value *metadata;
   if (useSuperVTable) {

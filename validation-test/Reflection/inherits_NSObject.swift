@@ -6,10 +6,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
-
-// REQUIRES: OS=macosx || OS=ios || OS=tvos
-// NOTE: Test is temporarily disabled for watchOS until we can figure out why
-// it's failing there. rdar://problem/50898688
+// UNSUPPORTED: use_os_stdlib
 
 import Foundation
 import simd

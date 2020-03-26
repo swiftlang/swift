@@ -129,22 +129,24 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
          "Expected to both blocks to be entries or not");
   if (isEntry()) {
     assert(args_empty() && "Expected to have no arguments");
-    for (auto *FuncArg : Other->getFunctionArguments()) {
+    for (auto *FuncArg : Other->getSILFunctionArguments()) {
       createFunctionArgument(FuncArg->getType(),
                              FuncArg->getDecl());
     }
     return;
   }
 
-  for (auto *PHIArg : Other->getPhiArguments()) {
+  for (auto *PHIArg : Other->getSILPhiArguments()) {
     createPhiArgument(PHIArg->getType(), PHIArg->getOwnershipKind(),
                       PHIArg->getDecl());
   }
 }
 
-SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,
-                                                           const ValueDecl *D) {
-  assert(isEntry() && "Function Arguments can only be in the entry block");
+SILFunctionArgument *
+SILBasicBlock::createFunctionArgument(SILType Ty, const ValueDecl *D,
+                                      bool disableEntryBlockVerification) {
+  assert((disableEntryBlockVerification || isEntry()) &&
+         "Function Arguments can only be in the entry block");
   const SILFunction *Parent = getParent();
   auto OwnershipKind = ValueOwnershipKind(
       *Parent, Ty,
@@ -167,7 +169,7 @@ SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
   SILFunction *F = getParent();
   SILModule &M = F->getModule();
   if (Ty.isTrivial(*F))
-    Kind = ValueOwnershipKind::Any;
+    Kind = ValueOwnershipKind::None;
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old arg!");
 
@@ -193,7 +195,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
   SILFunction *F = getParent();
   SILModule &M = F->getModule();
   if (Ty.isTrivial(*F))
-    Kind = ValueOwnershipKind::Any;
+    Kind = ValueOwnershipKind::None;
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
 
@@ -238,7 +240,7 @@ SILPhiArgument *SILBasicBlock::createPhiArgument(SILType Ty,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
   if (Ty.isTrivial(*getParent()))
-    Kind = ValueOwnershipKind::Any;
+    Kind = ValueOwnershipKind::None;
   return new (getModule()) SILPhiArgument(this, Ty, Kind, D);
 }
 
@@ -247,7 +249,7 @@ SILPhiArgument *SILBasicBlock::insertPhiArgument(arg_iterator Iter, SILType Ty,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
   if (Ty.isTrivial(*getParent()))
-    Kind = ValueOwnershipKind::Any;
+    Kind = ValueOwnershipKind::None;
   return new (getModule()) SILPhiArgument(this, Iter, Ty, Kind, D);
 }
 
@@ -357,18 +359,12 @@ bool SILBasicBlock::isEntry() const {
 }
 
 /// Declared out of line so we can have a declaration of SILArgument.
-PhiArgumentArrayRef SILBasicBlock::getPhiArguments() const {
-  return PhiArgumentArrayRef(getArguments(), [](SILArgument *arg) {
-    return cast<SILPhiArgument>(arg);
-  });
-}
-
-/// Declared out of line so we can have a declaration of SILArgument.
-FunctionArgumentArrayRef SILBasicBlock::getFunctionArguments() const {
-  return FunctionArgumentArrayRef(getArguments(), [](SILArgument *arg) {
-    return cast<SILFunctionArgument>(arg);
-  });
-}
+#define ARGUMENT(NAME, PARENT)                                                 \
+  NAME##ArrayRef SILBasicBlock::get##NAME##s() const {                         \
+    return NAME##ArrayRef(getArguments(),                                      \
+                          [](SILArgument *arg) { return cast<NAME>(arg); });   \
+  }
+#include "swift/SIL/SILNodes.def"
 
 /// Returns true if this block ends in an unreachable or an apply of a
 /// no-return apply or builtin.

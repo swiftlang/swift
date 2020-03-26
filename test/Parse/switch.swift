@@ -62,9 +62,9 @@ case 10,
 case _ where x % 2 == 0,
      20:
   x = 1
-case var y where y % 2 == 0: // expected-warning {{variable 'y' was never mutated; consider changing to 'let' constant}}
+case var y where y % 2 == 0:
   x = y + 1
-case _ where 0: // expected-error {{'Int' is not convertible to 'Bool'}}
+case _ where 0: // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
   x = 0
 default:
   x = 1

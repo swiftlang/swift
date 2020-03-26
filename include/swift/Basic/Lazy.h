@@ -16,6 +16,8 @@
 #include <memory>
 #ifdef __APPLE__
 #include <dispatch/dispatch.h>
+#elif defined(__wasi__)
+// No pthread on wasi, see https://bugs.swift.org/browse/SR-12097 for more details.
 #else
 #include <mutex>
 #endif

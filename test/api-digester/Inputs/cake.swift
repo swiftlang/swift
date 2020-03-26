@@ -3,6 +3,7 @@
 public protocol P1 {}
 public protocol P2 {}
 public protocol P3: P2, P1 {}
+
 @frozen
 public struct S1: P1 {
   public static func foo1() {}
@@ -123,3 +124,18 @@ public class PlatformIntroClass {}
 
 @available(swift, introduced: 5)
 public class SwiftIntroClass {}
+
+@objc(NewObjCClass)
+public class SwiftObjcClass {
+  @objc(ObjCFool:ObjCA:ObjCB:)
+  public func foo(a:Int, b:Int, c: Int) {}
+}
+
+@available(iOS 10.2, tvOS 10.3, watchOS 3.4, *)
+@available(macOS, unavailable)
+public class UnavailableOnMac {}
+
+@available(macOS, unavailable)
+extension SwiftObjcClass {
+  public func functionUnavailableOnMac() {}
+}

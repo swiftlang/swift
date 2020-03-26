@@ -2,5 +2,4 @@
 
 struct S {}
 
-typealias S = S // expected-error {{type alias 'S' references itself}}
-// expected-note@-1{{type declared here}}
+typealias S = S // expected-error {{type alias 'S' references itself}} expected-note {{through reference here}}

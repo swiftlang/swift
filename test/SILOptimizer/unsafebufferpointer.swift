@@ -54,7 +54,7 @@ public func testCount(_ x: UnsafeBufferPointer<UInt>) -> Int {
 // CHECK: .loopexit: ; preds = %[[LOOP]]
 // CHECK: ret float
 //
-// CHECK: ; <label>:[[LOOP]]:
+// CHECK: [[LOOP]]:
 // CHECK: phi float [ 0.000000e+00
 // CHECK: load float, float*
 // CHECK: fadd float
@@ -77,7 +77,7 @@ public func testSubscript(_ ubp: UnsafeBufferPointer<Float>) -> Float {
 // CHECK: [[RET:.*]]: ; preds = %[[LOOP]], %entry
 // CHECK: ret i64
 //
-// CHECK: ; <label>:[[LOOP]]:
+// CHECK: [[LOOP]]:
 // CHECK: phi i64 [ 0
 // CHECK: load i8, i8*
 // CHECK: zext i8 %{{.*}} to i64

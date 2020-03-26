@@ -45,7 +45,7 @@ do {
 
 // CTP_ClosureResult
 do {
-  [ss].map { (x: Substring) -> String in x } // expected-error {{cannot convert value of type 'Substring' to closure result type 'String'}} {{42-42=String(}} {{43-43=)}}
+  [ss].map { (x: Substring) -> String in x } // expected-error {{declared closure result 'Substring' is incompatible with contextual type 'String'}}
 }
 
 // CTP_ArrayElement

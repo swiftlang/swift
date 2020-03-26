@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
-// RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil -enable-testing %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
+// RUN: %target-swift-frontend -enable-spec-devirt -O -module-name devirt_default_case -emit-sil %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
+// RUN: %target-swift-frontend -enable-spec-devirt -O -module-name devirt_default_case -emit-sil -enable-testing %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 
 @_silgen_name("action")
 func action(_ n:Int) -> ()
@@ -71,7 +71,7 @@ class Base3 {
 // CHECK: function_ref @$s19devirt_default_case5Base3C6middleyyF
 // CHECK: function_ref @$s19devirt_default_case8Derived333_{{.*}}6middle
 // CHECK-NORMAL-NOT: class_method
-// CHECK-TESTABLE: class_method %0 : $Base3, #Base3.middle!1
+// CHECK-TESTABLE: class_method %0 : $Base3, #Base3.middle
 // CHECK: } // end sil function '$s19devirt_default_case5Base3C5outeryyF'
   @inline(never) func outer() {
     middle()
@@ -126,7 +126,7 @@ class Base4 {
 // CHECK: function_ref @$s19devirt_default_case5Base4C3fooyyFTf4d_n
 // CHECK: function_ref @$s19devirt_default_case8Derived4C3fooyyFTf4d_n
 // CHECK-NORMAL-NOT: class_method
-// CHECK-TESTABLE: class_method %0 : $Base4, #Base4.foo!1
+// CHECK-TESTABLE: class_method %0 : $Base4, #Base4.foo
 // CHECK: } // end sil function '$s19devirt_default_case5Base4C4testyyF'
     foo() 
   }
@@ -171,8 +171,8 @@ func check_static_class_devirt(_ c: C6) -> Int {
 // Check that C.bar() and D.bar() are devirtualized.
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @$s19devirt_default_case019check_static_class_A0ySiAA2C6CF
-// CHECK: checked_cast_br [exact] %0 : $C6 to $C6
-// CHECK: checked_cast_br [exact] %0 : $C6 to $D6
+// CHECK: checked_cast_br [exact] %0 : $C6 to C6
+// CHECK: checked_cast_br [exact] %0 : $C6 to D6
 // CHECK: class_method
 // CHECK: } // end sil function '$s19devirt_default_case019check_static_class_A0ySiAA2C6CF'
   return c.bar() 

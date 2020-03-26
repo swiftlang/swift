@@ -15,24 +15,25 @@ silopt_register_sources(
   DeadCodeElimination.cpp
   DeadObjectElimination.cpp
   DeadStoreElimination.cpp
+  DestroyHoisting.cpp
   Devirtualizer.cpp
   GenericSpecializer.cpp
   MergeCondFail.cpp
   Outliner.cpp
   ObjectOutliner.cpp
-  OwnershipModelEliminator.cpp
   PerformanceInliner.cpp
   RedundantLoadElimination.cpp
   RedundantOverflowCheckRemoval.cpp
   ReleaseDevirtualizer.cpp
+  SemanticARCOpts.cpp
   SILCodeMotion.cpp
   SILLowerAggregateInstrs.cpp
   SILMem2Reg.cpp
   SILSROA.cpp
   SimplifyCFG.cpp
   Sink.cpp
-  SpecializeOpaqueArchetypes.cpp
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
+  TempRValueElimination.cpp
   UnsafeGuaranteedPeephole.cpp
 )

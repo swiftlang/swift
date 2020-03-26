@@ -58,7 +58,17 @@ func callproto(_ p: MyProto) {
 	print(p.protofunc())
 }
 
+public func mutateBaseArray(_ arr: inout [Base], _ x: Base) {
+  arr.append(x)
+}
+
+
 // Check the llvm IR files:
+
+// Check if all specializations from stdlib functions are created in the same LLVM module.
+
+// CHECK-MAINLL-DAG: define {{.*}} @"$sSa16_createNewBuffer14bufferIsUnique15minimumCapacity13growForAppendySb_SiSbtF4test8MyStructV_Tg5"
+// CHECK-MAINLL-DAG: define {{.*}} @"$sSa16_createNewBuffer14bufferIsUnique15minimumCapacity13growForAppendySb_SiSbtF4test4BaseC_Tg5"
 
 // Check if the DI filename is correct and not "<unknown>".
 

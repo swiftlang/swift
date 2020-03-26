@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -o %t/tmp.swiftmodule
-// RUN: %target-sil-opt %t/tmp.swiftmodule -disable-sil-linking | %FileCheck %s
+// RUN: %target-sil-opt %t/tmp.swiftmodule -disable-sil-linking -emit-sorted-sil | %FileCheck %s
 
 
 // CHECK-DAG-LABEL: sil [serialized] [dynamically_replacable] [canonical] @test_dynamically_replaceable

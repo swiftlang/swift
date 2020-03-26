@@ -100,7 +100,7 @@ func testCollectReferencesInsideObject() {
 func testRuntimeCounters() {
   print("TEST: APIs from _RuntimeFunctionCounters")
   let numRuntimeFunctionPointer =
-    _RuntimeFunctionCounters.getNumRuntimeFunctionCounters()
+    Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
 
   print("Number of runtime function pointers: \(numRuntimeFunctionPointer)")
 

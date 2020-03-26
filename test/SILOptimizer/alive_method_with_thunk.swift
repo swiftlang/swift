@@ -18,11 +18,11 @@ public class DerivedClass: BaseClass<Double> {
 }
 
 // CHECK-LABEL: sil_vtable BaseClass {
-// CHECK-NEXT:  #BaseClass.deinit!deallocator.1: @$s23alive_method_with_thunk9BaseClassCfD
+// CHECK-NEXT:  #BaseClass.deinit!deallocator: @$s23alive_method_with_thunk9BaseClassCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable DerivedClass {
-// CHECK-NEXT:  #DerivedClass.doSomething!1: (DerivedClass) -> (Double) -> Int : @$s23alive_method_with_thunk12DerivedClassC11doSomethingySiSdF
-// CHECK-NEXT:  #DerivedClass.deinit!deallocator.1: @$s23alive_method_with_thunk12DerivedClassCfD
+// CHECK-NEXT:  #DerivedClass.doSomething: (DerivedClass) -> (Double) -> Int : @$s23alive_method_with_thunk12DerivedClassC11doSomethingySiSdF
+// CHECK-NEXT:  #DerivedClass.deinit!deallocator: @$s23alive_method_with_thunk12DerivedClassCfD
 // CHECK-NEXT: }
 

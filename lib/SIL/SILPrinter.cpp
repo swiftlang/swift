@@ -47,6 +47,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/FileSystem.h"
+#include <set>
 
 
 using namespace swift;
@@ -63,6 +64,10 @@ SILFullDemangle("sil-full-demangle", llvm::cl::init(false),
 llvm::cl::opt<bool>
 SILPrintDebugInfo("sil-print-debuginfo", llvm::cl::init(false),
                 llvm::cl::desc("Include debug info in SIL output"));
+
+llvm::cl::opt<bool>
+SILPrintSourceInfo("sil-print-sourceinfo", llvm::cl::init(false),
+                   llvm::cl::desc("Include source annotation in SIL output"));
 
 llvm::cl::opt<bool> SILPrintGenericSpecializationInfo(
     "sil-print-generic-specialization-info", llvm::cl::init(false),
@@ -222,9 +227,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
 
 static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
   printFullContext(Decl->getDeclContext(), OS);
-  assert(Decl->hasName());
 
-  if (Decl->isOperator()) {
+  if (!Decl->hasName()) {
+    OS << "anonname=" << (const void*)Decl;
+  } else if (Decl->isOperator()) {
     OS << '"' << Decl->getBaseName() << '"';
   } else {
     bool shouldEscape = !Decl->getBaseName().isSpecial() &&
@@ -333,17 +339,30 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::StoredPropertyInitializer:
     OS << "!propertyinit";
     break;
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    OS << "!backinginit";
+    break;
   }
 
-  auto uncurryLevel = getParameterListCount() - 1;
-  if (uncurryLevel != 0)
-    OS << (isDot ? '.' : '!')  << uncurryLevel;
-
   if (isForeign)
-    OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "foreign";
+    OS << (isDot ? '.' : '!')  << "foreign";
 
-  if (isDirectReference)
-    OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "direct";
+  if (derivativeFunctionIdentifier) {
+    OS << ((isDot || isForeign) ? '.' : '!');
+    switch (derivativeFunctionIdentifier->getKind()) {
+    case AutoDiffDerivativeFunctionKind::JVP:
+      OS << "jvp.";
+      break;
+    case AutoDiffDerivativeFunctionKind::VJP:
+      OS << "vjp.";
+      break;
+    }
+    OS << derivativeFunctionIdentifier->getParameterIndices()->getString();
+    if (auto derivativeGenSig =
+            derivativeFunctionIdentifier->getDerivativeGenericSignature()) {
+      OS << "." << derivativeGenSig;
+    }
+  }
 }
 
 void SILDeclRef::dump() const {
@@ -428,6 +447,60 @@ void SILType::dump() const {
   llvm::errs() << '\n';
 }
 
+/// Prints the name and type of the given SIL function with the given
+/// `PrintOptions`. Computes mapping for sugared type names and stores the
+/// result in `sugaredTypeNames`.
+static void printSILFunctionNameAndType(
+    llvm::raw_ostream &OS, const SILFunction *function,
+    llvm::DenseMap<CanType, Identifier> &sugaredTypeNames) {
+  function->printName(OS);
+  OS << " : $";
+  auto genSig =
+    function->getLoweredFunctionType()->getInvocationGenericSignature();
+  auto *genEnv = function->getGenericEnvironment();
+  // If `genSig` and `genEnv` are both defined, get sugared names of generic
+  // parameter types for printing.
+  if (genSig && genEnv) {
+    llvm::DenseSet<Identifier> usedNames;
+    llvm::SmallString<16> disambiguatedNameBuf;
+    unsigned disambiguatedNameCounter = 1;
+    for (auto *paramTy : genSig->getGenericParams()) {
+      // Get a uniqued sugared name for the generic parameter type.
+      auto sugaredTy = genEnv->getSugaredType(paramTy);
+      Identifier name = sugaredTy->getName();
+      while (!usedNames.insert(name).second) {
+        disambiguatedNameBuf.clear();
+        {
+          llvm::raw_svector_ostream names(disambiguatedNameBuf);
+          names << sugaredTy->getName() << disambiguatedNameCounter++;
+        }
+        name = function->getASTContext().getIdentifier(disambiguatedNameBuf);
+      }
+      // If the uniqued sugared name is equal to the sugared name, continue.
+      if (name == sugaredTy->getName())
+        continue;
+      // Otherwise, add sugared name mapping for the type (and its archetype, if
+      // defined).
+      sugaredTypeNames[paramTy->getCanonicalType()] = name;
+      if (auto *archetypeTy =
+              genEnv->mapTypeIntoContext(paramTy)->getAs<ArchetypeType>())
+        sugaredTypeNames[archetypeTy->getCanonicalType()] = name;
+    }
+  }
+  auto printOptions = PrintOptions::printSIL();
+  printOptions.GenericEnv = genEnv;
+  printOptions.AlternativeTypeNames =
+      sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames;
+  function->getLoweredFunctionType()->print(OS, printOptions);
+}
+
+/// Prints the name and type of the given SIL function.
+static void printSILFunctionNameAndType(llvm::raw_ostream &OS,
+                                        const SILFunction *function) {
+  llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
+  printSILFunctionNameAndType(OS, function, sugaredTypeNames);
+}
+
 namespace {
   
 class SILPrinter;
@@ -466,7 +539,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     if (!i.Type)
       return *this;
     *this << " : ";
-    if (i.OwnershipKind && *i.OwnershipKind != ValueOwnershipKind::Any) {
+    if (i.OwnershipKind && *i.OwnershipKind != ValueOwnershipKind::None) {
       *this << "@" << i.OwnershipKind.getValue() << " ";
     }
     return *this << i.Type;
@@ -614,7 +687,22 @@ public:
     }
     *this << '\n';
 
+    const auto &SM = BB->getModule().getASTContext().SourceMgr;
+    Optional<SILLocation> PrevLoc;
     for (const SILInstruction &I : *BB) {
+      if (SILPrintSourceInfo) {
+        auto CurSourceLoc = I.getLoc().getSourceLoc();
+        if (CurSourceLoc.isValid()) {
+          if (!PrevLoc || SM.getLineNumber(CurSourceLoc) > SM.getLineNumber(PrevLoc->getSourceLoc())) {
+              auto Buffer = SM.findBufferContainingLoc(CurSourceLoc);
+              auto Line = SM.getLineNumber(CurSourceLoc);
+              auto LineLength = SM.getLineLength(Buffer, Line);
+              PrintState.OS << "  // " << SM.extractText({SM.getLocForLineCol(Buffer, Line, 0), LineLength.getValueOr(0)}) <<
+              "\tSourceLoc: " << SM.getDisplayNameForLoc(CurSourceLoc) << ":" << Line << "\n";
+              PrevLoc = I.getLoc();
+          }
+        }
+      }
       Ctx.printInstructionCallBack(&I);
       if (SILPrintGenericSpecializationInfo) {
         if (auto AI = ApplySite::isa(const_cast<SILInstruction *>(&I)))
@@ -653,7 +741,7 @@ public:
       assert(!isa<SingleValueInstruction>(inst) && "SingleValueInstruction was "
                                                    "handled by the previous "
                                                    "value base check.");
-      copy(inst->getResults(), std::back_inserter(values));
+      llvm::copy(inst->getResults(), std::back_inserter(values));
     }
 
     // If the set of values is empty, we need to print the ID of
@@ -760,9 +848,6 @@ public:
 
       // Print the type of location.
       switch (L.getKind()) {
-      case SILLocation::NoneKind:
-        assert(L.isAutoGenerated() && "This kind shouldn't be printed.");
-        break;
       case SILLocation::RegularKind:
         break;
       case SILLocation::ReturnKind:
@@ -1019,6 +1104,8 @@ public:
   }
 
   void visitAllocStackInst(AllocStackInst *AVI) {
+    if (AVI->hasDynamicLifetime())
+      *this << "[dynamic_lifetime] ";
     *this << AVI->getElementType();
     printDebugVar(AVI->getVarInfo());
   }
@@ -1052,12 +1139,14 @@ public:
   }
 
   void visitAllocBoxInst(AllocBoxInst *ABI) {
+    if (ABI->hasDynamicLifetime())
+      *this << "[dynamic_lifetime] ";
     *this << ABI->getType();
     printDebugVar(ABI->getVarInfo());
   }
 
   void printSubstitutions(SubstitutionMap Subs,
-                          GenericSignature *Sig = nullptr) {
+                          GenericSignature Sig = GenericSignature()) {
     if (!Subs.hasAnySubstitutableParams()) return;
 
     // FIXME: This is a hack to cope with cases where the substitution map uses
@@ -1079,7 +1168,7 @@ public:
   void visitApplyInstBase(Inst *AI) {
     *this << Ctx.getID(AI->getCallee());
     printSubstitutions(AI->getSubstitutionMap(),
-                       AI->getOrigCalleeType()->getGenericSignature());
+                       AI->getOrigCalleeType()->getInvocationGenericSignature());
     *this << '(';
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << Ctx.getID(arg); },
@@ -1383,13 +1472,13 @@ public:
   }
   
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
-    *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
+    *this << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType();
   }
   
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
     if (CI->isExact())
       *this << "[exact] ";
-    *this << getIDAndType(CI->getOperand()) << " to " << CI->getCastType()
+    *this << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType()
           << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
     if (CI->getTrueBBCount())
@@ -1399,26 +1488,28 @@ public:
   }
 
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CI) {
-    *this << getIDAndType(CI->getOperand()) << " to " << CI->getCastType()
+    *this << CI->getSourceFormalType() << " in "
+          << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType()
           << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
   }
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
-    *this << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
-          << " to " << CI->getTargetType() << " in "
+    *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
+          << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
   }
 
   void visitUnconditionalCheckedCastValueInst(
       UnconditionalCheckedCastValueInst *CI) {
-    *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
+    *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getOperand())
+          << " to " << CI->getTargetFormalType();
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
-          << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
-          << " to " << CI->getTargetType() << " in "
+          << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
+          << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest()) << ", "
           << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
@@ -1473,8 +1564,8 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *CI) {
-    *this << ' ' << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
-          << " to " << CI->getTargetType() << " in "
+    *this << ' ' << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
+          << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
   }
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *CI) {
@@ -1537,9 +1628,14 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
-    *this << getIDAndType(I->getOperand()); \
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
+    *this << getIDAndType(I->getOperand());                                    \
+  }
+
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
+    *this << getIDAndType(I->getOperand());                                    \
   }
 #include "swift/AST/ReferenceStorage.def"
 
@@ -2172,6 +2268,101 @@ public:
     }
     }
   }
+
+  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
+    *this << "[parameters";
+    for (auto i : dfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    *this << getIDAndType(dfi->getOriginalFunction());
+    if (dfi->hasDerivativeFunctions()) {
+      *this << " with_derivative ";
+      *this << '{' << getIDAndType(dfi->getJVPFunction()) << ", "
+            << getIDAndType(dfi->getVJPFunction()) << '}';
+    }
+  }
+
+  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
+    *this << "[parameters";
+    for (auto i : lfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    *this << getIDAndType(lfi->getOriginalFunction());
+    if (lfi->hasTransposeFunction()) {
+      *this << " with_transpose ";
+      *this << getIDAndType(lfi->getTransposeFunction());
+    }
+  }
+
+  void visitDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *dfei) {
+    *this << '[';
+    switch (dfei->getExtractee()) {
+    case NormalDifferentiableFunctionTypeComponent::Original:
+      *this << "original";
+      break;
+    case NormalDifferentiableFunctionTypeComponent::JVP:
+      *this << "jvp";
+      break;
+    case NormalDifferentiableFunctionTypeComponent::VJP:
+      *this << "vjp";
+      break;
+    }
+    *this << "] ";
+    *this << getIDAndType(dfei->getOperand());
+    if (dfei->hasExplicitExtracteeType()) {
+      *this << " as ";
+      *this << dfei->getType();
+    }
+  }
+
+  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
+    *this << '[';
+    switch (lfei->getExtractee()) {
+    case LinearDifferentiableFunctionTypeComponent::Original:
+      *this << "original";
+      break;
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
+      *this << "transpose";
+      break;
+    }
+    *this << "] ";
+    *this << getIDAndType(lfei->getFunctionOperand());
+  }
+
+  void visitDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *dwfi) {
+    auto *witness = dwfi->getWitness();
+    *this << '[';
+    switch (dwfi->getWitnessKind()) {
+    case DifferentiabilityWitnessFunctionKind::JVP:
+      *this << "jvp";
+      break;
+    case DifferentiabilityWitnessFunctionKind::VJP:
+      *this << "vjp";
+      break;
+    case DifferentiabilityWitnessFunctionKind::Transpose:
+      *this << "transpose";
+      break;
+    }
+    *this << "] [parameters";
+    for (auto i : witness->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] [results";
+    for (auto i : witness->getResultIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    if (auto witnessGenSig = witness->getDerivativeGenericSignature()) {
+      auto subPrinter = PrintOptions::printSIL();
+      witnessGenSig->print(PrintState.OS, subPrinter);
+      *this << " ";
+    }
+    printSILFunctionNameAndType(PrintState.OS, witness->getOriginalFunction());
+    if (dwfi->getHasExplicitFunctionType()) {
+      *this << " as ";
+      *this << dwfi->getType();
+    }
+  }
 };
 } // end anonymous namespace
 
@@ -2318,13 +2509,29 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isDynamicallyReplaceable()) {
     OS << "[dynamically_replacable] ";
   }
+  if (isExactSelfClass()) {
+    OS << "[exact_self_class] ";
+  }
   if (isWithoutActuallyEscapingThunk())
     OS << "[without_actually_escaping] ";
 
-  if (isGlobalInit())
+  switch (getSpecialPurpose()) {
+  case SILFunction::Purpose::None:
+    break;
+  case SILFunction::Purpose::GlobalInit:
     OS << "[global_init] ";
-  if (isWeakLinked())
-    OS << "[_weakLinked] ";
+    break;
+  case SILFunction::Purpose::LazyPropertyGetter:
+    OS << "[lazy_getter] ";
+    break;
+  }
+  if (isAlwaysWeakImported())
+    OS << "[weak_imported] ";
+  auto availability = getAvailabilityForLinkage();
+  if (!availability.isAlwaysAvailable()) {
+    auto version = availability.getOSVersion().getLowerEndpoint();
+    OS << "[available " << version.getAsString() << "] ";
+  }
 
   switch (getInlineStrategy()) {
     case NoInline: OS << "[noinline] "; break;
@@ -2388,61 +2595,16 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (!isExternalDeclaration() && hasOwnership())
     OS << "[ossa] ";
 
-  printName(OS);
-  OS << " : $";
-  
-  // Print the type by substituting our context parameter names for the dependent
-  // parameters. In SIL, we may end up with multiple generic parameters that
-  // have the same name from different contexts, for instance, a generic
-  // protocol requirement with a generic method parameter <T>, which is
-  // witnessed by a generic type that has a generic type parameter also named
-  // <T>, so we may need to introduce disambiguating aliases.
-  llvm::DenseMap<CanType, Identifier> Aliases;
-  llvm::DenseSet<Identifier> UsedNames;
-  
-  auto sig = getLoweredFunctionType()->getGenericSignature();
-  auto *env = getGenericEnvironment();
-  if (sig && env) {
-    llvm::SmallString<16> disambiguatedNameBuf;
-    unsigned disambiguatedNameCounter = 1;
-    for (auto *paramTy : sig->getGenericParams()) {
-      auto sugaredTy = env->getSugaredType(paramTy);
-      Identifier name = sugaredTy->getName();
-      while (!UsedNames.insert(name).second) {
-        disambiguatedNameBuf.clear();
-        {
-          llvm::raw_svector_ostream names(disambiguatedNameBuf);
-          names << sugaredTy->getName() << disambiguatedNameCounter++;
-        }
-        name = getASTContext().getIdentifier(disambiguatedNameBuf);
-      }
-      if (name != sugaredTy->getName()) {
-        Aliases[paramTy->getCanonicalType()] = name;
+  llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
+  printSILFunctionNameAndType(OS, this, sugaredTypeNames);
 
-        // Also for the archetype
-        auto archetypeTy = env->mapTypeIntoContext(paramTy)
-            ->getAs<ArchetypeType>();
-        if (archetypeTy)
-          Aliases[archetypeTy->getCanonicalType()] = name;
-      }
-    }
-  }
-
-  {
-    PrintOptions withGenericEnvironment = PrintOptions::printSIL();
-    withGenericEnvironment.GenericEnv = env;
-    withGenericEnvironment.AlternativeTypeNames =
-      Aliases.empty() ? nullptr : &Aliases;
-    LoweredType->print(OS, withGenericEnvironment);
-  }
-  
   if (!isExternalDeclaration()) {
     if (auto eCount = getEntryCount()) {
       OS << " !function_entry_count(" << eCount.getValue() << ")";
     }
     OS << " {\n";
 
-    SILPrinter(PrintCtx, (Aliases.empty() ? nullptr : &Aliases))
+    SILPrinter(PrintCtx, sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames)
         .print(this);
     OS << "} // end sil function '" << getName() << '\'';
   }
@@ -2623,6 +2785,31 @@ printSILDefaultWitnessTables(SILPrintContext &Ctx,
     wt->print(Ctx.OS(), Ctx.printVerbose());
 }
 
+static void printSILDifferentiabilityWitnesses(
+    SILPrintContext &Ctx,
+    const SILModule::DifferentiabilityWitnessListType &diffWitnesses) {
+  if (!Ctx.sortSIL()) {
+    for (auto &dw : diffWitnesses)
+      dw.print(Ctx.OS(), Ctx.printVerbose());
+    return;
+  }
+
+  std::vector<const SILDifferentiabilityWitness *> sortedDiffWitnesses;
+  sortedDiffWitnesses.reserve(diffWitnesses.size());
+  for (auto &dw : diffWitnesses)
+    sortedDiffWitnesses.push_back(&dw);
+  std::sort(sortedDiffWitnesses.begin(), sortedDiffWitnesses.end(),
+            [](const SILDifferentiabilityWitness *dw1,
+               const SILDifferentiabilityWitness *dw2) -> bool {
+              // TODO(TF-893): Sort based on more criteria for deterministic
+              // ordering.
+              return dw1->getOriginalFunction()->getName().compare(
+                         dw2->getOriginalFunction()->getName()) == -1;
+            });
+  for (auto *dw : sortedDiffWitnesses)
+    dw->print(Ctx.OS(), Ctx.printVerbose());
+}
+
 static void
 printSILCoverageMaps(SILPrintContext &Ctx,
                      const SILModule::CoverageMapCollectionType &CoverageMaps) {
@@ -2644,6 +2831,57 @@ printSILCoverageMaps(SILPrintContext &Ctx,
     M->print(Ctx);
 }
 
+using MagicFileStringMap =
+    llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>;
+
+static void
+printMagicFileStringMapEntry(SILPrintContext &Ctx,
+                             const MagicFileStringMap::MapEntryTy &entry) {
+  auto &OS = Ctx.OS();
+  OS << "//   '" << std::get<0>(entry.second)
+     << "' => '" << entry.first() << "'";
+
+  if (!std::get<1>(entry.second))
+    OS << " (alternate)";
+
+  OS << "\n";
+}
+
+static void printMagicFileStringMap(SILPrintContext &Ctx,
+                                    const MagicFileStringMap map) {
+  if (map.empty())
+    return;
+
+  Ctx.OS() << "\n\n// Mappings from '#file' to '#filePath':\n";
+
+  if (Ctx.sortSIL()) {
+    llvm::SmallVector<llvm::StringRef, 16> keys;
+    llvm::copy(map.keys(), std::back_inserter(keys));
+
+    llvm::sort(keys, [&](StringRef leftKey, StringRef rightKey) -> bool {
+      const auto &leftValue = map.find(leftKey)->second;
+      const auto &rightValue = map.find(rightKey)->second;
+
+      // Lexicographically earlier #file strings sort earlier.
+      if (std::get<0>(leftValue) != std::get<0>(rightValue))
+        return std::get<0>(leftValue) < std::get<0>(rightValue);
+
+      // Conflict winners sort before losers.
+      if (std::get<1>(leftValue) != std::get<1>(rightValue))
+        return std::get<1>(leftValue);
+
+      // Finally, lexicographically earlier #filePath strings sort earlier.
+      return leftKey < rightKey;
+    });
+
+    for (auto key : keys)
+      printMagicFileStringMapEntry(Ctx, *map.find(key));
+  } else {
+    for (const auto &entry : map)
+      printMagicFileStringMapEntry(Ctx, entry);
+  }
+}
+
 void SILProperty::print(SILPrintContext &Ctx) const {
   PrintOptions Options = PrintOptions::printSIL();
   
@@ -2656,7 +2894,7 @@ void SILProperty::print(SILPrintContext &Ctx) const {
   printValueDecl(getDecl(), OS);
   if (auto sig = getDecl()->getInnermostDeclContext()
                           ->getGenericSignatureOfContext()) {
-    sig->getCanonicalSignature()->print(OS, Options);
+    sig.getCanonicalSignature()->print(OS, Options);
   }
   OS << " (";
   if (auto component = getComponent())
@@ -2674,6 +2912,18 @@ static void printSILProperties(SILPrintContext &Ctx,
   for (const SILProperty &P : Properties) {
     P.print(Ctx);
   }
+}
+
+static void printExternallyVisibleDecls(SILPrintContext &Ctx,
+                                        ArrayRef<ValueDecl *> decls) {
+  if (decls.empty())
+    return;
+  Ctx.OS() << "/* externally visible decls: \n";
+  for (ValueDecl *decl : decls) {
+    printValueDecl(decl, Ctx.OS());
+    Ctx.OS() << '\n';
+  }
+  Ctx.OS() << "*/\n";
 }
 
 /// Pretty-print the SILModule to the designated stream.
@@ -2736,13 +2986,20 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   }
 
   printSILGlobals(PrintCtx, getSILGlobalList());
+  printSILDifferentiabilityWitnesses(PrintCtx,
+                                     getDifferentiabilityWitnessList());
   printSILFunctions(PrintCtx, getFunctionList());
   printSILVTables(PrintCtx, getVTableList());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
-  
+  printExternallyVisibleDecls(PrintCtx, externallyVisible.getArrayRef());
+
+  if (M)
+    printMagicFileStringMap(
+        PrintCtx, M->computeMagicFileStringMap(/*shouldDiagnose=*/false));
+
   OS << "\n\n";
 }
 
@@ -2954,6 +3211,64 @@ void SILDefaultWitnessTable::dump() const {
   print(llvm::errs());
 }
 
+void SILDifferentiabilityWitness::print(llvm::raw_ostream &OS,
+                                        bool verbose) const {
+  OS << "// differentiability witness for "
+     << demangleSymbol(getOriginalFunction()->getName()) << '\n';
+  PrintOptions qualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  // sil_differentiability_witness (linkage)?
+  OS << "sil_differentiability_witness ";
+  printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
+  // ([serialized])?
+  if (isSerialized())
+    OS << "[serialized] ";
+  // [parameters ...]
+  OS << "[parameters ";
+  interleave(
+      getParameterIndices()->getIndices(), [&](unsigned index) { OS << index; },
+      [&] { OS << ' '; });
+  // [results ...]
+  OS << "] [results ";
+  interleave(
+      getResultIndices()->getIndices(), [&](unsigned index) { OS << index; },
+      [&] { OS << ' '; });
+  OS << "] ";
+  // (<...>)?
+  if (auto derivativeGenSig = getDerivativeGenericSignature()) {
+    auto subPrinter = PrintOptions::printSIL();
+    derivativeGenSig->print(OS, subPrinter);
+    OS << " ";
+  }
+  // @original-function-name : $original-sil-type
+  printSILFunctionNameAndType(OS, getOriginalFunction());
+
+  if (isDeclaration()) {
+    OS << "\n\n";
+    return;
+  }
+
+  // {
+  //   jvp: @jvp-function-name : $jvp-sil-type
+  //   vjp: @vjp-function-name : $vjp-sil-type
+  // }
+  OS << " {\n";
+  if (auto *jvp = getJVP()) {
+    OS << "  jvp: ";
+    printSILFunctionNameAndType(OS, jvp);
+    OS << '\n';
+  }
+  if (auto *vjp = getVJP()) {
+    OS << "  vjp: ";
+    printSILFunctionNameAndType(OS, vjp);
+    OS << '\n';
+  }
+  OS << "}\n\n";
+}
+
+void SILDifferentiabilityWitness::dump() const {
+  print(llvm::errs());
+}
+
 void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
   OS << "sil_coverage_map " << QuotedString(getFile()) << " "
@@ -2979,6 +3294,12 @@ void SILCoverageMap::dump() const {
 }
 
 #ifndef NDEBUG
+// Disable the "for use only in debugger" warning.
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+
 void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
                          unsigned Indent) const {
   OS << "{\n";
@@ -3012,6 +3333,10 @@ void SILDebugScope::dump(SILModule &Mod) const {
   dump(Mod.getASTContext().SourceMgr);
 }
 
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(pop)
+#endif
+
 #endif
 
 void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
@@ -3024,12 +3349,23 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   OS << "exported: " << exported << ", ";
   OS << "kind: " << kind << ", ";
 
-  if (!getRequirements().empty()) {
+  ArrayRef<Requirement> requirements;
+  SmallVector<Requirement, 4> requirementsScratch;
+  if (auto specializedSig = getSpecializedSignature()) {
+    if (auto env = getFunction()->getGenericEnvironment()) {
+      requirementsScratch = specializedSig->requirementsNotSatisfiedBy(
+          env->getGenericSignature());
+      requirements = requirementsScratch;
+    } else {
+      requirements = specializedSig->getRequirements();
+    }
+  }
+  if (!requirements.empty()) {
     OS << "where ";
     SILFunction *F = getFunction();
     assert(F);
     auto GenericEnv = F->getGenericEnvironment();
-    interleave(getRequirements(),
+    interleave(requirements,
                [&](Requirement req) {
                  if (!GenericEnv) {
                    req.print(OS, SubPrinter);
@@ -3061,6 +3397,11 @@ SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
                 bool SortedSIL) :
   OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
   DebugInfo(SILPrintDebugInfo) { }
+
+SILPrintContext::SILPrintContext(llvm::raw_ostream &OS,
+                                 const SILOptions &Opts) :
+  OutStream(OS), Verbose(Opts.EmitVerboseSIL), SortedSIL(Opts.EmitSortedSIL),
+  DebugInfo(SILPrintDebugInfo) {}
 
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
                                  bool SortedSIL, bool DebugInfo) :

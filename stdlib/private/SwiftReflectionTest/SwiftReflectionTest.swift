@@ -44,6 +44,8 @@ public enum InstanceKind : UInt8 {
   case Existential
   case ErrorExistential
   case Closure
+  case Enum
+  case EnumValue
 }
 
 /// Represents a section in a loaded image in this process.
@@ -390,12 +392,12 @@ public func reflect(object: AnyObject) {
 /// The test doesn't care about the witness tables - we only care
 /// about what's in the buffer, so we always put these values into
 /// an Any existential.
-public func reflect<T>(any: T) {
+public func reflect<T>(any: T, kind: InstanceKind = .Existential) {
   let any: Any = any
   let anyPointer = UnsafeMutablePointer<Any>.allocate(capacity: MemoryLayout<Any>.size)
   anyPointer.initialize(to: any)
   let anyPointerValue = UInt(bitPattern: anyPointer)
-  reflect(instanceAddress: anyPointerValue, kind: .Existential)
+  reflect(instanceAddress: anyPointerValue, kind: kind)
   anyPointer.deallocate()
 }
 
@@ -425,6 +427,18 @@ public func reflect<T: Error>(error: T) {
   let error: Error = error
   let errorPointerValue = unsafeBitCast(error, to: UInt.self)
   reflect(instanceAddress: errorPointerValue, kind: .ErrorExistential)
+}
+
+// Reflect an `Enum`
+//
+// These are handled like existentials, but
+// the test driver verifies a different set of data.
+public func reflect<T>(enum value: T) {
+  reflect(any: value, kind: .Enum)
+}
+
+public func reflect<T>(enumValue value: T) {
+  reflect(any: value, kind: .EnumValue)
 }
 
 /// Wraps a thick function with arity 0.

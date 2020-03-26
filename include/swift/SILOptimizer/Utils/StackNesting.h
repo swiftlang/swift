@@ -155,10 +155,13 @@ private:
     return bitNumberForAlloc(AllocInst);
   }
 
+  /// Insert deallocations at block boundaries.
+  Changes insertDeallocsAtBlockBoundaries();
+
   /// Modifies the SIL to end up with a correct stack nesting.
   ///
   /// Returns the status of what changes were made.
-  Changes adaptDeallocs();
+  bool adaptDeallocs();
 };
 
 } // end namespace swift

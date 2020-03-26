@@ -19,10 +19,15 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
+
+namespace llvm {
+class FileCollector;
+}
 
 namespace clang {
 class DependencyCollector;
@@ -33,8 +38,10 @@ namespace swift {
 class AbstractFunctionDecl;
 class ClangImporterOptions;
 class ClassDecl;
+class FileUnit;
 class ModuleDecl;
 class NominalTypeDecl;
+class TypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
 
@@ -53,8 +60,9 @@ enum class Bridgeability : unsigned {
 class DependencyTracker {
   std::shared_ptr<clang::DependencyCollector> clangCollector;
 public:
-
-  explicit DependencyTracker(bool TrackSystemDeps);
+  explicit DependencyTracker(
+      bool TrackSystemDeps,
+      std::shared_ptr<llvm::FileCollector> FileCollector = {});
 
   /// Adds a file as a dependency.
   ///
@@ -94,7 +102,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) = 0;
+  virtual bool canImportModule(Located<Identifier> named) = 0;
 
   /// Import a module with the given module path.
   ///
@@ -107,7 +115,7 @@ public:
   /// emits a diagnostic and returns NULL.
   virtual
   ModuleDecl *loadModule(SourceLoc importLoc,
-                         ArrayRef<std::pair<Identifier, SourceLoc>> path) = 0;
+                         ArrayRef<Located<Identifier>> path) = 0;
 
   /// Load extensions to the given nominal type.
   ///
@@ -147,6 +155,10 @@ public:
 
   /// Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }
+
+  /// Discover overlays declared alongside this file and add infomation about
+  /// them to it.
+  void findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module, FileUnit *file);
 };
 
 } // namespace swift

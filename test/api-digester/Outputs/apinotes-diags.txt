@@ -1,15 +1,13 @@
 
 /* Generic Signature Changes */
-APINotesTest(APINotesTest.h): Func SwiftTypeWithMethodLeft.minusPrint() has generic signature change from <Self where Self : SwiftTypeWithMethodLeft> to <Self where Self : SwiftTypeWithMethodRight>
-APINotesTest(APINotesTest.h): Func SwiftTypeWithMethodLeft.plusPrint() has generic signature change from <Self where Self : SwiftTypeWithMethodLeft> to <Self where Self : SwiftTypeWithMethodRight>
-
-/* RawRepresentable Changes */
-APINotesTest(APINotesTest.h): TypeAlias CatAttributeName(NSString) is now String representable
+APINotesTest(APINotesTest.h): Func SwiftTypeWithMethodLeft.minusPrint() has generic signature change from <Self where Self : APINotesTest.SwiftTypeWithMethodLeft> to <Self where Self : APINotesTest.SwiftTypeWithMethodRight>
+APINotesTest(APINotesTest.h): Func SwiftTypeWithMethodLeft.plusPrint() has generic signature change from <Self where Self : APINotesTest.SwiftTypeWithMethodLeft> to <Self where Self : APINotesTest.SwiftTypeWithMethodRight>
 
 /* Removed Decls */
 APINotesTest(APINotesTest.h): Func ObjcProt.protMemberFunc2() has been removed
 APINotesTest(APINotesTest.h): Func ObjcProt.protMemberFunc3() has been removed
 APINotesTest(APINotesTest.h): Func SwiftTypeWithMethodLeft.getPropertyA() has been removed
+APINotesTest(APINotesTest.h): TypeAlias CatAttributeName has been removed
 
 /* Moved Decls */
 
@@ -19,12 +17,12 @@ APINotesTest(APINotesTest.h): Var OldType.oldMember has been renamed to Var NewT
 APINotesTest(APINotesTest.h): Var globalAttributeName has been renamed to Var AnimalAttributeName.globalAttributeName
 
 /* Type Changes */
-APINotesTest(APINotesTest.h): Constructor Cat.init(name:) has return type change from Cat to Cat?
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributes(_:) has parameter 0 type change from [String : Any] to [AnimalAttributeName : Any]
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributesArray(_:) has parameter 0 type change from [String] to [AnimalAttributeName]
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributes(_:) has parameter 0 type change from [String : Any]? to [AnimalAttributeName : Any]?
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributesArray(_:) has parameter 0 type change from [String]? to [AnimalAttributeName]?
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleAttribute(_:) has parameter 0 type change from String to AnimalAttributeName
-APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleOptionalAttribute(_:) has parameter 0 type change from String? to AnimalAttributeName?
+APINotesTest(APINotesTest.h): Constructor Cat.init(name:) has return type change from APINotesTest.Cat to APINotesTest.Cat?
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributes(_:) has parameter 0 type change from [Swift.String : Any] to [APINotesTest.AnimalAttributeName : Any]
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributesArray(_:) has parameter 0 type change from [Swift.String] to [APINotesTest.AnimalAttributeName]
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributes(_:) has parameter 0 type change from [Swift.String : Any]? to [APINotesTest.AnimalAttributeName : Any]?
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributesArray(_:) has parameter 0 type change from [Swift.String]? to [APINotesTest.AnimalAttributeName]?
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleAttribute(_:) has parameter 0 type change from Swift.String to APINotesTest.AnimalAttributeName
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleOptionalAttribute(_:) has parameter 0 type change from Swift.String? to APINotesTest.AnimalAttributeName?
 
 /* Decl Attribute changes */

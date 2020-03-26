@@ -22,6 +22,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
+#include "swift/IDE/CompletionInstance.h"
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -90,7 +91,7 @@ struct SwiftCodeCompletionConsumer
       : handleResultsImpl(handleResultsImpl) {}
 
   void setContext(swift::ASTContext *context,
-                  swift::CompilerInvocation *invocation,
+                  const swift::CompilerInvocation *invocation,
                   swift::ide::CodeCompletionContext *completionContext) {
     swiftContext.swiftASTContext = context;
     swiftContext.invocation = invocation;
@@ -100,7 +101,6 @@ struct SwiftCodeCompletionConsumer
 
   void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override {
     assert(swiftContext.swiftASTContext);
-    CodeCompletionContext::sortCompletionResults(Results);
     handleResultsImpl(Results, swiftContext);
   }
 };
@@ -123,106 +123,47 @@ static bool swiftCodeCompleteImpl(
     unsigned Offset, SwiftCodeCompletionConsumer &SwiftConsumer,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    std::string &Error) {
-  assert(FileSystem);
+    bool EnableASTCaching, std::string &Error) {
+  return Lang.performCompletionLikeOperation(
+      UnresolvedInputFile, Offset, Args, FileSystem, EnableASTCaching, Error,
+      [&](CompilerInstance &CI) {
+        // Create a factory for code completion callbacks that will feed the
+        // Consumer.
+        auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
+        ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
+        std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+            ide::makeCodeCompletionCallbacksFactory(CompletionContext,
+                                                    SwiftConsumer));
 
-  // Resolve symlinks for the input file; we resolve them for the input files
-  // in the arguments as well.
-  // FIXME: We need the Swift equivalent of Clang's FileEntry.
-  auto InputFile = llvm::MemoryBuffer::getMemBuffer(
-      UnresolvedInputFile->getBuffer(),
-      Lang.resolvePathSymlinks(UnresolvedInputFile->getBufferIdentifier()));
+        SwiftConsumer.setContext(&CI.getASTContext(), &CI.getInvocation(),
+                                 &CompletionContext);
 
-  auto origBuffSize = InputFile->getBufferSize();
-  unsigned CodeCompletionOffset = Offset;
-  if (CodeCompletionOffset > origBuffSize) {
-    CodeCompletionOffset = origBuffSize;
-  }
-
-  CompilerInstance CI;
-  // Display diagnostics to stderr.
-  PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-
-  EditorDiagConsumer TraceDiags;
-  trace::TracedOperation TracedOp(trace::OperationKind::CodeCompletion);
-  if (TracedOp.enabled()) {
-    CI.addDiagnosticConsumer(&TraceDiags);
-    trace::SwiftInvocation SwiftArgs;
-    trace::initTraceInfo(SwiftArgs, InputFile->getBufferIdentifier(), Args);
-    TracedOp.setDiagnosticProvider(
-        [&TraceDiags](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
-          TraceDiags.getAllDiagnostics(diags);
-        });
-    TracedOp.start(SwiftArgs,
-                   {std::make_pair("OriginalOffset", std::to_string(Offset)),
-                    std::make_pair("Offset",
-                      std::to_string(CodeCompletionOffset))});
-  }
-
-  CompilerInvocation Invocation;
-  bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, CI.getDiags(), InputFile->getBufferIdentifier(),
-      FileSystem, Error);
-  if (Failed) {
-    return false;
-  }
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-    Error = "no input filenames specified";
-    return false;
-  }
-
-  const char *Position = InputFile->getBufferStart() + CodeCompletionOffset;
-  std::unique_ptr<llvm::WritableMemoryBuffer> NewBuffer =
-      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
-                                              InputFile->getBufferSize() + 1,
-                                              InputFile->getBufferIdentifier());
-  char *NewBuf = NewBuffer->getBufferStart();
-  char *NewPos = std::copy(InputFile->getBufferStart(), Position, NewBuf);
-  *NewPos = '\0';
-  std::copy(Position, InputFile->getBufferEnd(), NewPos+1);
-
-  Invocation.setCodeCompletionPoint(NewBuffer.get(), CodeCompletionOffset);
-
-  auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
-  ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
-
-  // Create a factory for code completion callbacks that will feed the
-  // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory(
-      ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                              SwiftConsumer));
-
-  Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
-
-  // FIXME: We need to be passing the buffers from the open documents.
-  // It is not a huge problem in practice because Xcode auto-saves constantly.
-
-  if (FileSystem != llvm::vfs::getRealFileSystem()) {
-    CI.getSourceMgr().setFileSystem(FileSystem);
-    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
-  }
-
-  if (CI.setup(Invocation)) {
-    // FIXME: error?
-    return true;
-  }
-
-  CloseClangModuleFiles scopedCloseFiles(
-      *CI.getASTContext().getClangModuleLoader());
-  SwiftConsumer.setContext(&CI.getASTContext(), &Invocation,
-                           &CompletionContext);
-  registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
-  SwiftConsumer.clearContext();
-
-  return true;
+        auto SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
+        SwiftConsumer.clearContext();
+      });
 }
+
+static void translateCodeCompletionOptions(OptionsDictionary &from,
+                                           CodeCompletion::Options &to,
+                                           StringRef &filterText,
+                                           unsigned &resultOffset,
+                                           unsigned &maxResults);
 
 void SwiftLangSupport::codeComplete(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+    OptionsDictionary *options,
     SourceKit::CodeCompletionConsumer &SKConsumer, ArrayRef<const char *> Args,
     Optional<VFSOptions> vfsOptions) {
+
+  CodeCompletion::Options CCOpts;
+  if (options) {
+    StringRef filterText;
+    unsigned resultOffset = 0;
+    unsigned maxResults = 0;
+    translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
+                                   maxResults);
+  }
 
   std::string error;
   // FIXME: the use of None as primary file is to match the fact we do not read
@@ -268,7 +209,8 @@ void SwiftLangSupport::codeComplete(
 
   std::string Error;
   if (!swiftCodeCompleteImpl(*this, UnresolvedInputFile, Offset, SwiftConsumer,
-                             Args, fileSystem, Error)) {
+                             Args, fileSystem,
+                             CCOpts.reuseASTContextIfPossible, Error)) {
     SKConsumer.failed(Error);
   }
 }
@@ -561,6 +503,28 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
     Info.SemanticContext = CCCtxOtherModule; break;
   }
 
+  static UIdent CCTypeRelNotApplicable("source.codecompletion.typerelation.notapplicable");
+  static UIdent CCTypeRelUnknown("source.codecompletion.typerelation.unknown");
+  static UIdent CCTypeRelUnrelated("source.codecompletion.typerelation.unrelated");
+  static UIdent CCTypeRelInvalid("source.codecompletion.typerelation.invalid");
+  static UIdent CCTypeRelConvertible("source.codecompletion.typerelation.convertible");
+  static UIdent CCTypeRelIdentical("source.codecompletion.typerelation.identical");
+
+  switch (Result->getExpectedTypeRelation()) {
+  case CodeCompletionResult::NotApplicable:
+    Info.TypeRelation = CCTypeRelNotApplicable; break;
+  case CodeCompletionResult::Unknown:
+    Info.TypeRelation = CCTypeRelUnknown; break;
+  case CodeCompletionResult::Unrelated:
+    Info.TypeRelation = CCTypeRelUnrelated; break;
+  case CodeCompletionResult::Invalid:
+    Info.TypeRelation = CCTypeRelInvalid; break;
+  case CodeCompletionResult::Convertible:
+    Info.TypeRelation = CCTypeRelConvertible; break;
+  case  CodeCompletionResult::Identical:
+    Info.TypeRelation = CCTypeRelIdentical; break;
+  }
+
   Info.ModuleName = Result->getModuleName();
   Info.DocBrief = Result->getBriefDocComment();
   Info.NotRecommended = Result->isNotRecommended();
@@ -843,6 +807,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyContextWeight("key.codecomplete.sort.contextweight");
   static UIdent KeyFuzzyWeight("key.codecomplete.sort.fuzzyweight");
   static UIdent KeyPopularityBonus("key.codecomplete.sort.popularitybonus");
+  static UIdent KeyReuseASTContext("key.codecomplete.reuseastcontext");
   from.valueForOption(KeySortByName, to.sortByName);
   from.valueForOption(KeyUseImportDepth, to.useImportDepth);
   from.valueForOption(KeyGroupOverloads, to.groupOverloads);
@@ -866,6 +831,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyPopularityBonus, to.popularityBonus);
   from.valueForOption(KeyHideByName, to.hideByNameStyle);
   from.valueForOption(KeyTopNonLiteral, to.showTopNonLiteralResults);
+  from.valueForOption(KeyReuseASTContext, to.reuseASTContextIfPossible);
 }
 
 /// Canonicalize a name that is in the format of a reference to a function into
@@ -1027,7 +993,8 @@ static void transformAndForwardResults(
     CodeCompletion::SwiftResult paren(
         CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
         SemanticContextKind::ExpressionSpecific,
-        exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString);
+        exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString,
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
 
     SwiftCompletionInfo info;
     std::vector<Completion *> extended =
@@ -1121,7 +1088,7 @@ static void transformAndForwardResults(
     });
 
     auto *inputBuf = session->getBuffer();
-    std::string str = inputBuf->getBuffer().slice(0, offset);
+    std::string str = inputBuf->getBuffer().slice(0, offset).str();
     {
       llvm::raw_string_ostream OSS(str);
       SwiftToSourceKitCompletionAdapter::getResultSourceText(
@@ -1136,7 +1103,8 @@ static void transformAndForwardResults(
       cargs.push_back(arg.c_str());
     std::string error;
     if (!swiftCodeCompleteImpl(lang, buffer.get(), str.size(), swiftConsumer,
-                               cargs, session->getFileSystem(), error)) {
+                               cargs, session->getFileSystem(),
+                               options.reuseASTContextIfPossible, error)) {
       consumer.failed(error);
       return;
     }
@@ -1175,7 +1143,8 @@ static void transformAndForwardResults(
 void SwiftLangSupport::codeCompleteOpen(
     StringRef name, llvm::MemoryBuffer *inputBuf, unsigned offset,
     OptionsDictionary *options, ArrayRef<FilterRule> rawFilterRules,
-    GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args, Optional<VFSOptions> vfsOptions) {
+    GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args,
+    Optional<VFSOptions> vfsOptions) {
   StringRef filterText;
   unsigned resultOffset = 0;
   unsigned maxResults = 0;
@@ -1233,7 +1202,8 @@ void SwiftLangSupport::codeCompleteOpen(
 
   // Invoke completion.
   if (!swiftCodeCompleteImpl(*this, inputBuf, offset, swiftConsumer,
-                             extendedArgs, fileSystem, error)) {
+                             extendedArgs, fileSystem,
+                             CCOpts.reuseASTContextIfPossible, error)) {
     consumer.failed(error);
     return;
   }
@@ -1322,9 +1292,9 @@ SwiftCompletionCache::~SwiftCompletionCache() {}
 
 void SwiftLangSupport::codeCompleteCacheOnDisk(StringRef path) {
   ThreadSafeRefCntPtr<SwiftCompletionCache> newCache(new SwiftCompletionCache);
-  newCache->onDisk = llvm::make_unique<ide::OnDiskCodeCompletionCache>(path);
+  newCache->onDisk = std::make_unique<ide::OnDiskCodeCompletionCache>(path);
   newCache->inMemory =
-      llvm::make_unique<ide::CodeCompletionCache>(newCache->onDisk.get());
+      std::make_unique<ide::CodeCompletionCache>(newCache->onDisk.get());
 
   CCCache = newCache; // replace the old cache.
 }

@@ -26,7 +26,7 @@ public class MyCls {
 
   // Allocating entry point is [serialized]
 
-  // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute5MyClsC14designatedInitACyt_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
+  // CHECK-LABEL: sil [serialized] [exact_self_class] [ossa] @$s19inlinable_attribute5MyClsC14designatedInitACyt_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
   public init(designatedInit: ()) {}
 
   // Note -- convenience init is intentionally not [serialized]
@@ -43,7 +43,8 @@ public class MyCls {
   case c(MySt)
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s19inlinable_attribute6MyEnumO1cyAcA0C2StVcACmFTc : $@convention(thin) (@thin MyEnum.Type) -> @owned @callee_guaranteed (MySt) -> MyEnum
+// CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute16referencesMyEnumyyFAA0dE0OAA0D2StVcADmcfu_ : $@convention(thin) (@thin MyEnum.Type) -> @owned @callee_guaranteed (MySt) -> MyEnum {
+// CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute16referencesMyEnumyyFAA0dE0OAA0D2StVcADmcfu_AdFcfu0_ : $@convention(thin) (MySt, @thin MyEnum.Type) -> MyEnum {
 
 @inlinable public func referencesMyEnum() {
   _ = MyEnum.c
@@ -64,13 +65,13 @@ public class Horse {
   public func gallop() {}
 }
 
-// CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute15talkAboutAHorse1hyAA5HorseC_tF : $@convention(thin) (@guaranteed Horse) -> () {
-// CHECK: function_ref @$s19inlinable_attribute5HorseC6gallopyyFTc
+// CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute15talkAboutAHorse1hyAA5HorseC_tFyycAEcfu_ : $@convention(thin) (@guaranteed Horse) -> @owned @callee_guaranteed () -> () {
+// CHECK: function_ref @$s19inlinable_attribute15talkAboutAHorse1hyAA5HorseC_tFyycAEcfu_yycfu0_
 // CHECK: return
 // CHECK: }
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$s19inlinable_attribute5HorseC6gallopyyFTc : $@convention(thin) (@guaranteed Horse) -> @owned @callee_guaranteed () -> () {
-// CHECK: class_method
+// CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute15talkAboutAHorse1hyAA5HorseC_tFyycAEcfu_yycfu0_ : $@convention(thin) (@guaranteed Horse) -> () {
+// CHECK: class_method %0 : $Horse, #Horse.gallop : (Horse) -> () -> (), $@convention(method) (@guaranteed Horse) -> ()
 // CHECK: return
 // CHECK: }
 
@@ -142,7 +143,7 @@ public func bas() {
   }
 
   // CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute3bas{{[_0-9a-zA-Z]*}}U_
-  let zung = {
+  let _ = {
     // CHECK-LABEL: sil shared [serializable] [ossa] @$s19inlinable_attribute3basyyFyycfU_7zippityL_yyF
     func zippity() { }
   }

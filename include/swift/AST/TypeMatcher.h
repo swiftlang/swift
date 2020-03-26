@@ -107,10 +107,15 @@ class TypeMatcher {
     TRIVIAL_CASE(BuiltinRawPointerType)
     TRIVIAL_CASE(BuiltinNativeObjectType)
     TRIVIAL_CASE(BuiltinBridgeObjectType)
-    TRIVIAL_CASE(BuiltinUnknownObjectType)
     TRIVIAL_CASE(BuiltinUnsafeValueBufferType)
     TRIVIAL_CASE(BuiltinVectorType)
     TRIVIAL_CASE(SILTokenType)
+
+    bool visitUnresolvedType(CanUnresolvedType firstType, Type secondType,
+                             Type sugaredFirstType) {
+      // Unresolved types never match.
+      return mismatch(firstType.getPointer(), secondType, sugaredFirstType);
+    }
 
     bool visitTupleType(CanTupleType firstTuple, Type secondType,
                         Type sugaredFirstType) {
@@ -265,23 +270,6 @@ class TypeMatcher {
       return mismatch(firstInOut.getPointer(), secondType, sugaredFirstType);
     }
 
-    bool visitUnboundBoundGenericType(CanUnboundGenericType firstUBGT,
-                                      Type secondType, Type sugaredFirstType) {
-      if (auto secondUBGT = secondType->getAs<UnboundGenericType>()) {
-        if (firstUBGT->getDecl() != secondUBGT->getDecl())
-          return mismatch(firstUBGT.getPointer(), secondUBGT, sugaredFirstType);
-
-        if (firstUBGT.getParent())
-          return this->visit(firstUBGT.getParent(), secondUBGT->getParent(),
-                             sugaredFirstType->castTo<UnboundGenericType>()
-                               ->getParent());
-
-        return true;
-      }
-
-      return mismatch(firstUBGT.getPointer(), secondType, sugaredFirstType);
-    }
-
     bool visitBoundGenericType(CanBoundGenericType firstBGT,
                                Type secondType, Type sugaredFirstType) {
       auto _secondBGT = secondType->getCanonicalType();
@@ -309,8 +297,6 @@ class TypeMatcher {
 
       return mismatch(firstBGT.getPointer(), secondType, sugaredFirstType);
     }
-
-    TRIVIAL_CASE(TypeVariableType)
 
 #undef TRIVIAL_CASE
   };

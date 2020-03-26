@@ -114,6 +114,11 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F) {
   // So try deserializing HiddenExternal functions too.
   if (F->getLinkage() == SILLinkage::HiddenExternal)
     return addFunctionToWorklist(F);
+  
+  // Update the linkage of the function in case it's different in the serialized
+  // SIL than derived from the AST. This can be the case with cross-module-
+  // optimizations.
+  Mod.updateFunctionLinkage(F);
 }
 
 /// Process F, recursively deserializing any thing F may reference.

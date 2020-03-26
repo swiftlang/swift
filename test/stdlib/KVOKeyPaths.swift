@@ -191,3 +191,30 @@ print("keyPath == \\Sortable1.name:", descriptor.keyPath == \Sortable1.name)
 
 // CHECK-51-LABEL: creating NSSortDescriptor
 // CHECK-51-NEXT: keyPath == \Sortable1.name: true
+
+//===----------------------------------------------------------------------===//
+// Test keyPath with optional value has correct oldValue/newValue behavior
+//===----------------------------------------------------------------------===//
+
+class TestClassForOptionalKeyPath : NSObject {
+    
+    // Should not use NSObject? as object type
+    @objc dynamic var optionalObject: String?
+    
+}
+
+let testObjectForOptionalKeyPath = TestClassForOptionalKeyPath()
+
+print("observe keyPath with optional value")
+
+let optionalKeyPathObserver = testObjectForOptionalKeyPath.observe(\.optionalObject, options: [.initial, .old, .new]) { (_, change) in
+    Swift.print("oldValue = \(change.oldValue as String??), newValue = \(change.newValue as String??)")
+}
+
+testObjectForOptionalKeyPath.optionalObject = nil
+testObjectForOptionalKeyPath.optionalObject = "foo"
+
+// CHECK-51-LABEL: observe keyPath with optional value
+// CHECK-51-NEXT: oldValue = Optional(nil), newValue = Optional(nil)
+// CHECK-51-NEXT: oldValue = Optional(nil), newValue = Optional(nil)
+// CHECK-51-NEXT: oldValue = Optional(nil), newValue = Optional(Optional("foo"))

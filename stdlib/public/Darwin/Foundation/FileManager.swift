@@ -48,7 +48,7 @@ extension FileManager {
         return __NSFileManagerEnumeratorAtURL(self, url, keys, mask, { (url, error) in
             var errorResult = true
             if let h = handler {
-                errorResult = h(url as URL, error)
+                errorResult = h(url, error)
             }
             return errorResult
         })

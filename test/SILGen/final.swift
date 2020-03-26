@@ -32,14 +32,14 @@ func testDirectDispatch(c : TestClass) -> Int {
 
 // Verify that the non-overriding final methods don't get emitted to the vtable.
 // CHECK-LABEL: sil_vtable TestClass {
-// CHECK-NEXT:  #TestClass.baseMethod!1: {{.*}} : @$s5final9TestClassC10baseMethod{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:  #TestClass.init!allocator.1: {{.*}} : @$s5final9TestClassC{{[_0-9a-zA-Z]*}}fC
+// CHECK-NEXT:  #TestClass.baseMethod: {{.*}} : @$s5final9TestClassC10baseMethod{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:  #TestClass.init!allocator: {{.*}} : @$s5final9TestClassC{{[_0-9a-zA-Z]*}}fC
 // CHECK-NEXT:  #TestClass.deinit!
 // CHECK-NEXT: }
 
 // Verify that overriding final methods don't get emitted to the vtable.
 // CHECK-LABEL: sil_vtable TestDerived {
-// CHECK-NEXT:  #TestClass.baseMethod!1: {{.*}} : @$s5final11TestDerivedC10baseMethod{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:  #TestClass.init!allocator.1: {{.*}} : @$s5final11TestDerivedC{{[_0-9a-zA-Z]*}}fC
+// CHECK-NEXT:  #TestClass.baseMethod: {{.*}} : @$s5final11TestDerivedC10baseMethod{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT:  #TestClass.init!allocator: {{.*}} : @$s5final11TestDerivedC{{[_0-9a-zA-Z]*}}fC
 // CHECK-NEXT:  #TestDerived.deinit!
 // CHECK-NEXT: }

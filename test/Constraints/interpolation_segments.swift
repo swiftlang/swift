@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typecheck -debug-constraints %s > %t.dump 2>&1 
+// RUN: %target-typecheck-verify-swift -debug-constraints > %t.dump 2>&1 
 // RUN: %FileCheck %s < %t.dump
 
 // Make sure that the type checker doesn't initially try to solve the appendLiteral and 

@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines macros used for macro-metaprogramming with compiler-known
-// protocols.
+// protocols. Note that this mechanism does not look through an overlay into its
+// underlying module, so it typically cannot find Objective-C protocols.
 //
 //===----------------------------------------------------------------------===//
 
@@ -68,6 +69,7 @@ PROTOCOL_(ErrorCodeProtocol)
 PROTOCOL(OptionSet)
 PROTOCOL(CaseIterable)
 PROTOCOL(SIMDScalar)
+PROTOCOL(BinaryInteger)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)
@@ -81,6 +83,9 @@ PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)
 
 PROTOCOL(StringInterpolationProtocol)
+
+PROTOCOL(AdditiveArithmetic)
+PROTOCOL(Differentiable)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)

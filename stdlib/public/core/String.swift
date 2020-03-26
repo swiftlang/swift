@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -428,56 +428,66 @@ extension String {
     return
   }
   
-  /// Creates a new String with the specified capacity in UTF-8 code units then
-  /// calls the given closure with a buffer covering the String's uninitialized
-  /// memory.
+  /// Creates a new string with the specified capacity in UTF-8 code units, and
+  /// then calls the given closure with a buffer covering the string's
+  /// uninitialized memory.
   ///
   /// The closure should return the number of initialized code units,
   /// or 0 if it couldn't initialize the buffer (for example if the
   /// requested capacity was too small).
   ///
   /// This method replaces ill-formed UTF-8 sequences with the Unicode
-  /// replacement character (`"\u{FFFD}"`); This may require resizing
+  /// replacement character (`"\u{FFFD}"`). This may require resizing
   /// the buffer beyond its original capacity.
   ///
   /// The following examples use this initializer with the contents of two
-  /// different `UInt8` arrays---the first with well-formed UTF-8 code unit
-  /// sequences and the second with an ill-formed sequence at the end.
+  /// different `UInt8` arrays---the first with a well-formed UTF-8 code unit
+  /// sequence, and the second with an ill-formed sequence at the end.
   ///
-  ///     let validUTF8: [UInt8] = [67, 97, 102, -61, -87, 0]
-  ///     let s = String(uninitializedCapacity: validUTF8.count,
-  ///                    initializingUTF8With: { ptr in
-  ///         ptr.initializeFrom(validUTF8)
+  ///     let validUTF8: [UInt8] = [0x43, 0x61, 0x66, 0xC3, 0xA9]
+  ///     let invalidUTF8: [UInt8] = [0x43, 0x61, 0x66, 0xC3]
+  ///
+  ///     let cafe1 = String(unsafeUninitializedCapacity: validUTF8.count) {
+  ///         _ = $0.initialize(from: validUTF8)
   ///         return validUTF8.count
-  ///     })
-  ///     // Prints "Café"
+  ///     }
+  ///     // cafe1 == "Café"
   ///
-  ///     let invalidUTF8: [UInt8] = [67, 97, 102, -61, 0]
-  ///     let s = String(uninitializedCapacity: invalidUTF8.count,
-  ///                    initializingUTF8With: { ptr in
-  ///         ptr.initializeFrom(invalidUTF8)
+  ///     let cafe2 = String(unsafeUninitializedCapacity: invalidUTF8.count) {
+  ///         _ = $0.initialize(from: invalidUTF8)
   ///         return invalidUTF8.count
-  ///     })
-  ///     // Prints "Caf�"
+  ///     }
+  ///     // cafe2 == "Caf�"
   ///
-  ///     let s = String(uninitializedCapacity: invalidUTF8.count,
-  ///                    initializingUTF8With: { ptr in
-  ///         ptr.initializeFrom(invalidUTF8)
+  ///     let empty = String(unsafeUninitializedCapacity: 16) { _ in
+  ///         // Can't initialize the buffer (e.g. the capacity is too small).
   ///         return 0
-  ///     })
-  ///     // Prints ""
+  ///     }
+  ///     // empty == ""
   ///
   /// - Parameters:
   ///   - capacity: The number of UTF-8 code units worth of memory to allocate
-  ///       for the String.
-  ///   - initializer: A closure that initializes elements and sets the count of
-  ///       the new String
-  ///     - Parameters:
-  ///       - buffer: A buffer covering uninitialized memory with room for the
-  ///           specified number of UTF-8 code units.
+  ///     for the string (excluding the null terminator).
+  ///   - initializer: A closure that accepts a buffer covering uninitialized
+  ///     memory with room for `capacity` UTF-8 code units, initializes
+  ///     that memory, and returns the number of initialized elements.
+  @inline(__always)
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public init(
+    unsafeUninitializedCapacity capacity: Int,
+    initializingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>
+    ) throws -> Int
+  ) rethrows {
+    self = try String(
+      _uninitializedCapacity: capacity,
+      initializingUTF8With: initializer
+    )
+  }
+  
   @inline(__always)
   internal init(
-    uninitializedCapacity capacity: Int,
+    _uninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
     ) throws -> Int
@@ -786,7 +796,7 @@ extension String {
   public func lowercased() -> String {
     if _fastPath(_guts.isFastASCII) {
       return _guts.withFastUTF8 { utf8 in
-        return String(uninitializedCapacity: utf8.count) { buffer in
+        return String(_uninitializedCapacity: utf8.count) { buffer in
           for i in 0 ..< utf8.count {
             buffer[i] = _lowercaseASCII(utf8[i])
           }
@@ -846,7 +856,7 @@ extension String {
   public func uppercased() -> String {
     if _fastPath(_guts.isFastASCII) {
       return _guts.withFastUTF8 { utf8 in
-        return String(uninitializedCapacity: utf8.count) { buffer in
+        return String(_uninitializedCapacity: utf8.count) { buffer in
           for i in 0 ..< utf8.count {
             buffer[i] = _uppercaseASCII(utf8[i])
           }

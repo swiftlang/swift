@@ -290,6 +290,7 @@ Entities
   entity-spec ::= type 'fu' INDEX            // implicit anonymous closure
   entity-spec ::= 'fA' INDEX                 // default argument N+1 generator
   entity-spec ::= 'fi'                       // non-local variable initializer
+  entity-spec ::= 'fP'                       // property wrapper backing initializer
   entity-spec ::= 'fD'                       // deallocating destructor; untyped
   entity-spec ::= 'fd'                       // non-deallocating destructor; untyped
   entity-spec ::= 'fE'                       // ivar destroyer; untyped
@@ -480,7 +481,7 @@ Types
   type ::= 'Bf' NATURAL '_'                  // Builtin.Float<n>
   type ::= 'Bi' NATURAL '_'                  // Builtin.Int<n>
   type ::= 'BI'                              // Builtin.IntLiteral
-  type ::= 'BO'                              // Builtin.UnknownObject
+  type ::= 'BO'                              // Builtin.UnknownObject (no longer a distinct type, but still used for AnyObject)
   type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= 'Bt'                              // Builtin.SILToken
@@ -551,6 +552,11 @@ Types
   type ::= assoc-type-name 'Qz'                      // shortcut for 'Qyz'
   type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
   type ::= assoc-type-list 'QZ'                      // shortcut for 'QYz'
+  
+  #if SWIFT_RUNTIME_VERSION >= 5.2
+    type ::= type assoc-type-name 'Qx' // associated type relative to base `type`
+    type ::= type assoc-type-list 'QX' // associated type relative to base `type`
+  #endif
 
   protocol-list ::= protocol '_' protocol*
   protocol-list ::= empty-list
@@ -577,10 +583,12 @@ mangled in to disambiguate.
 ::
 
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
-  impl-function-type ::= type* generic-signature 'I' PSEUDO-GENERIC? FUNC-ATTRIBUTES '_'
+  impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= CALLEE-ESCAPE? CALLEE-CONVENTION FUNC-REPRESENTATION? PARAM-CONVENTION* RESULT-CONVENTION* ('z' RESULT-CONVENTION)
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? PARAM-CONVENTION* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION)?
 
+  PATTERN-SUBS ::= 's'                       // has pattern substitutions
+  INVOCATION-SUB ::= 'I'                     // has invocation substitutions
   PSEUDO-GENERIC ::= 'P'
 
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
@@ -596,6 +604,9 @@ mangled in to disambiguate.
   FUNC-REPRESENTATION ::= 'J'                // ObjC method
   FUNC-REPRESENTATION ::= 'K'                // closure
   FUNC-REPRESENTATION ::= 'W'                // protocol witness
+
+  COROUTINE-KIND ::= 'A'                     // yield-once coroutine
+  COROUTINE-KIND ::= 'G'                     // yield-many coroutine
 
   PARAM-CONVENTION ::= 'i'                   // indirect in
   PARAM-CONVENTION ::= 'c'                   // indirect in constant

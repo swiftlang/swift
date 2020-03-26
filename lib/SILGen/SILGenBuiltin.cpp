@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -648,13 +649,14 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   auto &toTL = SGF.getTypeLowering(toTy);
   assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
 
+  auto arg = args[0];
+
   // TODO: Fix this API.
   if (!fromTL.isAddress() || !toTL.isAddress()) {
-    if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, args[0],
-                                                       toTL.getLoweredType())) {
+    if (SILType::canRefCast(arg.getType(), toTL.getLoweredType(), SGF.SGM.M)) {
       // Create a reference cast, forwarding the cleanup.
       // The cast takes the source reference.
-      return refCast;
+      return SGF.B.createUncheckedRefCast(loc, arg, toTL.getLoweredType());
     }
   }
 
@@ -669,7 +671,7 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   // TODO: For now, we leave invalid casts in address form so that the runtime
   // will trap. We could emit a noreturn call here instead which would provide
   // more information to the optimizer.
-  SILValue srcVal = args[0].ensurePlusOne(SGF, loc).forward(SGF);
+  SILValue srcVal = arg.ensurePlusOne(SGF, loc).forward(SGF);
   SILValue fromAddr;
   if (!fromTL.isAddress()) {
     // Move the loadable value into a "source temp".  Since the source and
@@ -744,17 +746,9 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
   }
   // Create the appropriate bitcast based on the source and dest types.
   ManagedValue in = args[0];
+
   SILType resultTy = toTL.getLoweredType();
-  if (resultTy.isTrivial(SGF.F))
-    return SGF.B.createUncheckedTrivialBitCast(loc, in, resultTy);
-
-  // If we can perform a ref cast, just return.
-  if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, in, resultTy))
-    return refCast;
-
-  // Otherwise leave the original cleanup and retain the cast value.
-  SILValue out = SGF.B.createUncheckedBitwiseCast(loc, in.getValue(), resultTy);
-  return SGF.emitManagedRetain(loc, out, toTL);
+  return SGF.B.createUncheckedBitCast(loc, in, resultTy);
 }
 
 /// Specialized emitter for Builtin.castToBridgeObject.
@@ -975,8 +969,8 @@ static ManagedValue emitBuiltinProjectTailElems(SILGenFunction &SGF,
   SILType ElemType = SGF.getLoweredType(subs.getReplacementTypes()[1]->
                                         getCanonicalType()).getObjectType();
 
-  SILValue result = SGF.B.createRefTailAddr(loc, args[0].getValue(),
-                                            ElemType.getAddressType());
+  SILValue result = SGF.B.createRefTailAddr(
+      loc, args[0].borrow(SGF, loc).getValue(), ElemType.getAddressType());
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
   result = SGF.B.createAddressToPointer(loc, result, rawPointerType);
   return ManagedValue::forUnmanaged(result);
@@ -1029,6 +1023,200 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(val);
 }
 
+static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
+    AutoDiffDerivativeFunctionKind kind, unsigned arity,
+    bool throws, SILGenFunction &SGF, SILLocation loc,
+    SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
+  // FIXME(SR-11853): Support throwing functions.
+  assert(!throws && "Throwing functions are not yet supported");
+
+  auto origFnVal = args[0].getValue();
+  SmallVector<SILValue, 2> origFnArgVals;
+  for (auto& arg : args.drop_front(1))
+    origFnArgVals.push_back(arg.getValue());
+
+  auto origFnType = origFnVal->getType().castTo<SILFunctionType>();
+  auto origFnUnsubstType = origFnType->getUnsubstitutedType(SGF.getModule());
+  if (origFnType != origFnUnsubstType) {
+    origFnVal = SGF.B.createConvertFunction(
+        loc, origFnVal, SILType::getPrimitiveObjectType(origFnUnsubstType),
+        /*withoutActuallyEscaping*/ false);
+  }
+
+  // Get the derivative function.
+  SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
+      loc, kind, origFnVal);
+  auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
+  assert(derivativeFnType->getNumResults() == 2);
+  assert(derivativeFnType->getNumParameters() == origFnArgVals.size());
+
+  auto derivativeFnUnsubstType =
+      derivativeFnType->getUnsubstitutedType(SGF.getModule());
+  if (derivativeFnType != derivativeFnUnsubstType) {
+    derivativeFn = SGF.B.createConvertFunction(
+        loc, derivativeFn,
+        SILType::getPrimitiveObjectType(derivativeFnUnsubstType),
+        /*withoutActuallyEscaping*/ false);
+  }
+
+  // We don't need to destroy the original function or retain the
+  // `derivativeFn`, because they are trivial (because they are @noescape).
+  assert(origFnVal->getType().isTrivial(SGF.F));
+  assert(derivativeFn->getType().isTrivial(SGF.F));
+
+  // Do the apply for the indirect result case.
+  if (derivativeFnType->hasIndirectFormalResults()) {
+    auto indResBuffer = SGF.getBufferForExprResult(
+        loc, derivativeFnType->getAllResultsInterfaceType(), C);
+    SmallVector<SILValue, 3> applyArgs;
+    applyArgs.push_back(SGF.B.createTupleElementAddr(loc, indResBuffer, 0));
+    for (auto origFnArgVal : origFnArgVals)
+      applyArgs.push_back(origFnArgVal);
+    auto differential = SGF.B.createApply(loc, derivativeFn, SubstitutionMap(),
+                                          applyArgs, /*isNonThrowing*/ false);
+
+    derivativeFn = SILValue();
+
+    SGF.B.createStore(loc, differential,
+                      SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
+                      StoreOwnershipQualifier::Init);
+    return SGF.manageBufferForExprResult(
+        indResBuffer, SGF.getTypeLowering(indResBuffer->getType()), C);
+  }
+
+  // Do the apply for the direct result case.
+  auto resultTuple = SGF.B.createApply(
+      loc, derivativeFn, SubstitutionMap(), origFnArgVals,
+      /*isNonThrowing*/ false);
+
+  derivativeFn = SILValue();
+
+  return SGF.emitManagedRValueWithCleanup(resultTuple);
+}
+
+static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
+    unsigned arity, bool throws, SILGenFunction &SGF, SILLocation loc,
+    SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
+  // FIXME(SR-11853): Support throwing functions.
+  assert(!throws && "Throwing functions are not yet supported");
+
+  auto origFnVal = args.front().getValue();
+  SmallVector<SILValue, 2> origFnArgVals;
+  for (auto &arg : args.drop_front(1))
+    origFnArgVals.push_back(arg.getValue());
+
+  // Get the transpose function.
+  // TODO(TF-1142): Create a linear_function_extract instead of an undef.
+  auto fnTy = origFnVal->getType().castTo<SILFunctionType>();
+  auto transposeFnType =
+      fnTy->getWithoutDifferentiability()->getAutoDiffTransposeFunctionType(
+      fnTy->getDifferentiabilityParameterIndices(), SGF.SGM.M.Types,
+      LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+  SILValue transposeFn =
+      SILUndef::get(SILType::getPrimitiveObjectType(transposeFnType), SGF.F);
+  auto transposeFnUnsubstType =
+      transposeFnType->getUnsubstitutedType(SGF.getModule());
+  if (transposeFnType != transposeFnUnsubstType) {
+    transposeFn = SGF.B.createConvertFunction(
+        loc, transposeFn,
+        SILType::getPrimitiveObjectType(transposeFnUnsubstType),
+        /*withoutActuallyEscaping*/ false);
+    transposeFnType = transposeFn->getType().castTo<SILFunctionType>();
+  }
+
+  SmallVector<SILValue, 2> applyArgs;
+  if (transposeFnType->hasIndirectFormalResults())
+    applyArgs.push_back(
+        SGF.getBufferForExprResult(
+            loc, transposeFnType->getAllResultsInterfaceType(), C));
+  for (auto paramArg : args.drop_front()) {
+    applyArgs.push_back(paramArg.getValue());
+  }
+  auto *apply = SGF.B.createApply(
+      loc, transposeFn, SubstitutionMap(), applyArgs);
+  if (transposeFnType->hasIndirectFormalResults()) {
+    auto resultAddress = applyArgs.front();
+    AbstractionPattern pattern(
+        SGF.F.getLoweredFunctionType()->getSubstGenericSignature(),
+        resultAddress->getType().getASTType());
+    auto &tl =
+        SGF.getTypeLowering(pattern, resultAddress->getType().getASTType());
+    return SGF.manageBufferForExprResult(resultAddress, tl, C);
+  } else {
+    return SGF.emitManagedRValueWithCleanup(apply);
+  }
+}
+
+static ManagedValue emitBuiltinApplyDerivative(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  auto *callExpr = loc.castToASTNode<CallExpr>();
+  auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
+      cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
+          ->getDecl());
+  auto builtinName = builtinDecl->getName().str();
+  AutoDiffDerivativeFunctionKind kind;
+  unsigned arity;
+  bool throws;
+  auto successfullyParsed = autodiff::getBuiltinApplyDerivativeConfig(
+      builtinName, kind, arity, throws);
+  assert(successfullyParsed);
+  return emitBuiltinAutoDiffApplyDerivativeFunction(
+      kind, arity, throws, SGF, loc, substitutions, args, C);
+}
+
+static ManagedValue emitBuiltinApplyTranspose(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  auto *callExpr = loc.castToASTNode<CallExpr>();
+  auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
+      cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
+          ->getDecl());
+  auto builtinName = builtinDecl->getName().str();
+  unsigned arity;
+  bool throws;
+  auto successfullyParsed = autodiff::getBuiltinApplyTransposeConfig(
+      builtinName, arity, throws);
+  assert(successfullyParsed);
+  return emitBuiltinAutoDiffApplyTransposeFunction(
+      arity, throws, SGF, loc, substitutions, args, C);
+}
+
+static ManagedValue emitBuiltinDifferentiableFunction(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 3);
+  auto origFn = args.front();
+  auto origType = origFn.getType().castTo<SILFunctionType>();
+  auto diffFn = SGF.B.createDifferentiableFunction(
+      loc,
+      IndexSubset::getDefault(
+          SGF.getASTContext(), origType->getNumParameters(),
+          /*includeAll*/ true),
+      origFn.forward(SGF),
+      std::make_pair(args[1].forward(SGF), args[2].forward(SGF)));
+  return SGF.emitManagedRValueWithCleanup(diffFn);
+}
+
+static ManagedValue emitBuiltinLinearFunction(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 2);
+  auto origFn = args.front();
+  auto origType = origFn.getType().castTo<SILFunctionType>();
+  // TODO(TF-1142): Create a linear_function instead of an undef.
+  auto linearFnTy = origType->getWithDifferentiability(
+      DifferentiabilityKind::Linear,
+      IndexSubset::getDefault(
+          SGF.getASTContext(), origType->getNumParameters(),
+          /*includeAll*/ true));
+  SILValue linearFn = SILUndef::get(
+      SILType::getPrimitiveObjectType(linearFnTy), SGF.F);
+  return SGF.emitManagedRValueWithCleanup(linearFn);
+}
+
+
+
 /// Emit SIL for the named builtin: globalStringTablePointer. Unlike the default
 /// ownership convention for named builtins, which is to take (non-trivial)
 /// arguments as Owned, this builtin accepts owned as well as guaranteed
@@ -1049,6 +1237,111 @@ emitBuiltinGlobalStringTablePointer(SILGenFunction &SGF, SILLocation loc,
                                        SILType::getRawPointerType(astContext),
                                        subs, ArrayRef<SILValue>(argValue));
   return SGF.emitManagedRValueWithCleanup(resultVal);
+}
+
+/// Emit SIL for the named builtin:
+/// convertStrongToUnownedUnsafe. Unlike the default ownership
+/// convention for named builtins, which is to take (non-trivial)
+/// arguments as Owned, this builtin accepts owned as well as
+/// guaranteed arguments, and hence doesn't require the arguments to
+/// be at +1. Therefore, this builtin is emitted specially.
+///
+/// We assume our convention is (T, @inout @unmanaged T) -> ()
+static ManagedValue emitBuiltinConvertStrongToUnownedUnsafe(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 2);
+  if (!argsOrError)
+    return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+
+  auto args = *argsOrError;
+
+  // First get our object at +0 if we can.
+  auto object = SGF.emitRValue(args[0], SGFContext::AllowGuaranteedPlusZero)
+                    .getAsSingleValue(SGF, args[0]);
+
+  // Borrow it and get the value.
+  SILValue objectSrcValue = object.borrow(SGF, loc).getValue();
+
+  // Then create our inout.
+  auto inout = cast<InOutExpr>(args[1]->getSemanticsProvidingExpr());
+  auto lv =
+      SGF.emitLValue(inout->getSubExpr(), SGFAccessKind::BorrowedAddressRead);
+  lv.unsafelyDropLastComponent(PathComponent::OwnershipKind);
+  if (!lv.isPhysical() || !lv.isLoadingPure()) {
+    llvm::report_fatal_error("Builtin.convertStrongToUnownedUnsafe passed "
+                             "non-physical, non-pure lvalue as 2nd arg");
+  }
+
+  SILValue inoutDest =
+      SGF.emitAddressOfLValue(args[1], std::move(lv)).getLValueAddress();
+  SILType destType = inoutDest->getType().getObjectType();
+
+  // Make sure our types match up as we expect.
+  if (objectSrcValue->getType() !=
+      destType.getReferenceStorageReferentType().getObjectType()) {
+    llvm::errs()
+        << "Invalid usage of Builtin.convertStrongToUnownedUnsafe. lhsType "
+           "must be T and rhsType must be inout unsafe(unowned) T"
+        << "lhsType: " << objectSrcValue->getType() << "\n"
+        << "rhsType: " << inoutDest->getType() << "\n";
+    llvm::report_fatal_error("standard fatal error msg");
+  }
+
+  SILType unmanagedOptType = objectSrcValue->getType().getReferenceStorageType(
+      SGF.getASTContext(), ReferenceOwnership::Unmanaged);
+  SILValue unownedObjectSrcValue = SGF.B.createRefToUnmanaged(
+      loc, objectSrcValue, unmanagedOptType.getObjectType());
+  SGF.B.emitStoreValueOperation(loc, unownedObjectSrcValue, inoutDest,
+                                StoreOwnershipQualifier::Trivial);
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
+/// Emit SIL for the named builtin: convertUnownedUnsafeToGuaranteed.
+///
+/// We assume our convention is:
+///
+/// <BaseT, T> (BaseT, @inout @unowned(unsafe) T) -> @guaranteed T
+///
+static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 2);
+  if (!argsOrError)
+    return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+
+  auto args = *argsOrError;
+
+  // First grab our base and borrow it.
+  auto baseMV =
+      SGF.emitRValueAsSingleValue(args[0], SGFContext::AllowGuaranteedPlusZero)
+          .borrow(SGF, args[0]);
+
+  // Then grab our LValue operand, drop the last ownership component.
+  auto srcLV = SGF.emitLValue(args[1]->getSemanticsProvidingExpr(),
+                              SGFAccessKind::BorrowedAddressRead);
+  srcLV.unsafelyDropLastComponent(PathComponent::OwnershipKind);
+  if (!srcLV.isPhysical() || !srcLV.isLoadingPure()) {
+    llvm::report_fatal_error("Builtin.convertUnownedUnsafeToGuaranteed passed "
+                             "non-physical, non-pure lvalue as 2nd arg");
+  }
+
+  // Grab our address and load our unmanaged and convert it to a ref.
+  SILValue srcAddr =
+      SGF.emitAddressOfLValue(args[1], std::move(srcLV)).getLValueAddress();
+  SILValue srcValue = SGF.B.emitLoadValueOperation(
+      loc, srcAddr, LoadOwnershipQualifier::Trivial);
+  SILValue unownedNonTrivialRef = SGF.B.createUnmanagedToRef(
+      loc, srcValue, srcValue->getType().getReferenceStorageReferentType());
+
+  // Now convert our unownedNonTrivialRef from unowned ownership to guaranteed
+  // ownership and create a cleanup for it.
+  SILValue guaranteedNonTrivialRef = SGF.B.createUncheckedOwnershipConversion(
+      loc, unownedNonTrivialRef, ValueOwnershipKind::Guaranteed);
+  auto guaranteedNonTrivialRefMV =
+      SGF.emitManagedBorrowedRValueWithCleanup(guaranteedNonTrivialRef);
+  // Now create a mark dependence on our base and return the result.
+  return SGF.B.createMarkDependence(loc, guaranteedNonTrivialRefMV, baseMV);
 }
 
 Optional<SpecializedEmitter>

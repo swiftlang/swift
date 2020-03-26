@@ -1,32 +1,72 @@
 [flake8]
-ignore = W291 W504
-filename = *.py,
-           ./utils/80+-check,
-           ./utils/backtrace-check,
-           ./benchmark/scripts/Benchmark_Driver,
-           ./benchmark/scripts/Benchmark_DTrace.in,
-           ./benchmark/scripts/Benchmark_GuardMalloc.in,
-           ./benchmark/scripts/Benchmark_RuntimeLeaksRunner.in,
-           ./utils/build-script,
-           ./utils/check-incremental,
-           ./test/Driver/Inputs/fake-toolchain/clang++,
-           ./utils/coverage/coverage-build-db,
-           ./utils/coverage/coverage-generate-data,
-           ./utils/coverage/coverage-query-db,
-           ./utils/coverage/coverage-touch-tests,
-           ./utils/gyb,
-           ./test/Driver/Inputs/fake-toolchain/ld,
-           ./utils/line-directive,
-           ./utils/swift_build_support/tests/mock-distcc,
-           ./docs/scripts/ns-html2rst,
-           ./utils/PathSanitizingFileCheck,
-           ./utils/recursive-lipo,
-           ./utils/round-trip-syntax-test,
-           ./utils/rth,
-           ./utils/run-remote,
-           ./utils/run-test,
-           ./utils/scale-test,
-           ./utils/submit-benchmark-results,
-           ./utils/update-checkout,
-           ./utils/viewcfg,
-           ./utils/symbolicate-linux-fatal,
+
+filename =
+    *.py,
+
+    ./benchmark/scripts/Benchmark_Driver,
+    ./benchmark/scripts/Benchmark_DTrace.in,
+    ./benchmark/scripts/Benchmark_GuardMalloc.in,
+    ./benchmark/scripts/Benchmark_QuickCheck.in,
+    ./benchmark/scripts/Benchmark_RuntimeLeaksRunner.in,
+    ./benchmark/scripts/run_smoke_bench,
+
+    ./docs/scripts/ns-html2rst,
+
+    ./test/Driver/Inputs/fake-toolchain/ld,
+
+    ./utils/80+-check,
+    ./utils/backtrace-check,
+    ./utils/build-parser-lib,
+    ./utils/build-script,
+    ./utils/check-incremental,
+    ./utils/coverage/coverage-build-db,
+    ./utils/coverage/coverage-generate-data,
+    ./utils/coverage/coverage-query-db,
+    ./utils/coverage/coverage-touch-tests,
+    ./utils/dev-scripts/blockifyasm,
+    ./utils/dev-scripts/split-cmdline,
+    ./utils/gyb,
+    ./utils/line-directive,
+    ./utils/PathSanitizingFileCheck,
+    ./utils/recursive-lipo,
+    ./utils/round-trip-syntax-test,
+    ./utils/rth,
+    ./utils/run-test,
+    ./utils/scale-test,
+    ./utils/submit-benchmark-results,
+    ./utils/swift_build_support/tests/mock-distcc,
+    ./utils/symbolicate-linux-fatal,
+    ./utils/update-checkout,
+    ./utils/viewcfg,
+
+    # TODO: We should be linting the lit configs.
+    #lit.cfg,
+
+exclude =
+    .git,
+    __pycache__,
+
+ignore =
+    # The black tool treats slices consistently, the E203 warning is not PEP8
+    # compliant (https://github.com/psf/black#slices).
+    E203,
+
+    # FIXME: We should not have trailing whitespace.
+    W291,
+
+    # Line breaks before binary operators are not explicitly disallowed in
+    # PEP8, rather it should be consistent throughout the project. The black
+    # tool puts them on new lines which is to be considered a best practice
+    # in the future.
+    W503,
+
+    # Similarly ignore line break after binary operators.
+    W504,
+
+    # TODO: Ignore Bugbear lints for now, but we should enable these in the
+    # future.
+    B,
+
+# 10% larger than the standard 80 character limit. Conforms to the black
+# standard and Bugbear's B950.
+max-line-length = 88

@@ -16,13 +16,13 @@
 #define DEBUG_TYPE "remove-redundant-overflow-checks"
 
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 

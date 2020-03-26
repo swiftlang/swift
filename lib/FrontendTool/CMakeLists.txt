@@ -12,7 +12,6 @@ target_link_libraries(swiftFrontendTool INTERFACE
 target_link_libraries(swiftFrontendTool PRIVATE
     swiftClangImporter
     swiftDemangling
-    swiftDWARFImporter
     swiftFrontend
     swiftIDE
     swiftImmediate

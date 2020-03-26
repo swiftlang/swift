@@ -17,7 +17,6 @@ extension LikeOptionSet where RawValue : FixedWidthInteger {
 struct X : LikeOptionSet {}
 // expected-error@-1 {{type 'X' does not conform to protocol 'LikeSetAlgebra'}}
 // expected-error@-2 {{type 'X' does not conform to protocol 'RawRepresentable'}}
-// expected-note@-3 {{do you want to add protocol stubs?}}
 
 protocol IterProtocol {}
 protocol LikeSequence {

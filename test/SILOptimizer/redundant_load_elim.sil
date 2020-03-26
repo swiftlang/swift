@@ -255,8 +255,8 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $*Int32):
 
 bb1:                                              // Preds: bb0
   %4 = tuple (%0 : $Int32, %1 : $Int32)           // user: %5
-  %5 = enum $XYZ, #XYZ.B!enumelt.1, %4 : $(Int32, Int32) // user: %6
-  switch_enum %5 : $XYZ, case #XYZ.A!enumelt: bb2, case #XYZ.B!enumelt.1: bb4, case #XYZ.C!enumelt.1: bb6 // id: %6
+  %5 = enum $XYZ, #XYZ.B!enumelt, %4 : $(Int32, Int32) // user: %6
+  switch_enum %5 : $XYZ, case #XYZ.A!enumelt: bb2, case #XYZ.B!enumelt: bb4, case #XYZ.C!enumelt: bb6 // id: %6
 
 bb2:                                              // Preds: bb1
   br bb3                                          // id: %7
@@ -588,8 +588,10 @@ bb5:
 // CHECK: store
 // CHECK-NOT: = load
 // CHECK: bb2:
-// CHECK: bb3:
-// CHECK: = load
+// CHECK: bb3([[A:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NOT: = load
+// CHECK: apply %{{[0-9]+}}([[A]])
+// CHECK-LABEL: } // end sil function 'load_to_load_conflicting_branches_diamond'
 sil @load_to_load_conflicting_branches_diamond : $@convention(thin) (@inout Builtin.Int32) -> () {
 // %0                                             // users: %1, %4, %9, %11, %16, %21
 bb0(%0 : $*Builtin.Int32):

@@ -538,31 +538,33 @@ extension Decimal {
 
     public var isCanonical: Bool { true }
 
-    /// `true` iff `self` is negative.
+    /// `true` if `self` is negative, `false` otherwise.
     public var isSignMinus: Bool { _isNegative != 0 }
 
-    /// `true` iff `self` is +0.0 or -0.0.
+    /// `true` if `self` is +0.0 or -0.0, `false` otherwise.
     public var isZero: Bool { _length == 0 && _isNegative == 0 }
 
-    /// `true` iff `self` is subnormal.
+    /// `true` if `self` is subnormal, `false` otherwise.
     public var isSubnormal: Bool { false }
 
-    /// `true` iff `self` is normal (not zero, subnormal, infinity, or NaN).
+    /// `true` if `self` is normal (not zero, subnormal, infinity, or NaN),
+    /// `false` otherwise.
     public var isNormal: Bool { !isZero && !isInfinite && !isNaN }
 
-    /// `true` iff `self` is zero, subnormal, or normal (not infinity or NaN).
+    /// `true` if `self` is zero, subnormal, or normal (not infinity or NaN),
+    /// `false` otherwise.
     public var isFinite: Bool { !isNaN }
 
-    /// `true` iff `self` is infinity.
+    /// `true` if `self` is infinity, `false` otherwise.
     public var isInfinite: Bool { false }
 
-    /// `true` iff `self` is NaN.
+    /// `true` if `self` is NaN, `false` otherwise.
     public var isNaN: Bool { _length == 0 && _isNegative == 1 }
 
-    /// `true` iff `self` is a signaling NaN.
+    /// `true` if `self` is a signaling NaN, `false` otherwise.
     public var isSignaling: Bool { false }
 
-    /// `true` iff `self` is a signaling NaN.
+    /// `true` if `self` is a signaling NaN, `false` otherwise.
     public var isSignalingNaN: Bool { false }
 
     public func isEqual(to other: Decimal) -> Bool {

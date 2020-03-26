@@ -150,6 +150,9 @@ testSuite.test("Basic")
   requireClass(named: "main.ObjCSuperclass")
 }
 
+class Çlass<T> {}
+class SubÇlass: Çlass<Int> {}
+
 testSuite.test("BasicMangled")
   .requireOwnProcess()
   .code {
@@ -188,6 +191,10 @@ testSuite.test("GenericMangled")
                demangledName: "main.ConstrainedObjCSubclass")
   requireClass(named:   "_TtC4main25ConstrainedObjCSuperclass",
                demangledName: "main.ConstrainedObjCSuperclass")
+
+  // Make sure we don't accidentally ban high-bit characters.
+  requireClass(named: "_TtC4main9SubÇlass", demangledName: "main.SubÇlass")
+  requireClass(named: "4main9SubÇlassC", demangledName: "main.SubÇlass")
 }
 
 testSuite.test("ResilientSubclass")
@@ -248,6 +255,18 @@ testSuite.test("NotPresent") {
 
   // Swift.Int is not a class type.
   expectNil(NSClassFromString("Si"))
+
+  // Mangled names with byte sequences that look like symbolic references
+  // should not be demangled.
+  expectNil(NSClassFromString("\u{1}badnews"));
+  expectNil(NSClassFromString("$s\u{1}badnews"));
+  expectNil(NSClassFromString("_T\u{1}badnews"));
+
+  // Correct mangled names with additional text afterwards should not resolve.
+  expectNil(NSClassFromString("_TtC4main20MangledSwiftSubclass_"))
+  expectNil(NSClassFromString("_TtC4main22MangledSwiftSuperclassXYZ"))
+  expectNil(NSClassFromString("_TtC4main19MangledObjCSubclass123"))
+  expectNil(NSClassFromString("_TtC4main21MangledObjCSuperclasswhee"))
 }
 
 runAllTests()

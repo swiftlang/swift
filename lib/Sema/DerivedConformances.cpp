@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,16 +17,17 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "DerivedConformances.h"
 
 using namespace swift;
 
-DerivedConformance::DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
+DerivedConformance::DerivedConformance(ASTContext &ctx, Decl *conformanceDecl,
                                        NominalTypeDecl *nominal,
                                        ProtocolDecl *protocol)
-    : TC(tc), ConformanceDecl(conformanceDecl), Nominal(nominal),
+    : Context(ctx), ConformanceDecl(conformanceDecl), Nominal(nominal),
       Protocol(protocol) {
   assert(getConformanceContext()->getSelfNominalTypeDecl() == nominal);
 }
@@ -38,8 +39,11 @@ DeclContext *DerivedConformance::getConformanceContext() const {
 void DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  auto *SF = ConformanceDecl->getDeclContext()->getParentSourceFile();
   for (auto child : children) {
     IDC->addMember(child);
+    if (SF)
+      SF->SynthesizedDecls.push_back(child);
   }
 }
 
@@ -62,17 +66,24 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveHashable(Nominal);
   }
 
+  if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
+    return canDeriveAdditiveArithmetic(Nominal, DC);
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
         // The presence of a raw type is an explicit declaration that
         // the compiler should derive a RawRepresentable conformance.
       case KnownProtocolKind::RawRepresentable:
-        return enumDecl->hasRawType();
+        return canDeriveRawRepresentable(DC, Nominal);
 
         // Enums without associated values can implicitly derive Equatable
         // conformance.
       case KnownProtocolKind::Equatable:
         return canDeriveEquatable(DC, Nominal);
+      
+      case KnownProtocolKind::Comparable:
+        return !enumDecl->hasPotentiallyUnavailableCaseValue()
+            && canDeriveComparable(DC, enumDecl); 
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
@@ -100,7 +111,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         }
 
         // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
-        // empty enumas are allowed to conform as well.
+        // empty enums are allowed to conform as well.
         return enumDecl->hasOnlyCasesWithoutAssociatedValues();
       }
 
@@ -143,7 +154,9 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   auto knownProtocol = protocol->getKnownProtocolKind();
   if (!knownProtocol)
     return;
-
+  
+  // Comparable on eligible type kinds should never fail
+   
   if (*knownProtocol == KnownProtocolKind::Equatable) {
     tryDiagnoseFailedEquatableDerivation(DC, nominal);
   }
@@ -167,18 +180,18 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    if (auto conformance = TypeChecker::conformsToProtocol(
-            nominal->getDeclaredInterfaceType(), proto, nominal,
-            ConformanceCheckFlags::SkipConditionalRequirements)) {
-      auto DC = conformance->getConcrete()->getDeclContext();
+    auto conformance = TypeChecker::conformsToProtocol(
+        nominal->getDeclaredInterfaceType(), proto, nominal,
+        ConformanceCheckFlags::SkipConditionalRequirements);
+    if (conformance) {
+      auto DC = conformance.getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
       if (!DerivedConformance::derivesProtocolConformance(DC, nominal, proto))
         return nullptr;
     }
 
     // Retrieve the requirement.
-    auto results = proto->lookupDirect(name);
-    return results.empty() ? nullptr : results.front();
+    return proto->getSingleRequirement(name);
   };
 
   // Properties.
@@ -207,13 +220,27 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_intValue))
       return getRequirement(KnownProtocolKind::CodingKey);
 
+    // AdditiveArithmetic.zero
+    if (name.isSimpleName(ctx.Id_zero))
+      return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+
     return nullptr;
   }
 
   // Functions.
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
+    if (func->isOperator() && name.getBaseName() == "<")
+      return getRequirement(KnownProtocolKind::Comparable);
+    
     if (func->isOperator() && name.getBaseName() == "==")
       return getRequirement(KnownProtocolKind::Equatable);
+
+    // AdditiveArithmetic.+
+    // AdditiveArithmetic.-
+    if (func->isOperator() && name.getArgumentNames().size() == 2 &&
+        (name.getBaseName() == "+" || name.getBaseName() == "-")) {
+      return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+    }
 
     // Encodable.encode(to: Encoder)
     if (name.isCompoundName() && name.getBaseName() == ctx.Id_encode) {
@@ -240,7 +267,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::RawRepresentable);
 
       // CodingKey.init?(stringValue:), CodingKey.init?(intValue:)
-      if (ctor->getFailability() == OTK_Optional &&
+      if (ctor->isFailable() &&
+          !ctor->isImplicitlyUnwrappedOptional() &&
           (argumentNames[0] == ctx.Id_stringValue ||
            argumentNames[0] == ctx.Id_intValue))
         return getRequirement(KnownProtocolKind::CodingKey);
@@ -292,8 +320,6 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
 AccessorDecl *
 DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
                                                  Type propertyContextType) {
-  bool isStatic = property->isStatic();
-
   auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
@@ -308,17 +334,10 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     /*GenericParams=*/nullptr, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
-  getterDecl->setStatic(isStatic);
-
-  // Compute the interface type of the getter.
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    getterDecl->setGenericEnvironment(env);
-  getterDecl->computeType();
+  getterDecl->setIsTransparent(false);
 
   getterDecl->copyFormalAccessFrom(property);
-  getterDecl->setValidationToChecked();
 
-  C.addSynthesizedDecl(getterDecl);
 
   return getterDecl;
 }
@@ -328,25 +347,24 @@ DerivedConformance::declareDerivedProperty(Identifier name,
                                            Type propertyInterfaceType,
                                            Type propertyContextType,
                                            bool isStatic, bool isFinal) {
-  auto &C = TC.Context;
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
-                                      /*IsCaptureList*/false, SourceLoc(), name,
-                                      parentDC);
+  VarDecl *propDecl = new (Context)
+      VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
+              /*IsCaptureList*/ false, SourceLoc(), name, parentDC);
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
-  propDecl->setValidationToChecked();
 
-  Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
+  Pattern *propPat = new (Context) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
 
-  propPat = TypedPattern::createImplicit(C, propPat, propertyContextType);
+  propPat = TypedPattern::createImplicit(Context, propPat, propertyContextType);
   propPat->setType(propertyContextType);
 
   auto *pbDecl = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, parentDC);
+      Context, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
+      parentDC);
   return {propDecl, pbDecl};
 }
 
@@ -365,11 +383,9 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   if (!allowCrossfileExtensions &&
       Nominal->getModuleScopeContext() !=
           getConformanceContext()->getModuleScopeContext()) {
-    TC.diagnose(ConformanceDecl->getLoc(),
-                diag::cannot_synthesize_in_crossfile_extension,
-                getProtocolType());
-    TC.diagnose(Nominal->getLoc(), diag::kind_declared_here,
-                DescriptiveDeclKind::Type);
+    ConformanceDecl->diagnose(diag::cannot_synthesize_in_crossfile_extension,
+                              getProtocolType());
+    Nominal->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
     return true;
   }
 
@@ -378,12 +394,295 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   if (auto CD = dyn_cast<ClassDecl>(Nominal)) {
     if (!CD->isFinal() && isa<ConstructorDecl>(synthesizing) &&
         isa<ExtensionDecl>(ConformanceDecl)) {
-      TC.diagnose(ConformanceDecl->getLoc(),
-                  diag::cannot_synthesize_init_in_extension_of_nonfinal,
-                  getProtocolType(), synthesizing->getFullName());
+      ConformanceDecl->diagnose(
+          diag::cannot_synthesize_init_in_extension_of_nonfinal,
+          getProtocolType(), synthesizing->getFullName());
       return true;
     }
   }
 
   return false;
+}
+
+/// Returns a generated guard statement that checks whether the given lhs and
+/// rhs expressions are equal. If not equal, the else block for the guard
+/// returns `guardReturnValue`.
+/// \p C The AST context.
+/// \p lhsExpr The first expression to compare for equality.
+/// \p rhsExpr The second expression to compare for equality.
+/// \p guardReturnValue The expression to return if the two sides are not equal 
+GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
+                                        Expr *lhsExpr,
+                                        Expr *rhsExpr, 
+                                        Expr *guardReturnValue) {
+  SmallVector<StmtConditionElement, 1> conditions;
+  SmallVector<ASTNode, 1> statements;
+  
+  auto returnStmt = new (C) ReturnStmt(SourceLoc(), guardReturnValue);
+  statements.push_back(returnStmt);
+
+  // Next, generate the condition being checked.
+  // lhs == rhs
+  auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
+    DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
+    DeclNameLoc());
+  auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
+                                        { lhsExpr, rhsExpr },
+                                        { }, { }, SourceLoc(),
+                                        /*HasTrailingClosure*/false,
+                                        /*Implicit*/true);
+  auto cmpExpr = new (C) BinaryExpr(cmpFuncExpr, cmpArgsTuple,
+                                    /*Implicit*/true);
+  conditions.emplace_back(cmpExpr);
+
+  // Build and return the complete guard statement.
+  // guard lhs == rhs else { return lhs < rhs }
+  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
+  return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
+}
+/// Returns a generated guard statement that checks whether the given lhs and
+/// rhs expressions are equal. If not equal, the else block for the guard
+/// returns `false`.
+/// \p C The AST context.
+/// \p lhsExpr The first expression to compare for equality.
+/// \p rhsExpr The second expression to compare for equality. 
+GuardStmt *DerivedConformance::returnFalseIfNotEqualGuard(ASTContext &C,
+                                        Expr *lhsExpr,
+                                        Expr *rhsExpr) {
+  // return false
+  auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(), true);
+  return returnIfNotEqualGuard(C, lhsExpr, rhsExpr, falseExpr);
+}
+/// Returns a generated guard statement that checks whether the given lhs and
+/// rhs expressions are equal. If not equal, the else block for the guard
+/// returns lhs < rhs.
+/// \p C The AST context.
+/// \p lhsExpr The first expression to compare for equality.
+/// \p rhsExpr The second expression to compare for equality. 
+GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
+                                        Expr *lhsExpr,
+                                        Expr *rhsExpr) {
+  // return lhs < rhs
+  auto ltFuncExpr = new (C) UnresolvedDeclRefExpr(
+    DeclNameRef(C.Id_LessThanOperator), DeclRefKind::BinaryOperator,
+    DeclNameLoc());
+  auto ltArgsTuple = TupleExpr::create(C, SourceLoc(),
+                                        { lhsExpr, rhsExpr },
+                                        { }, { }, SourceLoc(),
+                                        /*HasTrailingClosure*/false,
+                                        /*Implicit*/true);
+  auto ltExpr = new (C) BinaryExpr(ltFuncExpr, ltArgsTuple, /*Implicit*/true);
+  return returnIfNotEqualGuard(C, lhsExpr, rhsExpr, ltExpr);
+}
+
+/// Build a type-checked integer literal.
+static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
+  Type intType = C.getIntDecl()->getDeclaredType();
+
+  auto literal = IntegerLiteralExpr::createFromUnsigned(C, index);
+  literal->setType(intType);
+  literal->setBuiltinInitializer(C.getIntBuiltinInitDecl(C.getIntDecl()));
+
+  return literal;
+}
+
+/// Create AST statements which convert from an enum to an Int with a switch.
+/// \p stmts The generated statements are appended to this vector.
+/// \p parentDC Either an extension or the enum itself.
+/// \p enumDecl The enum declaration.
+/// \p enumVarDecl The enum input variable.
+/// \p funcDecl The parent function.
+/// \p indexName The name of the output variable.
+/// \return A DeclRefExpr of the output variable (of type Int).
+DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
+                                       DeclContext *parentDC,
+                                       EnumDecl *enumDecl,
+                                       VarDecl *enumVarDecl,
+                                       AbstractFunctionDecl *funcDecl,
+                                       const char *indexName) {
+  ASTContext &C = enumDecl->getASTContext();
+  Type enumType = enumVarDecl->getType();
+  Type intType = C.getIntDecl()->getDeclaredType();
+
+  auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
+                                  /*IsCaptureList*/false, SourceLoc(),
+                                  C.getIdentifier(indexName),
+                                  funcDecl);
+  indexVar->setInterfaceType(intType);
+  indexVar->setImplicit();
+
+  // generate: var indexVar
+  Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
+  indexPat->setType(intType);
+  indexPat = TypedPattern::createImplicit(C, indexPat, intType);
+  indexPat->setType(intType);
+  auto *indexBind = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, indexPat, /*InitExpr*/ nullptr, funcDecl);
+
+  unsigned index = 0;
+  SmallVector<ASTNode, 4> cases;
+  for (auto elt : enumDecl->getAllElements()) {
+    // generate: case .<Case>:
+    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
+                                          SourceLoc(), DeclNameLoc(),
+                                          DeclNameRef(), elt, nullptr);
+    pat->setImplicit();
+    pat->setType(enumType);
+
+    auto labelItem = CaseLabelItem(pat);
+
+    // generate: indexVar = <index>
+    auto indexExpr = buildIntegerLiteral(C, index++);
+
+    auto indexRef = new (C) DeclRefExpr(indexVar, DeclNameLoc(),
+                                        /*implicit*/true,
+                                        AccessSemantics::Ordinary,
+                                        LValueType::get(intType));
+    auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
+                                         indexExpr, /*implicit*/ true);
+    assignExpr->setType(TupleType::getEmpty(C));
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
+                                  SourceLoc());
+    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
+                                     SourceLoc(), body,
+                                     /*case body vardecls*/ None));
+  }
+
+  // generate: switch enumVar { }
+  auto enumRef = new (C) DeclRefExpr(enumVarDecl, DeclNameLoc(),
+                                     /*implicit*/true,
+                                     AccessSemantics::Ordinary,
+                                     enumVarDecl->getType());
+  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
+                                       SourceLoc(), cases, SourceLoc(), C);
+
+  stmts.push_back(indexBind);
+  stmts.push_back(switchStmt);
+
+  return new (C) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit*/ true,
+                             AccessSemantics::Ordinary, intType);
+}
+
+/// Returns the ParamDecl for each associated value of the given enum whose type
+/// does not conform to a protocol
+/// \p theEnum The enum whose elements and associated values should be checked.
+/// \p protocol The protocol being requested.
+/// \return The ParamDecl of each associated value whose type does not conform.
+SmallVector<ParamDecl *, 4>
+DerivedConformance::associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
+                                        ProtocolDecl *protocol) {
+  SmallVector<ParamDecl *, 4> nonconformingAssociatedValues;
+  for (auto elt : theEnum->getAllElements()) {
+    auto PL = elt->getParameterList();
+    if (!PL)
+      continue;
+
+    for (auto param : *PL) {
+      auto type = param->getInterfaceType();
+      if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
+                                          protocol, DC, None)
+              .isInvalid()) {
+        nonconformingAssociatedValues.push_back(param);
+      }
+    }
+  }
+  return nonconformingAssociatedValues;
+}
+
+/// Returns true if, for every element of the given enum, it either has no
+/// associated values or all of them conform to a protocol.
+/// \p theEnum The enum whose elements and associated values should be checked.
+/// \p protocol The protocol being requested.
+/// \return True if all associated values of all elements of the enum conform.
+bool DerivedConformance::allAssociatedValuesConformToProtocol(DeclContext *DC,
+                                                 EnumDecl *theEnum,
+                                                 ProtocolDecl *protocol) {
+  return associatedValuesNotConformingToProtocol(DC, theEnum, protocol).empty();
+}
+
+/// Returns the pattern used to match and bind the associated values (if any) of
+/// an enum case.
+/// \p enumElementDecl The enum element to match.
+/// \p varPrefix The prefix character for variable names (e.g., a0, a1, ...).
+/// \p varContext The context into which payload variables should be declared.
+/// \p boundVars The array to which the pattern's variables will be appended.
+Pattern*
+DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
+                             char varPrefix, DeclContext *varContext,
+                             SmallVectorImpl<VarDecl*> &boundVars) {
+  auto parentDC = enumElementDecl->getDeclContext();
+  ASTContext &C = parentDC->getASTContext();
+
+  // No arguments, so no subpattern to match.
+  if (!enumElementDecl->hasAssociatedValues())
+    return nullptr;
+
+  auto argumentType = enumElementDecl->getArgumentInterfaceType();
+  if (auto tupleType = argumentType->getAs<TupleType>()) {
+    // Either multiple (labeled or unlabeled) arguments, or one labeled
+    // argument. Return a tuple pattern that matches the enum element in arity,
+    // types, and labels. For example:
+    // case a(x: Int) => (x: let a0)
+    // case b(Int, String) => (let a0, let a1)
+    SmallVector<TuplePatternElt, 4> elementPatterns;
+    int index = 0;
+    for (auto tupleElement : tupleType->getElements()) {
+      auto payloadVar = indexedVarDecl(varPrefix, index++,
+                                       tupleElement.getType(), varContext);
+      boundVars.push_back(payloadVar);
+
+      auto namedPattern = new (C) NamedPattern(payloadVar);
+      namedPattern->setImplicit();
+      auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
+                                           namedPattern);
+      elementPatterns.push_back(TuplePatternElt(tupleElement.getName(),
+                                                SourceLoc(), letPattern));
+    }
+
+    auto pat = TuplePattern::create(C, SourceLoc(), elementPatterns,
+                                    SourceLoc());
+    pat->setImplicit();
+    return pat;
+  }
+
+  // Otherwise, a one-argument unlabeled payload. Return a paren pattern whose
+  // underlying type is the same as the payload. For example:
+  // case a(Int) => (let a0)
+  auto underlyingType = argumentType->getWithoutParens();
+  auto payloadVar = indexedVarDecl(varPrefix, 0, underlyingType, varContext);
+  boundVars.push_back(payloadVar);
+
+  auto namedPattern = new (C) NamedPattern(payloadVar);
+  namedPattern->setImplicit();
+  auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
+                                       namedPattern);
+  auto pat = new (C) ParenPattern(SourceLoc(), letPattern, SourceLoc());
+  pat->setImplicit();
+  return pat;
+}
+
+
+/// Creates a named variable based on a prefix character and a numeric index.
+/// \p prefixChar The prefix character for the variable's name.
+/// \p index The numeric index to append to the variable's name.
+/// \p type The type of the variable.
+/// \p varContext The context of the variable.
+/// \return A VarDecl named with the prefix and number.
+VarDecl *DerivedConformance::indexedVarDecl(char prefixChar, int index, Type type,
+                               DeclContext *varContext) {
+  ASTContext &C = varContext->getASTContext();
+
+  llvm::SmallString<8> indexVal;
+  indexVal.append(1, prefixChar);
+  APInt(32, index).toString(indexVal, 10, /*signed*/ false);
+  auto indexStr = C.AllocateCopy(indexVal);
+  auto indexStrRef = StringRef(indexStr.data(), indexStr.size());
+
+  auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
+                                 /*IsCaptureList*/true, SourceLoc(),
+                                 C.getIdentifier(indexStrRef),
+                                 varContext);
+  varDecl->setInterfaceType(type);
+  varDecl->setHasNonPatternBindingInit(true);
+  return varDecl;
 }

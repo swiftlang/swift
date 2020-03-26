@@ -21,20 +21,13 @@ Enabling Optimizations
 ======================
 
 The first thing one should always do is to enable optimization. Swift provides
-four different optimization levels:
+three different optimization levels:
 
 - ``-Onone``: This is meant for normal development. It performs minimal
   optimizations and preserves all debug info.
 - ``-O``: This is meant for most production code. The compiler performs
   aggressive optimizations that can drastically change the type and amount of
   emitted code. Debug information will be emitted but will be lossy.
-- ``-Ounchecked``: This is a special optimization mode meant for specific
-  libraries or applications where one is willing to trade safety for
-  performance.  The compiler will remove all overflow checks as well as some
-  implicit type checks.  This is not intended to be used in general since it may
-  result in undetected memory safety issues and integer overflows. Only use this
-  if you have carefully reviewed that your code is safe with respect to integer
-  overflow and type casts.
 - ``-Osize``: This is a special optimization mode where the compiler prioritizes
   code size over performance.
 
@@ -43,8 +36,8 @@ In the Xcode UI, one can modify the current optimization level as follows:
 ...
 
 
-Whole Module Optimizations
-==========================
+Whole Module Optimizations (WMO)
+================================
 
 By default Swift compiles each file individually. This allows Xcode to
 compile multiple files in parallel very quickly. However, compiling
@@ -55,8 +48,11 @@ mode is enabled using the ``swiftc`` command line flag
 ``-whole-module-optimization``. Programs that are compiled in this
 mode will most likely take longer to compile, but may run faster.
 
-This mode can be enabled using the Xcode build setting 'Whole Module Optimization'.
+This mode can be enabled using the Xcode build setting 'Whole Module
+Optimization'.
 
+NOTE: In sections below, for brevity purposes, we will refer to 'Whole
+Module Optimization' by the abbreviation 'WMO'.
 
 Reducing Dynamic Dispatch
 =========================
@@ -82,7 +78,7 @@ in the following code snippet, ``a.aProperty``, ``a.doSomething()`` and
     dynamic doSomethingElse() { ... }
   }
 
-  class B : A {
+  class B: A {
     override var aProperty {
       get { ... }
       set { ... }
@@ -155,7 +151,7 @@ assuming ``E``, ``F`` do not have any overriding declarations in the same file:
   }
 
   class F {
-    fileprivate var myPrivateVar : Int
+    fileprivate var myPrivateVar: Int
   }
 
   func usingE(_ e: E) {
@@ -167,6 +163,20 @@ assuming ``E``, ``F`` do not have any overriding declarations in the same file:
   func usingF(_ f: F) -> Int {
     return f.myPrivateVar
   }
+
+Advice: If WMO is enabled, use 'internal' when a declaration does not need to be accessed outside of module
+-----------------------------------------------------------------------------------------------------------
+
+WMO (see section above) causes the compiler to compile a module's
+sources all together at once. This allows the optimizer to have module
+wide visibility when compiling individual declarations. Since an
+internal declaration is not visible outside of the current module, the
+optimizer can then infer `final` by automatically discovering all
+potentially overridding declarations.
+
+NOTE: Since in Swift the default access control level is ``internal``
+anyways, by enabling Whole Module Optimization, one can gain
+additional devirtualization without any further work.
 
 Using Container Types Efficiently
 =================================
@@ -193,11 +203,11 @@ Array.
 
   // Don't use a class here.
   struct PhonebookEntry {
-    var name : String
-    var number : [Int]
+    var name: String
+    var number: [Int]
   }
 
-  var a : [PhonebookEntry]
+  var a: [PhonebookEntry]
 
 Keep in mind that there is a trade-off between using large value types and using
 reference types. In certain cases, the overhead of copying and moving around
@@ -277,9 +287,9 @@ safe.
 
 ::
 
-  a : [Int]
-  b : [Int]
-  c : [Int]
+  a: [Int]
+  b: [Int]
+  c: [Int]
 
   // Precondition: for all a[i], b[i]: a[i] + b[i] does not overflow!
   for i in 0 ... n {
@@ -319,7 +329,7 @@ generics. Some more examples of generics:
     func pop() -> T { ... }
   }
 
-  func myAlgorithm(_ a: [T], length: Int) { ... }
+  func myAlgorithm<T>(_ a: [T], length: Int) { ... }
 
   // The compiler can specialize code of MyStack<Int>
   var stackOfInts: MyStack<Int>
@@ -368,12 +378,12 @@ represented as values, so this example is somewhat realistic.
 ::
 
   protocol P {}
-  struct Node : P {
-    var left, right : P?
+  struct Node: P {
+    var left, right: P?
   }
 
   struct Tree {
-    var node : P?
+    var node: P?
     init() { ... }
   }
 
@@ -402,8 +412,8 @@ argument drops from being O(n), depending on the size of the tree to O(1).
 
 ::
 
-  struct Tree : P {
-    var node : [P?]
+  struct Tree: P {
+    var node: [P?]
     init() {
       node = [thing]
     }
@@ -435,18 +445,18 @@ construct such a data structure:
 ::
 
   final class Ref<T> {
-    var val : T
-    init(_ v : T) {val = v}
+    var val: T
+    init(_ v: T) {val = v}
   }
 
   struct Box<T> {
-      var ref : Ref<T>
-      init(_ x : T) { ref = Ref(x) }
+      var ref: Ref<T>
+      init(_ x: T) { ref = Ref(x) }
 
       var value: T {
           get { return ref.val }
           set {
-            if (!isKnownUniquelyReferenced(&ref)) {
+            if !isKnownUniquelyReferenced(&ref) {
               ref = Ref(newValue)
               return
             }
@@ -506,7 +516,7 @@ alive.
     withExtendedLifetime(Head) {
 
       // Create an Unmanaged reference.
-      var Ref : Unmanaged<Node> = Unmanaged.passUnretained(Head)
+      var Ref: Unmanaged<Node> = Unmanaged.passUnretained(Head)
 
       // Use the unmanaged reference in a call/variable access. The use of
       // _withUnsafeGuaranteedRef allows the compiler to remove the ultimate
@@ -540,10 +550,42 @@ protocols as class-only protocols to get better runtime performance.
 
 ::
 
-  protocol Pingable : AnyObject { func ping() -> Int }
+  protocol Pingable: AnyObject { func ping() -> Int }
 
 .. https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html
 
+The Cost of Let/Var when Captured by Escaping Closures
+======================================================
+
+While one may think that the distinction in between let/var is just
+about language semantics, there are also performance
+considerations. Remember that any time one creates a binding for a
+closure, one is forcing the compiler to emit an escaping closure,
+e.x.:
+
+::
+
+  let f: () -> () = { ... } // Escaping closure
+  // Contrasted with:
+  ({ ... })() // Non Escaping closure
+  x.map { ... } // Non Escaping closure
+
+When a var is captured by an escaping closure, the compiler must
+allocate a heap box to store the var so that both the closure
+creator/closure can read/write to the value. This even includes
+situations where the underlying type of the captured binding is
+trivial! In contrast, when captured a `let` is captured by value. As
+such, the compiler stores a copy of the value directly into the
+closure's storage without needing a box.
+
+Advice: Pass var as an `inout` if closure not actually escaping
+---------------------------------------------------------------
+
+If one is using an escaping closure for expressivity purposes, but is
+actually using a closure locally, pass vars as inout parameters
+instead of by using captures. The inout will ensure that a heap box is
+not allocated for the variables and avoid any retain/release traffic
+from the heap box being passed around.
 
 Unsupported Optimization Attributes
 ===================================

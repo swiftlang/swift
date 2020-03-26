@@ -89,6 +89,7 @@ func test005() {
 // BAR_INIT_0: ()
 // BAR_INIT_0-NEXT: (x: A)
 // BAR_INIT_0-NEXT: (x: B)
+// BAR_INIT_0-NEXT: .foo(self: Bar)
 // BAR_INIT_0-NEXT: .self
 
 extension Bar {

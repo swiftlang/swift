@@ -195,7 +195,7 @@ class SimpleRequest<Derived, Output(Inputs...), Caching> {
 
   template<size_t ...Indices>
   llvm::Expected<Output>
-  callDerived(Evaluator &evaluator, llvm::index_sequence<Indices...>) const {
+  callDerived(Evaluator &evaluator, std::index_sequence<Indices...>) const {
     static_assert(sizeof...(Indices) > 0, "Subclass must define evaluate()");
     return asDerived().evaluate(evaluator, std::get<Indices>(storage)...);
   }
@@ -217,7 +217,7 @@ public:
   static llvm::Expected<OutputType>
   evaluateRequest(const Derived &request, Evaluator &evaluator) {
     return request.callDerived(evaluator,
-                               llvm::index_sequence_for<Inputs...>());
+                               std::index_sequence_for<Inputs...>());
   }
 
   /// Retrieve the nearest source location to which this request applies.
@@ -259,6 +259,13 @@ public:
     return make_tracer(Reporter, TypeID<Derived>::getName(), request.storage);
   }
 };
+}
+
+namespace llvm {
+  template <typename T, unsigned N>
+  llvm::hash_code hash_value(const SmallVector<T, N> &vec) {
+    return hash_combine_range(vec.begin(), vec.end());
+  }
 }
 
 #endif // SWIFT_BASIC_SIMPLEREQUEST_H

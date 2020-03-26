@@ -52,8 +52,8 @@ extension String {
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
   /// by the given pointer.
   ///
-  /// This is identical to init(cString: UnsafePointer<CChar> but operates on an
-  /// unsigned sequence of bytes.
+  /// This is identical to `init(cString: UnsafePointer<CChar>)` but operates on
+  /// an unsigned sequence of bytes.
   public init(cString: UnsafePointer<UInt8>) {
     let len = UTF8._nullCodeUnitOffset(in: cString)
     self = String._fromUTF8Repairing(

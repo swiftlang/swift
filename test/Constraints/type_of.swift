@@ -81,6 +81,6 @@ foo(type(of: bar())) // expected-error {{ambiguous use of 'bar()'}}
 
 struct SR10696 {
   func bar(_ s: SR10696.Type) {
-    type(of: s)() // expected-error {{cannot invoke value of type 'SR10696.Type.Type' with argument list '()'}}
+    type(of: s)() // expected-error {{type 'SR10696.Type' has no member 'init'}}
   }
 }

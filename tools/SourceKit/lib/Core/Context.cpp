@@ -16,11 +16,25 @@
 
 using namespace SourceKit;
 
+GlobalConfig::Settings
+GlobalConfig::update(Optional<bool> OptimizeForIDE) {
+  llvm::sys::ScopedLock L(Mtx);
+  if (OptimizeForIDE.hasValue())
+    State.OptimizeForIDE = *OptimizeForIDE;
+  return State;
+};
+
+bool GlobalConfig::shouldOptimizeForIDE() const {
+  llvm::sys::ScopedLock L(Mtx);
+  return State.OptimizeForIDE;
+}
+
 SourceKit::Context::Context(StringRef RuntimeLibPath,
     llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
     LangSupportFactoryFn,
     bool shouldDispatchNotificationsOnMain) : RuntimeLibPath(RuntimeLibPath),
-    NotificationCtr(new NotificationCenter(shouldDispatchNotificationsOnMain)) {
+    NotificationCtr(new NotificationCenter(shouldDispatchNotificationsOnMain)),
+    Config(new GlobalConfig()) {
   // Should be called last after everything is initialized.
   SwiftLang = LangSupportFactoryFn(*this);
 }

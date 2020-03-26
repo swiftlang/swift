@@ -38,12 +38,13 @@ func modifyFooHeap(_ a: inout Int64,
 // Inout reference type.
 // FOO-CHECK: define {{.*}}@"$s5inout9modifyFooyys5Int64Vz_SftF"
 // FOO-CHECK: call void @llvm.dbg.declare(metadata %Ts5Int64V** %
-// FOO-CHECK-SAME:          metadata ![[U:[0-9]+]], metadata !DIExpression(DW_OP_deref))
+// FOO-CHECK-SAME: metadata ![[U:[0-9]+]], metadata !DIExpression(DW_OP_deref))
 func modifyFoo(_ u: inout Int64,
-// FOO-CHECK-DAG: !DILocalVariable(name: "v", arg: 2{{.*}} line: [[@LINE+3]],{{.*}} type: ![[MYFLOAT:[0-9]+]]
-  // FOO-CHECK-DAG: [[U]] = !DILocalVariable(name: "u", arg: 1{{.*}} line: [[@LINE-2]],{{.*}} type: ![[RINT:[0-9]+]]
-  // FOO-CHECK-DAG: ![[RINT]] = !DICompositeType({{.*}}identifier: "$ss5Int64VD"
-               _ v: MyFloat)
+// FOO-CHECK-DAG: !DILocalVariable(name: "v", arg: 2{{.*}} line: [[@LINE+3]],{{.*}} type: ![[LET_MYFLOAT:[0-9]+]]
+// FOO-CHECK-DAG: [[U]] = !DILocalVariable(name: "u", arg: 1,{{.*}} line: [[@LINE-2]],{{.*}} type: ![[RINT:[0-9]+]]
+// FOO-CHECK-DAG: ![[RINT]] = !DICompositeType({{.*}}identifier: "$ss5Int64VD"
+  _ v: MyFloat)
+// FOO-CHECK-DAG: ![[LET_MYFLOAT]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[MYFLOAT:[0-9]+]])
 // FOO-CHECK-DAG: ![[MYFLOAT]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s5inout7MyFloataD",{{.*}} baseType: ![[FLOAT:[0-9]+]]
 // FOO-CHECK-DAG: ![[FLOAT]] = !DICompositeType({{.*}}identifier: "$sSfD"
 {

@@ -2,6 +2,7 @@
 // REQUIRES: objc_interop
 import ImportAsMember.A
 import ImportAsMember.Class
+import Foundation
 
 public func returnGlobalVar() -> Double {
 	return Struct1.globalVar
@@ -34,7 +35,7 @@ public func returnNullableStringGlobalVar() -> String? {
 // CHECK:   [[VAL:%.*]] = load [copy] %0 : $*NSString
 // CHECK:   [[BRIDGE:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
 // CHECK:   [[RESULT:%.*]] = apply [[BRIDGE]](
-// CHECK:   [[SOME:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[RESULT]]
+// CHECK:   [[SOME:%.*]] = enum $Optional<String>, #Optional.some!enumelt, [[RESULT]]
 // CHECK:   return [[SOME]] : $Optional<String>
 // CHECK-NEXT: }
 
@@ -65,7 +66,6 @@ extension SomeClass {
 }
 
 public func useSpecialInit() -> Struct1 {
-  // FIXME: the below triggers an assert, due to number or params mismatch
-  // return Struct1(specialLabel:())
+  return Struct1(specialLabel:())
 }
 

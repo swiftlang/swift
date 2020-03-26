@@ -27,7 +27,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -74,7 +74,6 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 /// Passes for performing definite initialization. Must be run together in this
 /// order.
 static void addDefiniteInitialization(SILPassPipelinePlan &P) {
-  P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
   P.addRawSILInstLowering();
 }
@@ -102,8 +101,16 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   // there.
   const auto &Options = P.getOptions();
   P.addClosureLifetimeFixup();
+
+#ifndef NDEBUG
+  // Add a verification pass to check our work when skipping non-inlinable
+  // function bodies.
+  if (Options.SkipNonInlinableFunctionBodies)
+    P.addNonInlinableFunctionSkippingChecker();
+#endif
+
   if (Options.shouldOptimize()) {
-    P.addSemanticARCOpts();
+    P.addDestroyHoisting();
   }
   if (!Options.StripOwnershipAfterSerialization)
     P.addOwnershipModelEliminator();
@@ -249,7 +256,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addCOWArrayOpts();
   // Cleanup.
   P.addDCE();
-  P.addSwiftArrayOpts();
+  P.addSwiftArrayPropertyOpt();
 }
 
 // Perform classic SSA optimizations.
@@ -282,10 +289,6 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
 
   // Mainly for Array.append(contentsOf) optimization.
   P.addArrayElementPropagation();
-
-  // Specialize opaque archetypes.
-  // This can expose oportunities for the generic specializer.
-  P.addOpaqueArchetypeSpecializer();
 
   // Run the devirtualizer, specializer, and inliner. If any of these
   // makes a change we'll end up restarting the function passes on the
@@ -392,18 +395,33 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
 
+  // Cleanup after SILGen: remove trivial copies to temporaries.
+  P.addTempRValueOpt();
+  // Cleanup after SILGen: remove unneeded borrows/copies.
+  P.addSemanticARCOpts();
+
   // Strip ownership from non-transparent functions.
   if (P.getOptions().StripOwnershipAfterSerialization)
     P.addNonTransparentFunctionOwnershipModelEliminator();
 
-  // Start by cloning functions from stdlib.
+  // Start by linking in referenced functions from other modules.
   P.addPerformanceSILLinker();
 
-  // Cleanup after SILGen: remove trivial copies to temporaries.
+  // Cleanup after SILGen: remove trivial copies to temporaries. This version of
+  // temp-rvalue opt is here so that we can hit copies from non-ossa code that
+  // is linked in from the stdlib.
   P.addTempRValueOpt();
 
   // Add the outliner pass (Osize).
   P.addOutliner();
+
+  P.addCrossModuleSerializationSetup();
+  
+  // In case of cross-module-optimization, we need to serialize right after
+  // CrossModuleSerializationSetup. Eventually we want to serialize early
+  // anyway, but for now keep the SerializeSILPass at the later stage of the
+  // pipeline in case cross-module-optimization is not enabled.
+  P.addCMOSerializeSILPass();
 }
 
 static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
@@ -435,6 +453,9 @@ static bool addMidLevelPassPipeline(SILPassPipelinePlan &P) {
   // for CapturePropagation.
   P.addDeadArgSignatureOpt();
 
+  // A LICM pass at mid-level is mainly needed to hoist addressors of globals.
+  // It needs to be before global_init functions are inlined.
+  P.addLICM();
   // Run loop unrolling after inlining and constant propagation, because loop
   // trip counts may have became constant.
   P.addLoopUnroll();
@@ -474,7 +495,9 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addStackPromotion();
 
   // Speculate virtual call targets.
-  P.addSpeculativeDevirtualization();
+  if (P.getOptions().EnableSpeculativeDevirtualization) {
+    P.addSpeculativeDevirtualization();
+  }
 
   // There should be at least one SILCombine+SimplifyCFG between the
   // ClosureSpecializer, etc. and the last inliner. Cleaning up after these
@@ -506,7 +529,9 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LateLoopOpt");
 
   // Delete dead code and drop the bodies of shared functions.
-  P.addDeadFunctionElimination();
+  // Also, remove externally available witness tables. They are not needed
+  // anymore after the last devirtualizer run.
+  P.addLateDeadFunctionElimination();
 
   // Perform the final lowering transformations.
   P.addCodeSinking();
@@ -566,6 +591,7 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
   P.startPipeline("Address Lowering");
+  P.addOwnershipModelEliminator();
   P.addIRGenPrepare();
   P.addAddressLowering();
 
@@ -596,6 +622,8 @@ SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
   }
 
   P.startPipeline("SILOpt Prepare Passes");
+  P.addForEachLoopUnroll();
+  P.addMandatoryCombine();
   P.addAccessMarkerElimination();
 
   return P;
@@ -653,6 +681,10 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
 
+  P.startPipeline("Mandatory Combines");
+  P.addForEachLoopUnroll();
+  P.addMandatoryCombine();
+
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");
   P.addSerializeSILPass();
@@ -671,6 +703,20 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();
 
+  return P;
+}
+
+//===----------------------------------------------------------------------===//
+//                        Serialize SIL Pass Pipeline
+//===----------------------------------------------------------------------===//
+
+// Add to P a new pipeline that just serializes SIL. Meant to be used in
+// situations where perf optzns are disabled, but we may need to serialize.
+SILPassPipelinePlan
+SILPassPipelinePlan::getSerializeSILPassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P(Options);
+  P.startPipeline("Serialize SIL");
+  P.addSerializeSILPass();
   return P;
 }
 
@@ -722,82 +768,82 @@ SILPassPipelinePlan::getPassPipelineForKinds(const SILOptions &Options,
 //                Dumping And Loading Pass Pipelines from Yaml
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+struct YAMLPassPipeline {
+  std::string name;
+  std::vector<PassKind> passes;
+
+  YAMLPassPipeline() {}
+  YAMLPassPipeline(const SILPassPipeline &pipeline,
+                   SILPassPipelinePlan::PipelineKindRange pipelineKinds)
+      : name(pipeline.Name), passes() {
+    llvm::copy(pipelineKinds, std::back_inserter(passes));
+  }
+};
+
+} // end anonymous namespace
+
+namespace llvm {
+namespace yaml {
+
+template <> struct ScalarEnumerationTraits<PassKind> {
+  static void enumeration(IO &io, PassKind &value) {
+#define PASS(ID, TAG, NAME) io.enumCase(value, #TAG, PassKind::ID);
+#include "swift/SILOptimizer/PassManager/Passes.def"
+  }
+};
+
+template <> struct MappingTraits<YAMLPassPipeline> {
+  static void mapping(IO &io, YAMLPassPipeline &info) {
+    io.mapRequired("name", info.name);
+    io.mapRequired("passes", info.passes);
+  }
+};
+
+} // namespace yaml
+} // namespace llvm
+
+LLVM_YAML_IS_FLOW_SEQUENCE_VECTOR(PassKind)
+LLVM_YAML_IS_DOCUMENT_LIST_VECTOR(YAMLPassPipeline)
+
 void SILPassPipelinePlan::dump() {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
 
 void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
-  // Our pipelines yaml representation is simple, we just output it ourselves
-  // rather than use the yaml writer interface. We want to use the yaml reader
-  // interface to be resilient against slightly different forms of yaml.
-  os << "[\n";
-  interleave(getPipelines(),
-             [&](const SILPassPipeline &Pipeline) {
-               os << "    [\n";
-
-               os << "        \"" << Pipeline.Name << "\"";
-               for (PassKind Kind : getPipelinePasses(Pipeline)) {
-                 os << ",\n        [\"" << PassKindID(Kind) << "\","
-                    << "\"" << PassKindTag(Kind) << "\"]";
-               }
-             },
-             [&] { os << "\n    ],\n"; });
-  os << "\n    ]\n";
-  os << ']';
+  llvm::yaml::Output out(os);
+  std::vector<YAMLPassPipeline> data;
+  transform(getPipelines(), std::back_inserter(data),
+            [&](const SILPassPipeline &pipeline) {
+              return YAMLPassPipeline(pipeline, getPipelinePasses(pipeline));
+            });
+  out << data;
 }
 
 SILPassPipelinePlan
-SILPassPipelinePlan::getPassPipelineFromFile(const SILOptions &Options,
-                                             StringRef Filename) {
-  namespace yaml = llvm::yaml;
-  LLVM_DEBUG(llvm::dbgs() << "Parsing Pass Pipeline from " << Filename << "\n");
-
-  // Load the input file.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(Filename);
-  if (!FileBufOrErr) {
-    llvm_unreachable("Failed to read yaml file");
-  }
-
-  StringRef Buffer = FileBufOrErr->get()->getBuffer();
-  llvm::SourceMgr SM;
-  yaml::Stream Stream(Buffer, SM);
-  yaml::document_iterator DI = Stream.begin();
-  assert(DI != Stream.end() && "Failed to read a document");
-  yaml::Node *N = DI->getRoot();
-  assert(N && "Failed to find a root");
-
-  SILPassPipelinePlan P(Options);
-
-  auto *RootList = cast<yaml::SequenceNode>(N);
-  llvm::SmallVector<PassKind, 32> Passes;
-  for (yaml::Node &PipelineNode :
-       make_range(RootList->begin(), RootList->end())) {
-    Passes.clear();
-    LLVM_DEBUG(llvm::dbgs() << "New Pipeline:\n");
-
-    auto *Desc = cast<yaml::SequenceNode>(&PipelineNode);
-    yaml::SequenceNode::iterator DescIter = Desc->begin();
-    StringRef Name = cast<yaml::ScalarNode>(&*DescIter)->getRawValue();
-    LLVM_DEBUG(llvm::dbgs() << "    Name: \"" << Name << "\"\n");
-    ++DescIter;
-
-    for (auto DescEnd = Desc->end(); DescIter != DescEnd; ++DescIter) {
-      auto *InnerPassList = cast<yaml::SequenceNode>(&*DescIter);
-      auto *FirstNode = &*InnerPassList->begin();
-      StringRef PassName = cast<yaml::ScalarNode>(FirstNode)->getRawValue();
-      unsigned Size = PassName.size() - 2;
-      PassName = PassName.substr(1, Size);
-      LLVM_DEBUG(llvm::dbgs() << "    Pass: \"" << PassName << "\"\n");
-      auto Kind = PassKindFromString(PassName);
-      assert(Kind != PassKind::invalidPassKind && "Found invalid pass kind?!");
-      Passes.push_back(Kind);
+SILPassPipelinePlan::getPassPipelineFromFile(const SILOptions &options,
+                                             StringRef filename) {
+  std::vector<YAMLPassPipeline> yamlPipelines;
+  {
+    // Load the input file.
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
+        llvm::MemoryBuffer::getFileOrSTDIN(filename);
+    if (!fileBufOrErr) {
+      llvm_unreachable("Failed to read yaml file");
     }
 
-    P.startPipeline(Name);
-    P.addPasses(Passes);
+    llvm::yaml::Input in(fileBufOrErr->get()->getBuffer());
+    in >> yamlPipelines;
   }
 
-  return P;
+  SILPassPipelinePlan silPlan(options);
+
+  for (auto &pipeline : yamlPipelines) {
+    silPlan.startPipeline(pipeline.name);
+    silPlan.addPasses(pipeline.passes);
+  }
+
+  return silPlan;
 }

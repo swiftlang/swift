@@ -1,8 +1,4 @@
 
-if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
-  set(EXTRA_AST_FLAGS "FORCE_BUILD_OPTIMIZED")
-endif()
-
 if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
   set(SWIFTAST_LLVM_LINK_COMPONENTS)
 else()
@@ -14,6 +10,7 @@ else()
 endif()
 
 add_swift_host_library(swiftAST STATIC
+  AbstractSourceFileDepGraphFactory.cpp
   AccessRequests.cpp
   ASTContext.cpp
   ASTDemangler.cpp
@@ -29,10 +26,13 @@ add_swift_host_library(swiftAST STATIC
   ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp
+  AutoDiff.cpp
   Availability.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
   CaptureInfo.cpp
+  ClangSwiftTypeCorrespondence.cpp
+  ClangTypeConverter.cpp
   ConcreteDeclRef.cpp
   ConformanceLookupTable.cpp
   Decl.cpp
@@ -43,13 +43,16 @@ add_swift_host_library(swiftAST STATIC
   DiagnosticList.cpp
   DocComment.cpp
   Evaluator.cpp
-  ExperimentalDependencies.cpp
-  ExperimentalDependenciesSourceFileDepGraphConstructor.cpp
   Expr.cpp
+  FineGrainedDependencies.cpp
+  FrontendSourceFileDepGraphFactory.cpp
   GenericEnvironment.cpp
   GenericSignature.cpp
   GenericSignatureBuilder.cpp
   Identifier.cpp
+  ImportCache.cpp
+  IncrementalRanges.cpp
+  IndexSubset.cpp
   InlinableText.cpp
   LayoutConstraint.cpp
   Module.cpp
@@ -63,6 +66,7 @@ add_swift_host_library(swiftAST STATIC
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   RawComment.cpp
+  ReferencedNameTracker.cpp
   RequirementEnvironment.cpp
   SyntaxASTMap.cpp
   SILLayout.cpp
@@ -81,9 +85,15 @@ add_swift_host_library(swiftAST STATIC
 
   LLVM_LINK_COMPONENTS
   ${SWIFTAST_LLVM_LINK_COMPONENTS}
-
-  ${EXTRA_AST_FLAGS}
   )
+
+if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL MSVC)
+    target_compile_options(swiftAST PRIVATE /O2 /Ob2)
+  else()
+    target_compile_options(swiftAST PRIVATE -O3)
+  endif()
+endif()
 if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
   target_link_libraries(swiftAST INTERFACE
     clangCodeGen

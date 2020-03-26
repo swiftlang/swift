@@ -15,21 +15,14 @@ public func makeAMetadata() {
   blah(OuterGenericClass<Int>.InnerConcreteClass.self)
 }
 
-// Type constructor for OuterGenericStruct<Int>.InnerGenericStruct<String>
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV05InnerdE0VySi_SSGMa"(i64)
-// CHECK: call swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV05InnerdE0VMa"(i64 %0, %swift.type* @"$sSiN", %swift.type* @"$sSSN")
-// CHECK: ret %swift.metadata_response
+// Type constructor for OuterGenericStruct<T>
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructVMa"(i64 %0, %swift.type* %1)
 
 // Type constructor for OuterGenericStruct<T>.InnerGenericStruct<U>
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV05InnerdE0VMa"(i64, %swift.type*, %swift.type*)
-
-// Type constructor for OuterGenericStruct<Int>.InnerConcreteStruct
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV013InnerConcreteE0VySi_GMa"(i64)
-// CHECK: call swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV013InnerConcreteE0VMa"(i64 %0, %swift.type* @"$sSiN")
-// CHECK: ret %swift.metadata_response
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV05InnerdE0VMa"(i64 %0, %swift.type* %1, %swift.type* %2)
 
 // Type constructor for OuterGenericStruct<T>.InnerConcreteStruct
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV013InnerConcreteE0VMa"(i64, %swift.type*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV013InnerConcreteE0VMa"(i64 %0, %swift.type* %1)
 
 public struct OuterGenericStruct<T> {
   public struct InnerGenericStruct<U> {
@@ -46,26 +39,14 @@ public struct OuterGenericStruct<T> {
   }
 }
 
-// Type constructor for OuterGenericClass<Int>.InnerGenericClass<String>
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC05InnerdE0CySi_SSGMa"(i64)
-// CHECK: call swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC05InnerdE0CMa"(i64 %0, %swift.type* @"$sSiN", %swift.type* @"$sSSN")
+// Type constructor for OuterGenericClass<T>
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassCMa"(i64 %0, %swift.type* %1)
 
 // Type constructor for OuterGenericClass<T>.InnerGenericClass<U>
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC05InnerdE0CMa"(i64, %swift.type*, %swift.type*)
-
-// Type constructor for OuterGenericClass<Int>.InnerConcreteClass
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC013InnerConcreteE0CySi_GMa"(i64)
-// CHECK: call swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC013InnerConcreteE0CMa"(i64 %0, %swift.type* @"$sSiN")
-// CHECK: ret %swift.metadata_response
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC05InnerdE0CMa"(i64 %0, %swift.type* %1, %swift.type* %2)
 
 // Type constructor for OuterGenericClass<T>.InnerConcreteClass
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC013InnerConcreteE0CMa"(i64, %swift.type*)
-
-// Type constructor for OuterGenericStruct<T>
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructVMa"(i64, %swift.type*)
-
-// Type constructor for OuterGenericClass<T>
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassCMa"(i64, %swift.type*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC013InnerConcreteE0CMa"(i64 %0, %swift.type* %1)
 
 public class OuterGenericClass<T> {
   public class InnerGenericClass<U> {
@@ -175,10 +156,10 @@ extension Container.Conformancy3: HasAssoc where T == Outer {
 }
 
 // CHECK-CONSTANTS-LABEL: @"$s15nested_generics9ContainerO12Conformancy3Vyx_GAA8HasAssocA2A5OuterORszrlWP" =
-// CHECK-CONSTANTS-SAME: @"symbolic 15nested_generics5OuterO"
+// CHECK-CONSTANTS-SAME: @"symbolic{{.*}}15nested_generics5OuterO"
 
 // CHECK-CONSTANTS-LABEL: @"$s15nested_generics9ContainerO12Conformancy2Vyx_qd__GAA8HasAssocA2A5OuterORszrlWP" =
-// CHECK-CONSTANTS-SAME: @"symbolic 15nested_generics5OuterO"
+// CHECK-CONSTANTS-SAME: @"symbolic{{.*}}15nested_generics5OuterO"
 
 // CHECK-CONSTANTS-LABEL: @"$s15nested_generics9ContainerO11ConformancyVyx_qd__GAA8HasAssocAAWP" =
-// CHECK-CONSTANTS-SAME: @"symbolic 15nested_generics5OuterO"
+// CHECK-CONSTANTS-SAME: @"symbolic{{.*}}15nested_generics5OuterO"

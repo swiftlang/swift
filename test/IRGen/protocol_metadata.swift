@@ -17,14 +17,6 @@ protocol C : class { func c() }
 protocol AB : A, B { func ab() }
 protocol ABO : A, B, O { func abo() }
 
-// -- @objc protocol O uses ObjC symbol mangling and layout
-// CHECK-LABEL: @_PROTOCOL__TtP17protocol_metadata1O_ = private constant
-// CHECK-SAME:   @_PROTOCOL_INSTANCE_METHODS__TtP17protocol_metadata1O_,
-// -- size, flags: 1 = Swift
-// CHECK-SAME:   i32 96, i32 1
-// CHECK-SAME: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata1O_
-// CHECK-SAME: }
-
 // CHECK: [[A_NAME:@.*]] = private constant [2 x i8] c"A\00"
 
 // CHECK-LABEL: @"$s17protocol_metadata1AMp" = hidden constant
@@ -57,6 +49,14 @@ protocol ABO : A, B, O { func abo() }
 // CHECK-SAME:   i32 31,
 // CHECK-SAME:   @"symbolic x"
 // CHECK-SAME:   i32 0
+// CHECK-SAME: }
+
+// -- @objc protocol O uses ObjC symbol mangling and layout
+// CHECK-LABEL: @_PROTOCOL__TtP17protocol_metadata1O_ = private constant
+// CHECK-SAME:   @_PROTOCOL_INSTANCE_METHODS__TtP17protocol_metadata1O_,
+// -- size, flags: 1 = Swift
+// CHECK-SAME:   i32 96, i32 1
+// CHECK-SAME: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata1O_
 // CHECK-SAME: }
 
 // -- @objc protocol OPT uses ObjC symbol mangling and layout
@@ -116,30 +116,4 @@ protocol Comprehensive {
 // CHECK-SAME:   %swift.protocol_requirement { i32 3, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 4, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 6, i32 0 }
-
-
-func reify_metadata<T>(_ x: T) {}
-
-// CHECK: define hidden swiftcc void @"$s17protocol_metadata0A6_types{{[_0-9a-zA-Z]*}}F"
-func protocol_types(_ a: A,
-                    abc: A & B & C,
-                    abco: A & B & C & O) {
-  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1AMp" to [[INT]])
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 true, %swift.type* null, i64 1, [[INT]]* {{%.*}})
-  reify_metadata(a)
-  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1AMp"
-  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1BMp"
-  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1CMp"
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* null, i64 3, [[INT]]* {{%.*}})
-  reify_metadata(abc)
-  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1AMp"
-  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1BMp"
-  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1CMp"
-  // CHECK: [[O_REF:%.*]] = load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP17protocol_metadata1O_"
-  // CHECK: [[O_REF_INT:%.*]] = ptrtoint i8* [[O_REF]] to [[INT]]
-  // CHECK: [[O_REF_DESCRIPTOR:%.*]] = or [[INT]] [[O_REF_INT]], 1
-  // CHECK: store [[INT]] [[O_REF_DESCRIPTOR]]
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* null, i64 4, [[INT]]* {{%.*}})
-  reify_metadata(abco)
-}
 

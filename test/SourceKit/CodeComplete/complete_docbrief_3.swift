@@ -40,6 +40,7 @@ func test() {
 // CHECK-NEXT:       key.typename: "Void",
 // CHECK-NEXT:       key.doc.brief: "This is a doc comment of P.foo",
 // CHECK-NEXT:       key.context: source.codecompletion.context.thisclass,
+// CHECK-NEXT:       key.typerelation: source.codecompletion.typerelation.unrelated,
 // CHECK-NEXT:       key.num_bytes_to_erase: 0,
 // CHECK-NEXT:       key.associated_usrs: "s:12DocBriefTest1SV3fooyyF s:12DocBriefTest1PP3fooyyF",
 // CHECK-NEXT:       key.modulename: "DocBriefTest"

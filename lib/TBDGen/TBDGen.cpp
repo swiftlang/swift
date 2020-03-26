@@ -19,44 +19,386 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/StringSwitch.h"
+#include "llvm/IR/Mangler.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/YAMLParser.h"
+#include "llvm/TextAPI/MachO/InterfaceFile.h"
+#include "llvm/TextAPI/MachO/TextAPIReader.h"
+#include "llvm/TextAPI/MachO/TextAPIWriter.h"
 
 #include "TBDGenVisitor.h"
-#include "tapi/Architecture.h"
-#include "tapi/InterfaceFile.h"
-#include "tapi/Platform.h"
-#include "tapi/TextStub_v3.h"
-#include "tapi/YAMLReaderWriter.h"
 
 using namespace swift;
 using namespace swift::irgen;
 using namespace swift::tbdgen;
+using namespace llvm::yaml;
 using StringSet = llvm::StringSet<>;
-using SymbolKind = tapi::internal::SymbolKind;
+using SymbolKind = llvm::MachO::SymbolKind;
+
+static constexpr StringLiteral ObjC2ClassNamePrefix = "_OBJC_CLASS_$_";
+static constexpr StringLiteral ObjC2MetaClassNamePrefix = "_OBJC_METACLASS_$_";
 
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
 }
 
-void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
-  Symbols.addSymbol(kind, name, Archs);
+// If a symbol is implied, we don't need to emit it explictly into the tbd file.
+// e.g. When a symbol is in the `objc-classes` section in a tbd file, a additional
+// symbol with `_OBJC_CLASS_$_` is implied.
+static bool isSymbolImplied(StringRef name) {
+  return name.startswith(ObjC2ClassNamePrefix) ||
+    name.startswith(ObjC2MetaClassNamePrefix);
+}
 
+void TBDGenVisitor::addSymbolInternal(StringRef name,
+                                      llvm::MachO::SymbolKind kind,
+                                      bool isLinkerDirective) {
+  if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
+    return;
+  if (!isSymbolImplied(name))
+    Symbols.addSymbol(kind, name, Targets);
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(name).second;
     (void)isNewValue;
     assert(isNewValue && "symbol appears twice");
+  }
+}
+
+static std::vector<OriginallyDefinedInAttr::ActiveVersion>
+getAllMovedPlatformVersions(Decl *D) {
+  std::vector<OriginallyDefinedInAttr::ActiveVersion> Results;
+  for (auto *attr: D->getAttrs()) {
+    if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
+      auto Active = ODA->isActivePlatform(D->getASTContext());
+      if (Active.hasValue()) {
+        Results.push_back(*Active);
+      }
+    }
+  }
+  return Results;
+}
+
+static StringRef getLinkerPlatformName(uint8_t Id) {
+  switch (Id) {
+#define LD_PLATFORM(Name, Id) case Id: return #Name;
+#include "ldPlatformKinds.def"
+  default:
+    llvm_unreachable("unrecognized platform id");
+  }
+}
+
+static Optional<uint8_t> getLinkerPlatformId(StringRef Platform) {
+  return llvm::StringSwitch<Optional<uint8_t>>(Platform)
+#define LD_PLATFORM(Name, Id) .Case(#Name, Id)
+#include "ldPlatformKinds.def"
+    .Default(None);
+}
+
+StringRef InstallNameStore::getInstallName(LinkerPlatformId Id) const {
+  auto It = PlatformInstallName.find((uint8_t)Id);
+  if (It == PlatformInstallName.end())
+    return InstallName;
+  else
+    return It->second;
+}
+
+void InstallNameStore::remark(ASTContext &Ctx, StringRef ModuleName) const {
+  Ctx.Diags.diagnose(SourceLoc(), diag::default_previous_install_name,
+                     ModuleName, InstallName);
+  for (auto Pair: PlatformInstallName) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::platform_previous_install_name,
+                       ModuleName, getLinkerPlatformName(Pair.first),
+                       Pair.second);
+  }
+}
+
+static std::string getScalaNodeText(Node *N) {
+  SmallString<32> Buffer;
+  return cast<ScalarNode>(N)->getValue(Buffer).str();
+}
+
+static std::set<int8_t> getSequenceNodePlatformList(ASTContext &Ctx, Node *N) {
+  std::set<int8_t> Results;
+  for (auto &E: *cast<SequenceNode>(N)) {
+    auto Platform = getScalaNodeText(&E);
+    auto Id = getLinkerPlatformId(Platform);
+    if (Id.hasValue()) {
+      Results.insert(*Id);
+    } else {
+      // Diagnose unrecognized platform name.
+      Ctx.Diags.diagnose(SourceLoc(), diag::unknown_platform_name, Platform);
+    }
+  }
+  return Results;
+}
+
+/// Parse an entry like this, where the "platforms" key-value pair is optional:
+///  {
+///     "module": "Foo",
+///     "platforms": ["macOS"],
+///     "install_name": "/System/MacOS"
+///  },
+static int
+parseEntry(ASTContext &Ctx,
+           Node *Node, std::map<std::string, InstallNameStore> &Stores) {
+  if (auto *SN = cast<SequenceNode>(Node)) {
+    for (auto It = SN->begin(); It != SN->end(); ++It) {
+      auto *MN = cast<MappingNode>(&*It);
+      std::string ModuleName;
+      std::string InstallName;
+      Optional<std::set<int8_t>> Platforms;
+      for (auto &Pair: *MN) {
+        auto Key = getScalaNodeText(Pair.getKey());
+        auto* Value = Pair.getValue();
+        if (Key == "module") {
+          ModuleName = getScalaNodeText(Value);
+        } else if (Key == "platforms") {
+          Platforms = getSequenceNodePlatformList(Ctx, Value);
+        } else if (Key == "install_name") {
+          InstallName = getScalaNodeText(Value);
+        } else {
+          return 1;
+        }
+      }
+      if (ModuleName.empty() || InstallName.empty())
+        return 1;
+      auto &Store = Stores.insert(std::make_pair(ModuleName,
+        InstallNameStore())).first->second;
+      if (Platforms.hasValue()) {
+        // This install name is platform-specific.
+        for (auto Id: Platforms.getValue()) {
+          Store.PlatformInstallName[Id] = InstallName;
+        }
+      } else {
+        // The install name is the default one.
+        Store.InstallName = InstallName;
+      }
+    }
+  } else {
+    return 1;
+  }
+  return 0;
+}
+
+std::unique_ptr<std::map<std::string, InstallNameStore>>
+TBDGenVisitor::parsePreviousModuleInstallNameMap() {
+  StringRef FileName = Opts.ModuleInstallNameMapPath;
+  // Nothing to parse.
+  if (FileName.empty())
+    return nullptr;
+  namespace yaml = llvm::yaml;
+  ASTContext &Ctx = SwiftModule->getASTContext();
+  std::unique_ptr<std::map<std::string, InstallNameStore>> pResult(
+    new std::map<std::string, InstallNameStore>());
+  auto &AllInstallNames = *pResult;
+  SWIFT_DEFER {
+    for (auto Pair: AllInstallNames) {
+      Pair.second.remark(Ctx, Pair.first);
+    }
+  };
+
+  // Load the input file.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+    llvm::MemoryBuffer::getFile(FileName);
+  if (!FileBufOrErr) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_missing,
+                       FileName);
+    return nullptr;
+  }
+  StringRef Buffer = FileBufOrErr->get()->getBuffer();
+
+  // Use a new source manager instead of the one from ASTContext because we
+  // don't want the Json file to be persistent.
+  SourceManager SM;
+  yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, FileName),
+                      SM.getLLVMSourceMgr());
+  for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
+    assert(DI != Stream.end() && "Failed to read a document");
+    yaml::Node *N = DI->getRoot();
+    assert(N && "Failed to find a root");
+    if (parseEntry(Ctx, N, AllInstallNames)) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_corrupted,
+                         FileName);
+      return nullptr;
+    }
+  }
+  return pResult;
+}
+
+static LinkerPlatformId
+getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
+  switch(Ver.Platform) {
+  case swift::PlatformKind::none:
+    llvm_unreachable("cannot find platform kind");
+  case swift::PlatformKind::iOS:
+  case swift::PlatformKind::iOSApplicationExtension:
+    return Ver.IsSimulator ? LinkerPlatformId::iOS_sim:
+                             LinkerPlatformId::iOS;
+  case swift::PlatformKind::tvOS:
+  case swift::PlatformKind::tvOSApplicationExtension:
+    return Ver.IsSimulator ? LinkerPlatformId::tvOS_sim:
+                             LinkerPlatformId::tvOS;
+  case swift::PlatformKind::watchOS:
+  case swift::PlatformKind::watchOSApplicationExtension:
+    return Ver.IsSimulator ? LinkerPlatformId::watchOS_sim:
+                             LinkerPlatformId::watchOS;
+  case swift::PlatformKind::OSX:
+  case swift::PlatformKind::OSXApplicationExtension:
+    return LinkerPlatformId::macOS;
+  case swift::PlatformKind::macCatalyst:
+  case swift::PlatformKind::macCatalystApplicationExtension:
+    return LinkerPlatformId::macCatalyst;
+  }
+}
+
+static StringRef
+getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
+  return getLinkerPlatformName((uint8_t)getLinkerPlatformId(Ver));
+}
+
+/// Find the most relevant introducing version of the decl stack we have visted
+/// so far.
+static Optional<llvm::VersionTuple>
+getInnermostIntroVersion(ArrayRef<Decl*> DeclStack, PlatformKind Platform) {
+  for (auto It = DeclStack.rbegin(); It != DeclStack.rend(); ++ It) {
+    if (auto Result = (*It)->getIntroducedOSVersion(Platform))
+      return Result;
+  }
+  return None;
+}
+
+void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
+                                                llvm::MachO::SymbolKind kind) {
+  if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
+    return;
+  if(DeclStack.empty())
+    return;
+  auto TopLevelDecl = DeclStack.front();
+  auto MovedVers = getAllMovedPlatformVersions(TopLevelDecl);
+  if (MovedVers.empty())
+    return;
+  assert(!MovedVers.empty());
+  assert(previousInstallNameMap);
+  auto &Ctx = TopLevelDecl->getASTContext();
+  for (auto &Ver: MovedVers) {
+    auto IntroVer = getInnermostIntroVersion(DeclStack, Ver.Platform);
+    assert(IntroVer && "cannot find OS intro version");
+    if (!IntroVer.hasValue())
+      continue;
+    // This decl is available after the top-level symbol has been moved here,
+    // so we don't need the linker directives.
+    if (*IntroVer >= Ver.Version)
+      continue;
+    auto PlatformNumber = getLinkerPlatformId(Ver);
+    auto It = previousInstallNameMap->find(Ver.ModuleName.str());
+    if (It == previousInstallNameMap->end()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
+                         Ver.ModuleName, getLinkerPlatformName(Ver));
+      continue;
+    }
+    auto InstallName = It->second.getInstallName(PlatformNumber);
+    if (InstallName.empty()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
+                         Ver.ModuleName, getLinkerPlatformName(Ver));
+      continue;
+    }
+    llvm::SmallString<64> Buffer;
+    llvm::raw_svector_ostream OS(Buffer);
+    // Empty compatible version indicates using the current compatible version.
+    StringRef ComptibleVersion = "";
+    OS << "$ld$previous$";
+    OS << InstallName << "$";
+    OS << ComptibleVersion << "$";
+    OS << std::to_string((uint8_t)PlatformNumber) << "$";
+    static auto getMinor = [](Optional<unsigned> Minor) {
+      return Minor.hasValue() ? *Minor : 0;
+    };
+    OS << IntroVer->getMajor() << "." << getMinor(IntroVer->getMinor()) << "$";
+    OS << Ver.Version.getMajor() << "." << getMinor(Ver.Version.getMinor()) << "$";
+    OS << name << "$";
+    addSymbolInternal(OS.str(), llvm::MachO::SymbolKind::GlobalSymbol,
+                      /*LinkerDirective*/true);
+  }
+}
+
+void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
+                                                    llvm::MachO::SymbolKind kind) {
+  if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
+    return;
+  if (DeclStack.empty())
+    return;
+  auto TopLevelDecl = DeclStack.front();
+  auto MovedVers = getAllMovedPlatformVersions(TopLevelDecl);
+  if (MovedVers.empty())
+    return;
+  assert(!MovedVers.empty());
+
+  // Using $ld$add and $ld$hide cannot encode platform name in the version number,
+  // so we can only handle one version.
+  // FIXME: use $ld$previous instead
+  auto MovedVer = MovedVers.front().Version;
+  auto Platform = MovedVers.front().Platform;
+  unsigned Major[2];
+  unsigned Minor[2];
+  Major[1] = MovedVer.getMajor();
+  Minor[1] = MovedVer.getMinor().hasValue() ? *MovedVer.getMinor(): 0;
+  auto IntroVer = getInnermostIntroVersion(DeclStack, Platform);
+  assert(IntroVer && "cannot find the start point of availability");
+  if (!IntroVer.hasValue())
+    return;
+  // This decl is available after the top-level symbol has been moved here,
+  // so we don't need the linker directives.
+  if (*IntroVer >= MovedVer)
+    return;
+  Major[0] = IntroVer->getMajor();
+  Minor[0] = IntroVer->getMinor().hasValue() ? IntroVer->getMinor().getValue() : 0;
+  for (auto CurMaj = Major[0]; CurMaj <= Major[1]; ++ CurMaj) {
+    unsigned MinRange[2] = {0, 31};
+    if (CurMaj == Major[0])
+      MinRange[0] = Minor[0];
+    if (CurMaj == Major[1])
+      MinRange[1] = Minor[1];
+    for (auto CurMin = MinRange[0]; CurMin != MinRange[1]; ++ CurMin) {
+      llvm::SmallString<64> Buffer;
+      llvm::raw_svector_ostream OS(Buffer);
+      OS << "$ld$hide$os" << CurMaj << "." << CurMin << "$" << name;
+      addSymbolInternal(OS.str(), llvm::MachO::SymbolKind::GlobalSymbol,
+                        /*LinkerDirective*/true);
+    }
+  }
+}
+
+void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
+  // The linker expects to see mangled symbol names in TBD files, so make sure
+  // to mangle before inserting the symbol.
+  SmallString<32> mangled;
+  llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
+  addSymbolInternal(mangled, kind);
+  if (previousInstallNameMap) {
+    addLinkerDirectiveSymbolsLdPrevious(mangled, kind);
+  } else {
+    addLinkerDirectiveSymbolsLdHide(mangled, kind);
   }
 }
 
@@ -70,8 +412,7 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
 
 void TBDGenVisitor::addSymbol(LinkEntity entity) {
   auto linkage =
-      LinkInfo::get(UniversalLinkInfo, SwiftModule, AvailCtx,
-                    entity, ForDefinition);
+      LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
 
   auto externallyVisible =
       llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
@@ -128,8 +469,12 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     if (!rootConformance) {
       continue;
     }
-
-    addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
+    // We cannot emit the witness table symbol if the protocol is imported from
+    // another module and it's resilient, because initialization of that protocol
+    // is necessary in this case
+    if (!rootConformance->getProtocol()->isResilient(DC->getParentModule(),
+                                                     ResilienceExpansion::Maximal))
+      addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
     addSymbol(LinkEntity::forProtocolConformanceDescriptor(rootConformance));
 
     // FIXME: the logic around visibility in extensions is confusing, and
@@ -158,8 +503,8 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
             auto witnessStorage = cast<AbstractStorageDecl>(witnessDecl);
             storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
               auto witnessAccessor =
-                witnessStorage->getAccessor(reqtAccessor->getAccessorKind());
-              assert(witnessAccessor && "no corresponding witness accessor?");
+                witnessStorage->getSynthesizedAccessor(
+                  reqtAccessor->getAccessorKind());
               addSymbolIfNecessary(reqtAccessor, witnessAccessor);
             });
           }
@@ -182,6 +527,23 @@ static bool shouldUseAllocatorMangling(const AbstractFunctionDecl *afd) {
          constructor->isConvenienceInit();
 }
 
+void TBDGenVisitor::visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
+  auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
+                                    SwiftModule->arePrivateImportsEnabled();
+  if (!publicDefaultArgGenerators)
+    return;
+
+  // In Swift 3 (or under -enable-testing), default arguments (of public
+  // functions) are public symbols, as the default values are computed at the
+  // call site.
+  auto index = 0;
+  for (auto *param : *PL) {
+    if (param->isDefaultArgument())
+      addSymbol(SILDeclRef::getDefaultArgGenerator(VD, index));
+    index++;
+  }
+}
+
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   // A @_silgen_name("...") function without a body only exists
   // to forward-declare a symbol from another library.
@@ -198,9 +560,8 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
         AFD, useAllocator));
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
-
   }
-  if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+  if (AFD->getDynamicallyReplacedDecl()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
         AFD, useAllocator));
@@ -214,20 +575,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
-  auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
-                                    SwiftModule->arePrivateImportsEnabled();
-  if (!publicDefaultArgGenerators)
-    return;
-
-  // In Swift 3 (or under -enable-testing), default arguments (of public
-  // functions) are public symbols, as the default values are computed at the
-  // call site.
-  auto index = 0;
-  for (auto *param : *AFD->getParameters()) {
-    if (param->isDefaultArgument())
-      addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
-    index++;
-  }
+  visitDefaultArguments(AFD, AFD->getParameters());
 }
 
 void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
@@ -241,7 +589,7 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
-    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+    if (FD->getDynamicallyReplacedDecl()) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
@@ -250,10 +598,7 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
 }
 
 void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
-  // Do nothing: accessors are always nested within the storage decl, but
-  // sometimes appear outside it too. To avoid double-walking them, we
-  // explicitly visit them as members of the storage and ignore them when we
-  // visit them as part of the main walk, here.
+  llvm_unreachable("should not see an accessor here");
 }
 
 void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
@@ -272,16 +617,16 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
-    if (ASD->hasAnyDynamicReplacementAccessors()) {
+    if (ASD->getDynamicallyReplacedDecl()) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
-  for (auto accessor : ASD->getAllAccessors()) {
-    visitAbstractFunctionDecl(accessor);
-  }
+  ASD->visitEmittedAccessors([&](AccessorDecl *accessor) {
+    visitFuncDecl(accessor);
+  });
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
@@ -303,11 +648,19 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
       if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
         // The actual variable has a symbol.
         Mangle::ASTMangler mangler;
-        addSymbol(mangler.mangleEntity(VD, false));
+        addSymbol(mangler.mangleEntity(VD));
       }
 
       if (VD->isLazilyInitializedGlobal())
         addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    }
+
+    // Wrapped non-static member properties may have a backing initializer.
+    if (auto wrapperInfo = VD->getPropertyWrapperBackingPropertyInfo()) {
+      if (wrapperInfo.initializeFromOriginal && !VD->isStatic()) {
+        addSymbol(
+            SILDeclRef(VD, SILDeclRef::Kind::PropertyWrapperBackingInitializer));
+      }
     }
   }
 
@@ -365,16 +718,8 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
   // Some members of classes get extra handling, beyond members of struct/enums,
   // so let's walk over them manually.
-  for (auto *member : CD->getMembers()) {
-    auto value = dyn_cast<ValueDecl>(member);
-    if (!value)
-      continue;
-
-    auto var = dyn_cast<VarDecl>(value);
-    auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
-    if (hasFieldOffset)
-      addSymbol(LinkEntity::forFieldOffset(var));
-  }
+  for (auto *var : CD->getStoredProperties())
+    addSymbol(LinkEntity::forFieldOffset(var));
 
   visitNominalTypeDecl(CD);
 
@@ -465,28 +810,6 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
     visit(member);
 }
 
-/// Determine whether the protocol descriptor for the given protocol will
-/// contain any protocol requirements.
-static bool protocolDescriptorHasRequirements(ProtocolDecl *proto) {
-  if (!proto->getRequirementSignature().empty())
-    return true;
-
-  for (auto *member : proto->getMembers()) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-      if (SILDeclRef::requiresNewWitnessTableEntry(func))
-        return true;
-    }
-
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      if (assocType->getOverriddenDecls().empty()) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 #ifndef NDEBUG
 static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   switch (D->getKind()) {
@@ -530,45 +853,45 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
-    // If there are any requirements, emit a requirements base descriptor.
-    if (protocolDescriptorHasRequirements(PD))
-      addProtocolRequirementsBaseDescriptor(PD);
+    struct WitnessVisitor : public SILWitnessVisitor<WitnessVisitor> {
+      TBDGenVisitor &TBD;
+      ProtocolDecl *PD;
 
-    for (const auto &req : PD->getRequirementSignature()) {
-      if (req.getKind() != RequirementKind::Conformance)
-        continue;
+    public:
+      WitnessVisitor(TBDGenVisitor &TBD, ProtocolDecl *PD)
+          : TBD(TBD), PD(PD) {}
 
-      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType())) {
-        BaseConformance conformance(
-          PD,
-          req.getSecondType()->castTo<ProtocolType>()->getDecl());
-        addBaseConformanceDescriptor(conformance);
-      } else {
-        AssociatedConformance conformance(
-          PD,
-          req.getFirstType()->getCanonicalType(),
-          req.getSecondType()->castTo<ProtocolType>()->getDecl());
-        addAssociatedConformanceDescriptor(conformance);
-      }
-    }
-
-    for (auto *member : PD->getMembers()) {
-      if (PD->isResilient()) {
-        if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(member)) {
-          if (SILDeclRef::requiresNewWitnessTableEntry(funcDecl)) {
-            addDispatchThunk(SILDeclRef(funcDecl));
-            addMethodDescriptor(SILDeclRef(funcDecl));
-          }
+      void addMethod(SILDeclRef declRef) {
+        if (PD->isResilient()) {
+          TBD.addDispatchThunk(declRef);
+          TBD.addMethodDescriptor(declRef);
         }
       }
 
-      // Always produce associated type descriptors, because they can
-      // be referenced by generic signatures.
-      if (auto *assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        if (assocType->getOverriddenDecls().empty())
-          addAssociatedTypeDescriptor(assocType);
+      void addAssociatedType(AssociatedType associatedType) {
+        TBD.addAssociatedTypeDescriptor(associatedType.getAssociation());
       }
-    }
+
+      void addProtocolConformanceDescriptor() {
+        TBD.addProtocolRequirementsBaseDescriptor(PD);
+      }
+
+      void addOutOfLineBaseProtocol(ProtocolDecl *proto) {
+        TBD.addBaseConformanceDescriptor(BaseConformance(PD, proto));
+      }
+
+      void addAssociatedConformance(AssociatedConformance associatedConf) {
+        TBD.addAssociatedConformanceDescriptor(associatedConf);
+      }
+
+      void addPlaceholder(MissingMemberDecl *decl) {}
+
+      void doIt() {
+        visitProtocolDecl(PD);
+      }
+    };
+
+    WitnessVisitor(*this, PD).doIt();
 
     // Include the self-conformance.
     addConformances(PD);
@@ -591,12 +914,12 @@ void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
 
   if (!ED->isResilient())
     return;
+}
 
-  // Emit resilient tags.
-  for (auto *elt : ED->getAllElements()) {
-    auto entity = LinkEntity::forEnumCase(elt);
-    addSymbol(entity);
-  }
+void TBDGenVisitor::visitEnumElementDecl(EnumElementDecl *EED) {
+  addSymbol(LinkEntity::forEnumCase(EED));
+  if (auto *PL = EED->getParameterList())
+    visitDefaultArguments(EED, PL);
 }
 
 void TBDGenVisitor::addFirstFileSymbols() {
@@ -606,48 +929,105 @@ void TBDGenVisitor::addFirstFileSymbols() {
   }
 }
 
-/// Converts a version tuple into a packed version, ignoring components beyond
-/// major, minor, and subminor.
-static tapi::internal::PackedVersion
-convertToPacked(const version::Version &version) {
-  // FIXME: Warn if version is greater than 3 components?
-  unsigned major = 0, minor = 0, subminor = 0;
-  if (version.size() > 0) major = version[0];
-  if (version.size() > 1) minor = version[1];
-  if (version.size() > 2) subminor = version[2];
-  return tapi::internal::PackedVersion(major, minor, subminor);
+void TBDGenVisitor::visit(Decl *D) {
+  DeclStack.push_back(D);
+  SWIFT_DEFER { DeclStack.pop_back(); };
+  ASTVisitor::visit(D);
+}
+
+/// The kind of version being parsed, used for diagnostics.
+/// Note: Must match the order in DiagnosticsFrontend.def
+enum DylibVersionKind_t: unsigned {
+  CurrentVersion,
+  CompatibilityVersion
+};
+
+/// Converts a version string into a packed version, truncating each component
+/// if necessary to fit all 3 into a 32-bit packed structure.
+///
+/// For example, the version '1219.37.11' will be packed as
+///
+///  Major (1,219)       Minor (37) Patch (11)
+/// ┌───────────────────┬──────────┬──────────┐
+/// │ 00001100 11000011 │ 00100101 │ 00001011 │
+/// └───────────────────┴──────────┴──────────┘
+///
+/// If an individual component is greater than the highest number that can be
+/// represented in its alloted space, it will be truncated to the maximum value
+/// that fits in the alloted space, which matches the behavior of the linker.
+static Optional<llvm::MachO::PackedVersion>
+parsePackedVersion(DylibVersionKind_t kind, StringRef versionString,
+                   ASTContext &ctx) {
+  if (versionString.empty())
+    return None;
+
+  llvm::MachO::PackedVersion version;
+  auto result = version.parse64(versionString);
+  if (!result.first) {
+    ctx.Diags.diagnose(SourceLoc(), diag::tbd_err_invalid_version,
+                       (unsigned)kind, versionString);
+    return None;
+  }
+  if (result.second) {
+    ctx.Diags.diagnose(SourceLoc(), diag::tbd_warn_truncating_version,
+                       (unsigned)kind, versionString);
+  }
+  return version;
 }
 
 static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
-  return LangOpts.EnableAppExtensionRestrictions;
+  // Existing linkers respect these flags to determine app extension safety.
+  return LangOpts.EnableAppExtensionRestrictions ||
+         llvm::sys::Process::GetEnv("LD_NO_ENCRYPT") ||
+         llvm::sys::Process::GetEnv("LD_APPLICATION_EXTENSION_SAFE");
 }
 
-static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
-                                           StringSet *symbols,
-                                           llvm::raw_ostream *os,
-                                           const TBDGenOptions &opts) {
-  auto &ctx = M->getASTContext();
-  auto isWholeModule = singleFile == nullptr;
-  const auto &target = ctx.LangOpts.Target;
-  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, false,
-                                isWholeModule);
-  auto availCtx = AvailabilityContext::forDeploymentTarget(ctx);
+static bool hasLinkerDirective(Decl *D) {
+  return !getAllMovedPlatformVersions(D).empty();
+}
 
-  tapi::internal::InterfaceFile file;
-  file.setFileType(tapi::internal::FileType::TBD_V3);
+llvm::Expected<TBDFileAndSymbols>
+GenerateTBDRequest::evaluate(Evaluator &evaluator,
+                             TBDGenDescriptor desc) const {
+  auto *M = desc.getParentModule();
+  auto &opts = desc.getOptions();
+
+  auto &ctx = M->getASTContext();
+  const auto &triple = ctx.LangOpts.Target;
+  UniversalLinkageInfo linkInfo(triple, opts.HasMultipleIGMs,
+                                /*forcePublicDecls*/ false);
+
+  llvm::MachO::InterfaceFile file;
+  file.setFileType(llvm::MachO::FileType::TBD_V3);
   file.setApplicationExtensionSafe(
     isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);
-  file.setCurrentVersion(convertToPacked(opts.CurrentVersion));
-  file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
   file.setTwoLevelNamespace();
-  file.setSwiftABIVersion(TAPI_SWIFT_ABI_VERSION);
-  file.setPlatform(tapi::internal::mapToSinglePlatform(target));
-  auto arch = tapi::internal::getArchType(target.getArchName());
-  file.setArch(arch);
-  file.setInstallAPI();
+  file.setSwiftABIVersion(irgen::getSwiftABIVersion());
+  file.setInstallAPI(opts.IsInstallAPI);
 
-  TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, availCtx, opts);
+  if (auto packed = parsePackedVersion(CurrentVersion,
+                                       opts.CurrentVersion, ctx)) {
+    file.setCurrentVersion(*packed);
+  }
+
+  if (auto packed = parsePackedVersion(CompatibilityVersion,
+                                       opts.CompatibilityVersion, ctx)) {
+    file.setCompatibilityVersion(*packed);
+  }
+
+  llvm::MachO::Target target(triple);
+  file.addTarget(target);
+  // Add target variant
+  if (ctx.LangOpts.TargetVariant.hasValue()) {
+    llvm::MachO::Target targetVar(*ctx.LangOpts.TargetVariant);
+    file.addTarget(targetVar);
+  }
+  StringSet symbols;
+  auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  TBDGenVisitor visitor(file, {target}, &symbols,
+                        clang->getTargetInfo().getDataLayout(),
+                        linkInfo, M, opts);
 
   auto visitFile = [&](FileUnit *file) {
     if (file == M->getFiles()[0]) {
@@ -659,41 +1039,60 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
 
     visitor.addMainIfNecessary(file);
 
-    for (auto d : decls)
+    for (auto d : decls) {
+      if (opts.LinkerDirectivesOnly && !hasLinkerDirective(d))
+        continue;
       visitor.visit(d);
+    }
   };
 
-  if (singleFile) {
+  if (auto *singleFile = desc.getSingleFile()) {
     assert(M == singleFile->getParentModule() && "mismatched file and module");
     visitFile(singleFile);
   } else {
-    for (auto *file : M->getFiles()) {
-      visitFile(file);
+    llvm::SmallVector<ModuleDecl*, 4> Modules;
+    Modules.push_back(M);
+    for (auto Name: opts.embedSymbolsFromModules) {
+      if (auto *MD = ctx.getModuleByName(Name)) {
+        // If it is a clang module, the symbols should be collected by TAPI.
+        if (!MD->isNonSwiftModule()) {
+          Modules.push_back(MD);
+          continue;
+        }
+      }
+      // Diagnose module name that cannot be found
+      ctx.Diags.diagnose(SourceLoc(), diag::unknown_swift_module_name, Name);
     }
+    // Collect symbols in each module.
+    llvm::for_each(Modules, [&](ModuleDecl *M) {
+      for (auto *file : M->getFiles()) {
+        visitFile(file);
+      }
+    });
   }
 
-  if (os) {
-    tapi::internal::YAMLWriter writer;
-    writer.add(
-        llvm::make_unique<tapi::internal::stub::v3::YAMLDocumentHandler>());
-
-    assert(writer.canWrite(&file) &&
-           "YAML writer should be able to write TBD v3");
-    llvm::cantFail(writer.writeFile(*os, &file),
-                   "YAML writing should be error-free");
-  }
+  return std::make_pair(std::move(file), std::move(symbols));
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
                                    const TBDGenOptions &opts) {
-  enumeratePublicSymbolsAndWrite(file->getParentModule(), file, &symbols,
-                                 nullptr, opts);
+  assert(symbols.empty() && "Additive symbol enumeration not supported");
+  auto &evaluator = file->getASTContext().evaluator;
+  auto desc = TBDGenDescriptor::forFile(file, opts);
+  symbols = llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
 }
 void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
                                    const TBDGenOptions &opts) {
-  enumeratePublicSymbolsAndWrite(M, nullptr, &symbols, nullptr, opts);
+  assert(symbols.empty() && "Additive symbol enumeration not supported");
+  auto &evaluator = M->getASTContext().evaluator;
+  auto desc = TBDGenDescriptor::forModule(M, opts);
+  symbols = llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                          const TBDGenOptions &opts) {
-  enumeratePublicSymbolsAndWrite(M, nullptr, nullptr, &os, opts);
+  auto &evaluator = M->getASTContext().evaluator;
+  auto desc = TBDGenDescriptor::forModule(M, opts);
+  auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc})).first;
+  llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(os, file),
+                 "YAML writing should be error-free");
 }

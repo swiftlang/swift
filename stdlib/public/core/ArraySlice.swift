@@ -249,7 +249,7 @@ extension ArraySlice: _ArrayProtocol {
   ///
   ///     numbers.append(contentsOf: stride(from: 60, through: 100, by: 10))
   ///     // numbers.count == 10
-  ///     // numbers.capacity == 12
+  ///     // numbers.capacity == 10
   @inlinable
   public var capacity: Int {
     return _getCapacity()
@@ -953,7 +953,10 @@ extension ArraySlice: RangeReplaceableCollection {
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
 
-    _buffer.count += writtenCount
+    // This check prevents a data race writing to _swiftEmptyArrayStorage
+    if writtenCount > 0 {
+      _buffer.count += writtenCount
+    }
 
     if writtenUpTo == buf.endIndex {
       // there may be elements that didn't fit in the existing buffer,

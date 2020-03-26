@@ -61,6 +61,10 @@ extension C12 : P1 {
         <#code#>
     }
 
+    func foo1() {
+        <#code#>
+    }
+
   func foo1() {}
 }
 extension C12 : P2 {

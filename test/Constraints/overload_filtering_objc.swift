@@ -19,10 +19,6 @@ import Foundation
 }
 
 func testOptional(obj: P) {
-  // FIXME: When we remove argument-label filtering from member name lookup,
-  // this will start failing and need to be replaced with "disabled disjunction
-  // term".
-  //
-  // CHECK-NOT: disjunction
+  // CHECK: disabled disjunction term $T2 bound to decl overload_filtering_objc.(file).P.opt(double:)
   _ = obj.opt?(1)
 }

@@ -59,8 +59,7 @@ class A {
     }
   }
   
-  // FIXME(SR-10323): The second note is wrong; it should be "potential overridden class subscript 'subscript(_:)' here". This is a preexisting bug.
-  class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{attempt to override subscript here}}
+  class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden class subscript 'subscript(_:)' here}}
     get {
       return "hello"
     }
@@ -144,8 +143,7 @@ class B : A {
     }
   }
   
-  // FIXME(SR-10323): This error is wrong; it should be "subscript does not override any subscript from its superclass". This is a preexisting bug.
-  override class subscript (i: Int) -> String { // expected-error{{cannot override mutable subscript of type '(Int) -> String' with covariant type '(String) -> String'}}
+  override class subscript (i: Int) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
     get {
       return "hello"
     }
@@ -581,6 +579,68 @@ class SR_4206_DerivedGeneric_6<T>: SR_4206_BaseConcrete_6 {
   override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{overridden method 'foo' has generic signature <T, T where T : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_2>; expected generic signature to be <T, T where T : SR_4206_Protocol_2>}}
 }
 
+// Contextual where clauses on non-generic members
+
+class SR_4206_Base_7<T> {
+  func foo1() where T: SR_4206_Protocol_1 {} // expected-note {{overridden declaration is here}}
+  func foo2() where T: SR_4206_Protocol_1 {}
+}
+
+class SR_4206_Derived_7<T>: SR_4206_Base_7<T> {
+  override func foo1() where T: SR_4206_Protocol_2 {} // expected-error {{overridden method 'foo1' has generic signature <T where T : SR_4206_Protocol_2> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_1>; expected generic signature to be <T where τ_0_0 : SR_4206_Protocol_1>}}
+
+  override func foo2() {} // OK
+}
+
+// Subclass with new constraint on inherited generic param
+
+class SR_4206_Base_8<T> {
+  func foo() where T: SR_4206_Protocol_1 {}
+}
+class SR_4206_Derived_8<T: SR_4206_Protocol_2, U>: SR_4206_Base_8<T> {
+  // Because the generic signature of foo() is the same either way,
+  // it may seem confusing that placing an additional constraint on the
+  // generic parameter declaration directly has a different effect on
+  // overridability in contrast to placing the constraint on foo().
+  // The former (unlike the latter) is accepted because the constraint
+  // in question only affects the ability to initialize an instance of the
+  // subclass — not the visibility of the override itself relative to an
+  // existing instance.
+  override func foo() where T: SR_4206_Protocol_1 {} // OK
+}
+
+// Same-type to conformance visibility reabstraction
+
+class SR_4206_Base_9<T> {
+  func foo() where T == Int {}
+}
+class SR_4206_Derived_9<T>: SR_4206_Base_9<T> {
+  override func foo() where T: FixedWidthInteger {} // OK
+}
+
+// Override with constraint on a non-inherited generic param
+
+class SR_4206_Base_10<T> {
+  func foo() where T: SR_4206_Protocol_1 {} // expected-note {{overridden declaration is here}}
+}
+class SR_4206_Derived_10<T, U>: SR_4206_Base_10<T> {
+  override func foo() where U: SR_4206_Protocol_1 {} // expected-error {{overridden method 'foo' has generic signature <T, U where U : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_1>; expected generic signature to be <T, U where τ_0_0 : SR_4206_Protocol_1>}}
+}
+
+// Override with return type specialization
+
+class SR_4206_Base_11<T> {
+  // The fact that the return type matches the substitution
+  // for T must hold across overrides.
+  func foo() -> T where T: FixedWidthInteger { fatalError() } // expected-note {{potential overridden instance method 'foo()' here}}
+}
+class SR_4206_Derived_11: SR_4206_Base_11<Int> {
+  override func foo() -> Int { return .zero } // OK
+}
+class SR_4206_Derived2_11: SR_4206_Base_11<Bool> {
+  override func foo() -> Int { return .zero } // expected-error {{method does not override any method from its superclass}}
+}
+
 // Misc //
 
 protocol SR_4206_Key {}
@@ -596,4 +656,54 @@ class SR_4206_Base<Key: SR_4206_Key> {
 class SR_4206_Derived<C: SR_4206_Container> : SR_4206_Base<C.Key> {
   typealias Key = C.Key
   override func foo(forKey key: Key) throws {} // Okay, no generic signature mismatch
+}
+
+// SR-10198
+
+class SR_10198_Base {
+  func a<T>(_ val: T) -> String { return "not equatable" }
+  func a<T: Equatable>(_ val: T) -> String { return "equatable" }
+}
+
+class SR_10198_Derived: SR_10198_Base {
+  override func a<T>(_ val: T) -> String { return super.a(val) } // okay
+  override func a<T: Equatable>(_ val: T) -> String { return super.a(val) } // okay
+}
+
+protocol SR_10198_Base_P {
+  associatedtype Bar
+}
+
+struct SR_10198_Base_S: SR_10198_Base_P {
+  typealias Bar = Int
+}
+
+class SR_10198_Base_1 {
+  init<F: SR_10198_Base_P>(_ arg: F) where F.Bar == Int {}
+}
+
+class SR_10198_Derived_1: SR_10198_Base_1 {
+  init(_ arg1: Int) { super.init(SR_10198_Base_S()) } // okay, doesn't crash
+}
+
+// SR-11740
+
+public class SR_11740_Base<F, A> {}
+
+public class SR_11740_Derived<F, A>
+  : SR_11740_Base<SR_11740_Base<F, A>, A>,
+    SR_11740_Q {}
+
+public protocol SR_11740_P {}
+
+public protocol SR_11740_Q: SR_11740_P {
+    associatedtype A
+}
+
+public extension SR_11740_Base where F: SR_11740_Q {
+    static func foo(_: F.A) {}
+}
+
+extension SR_11740_Derived where F: SR_11740_P {
+    public static func foo(_: A) {}
 }

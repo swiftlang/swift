@@ -117,14 +117,14 @@ struct ValueOwnershipKind {
     /// instruction exactly once along any path through the program.
     Guaranteed,
 
-    /// A SILValue with Any ownership kind is an independent value outside of
+    /// A SILValue with None ownership kind is an independent value outside of
     /// the ownership system. It is used to model trivially typed values as well
-    /// as trivial cases of non-trivial enums. Naturally Any can be merged with
+    /// as trivial cases of non-trivial enums. Naturally None can be merged with
     /// any ValueOwnershipKind allowing us to naturally model merge and branch
     /// points in the SSA graph.
-    Any,
+    None,
 
-    LastValueOwnershipKind = Any,
+    LastValueOwnershipKind = None,
   } Value;
 
   using UnderlyingType = std::underlying_type<innerty>::type;
@@ -167,7 +167,7 @@ struct ValueOwnershipKind {
   /// kinds.
   UseLifetimeConstraint getForwardingLifetimeConstraint() const {
     switch (Value) {
-    case ValueOwnershipKind::Any:
+    case ValueOwnershipKind::None:
     case ValueOwnershipKind::Guaranteed:
     case ValueOwnershipKind::Unowned:
       return UseLifetimeConstraint::MustBeLive;
@@ -181,14 +181,14 @@ struct ValueOwnershipKind {
   /// that the two ownership kinds are "compatibile".
   ///
   /// The reason why we do not compare directy is to allow for
-  /// ValueOwnershipKind::Any to merge into other forms of ValueOwnershipKind.
+  /// ValueOwnershipKind::None to merge into other forms of ValueOwnershipKind.
   bool isCompatibleWith(ValueOwnershipKind other) const {
     return merge(other).hasValue();
   }
 
   template <typename RangeTy>
   static Optional<ValueOwnershipKind> merge(RangeTy &&r) {
-    auto initial = Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
+    auto initial = Optional<ValueOwnershipKind>(ValueOwnershipKind::None);
     return accumulate(
         std::forward<RangeTy>(r), initial,
         [](Optional<ValueOwnershipKind> acc, ValueOwnershipKind x) {
@@ -197,6 +197,8 @@ struct ValueOwnershipKind {
           return acc.getValue().merge(x);
         });
   }
+
+  StringRef asString() const;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ValueOwnershipKind Kind);
@@ -270,8 +272,42 @@ public:
   /// otherwise.
   inline Operand *getSingleUse() const;
 
+  /// Returns .some(single user) if this value is non-trivial, we are in ossa,
+  /// and it has a single consuming user. Returns .none otherwise.
+  inline Operand *getSingleConsumingUse() const;
+
   template <class T>
   inline T *getSingleUserOfType() const;
+
+  template <class T> inline T *getSingleConsumingUserOfType() const;
+
+  /// Returns true if this operand has exactly two.
+  ///
+  /// This is useful if one has found a predefined set of 2 unique users and
+  /// wants to check if there are any other users without iterating over the
+  /// entire use list.
+  inline bool hasTwoUses() const;
+
+  /// Helper struct for DowncastUserFilterRange
+  struct UseToUser;
+
+  template <typename Subclass>
+  using DowncastUserFilterRange =
+      DowncastFilterRange<Subclass,
+                          iterator_range<llvm::mapped_iterator<
+                              use_iterator, UseToUser, SILInstruction *>>>;
+
+  /// Iterate over the use list of this ValueBase visiting all users that are of
+  /// class T.
+  ///
+  /// Example:
+  ///
+  ///   ValueBase *v = ...;
+  ///   for (CopyValueInst *cvi : v->getUsersOfType<CopyValueInst>()) { ... }
+  ///
+  /// NOTE: Uses llvm::dyn_cast internally.
+  template <typename T>
+  inline DowncastUserFilterRange<T> getUsersOfType() const;
 
   /// Return the instruction that defines this value, or null if it is
   /// not defined by an instruction.
@@ -364,6 +400,18 @@ public:
           NumLowBitsAvailable
   };
 
+  /// If this SILValue is a result of an instruction, return its
+  /// defining instruction. Returns nullptr otherwise.
+  SILInstruction *getDefiningInstruction() {
+    return Value->getDefiningInstruction();
+  }
+
+  /// If this SILValue is a result of an instruction, return its
+  /// defining instruction. Returns nullptr otherwise.
+  const SILInstruction *getDefiningInstruction() const {
+    return Value->getDefiningInstruction();
+  }
+
   /// Returns the ValueOwnershipKind that describes this SILValue's ownership
   /// semantics if the SILValue has ownership semantics. Returns is a value
   /// without any Ownership Semantics.
@@ -414,7 +462,7 @@ struct OperandOwnershipKindMap {
 
   /// Return the OperandOwnershipKindMap that tests for compatibility with
   /// ValueOwnershipKind kind. This means that it will accept a element whose
-  /// ownership is ValueOwnershipKind::Any.
+  /// ownership is ValueOwnershipKind::None.
   static OperandOwnershipKindMap
   compatibilityMap(ValueOwnershipKind kind, UseLifetimeConstraint constraint) {
     OperandOwnershipKindMap set;
@@ -484,7 +532,7 @@ struct OperandOwnershipKindMap {
 
   void addCompatibilityConstraint(ValueOwnershipKind kind,
                                   UseLifetimeConstraint constraint) {
-    add(ValueOwnershipKind::Any, UseLifetimeConstraint::MustBeLive);
+    add(ValueOwnershipKind::None, UseLifetimeConstraint::MustBeLive);
     add(kind, constraint);
   }
 
@@ -497,7 +545,7 @@ struct OperandOwnershipKindMap {
   UseLifetimeConstraint getLifetimeConstraint(ValueOwnershipKind kind) const;
 
   void print(llvm::raw_ostream &os) const;
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in a debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -550,6 +598,9 @@ public:
   /// Operands are not copyable.
   Operand(const Operand &use) = delete;
   Operand &operator=(const Operand &use) = delete;
+
+  Operand(Operand &&) = default;
+  Operand &operator=(Operand &&) = default;
 
   /// Return the current value being used by this operand.
   SILValue get() const { return TheValue; }
@@ -605,6 +656,21 @@ public:
   /// will be removed once borrow scoping is checked by the normal verifier.
   OperandOwnershipKindMap
   getOwnershipKindMap(bool isForwardingSubValue = false) const;
+
+  /// Returns true if this operand acts as a use that consumes its associated
+  /// value.
+  bool isConsumingUse() const {
+    // Type dependent uses can never be consuming and do not have valid
+    // ownership maps since they do not participate in the ownership system.
+    if (isTypeDependent())
+      return false;
+    auto map = getOwnershipKindMap();
+    auto constraint = map.getLifetimeConstraint(get().getOwnershipKind());
+    return constraint == UseLifetimeConstraint::MustBeInvalidated;
+  }
+
+  SILBasicBlock *getParentBlock() const;
+  SILFunction *getParentFunction() const;
 
 private:
   void removeFromCurrent() {
@@ -702,17 +768,67 @@ inline Operand *ValueBase::getSingleUse() const {
   return Op;
 }
 
-template <class T>
-inline T *ValueBase::getSingleUserOfType() const {
-  T *Result = nullptr;
-  for (auto *Op : getUses()) {
-    if (auto *Tmp = dyn_cast<T>(Op->getUser())) {
-      if (Result)
+inline Operand *ValueBase::getSingleConsumingUse() const {
+  Operand *result = nullptr;
+  for (auto *op : getUses()) {
+    if (op->isConsumingUse()) {
+      if (result) {
         return nullptr;
-      Result = Tmp;
+      }
+      result = op;
     }
   }
-  return Result;
+  return result;
+}
+
+inline bool ValueBase::hasTwoUses() const {
+  auto iter = use_begin(), end = use_end();
+  for (unsigned i = 0; i < 2; ++i) {
+    if (iter == end)
+      return false;
+    ++iter;
+  }
+  return iter == end;
+}
+
+template <class T>
+inline T *ValueBase::getSingleUserOfType() const {
+  T *result = nullptr;
+  for (auto *op : getUses()) {
+    if (auto *tmp = dyn_cast<T>(op->getUser())) {
+      if (result)
+        return nullptr;
+      result = tmp;
+    }
+  }
+  return result;
+}
+
+template <class T> inline T *ValueBase::getSingleConsumingUserOfType() const {
+  auto *op = getSingleConsumingUse();
+  if (!op)
+    return nullptr;
+
+  return dyn_cast<T>(op->getUser());
+}
+
+struct ValueBase::UseToUser {
+  SILInstruction *operator()(const Operand *use) const {
+    return const_cast<SILInstruction *>(use->getUser());
+  }
+  SILInstruction *operator()(const Operand &use) const {
+    return const_cast<SILInstruction *>(use.getUser());
+  }
+  SILInstruction *operator()(Operand *use) { return use->getUser(); }
+  SILInstruction *operator()(Operand &use) { return use.getUser(); }
+};
+
+template <typename T>
+inline ValueBase::DowncastUserFilterRange<T> ValueBase::getUsersOfType() const {
+  auto begin = llvm::map_iterator(use_begin(), UseToUser());
+  auto end = llvm::map_iterator(use_end(), UseToUser());
+  auto transformRange = llvm::make_range(begin, end);
+  return makeDowncastFilterRange<T>(transformRange);
 }
 
 /// A constant-size list of the operands of an instruction.

@@ -28,10 +28,8 @@
 #if canImport(CoreGraphics)
   let square = CGRect(x: 100, y: 100, width: 100, height: 100)
   // expected-error@-1 {{use of unresolved identifier 'CGRect'}}
-  // expected-note@-2 {{'square' declared here}}
 
   let (r, s) = square.divided(atDistance: 50, from: .minXEdge)
-  // expected-error@-1 {{ambiguous use of 'square'}}
 #endif
 
 #if canImport(MixedWithHeader)

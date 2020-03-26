@@ -26,6 +26,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/RecordLayout.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
@@ -74,7 +75,8 @@ namespace {
     }
     
     SILType getType(IRGenModule &IGM, SILType T) const {
-      return T.getFieldType(Field, IGM.getSILModule());
+      return T.getFieldType(Field, IGM.getSILModule(),
+                            IGM.getMaximalTypeExpansionContext());
     }
   };
 
@@ -95,7 +97,8 @@ namespace {
 
     SILType getType(IRGenModule &IGM, SILType T) const {
       if (Field)
-        return T.getFieldType(Field, IGM.getSILModule());
+        return T.getFieldType(Field, IGM.getSILModule(),
+                              IGM.getMaximalTypeExpansionContext());
 
       // The Swift-field-less cases use opaque storage, which is
       // guaranteed to ignore the type passed to it.
@@ -185,6 +188,7 @@ namespace {
       switch (fieldInfo.getKind()) {
       case ElementLayout::Kind::Fixed:
       case ElementLayout::Kind::Empty:
+      case ElementLayout::Kind::EmptyTailAllocatedCType:
         return MemberAccessStrategy::getDirectFixed(
                                                fieldInfo.getFixedByteOffset());
       case ElementLayout::Kind::InitialNonFixedSize:
@@ -215,7 +219,7 @@ namespace {
         return false;
       return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
     }
-    
+       
     void verify(IRGenTypeVerifierFunction &IGF,
                 llvm::Value *metadata,
                 SILType structType) const override {
@@ -278,6 +282,7 @@ namespace {
           break;
         }
         case ElementLayout::Kind::Empty:
+        case ElementLayout::Kind::EmptyTailAllocatedCType:
         case ElementLayout::Kind::InitialNonFixedSize:
         case ElementLayout::Kind::NonFixed:
           continue;
@@ -303,6 +308,11 @@ namespace {
                            align, IsPOD, IsFixedSize),
         ClangDecl(clangDecl)
     {
+    }
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -354,6 +364,11 @@ namespace {
       }
     }
 
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
+
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address addr, SILType T,
                               bool isOutlined) const override {
@@ -387,6 +402,12 @@ namespace {
                            fields, T, size, std::move(spareBits), align,
                            isPOD, isBT, alwaysFixedSize)
     {}
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    }
+
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
       return None;
     }
@@ -409,17 +430,14 @@ namespace {
     }
     
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
-      // TODO: do this with StructMetadataLayout::getFieldOffset
-
-      // Get the field offset vector from the struct metadata.
+      auto &layout =
+          IGF.IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct());
+      auto offset = layout.getFieldOffset(
+          IGF, layout.getDecl()->getStoredProperties()[index]);
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
-      Address fieldVector = emitAddressOfFieldOffsetVector(IGF, metadata,
-                                    TheStruct.getStructOrBoundGenericStruct());
-      
-      // Grab the indexed offset.
-      fieldVector = IGF.Builder.CreateConstArrayGEP(fieldVector, index,
-                                                    IGF.IGM.getPointerSize());
-      return IGF.Builder.CreateLoad(fieldVector);
+      auto field = IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.Int32Ty,
+                                           IGF.IGM.getPointerAlignment());
+      return IGF.Builder.CreateLoad(field);
     }
 
     MemberAccessStrategy getFieldAccessStrategy(IRGenModule &IGM,
@@ -452,6 +470,28 @@ namespace {
       : StructTypeInfoBase(StructTypeInfoKind::NonFixedStructTypeInfo,
                            fields, fieldsAccessible,
                            T, align, isPOD, isBT, structAccessible) {
+    }
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      if (!areFieldsABIAccessible()) {
+        return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+      }
+
+      std::vector<TypeLayoutEntry *> fields;
+      for (auto &field : getFields()) {
+        auto fieldTy = field.getType(IGM, T);
+        fields.push_back(
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+      }
+      assert(!fields.empty() &&
+             "Empty structs should not be NonFixedStructTypeInfo");
+
+      if (fields.size() == 1) {
+        return fields[0];
+      }
+
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1, false);
     }
 
     // We have an indirect schema.
@@ -590,7 +630,9 @@ namespace {
     SILType getType(VarDecl *field) {
       assert(field->getDeclContext() == TheStruct->getAnyNominal());
       auto silType = SILType::getPrimitiveAddressType(TheStruct);
-      return silType.getFieldType(field, IGM.getSILModule());
+      return silType.getFieldType(
+          field, IGM.getSILModule(),
+          IGM.getMaximalTypeExpansionContext());
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
@@ -731,8 +773,9 @@ private:
 
     // If we have a Swift import of this type, use our lowered information.
     if (swiftField) {
-      auto &fieldTI = cast<LoadableTypeInfo>(
-        IGM.getTypeInfo(SwiftType.getFieldType(swiftField, IGM.getSILModule())));
+      auto &fieldTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(
+          SwiftType.getFieldType(swiftField, IGM.getSILModule(),
+                                 IGM.getMaximalTypeExpansionContext())));
       addField(swiftField, offset, fieldTI);
       return;
     }
@@ -789,7 +832,8 @@ private:
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
     auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
     if (isEmpty)
-      layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal));
+      layout.completeEmptyTailAllocatedCType(
+          fieldType.isPOD(ResilienceExpansion::Maximal), NextOffset);
     else
       layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());
@@ -904,6 +948,11 @@ namespace {
     ResilientStructTypeInfo(llvm::Type *T, IsABIAccessible_t abiAccessible)
       : ResilientTypeInfo(T, abiAccessible) {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
+    }
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
     }
   };
 } // end anonymous namespace

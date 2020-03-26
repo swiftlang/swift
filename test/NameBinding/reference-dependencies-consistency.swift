@@ -10,6 +10,6 @@
 // RUN: echo 'fileprivate var v: String { return "\(x)" }; fileprivate let x = "a"' >%t/1.swift
 // RUN: echo 'fileprivate var v: String { return "\(x)" }; fileprivate let x = "a"' >%t/2.swift
 //
-// RUN:  %target-swift-frontend -typecheck -primary-file %t/1.swift -primary-file %t/2.swift -emit-reference-dependencies-path %t/1.swiftdeps -emit-reference-dependencies-path %t/2.swiftdeps
+// RUN:  %target-swift-frontend -disable-fine-grained-dependencies -typecheck -primary-file %t/1.swift -primary-file %t/2.swift -emit-reference-dependencies-path %t/1.swiftdeps -emit-reference-dependencies-path %t/2.swiftdeps
 //
 // RUN: cmp -s %t/1.swiftdeps %t/2.swiftdeps

@@ -129,7 +129,7 @@ func genericFunction<T>(t: T) {
   class First : Second<T>.UnknownType { }
   // expected-error@-1 {{type 'First' cannot be nested in generic function 'genericFunction(t:)'}}
   // expected-error@-2 {{'UnknownType' is not a member type of 'Second<T>'}}
-  class Second<T> : Second { }
+  class Second<T> : Second { } // expected-note{{'Second' declared here}}
   // expected-error@-1 {{type 'Second' cannot be nested in generic function 'genericFunction(t:)'}}
   // expected-error@-2 {{'Second' inherits from itself}}
 }

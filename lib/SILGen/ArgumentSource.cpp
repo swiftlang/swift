@@ -78,9 +78,11 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
 
 ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
                                               AbstractionPattern origFormalType,
+                                              SILType loweredTy,
                                               SGFContext C) && {
   auto substFormalType = getSubstRValueType();
-  auto conversion = Conversion::getSubstToOrig(origFormalType, substFormalType);
+  auto conversion =
+    Conversion::getSubstToOrig(origFormalType, substFormalType, loweredTy);
   return std::move(*this).getConverted(SGF, conversion, C);
 }
 
@@ -209,6 +211,7 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF,
   SILLocation loc = getLocation();
   ManagedValue outputValue =
       std::move(*this).getAsSingleValue(SGF, origFormalType,
+                                        destTL.getLoweredType(),
                                         SGFContext(dest));
 
   if (outputValue.isInContext()) return;

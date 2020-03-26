@@ -8,8 +8,9 @@
 -Xlinker
 --defsym=__import_pthread_key_create=pthread_key_create
 -lpthread
--latomic
 -licui18n
 -licuuc
 -licudata
 -ldl
+-lstdc++
+-lm

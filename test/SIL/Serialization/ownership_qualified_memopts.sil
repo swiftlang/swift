@@ -2,12 +2,32 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name ownership_qualified_memopts
 // RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name ownership_qualified_memopts
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name ownership_qualified_memopts | %FileCheck %s
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name ownership_qualified_memopts -emit-sorted-sil | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 
+
+// CHECK-LABEL: sil [serialized] [ossa] @non_trivial : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : @owned $Builtin.NativeObject):
+// CHECK: [[ARG1_VAL:%.*]] = load [copy] [[ARG1]] : $*Builtin.NativeObject
+// CHECK: [[ARG1_VAL_2:%.*]] = load [take] [[ARG1]] : $*Builtin.NativeObject
+// CHECK: store [[ARG1_VAL]] to [init] [[ARG1]] : $*Builtin.NativeObject
+// CHECK: store [[ARG2]] to [assign] [[ARG1]] : $*Builtin.NativeObject
+// CHECK: destroy_value [[ARG1_VAL_2]]
+// CHECK: } // end sil function 'non_trivial'
+sil [serialized] [ossa] @non_trivial : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %2 = load [copy] %0 : $*Builtin.NativeObject
+  %3 = load [take] %0 : $*Builtin.NativeObject
+  store %2 to [init] %0 : $*Builtin.NativeObject
+  store %1 to [assign] %0 : $*Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  destroy_addr %0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
 
 // CHECK-LABEL: sil [serialized] [ossa] @trivial_args : $@convention(thin) (@in Builtin.Int32, Builtin.Int32) -> () {
 // CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.Int32, [[ARG2:%[0-9]+]] : $Builtin.Int32):
@@ -19,23 +39,4 @@ bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
   store %1 to [trivial] %0 : $*Builtin.Int32
   %2 = tuple()
   return %2 : $()
-}
-
-// CHECK-LABEL: sil [serialized] [ossa] @non_trivial : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
-// CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : @owned $Builtin.NativeObject):
-// CHECK: [[ARG1_VAL:%.*]] = load [take] [[ARG1]] : $*Builtin.NativeObject
-// CHECK: [[ARG1_VAL_2:%.*]] = load [copy] [[ARG1]] : $*Builtin.NativeObject
-// CHECK: store [[ARG1_VAL]] to [init] [[ARG1]] : $*Builtin.NativeObject
-// CHECK: store [[ARG2]] to [assign] [[ARG1]] : $*Builtin.NativeObject
-// CHECK: destroy_value [[ARG1_VAL_2]]
-// CHECK: } // end sil function 'non_trivial'
-sil [serialized] [ossa] @non_trivial : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
-  %2 = load [take] %0 : $*Builtin.NativeObject
-  %3 = load [copy] %0 : $*Builtin.NativeObject
-  store %2 to [init] %0 : $*Builtin.NativeObject
-  store %1 to [assign] %0 : $*Builtin.NativeObject
-  destroy_value %3 : $Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
 }

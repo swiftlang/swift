@@ -17,7 +17,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
@@ -111,8 +111,7 @@ public:
   /// invalidating parts of the call graph.
   const FunctionInfo &getFunctionInfo(SILFunction *f) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Print the state of the caller analysis as a sequence of yaml documents for
   /// each callee we are tracking.
@@ -120,9 +119,7 @@ public:
 
   /// Print the state of the caller analysis as a sequence of yaml documents for
   /// each callee we are tracking to the passed in file path.
-  LLVM_ATTRIBUTE_DEPRECATED(void print(const char *filePath)
-                                const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMPER(print(const char *filePath));
 
   void verify() const override;
   void verify(SILFunction *f) const override;
@@ -278,6 +275,10 @@ class CallerAnalysis::FunctionInfo {
   /// visibility of a protocol conformance or class.
   bool mayHaveIndirectCallers : 1;
 
+  /// Whether the function is sufficiently visible to be called by a different
+  /// module.
+  bool mayHaveExternalCallers : 1;
+
 public:
   FunctionInfo(SILFunction *f);
 
@@ -289,7 +290,8 @@ public:
   /// function (e.g. a specialized function) without needing to introduce a
   /// thunk since we can rewrite all of the callers to call the new function.
   bool foundAllCallers() const {
-    return hasOnlyCompleteDirectCallerSets() && !mayHaveIndirectCallers;
+    return hasOnlyCompleteDirectCallerSets() && !mayHaveIndirectCallers &&
+           !mayHaveExternalCallers;
   }
 
   /// Returns true if this function has at least one direct caller.
@@ -344,8 +346,7 @@ public:
     return llvm::make_range(callerStates.begin(), callerStates.end());
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   void print(llvm::raw_ostream &os) const;
 };

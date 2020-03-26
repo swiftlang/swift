@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-sil %s -emit-sib -o %t/Library.sib -module-name Library -I %S/Inputs/good-modules -parse-stdlib
-// RUN: %target-sil-opt %t/Library.sib -I %S/Inputs/good-modules | %FileCheck %s
-// RUN: %target-sil-opt %t/Library.sib -I %S/Inputs/bad-modules | %FileCheck -check-prefix=CHECK-RECOVERY %s
-// RUN: %target-sil-opt %t/Library.sib -I %S/Inputs/bad-modules | %FileCheck -check-prefix=CHECK-RECOVERY-NEGATIVE %s
+// RUN: %target-sil-opt %t/Library.sib -I %S/Inputs/good-modules -emit-sorted-sil | %FileCheck %s
+// RUN: %target-sil-opt %t/Library.sib -I %S/Inputs/bad-modules -emit-sorted-sil | %FileCheck -check-prefix=CHECK-RECOVERY %s
+// RUN: %target-sil-opt %t/Library.sib -I %S/Inputs/bad-modules -emit-sorted-sil | %FileCheck -check-prefix=CHECK-RECOVERY-NEGATIVE %s
 
 // CHECK-LABEL: sil_stage raw
 // CHECK-RECOVERY-LABEL: sil_stage raw
@@ -13,7 +13,7 @@ import Types
 // CHECK-LABEL: sil @missingParam : $@convention(thin) (SoonToBeMissing) -> () {
 // CHECK-RECOVERY-NEGATIVE-NOT: sil [ossa] @missingParam
 sil [ossa] @missingParam : $@convention(thin) (SoonToBeMissing) -> () {
-entry(%arg : @unowned $SoonToBeMissing):
+entry(%arg : $SoonToBeMissing):
   %9999 = tuple()
   return %9999 : $()
 }

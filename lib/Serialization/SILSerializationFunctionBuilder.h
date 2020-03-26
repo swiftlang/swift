@@ -33,6 +33,10 @@ public:
         IsNotSerialized, IsNotDynamic, ProfileCounter(), IsNotThunk,
         SubclassScope::NotApplicable);
   }
+
+  void setHasOwnership(SILFunction *f, bool newValue) {
+    builder.setHasOwnership(f, newValue);
+  }
 };
 
 } // namespace swift

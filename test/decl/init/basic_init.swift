@@ -10,8 +10,7 @@ class C {
 	init() {}
 }
 
-typealias t = t // expected-error {{type alias 't' references itself}}
-// expected-note@-1{{type declared here}}
+typealias t = t // expected-error {{type alias 't' references itself}} expected-note {{through reference here}}
 
 extension Foo {
   convenience init() {} // expected-error{{invalid redeclaration of synthesized 'init()'}}
@@ -23,13 +22,15 @@ class InitClass {
   @objc dynamic init(bar: Int) {}
 }
 class InitSubclass: InitClass {}
-// expected-error@-1 {{'init(bar:)' has already been overridden}}
-// expected-error@-2 {{'init(baz:)' has already been overridden}}
+// expected-note@-1{{'init(baz:)' previously overridden here}}
+// expected-note@-2{{'init(bar:)' previously overridden here}}
 extension InitSubclass {
   convenience init(arg: Bool) {} // expected-error{{overriding non-@objc declarations from extensions is not supported}}
-  convenience override init(baz: Int) {} // expected-note{{'init(baz:)' previously overridden here}}
-  // expected-error@-1 {{cannot override a non-dynamic class declaration from an extension}}
-  convenience override init(bar: Int) {} // expected-note{{'init(bar:)' previously overridden here}}
+  convenience override init(baz: Int) {}
+  // expected-error@-1 {{'init(baz:)' has already been overridden}}
+  // expected-error@-2 {{cannot override a non-dynamic class declaration from an extension}}
+  convenience override init(bar: Int) {}
+  // expected-error@-1 {{'init(bar:)' has already been overridden}}
 }
 
 struct InitStruct {

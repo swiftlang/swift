@@ -29,7 +29,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   {
     auto SILGenName = gDecl->getAttrs().getAttribute<SILGenNameAttr>();
     if (SILGenName && !SILGenName->Name.empty()) {
-      mangledName = SILGenName->Name;
+      mangledName = SILGenName->Name.str();
     } else {
       Mangle::ASTMangler NewMangler;
       mangledName = NewMangler.mangleGlobalVariableFull(gDecl);
@@ -126,9 +126,8 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
     // Find Builtin.once.
     auto &C = SGM.M.getASTContext();
     SmallVector<ValueDecl*, 2> found;
-    C.TheBuiltinModule
-      ->lookupValue({}, C.getIdentifier("once"),
-                    NLKind::QualifiedLookup, found);
+    C.TheBuiltinModule->lookupValue(C.getIdentifier("once"),
+                                    NLKind::QualifiedLookup, found);
 
     assert(found.size() == 1 && "didn't find Builtin.once?!");
 

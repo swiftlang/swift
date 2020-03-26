@@ -17,12 +17,11 @@
 #ifndef SWIFT_BASIC_FLAGGEDPOINTER_H
 #define SWIFT_BASIC_FLAGGEDPOINTER_H
 
+#include <algorithm>
 #include <cassert>
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
-
-#include "Algorithm.h"
 
 namespace swift {
 
@@ -170,7 +169,7 @@ public:
   enum {
     NumLowBitsAvailable = (BitPosition >= PtrTraits::NumLowBitsAvailable)
       ? PtrTraits::NumLowBitsAvailable
-      : (swift::min(int(BitPosition + 1),
+      : (std::min(int(BitPosition + 1),
         int(PtrTraits::NumLowBitsAvailable)) - 1)
   };
 };

@@ -14,4 +14,12 @@
 //  TypeID zone, for use with the TypeID template.
 //
 //===----------------------------------------------------------------------===//
-SWIFT_TYPEID(IsDeclApplicableRequest)
+
+SWIFT_REQUEST(IDETypeChecking, IsDeclApplicableRequest,
+              bool(DeclApplicabilityOwner), Cached, NoLocationInfo)
+SWIFT_REQUEST(IDETypeChecking, RootAndResultTypeOfKeypathDynamicMemberRequest,
+              TypePair(SubscriptDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(IDETypeChecking, RootTypeOfKeypathDynamicMemberRequest,
+              Type(SubscriptDecl *), Uncached, NoLocationInfo)
+SWIFT_REQUEST(IDETypeChecking, TypeRelationCheckRequest,
+              bool(TypeRelationCheckInput), Cached, NoLocationInfo)

@@ -28,6 +28,7 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenPattern.cpp
   SILGenPoly.cpp
   SILGenProlog.cpp
+  SILGenRequests.cpp
   SILGenStmt.cpp
   SILGenThunk.cpp
   SILGenType.cpp)

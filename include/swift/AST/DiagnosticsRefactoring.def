@@ -64,8 +64,6 @@ ERROR(invalid_default_location, none, "given location is not on a default statem
 
 ERROR(no_parent_switch, none, "cannot find enclosing switch statement", ())
 
-ERROR(no_subject_enum, none, "cannot find subject enum in the enclosing switch statement", ())
-
 ERROR(no_remaining_cases, none, "no remaining cases to expand", ())
 
 WARNING(mismatched_rename, none, "the name at the given location cannot be renamed to '%0'", (StringRef))

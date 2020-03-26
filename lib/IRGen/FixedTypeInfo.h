@@ -213,10 +213,11 @@ public:
   ///   SpareBitVector spareBits;
   ///   for (EnumElementDecl *elt : u->getAllElements())
   ///     getFragileTypeInfo(elt->getArgumentType())
-  ///       .applyFixedSpareBitsMask(spareBits);
+  ///       .applyFixedSpareBitsMask(IGM, spareBits);
   ///
   /// and end up with a spare bits mask for the entire enum.
-  void applyFixedSpareBitsMask(SpareBitVector &mask) const;
+  void applyFixedSpareBitsMask(const IRGenModule &IGM,
+                               SpareBitVector &mask) const;
 
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
@@ -238,11 +239,32 @@ public:
   static bool classof(const TypeInfo *type) { return type->isFixedSize(); }
 };
 
+llvm::Value *getFixedTypeEnumTagSinglePayload(
+    IRGenFunction &IGF, llvm::Value *numEmptyCases, Address enumAddr,
+    llvm::Value *size, Size fixedSize, unsigned fixedExtraInhabitantCount,
+    llvm::function_ref<llvm::Value *(Address)> getExtraInhabitantIndex,
+    bool isOutlined);
+
 llvm::Value *getFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
                                               const FixedTypeInfo &fixedTI,
                                               llvm::Value *numEmptyCases,
                                               Address enumAddr,
                                               SILType T, bool isOutlined);
+void storeFixedTypeEnumTagSinglePayload(
+    IRGenFunction &IGF, llvm::Value *whichCase, llvm::Value *numEmptyCases,
+    Address enumAddr, llvm::Value *size, Size fixedSize,
+    unsigned fixedExtraInhabitantCount,
+    llvm::function_ref<void(llvm::Value *, Address)> storeExtraInhabitant,
+    bool isOutlined);
+
+llvm::Value *emitLoad1to4Bytes(IRGenFunction &IGF, Address from,
+                               llvm::Value *size);
+void emitStore1to4Bytes(IRGenFunction &IGF, Address to, llvm::Value *val,
+                        llvm::Value *size);
+
+llvm::Value *emitGetTag(IRGenFunction &IGF, Address from, llvm::Value *size);
+void emitSetTag(IRGenFunction &IGF, Address to, llvm::Value *val,
+                llvm::Value *size);
 
 void storeFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
                                         const FixedTypeInfo &fixedTI,

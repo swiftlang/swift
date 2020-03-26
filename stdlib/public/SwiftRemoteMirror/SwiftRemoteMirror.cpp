@@ -19,10 +19,15 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 unsigned long long swift_reflection_classIsSwiftMask = 2;
 }
 
+#include "swift/Demangling/Demangler.h"
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/Runtime/Unreachable.h"
+
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#endif
 
 using namespace swift;
 using namespace swift::reflection;
@@ -58,14 +63,55 @@ template <uint8_t WordSize>
 static int minimalDataLayoutQueryFunction(void *ReaderContext,
                                           DataLayoutQueryType type,
                                           void *inBuffer, void *outBuffer) {
+    // TODO: The following should be set based on the target.
+    // This code sets it to match the platform this code was compiled for.
+#if defined(__APPLE__) && __APPLE__
+    auto applePlatform = true;
+#else
+    auto applePlatform = false;
+#endif
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+    auto iosDerivedPlatform = true;
+#else
+    auto iosDerivedPlatform = false;
+#endif
+
   if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
     auto result = static_cast<uint8_t *>(outBuffer);
     *result = WordSize;
     return 1;
   }
+  if (type == DLQ_GetObjCReservedLowBits) {
+    auto result = static_cast<uint8_t *>(outBuffer);
+    if (applePlatform && !iosDerivedPlatform && WordSize == 8) {
+      // Obj-C reserves low bit on 64-bit macOS only.
+      // Other Apple platforms don't reserve this bit (even when
+      // running on x86_64-based simulators).
+      *result = 1;
+    } else {
+      *result = 0;
+    }
+    return 1;
+  }
+  if (type == DLQ_GetLeastValidPointerValue) {
+    auto result = static_cast<uint64_t *>(outBuffer);
+    if (applePlatform && WordSize == 8) {
+      // Swift reserves the first 4GiB on all 64-bit Apple platforms
+      *result = 0x100000000;
+    } else {
+      // Swift reserves the first 4KiB everywhere else
+      *result = 0x1000;
+    }
+    return 1;
+  }
   return 0;
 }
 
+// Caveat: This basically only works correctly if running on the same
+// host as the target.  Otherwise, you'll need to use
+// swift_reflection_createReflectionContextWithDataLayout() below
+// with an appropriate data layout query function that understands
+// the target environment.
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
                                          uint8_t PointerSize,
@@ -114,12 +160,44 @@ void swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context
   delete ContextRef;
 }
 
+template<typename Iterator>
+ReflectionSection<Iterator> sectionFromInfo(const swift_reflection_info_t &Info,
+                              const swift_reflection_section_pair_t &Section) {
+  auto RemoteSectionStart = (uint64_t)(uintptr_t)Section.section.Begin
+    - Info.LocalStartAddress
+    + Info.RemoteStartAddress;
+  
+  auto Start = RemoteRef<void>(RemoteSectionStart, Section.section.Begin);
+  
+  return ReflectionSection<Iterator>(Start,
+             (uintptr_t)Section.section.End - (uintptr_t)Section.section.Begin);
+}
+
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info) {
   auto Context = ContextRef->nativeContext;
   
-  Context->addReflectionInfo(*reinterpret_cast<ReflectionInfo *>(&Info));
+  // The `offset` fields must be zero.
+  if (Info.field.offset != 0
+      || Info.associated_types.offset != 0
+      || Info.builtin_types.offset != 0
+      || Info.capture.offset != 0
+      || Info.type_references.offset != 0
+      || Info.reflection_strings.offset != 0) {
+    fprintf(stderr, "reserved field in swift_reflection_info_t is not zero\n");
+    abort();
+  }
+  
+  ReflectionInfo ContextInfo{
+    sectionFromInfo<FieldDescriptorIterator>(Info, Info.field),
+    sectionFromInfo<AssociatedTypeIterator>(Info, Info.associated_types),
+    sectionFromInfo<BuiltinTypeDescriptorIterator>(Info, Info.builtin_types),
+    sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
+    sectionFromInfo<const void *>(Info, Info.type_references),
+    sectionFromInfo<const void *>(Info, Info.reflection_strings)};
+  
+  Context->addReflectionInfo(ContextInfo);
 }
 
 int
@@ -218,6 +296,9 @@ swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef) {
 
 swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   switch (TI.getKind()) {
+  case TypeInfoKind::Invalid: {
+    return SWIFT_UNKNOWN;
+  }
   case TypeInfoKind::Builtin: {
     auto &BuiltinTI = cast<BuiltinTypeInfo>(TI);
     if (BuiltinTI.getMangledTypeName() == "Bp")
@@ -381,12 +462,45 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
   return Success;
 }
 
+int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
+                                      swift_addr_t EnumAddress,
+                                      swift_typeref_t EnumTypeRef,
+                                      int *CaseIndex) {
+  auto Context = ContextRef->nativeContext;
+  auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
+  auto RemoteEnumAddress = RemoteAddress(EnumAddress);
+  return Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex);
+}
+
+int swift_reflection_getEnumCaseTypeRef(SwiftReflectionContextRef ContextRef,
+                                        swift_typeref_t EnumTypeRef,
+                                        int CaseIndex,
+                                        char **CaseName,
+                                        swift_typeref_t *PayloadTypeRef) {
+  *PayloadTypeRef = 0;
+  *CaseName = nullptr;
+  auto Context = ContextRef->nativeContext;
+  auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
+  const TypeRef *PayloadTR = nullptr;
+  std::string Name;
+  auto success = Context->getEnumCaseTypeRef(EnumTR, CaseIndex,
+                                             Name, &PayloadTR);
+  if (success) {
+    *PayloadTypeRef = reinterpret_cast<swift_typeref_t>(PayloadTR);
+    // FIXME: Is there a better way to return a string here?
+    // Just returning Case.Name.c_str() doesn't work as the backing data gets
+    // released at the end of this function.
+    *CaseName = strdup(Name.c_str());
+  }
+  return success;
+}
+
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   if (TR == nullptr) {
-    std::cout << "<null type reference>\n";
+    fprintf(stdout, "<null type reference>\n");
   } else {
-    TR->dump(std::cout);
+    TR->dump(stdout);
   }
 }
 
@@ -396,9 +510,17 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto TI = Context->getTypeInfo(TR);
   if (TI == nullptr) {
-    std::cout << "<null type info>\n";
+    fprintf(stdout, "<null type info>\n");
   } else {
-    TI->dump(std::cout);
+    TI->dump(stdout);
+    Demangle::Demangler Dem;
+    std::string MangledName = mangleNode(TR->getDemangling(Dem));
+    fprintf(stdout, "Mangled name: %s%s\n", MANGLING_PREFIX_STR,
+            MangledName.c_str());
+#ifndef NDEBUG
+    assert(mangleNode(TR->getDemangling(Dem)) == MangledName &&
+           "round-trip diff");
+#endif
   }
 }
 
@@ -407,9 +529,9 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
   auto Context = ContextRef->nativeContext;
   auto TI = Context->getMetadataTypeInfo(Metadata);
   if (TI == nullptr) {
-    std::cout << "<null type info>\n";
+    fprintf(stdout, "<null type info>\n");
   } else {
-    TI->dump(std::cout);
+    TI->dump(stdout);
   }
 }
 
@@ -418,9 +540,9 @@ void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
   auto Context = ContextRef->nativeContext;
   auto TI = Context->getInstanceTypeInfo(Object);
   if (TI == nullptr) {
-    std::cout << "<null type info>\n";
+    fprintf(stdout, "%s", "<null type info>\n");
   } else {
-    TI->dump(std::cout);
+    TI->dump(stdout);
   }
 }
 

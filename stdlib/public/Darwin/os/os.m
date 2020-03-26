@@ -33,7 +33,7 @@ typedef struct os_log_pack_s {
     const void     *olp_mh;
     const void     *olp_pc;
     const char     *olp_format;
-    uint8_t         olp_data[0];
+    uint8_t         olp_data[];
 } os_log_pack_s, *os_log_pack_t;
 
 API_AVAILABLE(macosx(10.12.4), ios(10.3), tvos(10.2), watchos(3.2))

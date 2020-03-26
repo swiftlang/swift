@@ -18,15 +18,62 @@ import re
 import sys
 import traceback
 from functools import reduce
-from multiprocessing import freeze_support
+from multiprocessing import Lock, Pool, cpu_count, freeze_support
+
+from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
 from swift_build_support.swift_build_support import shell
-from swift_build_support.swift_build_support.SwiftBuildSupport import \
-    SWIFT_SOURCE_ROOT
 
 
 SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
+
+
+def run_parallel(fn, pool_args, n_processes=0):
+    """Function used to run a given closure in parallel.
+
+    NOTE: This function was originally located in the shell module of
+    swift_build_support and should eventually be replaced with a better
+    parallel implementation.
+    """
+
+    def init(l):
+        global lock
+        lock = l
+
+    if n_processes == 0:
+        n_processes = cpu_count() * 2
+
+    lk = Lock()
+    print("Running ``%s`` with up to %d processes." %
+          (fn.__name__, n_processes))
+    pool = Pool(processes=n_processes, initializer=init, initargs=(lk,))
+    results = pool.map_async(func=fn, iterable=pool_args).get(999999)
+    pool.close()
+    pool.join()
+    return results
+
+
+def check_parallel_results(results, op):
+    """Function used to check the results of run_parallel.
+
+    NOTE: This function was originally located in the shell module of
+    swift_build_support and should eventually be replaced with a better
+    parallel implementation.
+    """
+
+    fail_count = 0
+    if results is None:
+        return 0
+    for r in results:
+        if r is not None:
+            if fail_count == 0:
+                print("======%s FAILURES======" % op)
+            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
+            fail_count += 1
+            if r.stderr:
+                print(r.stderr)
+    return fail_count
 
 
 def confirm_tag_in_repo(tag, repo_name):
@@ -40,18 +87,9 @@ def confirm_tag_in_repo(tag, repo_name):
 
 
 def find_rev_by_timestamp(timestamp, repo_name, refspec):
-    base_args = ["git", "log", "-1", "--format=%H",
-                 '--before=' + timestamp]
-    # On repos with regular batch-automerges from swift-ci -- namely clang,
-    # llvm and lldb -- prefer the most-recent change _made by swift-ci_
-    # before the timestamp, falling back to most-recent in general if there
-    # is none by swift-ci.
-    if repo_name in ["llvm", "clang", "lldb"]:
-        rev = shell.capture(base_args +
-                            ['--author', 'swift-ci', refspec]).strip()
-        if rev:
-            return rev
-    rev = shell.capture(base_args + [refspec]).strip()
+    args = ["git", "log", "-1", "--format=%H", "--first-parent",
+            '--before=' + timestamp, refspec]
+    rev = shell.capture(args).strip()
     if rev:
         return rev
     else:
@@ -209,8 +247,7 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
                    cross_repos_pr]
         pool_args.append(my_args)
 
-    return shell.run_parallel(update_single_repository, pool_args,
-                              args.n_processes)
+    return run_parallel(update_single_repository, pool_args, args.n_processes)
 
 
 def obtain_additional_swift_sources(pool_args):
@@ -304,8 +341,8 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
         print("Not cloning any repositories.")
         return
 
-    return shell.run_parallel(obtain_additional_swift_sources, pool_args,
-                              args.n_processes)
+    return run_parallel(
+        obtain_additional_swift_sources, pool_args, args.n_processes)
 
 
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
@@ -408,31 +445,14 @@ def skip_list_for_platform(config):
     return skip_list
 
 
-def symlink_llvm_monorepo(args):
-    print("Create symlink for LLVM Project")
-    llvm_projects = ['clang',
-                     'llvm',
-                     'lldb',
-                     'compiler-rt',
-                     'libcxx',
-                     'clang-tools-extra']
-    for project in llvm_projects:
-        src_path = os.path.join(args.source_root,
-                                'llvm-project',
-                                project)
-        dst_path = os.path.join(args.source_root, project)
-        if not os.path.islink(dst_path):
-            os.symlink(src_path, dst_path)
-
-
 def main():
     freeze_support()
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""
+By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM
 repositories.
-
-By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
+""")
     parser.add_argument(
         "--clone",
         help="Obtain Sources for Swift and Related Projects",
@@ -506,10 +526,6 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         help="The root directory to checkout repositories",
         default=SWIFT_SOURCE_ROOT,
         dest='source_root')
-    parser.add_argument(
-        '--symlink-llvm-monorepo',
-        help='Create symlink from LLVM-Project to source root directory',
-        action='store_true')
     args = parser.parse_args()
 
     if not args.scheme:
@@ -576,13 +592,11 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     update_results = update_all_repositories(args, config, scheme,
                                              cross_repos_pr)
     fail_count = 0
-    fail_count += shell.check_parallel_results(clone_results, "CLONE")
-    fail_count += shell.check_parallel_results(update_results, "UPDATE")
+    fail_count += check_parallel_results(clone_results, "CLONE")
+    fail_count += check_parallel_results(update_results, "UPDATE")
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
     else:
-        if args.symlink_llvm_monorepo:
-            symlink_llvm_monorepo(args)
         print("update-checkout succeeded")
         print_repo_hashes(args, config)
     sys.exit(fail_count)

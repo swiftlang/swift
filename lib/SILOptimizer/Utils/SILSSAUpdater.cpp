@@ -10,19 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/SSAUpdaterImpl.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "swift/Basic/Malloc.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
-
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/SSAUpdaterImpl.h"
 
 using namespace swift;
 
@@ -222,7 +221,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   if (!BB->getArguments().empty()) {
     llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> ValueMap(PredVals.begin(),
                                                                PredVals.end());
-    for (auto *Arg : BB->getPhiArguments())
+    for (auto *Arg : BB->getSILPhiArguments())
       if (isEquivalentPHI(Arg, ValueMap))
         return Arg;
 
@@ -439,7 +438,7 @@ UseWrapper::UseWrapper(Operand *Use) {
 }
 
 /// Return the operand we wrap. Reconstructing branch operands.
-UseWrapper::operator Operand *() {
+Operand *UseWrapper::getOperand() {
   switch (Type) {
   case kRegularUse:
     return U;

@@ -21,7 +21,7 @@ var topLevelObject2:TopLevelObjectTyWithoutDestructor
 
 // Check allocating initializer
 // CHECK-LABEL: sil_locations_top_level.TopLevelObjectTy.__allocating_init
-// CHECK: sil hidden [ossa] @$s23sil_locations_top_level16TopLevelObjectTyC{{[_0-9a-zA-Z]*}}fC
+// CHECK: sil hidden [exact_self_class] [ossa] @$s23sil_locations_top_level16TopLevelObjectTyC{{[_0-9a-zA-Z]*}}fC
 // CHECK: alloc_ref {{.*}}line:5:3:auto_gen
 // CHECK: function_ref
 

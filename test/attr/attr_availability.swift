@@ -1100,3 +1100,16 @@ func unavailableFunc(_ arg: UnavailableProto) -> UnavailableProto {}
 struct S {
   var a: UnavailableProto
 }
+
+// Bad rename.
+struct BadRename {
+  @available(*, deprecated, renamed: "init(range:step:)")
+  init(from: Int, to: Int, step: Int = 1) { }
+
+  init(range: Range<Int>, step: Int) { }
+}
+
+func testBadRename() {
+  _ = BadRename(from: 5, to: 17) // expected-warning{{'init(from:to:step:)' is deprecated: replaced by 'init(range:step:)'}}
+  // expected-note@-1{{use 'init(range:step:)' instead}}
+}

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 func needsSameType<T>(_: T.Type, _: T.Type) {}
 

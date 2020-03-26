@@ -90,7 +90,8 @@ z[0] = 0.0 // expected-error{{cannot assign through subscript: subscript is get-
 f2(&z[0]) // expected-error{{cannot pass immutable value as inout argument: subscript is get-only}}
 f1(&z[0]) // expected-error{{cannot pass immutable value as inout argument: subscript is get-only}}
 z[0] += 0.0 // expected-error{{left side of mutating operator isn't mutable: subscript is get-only}}
-+++z[0] // expected-error{{cannot pass immutable value as inout argument: subscript is get-only}}
++++z[0] // expected-error{{cannot convert value of type 'Double' to expected argument type 'X'}}
++++z[(i: 0, j: 0)] // expected-error{{cannot pass immutable value to mutating operator: subscript is get-only}}
 
 // settable property of an rvalue value type is non-settable:
 fz().settable_x = x // expected-error{{cannot assign to property: 'fz' returns immutable value}}
@@ -111,7 +112,7 @@ z.non_settable_x.property = 1.0 // expected-error{{cannot assign to property: 'n
 f2(&z.non_settable_x.property) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 f1(&z.non_settable_x.property) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 z.non_settable_x.property += 1.0 // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
-+++z.non_settable_x.property // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
++++z.non_settable_x.property // expected-error{{cannot convert value of type 'Double' to expected argument type 'X'}}
 
 // settable property of a non-settable reference type IS SETTABLE:
 z.non_settable_reftype.property = 1.0

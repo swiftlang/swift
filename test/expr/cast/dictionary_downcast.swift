@@ -32,13 +32,13 @@ if let _ = dictCC as? Dictionary<D, C> { }
 if let _ = dictCC as? Dictionary<D, D> { }
 
 // Test dictionary downcasts to unrelated types.
-dictCC as Dictionary<D, U> // expected-error{{cannot convert value of type '[C : C]' to type '[D : U]' in coercion}}
+dictCC as Dictionary<D, U> // expected-error{{cannot convert value of type '[C : C]' to type 'Dictionary<D, U>' in coercion}}
 // expected-note@-1 {{arguments to generic parameter 'Key' ('C' and 'D') are expected to be equal}}
 // expected-note@-2 {{arguments to generic parameter 'Value' ('C' and 'U') are expected to be equal}}
-dictCC as Dictionary<U, D> // expected-error{{cannot convert value of type '[C : C]' to type '[U : D]' in coercion}}
+dictCC as Dictionary<U, D> // expected-error{{cannot convert value of type '[C : C]' to type 'Dictionary<U, D>' in coercion}}
 // expected-note@-1 {{arguments to generic parameter 'Key' ('C' and 'U') are expected to be equal}}
 // expected-note@-2 {{arguments to generic parameter 'Value' ('C' and 'D') are expected to be equal}}
-dictCC as Dictionary<U, U> // expected-error{{cannot convert value of type '[C : C]' to type '[U : U]' in coercion}}
+dictCC as Dictionary<U, U> // expected-error{{cannot convert value of type '[C : C]' to type 'Dictionary<U, U>' in coercion}}
 // expected-note@-1 {{arguments to generic parameter 'Key' ('C' and 'U') are expected to be equal}}
 // expected-note@-2 {{arguments to generic parameter 'Value' ('C' and 'U') are expected to be equal}}
 

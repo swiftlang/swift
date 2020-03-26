@@ -286,9 +286,13 @@ extension OptionSet where Element == Self {
   @inlinable // generic-performance
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
-    let r = isSuperset(of: member) ? Optional(member) : nil
+    let intersectionElements = intersection(member)
+    guard !intersectionElements.isEmpty else {
+      return nil
+    }
+    
     self.subtract(member)
-    return r
+    return intersectionElements
   }
 
   /// Inserts the given element into the set.

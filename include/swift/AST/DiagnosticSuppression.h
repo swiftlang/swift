@@ -37,6 +37,7 @@ class DiagnosticSuppression {
 public:
   explicit DiagnosticSuppression(DiagnosticEngine &diags);
   ~DiagnosticSuppression();
+  static bool isEnabled(const DiagnosticEngine &diags);
 };
 
 }

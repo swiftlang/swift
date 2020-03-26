@@ -32,18 +32,10 @@ namespace swift {
     virtual bool parseSILGlobal(Parser &P) = 0;
     virtual bool parseSILWitnessTable(Parser &P) = 0;
     virtual bool parseSILDefaultWitnessTable(Parser &P) = 0;
+    virtual bool parseSILDifferentiabilityWitness(Parser &P) = 0;
     virtual bool parseSILCoverageMap(Parser &P) = 0;
     virtual bool parseSILProperty(Parser &P) = 0;
     virtual bool parseSILScope(Parser &P) = 0;
-  };
-
-  /// To assist debugging parser crashes, tell us the location of the
-  /// current token.
-  class PrettyStackTraceParser : public llvm::PrettyStackTraceEntry {
-    Parser &P;
-  public:
-    explicit PrettyStackTraceParser(Parser &P) : P(P) {}
-    void print(llvm::raw_ostream &out) const override;
   };
 } // end namespace swift
 

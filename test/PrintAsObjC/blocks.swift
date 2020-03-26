@@ -113,6 +113,9 @@ typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
     return input
   }
 
+  // CHECK-NEXT: - (void)blockWithConsumingArgument:(void (^ _Nonnull)(SWIFT_RELEASES_ARGUMENT NSObject * _Nonnull))block;
+  @objc func blockWithConsumingArgument(_ block: @escaping (__owned NSObject) -> ()) {}
+
   // CHECK-NEXT: @property (nonatomic, copy) NSInteger (^ _Nullable savedBlock)(NSInteger);
   @objc var savedBlock: ((Int) -> Int)?
   

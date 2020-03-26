@@ -1,0 +1,16 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select VarDeclUsageCheckerExprVisits %s
+// REQUIRES: asserts
+
+protocol Proto {}
+extension Proto {
+  var selfish: Proto { return self }
+}
+
+struct X: Proto {}
+
+func test(_ x: X) -> Proto {
+  return x
+%for i in range(0, N*5):
+    .selfish
+%end
+}

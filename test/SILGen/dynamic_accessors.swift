@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o /dev/null -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-parseable-module-interface-path %t/dynamic_accessors.swiftinterface %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-module-interface-path %t/dynamic_accessors.swiftinterface %s
 // RUN: %target-swift-emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop %t/dynamic_accessors.swiftinterface | %FileCheck %s
 
@@ -33,11 +33,11 @@ public class MyObjCClass {
 
 @inlinable public func foo() {
   let x = MyObjCClass()
-  // CHECK: objc_method %{{[0-9]+}} : $MyObjCClass, #MyObjCClass.a!getter.1.foreign
-  // CHECK: objc_method %{{[0-9]+}} : $MyObjCClass, #MyObjCClass.a!setter.1.foreign
+  // CHECK: objc_method %{{[0-9]+}} : $MyObjCClass, #MyObjCClass.a!getter.foreign
+  // CHECK: objc_method %{{[0-9]+}} : $MyObjCClass, #MyObjCClass.a!setter.foreign
   x.a = x.a + 1
 
-  // CHECK: objc_method %{{[0-9]+}} : $MyObjCClass, #MyObjCClass.subscript!getter.1.foreign
-  // CHECK: objc_method %{{[0-9]+}} : $MyObjCClass, #MyObjCClass.subscript!setter.1.foreign
+  // CHECK: objc_method %{{[0-9]+}} : $MyObjCClass, #MyObjCClass.subscript!getter.foreign
+  // CHECK: objc_method %{{[0-9]+}} : $MyObjCClass, #MyObjCClass.subscript!setter.foreign
   x[4] = x[5]
 }

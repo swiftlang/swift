@@ -50,14 +50,14 @@ static bool isResolvableScope(ScopeKind SK) {
 }
 
 Scope::Scope(Parser *P, ScopeKind SC, bool isInactiveConfigBlock)
-  : SI(P->getScopeInfo()),
-    HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
-    PrevScope(SI.CurScope),
-    PrevResolvableDepth(SI.ResolvableDepth),
-    Kind(SC),
-    IsInactiveConfigBlock(isInactiveConfigBlock) {
+    : Scope(P->getScopeInfo(), SC, isInactiveConfigBlock) {}
+
+Scope::Scope(ScopeInfo &SI, ScopeKind SC, bool isInactiveConfigBlock)
+    : SI(SI), HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
+      PrevScope(SI.CurScope), PrevResolvableDepth(SI.ResolvableDepth), Kind(SC),
+      IsInactiveConfigBlock(isInactiveConfigBlock) {
   assert(PrevScope || Kind == ScopeKind::TopLevel);
-  
+
   if (SI.CurScope) {
     Depth = SI.CurScope->Depth + 1;
     IsInactiveConfigBlock |= SI.CurScope->IsInactiveConfigBlock;
@@ -145,6 +145,13 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser,
                      std::make_pair(CurScope->getDepth(), D));
 }
 
+
+// Disable the "for use only in debugger" warning.
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+
 void ScopeInfo::dump() const {
 #ifndef NDEBUG
   // Dump out the current list of scopes.
@@ -167,3 +174,7 @@ void ScopeInfo::dump() const {
   llvm::dbgs() << "\n";
 #endif
 }
+
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(pop)
+#endif

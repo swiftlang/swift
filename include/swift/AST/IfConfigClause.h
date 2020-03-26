@@ -39,7 +39,7 @@ struct IfConfigClause {
   ArrayRef<ASTNode> Elements;
 
   /// True if this is the active clause of the #if block.
-  bool isActive;
+  const bool isActive;
 
   IfConfigClause(SourceLoc Loc, Expr *Cond,
                  ArrayRef<ASTNode> Elements, bool isActive)

@@ -113,17 +113,13 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return false;
 }
 
-SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                       bool isCurried, bool isForeign)
-  : loc(vd), kind(kind),
-    isCurried(isCurried), isForeign(isForeign),
-    isDirectReference(0), defaultArgIndex(0)
-{}
+SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
+                       AutoDiffDerivativeFunctionIdentifier *derivativeId)
+    : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0),
+      derivativeFunctionIdentifier(derivativeId) {}
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
-                       bool isCurried, bool asForeign) 
-  : isCurried(isCurried), isDirectReference(0), defaultArgIndex(0)
-{
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign)
+    : defaultArgIndex(0), derivativeFunctionIdentifier(nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
       // Map FuncDecls directly to Func SILDeclRefs.
@@ -174,7 +170,7 @@ Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
 }
 
 bool SILDeclRef::isThunk() const {
-  return isCurried || isForeignToNativeThunk() || isNativeToForeignThunk();
+  return isForeignToNativeThunk() || isNativeToForeignThunk();
 }
 
 bool SILDeclRef::isClangImported() const {
@@ -247,22 +243,6 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     moduleContext = moduleContext->getParent();
   }
 
-  // Enum constructors and curry thunks either have private or shared
-  // linkage, dependings are essentially the same as thunks, they are
-  // emitted by need and have shared linkage.
-  if (isEnumElement() || isCurried) {
-    switch (d->getEffectiveAccess()) {
-    case AccessLevel::Private:
-    case AccessLevel::FilePrivate:
-      return maybeAddExternal(SILLinkage::Private);
-
-    case AccessLevel::Internal:
-    case AccessLevel::Public:
-    case AccessLevel::Open:
-      return SILLinkage::Shared;
-    }
-  }
-
   // Calling convention thunks have shared linkage.
   if (isForeignToNativeThunk())
     return SILLinkage::Shared;
@@ -314,7 +294,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   }
 
   // Stored property initializers get the linkage of their containing type.
-  if (isStoredPropertyInitializer()) {
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer()) {
     // Three cases:
     //
     // 1) Type is formally @_fixed_layout/@frozen. Root initializers can be
@@ -443,8 +423,11 @@ bool SILDeclRef::isTransparent() const {
   if (isStoredPropertyInitializer())
     return true;
 
-  if (hasAutoClosureExpr())
-    return true;
+  if (hasAutoClosureExpr()) {
+    auto *ace = getAutoClosureExpr();
+    if (ace->getThunkKind() == AutoClosureExpr::Kind::None)
+      return true;
+  }
 
   if (hasDecl()) {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(getDecl()))
@@ -493,7 +476,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   // Stored property initializers are inlinable if the type is explicitly
   // marked as @frozen.
-  if (isStoredPropertyInitializer()) {
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer()) {
     auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
@@ -528,18 +511,6 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     if (!isClangImported() &&
         fn->hasForcedStaticDispatch())
       return IsSerialized;
-
-  // Enum element constructors are serializable if the enum is
-  // @usableFromInline or public.
-  if (isEnumElement())
-    return IsSerializable;
-
-  // Currying thunks are serialized if referenced from an inlinable
-  // context -- Sema's semantic checks ensure the serialization of
-  // such a thunk is valid, since it must in turn reference a public
-  // symbol, or dispatch via class_method or witness_method.
-  if (isCurried)
-    return IsSerializable;
 
   if (isForeignToNativeThunk())
     return IsSerializable;
@@ -674,24 +645,38 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   using namespace Mangle;
   ASTMangler mangler;
 
+  if (derivativeFunctionIdentifier) {
+    std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
+    auto *silParameterIndices = autodiff::getLoweredParameterIndices(
+        derivativeFunctionIdentifier->getParameterIndices(),
+        getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
+    auto &ctx = getDecl()->getASTContext();
+    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+    AutoDiffConfig silConfig(
+        silParameterIndices, resultIndices,
+        derivativeFunctionIdentifier->getDerivativeGenericSignature());
+    auto derivativeFnKind = derivativeFunctionIdentifier->getKind();
+    return mangler.mangleAutoDiffDerivativeFunctionHelper(
+        originalMangled, derivativeFnKind, silConfig);
+  }
+
   // As a special case, Clang functions and globals don't get mangled at all.
   if (hasDecl()) {
     if (auto clangDecl = getDecl()->getClangDecl()) {
-      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()
-          && !isCurried) {
+      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
         if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
           if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
             std::string s(1, '\01');
             s += asmLabel->getLabel();
             return s;
-          } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>()) {
+          } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>() ||
+                     getDecl()->getASTContext().LangOpts.EnableCXXInterop) {
             std::string storage;
             llvm::raw_string_ostream SS(storage);
-            // FIXME: When we can import C++, use Clang's mangler all the time.
             mangleClangDecl(SS, namedClangDecl, getDecl()->getASTContext());
             return SS.str();
           }
-          return namedClangDecl->getName();
+          return namedClangDecl->getName().str();
         }
       }
     }
@@ -702,8 +687,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     case SILDeclRef::ManglingKind::Default:
       if (isForeign) {
         SKind = ASTMangler::SymbolKind::SwiftAsObjCThunk;
-      } else if (isDirectReference) {
-        SKind = ASTMangler::SymbolKind::DirectMethodReferenceThunk;
       } else if (isForeignToNativeThunk()) {
         SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
       }
@@ -723,31 +706,28 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // point.
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!NameA->Name.empty() &&
-          !isForeignToNativeThunk() && !isNativeToForeignThunk()
-          && !isCurried) {
-        return NameA->Name;
+          !isForeignToNativeThunk() && !isNativeToForeignThunk()) {
+        return NameA->Name.str();
       }
       
     // Use a given cdecl name for native-to-foreign thunks.
     if (auto CDeclA = getDecl()->getAttrs().getAttribute<CDeclAttr>())
       if (isNativeToForeignThunk()) {
-        return CDeclA->Name;
+        return CDeclA->Name.str();
       }
 
     // Otherwise, fall through into the 'other decl' case.
     LLVM_FALLTHROUGH;
 
   case SILDeclRef::Kind::EnumElement:
-    return mangler.mangleEntity(getDecl(), isCurried, SKind);
+    return mangler.mangleEntity(getDecl(), SKind);
 
   case SILDeclRef::Kind::Deallocator:
-    assert(!isCurried);
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
                                           /*isDeallocating*/ true,
                                           SKind);
 
   case SILDeclRef::Kind::Destroyer:
-    assert(!isCurried);
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
                                           /*isDeallocating*/ false,
                                           SKind);
@@ -755,45 +735,77 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::Allocator:
     return mangler.mangleConstructorEntity(cast<ConstructorDecl>(getDecl()),
                                            /*allocating*/ true,
-                                           isCurried,
                                            SKind);
 
   case SILDeclRef::Kind::Initializer:
     return mangler.mangleConstructorEntity(cast<ConstructorDecl>(getDecl()),
                                            /*allocating*/ false,
-                                           isCurried,
                                            SKind);
 
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
-    assert(!isCurried);
     return mangler.mangleIVarInitDestroyEntity(cast<ClassDecl>(getDecl()),
                                   kind == SILDeclRef::Kind::IVarDestroyer,
                                   SKind);
 
   case SILDeclRef::Kind::GlobalAccessor:
-    assert(!isCurried);
     return mangler.mangleAccessorEntity(AccessorKind::MutableAddress,
                                         cast<AbstractStorageDecl>(getDecl()),
                                         /*isStatic*/ false,
                                         SKind);
 
   case SILDeclRef::Kind::DefaultArgGenerator:
-    assert(!isCurried);
     return mangler.mangleDefaultArgumentEntity(
                                         cast<DeclContext>(getDecl()),
                                         defaultArgIndex,
                                         SKind);
 
   case SILDeclRef::Kind::StoredPropertyInitializer:
-    assert(!isCurried);
     return mangler.mangleInitializerEntity(cast<VarDecl>(getDecl()), SKind);
+
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
+                                                  SKind);
   }
 
   llvm_unreachable("bad entity kind!");
 }
 
+// Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
+// FIXME(TF-1213): Also consider derived declaration `@derivative` attributes.
+static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
+  assert(declRef.derivativeFunctionIdentifier &&
+         "Expected a derivative function SILDeclRef");
+  auto overridden = declRef.getOverridden();
+  if (!overridden)
+    return false;
+  // Get the derived `@differentiable` attribute.
+  auto *derivedDiffAttr = *llvm::find_if(
+      declRef.getDecl()->getAttrs().getAttributes<DifferentiableAttr>(),
+      [&](const DifferentiableAttr *derivedDiffAttr) {
+        return derivedDiffAttr->getParameterIndices() ==
+               declRef.derivativeFunctionIdentifier->getParameterIndices();
+      });
+  assert(derivedDiffAttr && "Expected `@differentiable` attribute");
+  // Otherwise, if the base `@differentiable` attribute specifies a derivative
+  // function, then the derivative is inherited and no new vtable entry is
+  // needed. Return false.
+  auto baseDiffAttrs =
+      overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
+  for (auto *baseDiffAttr : baseDiffAttrs) {
+    if (baseDiffAttr->getParameterIndices() ==
+        declRef.derivativeFunctionIdentifier->getParameterIndices())
+      return false;
+  }
+  // Otherwise, if there is no base `@differentiable` attribute exists, then a
+  // new vtable entry is needed. Return true.
+  return true;
+}
+
 bool SILDeclRef::requiresNewVTableEntry() const {
+  if (derivativeFunctionIdentifier)
+    if (derivativeFunctionRequiresNewVTableEntry(*this))
+      return true;
   if (cast<AbstractFunctionDecl>(getDecl())->needsNewVTableEntry())
     return true;
   return false;
@@ -813,8 +825,7 @@ SILDeclRef SILDeclRef::getOverridden() const {
   auto overridden = getDecl()->getOverriddenDecl();
   if (!overridden)
     return SILDeclRef();
-
-  return SILDeclRef(overridden, kind, isCurried);
+  return withDecl(overridden);
 }
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
@@ -866,6 +877,26 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (isa<ExtensionDecl>(overridden.getDecl()->getDeclContext()))
       return SILDeclRef();
 
+    // JVPs/VJPs are overridden only if the base declaration has a
+    // `@differentiable` attribute with the same parameter indices.
+    if (derivativeFunctionIdentifier) {
+      auto overriddenAttrs =
+          overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
+      for (const auto *attr : overriddenAttrs) {
+        if (attr->getParameterIndices() !=
+            derivativeFunctionIdentifier->getParameterIndices())
+          continue;
+        auto *overriddenDerivativeId = overridden.derivativeFunctionIdentifier;
+        overridden.derivativeFunctionIdentifier =
+            AutoDiffDerivativeFunctionIdentifier::get(
+                overriddenDerivativeId->getKind(),
+                overriddenDerivativeId->getParameterIndices(),
+                attr->getDerivativeGenericSignature(),
+                getDecl()->getASTContext());
+        return overridden;
+      }
+      return SILDeclRef();
+    }
     return overridden;
   }
   return SILDeclRef();
@@ -874,7 +905,7 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
 SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
   auto bestOverridden =
     getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-  return SILDeclRef(bestOverridden, kind, isCurried);
+  return withDecl(bestOverridden);
 }
 
 AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(
@@ -946,31 +977,52 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (!isa<AbstractFunctionDecl>(decl))
     return SubclassScope::NotApplicable;
 
-  // If this declaration is a function which goes into a vtable, then it's
-  // symbol must be as visible as its class, because derived classes have to put
-  // all less visible methods of the base class into their vtables.
+  DeclContext *context = decl->getDeclContext();
+
+  // Only methods in non-final classes go in the vtable.
+  auto *classType = dyn_cast<ClassDecl>(context);
+  if (!classType || classType->isFinal())
+    return SubclassScope::NotApplicable;
+
+  // If a method appears in the vtable of a class, we must give it's symbol
+  // special consideration when computing visibility because the SIL-level
+  // linkage does not map to the symbol's visibility in a straightforward
+  // way.
+  //
+  // In particular, the rules are:
+  // - If the class metadata is not resilient, then all method symbols must
+  //   be visible from any translation unit where a subclass might be defined,
+  //   because the subclass metadata will re-emit all vtable entries.
+  //
+  // - For resilient classes, we do the opposite: generally, a method's symbol
+  //   can be hidden from other translation units, because we want to enforce
+  //   that resilient access patterns are used for method calls and overrides.
+  //
+  //   Constructors and final methods are the exception here, because they can
+  //   be called directly.
+
+  // FIXME: This is too narrow. Any class with resilient metadata should
+  // probably have this, at least for method overrides that don't add new
+  // vtable entries.
+  bool isResilientClass = classType->isResilient();
 
   if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
+    if (isResilientClass)
+      return SubclassScope::NotApplicable;
     // Initializing entry points do not appear in the vtable.
     if (kind == SILDeclRef::Kind::Initializer)
       return SubclassScope::NotApplicable;
-    // Non-required convenience inits do not apper in the vtable.
+    // Non-required convenience inits do not appear in the vtable.
     if (!CD->isRequired() && !CD->isDesignatedInit())
       return SubclassScope::NotApplicable;
   } else if (isa<DestructorDecl>(decl)) {
-    // Detructors do not appear in the vtable.
+    // Destructors do not appear in the vtable.
     return SubclassScope::NotApplicable;
   } else {
     assert(isa<FuncDecl>(decl));
   }
 
-  DeclContext *context = decl->getDeclContext();
-
-  // Methods from extensions don't go in the vtable.
-  if (isa<ExtensionDecl>(context))
-    return SubclassScope::NotApplicable;
-
-  // Various forms of thunks don't either.
+  // Various forms of thunks don't go in the vtable.
   if (isThunk() || isForeign)
     return SubclassScope::NotApplicable;
 
@@ -978,34 +1030,41 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (isDefaultArgGenerator())
     return SubclassScope::NotApplicable;
 
-  // Only non-final methods in non-final classes go in the vtable.
-  auto *classType = context->getSelfClassDecl();
-  if (!classType || classType->isFinal())
-    return SubclassScope::NotApplicable;
+  if (decl->isFinal()) {
+    // Final methods only go in the vtable if they override something.
+    if (!decl->getOverriddenDecl())
+      return SubclassScope::NotApplicable;
 
-  if (decl->isFinal())
-    return SubclassScope::NotApplicable;
+    // In the resilient case, we're going to be making symbols _less_
+    // visible, so make sure we stop now; final methods can always be
+    // called directly.
+    if (isResilientClass)
+      return SubclassScope::Internal;
+  }
 
   assert(decl->getEffectiveAccess() <= classType->getEffectiveAccess() &&
          "class must be as visible as its members");
 
-  // FIXME: This is too narrow. Any class with resilient metadata should
-  // probably have this, at least for method overrides that don't add new
-  // vtable entries.
-  if (classType->isResilient()) {
-    if (isa<ConstructorDecl>(decl))
-      return SubclassScope::NotApplicable;
+  if (isResilientClass) {
+    // The symbol should _only_ be reached via the vtable, so we're
+    // going to make it hidden.
     return SubclassScope::Resilient;
   }
 
   switch (classType->getEffectiveAccess()) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
+    // If the class is private, it can only be subclassed from the same
+    // SILModule, so we don't need to do anything.
     return SubclassScope::NotApplicable;
   case AccessLevel::Internal:
   case AccessLevel::Public:
+    // If the class is internal or public, it can only be subclassed from
+    // the same AST Module, but possibly a different SILModule.
     return SubclassScope::Internal;
   case AccessLevel::Open:
+    // If the class is open, it can be subclassed from a different
+    // AST Module. All method symbols are public.
     return SubclassScope::External;
   }
 
@@ -1013,7 +1072,7 @@ SubclassScope SILDeclRef::getSubclassScope() const {
 }
 
 unsigned SILDeclRef::getParameterListCount() const {
-  if (isCurried || !hasDecl() || kind == Kind::DefaultArgGenerator)
+  if (!hasDecl() || kind == Kind::DefaultArgGenerator)
     return 1;
 
   auto *vd = getDecl();
@@ -1052,7 +1111,7 @@ bool SILDeclRef::canBeDynamicReplacement() const {
 bool SILDeclRef::isDynamicallyReplaceable() const {
   if (kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
-  if (isStoredPropertyInitializer())
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer())
     return false;
 
   // Class allocators are not dynamic replaceable.

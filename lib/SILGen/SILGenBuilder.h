@@ -115,16 +115,26 @@ public:
                                            ManagedValue originalValue);
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
-  using SILBuilder::createCopy##Name##Value;                             \
-  ManagedValue createCopy##Name##Value(SILLocation loc,                        \
-                                       ManagedValue originalValue);
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  ManagedValue createUnsafeCopy##Name##Value(SILLocation loc, \
+  using SILBuilder::createStrongCopy##Name##Value;                             \
+  ManagedValue createStrongCopy##Name##Value(SILLocation loc,                  \
+                                             ManagedValue originalValue);
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  using SILBuilder::createStrongCopy##Name##Value;                             \
+  ManagedValue createStrongCopy##Name##Value(SILLocation loc,                  \
                                              ManagedValue originalValue);
 #include "swift/AST/ReferenceStorage.def"
 
   ManagedValue createOwnedPhiArgument(SILType type);
   ManagedValue createGuaranteedPhiArgument(SILType type);
+
+  /// For arguments from terminators that are "transforming terminators". These
+  /// types of guaranteed arguments are validated as part of the operand of the
+  /// transforming terminator since transforming terminators are guaranteed to
+  /// be the only predecessor of our parent block.
+  ///
+  /// NOTE: Two examples of transforming terminators are switch_enum,
+  /// checked_cast_br.
+  ManagedValue createGuaranteedTransformingTerminatorArgument(SILType type);
 
   using SILBuilder::createMarkUninitialized;
   ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
@@ -222,32 +232,38 @@ public:
   using SILBuilder::createUnconditionalCheckedCastValue;
   ManagedValue
   createUnconditionalCheckedCastValue(SILLocation loc,
-                                      ManagedValue operand, SILType type);
+                                      ManagedValue op,
+                                      CanType srcFormalTy,
+                                      SILType destLoweredTy,
+                                      CanType destFormalTy);
   using SILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(SILLocation loc,
-                                              ManagedValue operand,
-                                              SILType type);
+                                              ManagedValue op,
+                                              SILType destLoweredTy,
+                                              CanType destFormalTy);
 
   using SILBuilder::createCheckedCastBranch;
   void createCheckedCastBranch(SILLocation loc, bool isExact,
-                               ManagedValue operand, SILType type,
+                               ManagedValue op,
+                               SILType destLoweredTy,
+                               CanType destFormalTy,
                                SILBasicBlock *trueBlock,
                                SILBasicBlock *falseBlock,
                                ProfileCounter Target1Count,
                                ProfileCounter Target2Count);
 
   using SILBuilder::createCheckedCastValueBranch;
-  void createCheckedCastValueBranch(SILLocation loc, ManagedValue operand,
-                                    SILType type, SILBasicBlock *trueBlock,
+  void createCheckedCastValueBranch(SILLocation loc,
+                                    ManagedValue op,
+                                    CanType srcFormalTy,
+                                    SILType destLoweredTy,
+                                    CanType destFormalTy,
+                                    SILBasicBlock *trueBlock,
                                     SILBasicBlock *falseBlock);
 
   using SILBuilder::createUpcast;
   ManagedValue createUpcast(SILLocation loc, ManagedValue original,
                             SILType type);
-
-  using SILBuilder::tryCreateUncheckedRefCast;
-  ManagedValue tryCreateUncheckedRefCast(SILLocation loc, ManagedValue original,
-                                         SILType type);
 
   using SILBuilder::createUncheckedTrivialBitCast;
   ManagedValue createUncheckedTrivialBitCast(SILLocation loc,
@@ -277,6 +293,10 @@ public:
   using SILBuilder::createOpenExistentialBoxValue;
   ManagedValue createOpenExistentialBoxValue(SILLocation loc,
                                           ManagedValue original, SILType type);
+
+  using SILBuilder::createOpenExistentialBox;
+  ManagedValue createOpenExistentialBox(SILLocation loc, ManagedValue original,
+                                        SILType type);
 
   using SILBuilder::createOpenExistentialMetatype;
   ManagedValue createOpenExistentialMetatype(SILLocation loc,
@@ -352,6 +372,10 @@ public:
   using SILBuilder::createProjectBox;
   ManagedValue createProjectBox(SILLocation loc, ManagedValue mv,
                                 unsigned index);
+
+  using SILBuilder::createMarkDependence;
+  ManagedValue createMarkDependence(SILLocation loc, ManagedValue value,
+                                    ManagedValue base);
 };
 
 } // namespace Lowering

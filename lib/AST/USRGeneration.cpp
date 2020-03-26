@@ -11,11 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/USRGeneration.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -213,7 +215,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
     if (auto ClangD = ClangN.getAsDecl()) {
       bool Ignore = clang::index::generateUSRForDecl(ClangD, Buffer);
       if (!Ignore) {
-        return Buffer.str();
+        return std::string(Buffer.str());
       } else {
         return std::string();
       }
@@ -227,7 +229,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
         ClangMacroInfo->getDefinitionLoc(),
         Importer.getClangASTContext().getSourceManager(), Buffer);
     if (!Ignore)
-      return Buffer.str();
+      return std::string(Buffer.str());
     else
       return std::string();
   }
@@ -236,15 +238,14 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
     if (printObjCUSR(D, OS)) {
       return std::string();
     } else {
-      return OS.str();
+      return std::string(OS.str());
     }
   }
 
-  if (!D->hasInterfaceType())
-    return std::string();
+  auto declIFaceTy = D->getInterfaceType();
 
   // Invalid code.
-  if (D->getInterfaceType().findIf([](Type t) -> bool {
+  if (declIFaceTy.findIf([](Type t) -> bool {
         return t->is<ModuleType>();
       }))
     return std::string();
@@ -256,9 +257,6 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
 llvm::Expected<std::string>
 swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
                                             const TypeDecl *D) const {
-  if (!D->hasInterfaceType())
-    return std::string();
-
   if (isa<ModuleDecl>(D))
     return std::string(); // Ignore.
 
@@ -277,7 +275,7 @@ bool ide::printModuleUSR(ModuleEntity Mod, raw_ostream &OS) {
   }
 }
 
-bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
+bool ide::printValueDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   auto result = evaluateOrDefault(D->getASTContext().evaluator,
                                   USRGenerationRequest { D },
                                   std::string());
@@ -308,7 +306,7 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
 
   Mangle::ASTMangler NewMangler;
   std::string Mangled = NewMangler.mangleAccessorEntityAsUSR(AccKind,
-                          SD, getUSRSpacePrefix());
+                          SD, getUSRSpacePrefix(), SD->isStatic());
 
   OS << Mangled;
 
@@ -325,17 +323,31 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
   for (auto D : ED->getMembers()) {
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       OS << getUSRSpacePrefix() << "e:";
-      return printDeclUSR(VD, OS);
+      return printValueDeclUSR(VD, OS);
     }
   }
   OS << getUSRSpacePrefix() << "e:";
-  printDeclUSR(nominal, OS);
+  printValueDeclUSR(nominal, OS);
   for (auto Inherit : ED->getInherited()) {
     if (auto T = Inherit.getType()) {
       if (T->getAnyNominal())
-        return printDeclUSR(T->getAnyNominal(), OS);
+        return printValueDeclUSR(T->getAnyNominal(), OS);
     }
   }
   return true;
 }
 
+bool ide::printDeclUSR(const Decl *D, raw_ostream &OS) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (ide::printValueDeclUSR(VD, OS)) {
+      return true;
+    }
+  } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    if (ide::printExtensionUSR(ED, OS)) {
+      return true;
+    }
+  } else {
+    return true;
+  }
+  return false;
+}

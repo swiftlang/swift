@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/LLVM.h"
@@ -28,11 +29,14 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Triple.h"
-
-#include "tapi/InterfaceFile.h"
+#include "llvm/TextAPI/MachO/InterfaceFile.h"
 
 using namespace swift::irgen;
 using StringSet = llvm::StringSet<>;
+
+namespace llvm {
+class DataLayout;
+}
 
 namespace swift {
 
@@ -40,20 +44,44 @@ struct TBDGenOptions;
 
 namespace tbdgen {
 
+enum class LinkerPlatformId: uint8_t {
+#define LD_PLATFORM(Name, Id) Name = Id,
+#include "ldPlatformKinds.def"
+};
+
+struct InstallNameStore {
+  // The default install name to use when no specific install name is specified.
+  std::string InstallName;
+  // The install name specific to the platform id. This takes precedence over
+  // the default install name.
+  std::map<uint8_t, std::string> PlatformInstallName;
+  StringRef getInstallName(LinkerPlatformId Id) const;
+  void remark(ASTContext &Ctx, StringRef ModuleName) const;
+};
+
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
-  tapi::internal::InterfaceFile &Symbols;
-  tapi::internal::ArchitectureSet Archs;
+  llvm::MachO::InterfaceFile &Symbols;
+  llvm::MachO::TargetList Targets;
   StringSet *StringSymbols;
+  const llvm::DataLayout &DataLayout;
 
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
-  AvailabilityContext AvailCtx;
   const TBDGenOptions &Opts;
 
 private:
-  void addSymbol(StringRef name, tapi::internal::SymbolKind kind =
-                                     tapi::internal::SymbolKind::GlobalSymbol);
+  std::vector<Decl*> DeclStack;
+  std::unique_ptr<std::map<std::string, InstallNameStore>>
+    previousInstallNameMap;
+  std::unique_ptr<std::map<std::string, InstallNameStore>>
+    parsePreviousModuleInstallNameMap();
+  void addSymbolInternal(StringRef name, llvm::MachO::SymbolKind kind,
+                         bool isLinkerDirective = false);
+  void addLinkerDirectiveSymbolsLdHide(StringRef name, llvm::MachO::SymbolKind kind);
+  void addLinkerDirectiveSymbolsLdPrevious(StringRef name, llvm::MachO::SymbolKind kind);
+  void addSymbol(StringRef name, llvm::MachO::SymbolKind kind =
+                                     llvm::MachO::SymbolKind::GlobalSymbol);
 
   void addSymbol(SILDeclRef declRef);
 
@@ -71,25 +99,31 @@ private:
   void addBaseConformanceDescriptor(BaseConformance conformance);
 
 public:
-  TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
-                tapi::internal::ArchitectureSet archs, StringSet *stringSymbols,
+  TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,
+                llvm::MachO::TargetList targets, StringSet *stringSymbols,
+                const llvm::DataLayout &dataLayout,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, AvailabilityContext availCtx,
-                const TBDGenOptions &opts)
-      : Symbols(symbols), Archs(archs), StringSymbols(stringSymbols),
-        UniversalLinkInfo(universalLinkInfo), SwiftModule(swiftModule),
-        AvailCtx(availCtx), Opts(opts) {}
-
+                ModuleDecl *swiftModule, const TBDGenOptions &opts)
+      : Symbols(symbols), Targets(targets), StringSymbols(stringSymbols),
+        DataLayout(dataLayout), UniversalLinkInfo(universalLinkInfo),
+        SwiftModule(swiftModule), Opts(opts),
+        previousInstallNameMap(parsePreviousModuleInstallNameMap())  {}
+  ~TBDGenVisitor() { assert(DeclStack.empty()); }
   void addMainIfNecessary(FileUnit *file) {
     // HACK: 'main' is a special symbol that's always emitted in SILGen if
     //       the file has an entry point. Since it doesn't show up in the
     //       module until SILGen, we need to explicitly add it here.
-    if (file->hasEntryPoint())
+    //
+    // Make sure to only add the main symbol for the module that we're emitting
+    // TBD for, and not for any statically linked libraries.
+    if (file->hasEntryPoint() && file->getParentModule() == SwiftModule)
       addSymbol("main");
   }
 
   /// Adds the global symbols associated with the first file.
   void addFirstFileSymbols();
+
+  void visitDefaultArguments(ValueDecl *VD, ParameterList *PL);
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
 
@@ -115,7 +149,11 @@ public:
 
   void visitEnumDecl(EnumDecl *ED);
 
+  void visitEnumElementDecl(EnumElementDecl *EED);
+
   void visitDecl(Decl *D) {}
+
+  void visit(Decl *D);
 };
 } // end namespace tbdgen
 } // end namespace swift

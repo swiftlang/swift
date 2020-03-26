@@ -97,6 +97,9 @@ struct EnumValueWitnessTable : ValueWitnessTable {
 #define WANT_ONLY_ENUM_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
   ValueWitnessTypes::LOWER_ID LOWER_ID;
+#define FUNCTION_VALUE_WITNESS(LOWER_ID, UPPER_ID, RET, PARAMS) \
+  ValueWitnessTypes::LOWER_ID LOWER_ID;
+
 #include "swift/ABI/ValueWitness.def"
 
   constexpr EnumValueWitnessTable()
@@ -106,9 +109,11 @@ struct EnumValueWitnessTable : ValueWitnessTable {
       destructiveInjectEnumTag(nullptr) {}
   constexpr EnumValueWitnessTable(
           const ValueWitnessTable &base,
-          ValueWitnessTypes::getEnumTag getEnumTag,
-          ValueWitnessTypes::destructiveProjectEnumData destructiveProjectEnumData,
-          ValueWitnessTypes::destructiveInjectEnumTag destructiveInjectEnumTag)
+          ValueWitnessTypes::getEnumTagUnsigned getEnumTag,
+          ValueWitnessTypes::destructiveProjectEnumDataUnsigned
+            destructiveProjectEnumData,
+          ValueWitnessTypes::destructiveInjectEnumTagUnsigned
+            destructiveInjectEnumTag)
     : ValueWitnessTable(base),
       getEnumTag(getEnumTag),
       destructiveProjectEnumData(destructiveProjectEnumData),

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -enable-ownership-stripping-after-serialization -primary-file %s -o /dev/null -verify
 //
 // These are tests for diagnostics produced by constant propagation pass.
 // Due to the change in the implementation of Integer initializers some of the

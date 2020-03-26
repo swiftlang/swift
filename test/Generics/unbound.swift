@@ -59,14 +59,14 @@ class SomeClassWithInvalidMethod {
 // <rdar://problem/20792596> QoI: Cannot invoke with argument list (T), expected an argument list of (T)
 protocol r20792596P {}
 
-func foor20792596<T: r20792596P>(x: T) -> T {
+func foor20792596<T: r20792596P>(x: T) -> T { // expected-note {{where 'T' = 'T'}}
   return x
 }
 
 func callfoor20792596<T>(x: T) -> T {
   return foor20792596(x)
   // expected-error@-1 {{missing argument label 'x:' in call}}
-  // expected-error@-2 {{argument type 'T' does not conform to expected type 'r20792596P'}}
+  // expected-error@-2 {{global function 'foor20792596(x:)' requires that 'T' conform to 'r20792596P'}}
 }
 
 // <rdar://problem/31181895> parameter "not used in function signature" when part of a superclass constraint

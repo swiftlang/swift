@@ -14,5 +14,5 @@ struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}}
 
 // FIXME: Lousy diagnostics on this case.
 protocol SR9224_Foo: SR9224_Foobar {} // expected-error 2 {{protocol 'SR9224_Foo' refines itself}}
-protocol SR9224_Bar: SR9224_Foobar {} // expected-error {{protocol 'SR9224_Bar' refines itself}} expected-note {{protocol 'SR9224_Bar' declared here}}
+protocol SR9224_Bar: SR9224_Foobar {} // expected-note {{protocol 'SR9224_Bar' declared here}}
 typealias SR9224_Foobar = SR9224_Foo & SR9224_Bar

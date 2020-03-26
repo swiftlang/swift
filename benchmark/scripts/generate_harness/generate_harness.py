@@ -21,12 +21,12 @@ import os
 import subprocess
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
-perf_dir = os.path.realpath(os.path.join(script_dir, '../..'))
-gyb = os.path.realpath(os.path.join(perf_dir, '../utils/gyb'))
+perf_dir = os.path.realpath(os.path.join(script_dir, "../.."))
+gyb = os.path.realpath(os.path.join(perf_dir, "../utils/gyb"))
 parser = argparse.ArgumentParser()
-parser.add_argument("--output-dir",
-                    help="Output directory (for validation test)",
-                    default=perf_dir)
+parser.add_argument(
+    "--output-dir", help="Output directory (for validation test)", default=perf_dir
+)
 args = parser.parse_args()
 output_dir = args.output_dir
 
@@ -35,7 +35,8 @@ def all_files(directory, extension):  # matching: [directory]/**/*[extension]
     return [
         os.path.join(root, f)
         for root, _, files in os.walk(directory)
-        for f in files if f.endswith(extension)
+        for f in files
+        if f.endswith(extension)
     ]
 
 
@@ -46,13 +47,13 @@ def will_write(filename):  # ensure path to file exists before writing
         os.makedirs(output_path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Generate Your Boilerplate
     # Make sure longer paths are done first as CMakeLists.txt and main.swift
     # depend on the other gybs being generated first.
-    gyb_files = sorted(all_files(perf_dir, '.gyb'), key=len, reverse=True)
+    gyb_files = sorted(all_files(perf_dir, ".gyb"), key=len, reverse=True)
     for f in gyb_files:
         relative_path = os.path.relpath(f[:-4], perf_dir)
         out_file = os.path.join(output_dir, relative_path)
         will_write(out_file)
-        subprocess.call([gyb, '--line-directive', '', '-o', out_file, f])
+        subprocess.call([gyb, "--line-directive", "", "-o", out_file, f])

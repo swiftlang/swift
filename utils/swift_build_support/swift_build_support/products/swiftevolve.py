@@ -1,4 +1,4 @@
-# swift_build_support/products/skstresstester.py -----------------*- python -*-
+# swift_build_support/products/swiftevolve.py --------------------*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
@@ -10,10 +10,10 @@
 #
 # ----------------------------------------------------------------------------
 
-from . import product
+from . import skstresstester
 
 
-class SwiftEvolve(product.Product):
+class SwiftEvolve(skstresstester.SKStressTester):
     @classmethod
     def product_source_name(cls):
         """product_source_name() -> str
@@ -21,3 +21,17 @@ class SwiftEvolve(product.Product):
         The name of the source code directory of this product.
         """
         return "swift-stress-tester"
+
+    def package_name(self):
+        return 'SwiftEvolve'
+
+    # Inherit the entire build configuration from the SourceKit stress tester
+
+    def should_build(self, host_target):
+        return True
+
+    def should_test(self, host_target):
+        return self.args.test_swiftevolve
+
+    def should_install(self, host_target):
+        return self.args.install_swiftevolve

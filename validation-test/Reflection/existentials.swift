@@ -5,6 +5,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 /*
    This file pokes at the swift_reflection_projectExistential API
@@ -67,6 +68,7 @@ reflect(any: mc)
 // CHECK-64-NEXT:    (struct Swift.Int))
 // CHECK-64: Type info:
 // CHECK-64: (reference kind=strong refcounting=native)
+// CHECK-64: Mangled name: $s12existentials7MyClassCyS2iG
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -76,6 +78,7 @@ reflect(any: mc)
 // CHECK-32-NEXT:   (struct Swift.Int))
 // CHECK-32: Type info:
 // CHECK-32: (reference kind=strong refcounting=native)
+// CHECK-32: Mangled name: $s12existentials7MyClassCyS2iG
 
 // This value fits in the 3-word buffer in the container.
 var smallStruct = MyStruct(x: 1, y: 2, z: 3)
@@ -103,6 +106,7 @@ reflect(any: smallStruct)
 // CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))
+// CHECK-64-NEXT:   Mangled name:  $s12existentials8MyStructVyS3iG
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -126,6 +130,7 @@ reflect(any: smallStruct)
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
+// CHECK-32-NEXT:   Mangled name:  $s12existentials8MyStructVyS3iG
 
 // This value will be copied into a heap buffer, with a
 // pointer to it in the existential.
@@ -192,6 +197,7 @@ reflect(any: largeStruct)
 // CHECK-64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:           (field name=_value offset=0
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
+// CHECK-64-NEXT:   Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itG
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -253,6 +259,41 @@ reflect(any: largeStruct)
 // CHECK-32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:           (field name=_value offset=0
 // CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))))
+// CHECK-32-NEXT:   Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itG
+
+// Function type:
+reflect(any: {largeStruct})
+// CHECK-64: Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itGyc
+// CHECK-32: Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itGyc
+
+// Protocol composition:
+protocol P {}
+protocol Q {}
+protocol Composition : P, Q {}
+struct S : Composition {}
+func getComposition() -> P & Q { return S() }
+reflect(any: getComposition())
+// CHECK-64: Mangled name: $s12existentials1P_AA1Qp
+// CHECK-32: Mangled name: $s12existentials1P_AA1Qp
+
+// Metatype:
+reflect(any: Int.self)
+// CHECK-64: Mangled name: $sSim
+// CHECK-32: Mangled name: $sSim
+
+protocol WithType {
+  associatedtype T
+  func f() -> T
+}
+struct S1 : WithType {
+  typealias T = Int
+  func f() -> Int { return 0 }
+}
+func getWithType<T>(_ t: T)  where T: WithType {
+  reflect(any: T.self)
+}
+getWithType(S1())
+
 
 var he = HasError(singleError: MyError(), errorInComposition: MyError(), customError: MyCustomError(), customErrorInComposition: MyCustomError())
 reflect(any: he)
@@ -290,6 +331,7 @@ reflect(any: he)
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))
 // CHECK-64-NEXT:       (field name=wtable offset=40
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)))))
+// CHECK-64-NEXT:   Mangled name: $s12existentials8HasErrorV
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -324,6 +366,7 @@ reflect(any: he)
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1))
 // CHECK-32-NEXT:       (field name=wtable offset=20
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)))))
+// CHECK-32-NEXT:   Mangled name: $s12existentials8HasErrorV
 
 reflect(error: MyError())
 
@@ -338,6 +381,7 @@ reflect(error: MyError())
 // CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))
+// CHECK-64-NEXT:   Mangled name: $s12existentials7MyErrorV
 
 // CHECK-32: Reflecting an error existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -350,5 +394,6 @@ reflect(error: MyError())
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
+// CHECK-32-NEXT:   Mangled name: $s12existentials7MyErrorV
 
 doneReflecting()

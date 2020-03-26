@@ -39,7 +39,7 @@ XMLValidator::~XMLValidator() { delete Impl; }
 
 void XMLValidator::setSchema(StringRef FileName) {
   assert(Impl->SchemaFileName.empty());
-  Impl->SchemaFileName = FileName;
+  Impl->SchemaFileName = FileName.str();
 }
 
 XMLValidator::Status XMLValidator::validate(const std::string &XML) {

@@ -34,6 +34,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -50,7 +51,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -emit-module \
 // RUN:     -module-name SomeModule \
-// RUN:     -emit-parseable-module-interface-path %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftinterface \
+// RUN:     -emit-module-interface-path %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftinterface \
 // RUN:     -o /dev/null \
 // RUN:     -swift-version 5 \
 // RUN:     -enable-library-evolution \
@@ -66,6 +67,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -89,12 +91,13 @@ print(someFunc())
 // RUN:     %s
 //
 // --- Ensure module cache is populated.
-// RUN: find %t/modulecache -maxdepth 1 -name 'SomeModule-*.swiftmodule' | grep .
+// RUN: ls %t/modulecache/SomeModule-*.swiftmodule
 //
 // --- Built with indexing
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -114,7 +117,7 @@ print(someFunc())
 // --- Prebuild SDK module.
 // RUN: mkdir -p %t/prebuiltcache/SomeModule.swiftmodule
 // RUN: %target-swift-frontend \
-// RUN:     -build-module-from-parseable-interface \
+// RUN:     -compile-module-from-interface \
 // RUN:     -module-name SomeModule \
 // RUN:     -o %t/prebuiltcache/SomeModule.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:     %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftinterface
@@ -123,6 +126,7 @@ print(someFunc())
 // RUN: %target-swift-frontend \
 // RUN:     -typecheck \
 // RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \

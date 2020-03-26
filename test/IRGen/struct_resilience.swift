@@ -15,7 +15,7 @@ import resilient_enum
 // Resilient structs from outside our resilience domain are manipulated via
 // value witnesses
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience30functionWithResilientTypesSize_1f010resilient_A00G0VAFn_A2FnXEtF"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.opaque*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience30functionWithResilientTypesSize_1f010resilient_A00G0VAFn_A2FnXEtF"(%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1, i8* %2, %swift.opaque* %3)
 
 public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) -> Size) -> Size {
 // CHECK: entry:
@@ -60,14 +60,13 @@ public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) 
 // Make sure we use a type metadata accessor function, and load indirect
 // field offsets from it.
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience35functionWithResilientTypesRectangleyy010resilient_A00G0VF"(%T16resilient_struct9RectangleV* noalias nocapture)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience35functionWithResilientTypesRectangleyy010resilient_A00G0VF"(%T16resilient_struct9RectangleV* noalias nocapture %0)
 public func functionWithResilientTypesRectangle(_ r: Rectangle) {
 // CHECK: entry:
 // CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct9RectangleVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i32*
-// CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA_ADDR]], [[INT]] [[IDX:2|4]]
-// CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 2
+// CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, i32* [[METADATA_ADDR]], [[INT]] [[IDX:2|4|6]]
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_PTR]]
 // CHECK-NEXT: [[STRUCT_ADDR:%.*]] = bitcast %T16resilient_struct9RectangleV* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[STRUCT_ADDR]], i32 [[FIELD_OFFSET]]
@@ -90,7 +89,7 @@ public struct MySize {
   public let h: Int
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience32functionWithMyResilientTypesSize_1fAA0eH0VAEn_A2EnXEtF"(%T17struct_resilience6MySizeV* noalias nocapture sret, %T17struct_resilience6MySizeV* noalias nocapture dereferenceable({{8|(16)}}), i8*, %swift.opaque*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience32functionWithMyResilientTypesSize_1fAA0eH0VAEn_A2EnXEtF"(%T17struct_resilience6MySizeV* noalias nocapture sret %0, %T17struct_resilience6MySizeV* noalias nocapture dereferenceable({{8|(16)}}) %1, i8* %2, %swift.opaque* %3)
 public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned MySize) -> MySize) -> MySize {
 
 // There's an alloca for debug info?
@@ -148,8 +147,7 @@ public struct StructWithResilientStorage {
 // CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s17struct_resilience26StructWithResilientStorageVMa"([[INT]] 0)
 // CHECK:      [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i32*
-// CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA_ADDR]], [[INT]] [[IDX:2|4]]
-// CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 2
+// CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, i32* [[METADATA_ADDR]], [[INT]] [[IDX:2|4|6]]
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_PTR]]
 // CHECK-NEXT: [[STRUCT_ADDR:%.*]] = bitcast %T17struct_resilience26StructWithResilientStorageV* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[STRUCT_ADDR]], i32 [[FIELD_OFFSET]]
@@ -182,14 +180,14 @@ public struct ResilientStructWithMethod {
 
 // Corner case -- type is address-only in SIL, but empty in IRGen
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience29partialApplyOfResilientMethod1ryAA0f10StructWithG0V_tF"(%T17struct_resilience25ResilientStructWithMethodV* noalias nocapture)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience29partialApplyOfResilientMethod1ryAA0f10StructWithG0V_tF"(%T17struct_resilience25ResilientStructWithMethodV* noalias nocapture %0)
 public func partialApplyOfResilientMethod(r: ResilientStructWithMethod) {
   _ = r.method
 }
 
 // Type is address-only in SIL, and resilient in IRGen
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience29partialApplyOfResilientMethod1sy010resilient_A04SizeV_tF"(%swift.opaque* noalias nocapture)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience29partialApplyOfResilientMethod1sy010resilient_A04SizeV_tF"(%swift.opaque* noalias nocapture %0)
 public func partialApplyOfResilientMethod(s: Size) {
   _ = s.method
 }
@@ -200,17 +198,19 @@ public func resilientAny(s : ResilientWeakRef) {
   wantsAny(s)
 }
 
-// CHECK-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience12resilientAny1sy0c1_A016ResilientWeakRefV_tF"(%swift.opaque* noalias nocapture)
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience12resilientAny1sy0c1_A016ResilientWeakRefV_tF"(%swift.opaque* noalias nocapture %0)
 // CHECK: entry:
 // CHECK: [[ANY:%.*]] = alloca %Any
 // CHECK: [[META:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct16ResilientWeakRefVMa"([[INT]] 0)
 // CHECK: [[META2:%.*]] = extractvalue %swift.metadata_response %3, 0
-// CHECK: [[TYADDR:%.*]] = getelementptr inbounds %Any, %Any* %1, i32 0, i32 1
-// CHECK:  store %swift.type* [[META2]], %swift.type** [[TYADDR]]
-// CHECK:  call %swift.opaque* @__swift_allocate_boxed_opaque_existential_0(%Any* [[ANY]])
-// CHECK:  call swiftcc void @"$s17struct_resilience8wantsAnyyyypF"(%Any* noalias nocapture dereferenceable({{(32|16)}}) [[ANY]])
-// CHECK:  call void @__swift_destroy_boxed_opaque_existential_0(%Any* [[ANY]])
-// CHECK:  ret void
+// CHECK: [[TYADDR:%.*]] = getelementptr inbounds %Any, %Any* [[ANY]], i32 0, i32 1
+// CHECK: store %swift.type* [[META2]], %swift.type** [[TYADDR]]
+// CHECK: [[BITCAST:%.*]] = bitcast %Any* [[ANY]] to %__opaque_existential_type_0*
+// CHECK: call %swift.opaque* @__swift_allocate_boxed_opaque_existential_0(%__opaque_existential_type_0* [[BITCAST]])
+// CHECK: call swiftcc void @"$s17struct_resilience8wantsAnyyyypF"(%Any* noalias nocapture dereferenceable({{(32|16)}}) [[ANY]])
+// CHECK: [[BITCAST:%.*]] = bitcast %Any* [[ANY]] to %__opaque_existential_type_0*
+// CHECK: call void @__swift_destroy_boxed_opaque_existential_0(%__opaque_existential_type_0* [[BITCAST]])
+// CHECK: ret void
 
 // Make sure that MemoryLayout properties access resilient types' metadata
 // instead of hardcoding sizes based on compile-time layouts.
@@ -296,11 +296,11 @@ public func memoryLayoutDotOffsetOfWithResilientStruct() -> Int? {
 // Public metadata accessor for our resilient struct
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s17struct_resilience6MySizeVMa"
-// CHECK-SAME:    ([[INT]])
+// CHECK-SAME:    ([[INT]] %0)
 // CHECK: ret %swift.metadata_response { %swift.type* bitcast ([[INT]]* getelementptr inbounds {{.*}} @"$s17struct_resilience6MySizeVMf", i32 0, i32 1) to %swift.type*), [[INT]] 0 }
 
 
-// CHECK-LABEL:  define internal swiftcc %swift.metadata_response @"$s17struct_resilience26StructWithResilientStorageVMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL:  define internal swiftcc %swift.metadata_response @"$s17struct_resilience26StructWithResilientStorageVMr"(%swift.type* %0, i8* %1, i8** %2)
 // CHECK: [[FIELDS:%.*]] = alloca [4 x i8**]
 // CHECK: [[TUPLE_LAYOUT:%.*]] = alloca %swift.full_type_layout,
 

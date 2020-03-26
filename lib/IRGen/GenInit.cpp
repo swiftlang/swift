@@ -89,7 +89,7 @@ void TemporarySet::destroyAll(IRGenFunction &IGF) const {
   assert(!hasBeenCleared() && "destroying a set that's been cleared?");
 
   // Deallocate all the temporaries.
-  for (auto &temporary : reversed(Stack)) {
+  for (auto &temporary : llvm::reverse(Stack)) {
     temporary.destroy(IGF);
   }
 }

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -O -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib -emit-module %s -o %t/Swift.swiftmodule
-// RUN: %target-sil-opt -enable-sil-verify-all %t/Swift.swiftmodule -o - | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %t/Swift.swiftmodule -emit-sorted-sil -o - | %FileCheck %s
 
 // Test that early serialization works as expected:
 // - it happens before the performance inlining and thus preserves @_semantics functions
@@ -10,18 +10,6 @@
 public struct Int {
   @inlinable
   public init() {}
-}
-
-// Check that a specialized version of a function is produced
-// CHECK: sil shared [serializable] [_semantics "array.get_capacity"] [canonical] @$sSa12_getCapacitySiyFSi_Tgq5 : $@convention(method) (Array<Int>) -> Int
-
-// Check that a call of a @_semantics function was not inlined if early-serialization is enabled.
-// CHECK: sil [serialized] [canonical] @$ss28userOfSemanticsAnnotatedFuncySiSaySiGF
-// CHECK: function_ref
-// CHECK: apply
-@inlinable
-public func userOfSemanticsAnnotatedFunc(_ a: Array<Int>) -> Int {
-  return a._getCapacity()
 }
 
 @frozen
@@ -37,4 +25,16 @@ public struct Array<T> {
   internal func _getCapacity() -> Int {
     return Int()
   }
+}
+
+// Check that a specialized version of a function is produced
+// CHECK: sil shared [serializable] [_semantics "array.get_capacity"] [canonical] @$sSa12_getCapacitySiyFSi_Tgq5 : $@convention(method) (Array<Int>) -> Int
+
+// Check that a call of a @_semantics function was not inlined if early-serialization is enabled.
+// CHECK: sil [serialized] [canonical] @$ss28userOfSemanticsAnnotatedFuncySiSaySiGF
+// CHECK: function_ref
+// CHECK: apply
+@inlinable
+public func userOfSemanticsAnnotatedFunc(_ a: Array<Int>) -> Int {
+  return a._getCapacity()
 }

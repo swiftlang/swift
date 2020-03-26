@@ -61,9 +61,6 @@ public func useConditionallyAvailableStruct() {
   blackHole(ConditionallyAvailableStruct.self)
 }
 
-// CHECK-OLD-LABEL: declare extern_weak swiftcc %swift.metadata_response @"$s31weak_import_availability_helper28ConditionallyAvailableStructVMa"(i64)
-// CHECK-NEW-LABEL: declare swiftcc %swift.metadata_response @"$s31weak_import_availability_helper28ConditionallyAvailableStructVMa"(i64)
-
 @available(macOS 10.50, *)
 public func useConditionallyAvailableMethod(s: ConditionallyAvailableStruct) {
   s.conditionallyAvailableMethod()

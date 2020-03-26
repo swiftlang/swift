@@ -138,14 +138,60 @@ FRONTEND_STATISTIC(AST, NumPrefixOperators)
 /// Number of precedence groups in the AST context.
 FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
 
+/// Number of local lookups into a module.
+FRONTEND_STATISTIC(AST, NumModuleLookupValue)
+
+/// Number of local lookups into a module's class members, for
+/// AnyObject lookup.
+FRONTEND_STATISTIC(AST, NumModuleLookupClassMember)
+
+/// Number of body scopes for iterable types
+FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopes)
+
+/// Number of expansions of body scopes for iterable types
+FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopeExpansions)
+
+/// Number of brace statment scopes for iterable types
+FRONTEND_STATISTIC(AST, NumBraceStmtASTScopes)
+
+/// Number of expansions of brace statement scopes for iterable types
+FRONTEND_STATISTIC(AST, NumBraceStmtASTScopeExpansions)
+
+/// Number of ASTScope lookups
+FRONTEND_STATISTIC(AST, NumASTScopeLookups)
+
+/// Number of lookups of the cached import graph for a module or
+/// source file.
+FRONTEND_STATISTIC(AST, ImportSetFoldHit)
+FRONTEND_STATISTIC(AST, ImportSetFoldMiss)
+
+FRONTEND_STATISTIC(AST, ImportSetCacheHit)
+FRONTEND_STATISTIC(AST, ImportSetCacheMiss)
+
+FRONTEND_STATISTIC(AST, ModuleVisibilityCacheHit)
+FRONTEND_STATISTIC(AST, ModuleVisibilityCacheMiss)
+
+FRONTEND_STATISTIC(AST, ModuleShadowCacheHit)
+FRONTEND_STATISTIC(AST, ModuleShadowCacheMiss)
+
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 
 /// Number of full braced decl list parsed.
 FRONTEND_STATISTIC(Parse, NumIterableDeclContextParsed)
 
+#define SWIFT_REQUEST(ZONE, NAME, SIG, CACHE, LocOptions) FRONTEND_STATISTIC(Parse, NAME)
+#include "swift/AST/ParseTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 /// Number of conformances that were deserialized by this frontend job.
 FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
+
+/// Number of pairs of modules we've checked for cross-imports.
+FRONTEND_STATISTIC(Sema, NumCrossImportsChecked)
+
+/// Number of pairs of modules we've actually found cross-imports for.
+FRONTEND_STATISTIC(Sema, NumCrossImportsFound)
 
 /// Number of constraint-solving scopes created in the typechecker, while
 /// solving expression type constraints. A rough proxy for "how much work the
@@ -166,31 +212,27 @@ FRONTEND_STATISTIC(Sema, NumLeafScopes)
 /// This is a measure of complexity of the contraction algorithm.
 FRONTEND_STATISTIC(Sema, NumConstraintsConsideredForEdgeContraction)
 
+/// Number of constraint-solving scopes created in the typechecker, while
+/// solving expression type constraints. A rough proxy for "how much work the
+/// expression typechecker did".
+FRONTEND_STATISTIC(Sema, NumCyclicOneWayComponentsCollapsed)
+
 /// Number of declarations that were deserialized. A rough proxy for the amount
 /// of material loaded from other modules.
 FRONTEND_STATISTIC(Sema, NumDeclsDeserialized)
 
-/// Number of declarations validated.
-FRONTEND_STATISTIC(Sema, NumDeclsValidated)
-
 /// Number of declarations type checked.
 FRONTEND_STATISTIC(Sema, NumDeclsTypechecked)
 
-/// Number of declarations finalized.
-FRONTEND_STATISTIC(Sema, NumDeclsFinalized)
+/// Number of synthesized accessors.
+FRONTEND_STATISTIC(Sema, NumAccessorsSynthesized)
 
-/// Number of full function bodies typechecked.
-FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
+/// Number of synthesized accessor bodies.
+FRONTEND_STATISTIC(Sema, NumAccessorBodiesSynthesized)
 
 /// Number of generic signature builders constructed. Rough proxy for
 /// amount of work the GSB does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
-
-/// Number of lazy generic environments registered.
-FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironments)
-
-/// Number of lazy generic environments deserialized.
-FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironmentsLoaded)
 
 /// Number of lazy requirement signatures registered.
 FRONTEND_STATISTIC(Sema, NumLazyRequirementSignatures)
@@ -201,14 +243,8 @@ FRONTEND_STATISTIC(Sema, NumLazyRequirementSignaturesLoaded)
 /// Number of lazy iterable declaration contexts constructed.
 FRONTEND_STATISTIC(Sema, NumLazyIterableDeclContexts)
 
-/// Number of direct member-name lookups performed on nominal types.
-FRONTEND_STATISTIC(Sema, NominalTypeLookupDirectCount)
-
 /// Number of member-name lookups that avoided loading all members.
 FRONTEND_STATISTIC(Sema, NamedLazyMemberLoadSuccessCount)
-
-/// Number of member-name lookups that wound up loading all members.
-FRONTEND_STATISTIC(Sema, NamedLazyMemberLoadFailureCount)
 
 /// Number of types deserialized.
 FRONTEND_STATISTIC(Sema, NumTypesDeserialized)
@@ -219,14 +255,20 @@ FRONTEND_STATISTIC(Sema, NumTypesValidated)
 /// Number of lazy iterable declaration contexts left unloaded.
 FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 
+/// Number of lookups into a module and its imports.
+
 /// All type check requests go into the Sema area.
-#define SWIFT_TYPEID(NAME) FRONTEND_STATISTIC(Sema, NAME)
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(Sema, NAME)
 #include "swift/AST/AccessTypeIDZone.def"
 #include "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/IDE/IDERequestIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
+
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(SILGen, NAME)
+#include "swift/AST/SILGenTypeIDZone.def"
+#undef SWIFT_REQUEST
 
 /// The next 10 statistics count 5 kinds of SIL entities present
 /// after the SILGen and SILOpt phases. The entities are functions,
@@ -238,16 +280,24 @@ FRONTEND_STATISTIC(SILModule, NumSILGenWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILGenDefaultWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILGenGlobalVariables)
 
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(SILOptimizer, NAME)
+#include "swift/AST/SILOptimizerTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 FRONTEND_STATISTIC(SILModule, NumSILOptFunctions)
 FRONTEND_STATISTIC(SILModule, NumSILOptVtables)
 FRONTEND_STATISTIC(SILModule, NumSILOptWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILOptDefaultWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILOptGlobalVariables)
 
-/// The next 9 statistics count kinds of LLVM entities produced
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(IRGen, NAME)
+#include "swift/AST/IRGenTypeIDZone.def"
+#undef SWIFT_REQUEST
+
+/// The next 10 statistics count kinds of LLVM entities produced
 /// during the IRGen phase: globals, functions, aliases, ifuncs,
 /// named metadata, value and comdat symbols, basic blocks,
-/// and instructions.
+/// instructions, and GOT entries.
 FRONTEND_STATISTIC(IRModule, NumIRGlobals)
 FRONTEND_STATISTIC(IRModule, NumIRFunctions)
 FRONTEND_STATISTIC(IRModule, NumIRAliases)
@@ -257,10 +307,15 @@ FRONTEND_STATISTIC(IRModule, NumIRValueSymbols)
 FRONTEND_STATISTIC(IRModule, NumIRComdatSymbols)
 FRONTEND_STATISTIC(IRModule, NumIRBasicBlocks)
 FRONTEND_STATISTIC(IRModule, NumIRInsts)
+FRONTEND_STATISTIC(IRModule, NumGOTEntries)
 
 /// Number of bytes written to the object-file output stream
 /// of the frontend job, which should be the same as the size of
 /// the .o file you find on disk after the frontend exits.
 FRONTEND_STATISTIC(LLVM, NumLLVMBytesOutput)
+
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(TBDGen, NAME)
+#include "swift/AST/TBDGenTypeIDZone.def"
+#undef SWIFT_REQUEST
 
 #endif

@@ -57,11 +57,11 @@ func guardFn(_ l: D, _ r: D) -> Bool { return true }
 // CHECK:       [[TUP:%.*]] = tuple ([[ARG0_COPY:%.*]] : $B, [[ARG1_COPY:%.*]] : $B)
 // CHECK:       [[BORROWED_TUP:%.*]] = begin_borrow [[TUP]]
 // CHECK:       ([[TUP_1:%.*]], [[TUP_2:%.*]]) = destructure_tuple [[BORROWED_TUP]]
-// CHECK:       checked_cast_br [[TUP_1]] : $B to $D, [[R_CAST_YES:bb[0-9]+]], [[R_CAST_NO:bb[0-9]+]]
+// CHECK:       checked_cast_br [[TUP_1]] : $B to D, [[R_CAST_YES:bb[0-9]+]], [[R_CAST_NO:bb[0-9]+]]
 //
 // CHECK:       [[R_CAST_YES]]([[R:%.*]] : @guaranteed $D):
 // CHECK:         [[R2:%.*]] = copy_value [[R]]
-// CHECK:         checked_cast_br [[TUP_2]] : $B to $D, [[L_CAST_YES:bb[0-9]+]], [[L_CAST_NO:bb[0-9]+]]
+// CHECK:         checked_cast_br [[TUP_2]] : $B to D, [[L_CAST_YES:bb[0-9]+]], [[L_CAST_NO:bb[0-9]+]]
 //
 // CHECK:       [[L_CAST_YES]]([[L:%.*]] : @guaranteed $D):
 // CHECK:         [[L2:%.*]] = copy_value [[L]]
@@ -71,8 +71,6 @@ func guardFn(_ l: D, _ r: D) -> Bool { return true }
 // CHECK:       [[GUARD_YES]]:
 // CHECK-NEXT:    destroy_value [[L2]]
 // CHECK-NEXT:    destroy_value [[R2]]
-// CHECK-NEXT:    end_borrow [[L]]
-// CHECK-NEXT:    end_borrow [[R]]
 // CHECK-NEXT:    end_borrow [[BORROWED_TUP]]
 // CHECK-NEXT:    destroy_value [[TUP]]
 // CHECK-NEXT:    br [[EXIT:bb[0-9]+]]
@@ -80,16 +78,11 @@ func guardFn(_ l: D, _ r: D) -> Bool { return true }
 // CHECK:       [[GUARD_NO]]:
 // CHECK-NEXT:    destroy_value [[L2]]
 // CHECK-NEXT:    destroy_value [[R2]]
-// TODO: Infer end_borrow from the input begin_borrow. This should be eliminated.
-// CHECK-NEXT:    end_borrow [[L]]
-// CHECK-NEXT:    end_borrow [[R]]
 // CHECK-NEXT:    end_borrow [[BORROWED_TUP]]
 // CHECK-NEXT:    br [[CONT:bb[0-9]+]]
 //
 // CHECK:       [[L_CAST_NO]]([[LFAIL:%.*]] : @guaranteed $B):
-// CHECK-NEXT:    end_borrow [[LFAIL]]
 // CHECK-NEXT:    destroy_value [[R2]]
-// CHECK-NEXT:    end_borrow [[R]]
 // CHECK-NEXT:    end_borrow [[BORROWED_TUP]]
 // CHECK-NEXT:    br [[CONT]]
 //

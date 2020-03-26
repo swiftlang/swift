@@ -7,4 +7,4 @@
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
 
-// RUN: %{python} -m unittest discover -s %utils/build_swift/ -t %utils/
+// RUN: %{python} %utils/build_swift/run_tests.py

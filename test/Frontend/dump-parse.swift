@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -dump-parse %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -dump-parse %s | %FileCheck %s
 // RUN: not %target-swift-frontend -dump-ast %s | %FileCheck %s -check-prefix=CHECK-AST
 
 // CHECK-LABEL: (func_decl{{.*}}"foo(_:)"

@@ -141,6 +141,12 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
   Bits.BraceStmt.NumElements = elts.size();
   std::uninitialized_copy(elts.begin(), elts.end(),
                           getTrailingObjects<ASTNode>());
+
+#ifndef NDEBUG
+  for (auto elt : elts)
+    if (auto *decl = elt.dyn_cast<Decl *>())
+      assert(!isa<AccessorDecl>(decl) && "accessors should not be added here");
+#endif
 }
 
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
@@ -149,6 +155,22 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   assert(std::none_of(elts.begin(), elts.end(),
                       [](ASTNode node) -> bool { return node.isNull(); }) &&
          "null element in BraceStmt");
+  // Uncomment the following after rdar://53254395 is done:
+  //  if (
+  //    !std::is_sorted(
+  //      elts.begin(), elts.end(),
+  //      [&](ASTNode n1, ASTNode n2) {
+  //        return !ctx.SourceMgr.isBeforeInBuffer(n2.getEndLoc(),
+  //                                              n1.getEndLoc());
+  //      })) {
+  //    llvm::errs() << "Brace statement elements out of order: \n";
+  //    for (auto n: elts) {
+  //      llvm::errs() << n.getOpaqueValue() << ": ";
+  //      n.dump(llvm::errs());
+  //    }
+  //    llvm_unreachable("brace elements out of order")
+  //  }
+
   void *Buffer = ctx.Allocate(totalSizeToAlloc<ASTNode>(elts.size()),
                               alignof(BraceStmt));
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
@@ -283,17 +305,21 @@ bool CatchStmt::isSyntacticallyExhaustive() const {
 
 PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
                                                SourceLoc PoundLoc,
+                                               SourceLoc LParenLoc,
                                        ArrayRef<AvailabilitySpec *> queries,
                                                      SourceLoc RParenLoc) {
   unsigned size = totalSizeToAlloc<AvailabilitySpec *>(queries.size());
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
-  return ::new (Buffer) PoundAvailableInfo(PoundLoc, queries, RParenLoc);
+  return ::new (Buffer) PoundAvailableInfo(PoundLoc, LParenLoc, queries,
+                                           RParenLoc);
 }
 
 SourceLoc PoundAvailableInfo::getEndLoc() const {
   if (RParenLoc.isInvalid()) {
     if (NumQueries == 0) {
-      return PoundLoc;
+      if (LParenLoc.isInvalid())
+        return PoundLoc;
+      return LParenLoc;
     }
     return getQueries()[NumQueries - 1]->getSourceRange().End;
   }

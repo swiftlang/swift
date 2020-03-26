@@ -3,6 +3,5 @@
 
 class Oof {
   @objc dynamic func impliesObjC() { }
-  // expected-error@-1 {{'dynamic' attribute used without importing module 'Foundation'}}
-  // expected-error@-2 {{@objc attribute used without importing module 'Foundation'}}
+  // expected-error@-1 {{@objc attribute used without importing module 'Foundation'}}
 }

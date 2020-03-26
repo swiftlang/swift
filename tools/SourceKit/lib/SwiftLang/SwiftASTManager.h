@@ -43,6 +43,7 @@ namespace SourceKit {
   class SwiftLangSupport;
   class SwiftInvocation;
   struct SwiftStatistics;
+  class GlobalConfig;
   typedef RefPtr<SwiftInvocation> SwiftInvocationRef;
   class EditorDiagConsumer;
 
@@ -89,6 +90,7 @@ typedef std::shared_ptr<SwiftASTConsumer> SwiftASTConsumerRef;
 class SwiftASTManager : public std::enable_shared_from_this<SwiftASTManager> {
 public:
   explicit SwiftASTManager(std::shared_ptr<SwiftEditorDocumentFileMap>,
+                           std::shared_ptr<GlobalConfig> Config,
                            std::shared_ptr<SwiftStatistics> Stats,
                            StringRef RuntimeResourcePath);
   ~SwiftASTManager();

@@ -1,19 +1,19 @@
 // RUN: rm -rf %t/stats-dir
 // RUN: mkdir -p %t/stats-dir
 // RUN: %target-typecheck-verify-swift
-// RUN: not %target-swift-frontend -typecheck -debug-cycles %s -output-request-graphviz %t.dot -stats-output-dir %t/stats-dir 2> %t.cycles
+// RUN: not %target-swift-frontend -typecheck -debug-cycles %s -build-request-dependency-graph -output-request-graphviz %t.dot -stats-output-dir %t/stats-dir 2> %t.cycles
 // RUN: %FileCheck %s < %t.cycles
 // RUN: %FileCheck -check-prefix CHECK-DOT %s  < %t.dot
 
 // Check that we produced superclass type requests.
-// RUN: %{python} %utils/process-stats-dir.py --evaluate 'SuperclassTypeRequest == 17' %t/stats-dir
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'SuperclassTypeRequest == 18' %t/stats-dir
 
-class Left // expected-error {{circular reference}}
+class Left // expected-error {{circular reference}} expected-note {{through reference here}}
     : Right.Hand { // expected-note {{through reference here}}
   class Hand {}
 }
 
-class Right // expected-note {{through reference here}}
+class Right // expected-note 2 {{through reference here}}
   : Left.Hand { // expected-note {{through reference here}}
   class Hand {}
 }
@@ -35,23 +35,24 @@ class Outer {
   class Inner : Outer {}
 }
 
-class Outer2 // expected-error {{circular reference}}
+class Outer2 // expected-error {{circular reference}} expected-note {{through reference here}}
     : Outer2.Inner { // expected-note {{through reference here}}
 
   class Inner {}
 }
 
-class Outer3 // expected-error {{circular reference}}
+class Outer3 // expected-error {{circular reference}} expected-note {{through reference here}}
     : Outer3.Inner<Int> { // expected-note {{through reference here}}
   class Inner<T> {}
 }
 
 // CHECK: ===CYCLE DETECTED===
-// CHECK-NEXT: `--{{.*}}SuperclassDeclRequest({{.*Left}}
-// CHECK:      `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Left@
-// CHECK:          `--{{.*}}SuperclassDeclRequest
-// CHECK:              `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Right@
-// CHECK:                  `--{{.*}}SuperclassDeclRequest{{.*(cyclic dependency)}}
+// CHECK-LABEL: `--{{.*}}HasCircularInheritanceRequest(circular_inheritance.(file).Left@
+// CHECK-NEXT:     `--{{.*}}SuperclassDeclRequest({{.*Left}}
+// CHECK:          `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Left@
+// CHECK:              `--{{.*}}SuperclassDeclRequest
+// CHECK:                  `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Right@
+// CHECK:                      `--{{.*}}SuperclassDeclRequest{{.*(cyclic dependency)}}
 
 // CHECK-DOT: digraph Dependencies
 // CHECK-DOT: label="InheritedTypeRequest
@@ -59,6 +60,7 @@ class Outer3 // expected-error {{circular reference}}
 protocol Initable {
   init()
   // expected-note@-1 {{protocol requires initializer 'init()' with type '()'; do you want to add a stub?}}
+  // expected-note@-2 {{did you mean 'init'?}}
 }
 
 protocol Shape : Circle {}
@@ -70,4 +72,14 @@ class Circle : Initable & Circle {}
 func crash() {
   Circle()
   // expected-error@-1 {{'Circle' cannot be constructed because it has no accessible initializers}}
+}
+
+// FIXME: We shouldn't emit the redundant "circular reference" diagnostics here.
+class WithDesignatedInit : WithDesignatedInit {
+  // expected-error@-1 {{'WithDesignatedInit' inherits from itself}}
+  // expected-error@-2 {{circular reference}}
+  // expected-note@-3 {{through reference here}}
+  // expected-note@-4 2 {{through reference here}}
+
+  init(x: Int) {} // expected-error {{circular reference}}
 }

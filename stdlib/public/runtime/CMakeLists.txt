@@ -37,6 +37,7 @@ set(swift_runtime_sources
     CygwinPort.cpp
     Demangle.cpp
     Enum.cpp
+    ErrorObjectCommon.cpp
     ErrorObjectConstants.cpp
     ErrorObjectNative.cpp
     Errors.cpp
@@ -94,7 +95,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   string(TOLOWER "${sdk}" lowercase_sdk)
 
   # These two libraries are only used with the static swiftcore
-  add_swift_target_library(swiftImageInspectionShared TARGET_LIBRARY STATIC
+  add_swift_target_library(swiftImageInspectionShared STATIC
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
     LINK_FLAGS ${swift_runtime_linker_flags}
@@ -111,6 +112,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
         "${LibraryLocation}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
       DEPENDS
          ${FragileSupportLibrary})
+    add_dependencies(stdlib ${FragileSupportLibrary})
     swift_install_in_component(FILES $<TARGET_FILE:${FragileSupportLibrary}>
                                DESTINATION "lib/swift_static/${lowercase_sdk}/${arch}"
                                COMPONENT stdlib)
@@ -125,6 +127,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
       "${LibraryLocationPrimary}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
       DEPENDS
          ${FragileSupportLibraryPrimary})
+    add_dependencies(stdlib ${FragileSupportLibraryPrimary})
     swift_install_in_component(FILES $<TARGET_FILE:${FragileSupportLibraryPrimary}>
                                DESTINATION "lib/swift_static/${lowercase_sdk}"
                                COMPONENT stdlib)
@@ -150,8 +153,9 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     add_dependencies(static_binary_magic ${swift_image_inspection_${arch}_static})
   endforeach()
   add_dependencies(static_binary_magic ${swift_image_inspection_static_primary_arch})
+  add_dependencies(stdlib static_binary_magic)
 
-  add_swift_target_library(swiftImageInspectionSharedObject OBJECT_LIBRARY TARGET_LIBRARY
+  add_swift_target_library(swiftImageInspectionSharedObject OBJECT_LIBRARY
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
     LINK_FLAGS ${swift_runtime_linker_flags}
@@ -159,11 +163,16 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     INSTALL_IN_COMPONENT never_install)
 endif()
 
-add_swift_target_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
+if(SWIFT_STDLIB_USE_NONATOMIC_RC)
+  set(_RUNTIME_NONATOMIC_FLAGS -DSWIFT_STDLIB_USE_NONATOMIC_RC)
+endif()
+add_swift_target_library(swiftRuntime OBJECT_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
-  C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
+  C_COMPILE_FLAGS
+    ${swift_runtime_library_compile_flags}
+    ${_RUNTIME_NONATOMIC_FLAGS}
   LINK_FLAGS ${swift_runtime_linker_flags}
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT never_install)
@@ -177,6 +186,7 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
     list(APPEND COFF_SDKS ${sdk})
   endif()
 endforeach()
+
 
 add_swift_target_library(swiftImageRegistrationObjectELF
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
@@ -250,6 +260,7 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       add_custom_target(swiftImageRegistration-${arch_suffix}
                         ALL DEPENDS
                           ${swiftImageRegistration-${arch_suffix}})
+      add_dependencies(stdlib swift-stdlib-${arch_suffix} swiftImageRegistration-${arch_suffix})
     endif()
   endforeach()
 endforeach()

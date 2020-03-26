@@ -38,8 +38,7 @@ struct DeclApplicabilityOwner {
     DC(DC), Ty(Ty), ExtensionOrMember(VD) {}
 
   friend llvm::hash_code hash_value(const DeclApplicabilityOwner &CI) {
-    return hash_combine(hash_value(CI.Ty.getPointer()),
-                        hash_value(CI.ExtensionOrMember));
+    return llvm::hash_combine(CI.Ty.getPointer(), CI.ExtensionOrMember);
   }
 
   friend bool operator==(const DeclApplicabilityOwner &lhs,
@@ -83,24 +82,167 @@ public:
   SourceLoc getNearestLoc() const { return SourceLoc(); };
 };
 
+//----------------------------------------------------------------------------//
+// Type relation checking
+//----------------------------------------------------------------------------//
+enum class TypeRelation: uint8_t {
+  ConvertTo,
+};
+
+struct TypePair {
+  Type FirstTy;
+  Type SecondTy;
+  TypePair(Type FirstTy, Type SecondTy): FirstTy(FirstTy), SecondTy(SecondTy) {}
+  TypePair(): TypePair(Type(), Type()) {}
+  friend llvm::hash_code hash_value(const TypePair &TI) {
+    return llvm::hash_combine(TI.FirstTy.getPointer(),
+                              TI.SecondTy.getPointer());
+  }
+
+  friend bool operator==(const TypePair &lhs,
+                         const TypePair &rhs) {
+    return lhs.FirstTy.getPointer() == rhs.FirstTy.getPointer() &&
+      lhs.SecondTy.getPointer() == rhs.SecondTy.getPointer();
+  }
+
+  friend bool operator!=(const TypePair &lhs,
+                         const TypePair &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend void simple_display(llvm::raw_ostream &out,
+                             const TypePair &owner) {
+    out << "<";
+    simple_display(out, owner.FirstTy);
+    out << ", ";
+    simple_display(out, owner.SecondTy);
+    out << ">";
+  }
+};
+
+struct TypeRelationCheckInput {
+  DeclContext *DC;
+  TypePair Pair;
+  TypeRelation Relation;
+  bool OpenArchetypes;
+
+  TypeRelationCheckInput(DeclContext *DC, Type FirstType, Type SecondType,
+                         TypeRelation Relation, bool OpenArchetypes = true):
+    DC(DC), Pair(FirstType, SecondType), Relation(Relation),
+    OpenArchetypes(OpenArchetypes) {}
+
+  friend llvm::hash_code hash_value(const TypeRelationCheckInput &TI) {
+    return llvm::hash_combine(TI.Pair, TI.Relation, TI.OpenArchetypes);
+  }
+
+  friend bool operator==(const TypeRelationCheckInput &lhs,
+                         const TypeRelationCheckInput &rhs) {
+    return lhs.Pair == rhs.Pair && lhs.Relation == rhs.Relation &&
+      lhs.OpenArchetypes == rhs.OpenArchetypes;
+  }
+
+  friend bool operator!=(const TypeRelationCheckInput &lhs,
+                         const TypeRelationCheckInput &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend void simple_display(llvm::raw_ostream &out,
+                               const TypeRelationCheckInput &owner) {
+    out << "Check if ";
+    simple_display(out, owner.Pair);
+    out << " is ";
+    switch(owner.Relation) {
+#define CASE(NAME) case TypeRelation::NAME: out << #NAME << " "; break;
+    CASE(ConvertTo)
+#undef CASE
+    }
+  }
+};
+
+class TypeRelationCheckRequest:
+    public SimpleRequest<TypeRelationCheckRequest,
+                         bool(TypeRelationCheckInput),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                TypeRelationCheckInput Owner) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+};
+
+//----------------------------------------------------------------------------//
+// RootAndResultTypeOfKeypathDynamicMemberRequest
+//----------------------------------------------------------------------------//
+class RootAndResultTypeOfKeypathDynamicMemberRequest:
+    public SimpleRequest<RootAndResultTypeOfKeypathDynamicMemberRequest,
+                         TypePair(SubscriptDecl*),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<TypePair> evaluate(Evaluator &evaluator, SubscriptDecl* SD) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+};
+
+class RootTypeOfKeypathDynamicMemberRequest:
+    public SimpleRequest<RootTypeOfKeypathDynamicMemberRequest,
+                         Type(SubscriptDecl*),
+                         /*Cached in the request above*/CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &evaluator, SubscriptDecl* SD) const {
+    return evaluateOrDefault(SD->getASTContext().evaluator,
+      RootAndResultTypeOfKeypathDynamicMemberRequest{SD}, TypePair()).
+        FirstTy;
+  }
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+};
 
 /// The zone number for the IDE.
-#define SWIFT_IDE_TYPE_CHECK_REQUESTS_TYPEID_ZONE 97
-#define SWIFT_TYPEID_ZONE SWIFT_IDE_TYPE_CHECK_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE IDETypeChecking
 #define SWIFT_TYPEID_HEADER "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_TYPEID(RequestType)                                \
-template<>                                                       \
-inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
-                            const RequestType &request) {        \
-  ++stats.getFrontendCounters().RequestType;                     \
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching, LocOptions)             \
+template<>                                                                     \
+inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,                \
+                            const RequestType &request) {                      \
+  ++stats.getFrontendCounters().RequestType;                                   \
 }
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 } // end namespace swift
 

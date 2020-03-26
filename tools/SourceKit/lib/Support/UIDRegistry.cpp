@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SourceKit/Support/UIdent.h"
 #include "SourceKit/Support/Concurrency.h"
+#include "SourceKit/Support/UIdent.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
 #include <mutex>
 #include <vector>

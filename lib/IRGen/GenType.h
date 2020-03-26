@@ -53,6 +53,7 @@ namespace swift {
   
 namespace irgen {
   class Alignment;
+  class GenericContextScope;
   class ProtocolInfo;
   class Size;
   class FixedTypeInfo;
@@ -86,6 +87,13 @@ public:
 
   IRGenModule &IGM;
 private:
+  // Set using the GenericContextScope RAII object.
+  friend GenericContextScope;
+  CanGenericSignature CurGenericSignature;
+  // Enter a generic context for lowering the parameters of a generic function
+  // type.
+  void setGenericContext(CanGenericSignature signature);
+
   Mode LoweringMode = Mode::Normal;
 
   llvm::DenseMap<ProtocolDecl*, std::unique_ptr<const ProtocolInfo>> Protocols;
@@ -117,6 +125,9 @@ private:
   llvm::StringMap<YAMLTypeInfoNode> LegacyTypeInfos;
   llvm::DenseMap<NominalTypeDecl *, std::string> DeclMangledNames;
 
+  /// The key is the number of witness tables.
+  llvm::DenseMap<unsigned, llvm::StructType *> OpaqueExistentialTypes;
+
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
   const LoadableTypeInfo *createPrimitiveForAlignedPointer(llvm::PointerType *T,
@@ -134,6 +145,8 @@ private:
   const TypeInfo *convertEnumType(TypeBase *key, CanType type, EnumDecl *D);
   const TypeInfo *convertStructType(TypeBase *key, CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(SILFunctionType *T);
+  const TypeInfo *convertNormalDifferentiableFunctionType(SILFunctionType *T);
+  const TypeInfo *convertLinearDifferentiableFunctionType(SILFunctionType *T);
   const TypeInfo *convertBlockStorageType(SILBlockStorageType *T);
   const TypeInfo *convertBoxType(SILBoxType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
@@ -161,6 +174,8 @@ public:
 
   const TypeInfo *getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
+
+  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
@@ -182,13 +197,12 @@ public:
                                             bool isOptional);
 #include "swift/AST/ReferenceStorage.def"
 
-  /// Enter a generic context for lowering the parameters of a generic function
-  /// type.
-  void pushGenericContext(CanGenericSignature signature);
-  
-  /// Exit a generic context.
-  void popGenericContext(CanGenericSignature signature);
+  llvm::Type *getExistentialType(unsigned numWitnessTables);
 
+  /// Retrieve the generic signature for the current generic context, or null if no
+  /// generic environment is active.
+  CanGenericSignature getCurGenericContext() { return CurGenericSignature; }
+  
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.
@@ -203,7 +217,7 @@ private:
 
   /// Read a YAML legacy type layout dump. Returns false on success, true on
   /// error.
-  bool readLegacyTypeInfo(StringRef path);
+  bool readLegacyTypeInfo(llvm::vfs::FileSystem &fs, StringRef path);
 
   Optional<YAMLTypeInfoNode> getLegacyTypeInfo(NominalTypeDecl *decl) const;
 
@@ -219,9 +233,16 @@ private:
     llvm::DenseMap<TypeBase *, const TypeInfo *> IndependentCache[NumLoweringModes];
     llvm::DenseMap<TypeBase *, const TypeInfo *> DependentCache[NumLoweringModes];
 
+    llvm::DenseMap<TypeBase *, const TypeLayoutEntry *>
+        IndependentTypeLayoutCache[NumLoweringModes];
+    llvm::DenseMap<TypeBase *, const TypeLayoutEntry *>
+        DependentTypeLayoutCache[NumLoweringModes];
+
   public:
     llvm::DenseMap<TypeBase *, const TypeInfo *> &getCacheFor(bool isDependent,
                                                               Mode mode);
+    llvm::DenseMap<TypeBase *, const TypeLayoutEntry *> &
+    getTypeLayoutCacheFor(bool isDependent, Mode mode);
   };
   Types_t Types;
 };
@@ -230,12 +251,12 @@ private:
 /// a scope.
 class GenericContextScope {
   TypeConverter &TC;
-  CanGenericSignature sig;
+  CanGenericSignature newSig, oldSig;
 public:
   GenericContextScope(TypeConverter &TC, CanGenericSignature sig)
-    : TC(TC), sig(sig)
+    : TC(TC), newSig(sig), oldSig(TC.CurGenericSignature)
   {
-    TC.pushGenericContext(sig);
+    TC.setGenericContext(newSig);
   }
   
   GenericContextScope(IRGenModule &IGM, CanGenericSignature sig)
@@ -243,7 +264,10 @@ public:
   {}
   
   ~GenericContextScope() {
-    TC.popGenericContext(sig);
+    if (!newSig)
+      return;
+    assert(TC.CurGenericSignature == newSig);
+    TC.setGenericContext(oldSig);
   }
 };
 
@@ -303,7 +327,37 @@ public:
                      Size size,
                      const llvm::Twine &description);
 };
-  
+
+template <class FixedTypeInfoType>
+TypeLayoutEntry *buildTypeLayoutEntryForFields(IRGenModule &IGM, SILType T,
+                                               const FixedTypeInfoType &TI) {
+  std::vector<TypeLayoutEntry *> fields;
+
+  auto minimumAlignment = TI.getFixedAlignment().getValue();
+  Alignment::int_type minFieldAlignment = 1;
+  for (auto &field : TI.getFields()) {
+    auto fieldTy = field.getType(IGM, T);
+    auto fieldAlignment = cast<FixedTypeInfo>(field.getTypeInfo())
+                              .getFixedAlignment()
+                              .getValue();
+    if (minFieldAlignment < fieldAlignment)
+      minFieldAlignment = fieldAlignment;
+    fields.push_back(field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+  }
+
+  if (fields.empty() && minFieldAlignment >= minimumAlignment) {
+    return IGM.typeLayoutCache.getEmptyEntry();
+  }
+
+  if (fields.size() == 1 && minFieldAlignment >= minimumAlignment) {
+    return fields[0];
+  }
+  if (minimumAlignment < minFieldAlignment)
+    minimumAlignment = minFieldAlignment;
+  return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+      fields, minimumAlignment, true);
+}
+
 } // end namespace irgen
 } // end namespace swift
 

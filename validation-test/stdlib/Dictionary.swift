@@ -3000,7 +3000,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 15.0, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
     // Identity of empty dictionaries changed in
     // https://github.com/apple/swift/pull/22527
     var d = getBridgedNonverbatimDictionary([:])
@@ -3295,7 +3295,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+  guard #available(macOS 15.0, iOS 13.0, watchOS 6.0, tvOS 13.0, *) else {
     // Identity of empty dictionaries changed in
     // https://github.com/apple/swift/pull/22527
     return

@@ -133,20 +133,19 @@ void addImageCallback2Sections(const mach_header *mh, intptr_t vmaddr_slide) {
 #endif
 
 void swift::initializeProtocolLookup() {
-  REGISTER_FUNC(
-    addImageCallback<TextSegment, ProtocolsSection,
-                     addImageProtocolsBlockCallback>);
+  REGISTER_FUNC(addImageCallback<TextSegment, ProtocolsSection,
+                                 addImageProtocolsBlockCallbackUnsafe>);
 }
 
 void swift::initializeProtocolConformanceLookup() {
   REGISTER_FUNC(
-    addImageCallback<TextSegment, ProtocolConformancesSection,
-                     addImageProtocolConformanceBlockCallback>);
+      addImageCallback<TextSegment, ProtocolConformancesSection,
+                       addImageProtocolConformanceBlockCallbackUnsafe>);
 }
 void swift::initializeTypeMetadataRecordLookup() {
   REGISTER_FUNC(
-    addImageCallback<TextSegment, TypeMetadataRecordSection,
-                     addImageTypeMetadataRecordBlockCallback>);
+      addImageCallback<TextSegment, TypeMetadataRecordSection,
+                       addImageTypeMetadataRecordBlockCallbackUnsafe>);
 }
 
 void swift::initializeDynamicReplacementLookup() {

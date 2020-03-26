@@ -633,7 +633,7 @@ void ResponseBuilder::Dictionary::set(UIdent Key, const char *Str) {
 
 void ResponseBuilder::Dictionary::set(UIdent Key, StringRef Str) {
   static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), 
-                                      new SKDString(Str));
+                                      new SKDString(std::string(Str)));
 }
 
 void ResponseBuilder::Dictionary::set(UIdent Key, const std::string &Str) {
@@ -649,7 +649,7 @@ void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
                                       ArrayRef<StringRef> Strs) {
   auto ArrayObject = new SKDArray();
   for (auto Str : Strs) {
-    ArrayObject->set(SOURCEKITD_ARRAY_APPEND, new SKDString(Str));
+    ArrayObject->set(SOURCEKITD_ARRAY_APPEND, new SKDString(std::string(Str)));
   }
   static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), ArrayObject);
 }

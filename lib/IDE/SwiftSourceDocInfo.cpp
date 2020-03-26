@@ -139,8 +139,10 @@ static std::vector<CharSourceRange> getEnumParamListInfo(SourceManager &SM,
   for (ParamDecl *Param: *PL) {
     if (Param->isImplicit())
       continue;
-    
-    SourceLoc LabelStart(Param->getTypeLoc().getLoc());
+
+    SourceLoc LabelStart;
+    if (auto *repr = Param->getTypeRepr())
+      LabelStart = repr->getLoc();
     SourceLoc LabelEnd(LabelStart);
     
     if (Param->getNameLoc().isValid()) {
@@ -175,7 +177,7 @@ bool NameMatcher::handleCustomAttrs(Decl *D) {
       // CustomAttr's type, e.g. on `Wrapper` in `@Wrapper(wrappedValue: 10)`.
       SWIFT_DEFER { CustomAttrArg = None; };
       if (Arg && !Arg->isImplicit())
-        CustomAttrArg = {Repr->getLoc(), Arg};
+        CustomAttrArg = Located<Expr*>(Arg, Repr->getLoc());
       if (!Repr->walk(*this))
         return false;
     }
@@ -244,7 +246,7 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
     }
   } else if (ImportDecl *ID = dyn_cast<ImportDecl>(D)) {
     for(const ImportDecl::AccessPathElement &Element: ID->getFullAccessPath()) {
-      tryResolve(ASTWalker::ParentTy(D), Element.second);
+      tryResolve(ASTWalker::ParentTy(D), Element.Loc);
       if (isDone())
         break;
     }
@@ -414,9 +416,9 @@ bool NameMatcher::walkToTypeReprPre(TypeRepr *T) {
   if (isa<ComponentIdentTypeRepr>(T)) {
     // If we're walking a CustomAttr's type we may have an associated call
     // argument to resolve with from its semantic initializer.
-    if (CustomAttrArg.hasValue() && CustomAttrArg->first == T->getLoc()) {
+    if (CustomAttrArg.hasValue() && CustomAttrArg->Loc == T->getLoc()) {
       tryResolve(ASTWalker::ParentTy(T), T->getLoc(), LabelRangeType::CallArg,
-                 getCallArgLabelRanges(getSourceMgr(), CustomAttrArg->second, LabelRangeEndAt::BeforeElemStart));
+                 getCallArgLabelRanges(getSourceMgr(), CustomAttrArg->Item, LabelRangeEndAt::BeforeElemStart));
     } else {
       tryResolve(ASTWalker::ParentTy(T), T->getLoc());
     }
@@ -762,18 +764,21 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
   auto ClangNode = VD->getClangNode();
 
   if (VD->getLoc().isValid()) {
-    unsigned NameLen;
-    if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-      SourceRange R = FD->getSignatureSourceRange();
-      if (R.isInvalid())
-        return;
-      NameLen = getCharLength(SM, R);
-    } else {
-      if (VD->hasName()) {
-        NameLen = VD->getBaseName().userFacingName().size();
-      } else {
-        NameLen = getCharLength(SM, VD->getLoc());
+    auto getSignatureRange = [&](const ValueDecl *VD) -> Optional<unsigned> {
+      if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+        SourceRange R = FD->getSignatureSourceRange();
+        if (R.isValid())
+          return getCharLength(SM, R);
       }
+      return None;
+    };
+    unsigned NameLen;
+    if (auto SigLen = getSignatureRange(VD)) {
+      NameLen = SigLen.getValue();
+    } else if (VD->hasName()) {
+      NameLen = VD->getBaseName().userFacingName().size();
+    } else {
+      NameLen = getCharLength(SM, VD->getLoc());
     }
 
     unsigned DeclBufID = SM.findBufferContainingLoc(VD->getLoc());

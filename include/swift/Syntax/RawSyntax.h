@@ -29,6 +29,7 @@
 #ifndef SWIFT_SYNTAX_RAWSYNTAX_H
 #define SWIFT_SYNTAX_RAWSYNTAX_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/SyntaxArena.h"
@@ -192,7 +193,9 @@ public:
 
   /// Dump a description of this position to the given output stream
   /// for debugging.
-  void dump(llvm::raw_ostream &OS = llvm::errs()) const;
+  void dump(llvm::raw_ostream &OS) const;
+
+  SWIFT_DEBUG_DUMP;
 };
 
 /// An indicator of whether a Syntax node was found or written in the source.
@@ -568,7 +571,7 @@ public:
   void print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const;
 
   /// Dump this piece of syntax recursively for debugging or testing.
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 
   /// Dump this piece of syntax recursively.
   void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;

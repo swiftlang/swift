@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-passmanager"
 
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILFunction.h"
@@ -58,8 +59,8 @@ llvm::cl::opt<std::string> SILBreakOnPass(
     "sil-break-on-pass", llvm::cl::init(""),
     llvm::cl::desc("Break before running a particular function pass"));
 
-llvm::cl::opt<std::string>
-    SILPrintOnlyFun("sil-print-only-function", llvm::cl::init(""),
+llvm::cl::list<std::string>
+    SILPrintOnlyFun("sil-print-only-function", llvm::cl::CommaSeparated,
                     llvm::cl::desc("Only print out the sil for this function"));
 
 llvm::cl::opt<std::string>
@@ -144,7 +145,8 @@ static llvm::cl::opt<DebugOnlyPassNumberOpt, true,
               llvm::cl::ValueRequired);
 
 static bool doPrintBefore(SILTransform *T, SILFunction *F) {
-  if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
+  if (!SILPrintOnlyFun.empty() && F && SILPrintOnlyFun.end() ==
+      std::find(SILPrintOnlyFun.begin(), SILPrintOnlyFun.end(), F->getName()))
     return false;
 
   if (!SILPrintOnlyFuns.empty() && F &&
@@ -168,7 +170,8 @@ static bool doPrintBefore(SILTransform *T, SILFunction *F) {
 }
 
 static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
-  if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
+  if (!SILPrintOnlyFun.empty() && F && SILPrintOnlyFun.end() ==
+      std::find(SILPrintOnlyFun.begin(), SILPrintOnlyFun.end(), F->getName()))
     return false;
 
   if (!SILPrintOnlyFuns.empty() && F &&
@@ -207,7 +210,8 @@ static void printModule(SILModule *Mod, bool EmitVerboseSIL) {
     return;
   }
   for (auto &F : *Mod) {
-    if (!SILPrintOnlyFun.empty() && F.getName().str() == SILPrintOnlyFun)
+    if (!SILPrintOnlyFun.empty() && SILPrintOnlyFun.end() !=
+        std::find(SILPrintOnlyFun.begin(), SILPrintOnlyFun.end(), F.getName()))
       F.dump(EmitVerboseSIL);
 
     if (!SILPrintOnlyFuns.empty() &&
@@ -272,9 +276,25 @@ public:
 
 } // end anonymous namespace
 
-SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage,
-                               bool isMandatoryPipeline)
-    : Mod(M), StageName(Stage), isMandatoryPipeline(isMandatoryPipeline),
+llvm::Expected<bool> ExecuteSILPipelineRequest::evaluate(
+    Evaluator &evaluator, SILPipelineExecutionDescriptor desc) const {
+  SILPassManager PM(desc.SM, desc.IsMandatory, desc.IRMod);
+  PM.executePassPipelinePlan(desc.Plan);
+  return false;
+}
+
+void swift::executePassPipelinePlan(SILModule *SM,
+                                    const SILPassPipelinePlan &plan,
+                                    bool isMandatory,
+                                    irgen::IRGenModule *IRMod) {
+  auto &evaluator = SM->getASTContext().evaluator;
+  SILPipelineExecutionDescriptor desc{SM, plan, isMandatory, IRMod};
+  (void)llvm::cantFail(evaluator(ExecuteSILPipelineRequest{desc}));
+}
+
+SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
+                               irgen::IRGenModule *IRMod)
+    : Mod(M), IRMod(IRMod), isMandatory(isMandatory),
       deserializationNotificationHandler(nullptr) {
 #define ANALYSIS(NAME) \
   Analyses.push_back(create##NAME##Analysis(Mod));
@@ -291,14 +311,8 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage,
   M->registerDeserializationNotificationHandler(std::move(handler));
 }
 
-SILPassManager::SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
-                               llvm::StringRef Stage, bool isMandatoryPipeline)
-    : SILPassManager(M, Stage, isMandatoryPipeline) {
-  this->IRMod = IRMod;
-}
-
 bool SILPassManager::continueTransforming() {
-  if (isMandatoryPipeline)
+  if (isMandatory)
     return true;
   return NumPassesRun < SILNumOptPassesToRun;
 }
@@ -467,7 +481,7 @@ runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
 
     // Only include functions that are definitions, and which have not
     // been intentionally excluded from optimization.
-    if (F.isDefinition() && (isMandatoryPipeline || F.shouldOptimize()))
+    if (F.isDefinition() && (isMandatory || F.shouldOptimize()))
       FunctionWorklist.push_back(*I);
   }
 
@@ -630,8 +644,6 @@ void SILPassManager::execute() {
 
 /// D'tor.
 SILPassManager::~SILPassManager() {
-  assert(IRGenPasses.empty() && "Must add IRGen SIL passes that were "
-                                "registered to the list of transformations");
   // Before we do anything further, verify the module and our analyses. These
   // are natural points with which to verify.
   //
@@ -675,8 +687,8 @@ void SILPassManager::notifyOfNewFunction(SILFunction *F, SILTransform *T) {
 
 void SILPassManager::addFunctionToWorklist(SILFunction *F,
                                            SILFunction *DerivedFrom) {
-  assert(F && F->isDefinition() && (isMandatoryPipeline || F->shouldOptimize())
-         && "Expected optimizable function definition!");
+  assert(F && F->isDefinition() && (isMandatory || F->shouldOptimize()) &&
+         "Expected optimizable function definition!");
 
   constexpr int MaxDeriveLevels = 10;
 
@@ -735,7 +747,7 @@ void SILPassManager::resetAndRemoveTransformations() {
 }
 
 void SILPassManager::setStageName(llvm::StringRef NextStage) {
-  StageName = NextStage;
+  StageName = NextStage.str();
 }
 
 StringRef SILPassManager::getStageName() const {
@@ -745,6 +757,14 @@ StringRef SILPassManager::getStageName() const {
 const SILOptions &SILPassManager::getOptions() const {
   return Mod->getOptions();
 }
+
+namespace {
+enum class IRGenPasses : uint8_t {
+#define PASS(ID, TAG, NAME)
+#define IRGEN_PASS(ID, TAG, NAME) ID,
+#include "swift/SILOptimizer/PassManager/Passes.def"
+};
+} // end anonymous namespace
 
 void SILPassManager::addPass(PassKind Kind) {
   assert(unsigned(PassKind::AllPasses_Last) >= unsigned(Kind) &&
@@ -759,11 +779,12 @@ void SILPassManager::addPass(PassKind Kind) {
   }
 #define IRGEN_PASS(ID, TAG, NAME)                                              \
   case PassKind::ID: {                                                         \
-    SILTransform *T = IRGenPasses[unsigned(Kind)];                             \
+    auto &ctx = Mod->getASTContext();                                          \
+    auto irPasses = ctx.getIRGenSILTransforms();                               \
+    SILTransform *T = irPasses[static_cast<unsigned>(IRGenPasses::ID)]();      \
     assert(T && "Missing IRGen pass?");                                        \
     T->setPassKind(PassKind::ID);                                              \
     Transformations.push_back(T);                                              \
-    IRGenPasses.erase(unsigned(Kind));                                         \
     break;                                                                     \
   }
 #include "swift/SILOptimizer/PassManager/Passes.def"
@@ -937,7 +958,7 @@ namespace llvm {
 
     std::string getNodeLabel(const CallGraph::Node *Node,
                              const CallGraph *Graph) {
-      std::string Label = Node->F->getName();
+      std::string Label = Node->F->getName().str();
       wrap(Label, Node->NumCallSites);
       return Label;
     }

@@ -63,6 +63,18 @@ static inline void forAllTypes(llvm::function_ref<void(file_types::ID)> fn) {
     fn(static_cast<ID>(i));
 }
 
+/// Some files are produced by the frontend and read by the driver in order to
+/// support incremental compilation. Invoke the passed-in function for every
+/// such file type.
+static inline void
+forEachIncrementalOutputType(llvm::function_ref<void(file_types::ID)> fn) {
+  static const std::vector<file_types::ID> incrementalOutputTypes = {
+      file_types::TY_SwiftDeps, file_types::TY_SwiftRanges,
+      file_types::TY_CompiledSource};
+  for (auto type : incrementalOutputTypes)
+    fn(type);
+}
+
 } // end namespace file_types
 } // end namespace swift
 

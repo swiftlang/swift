@@ -378,8 +378,8 @@ internal var _objectPointerLowSpareBitShift: UInt {
     }
 }
 
-#if arch(i386) || arch(arm) || arch(powerpc64) || arch(powerpc64le) || arch(
-  s390x)
+#if arch(i386) || arch(arm) || arch(wasm32) || arch(powerpc64) || arch(
+  powerpc64le) || arch(s390x)
 @inlinable
 internal var _objectPointerIsObjCBit: UInt {
     @inline(__always) get { return 0x0000_0002 }
@@ -689,6 +689,19 @@ func _isUnique_native<T>(_ object: inout T) -> Bool {
 public // @testable
 func _isPOD<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.ispod(type))
+}
+
+/// Returns `true` if `type` is known to refer to a concrete type once all
+/// optimizations and constant folding has occurred at the call site. Otherwise,
+/// this returns `false` if the check has failed.
+///
+/// Note that there may be cases in which, despite `T` being concrete at some
+/// point in the caller chain, this function will return `false`.
+@_alwaysEmitIntoClient
+@_transparent
+public // @testable
+func _isConcrete<T>(_ type: T.Type) -> Bool {
+  return Bool(Builtin.isConcrete(type))
 }
 
 /// Returns `true` if type is a bitwise takable. A bitwise takable type can

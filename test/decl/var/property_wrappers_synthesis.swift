@@ -21,7 +21,7 @@ struct UseWrapper<T: DefaultInit> {
 
   // CHECK: accessor_decl{{.*}}_modify_for=wrapped
   // CHECK: yield_stmt
-  // CHECK: member_ref_expr{{.*}}UseWrapper.wrapped
+  // CHECK: member_ref_expr{{.*}}Wrapper.wrappedValue
   @Wrapper
   var wrapped = T()
 

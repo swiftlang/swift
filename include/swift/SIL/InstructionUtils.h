@@ -25,13 +25,6 @@ namespace swift {
 /// nothing left to strip.
 SILValue getUnderlyingObject(SILValue V);
 
-/// Strip off indexing and address projections.
-///
-/// This is similar to getUnderlyingObject, except that it does not strip any
-/// object-to-address projections, like ref_element_addr. In other words, the
-/// result is always an address value.
-SILValue getUnderlyingAddressRoot(SILValue V);
-
 SILValue getUnderlyingObjectStopAtMarkDependence(SILValue V);
 
 SILValue stripSinglePredecessorArgs(SILValue V);
@@ -55,11 +48,6 @@ SILValue stripUpCasts(SILValue V);
 /// Return the underlying SILValue after stripping off all
 /// upcasts and downcasts.
 SILValue stripClassCasts(SILValue V);
-
-/// Return the underlying SILValue after stripping off non-projection address
-/// casts. The result will still be an address--this does not look through
-/// pointer-to-address.
-SILValue stripAddressAccess(SILValue V);
 
 /// Return the underlying SILValue after stripping off all address projection
 /// instructions.
@@ -142,47 +130,48 @@ bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
 void findClosuresForFunctionValue(SILValue V,
                                   TinyPtrVector<PartialApplyInst *> &results);
 
-/// A utility class for evaluating whether a newly parsed or deserialized
-/// function has qualified or unqualified ownership.
+/// Given a polymorphic builtin \p bi that may be generic and thus have in/out
+/// params, stash all of the information needed for either specializing while
+/// inlining or propagating the type in constant propagation.
 ///
-/// The reason that we are using this is that we would like to avoid needing to
-/// add code to the SILParser or to the Serializer to support this temporary
-/// staging concept of a function having qualified or unqualified
-/// ownership. Once SemanticARC is complete, SILFunctions will always have
-/// qualified ownership, so the notion of an unqualified ownership function will
-/// no longer exist.
-///
-/// Thus we note that there are three sets of instructions in SIL from an
-/// ownership perspective:
-///
-///    a. ownership qualified instructions
-///    b. ownership unqualified instructions
-///    c. instructions that do not have ownership semantics (think literals,
-///       geps, etc).
-///
-/// The set of functions can be split into ownership qualified and ownership
-/// unqualified using the rules that:
-///
-///    a. a function can never contain both ownership qualified and ownership
-///       unqualified instructions.
-///    b. a function that contains only instructions without ownership semantics
-///       is considered ownership qualified.
-///
-/// Thus we can know when parsing/serializing what category of function we have
-/// and set the bit appropriately.
-class FunctionOwnershipEvaluator {
-  NullablePtr<SILFunction> F;
-  bool HasOwnershipQualifiedInstruction = false;
+/// NOTE: If we perform this transformation, our builtin will no longer have any
+/// substitutions since we only substitute to concrete static overloads.
+struct PolymorphicBuiltinSpecializedOverloadInfo {
+  const BuiltinInfo *builtinInfo;
+  Identifier staticOverloadIdentifier;
+  SmallVector<SILType, 8> argTypes;
+  SILType resultType;
+  bool hasOutParam;
+
+private:
+  bool isInitialized;
 
 public:
-  FunctionOwnershipEvaluator() {}
-  FunctionOwnershipEvaluator(SILFunction *F) : F(F) {}
-  void reset(SILFunction *NewF) {
-    F = NewF;
-    HasOwnershipQualifiedInstruction = false;
+  PolymorphicBuiltinSpecializedOverloadInfo()
+      : builtinInfo(nullptr), staticOverloadIdentifier(), argTypes(),
+        resultType(), hasOutParam(false), isInitialized(false) {}
+
+  /// Returns true if we were able to map the polymorphic builtin to a static
+  /// overload. False otherwise.
+  ///
+  /// NOTE: This does not mean that the static overload actually exists.
+  bool init(BuiltinInst *bi);
+
+  bool doesOverloadExist() const {
+    CanBuiltinType builtinType = argTypes.front().getAs<BuiltinType>();
+    return canBuiltinBeOverloadedForType(builtinInfo->ID, builtinType);
   }
-  bool evaluate(SILInstruction *I);
+
+private:
+  bool init(SILFunction *fn, BuiltinValueKind builtinKind,
+            ArrayRef<SILType> oldOperandTypes, SILType oldResultType);
 };
+
+/// Given a polymorphic builtin \p bi, analyze its types and create a builtin
+/// for the static overload that the builtin corresponds to. If \p bi is not a
+/// polymorphic builtin or does not have any available overload for these types,
+/// return SILValue().
+SILValue getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi);
 
 } // end namespace swift
 

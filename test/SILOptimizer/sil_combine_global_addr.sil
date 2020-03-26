@@ -19,7 +19,7 @@ class SomeClass  : SomeProtocol {
 sil hidden [thunk] [always_inline] @foo_ : $@convention(witness_method:SomeProtocol) (@in_guaranteed SomeClass) -> Int {
 bb0(%0 : $*SomeClass):
   %1 = load %0 : $*SomeClass
-  %2 = class_method %1 : $SomeClass, #SomeClass.foo!1 : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
+  %2 = class_method %1 : $SomeClass, #SomeClass.foo : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
   %3 = apply %2(%1) : $@convention(method) (@guaranteed SomeClass) -> Int
   return %3 : $Int
 }
@@ -49,7 +49,7 @@ bb0:
   %8 = alloc_stack $SomeProtocol
   copy_addr %3 to [initialization] %8 : $*SomeProtocol
   %9 = open_existential_addr immutable_access %8 : $*SomeProtocol to $*@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol
-  %10 = witness_method $@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol, #SomeProtocol.foo!1 : <Self where Self : SomeProtocol> (Self) -> () -> Int, %9 : $*@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
+  %10 = witness_method $@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> Int, %9 : $*@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
   %11 = apply %10<@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol>(%9) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
   destroy_addr %8 : $*SomeProtocol
   dealloc_stack %8 : $*SomeProtocol
@@ -92,7 +92,7 @@ bb3(%6 : $*SomeClass):
   %8 = alloc_stack $SomeProtocol
   copy_addr %3 to [initialization] %8 : $*SomeProtocol
   %9 = open_existential_addr immutable_access %8 : $*SomeProtocol to $*@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol
-  %10 = witness_method $@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol, #SomeProtocol.foo!1 : <Self where Self : SomeProtocol> (Self) -> () -> Int, %9 : $*@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
+  %10 = witness_method $@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> Int, %9 : $*@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
   %11 = apply %10<@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol>(%9) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
   destroy_addr %8 : $*SomeProtocol
   dealloc_stack %8 : $*SomeProtocol
@@ -127,7 +127,7 @@ bb0:
   %8 = alloc_stack $SomeProtocol
   copy_addr %3 to [initialization] %8 : $*SomeProtocol
   %9 = open_existential_addr immutable_access %8 : $*SomeProtocol to $*@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol
-  %10 = witness_method $@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol, #SomeProtocol.foo!1 : <Self where Self : SomeProtocol> (Self) -> () -> Int, %9 : $*@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
+  %10 = witness_method $@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> Int, %9 : $*@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
   %11 = apply %10<@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D") SomeProtocol>(%9) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
   destroy_addr %8 : $*SomeProtocol
   dealloc_stack %8 : $*SomeProtocol
@@ -135,9 +135,9 @@ bb0:
 }
 
 sil_vtable SomeClass {
-  #SomeClass.foo!1: (SomeClass) -> () -> Int : @foo
+  #SomeClass.foo: (SomeClass) -> () -> Int : @foo
 }
 
 sil_witness_table hidden SomeClass: SomeProtocol module test {
-  method #SomeProtocol.foo!1: <Self where Self : SomeProtocol> (Self) -> () -> Int : @foo_
+  method #SomeProtocol.foo: <Self where Self : SomeProtocol> (Self) -> () -> Int : @foo_
 }

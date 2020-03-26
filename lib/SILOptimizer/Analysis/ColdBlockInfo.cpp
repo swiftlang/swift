@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/AST/SemanticAttrs.h"
 
 using namespace swift;
 
@@ -83,9 +84,9 @@ ColdBlockInfo::BranchHint ColdBlockInfo::getBranchHint(SILValue Cond,
     if (F->hasSemanticsAttrs()) {
       // fastpath/slowpath attrs are untested because the inliner luckily
       // inlines them before the downstream calls.
-      if (F->hasSemanticsAttr("slowpath"))
+      if (F->hasSemanticsAttr(semantics::SLOWPATH))
         return BranchHint::LikelyFalse;
-      else if (F->hasSemanticsAttr("fastpath"))
+      else if (F->hasSemanticsAttr(semantics::FASTPATH))
         return BranchHint::LikelyTrue;
     }
   }

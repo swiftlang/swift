@@ -98,15 +98,15 @@ set -x
 YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
-TOOLCHAIN_VERSION="swift-LOCAL-${YEAR}-${MONTH}-${DAY}-a"
+TOOLCHAIN_VERSION="5.0.${YEAR}${MONTH}${DAY}"
+TOOLCHAIN_NAME="swift-LOCAL-${YEAR}-${MONTH}-${DAY}-a"
 DARWIN_TOOLCHAIN_VERSION="0.0.${YEAR}${MONTH}${DAY}"
-ARCHIVE="${TOOLCHAIN_VERSION}-${OS_SUFFIX}.tar.gz"
-SYM_ARCHIVE="${TOOLCHAIN_VERSION}-${OS_SUFFIX}-symbols.tar.gz"
+ARCHIVE="${TOOLCHAIN_NAME}-${OS_SUFFIX}.tar.gz"
+SYM_ARCHIVE="${TOOLCHAIN_NAME}-${OS_SUFFIX}-symbols.tar.gz"
 BUNDLE_PREFIX=${BUNDLE_PREFIX:?Please specify a bundle prefix}
 BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
 DISPLAY_NAME_SHORT="Local Swift Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
-TOOLCHAIN_NAME="${TOOLCHAIN_VERSION}"
 
 SWIFT_INSTALLABLE_PACKAGE="${RESULT_DIR}/${ARCHIVE}"
 SWIFT_INSTALL_DIR="${RESULT_DIR}/swift-nightly-install"
@@ -126,5 +126,5 @@ DISTCC_FLAG="${DISTCC_FLAG}"
         darwin_toolchain_display_name="${DISPLAY_NAME}" \
         darwin_toolchain_display_name_short="${DISPLAY_NAME_SHORT}" \
         darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
-        darwin_toolchain_version="${DARWIN_TOOLCHAIN_VERSION}" \
+        darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
         darwin_toolchain_alias="Local"

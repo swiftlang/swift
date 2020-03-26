@@ -734,9 +734,12 @@ namespace {
       return true;
     }
 
-#define LOADABLE_REF_STORAGE_HELPER(Name) \
-    bool visit##Name##ToRefInst(Name##ToRefInst *RHS) { return true; } \
-    bool visitRefTo##Name##Inst(RefTo##Name##Inst *RHS) { return true; }
+#define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
+  bool visit##Name##ToRefInst(Name##ToRefInst *RHS) { return true; }           \
+  bool visitRefTo##Name##Inst(RefTo##Name##Inst *RHS) { return true; }         \
+  bool visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *RHS) {    \
+    return true;                                                               \
+  }
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     LOADABLE_REF_STORAGE_HELPER(Name) \
     bool visitStrongRetain##Name##Inst(const StrongRetain##Name##Inst *RHS) { \
@@ -1169,9 +1172,9 @@ SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
 /// additional handling. It is important to know this information when
 /// you perform such optimizations like e.g. jump-threading.
 bool SILInstruction::isTriviallyDuplicatable() const {
-  if (isa<AllocStackInst>(this) || isa<DeallocStackInst>(this)) {
+  if (isAllocatingStack())
     return false;
-  }
+
   if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
     if (ARI->canAllocOnStack())
       return false;
@@ -1209,9 +1212,6 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // nodes of objc_method type.
   if (isa<DynamicMethodBranchInst>(this))
     return false;
-
-  if (auto *PA = dyn_cast<PartialApplyInst>(this))
-    return !PA->isOnStack();
 
   // If you add more cases here, you should also update SILLoop:canDuplicate.
 

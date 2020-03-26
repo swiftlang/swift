@@ -11,7 +11,7 @@
 
 // RUN: %t/usr/bin/swift -sdk "" -deprecated-integrated-repl -### | %FileCheck -check-prefix=INTEGRATED %s
 
-// INTEGRATED: swift{{c?(\.EXE)?"?}} -frontend -repl
+// INTEGRATED: swift{{c?(\.exe)?"?}} -frontend -repl
 // INTEGRATED: -module-name REPL
 
 

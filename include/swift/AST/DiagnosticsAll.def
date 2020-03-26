@@ -38,6 +38,10 @@
   DIAG(REMARK,ID,Options,Text,Signature)
 #endif
 
+#ifndef FIXIT
+#  define FIXIT(ID, Text, Signature)
+#endif
+
 #define DIAG_NO_UNDEF
 
 #include "DiagnosticsCommon.def"
@@ -60,3 +64,4 @@
 #undef WARNING
 #undef ERROR
 #undef REMARK
+#undef FIXIT

@@ -20,8 +20,7 @@
 #include "swift/Basic/TypeID.h"
 namespace swift {
 
-#define SWIFT_IDE_TYPEID_ZONE 136
-#define SWIFT_TYPEID_ZONE SWIFT_IDE_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE IDETypes
 #define SWIFT_TYPEID_HEADER "swift/IDE/IDETypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 

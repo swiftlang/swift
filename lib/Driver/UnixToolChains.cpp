@@ -42,7 +42,8 @@ std::string
 toolchains::GenericUnix::sanitizerRuntimeLibName(StringRef Sanitizer,
                                                  bool shared) const {
   return (Twine("libclang_rt.") + Sanitizer + "-" +
-          this->getTriple().getArchName() + ".a")
+          this->getTriple().getArchName() +
+          (this->getTriple().isAndroid() ? "-android" : "") + ".a")
       .str();
 }
 
@@ -109,8 +110,30 @@ std::string toolchains::GenericUnix::getTargetForLinker() const {
   return getTriple().str();
 }
 
-bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
-  return true;
+bool toolchains::GenericUnix::addRuntimeRPath(const llvm::Triple &T,
+                                              const llvm::opt::ArgList &Args) const {
+  // If we are building a static executable, do not add a rpath for the runtime
+  // as it is a static binary and the loader will not be invoked.
+  if (Args.hasFlag(options::OPT_static_executable,
+                   options::OPT_no_static_executable, false))
+    return false;
+
+  // If we are building with a static standard library, do not add a rpath for
+  // the runtime because the runtime will be part of the binary and the rpath is
+  // no longer necessary.
+  if (Args.hasFlag(options::OPT_static_stdlib, options::OPT_no_static_stdlib,
+                   false))
+    return false;
+
+  // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
+  // of time the standard library won't be copied.
+
+  // Honour the user's request to add a rpath to the binary.  This defaults to
+  // `true` on non-android and `false` on android since the library must be
+  // copied into the bundle.
+  return Args.hasFlag(options::OPT_toolchain_stdlib_rpath,
+                      options::OPT_no_toolchain_stdlib_rpath,
+                      !T.isAndroid());
 }
 
 ToolChain::InvocationInfo
@@ -120,6 +143,12 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
          "Invalid linker output type.");
 
   ArgStringList Arguments;
+
+  std::string Target = getTargetForLinker();
+  if (!Target.empty()) {
+    Arguments.push_back("-target");
+    Arguments.push_back(context.Args.MakeArgString(Target));
+  }
 
   switch (job.getKind()) {
   case LinkKind::None:
@@ -152,15 +181,29 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   // Configure the toolchain.
-  // By default, use the system clang++ to link.
-  const char *Clang = "clang++";
+  //
+  // By default use the system `clang` to perform the link.  We use `clang` for
+  // the driver here because we do not wish to select a particular C++ runtime.
+  // Furthermore, until C++ interop is enabled, we cannot have a dependency on
+  // C++ code from pure Swift code.  If linked libraries are C++ based, they
+  // should properly link C++.  In the case of static linking, the user can
+  // explicitly specify the C++ runtime to link against.  This is particularly
+  // important for platforms like android where as it is a Linux platform, the
+  // default C++ runtime is `libstdc++` which is unsupported on the target but
+  // as the builds are usually cross-compiled from Linux, libstdc++ is going to
+  // be present.  This results in linking the wrong version of libstdc++
+  // generating invalid binaries.  It is also possible to use different C++
+  // runtimes than the default C++ runtime for the platform (e.g. libc++ on
+  // Windows rather than msvcprt).  When C++ interop is enabled, we will need to
+  // surface this via a driver flag.  For now, opt for the simpler approach of
+  // just using `clang` and avoid a dependency on the C++ runtime.
+  const char *Clang = "clang";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
     // If there is a clang in the toolchain folder, use that instead.
-    if (auto toolchainClang =
-            llvm::sys::findProgramByName("clang++", {toolchainPath})) {
-      Clang = context.Args.MakeArgString(toolchainClang.get());
+    if (auto tool = llvm::sys::findProgramByName("clang", {toolchainPath})) {
+      Clang = context.Args.MakeArgString(tool.get());
     }
 
     // Look for binutils in the toolchain folder.
@@ -171,12 +214,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   if (getTriple().getOS() == llvm::Triple::Linux &&
       job.getKind() == LinkKind::Executable) {
     Arguments.push_back("-pie");
-  }
-
-  std::string Target = getTargetForLinker();
-  if (!Target.empty()) {
-    Arguments.push_back("-target");
-    Arguments.push_back(context.Args.MakeArgString(Target));
   }
 
   bool staticExecutable = false;
@@ -194,9 +231,7 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   getRuntimeLibraryPaths(RuntimeLibPaths, context.Args, context.OI.SDKPath,
                          /*Shared=*/!(staticExecutable || staticStdlib));
 
-  if (!(staticExecutable || staticStdlib) && shouldProvideRPathToLinker()) {
-    // FIXME: We probably shouldn't be adding an rpath here unless we know
-    //        ahead of time the standard library won't be copied.
+  if (addRuntimeRPath(getTriple(), context.Args)) {
     for (auto path : RuntimeLibPaths) {
       Arguments.push_back("-Xlinker");
       Arguments.push_back("-rpath");
@@ -348,15 +383,23 @@ toolchains::GenericUnix::constructInvocation(const StaticLinkJobAction &job,
 
 std::string toolchains::Android::getTargetForLinker() const {
   const llvm::Triple &T = getTriple();
-  if (T.getArch() == llvm::Triple::arm &&
-      T.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7)
-    // Explicitly set the linker target to "androideabi", as opposed to the
-    // llvm::Triple representation of "armv7-none-linux-android".
-    return "armv7-none-linux-androideabi";
-  return T.str();
+  switch (T.getArch()) {
+  default:
+    // FIXME: we should just abort on an unsupported target
+    return T.str();
+  case llvm::Triple::arm:
+  case llvm::Triple::thumb:
+    // Current Android NDK versions only support ARMv7+.  Always assume ARMv7+
+    // for the arm/thumb target.
+    return "armv7-unknown-linux-androideabi";
+  case llvm::Triple::aarch64:
+    return "aarch64-unknown-linux-android";
+  case llvm::Triple::x86:
+    return "i686-unknown-linux-android";
+  case llvm::Triple::x86_64:
+    return "x86_64-unknown-linux-android";
+  }
 }
-
-bool toolchains::Android::shouldProvideRPathToLinker() const { return false; }
 
 std::string toolchains::Cygwin::getDefaultLinker() const {
   // Cygwin uses the default BFD linker, even on ARM.
@@ -364,3 +407,7 @@ std::string toolchains::Cygwin::getDefaultLinker() const {
 }
 
 std::string toolchains::Cygwin::getTargetForLinker() const { return ""; }
+
+std::string toolchains::OpenBSD::getDefaultLinker() const {
+  return "lld";
+}

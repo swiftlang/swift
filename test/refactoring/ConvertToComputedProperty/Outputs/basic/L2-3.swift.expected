@@ -1,0 +1,28 @@
+struct S {
+  var field1: Int {
+return 2
+}
+  var field2 = "2"
+  var field3 = String()
+  static var field4 = 4
+  var y: Int! = 45
+}
+
+class C {
+  static var field1 = S()
+  public var field2 = 2
+  private dynamic var field3 = 5
+  @available(macOS 10.12, *) private static dynamic var field4 = 4
+  let field5 = 5
+}
+
+
+
+
+
+
+
+
+
+
+

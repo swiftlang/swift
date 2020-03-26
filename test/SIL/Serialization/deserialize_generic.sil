@@ -22,5 +22,5 @@ bb0:
 }
 
 // Make sure the function body is deserialized.
-// CHECK-LABEL: sil public_external [serialized] [canonical] @$s11def_generic1AC23convertFromArrayLiteralyACyxGxd_tF : $@convention(method) <T> (@guaranteed Array<T>, @guaranteed A<T>) -> @owned A<T> {
+// CHECK-LABEL: sil public_external [serialized] [canonical] [ossa] @$s11def_generic1AC23convertFromArrayLiteralyACyxGxd_tF : $@convention(method) <T> (@guaranteed Array<T>, @guaranteed A<T>) -> @owned A<T> {
 sil @$s11def_generic1AC23convertFromArrayLiteralyACyxGxd_tF : $@convention(method) <T> (@guaranteed Array<T>, @guaranteed A<T>) -> @owned A<T>

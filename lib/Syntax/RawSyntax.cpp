@@ -325,10 +325,16 @@ void AbsolutePosition::dump(llvm::raw_ostream &OS) const {
   OS << ')';
 }
 
+void AbsolutePosition::dump() const {
+  dump(llvm::errs());
+}
+
 void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind,
                         OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
                         ArrayRef<TriviaPiece> TrailingTrivia) {
   ID.AddInteger(unsigned(TokKind));
+  ID.AddInteger(LeadingTrivia.size());
+  ID.AddInteger(TrailingTrivia.size());
   switch (TokKind) {
 #define TOKEN_DEFAULT(NAME) case tok::NAME:
 #define PUNCTUATOR(NAME, X) TOKEN_DEFAULT(NAME)

@@ -435,6 +435,15 @@ public protocol PublicRefinesInternal : InternalProto {} // expected-error {{pub
 public protocol PublicRefinesPI : PrivateProto, InternalProto {} // expected-error {{public protocol cannot refine a private protocol}}
 public protocol PublicRefinesIP : InternalProto, PrivateProto {} // expected-error {{public protocol cannot refine a private protocol}}
 
+private typealias PrivateTypeAlias = PublicProto; // expected-note {{type declared here}}
+private typealias PrivateCompoundTypeAlias = PublicProto & AnyObject // expected-note {{type declared here}}
+
+protocol DefaultRefinesPrivateClass: PrivateClass {} // expected-error {{protocol must be declared private or fileprivate because it refines a private class}}
+public protocol PublicRefinesPrivateClass: PrivateClass {} // expected-error {{public protocol cannot refine a private class}}
+public protocol PublicRefinesPrivateTypeAlias: PrivateTypeAlias {} // expected-error {{public protocol cannot refine a private type alias}}
+public protocol PublicRefinesPrivateCompoundTypeAlias: PrivateCompoundTypeAlias {} // expected-error {{public protocol cannot refine a private type alias}}
+
+
 
 // expected-note@+1 * {{type declared here}}
 private typealias PrivateInt = Int

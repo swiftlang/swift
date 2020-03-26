@@ -25,6 +25,8 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
+#include "swift/Basic/Debug.h"
+#include "swift/Basic/Located.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -160,9 +162,7 @@ public:
 
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Clone the given type representation.
   TypeRepr *clone(const ASTContext &ctx) const;
@@ -257,30 +257,30 @@ public:
 };
 
 class ComponentIdentTypeRepr : public IdentTypeRepr {
-  SourceLoc Loc;
+  DeclNameLoc Loc;
 
   /// Either the identifier or declaration that describes this
   /// component.
   ///
   /// The initial parsed representation is always an identifier, and
   /// name binding will resolve this to a specific declaration.
-  llvm::PointerUnion<Identifier, TypeDecl *> IdOrDecl;
+  llvm::PointerUnion<DeclNameRef, TypeDecl *> IdOrDecl;
 
   /// The declaration context from which the bound declaration was
   /// found. only valid if IdOrDecl is a TypeDecl.
   DeclContext *DC;
 
 protected:
-  ComponentIdentTypeRepr(TypeReprKind K, SourceLoc Loc, Identifier Id)
+  ComponentIdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id)
     : IdentTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
 
 public:
-  SourceLoc getIdLoc() const { return Loc; }
-  Identifier getIdentifier() const;
+  DeclNameLoc getNameLoc() const { return Loc; }
+  DeclNameRef getNameRef() const;
 
   /// Replace the identifier with a new identifier, e.g., due to typo
   /// correction.
-  void overwriteIdentifier(Identifier newId) { IdOrDecl = newId; }
+  void overwriteNameRef(DeclNameRef newId) { IdOrDecl = newId; }
 
   /// Return true if this has been name-bound already.
   bool isBound() const { return IdOrDecl.is<TypeDecl *>(); }
@@ -306,20 +306,20 @@ public:
 protected:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
-  SourceLoc getLocImpl() const { return Loc; }
+  SourceLoc getLocImpl() const { return Loc.getBaseNameLoc(); }
   friend class TypeRepr;
 };
 
 /// A simple identifier type like "Int".
 class SimpleIdentTypeRepr : public ComponentIdentTypeRepr {
 public:
-  SimpleIdentTypeRepr(SourceLoc Loc, Identifier Id)
+  SimpleIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id)
     : ComponentIdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
 
   // SmallVector::emplace_back will never need to call this because
   // we reserve the right size, but it does try statically.
   SimpleIdentTypeRepr(const SimpleIdentTypeRepr &repr)
-      : SimpleIdentTypeRepr(repr.getLoc(), repr.getIdentifier()) {
+      : SimpleIdentTypeRepr(repr.getNameLoc(), repr.getNameRef()) {
     llvm_unreachable("should not be called dynamically");
   }
 
@@ -329,8 +329,8 @@ public:
   static bool classof(const SimpleIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return getIdLoc(); }
-  SourceLoc getEndLocImpl() const { return getIdLoc(); }
+  SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
+  SourceLoc getEndLocImpl() const { return getNameLoc().getEndLoc(); }
   friend class TypeRepr;
 };
 
@@ -343,7 +343,7 @@ class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
   friend TrailingObjects;
   SourceRange AngleBrackets;
 
-  GenericIdentTypeRepr(SourceLoc Loc, Identifier Id,
+  GenericIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id,
                        ArrayRef<TypeRepr*> GenericArgs,
                        SourceRange AngleBrackets)
     : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
@@ -360,8 +360,8 @@ class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
 
 public:
   static GenericIdentTypeRepr *create(const ASTContext &C,
-                                      SourceLoc Loc,
-                                      Identifier Id,
+                                      DeclNameLoc Loc,
+                                      DeclNameRef Id,
                                       ArrayRef<TypeRepr*> GenericArgs,
                                       SourceRange AngleBrackets);
 
@@ -381,7 +381,7 @@ public:
   static bool classof(const GenericIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return getIdLoc(); }
+  SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
   SourceLoc getEndLocImpl() const { return AngleBrackets.End; }
   friend class TypeRepr;
 };
@@ -472,10 +472,15 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
 ///   (x: Foo, y: Bar) -> Baz
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
-  // These three are only used in SIL mode, which is the only time
-  // we can have polymorphic function values.
+  // The generic params / environment / substitutions fields are only used
+  // in SIL mode, which is the only time we can have polymorphic and
+  // substituted function values.
   GenericParamList *GenericParams;
   GenericEnvironment *GenericEnv;
+  ArrayRef<TypeRepr *> InvocationSubs;
+  GenericParamList *PatternGenericParams;
+  GenericEnvironment *PatternGenericEnv;
+  ArrayRef<TypeRepr *> PatternSubs;
 
   TupleTypeRepr *ArgsTy;
   TypeRepr *RetTy;
@@ -484,16 +489,38 @@ class FunctionTypeRepr : public TypeRepr {
 
 public:
   FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
-                   SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy)
+                   SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy,
+                   GenericParamList *patternGenericParams = nullptr,
+                   ArrayRef<TypeRepr *> patternSubs = {},
+                   ArrayRef<TypeRepr *> invocationSubs = {})
     : TypeRepr(TypeReprKind::Function),
-      GenericParams(genericParams),
-      GenericEnv(nullptr),
+      GenericParams(genericParams), GenericEnv(nullptr),
+      InvocationSubs(invocationSubs),
+      PatternGenericParams(patternGenericParams), PatternGenericEnv(nullptr),
+      PatternSubs(patternSubs),
       ArgsTy(argsTy), RetTy(retTy),
       ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc) {
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+
+  GenericParamList *getPatternGenericParams() const {
+    return PatternGenericParams;
+  }
+  GenericEnvironment *getPatternGenericEnvironment() const {
+    return PatternGenericEnv;
+  }
+
+  ArrayRef<TypeRepr*> getPatternSubstitutions() const { return PatternSubs; }
+  ArrayRef<TypeRepr*> getInvocationSubstitutions() const {
+    return InvocationSubs;
+  }
+
+  void setPatternGenericEnvironment(GenericEnvironment *genericEnv) {
+    assert(PatternGenericEnv == nullptr);
+    PatternGenericEnv = genericEnv;
+  }
 
   void setGenericEnvironment(GenericEnvironment *genericEnv) {
     assert(GenericEnv == nullptr);
@@ -653,7 +680,7 @@ struct TupleTypeReprElement {
   TypeRepr *Type;
   SourceLoc TrailingCommaLoc;
 
-  TupleTypeReprElement() {}
+  TupleTypeReprElement(): Type(nullptr) {}
   TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
 };
 
@@ -665,9 +692,9 @@ struct TupleTypeReprElement {
 /// \endcode
 class TupleTypeRepr final : public TypeRepr,
     private llvm::TrailingObjects<TupleTypeRepr, TupleTypeReprElement,
-                                  std::pair<SourceLoc, unsigned>> {
+                                  Located<unsigned>> {
   friend TrailingObjects;
-  typedef std::pair<SourceLoc, unsigned> SourceLocAndIdx;
+  typedef Located<unsigned> SourceLocAndIdx;
 
   SourceRange Parens;
   
@@ -738,12 +765,12 @@ public:
 
   SourceLoc getEllipsisLoc() const {
     return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].first : SourceLoc();
+      getTrailingObjects<SourceLocAndIdx>()[0].Loc : SourceLoc();
   }
 
   unsigned getEllipsisIndex() const {
     return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].second :
+      getTrailingObjects<SourceLocAndIdx>()[0].Item :
         Bits.TupleTypeRepr.NumElements;
   }
 
@@ -751,8 +778,8 @@ public:
     if (hasEllipsis()) {
       Bits.TupleTypeRepr.HasEllipsis = false;
       getTrailingObjects<SourceLocAndIdx>()[0] = {
-        SourceLoc(),
-        getNumElements()
+        getNumElements(),
+        SourceLoc()
       };
     }
   }

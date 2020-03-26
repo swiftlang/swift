@@ -76,7 +76,7 @@ bb0(%0 : $*P):
   %2 = alloc_stack $P                             
   copy_addr %0 to [initialization] %2 : $*P      
   %4 = open_existential_addr immutable_access %2 : $*P to $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P
-  %5 = witness_method $@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %4 : $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %5 = witness_method $@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %4 : $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %6 = apply %5<@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P>(%4) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   destroy_addr %2 : $*P 
   dealloc_stack %2 : $*P
@@ -111,7 +111,7 @@ bb0(%0 : $*P):
   copy_addr %0 to [initialization] %4 : $*P
   destroy_addr %0 : $*P
   %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P
-  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %8 = apply %7<@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   dealloc_stack %4 : $*P
   return %8 : $Int32
@@ -175,13 +175,13 @@ bb0(%0 : $*P, %1 : $*P):
   copy_addr %0 to [initialization] %4 : $*P
   destroy_addr %0 : $*P
   %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P
-  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %8 = apply %7<@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %9 = alloc_stack $P
   copy_addr %1 to [initialization] %9 : $*P
   destroy_addr %1 : $*P
   %11 = open_existential_addr immutable_access %9 : $*P to $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P
-  %12 = witness_method $@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %11 : $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %12 = witness_method $@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %11 : $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %13 = apply %12<@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P>(%11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %14 = struct_extract %8 : $Int32, #Int32._value
   %15 = struct_extract %13 : $Int32, #Int32._value
@@ -197,9 +197,67 @@ bb0(%0 : $*P, %1 : $*P):
 }
 
 sil_witness_table hidden Klass1: P module dealloc {
-  method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : nil
+  method #P.foo: <Self where Self : P> (Self) -> () -> Int32 : nil
 }
 
 sil_witness_table hidden Klass2: P module dealloc {
-  method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : nil
+  method #P.foo: <Self where Self : P> (Self) -> () -> Int32 : nil
+}
+
+// -----------------------------------------------------------------------------
+// Test composite conformances with superclass constraints where one of
+// the protocol constraints is satisfied by the superclass constraint.
+//
+// <rdar://problem/57025861> "Assertion failed: (conformances.size()
+// == numConformanceRequirements)" in ExistentialSpecializer on
+protocol Plotable {}
+
+class PlotLayer : Plotable {
+  init()
+}
+
+protocol InView {}
+
+class PlotLayerInView : PlotLayer & InView {
+  override init()
+}
+
+class PlotView {
+  @_hasStorage @_hasInitialValue var layers: Container<PlotLayer & Plotable & InView> { get set }
+  public func resolveLayers()
+  init()
+}
+
+struct Container<T> {
+  @_hasStorage @_hasInitialValue var val: T { get set }
+}
+
+// Check that the init_existential instruction was created with all
+// three requirements (the generic parameter only has two
+// requirements).  Relies on assertions during specialization and on
+// the SILVerifier to catch other inconsistencies.
+//
+// CHECK-LABEL: sil shared @$s40testExistentialSpecializeCompositeHelperTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : PlotLayer, τ_0_0 : InView> (@owned τ_0_0, @inout Container<PlotLayer & InView & Plotable>) -> () {
+// CHECK: bb0(%0 : $τ_0_0, %1 : $*Container<PlotLayer & InView & Plotable>):
+// CHECK:   init_existential_ref %0 : $τ_0_0 : $τ_0_0, $PlotLayer & InView & Plotable
+// CHECK-LABEL: } // end sil function '$s40testExistentialSpecializeCompositeHelperTf4en_n'
+sil shared @testExistentialSpecializeCompositeHelper : $@convention(method) (@owned PlotLayer & Plotable & InView, @inout Container<PlotLayer & Plotable & InView>) -> () {
+bb0(%0 : $PlotLayer & Plotable & InView, %1 : $*Container<PlotLayer & Plotable & InView>):
+  %adr = struct_element_addr %1 : $*Container<PlotLayer & Plotable & InView>, #Container.val
+  store %0 to %adr : $*PlotLayer & Plotable & InView
+  %v = tuple ()
+  return %v : $()
+}
+
+sil @testExistentialSpecializeComposite : $@convention(method) (@guaranteed PlotView) -> () {
+bb0(%0 : $PlotView):
+  %ref = alloc_ref $PlotLayerInView
+  strong_retain %ref : $PlotLayerInView
+  %exis = init_existential_ref %ref : $PlotLayerInView : $PlotLayerInView, $PlotLayer & Plotable & InView
+  %array = ref_element_addr %0 : $PlotView, #PlotView.layers
+  %f = function_ref @testExistentialSpecializeCompositeHelper : $@convention(method) (@owned PlotLayer & Plotable & InView, @inout Container<PlotLayer & Plotable & InView>) -> ()
+  %call = apply %f(%exis, %array) : $@convention(method) (@owned PlotLayer & Plotable & InView, @inout Container<PlotLayer & Plotable & InView>) -> ()
+  strong_release %ref : $PlotLayerInView
+  %v = tuple ()
+  return %v : $()
 }

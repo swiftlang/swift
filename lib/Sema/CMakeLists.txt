@@ -1,13 +1,7 @@
-
-if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
-  set(EXTRA_TYPECHECKER_FLAGS "FORCE_BUILD_OPTIMIZED")
-endif()
-
 add_swift_host_library(swiftSema STATIC
   BuilderTransform.cpp
   CSApply.cpp
   CSBindings.cpp
-  CSDiag.cpp
   CSGen.cpp
   CSRanking.cpp
   CSSimplify.cpp
@@ -15,17 +9,18 @@ add_swift_host_library(swiftSema STATIC
   CSStep.cpp
   CSFix.cpp
   CSDiagnostics.cpp
-  CalleeCandidateInfo.cpp
   CodeSynthesis.cpp
   Constraint.cpp
   ConstraintGraph.cpp
   ConstraintLocator.cpp
   ConstraintSystem.cpp
   DebuggerTestingTransform.cpp
+  DerivedConformanceAdditiveArithmetic.cpp
   DerivedConformanceCaseIterable.cpp
   DerivedConformanceCodable.cpp
   DerivedConformanceCodingKey.cpp
   DerivedConformanceEquatableHashable.cpp
+  DerivedConformanceComparable.cpp
   DerivedConformanceError.cpp
   DerivedConformanceRawRepresentable.cpp
   DerivedConformances.cpp
@@ -46,6 +41,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckDecl.cpp
   TypeCheckDeclObjC.cpp
   TypeCheckDeclOverride.cpp
+  TypeCheckDeclPrimary.cpp
   TypeCheckError.cpp
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
@@ -58,14 +54,19 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckREPL.cpp
   TypeCheckRequestFunctions.cpp
   TypeCheckStmt.cpp
+  TypeCheckStorage.cpp
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
   TypeChecker.cpp
-  IDETypeCheckingRequests.cpp
-
-  ${EXTRA_TYPECHECKER_FLAGS})
+  IDETypeCheckingRequests.cpp)
+if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL MSVC)
+    target_compile_options(swiftSema PRIVATE /O2 /Ob2)
+  else()
+    target_compile_options(swiftSema PRIVATE -O3)
+  endif()
+endif()
 target_link_libraries(swiftSema PRIVATE
   swiftAST
   swiftParse
   swiftSerialization)
-

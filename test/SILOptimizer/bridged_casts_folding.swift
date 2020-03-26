@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -O -emit-sil -enforce-exclusivity=unchecked %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -O -emit-sil -enforce-exclusivity=unchecked %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -O -emit-sil %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -906,7 +906,7 @@ var anyHashable: AnyHashable = 0
 // CHECK: [[GLOBAL:%[0-9]+]] = global_addr @$s21bridged_casts_folding11anyHashables03AnyE0Vv
 // CHECK: [[FUNC:%.*]] = function_ref @$ss11AnyHashableV10FoundationE19_bridgeToObjectiveCSo8NSObjectCyF
 // CHECK-NEXT: apply [[FUNC]]([[GLOBAL]])
-// CHECK-NEXT: unconditional_checked_cast {{%.*}} : $NSObject to $NSObjectSubclass
+// CHECK-NEXT: unconditional_checked_cast {{%.*}} : $NSObject to NSObjectSubclass
 // CHECK: } // end sil function '$s21bridged_casts_folding29testUncondCastSwiftToSubclassAA08NSObjectI0CyF'
 @inline(never)
 public func testUncondCastSwiftToSubclass() -> NSObjectSubclass {

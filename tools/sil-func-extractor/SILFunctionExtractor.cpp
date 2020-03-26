@@ -142,7 +142,7 @@ static void getFunctionNames(std::vector<std::string> &Names) {
       if (Token.empty()) {
         break;
       }
-      Names.push_back(Token);
+      Names.push_back(Token.str());
       Buffer = NewBuffer;
     }
   }
@@ -153,12 +153,12 @@ static bool stringInSortedArray(
     llvm::function_ref<bool(const std::string &, const std::string &)> &&cmp) {
   if (list.empty())
     return false;
-  auto iter = std::lower_bound(list.begin(), list.end(), str, cmp);
+  auto iter = std::lower_bound(list.begin(), list.end(), str.str(), cmp);
   // If we didn't find str, return false.
   if (list.end() == iter)
     return false;
 
-  return !cmp(str, *iter);
+  return !cmp(str.str(), *iter);
 }
 
 void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
@@ -277,8 +277,7 @@ int main(int argc, char **argv) {
   if (Invocation.hasSerializedAST()) {
     assert(!CI.hasSILModule() &&
            "performSema() should not create a SILModule.");
-    CI.setSILModule(
-        SILModule::createEmptyModule(CI.getMainModule(), CI.getSILOptions()));
+    CI.createSILModule();
     std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
         CI.getASTContext(), CI.getSILModule(), nullptr);
 
@@ -356,9 +355,13 @@ int main(int argc, char **argv) {
     const StringRef OutputFile =
         OutputFilename.size() ? StringRef(OutputFilename) : "-";
 
+    auto SILOpts = SILOptions();
+    SILOpts.EmitVerboseSIL = EmitVerboseSIL;
+    SILOpts.EmitSortedSIL = EnableSILSortOutput;
+
     if (OutputFile == "-") {
-      CI.getSILModule()->print(llvm::outs(), EmitVerboseSIL, CI.getMainModule(),
-                               EnableSILSortOutput, !DisableASTDump);
+      CI.getSILModule()->print(llvm::outs(), CI.getMainModule(), SILOpts,
+                               !DisableASTDump);
     } else {
       std::error_code EC;
       llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
@@ -367,8 +370,8 @@ int main(int argc, char **argv) {
                      << '\n';
         return 1;
       }
-      CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
-                               EnableSILSortOutput, !DisableASTDump);
+      CI.getSILModule()->print(OS, CI.getMainModule(), SILOpts,
+                               !DisableASTDump);
     }
   }
 }

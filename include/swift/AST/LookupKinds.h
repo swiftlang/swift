@@ -26,6 +26,8 @@ enum class NLKind {
   QualifiedLookup
 };
 
+void simple_display(llvm::raw_ostream &out, NLKind kind);
+
 /// Constants used to customize name lookup.
 enum NLOptions : unsigned {
   /// Consider declarations within protocols to which the context type conforms.
@@ -102,6 +104,8 @@ static inline NLOptions &operator&=(NLOptions &lhs, NLOptions rhs) {
 static inline NLOptions operator~(NLOptions value) {
   return NLOptions(~(unsigned)value);
 }
+
+void simple_display(llvm::raw_ostream &out, NLOptions options);
 
 } // end namespace swift
 

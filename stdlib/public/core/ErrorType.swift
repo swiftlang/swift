@@ -148,7 +148,7 @@ internal func _getErrorCode<T: Error>(_ x: UnsafePointer<T>) -> Int {
 @_silgen_name("")
 internal func _getErrorUserInfoNSDictionary<T: Error>(_ x: UnsafePointer<T>)
 -> AnyObject? {
-  return x.pointee._userInfo.map { $0 as AnyObject }
+  return x.pointee._userInfo.map { $0 }
 }
 
 // Called by the casting machinery to extract an NSError from an Error value.

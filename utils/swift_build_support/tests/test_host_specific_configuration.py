@@ -320,6 +320,23 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertIn('check-swift-only_executable-macosx-x86_64',
                       after.swift_test_run_targets)
 
+    def test_should_allow_testing_only_non_executable_tests(self):
+        args = self.default_args()
+        args.build_osx = True
+        args.test_osx = True
+        args.host_target = 'macosx-x86_64'
+        args.stdlib_deployment_targets = ['macosx-x86_64']
+        args.build_stdlib_deployment_targets = 'all'
+
+        before = HostSpecificConfiguration('macosx-x86_64', args)
+        self.assertIn('check-swift-macosx-x86_64',
+                      before.swift_test_run_targets)
+
+        args.only_non_executable_test = True
+        after = HostSpecificConfiguration('macosx-x86_64', args)
+        self.assertIn('check-swift-only_non_executable-macosx-x86_64',
+                      after.swift_test_run_targets)
+
     def generate_should_build_benchmarks(host_target, build_arg_name):
         def test(self):
             args = self.default_args()
@@ -616,8 +633,11 @@ class ToolchainTestCase(unittest.TestCase):
             build_tvos_simulator=False,
             build_watchos_device=False,
             build_watchos_simulator=False,
+            maccatalyst=False,
+            maccatalyst_ios_tests=False,
             long_test=False,
             only_executable_test=False,
+            only_non_executable_test=False,
             stress_test=False,
             test_android=False,
             test_android_host=False,

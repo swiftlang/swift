@@ -19,6 +19,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -45,6 +46,10 @@ public:
   bool isDone() const { return Cancelled; }
 
 private:
+
+  // FIXME: Remove this
+  bool shouldWalkAccessorsTheOldWay() override { return true; }
+
   bool shouldWalkIntoGenericParams() override {
     return SEWalker.shouldWalkIntoGenericParams();
   }
@@ -69,10 +74,12 @@ private:
   bool passReference(ValueDecl *D, Type Ty, SourceLoc Loc, SourceRange Range,
                      ReferenceMetaData Data);
   bool passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data);
-  bool passReference(ModuleEntity Mod, std::pair<Identifier, SourceLoc> IdLoc);
+  bool passReference(ModuleEntity Mod, Located<Identifier> IdLoc);
 
   bool passSubscriptReference(ValueDecl *D, SourceLoc Loc,
                               ReferenceMetaData Data, bool IsOpenBracket);
+  bool passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
+                                   ReferenceMetaData Data);
 
   bool passCallArgNames(Expr *Fn, TupleExpr *TupleE);
 
@@ -133,7 +140,9 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
         return false;
     }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();
+    SourceRange SR = SourceRange();
+    if (auto *repr = ED->getExtendedTypeRepr())
+      SR = repr->getSourceRange();
     Loc = SR.Start;
     if (Loc.isValid())
       NameLen = ED->getASTContext().SourceMgr.getByteDistance(SR.Start, SR.End);
@@ -181,25 +190,6 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
   bool ShouldVisitChildren;
   if (shouldIgnore(D, ShouldVisitChildren))
     return true;
-
-  // FIXME: rdar://17671977 the initializer for a lazy property has already
-  // been moved into its implicit getter.
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-    if (auto *VD = PBD->getSingleVar()) {
-      if (VD->getAttrs().hasAttribute<LazyAttr>()) {
-        if (auto *Get = VD->getGetter()) {
-          assert((Get->isImplicit() || Get->isInvalid())
-            && "lazy var getter must be either implicitly computed or invalid");
-
-          // Note that an implicit getter may not have the body synthesized
-          // in case the owning PatternBindingDecl is invalid.
-          if (auto *Body = Get->getBody()) {
-            Body->walk(*this);
-          }
-        }
-      }
-    }
-  }
 
   if (isa<ExtensionDecl>(D)) {
     assert(ExtDecls.back() == D);
@@ -256,17 +246,54 @@ static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   assert(E);
 
+  std::pair<bool, Expr *> stopTraversal = { false, nullptr };
+  std::pair<bool, Expr *> skipChildren = { false, E };
+
+  auto doSkipChildren = [&]() -> std::pair<bool, Expr *> {
+    if (!SEWalker.walkToExprPost(E))
+      return stopTraversal;
+    return skipChildren;
+  };
+
   if (isDone())
-    return { false, nullptr };
+    return stopTraversal;
 
   if (ExprsToSkip.count(E) != 0)
-    return { false, E };
+    return skipChildren;
 
   if (!SEWalker.walkToExprPre(E))
-    return { false, E };
+    return skipChildren;
 
   if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
+
+  if (auto *ACE = dyn_cast<AutoClosureExpr>(E)) {
+    if (auto *SubExpr = ACE->getUnwrappedCurryThunkExpr()) {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(SubExpr)) {
+        if (!passReference(DRE->getDecl(), DRE->getType(),
+                           DRE->getNameLoc(),
+                           ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
+                                             OpAccess)))
+          return stopTraversal;
+
+        return doSkipChildren();
+      }
+    }
+
+    return { true, E };
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+    auto *FD = dyn_cast<FuncDecl>(DRE->getDecl());
+    // Handle implicit callAsFunction reference. An explicit reference will be
+    // handled by the usual DeclRefExpr case below.
+    if (DRE->isImplicit() && FD && FD->isCallAsFunctionMethod()) {
+      ReferenceMetaData data(SemaReferenceKind::DeclMemberRef, OpAccess);
+      if (!passCallAsFunctionReference(FD, DRE->getLoc(), data))
+        return {false, nullptr};
+      return {true, E};
+    }
+  }
 
   if (!isa<InOutExpr>(E) &&
       !isa<LoadExpr>(E) &&
@@ -282,13 +309,13 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
-                         std::make_pair(module->getName(), E->getLoc())))
-        return { false, nullptr };
+                         {module->getName(), E->getLoc()}))
+        return stopTraversal;
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
                               DRE->getNameLoc(),
                       ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
                                         OpAccess))) {
-      return { false, nullptr };
+      return stopTraversal;
     }
   } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
     {
@@ -307,31 +334,29 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
       // Visit in source order.
       if (!MRE->getBase()->walk(*this))
-        return { false, nullptr };
+        return stopTraversal;
     }
 
     if (!passReference(MRE->getMember().getDecl(), MRE->getType(),
                        MRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclMemberRef,
                                          OpAccess)))
-      return { false, nullptr };
+      return stopTraversal;
 
     // We already visited the children.
-    if (!walkToExprPost(E))
-      return { false, nullptr };
-    return { false, E };
+    return doSkipChildren();
 
   } else if (auto OtherCtorE = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
     if (!passReference(OtherCtorE->getDecl(), OtherCtorE->getType(),
                        OtherCtorE->getConstructorLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclConstructorRef,
                                          OpAccess)))
-      return { false, nullptr };
+      return stopTraversal;
 
   } else if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
     // Visit in source order.
     if (!SE->getBase()->walk(*this))
-      return { false, nullptr };
+      return stopTraversal;
 
     ValueDecl *SubscrD = nullptr;
     if (SE->hasDecl())
@@ -342,21 +367,19 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
     if (SubscrD) {
       if (!passSubscriptReference(SubscrD, E->getLoc(), data, true))
-        return { false, nullptr };
+        return stopTraversal;
     }
 
     if (!SE->getIndex()->walk(*this))
-      return { false, nullptr };
+      return stopTraversal;
 
     if (SubscrD) {
       if (!passSubscriptReference(SubscrD, E->getEndLoc(), data, false))
-        return { false, nullptr };
+        return stopTraversal;
     }
 
     // We already visited the children.
-    if (!walkToExprPost(E))
-      return { false, nullptr };
-    return { false, E };
+    return doSkipChildren();
 
   } else if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
     for (auto &component : KPE->getComponents()) {
@@ -389,60 +412,54 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   } else if (auto *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
     if (!BinE->getArg()->getElement(0)->walk(*this))
-      return { false, nullptr };
+      return stopTraversal;
     if (!BinE->getFn()->walk(*this))
-      return { false, nullptr };
+      return stopTraversal;
     if (!BinE->getArg()->getElement(1)->walk(*this))
-      return { false, nullptr };
+      return stopTraversal;
 
     // We already visited the children.
-    if (!walkToExprPost(E))
-      return { false, nullptr };
-    return { false, E };
+    return doSkipChildren();
 
   } else if (auto TupleE = dyn_cast<TupleExpr>(E)) {
     if (auto CallE = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
       if (!passCallArgNames(CallE->getFn(), TupleE))
-        return { false, nullptr };
+        return stopTraversal;
     }
   } else if (auto IOE = dyn_cast<InOutExpr>(E)) {
     llvm::SaveAndRestore<Optional<AccessKind>>
       C(this->OpAccess, AccessKind::ReadWrite);
 
     if (!IOE->getSubExpr()->walk(*this))
-      return { false, nullptr };
+      return stopTraversal;
 
     // We already visited the children.
     if (!walkToExprPost(E))
-      return { false, nullptr };
-    return { false, E };
+      return stopTraversal;
+    return skipChildren;
   } else if (auto LE = dyn_cast<LoadExpr>(E)) {
     llvm::SaveAndRestore<Optional<AccessKind>>
       C(this->OpAccess, AccessKind::Read);
 
     if (!LE->getSubExpr()->walk(*this))
-      return { false, nullptr };
+      return stopTraversal;
 
     // We already visited the children.
-    if (!walkToExprPost(E))
-      return { false, nullptr };
-    return { false, E };
+    return doSkipChildren();
   } else if (auto AE = dyn_cast<AssignExpr>(E)) {
     {
       llvm::SaveAndRestore<Optional<AccessKind>>
         C(this->OpAccess, AccessKind::Write);
 
       if (AE->getDest() && !AE->getDest()->walk(*this))
-        return { false, nullptr };
+        return stopTraversal;
     }
 
     if (AE->getSrc() && !AE->getSrc()->walk(*this))
-      return { false, nullptr };
+      return stopTraversal;
 
     // We already visited the children.
-    if (!walkToExprPost(E))
-      return { false, nullptr };
-    return { false, E };
+    return doSkipChildren();
   } else if (auto OEE = dyn_cast<OpenExistentialExpr>(E)) {
     // Record opaque value.
     OpaqueValueMap[OEE->getOpaqueValue()] = OEE->getExistentialValue();
@@ -451,44 +468,39 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     };
 
     if (!OEE->getSubExpr()->walk(*this))
-      return { false, nullptr };
-    if (!walkToExprPost(E))
-      return { false, nullptr };
-    return { false, E };
+      return stopTraversal;
+
+    return doSkipChildren();
   } else if (auto MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
     // Manually walk to original arguments in order. We don't handle
     // OpaqueValueExpr here.
 
     // Original non-escaping closure.
     if (!MTEE->getNonescapingClosureValue()->walk(*this))
-      return { false, nullptr };
+      return stopTraversal;
 
     // Body, which is called by synthesized CallExpr.
     auto *callExpr = cast<CallExpr>(MTEE->getSubExpr());
     if (!callExpr->getFn()->walk(*this))
-      return { false, nullptr };
+      return stopTraversal;
 
-    if (!walkToExprPost(E))
-      return { false, nullptr };
-    return { false, E };
+    return doSkipChildren();
   } else if (auto CUCE = dyn_cast<CollectionUpcastConversionExpr>(E)) {
     // Ignore conversion expressions. We don't handle OpaqueValueExpr here
     // because it's only in conversion expressions. Instead, just walk into
     // sub expression.
     if (!CUCE->getSubExpr()->walk(*this))
-      return { false, nullptr };
-    if (!walkToExprPost(E))
-      return { false, nullptr };
-    return { false, E };
+      return stopTraversal;
+
+    return doSkipChildren();
   } else if (auto OVE = dyn_cast<OpaqueValueExpr>(E)) {
     // Walk into mapped value.
     auto value = OpaqueValueMap.find(OVE);
     if (value != OpaqueValueMap.end()) {
       if (!value->second->walk(*this))
-        return { false, nullptr };
-      if (!walkToExprPost(E))
-        return { false, nullptr };
-      return { false, E };
+        return stopTraversal;
+
+      return doSkipChildren();
     }
   }
 
@@ -501,11 +513,12 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
 
   if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
-      if (auto *ModD = dyn_cast<ModuleDecl>(VD))
-        return passReference(ModD, std::make_pair(IdT->getIdentifier(),
-                                                  IdT->getIdLoc()));
+      if (auto *ModD = dyn_cast<ModuleDecl>(VD)) {
+        auto ident = IdT->getNameRef().getBaseIdentifier();
+        return passReference(ModD, { ident, IdT->getLoc() });
+      }
 
-      return passReference(VD, Type(), DeclNameLoc(IdT->getIdLoc()),
+      return passReference(VD, Type(), IdT->getNameLoc(),
                            ReferenceMetaData(SemaReferenceKind::TypeRef, None));
     }
   }
@@ -639,6 +652,17 @@ bool SemaAnnotator::passSubscriptReference(ValueDecl *D, SourceLoc Loc,
   return Continue;
 }
 
+bool SemaAnnotator::passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
+                                                ReferenceMetaData Data) {
+  CharSourceRange Range =
+      Loc.isValid() ? CharSourceRange(Loc, 1) : CharSourceRange();
+
+  bool Continue = SEWalker.visitCallAsFunctionReference(D, Range, Data);
+  if (!Continue)
+    Cancelled = true;
+  return Continue;
+}
+
 bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
   return passReference(D, Ty, Loc.getBaseNameLoc(), Loc.getSourceRange(), Data);
@@ -660,7 +684,9 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
     }
 
     if (!ExtDecls.empty() && BaseNameLoc.isValid()) {
-      auto ExtTyLoc = ExtDecls.back()->getExtendedTypeLoc().getLoc();
+      SourceLoc ExtTyLoc = SourceLoc();
+      if (auto *repr = ExtDecls.back()->getExtendedTypeRepr())
+        ExtTyLoc = repr->getLoc();
       if (ExtTyLoc.isValid() && ExtTyLoc == BaseNameLoc) {
         ExtDecl = ExtDecls.back();
       }
@@ -678,11 +704,11 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
 }
 
 bool SemaAnnotator::passReference(ModuleEntity Mod,
-                                  std::pair<Identifier, SourceLoc> IdLoc) {
-  if (IdLoc.second.isInvalid())
+                                  Located<Identifier> IdLoc) {
+  if (IdLoc.Loc.isInvalid())
     return true;
-  unsigned NameLen = IdLoc.first.getLength();
-  CharSourceRange Range{ IdLoc.second, NameLen };
+  unsigned NameLen = IdLoc.Item.getLength();
+  CharSourceRange Range{ IdLoc.Loc, NameLen };
   bool Continue = SEWalker.visitModuleReference(Mod, Range);
   if (!Continue)
     Cancelled = true;
@@ -784,6 +810,12 @@ bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
   return IsOpenBracket
              ? visitDeclReference(D, Range, nullptr, nullptr, Type(), Data)
              : true;
+}
+
+bool SourceEntityWalker::visitCallAsFunctionReference(ValueDecl *D,
+                                                      CharSourceRange Range,
+                                                      ReferenceMetaData Data) {
+  return true;
 }
 
 bool SourceEntityWalker::visitCallArgName(Identifier Name,

@@ -22,7 +22,6 @@ class OuterGenericClass<T> {
 protocol OuterProtocol {
   associatedtype Hen
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
-  // expected-note@-1 {{did you mean 'InnerProtocol'?}}
     associatedtype Rooster
     func flip(_ r: Rooster)
     func flop(_ h: Hen) // expected-error{{use of undeclared type 'Hen'}}
@@ -33,7 +32,7 @@ struct ConformsToOuterProtocol : OuterProtocol {
   typealias Hen = Int
 
   func f() { let _ = InnerProtocol.self }
-  // expected-error@-1 {{use of unresolved identifier 'InnerProtocol'}}
+  // expected-error@-1 {{protocol 'InnerProtocol' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
 
 protocol Racoon {
@@ -51,16 +50,17 @@ protocol Racoon {
   }
 }
 
-enum SillyRawEnum : SillyProtocol.InnerClass {}
+enum SillyRawEnum : SillyProtocol.InnerClass {} // expected-error {{an enum with no cases cannot declare a raw type}}
+// expected-error@-1 {{raw type}}
 
 protocol SillyProtocol {
   class InnerClass<T> {} // expected-error {{type 'InnerClass' cannot be nested in protocol 'SillyProtocol'}}
 }
 
+// N.B. Redeclaration checks don't see this case because `protocol A` is invalid.
 enum OuterEnum {
   protocol C {} // expected-error{{protocol 'C' cannot be nested inside another declaration}}
-  // expected-note@-1{{'C' previously declared here}}
-  case C(C) // expected-error{{invalid redeclaration of 'C'}}
+  case C(C)
 }
 
 class OuterClass {
@@ -71,6 +71,7 @@ class OuterClass {
 class OtherGenericClass<T> {
   protocol InnerProtocol : OtherGenericClass { }
   // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+  // expected-error@-2{{superclass constraint 'Self' : 'OtherGenericClass<Self>' is recursive}}
 }
 
 protocol SelfDotTest {
@@ -104,6 +105,7 @@ func testLookup(_ x: OuterForUFI.Inner) {
   x.req()
   x.extMethod()
 }
+
 func testLookup<T: OuterForUFI.Inner>(_ x: T) {
   x.req()
   x.extMethod()

@@ -1,4 +1,3 @@
-
 //===--- DiagnosticsParse.def - Diagnostics Text ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
@@ -35,6 +34,10 @@
 #ifndef NOTE
 #  define NOTE(ID,Options,Text,Signature) \
   DIAG(NOTE,ID,Options,Text,Signature)
+#endif
+
+#ifndef FIXIT
+#  define FIXIT(ID, Text, Signature)
 #endif
 
 //==============================================================================
@@ -163,7 +166,7 @@ ERROR(lex_illegal_multiline_string_end,none,
       "multi-line string literal closing delimiter must begin on a new line", ())
 ERROR(lex_multiline_string_indent_inconsistent,none,
       "%select{unexpected space in|unexpected tab in|insufficient}2 indentation of "
-      "%select{line|next %1 lines}0 in multi-line string literal", 
+      "%select{line|next %1 lines}0 in multi-line string literal",
       (bool, unsigned, unsigned))
 NOTE(lex_multiline_string_indent_should_match_here,none,
       "should match %select{space|tab}0 here", (unsigned))
@@ -204,7 +207,7 @@ ERROR(lex_conflict_marker_in_file,none,
 //------------------------------------------------------------------------------
 
 NOTE(note_in_decl_extension,none,
-     "in %select{declaration|extension}0 of %1", (bool, Identifier))
+     "in %select{declaration|extension}0 of %1", (bool, DeclNameRef))
 ERROR(line_directive_style_deprecated,none,
         "#line directive was renamed to #sourceLocation",
         ())
@@ -221,7 +224,7 @@ ERROR(expected_keyword_in_decl,none,
 ERROR(number_cant_start_decl_name,none,
       "%0 name can only start with a letter or underscore, not a number",
       (StringRef))
-ERROR(expected_identifier_after_case_comma,none,
+ERROR(expected_identifier_after_case_comma, PointsToFirstBadToken,
       "expected identifier after comma in enum 'case' declaration", ())
 ERROR(decl_redefinition,none,
       "definition conflicts with previous value", ())
@@ -252,7 +255,7 @@ ERROR(cskeyword_not_attribute,none,
       "'%0' is a declaration modifier, not an attribute", (StringRef))
 
 ERROR(decl_already_static,none,
-      "%0 specified twice", (StaticSpellingKind))
+      "%0 cannot appear after another 'static' or 'class' keyword", (StaticSpellingKind))
 
 ERROR(enum_case_dot_prefix,none,
       "extraneous '.' in enum 'case' declaration", ())
@@ -304,8 +307,6 @@ ERROR(observing_accessor_conflicts_with_accessor,none,
       (unsigned, StringRef))
 ERROR(observing_accessor_in_subscript,none,
       "%select{'willSet'|'didSet'}0 is not allowed in subscripts", (unsigned))
-ERROR(getset_init,none,
-      "variable with getter/setter cannot have an initial value", ())
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
 
@@ -427,8 +428,14 @@ ERROR(operator_decl_inner_scope,none,
       "'operator' may only be declared at file scope", ())
 ERROR(expected_operator_name_after_operator,PointsToFirstBadToken,
       "expected operator name in operator declaration", ())
-ERROR(identifier_when_expecting_operator,PointsToFirstBadToken,
-      "%0 is considered to be an identifier, not an operator", (Identifier))
+ERROR(identifier_within_operator_name,PointsToFirstBadToken,
+      "'%0' is considered an identifier and must not "
+      "appear within an operator name", (StringRef))
+ERROR(operator_name_invalid_char,PointsToFirstBadToken,
+      "'%0' is not allowed in operator names", (StringRef))
+ERROR(postfix_operator_name_cannot_start_with_unwrap,PointsToFirstBadToken,
+      "postfix operator names starting with '?' or '!' are disallowed "
+      "to avoid collisions with built-in unwrapping operators", ())
 
 ERROR(deprecated_operator_body,PointsToFirstBadToken,
       "operator should no longer be declared with body", ())
@@ -469,6 +476,8 @@ ERROR(expected_precedencegroup_relation,none,
       (StringRef))
 
 // SIL
+ERROR(expected_sil_keyword,none,
+      "expected SIL keyword", ())
 ERROR(inout_not_attribute, none,
       "@inout is no longer an attribute", ())
 ERROR(only_allowed_in_sil,none,
@@ -487,10 +496,17 @@ ERROR(referenced_value_no_accessor,none,
       "referenced declaration has no %select{getter|setter}0", (unsigned))
 ERROR(expected_sil_value_ownership_kind,none,
       "expected value ownership kind in SIL code", ())
+ERROR(silfunc_and_silarg_have_incompatible_sil_value_ownership,none,
+      "SILFunction and SILArgument have mismatching ValueOwnershipKinds. "
+      "Function type specifies: '@%0'. SIL argument specifies: '@%1'.",
+      (StringRef, StringRef))
 ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
 ERROR(expected_sil_tuple_index,none,
       "expected tuple element index", ())
+ERROR(invalid_index_subset,none,
+      "invalid index subset; expected '[SU]+' where 'S' represents set indices "
+      "and 'U' represents unset indices", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -586,8 +602,6 @@ ERROR(sil_dbg_unknown_key,none,
       "unknown key '%0' in debug variable declaration", (StringRef))
 ERROR(sil_objc_with_tail_elements,none,
       "alloc_ref [objc] cannot have tail allocated elements", ())
-ERROR(found_unqualified_instruction_in_qualified_function,none,
-      "found unqualified instruction in qualified function '%0'", (StringRef))
 ERROR(sil_expected_access_kind,none,
       "%0 instruction must have explicit access kind", (StringRef))
 ERROR(sil_expected_access_enforcement,none,
@@ -600,9 +614,6 @@ ERROR(sil_keypath_unknown_component_kind,none,
 ERROR(sil_keypath_computed_property_missing_part,none,
       "keypath %select{gettable|settable}0_property component needs an "
       "%select{id and getter|id, getter, and setter}0", (bool))
-ERROR(sil_keypath_external_missing_part,none,
-      "keypath external component with indices needs an indices_equals and "
-      "indices_hash function", ())
 ERROR(sil_keypath_no_root,none,
       "keypath must have a root component declared",())
 ERROR(sil_keypath_index_not_hashable,none,
@@ -635,6 +646,8 @@ ERROR(expected_sil_function_type, none,
       "sil function expected to have SIL function type", ())
 ERROR(sil_dynamically_replaced_func_not_found,none,
       "dynamically replaced function not found %0", (Identifier))
+ERROR(sil_availability_expected_version,none,
+      "expected version number in 'available' attribute", ())
 
 // SIL Stage
 ERROR(expected_sil_stage_name, none,
@@ -676,9 +689,19 @@ ERROR(sil_witness_assoc_conf_not_found,none,
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
 
+// SIL differentiability witnesses
+ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
+      "expected '%0' in differentiability witness", (StringRef))
+ERROR(sil_diff_witness_serialized_declaration,none,
+      "differentiability witness declaration should not be serialized", ())
+ERROR(sil_diff_witness_undefined,PointsToFirstBadToken,
+      "reference to undefined differentiability witness", ())
+ERROR(sil_diff_witness_invalid_generic_signature,PointsToFirstBadToken,
+      "expected witness generic signature '%0' does not have same generic "
+      "parameters as original function generic signature '%1'",
+      (StringRef, StringRef))
+
 // SIL Coverage Map
-ERROR(sil_coverage_func_not_found, none,
-      "sil function not found %0", (Identifier))
 ERROR(sil_coverage_invalid_hash, none,
       "expected coverage hash", ())
 ERROR(sil_coverage_expected_lbrace, none,
@@ -803,6 +826,20 @@ ERROR(sil_box_expected_r_brace,none,
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
 
+// SIL function types
+ERROR(sil_function_subst_expected_l_angle,none,
+      "expected '<' to begin SIL function type substitution list after 'for'", ())
+ERROR(sil_function_subst_expected_r_angle,none,
+      "expected '>' to end SIL function type substitution list after 'for <...'", ())
+ERROR(sil_function_subst_expected_generics,none,
+      "expected '<' to begin substituted parameter list after '@substituted'", ())
+ERROR(sil_function_subst_expected_function,none,
+      "expected function type after '@substituted'", ())
+ERROR(sil_function_subst_expected_subs,none,
+      "expected 'for' to begin substitutions after '@substituted' function type", ())
+ERROR(sil_function_subs_without_generics,none,
+      "unexpected 'for' to begin substitutions after non-generic function type", ())
+
 // Opaque types
 ERROR(opaque_mid_composition,none,
       "'some' should appear at the beginning of a composition", ())
@@ -863,8 +900,6 @@ ERROR(expected_parameter_colon,PointsToFirstBadToken,
       "expected ':' following argument label and parameter name", ())
 ERROR(expected_assignment_instead_of_comparison_operator,none,
       "expected '=' instead of '==' to assign default value for parameter", ())
-ERROR(missing_parameter_type,PointsToFirstBadToken,
-      "parameter requires an explicit type", ())
 ERROR(multiple_parameter_ellipsis,none,
       "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,none,
@@ -883,11 +918,13 @@ WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
 ERROR(parameter_operator_keyword_argument,none,
-      "%select{operator|closure|enum case}0 cannot have keyword arguments", 
+      "%select{operator|closure|enum case}0 cannot have keyword arguments",
       (unsigned))
 
 ERROR(parameter_unnamed,none,
       "unnamed parameters must be written with the empty name '_'", ())
+WARNING(parameter_unnamed_warn,none,
+        "unnamed parameters must be written with the empty name '_'", ())
 
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
@@ -927,6 +964,8 @@ ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
 ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
+ERROR(labeled_block_needs_do,none,
+      "labeled block needs 'do'", ())
 
 ERROR(snake_case_deprecated,none,
       "%0 has been replaced with %1 in Swift 3",
@@ -1031,7 +1070,11 @@ ERROR(expected_expr_repeat_while,PointsToFirstBadToken,
       "expected expression in 'repeat-while' condition", ())
 
 ERROR(do_while_now_repeat_while,none,
-      "'do-while' statement is not allowed; use 'repeat-while' instead", ())
+      "'do-while' statement is not allowed", ())
+NOTE(do_while_expected_repeat_while, none,
+      "did you mean 'repeat-while' statement?", ())
+NOTE(do_while_expected_separate_stmt, none,
+      "did you mean separate 'do' and 'while' statements?", ())
 
 // Do/Catch Statement
 ERROR(expected_lbrace_after_do,PointsToFirstBadToken,
@@ -1273,12 +1316,6 @@ ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#selector' expression", ())
 
 // Type-of expressions.
-ERROR(expr_typeof_expected_label_of,PointsToFirstBadToken,
-      "expected argument label 'of:' within 'type(...)'", ())
-ERROR(expr_typeof_expected_expr,PointsToFirstBadToken,
-      "expected an expression within 'type(of: ...)'", ())
-ERROR(expr_typeof_expected_rparen,PointsToFirstBadToken,
-      "expected ')' to complete 'type(of: ...)' expression", ())
 ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
 
@@ -1335,6 +1372,11 @@ ERROR(attr_expected_comma,none,
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
 
+ERROR(attr_missing_label,PointsToFirstBadToken,
+      "missing label '%0:' in '@%1' attribute", (StringRef, StringRef))
+ERROR(attr_expected_label,none,
+      "expected label '%0:' in '@%1' attribute", (StringRef, StringRef))
+
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 
@@ -1353,6 +1395,8 @@ ERROR(projection_value_property_not_identifier,none,
 // Access control
 ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
+ERROR(attr_access_expected_spi_name,none,
+      "expected an SPI identifier as subject of the '@_spi' attribute", ())
 
 // Attributes
 ERROR(attr_renamed, none,
@@ -1403,6 +1447,32 @@ WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
       "'*'", (StringRef))
 
+// originallyDefinedIn
+ERROR(originally_defined_in_missing_rparen,none,
+      "expected ')' in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_unrecognized_platform,none,
+      "unrecognized platform name in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_unrecognized_property,none,
+      "unrecognized property in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_need_original_module_name,none,
+      "expected 'module: \"original\"' in the first argument to "
+      "@_originallyDefinedIn", ())
+
+ERROR(originally_defined_in_need_nonempty_module_name,none,
+      "original module name cannot be empty in @_originallyDefinedIn", ())
+
+ERROR(originally_defined_in_need_platform_version,none,
+     "expected at least one platform version in @_originallyDefinedIn", ())
+
+WARNING(originally_defined_in_major_minor_only,none,
+        "@_originallyDefinedIn only uses major and minor version number", ())
+
+WARNING(originally_defined_in_missing_platform_name,none,
+        "* as platform name has no effect", ())
+
 // convention
 ERROR(convention_attribute_expected_lparen,none,
       "expected '(' after 'convention' attribute", ())
@@ -1410,6 +1480,13 @@ ERROR(convention_attribute_expected_name,none,
       "expected convention name identifier in 'convention' attribute", ())
 ERROR(convention_attribute_expected_rparen,none,
       "expected ')' after convention name for 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_label,none,
+      "expected 'cType' label in 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_colon,none,
+      "expected ':' after 'cType' for 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_string,none,
+      "expected string literal containing clang type for 'cType' in "
+      "'convention' attribute", ())
 ERROR(convention_attribute_witness_method_expected_colon,none,
       "expected ':' after 'witness_method' for 'convention' attribute", ())
 ERROR(convention_attribute_witness_method_expected_protocol,none,
@@ -1431,6 +1508,11 @@ ERROR(attr_dynamic_replacement_expected_for,none,
       "expected 'for' in '_dynamicReplacement' attribute", ())
 ERROR(attr_dynamic_replacement_expected_colon,none,
       "expected ':' after @_dynamicReplacement(for", ())
+
+ERROR(attr_type_eraser_expected_type_name,none,
+      "expected a type name in @_typeEraser()", ())
+ERROR(attr_type_eraser_expected_rparen,none,
+      "expected ')' after type name for @_typeEraser", ())
 
 ERROR(attr_private_import_expected_rparen,none,
       "expected ')' after function name for @_private", ())
@@ -1473,10 +1555,6 @@ WARNING(attr_warn_unused_result_removed,none,
 ERROR(attr_warn_unused_result_expected_rparen,none,
       "expected ')' after 'warn_unused_result' attribute", ())
 
-// escaping
-ERROR(attr_escaping_conflicts_noescape,none,
-      "@escaping conflicts with @noescape", ())
-
 // _specialize
 ERROR(attr_specialize_missing_colon,none,
       "missing ':' after %0 in '_specialize' attribute", (StringRef))
@@ -1503,6 +1581,65 @@ ERROR(attr_specialize_expected_partial_or_full,none,
 ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
+// differentiable
+ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
+      "expected a list of parameters to differentiate with respect to", ())
+ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
+      "use 'wrt:' to specify parameters to differentiate with respect to", ())
+ERROR(attr_differentiable_expected_label,none,
+      "expected 'wrt:' or 'where' in '@differentiable' attribute", ())
+ERROR(attr_differentiable_unexpected_argument,none,
+      "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
+
+// differentiation `wrt` parameters clause
+ERROR(expected_colon_after_label,PointsToFirstBadToken,
+      "expected a colon ':' after '%0'", (StringRef))
+ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
+      "expected a parameter, which can be a function parameter name, "
+      "parameter index, or 'self'", ())
+ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
+      "expected a parameter, which can be a function parameter index or 'self'",
+      ())
+
+// Automatic differentiation attributes
+ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
+      "expected an original function name", ())
+
+// SIL autodiff
+ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
+      "expected '[' to start the %0", (StringRef))
+ERROR(sil_autodiff_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' to complete the %0", (StringRef))
+ERROR(sil_autodiff_expected_index_list,PointsToFirstBadToken,
+      "expected a space-separated list of indices, e.g. '0 1'", ())
+ERROR(sil_autodiff_expected_index_list_label,PointsToFirstBadToken,
+      "expected label '%0' in index list", (StringRef))
+ERROR(sil_autodiff_expected_parameter_index,PointsToFirstBadToken,
+      "expected the index of a parameter to differentiate with respect to", ())
+ERROR(sil_autodiff_expected_result_index,PointsToFirstBadToken,
+      "expected the index of a result to differentiate from", ())
+ERROR(sil_inst_autodiff_operand_list_expected_lbrace,PointsToFirstBadToken,
+      "expected '{' to start a derivative function list", ())
+ERROR(sil_inst_autodiff_operand_list_expected_comma,PointsToFirstBadToken,
+      "expected ',' between operands in a derivative function list", ())
+ERROR(sil_inst_autodiff_operand_list_expected_rbrace,PointsToFirstBadToken,
+      "expected '}' to start a derivative function list", ())
+ERROR(sil_inst_autodiff_expected_differentiable_extractee_kind,PointsToFirstBadToken,
+      "expected an extractee kind attribute, which can be one of '[original]', "
+      "'[jvp]', and '[vjp]'", ())
+ERROR(sil_inst_autodiff_expected_linear_extractee_kind,PointsToFirstBadToken,
+      "expected an extractee kind attribute, which can be one of '[original]' "
+      "and '[transpose]'", ())
+ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
+      "expected an operand of a function type", ())
+ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBadToken,
+      "expected a differentiability witness kind, which can be one of '[jvp]', "
+      "'[vjp]', or '[transpose]'", ())
+ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
+      "expected witness_generic signature '%0' does not have same generic "
+      "parameters as original function generic signature '%1'",
+      (StringRef, StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1519,6 +1656,8 @@ ERROR(expected_generics_type_restriction,none,
       (Identifier))
 ERROR(requires_single_equal,none,
       "use '==' for same-type requirements rather than '='", ())
+ERROR(requires_comma,none,
+      "expected ',' to separate the requirements of this 'where' clause", ())
 ERROR(expected_requirement_delim,none,
       "expected ':' or '==' to indicate a conformance or same-type requirement",
       ())
@@ -1526,10 +1665,6 @@ ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
-ERROR(where_without_generic_params,none,
-      "'where' clause cannot be attached to "
-      "%select{a non-generic|a protocol|an associated type}0 "
-      "declaration", (unsigned))
 ERROR(where_inside_brackets,none,
         "'where' clause next to generic parameters is obsolete, "
         "must be written following the declaration's type", ())
@@ -1575,6 +1710,8 @@ ERROR(empty_version_string,none,
 WARNING(unknown_platform_condition_argument,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))
+WARNING(renamed_platform_condition_argument,none,
+      "'%0' has been renamed to '%1'", (StringRef, StringRef))
 WARNING(likely_simulator_platform_condition,none,
       "platform condition appears to be testing for simulator environment; "
       "use 'targetEnvironment(simulator)' instead",
@@ -1637,4 +1774,5 @@ ERROR(unknown_syntax_entity, PointsToFirstBadToken,
 # undef NOTE
 # undef WARNING
 # undef ERROR
+# undef FIXIT
 #endif

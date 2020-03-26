@@ -61,11 +61,11 @@ function write_linkfile {
     cat >$OUTPUTFILE <<EOF
 -ldl
 -lpthread
--latomic
 -lswiftCore
--latomic
 -lswiftImageInspectionShared
 $ICU_LIBS
+-lstdc++
+-lm
 -Xlinker
 -export-dynamic
 -Xlinker

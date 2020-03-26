@@ -10,9 +10,32 @@ class C {
     func f() {}
   }
 }
+do {
+  typealias Alias2 = () -> (a b: [Generic<Int
+}
+do {
+  typealias Alias3 = (a b C,
+}
+do {
+  typealias Alias3 = () -> @objc func
+}
+do {
+  typealias
+}
+do {
+  typealias Alias = A & B & C.D<>
+}
+do {
+  typealias boo bar = Int
+}
 
 // Orphan '}' at top level
 }
+
+// Orphan #elseif, #else, #endif at top level.
+#elseif foobar
+#else
+#endif
 
 // Compound name.
 foo(x:y:)()

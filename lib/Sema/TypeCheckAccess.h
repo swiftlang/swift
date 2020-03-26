@@ -20,14 +20,13 @@
 namespace swift {
 
 class Decl;
-class TypeChecker;
 
 /// Performs access-related checks for \p D.
 ///
 /// At a high level, this checks the given declaration's signature does not
 /// reference any other declarations that are less visible than the declaration
 /// itself. Related checks may also be performed.
-void checkAccessControl(TypeChecker &TC, Decl *D);
+void checkAccessControl(Decl *D);
 
 } // end namespace swift
 

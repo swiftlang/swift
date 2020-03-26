@@ -22,7 +22,7 @@
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 
@@ -130,7 +130,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
     llvm::SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
         &ExistentialArgDescriptor) {
   auto *F = Apply.getReferencedFunctionOrNull();
-  auto CalleeArgs = F->begin()->getFunctionArguments();
+  auto CalleeArgs = F->begin()->getSILFunctionArguments();
   bool returnFlag = false;
 
   /// Analyze the argument for protocol conformance.  Iterator over the callee's
@@ -152,8 +152,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
       continue;
 
     auto ExistentialRepr =
-        CalleeArg->getType().getPreferredExistentialRepresentation(
-            F->getModule());
+        CalleeArg->getType().getPreferredExistentialRepresentation();
     if (ExistentialRepr != ExistentialRepresentation::Opaque &&
           ExistentialRepr != ExistentialRepresentation::Class)
       continue;
@@ -208,7 +207,6 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
 
 /// Determine if this callee function can be specialized or not.
 bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
-
   /// Determine the caller of the apply.
   auto *Callee = Apply.getReferencedFunctionOrNull();
   if (!Callee)
@@ -220,6 +218,23 @@ bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
 
   /// External function definitions.
   if (!Callee->isDefinition())
+    return false;
+
+  // If the callee has ownership enabled, bail.
+  //
+  // FIXME: We should be able to handle callees that have ownership, but the
+  // pass has not been updated yet.
+  if (Callee->hasOwnership())
+    return false;
+
+  // Ignore generic functions. Generic functions should be fully specialized
+  // before attempting to introduce new generic parameters for existential
+  // arguments. Otherwise, there's no guarantee that the generic specializer
+  // will be able to specialize the new generic parameter created by this pass.
+  //
+  // Enabling this would require additional implementation work to correctly
+  // substitute the original archetypes into the new generic signature.
+  if (Callee->getLoweredFunctionType()->getSubstGenericSignature())
     return false;
 
   /// Ignore functions with indirect results.
@@ -309,7 +324,7 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
       /// Save the arguments in a descriptor.
       llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;
       llvm::SmallVector<ArgumentDescriptor, 4> ArgumentDescList;
-      auto Args = Callee->begin()->getFunctionArguments();
+      auto Args = Callee->begin()->getSILFunctionArguments();
       for (unsigned i : indices(Args)) {
         ArgumentDescList.emplace_back(Args[i], Allocator);
       }

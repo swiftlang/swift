@@ -6,6 +6,9 @@
 // RUN: %target-codesign %t/Array && %line-directive %t/main.swift -- %target-run %t/Array
 // REQUIRES: executable_test
 
+// FIXME: rdar://problem/55944126
+// UNSUPPORTED: CPU=armv7s || CPU=armv7k
+
 import StdlibUnittest
 import StdlibCollectionUnittest
 
@@ -541,8 +544,6 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex") {
   expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
   expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
   expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 for indexRange in [
@@ -602,8 +603,6 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
 
   buffer.deallocate()
   _fixLifetime(a)
-
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/copyWithZone") {
@@ -721,8 +720,6 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
   expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
   expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
   expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
@@ -812,7 +809,6 @@ ArrayTestSuite.test("BridgedToObjC/Custom/objectAtIndex") {
   expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 for indexRange in [
@@ -874,7 +870,6 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
   _fixLifetime(a)
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/copyWithZone") {
@@ -1011,8 +1006,6 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
   expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
   expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
   expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
@@ -1045,8 +1038,6 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
   expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
   expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
   expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Adopt") {

@@ -30,6 +30,7 @@ namespace swift {
   class ArchetypeType;
   class AssociatedTypeDecl;
   class ASTContext;
+  class AttributeBase;
   class BraceStmt;
   class Decl;
   class DeclContext;
@@ -45,6 +46,7 @@ namespace swift {
   class ProtocolDecl;
   class ProtocolConformance;
   class SILFunction;
+  class SILFunctionType;
   class Stmt;
   class TypeVariableType;
   class TypeBase;
@@ -52,6 +54,7 @@ namespace swift {
   class ValueDecl;
 
   /// We frequently use three tag bits on all of these types.
+  constexpr size_t AttrAlignInBits = 3;
   constexpr size_t DeclAlignInBits = 3;
   constexpr size_t DeclContextAlignInBits = 3;
   constexpr size_t ExprAlignInBits = 3;
@@ -98,6 +101,8 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::ExtensionDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeBase, swift::TypeAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ArchetypeType, swift::TypeAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeVariableType, swift::TypeVariableAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::SILFunctionType,
+                            swift::TypeVariableAlignInBits)
 
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Stmt, swift::StmtAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::BraceStmt, swift::StmtAlignInBits)
@@ -116,6 +121,8 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::Pattern,
                             swift::PatternAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::SILFunction,
                             swift::SILFunctionAlignInBits)
+
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::AttributeBase, swift::AttrAlignInBits)
 
 static_assert(alignof(void*) >= 2, "pointer alignment is too small");
 

@@ -75,14 +75,15 @@ public:
   void cacheResult(AccessLevel value) const;
 };
 
+using DefaultAndMax = std::pair<AccessLevel, AccessLevel>;
+
 /// Request the Default and Max AccessLevels of the given ExtensionDecl.
 class DefaultAndMaxAccessLevelRequest :
     public SimpleRequest<DefaultAndMaxAccessLevelRequest,
-                         std::pair<AccessLevel, AccessLevel>(ExtensionDecl *),
+                         DefaultAndMax(ExtensionDecl *),
                          CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
-  using DefaultAndMax = std::pair<AccessLevel, AccessLevel>;
 private:
   friend SimpleRequest;
 
@@ -97,24 +98,21 @@ public:
   void cacheResult(DefaultAndMax value) const;
 };
 
-/// The zone number for access-control requests.
-#define SWIFT_ACCESS_REQUESTS_TYPEID_ZONE 11
-
-#define SWIFT_TYPEID_ZONE SWIFT_ACCESS_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE AccessControl
 #define SWIFT_TYPEID_HEADER "swift/AST/AccessTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_TYPEID(RequestType)                                \
-template<>                                                       \
-inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
-                            const RequestType &request) {        \
-  ++stats.getFrontendCounters().RequestType;                     \
-}
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching, LocOptions)             \
+  template <>                                                                  \
+  inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,              \
+                                     const RequestType &request) {             \
+    ++stats.getFrontendCounters().RequestType;                                 \
+  }
 #include "swift/AST/AccessTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 } // end namespace swift
 

@@ -19,6 +19,7 @@
 #ifndef SWIFT_ABI_METADATAVALUES_H
 #define SWIFT_ABI_METADATAVALUES_H
 
+#include "swift/ABI/KeyPath.h"
 #include "swift/AST/Ownership.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/FlagSet.h"
@@ -294,6 +295,8 @@ private:
     KindMask = 0x0F,                // 16 kinds should be enough for anybody
     IsInstanceMask = 0x10,
     IsDynamicMask = 0x20,
+    ExtraDiscriminatorShift = 16,
+    ExtraDiscriminatorMask = 0xFFFF0000,
   };
 
   int_type Value;
@@ -320,6 +323,13 @@ public:
     return copy;
   }
 
+  MethodDescriptorFlags withExtraDiscriminator(uint16_t value) const {
+    auto copy = *this;
+    copy.Value = (copy.Value & ~ExtraDiscriminatorMask)
+               | (int_type(value) << ExtraDiscriminatorShift);
+    return copy;
+  }
+
   Kind getKind() const { return Kind(Value & KindMask); }
 
   /// Is the method marked 'dynamic'?
@@ -329,6 +339,10 @@ public:
   ///
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
+
+  uint16_t getExtraDiscriminator() const {
+    return (Value >> ExtraDiscriminatorShift);
+  }
 
   int_type getIntValue() const { return Value; }
 };
@@ -516,6 +530,8 @@ private:
   enum : int_type {
     KindMask = 0x0F,                // 16 kinds should be enough for anybody
     IsInstanceMask = 0x10,
+    ExtraDiscriminatorShift = 16,
+    ExtraDiscriminatorMask = 0xFFFF0000,
   };
 
   int_type Value;
@@ -533,12 +549,27 @@ public:
     return copy;
   }
 
+  ProtocolRequirementFlags withExtraDiscriminator(uint16_t value) const {
+    auto copy = *this;
+    copy.Value = (copy.Value & ~ExtraDiscriminatorMask)
+               | (int_type(value) << ExtraDiscriminatorShift);
+    return copy;
+  }
+
   Kind getKind() const { return Kind(Value & KindMask); }
 
   /// Is the method an instance member?
   ///
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
+
+  bool isSignedWithAddress() const {
+    return getKind() != Kind::BaseProtocol;
+  }
+
+  uint16_t getExtraDiscriminator() const {
+    return (Value >> ExtraDiscriminatorShift);
+  }
 
   int_type getIntValue() const { return Value; }
 
@@ -672,7 +703,7 @@ public:
 private:
   enum : int_type {
     NumWitnessTablesMask  = 0x00FFFFFFU,
-    ClassConstraintMask   = 0x80000000U,
+    ClassConstraintMask   = 0x80000000U, // Warning: Set if NOT class-constrained!
     HasSuperclassMask     = 0x40000000U,
     SpecialProtocolMask   = 0x3F000000U,
     SpecialProtocolShift  = 24U,
@@ -913,55 +944,6 @@ public:
 };
 using TupleTypeFlags = TargetTupleTypeFlags<size_t>;
 
-/// Field types and flags as represented in a nominal type's field/case type
-/// vector.
-class FieldType {
-  typedef uintptr_t int_type;
-  // Type metadata is always at least pointer-aligned, so we get at least two
-  // low bits to stash flags. We could use three low bits on 64-bit, and maybe
-  // some high bits as well.
-  enum : int_type {
-    Indirect = 1,
-    Weak = 2,
-
-    TypeMask = ((uintptr_t)-1) & ~(alignof(void*) - 1),
-  };
-  int_type Data;
-
-  constexpr FieldType(int_type Data) : Data(Data) {}
-public:
-  constexpr FieldType() : Data(0) {}
-  FieldType withType(const Metadata *T) const {
-    return FieldType((Data & ~TypeMask) | (uintptr_t)T);
-  }
-
-  constexpr FieldType withIndirect(bool indirect) const {
-    return FieldType((Data & ~Indirect)
-                     | (indirect ? Indirect : 0));
-  }
-
-  constexpr FieldType withWeak(bool weak) const {
-    return FieldType((Data & ~Weak)
-                     | (weak ? Weak : 0));
-  }
-
-  bool isIndirect() const {
-    return bool(Data & Indirect);
-  }
-
-  bool isWeak() const {
-    return bool(Data & Weak);
-  }
-
-  const Metadata *getType() const {
-    return (const Metadata *)(Data & TypeMask);
-  }
-
-  int_type getIntValue() const {
-    return Data;
-  }
-};
-
 /// Flags for exclusivity-checking operations.
 enum class ExclusivityFlags : uintptr_t {
   Read             = 0x0,
@@ -1076,6 +1058,68 @@ static inline EnumLayoutFlags getLayoutAlgorithm(EnumLayoutFlags flags) {
 }
 static inline bool isValueWitnessTableMutable(EnumLayoutFlags flags) {
   return uintptr_t(flags) & uintptr_t(EnumLayoutFlags::IsVWTMutable);
+}
+
+namespace SpecialPointerAuthDiscriminators {
+  // All of these values are the stable string hash of the corresponding
+  // variable name:
+  //   (computeStableStringHash % 65535 + 1)
+
+  /// HeapMetadataHeader::destroy
+  const uint16_t HeapDestructor = 0xbbbf;
+
+  /// Type descriptor data pointers.
+  const uint16_t TypeDescriptor = 0xae86;
+
+  /// Runtime function variables exported by the runtime.
+  const uint16_t RuntimeFunctionEntry = 0x625b;
+
+  /// Value witness functions.
+  const uint16_t InitializeBufferWithCopyOfBuffer = 0xda4a;
+  const uint16_t Destroy = 0x04f8;
+  const uint16_t InitializeWithCopy = 0xe3ba;
+  const uint16_t AssignWithCopy = 0x8751;
+  const uint16_t InitializeWithTake = 0x48d8;
+  const uint16_t AssignWithTake = 0xefda;
+  const uint16_t DestroyArray = 0x2398;
+  const uint16_t InitializeArrayWithCopy = 0xa05c;
+  const uint16_t InitializeArrayWithTakeFrontToBack = 0x1c3e;
+  const uint16_t InitializeArrayWithTakeBackToFront = 0x8dd3;
+  const uint16_t StoreExtraInhabitant = 0x79c5;
+  const uint16_t GetExtraInhabitantIndex = 0x2ca8;
+  const uint16_t GetEnumTag = 0xa3b5;
+  const uint16_t DestructiveProjectEnumData = 0x041d;
+  const uint16_t DestructiveInjectEnumTag = 0xb2e4;
+  const uint16_t GetEnumTagSinglePayload = 0x60f0;
+  const uint16_t StoreEnumTagSinglePayload = 0xa0d1;
+
+  /// KeyPath metadata functions.
+  const uint16_t KeyPathDestroy = _SwiftKeyPath_ptrauth_ArgumentDestroy;
+  const uint16_t KeyPathCopy = _SwiftKeyPath_ptrauth_ArgumentCopy;
+  const uint16_t KeyPathEquals = _SwiftKeyPath_ptrauth_ArgumentEquals;
+  const uint16_t KeyPathHash = _SwiftKeyPath_ptrauth_ArgumentHash;
+  const uint16_t KeyPathGetter = _SwiftKeyPath_ptrauth_Getter;
+  const uint16_t KeyPathNonmutatingSetter = _SwiftKeyPath_ptrauth_NonmutatingSetter;
+  const uint16_t KeyPathMutatingSetter = _SwiftKeyPath_ptrauth_MutatingSetter;
+  const uint16_t KeyPathGetLayout = _SwiftKeyPath_ptrauth_ArgumentLayout;
+  const uint16_t KeyPathInitializer = _SwiftKeyPath_ptrauth_ArgumentInit;
+  const uint16_t KeyPathMetadataAccessor = _SwiftKeyPath_ptrauth_MetadataAccessor;
+
+  /// ObjC bridging entry points.
+  const uint16_t ObjectiveCTypeDiscriminator = 0x31c3; // = 12739
+  const uint16_t bridgeToObjectiveCDiscriminator = 0xbca0; // = 48288
+  const uint16_t forceBridgeFromObjectiveCDiscriminator = 0x22fb; // = 8955
+  const uint16_t conditionallyBridgeFromObjectiveCDiscriminator = 0x9a9b; // = 39579
+
+  /// Dynamic replacement pointers.
+  const uint16_t DynamicReplacementScope = 0x48F0; // = 18672
+  const uint16_t DynamicReplacementKey = 0x2C7D; // = 11389
+
+  /// Resume functions for yield-once coroutines that yield a single
+  /// opaque borrowed/inout value.  These aren't actually hard-coded, but
+  /// they're important enough to be worth writing in one place.
+  const uint16_t OpaqueReadResumeFunction = 56769;
+  const uint16_t OpaqueModifyResumeFunction = 3909;
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -1560,6 +1604,10 @@ class GenericMetadataPatternFlags : public FlagSet<uint32_t> {
     /// Does this pattern have an extra-data pattern?
     HasExtraDataPattern = 0,
 
+    /// Do instances of this pattern have a bitset of flags that occur at the
+    /// end of the metadata, after the extra data if there is any?
+    HasTrailingFlags = 1,
+
     // Class-specific flags.
 
     /// Does this pattern have an immediate-members pattern?
@@ -1583,6 +1631,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasExtraDataPattern,
                                 hasExtraDataPattern,
                                 setHasExtraDataPattern)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasTrailingFlags,
+                                hasTrailingFlags,
+                                setHasTrailingFlags)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Value_MetadataKind,
                                  Value_MetadataKind_width,
@@ -1714,6 +1766,30 @@ public:
   bool isSatisfiedBy(MetadataState state) const {
     return isAtLeast(state, getState());
   }
+};
+
+struct MetadataTrailingFlags : public FlagSet<uint64_t> {
+  enum {
+    /// Whether this metadata is a specialization of a generic metadata pattern
+    /// which was created during compilation.
+    IsStaticSpecialization = 0,
+
+    /// Whether this metadata is a specialization of a generic metadata pattern
+    /// which was created during compilation and made to be canonical by
+    /// modifying the metadata accessor.
+    IsCanonicalStaticSpecialization = 1,
+  };
+
+  explicit MetadataTrailingFlags(uint64_t bits) : FlagSet(bits) {}
+  constexpr MetadataTrailingFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsStaticSpecialization,
+                                isStaticSpecialization,
+                                setIsStaticSpecialization)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCanonicalStaticSpecialization,
+                                isCanonicalStaticSpecialization,
+                                setIsCanonicalStaticSpecialization)
 };
 
 /// Flags for Builtin.IntegerLiteral values.

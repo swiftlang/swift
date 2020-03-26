@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify -enable-ownership-stripping-after-serialization
 //
 // REQUIRES: !(CPU=i386 || CPU=x86_64)
 //

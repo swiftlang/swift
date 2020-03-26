@@ -5,7 +5,12 @@ if(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY)
   list(APPEND SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES SHARED)
 endif()
 if(SWIFT_BUILD_STATIC_SDK_OVERLAY)
-  list(APPEND SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES STATIC)
+  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
+  if(building_darwin_sdks)
+    message(SEND_ERROR "cannot build static standard library for Darwin SDKs")
+  else()
+    list(APPEND SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES STATIC)
+  endif()
 endif()
 
 set(all_overlays

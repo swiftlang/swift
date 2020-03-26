@@ -39,6 +39,7 @@ protocol P {}
 
 // CHECK-LABEL: sil @$s22generic_promotable_boxTf2ni_n : $@convention(thin) <T> (@in T, Builtin.Int32) -> Builtin.Int32
 // CHECK:       bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $Builtin.Int32):
+// CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    return [[ARG1]] : $Builtin.Int32
 
 sil [ossa] @generic_promotable_box : $@convention(thin) <T> (@in T, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
@@ -46,6 +47,7 @@ entry(%0 : $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %v = load [trivial] %a : $*Int
   destroy_value %b : $<τ_0_0> { var τ_0_0 } <Int>
+  destroy_addr %0 : $*T
   return %v : $Int
 }
 
@@ -90,13 +92,13 @@ sil [ossa] @generic_promotable_box2 : $@convention(thin) <T> (@in R<T>, @in Int,
 entry(%0 : $*R<T>, %1 : $*Int, %b : @owned $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>):
   %a = project_box %b : $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>, 0
   %e = load [copy] %a : $*E<(R<T>)->Int>
-  switch_enum %e : $E<(R<T>)->Int>, case #E.Some!enumelt.1 : bb1, default bb2
+  switch_enum %e : $E<(R<T>)->Int>, case #E.Some!enumelt : bb1, default bb2
 
-bb1(%f : @owned $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int):
-  %bf = begin_borrow %f : $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int
-  apply %bf(%1, %0) : $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int
-  end_borrow %bf : $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int 
-  destroy_value %f : $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int
+bb1(%f : @owned $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <R<T>, Int>):
+  %bf = begin_borrow %f : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <R<T>, Int>
+  apply %bf(%1, %0) : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <R<T>, Int>
+  end_borrow %bf : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <R<T>, Int>
+  destroy_value %f : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <R<T>, Int>
   br exit
 
 bb2(%original : @owned $E<(R<T>)->Int>):

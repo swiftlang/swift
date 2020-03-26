@@ -47,7 +47,12 @@ function(_report_sdk prefix)
       message(STATUS "  ${arch} LIB: ${${arch}_LIB}")
     endforeach()
   elseif("${prefix}" STREQUAL "ANDROID")
-    message(STATUS " NDK: $ENV{SWIFT_ANDROID_NDK_PATH}")
+    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+      message(STATUS " NDK: $ENV{SWIFT_ANDROID_NDK_PATH}")
+    endif()
+    if(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+      message(STATUS " Sysroot: ${SWIFT_ANDROID_NATIVE_SYSROOT}")
+    endif()
     foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
       swift_android_include_for_arch(${arch} ${arch}_INCLUDE)
       swift_android_lib_for_arch(${arch} ${arch}_LIB)
@@ -122,13 +127,10 @@ macro(configure_sdk_darwin
         COMMAND "xcrun" "--sdk" "${xcrun_name}" "--show-sdk-path"
         OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PATH
         OUTPUT_STRIP_TRAILING_WHITESPACE)
-    if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
-      message(FATAL_ERROR "${name} SDK not found at ${SWIFT_SDK_${prefix}_PATH}.")
-    endif()
   endif()
 
-  if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
-    message(FATAL_ERROR "${name} SDK not found at ${SWIFT_SDK_${prefix}_PATH}.")
+  if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/SDKSettings.plist")
+    message(FATAL_ERROR "${name} SDK not found at SWIFT_SDK_${prefix}_PATH.")
   endif()
 
   # Determine the SDK version we found.
@@ -178,6 +180,20 @@ macro(configure_sdk_darwin
 
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
         "${arch}-apple-${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
+
+    if(SWIFT_ENABLE_MACCATALYST AND "${prefix}" STREQUAL "OSX")
+      # For macCatalyst append the '-macabi' environment to the target triple.
+      set(SWIFT_SDK_MACCATALYST_ARCH_${arch}_TRIPLE
+        "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}-macabi")
+
+      # macCatalyst triple
+      set(SWIFT_MACCATALYST_TRIPLE
+        "x86_64-apple-ios${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}-macabi")
+
+      # For macCatalyst, the xcrun_name is "macosx" since it uses that sdk.
+      # Hard code the library subdirectory to "maccatalyst" in that case.
+      set(SWIFT_SDK_MACCATALYST_LIB_SUBDIR "maccatalyst")
+    endif()
   endforeach()
 
   # Add this to the list of known SDKs.
@@ -204,18 +220,37 @@ macro(configure_sdk_unix name architectures)
 
   foreach(arch ${architectures})
     if("${prefix}" STREQUAL "ANDROID")
-      set(SWIFT_SDK_ANDROID_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include" CACHE STRING "Path to C library headers")
-      set(SWIFT_SDK_ANDROID_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include" CACHE STRING "Path to C library architecture headers")
+      if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include" CACHE STRING "Path to C library headers")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include" CACHE STRING "Path to C library architecture headers")
+      elseif(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY "${SWIFT_ANDROID_NATIVE_SYSROOT}/usr/include" CACHE STRING "Path to C library headers")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY "${SWIFT_ANDROID_NATIVE_SYSROOT}/usr/include" CACHE STRING "Path to C library architecture headers")
+      else()
+        message(SEND_ERROR "Couldn't find LIBC_INCLUDE_DIRECTORY for Android")
+      endif()
 
       if("${arch}" STREQUAL "armv7")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "arm-linux-androideabi")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "arm")
-        set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NDK_PATH}/platforms/android-${SWIFT_ANDROID_API_LEVEL}/arch-arm")
+        if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+          set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NDK_PATH}/platforms/android-${SWIFT_ANDROID_API_LEVEL}/arch-arm")
+        elseif(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+          set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NATIVE_SYSROOT}")
+        else()
+          message(SEND_ERROR "Couldn't find SWIFT_SDK_ANDROID_ARCH_armv7_PATH")
+        endif()
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE "armv7-none-linux-androideabi")
       elseif("${arch}" STREQUAL "aarch64")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "aarch64-linux-android")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "aarch64")
-        set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NDK_PATH}/platforms/android-${SWIFT_ANDROID_API_LEVEL}/arch-arm64")
+        if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+          set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NDK_PATH}/platforms/android-${SWIFT_ANDROID_API_LEVEL}/arch-arm64")
+        elseif(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+          set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NATIVE_SYSROOT}")
+        else()
+          message(SEND_ERROR "Couldn't find SWIFT_SDK_ANDROID_ARCH_aarch64_PATH")
+        endif()
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE "aarch64-unknown-linux-android")
       elseif("${arch}" STREQUAL "i686")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "i686-linux-android")
@@ -238,6 +273,8 @@ macro(configure_sdk_unix name architectures)
         set(_swift_android_prebuilt_build linux-x86_64)
       elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
         set(_swift_android_prebuilt_build Windows-x86_64)
+      elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL Android)
+        # When building natively on an Android host, there's no NDK or prebuilt suffix.
       else()
         message(SEND_ERROR "cannot cross-compile to android from ${CMAKE_HOST_SYSTEM_NAME}")
       endif()

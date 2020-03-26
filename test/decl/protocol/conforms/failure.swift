@@ -93,7 +93,6 @@ struct P6Conformer : P6 { // expected-error 2 {{does not conform}}
 }
 
 // rdar://problem/23033862
-// expected-note@+3 2 {{do you want to add protocol stubs?}}
 // expected-error@+2{{type 'A' does not conform to protocol 'OptionSet'}}
 // expected-error@+1{{type 'A' does not conform to protocol 'RawRepresentable'}}
 struct A: OptionSet {
@@ -127,7 +126,6 @@ extension UInt32: ExpressibleByStringLiteral {}
 // expected-error@-1 {{type 'UInt32' does not conform to protocol 'ExpressibleByStringLiteral'}}
 // expected-error@-2 {{type 'UInt32' does not conform to protocol 'ExpressibleByExtendedGraphemeClusterLiteral'}}
 // expected-error@-3 {{type 'UInt32' does not conform to protocol 'ExpressibleByUnicodeScalarLiteral'}}
-// expected-note@-4 {{do you want to add protocol stubs?}}
 
 // After successfully type-checking this (due to the presumption of
 // the type actually conforming), do not crash when failing to find

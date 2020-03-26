@@ -81,6 +81,6 @@ presentBase(Derived(x: "two"))
 presentBase(Base(x: "two"))
 presentBase(Base(x: 2))
 
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s3foo12SuperDerivedCMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s3foo12SuperDerivedCMr"(%swift.type* %0, i8* %1, i8** %2)
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
 // CHECK:         call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, {{.*}})

@@ -17,7 +17,6 @@
 #ifndef SWIFT_SIL_SILGLOBALVARIABLE_H
 #define SWIFT_SIL_SILGLOBALVARIABLE_H
 
-#include <string>
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -106,7 +105,12 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType.castTo<SILFunctionType>();
   }
-    
+  SILType getLoweredTypeInContext(TypeExpansionContext context) const;
+  CanSILFunctionType
+  getLoweredFunctionTypeInContext(TypeExpansionContext context) const {
+    return getLoweredTypeInContext(context).castTo<SILFunctionType>();
+  }
+
   StringRef getName() const { return Name; }
   
   void setDeclaration(bool isD) { IsDeclaration = isD; }

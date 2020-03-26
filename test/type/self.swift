@@ -162,6 +162,13 @@ class C {
   }
 }
 
+extension C {
+  static var rdar57188331 = Self.staticFunc() // expected-error {{covariant 'Self' type cannot be referenced from a stored property initializer}} expected-error {{stored property cannot have covariant 'Self' type}}
+  static var rdar57188331Var = ""
+  static let rdar57188331Ref = UnsafeRawPointer(&Self.rdar57188331Var) // expected-error {{covariant 'Self' type cannot be referenced from a stored property initializer}}
+}
+
+
 struct S1 {
   typealias _SELF = Self
   let j = 99.1
@@ -253,4 +260,42 @@ class SelfStoredPropertyInit {
   static func myValue() -> Int { return 123 }
 
   var value = Self.myValue() // expected-error {{covariant 'Self' type cannot be referenced from a stored property initializer}}
+}
+
+// rdar://problem/55273931 - erroneously rejecting 'Self' in lazy initializer
+class Foo {
+  static var value: Int = 17
+
+  lazy var doubledValue: Int = {
+    Self.value * 2
+  }()
+}
+
+// https://bugs.swift.org/browse/SR-11681 - duplicate diagnostics
+struct Box<T> {
+  let boxed: T
+}
+
+class Boxer {
+  lazy var s = Box<Self>(boxed: self as! Self)
+  // expected-error@-1 {{stored property cannot have covariant 'Self' type}}
+  // expected-error@-2 {{mutable property cannot have covariant 'Self' type}}
+
+  var t = Box<Self>(boxed: Self())
+  // expected-error@-1 {{stored property cannot have covariant 'Self' type}}
+  // expected-error@-2 {{covariant 'Self' type cannot be referenced from a stored property initializer}}
+
+  required init() {}
+}
+
+// https://bugs.swift.org/browse/SR-12133 - a type named 'Self' should be found first
+struct OuterType {
+  struct `Self` {
+    let string: String
+  }
+
+  var foo: `Self`? {
+    let optional: String? = "foo"
+    return optional.map { `Self`(string: $0) }
+  }
 }

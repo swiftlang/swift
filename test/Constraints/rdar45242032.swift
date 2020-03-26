@@ -14,9 +14,9 @@ struct S {
 }
 
 do {
-  let _ = M.foo(bar & // expected-error {{missing argument for parameter 'bar' in call}}
+  let _ = M.foo(bar & // expected-error {{missing arguments for parameters 'bar', 'baz' in call}}
 } // expected-error {{expected expression after operator}}
 
 do {
-  let _ = S.bar(fiz & // expected-error {{missing argument for parameter 'fiz' in call}}
+  let _ = S.bar(fiz & // expected-error {{missing arguments for parameters 'fiz', 'baz' in call}}
 } // expected-error {{expected expression after operator}}

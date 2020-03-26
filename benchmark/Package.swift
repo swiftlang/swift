@@ -3,8 +3,9 @@
 import PackageDescription
 import Foundation
 
-var unsupportedTests: Set<String> = ["ObjectiveCNoBridgingStubs"]
+var unsupportedTests: Set<String> = []
 #if !os(macOS) && !os(iOS) && !os(watchOS) && !os(tvOS)
+unsupportedTests.insert("ObjectiveCNoBridgingStubs")
 unsupportedTests.insert("ObjectiveCBridging")
 unsupportedTests.insert("ObjectiveCBridgingStubs")
 #endif
@@ -123,6 +124,15 @@ singleSourceDeps.append(.target(name: "ObjectiveCTests"))
 #endif
 
 targets += singleSourceLibraries.map { name in
+  if name == "ObjectiveCNoBridgingStubs" {
+    return .target(
+      name: name,
+      dependencies: singleSourceDeps,
+      path: "single-source",
+      sources: ["\(name).swift"],
+      swiftSettings: [.unsafeFlags(["-Xfrontend",
+                                    "-disable-swift-bridge-attr"])])
+  }
   return .target(name: name,
       dependencies: singleSourceDeps,
       path: "single-source",

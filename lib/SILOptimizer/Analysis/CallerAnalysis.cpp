@@ -14,7 +14,8 @@
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/YAMLTraits.h"
 
@@ -33,7 +34,9 @@ CallerAnalysis::FunctionInfo::FunctionInfo(SILFunction *f)
       // TODO: Make this more aggressive by considering
       // final/visibility/etc.
       mayHaveIndirectCallers(f->getDynamicallyReplacedFunction() ||
-                             canBeCalledIndirectly(f->getRepresentation())) {}
+                             canBeCalledIndirectly(f->getRepresentation())),
+      mayHaveExternalCallers(f->isPossiblyUsedExternally() ||
+                             f->isAvailableExternally()) {}
 
 //===----------------------------------------------------------------------===//
 //                   CallerAnalysis::ApplySiteFinderVisitor

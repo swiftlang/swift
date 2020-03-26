@@ -1,5 +1,9 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution
-// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution %S/Inputs/exhaustive_switch_testable_helper.swift -emit-module -o %t
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -I %t
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics -I %t
+
+import exhaustive_switch_testable_helper
 
 func foo(a: Int?, b: Int?) -> Int {
   switch (a, b) {
@@ -48,7 +52,7 @@ enum Result<T> {
   }
 }
 
-func overParenthesized() {
+func parenthesized() {
   // SR-7492: Space projection needs to treat extra paren-patterns explicitly.
   let x: Result<(Result<Int>, String)> = .Ok((.Ok(1), "World"))
   switch x {
@@ -1175,3 +1179,262 @@ func sr10301_as(_ foo: SR10301<String,(Int,Error)>) {
     return
   }
 }
+
+func sr11160() {
+  switch Optional<(Int, Int)>((5, 6)) {
+  case .some((let a, let b)): print(a, b)
+  case nil:                   print(0)
+  }
+
+  switch Optional<(Int, Int)>((5, 6)) {
+  case let b?: print(b)
+  case nil:    print(0)
+  }
+}
+
+enum Z {
+  case z1(a: Int)
+  case z2(a: Int, b: Int)
+  case z3((c: Int, d: Int))
+}
+
+func sr11160_extra() {
+  switch Z.z1(a: 1) { // expected-error {{switch must be exhaustive}}
+                      // expected-note@-1 {{add missing case: '.z1(a: let a)'}}
+  case .z2(_, _): ()
+  case .z3(_): ()
+  }
+
+  switch Z.z1(a: 1) { // expected-error {{switch must be exhaustive}}
+                      // expected-note@-1 {{add missing case: '.z2(a: let a, b: let b)'}}
+  case .z1(_): ()
+  case .z3(_): ()
+  }
+
+  switch Z.z1(a: 1) { // expected-error {{switch must be exhaustive}}
+                      // expected-note@-1 {{add missing case: '.z3((let c, let d))'}}
+  case .z1(_):    ()
+  case .z2(_, _): ()
+  }
+}
+
+public enum SR11672Tests {
+  
+  @frozen public enum FrozenSameModule {
+    case a, b
+  }
+  
+  func testNotRequired(_ value: NonExhaustive, _ value2: FrozenEnum, _ value3: FrozenSameModule) {
+    switch value {
+      // expected-error@-1 {{switch must be exhaustive}}
+      // expected-note@-2 {{add missing case: '.a'}}
+      // expected-note@-3 {{add missing case: '.b'}}
+      // Do not suggest adding '@unknown default'
+    }
+    
+    switch value2 {
+      // expected-error@-1 {{switch must be exhaustive}}
+      // expected-note@-2 {{add missing case: '.a'}}
+      // expected-note@-3 {{add missing case: '.b'}}
+      // expected-note@-4 {{add missing case: '.c'}}
+    }
+    
+    switch value3 {
+      // expected-error@-1 {{switch must be exhaustive}}
+      // expected-note@-2 {{add missing case: '.a'}}
+      // expected-note@-3 {{add missing case: '.b'}}
+    }
+  }
+  
+  @inlinable public func testNotRequired2(_ value: FrozenSameModule) {
+    switch value {
+      // expected-error@-1 {{switch must be exhaustive}}
+      // expected-note@-2 {{add missing case: '.a'}}
+      // expected-note@-3 {{add missing case: '.b'}}
+    }
+  }
+  
+  // Inlinable code is considered "outside" the module and must include a default
+  // case.
+  @inlinable public func testRequired(_ value: NonExhaustive) {
+    switch value {
+      // expected-error@-1 {{switch must be exhaustive}}
+      // expected-note@-2 {{add missing case: '.a'}}
+      // expected-note@-3 {{add missing case: '.b'}}
+      // expected-note@-4 {{handle unknown values using "@unknown default"}}
+    }
+  }
+}
+
+// SR-11212 tests: Some of the tests here rely on compiler bugs related to
+// implicit (un)tupling in patterns.
+//
+// Related codegen test: Compatibility/implicit_tupling_untupling_codegen.swift
+enum SR11212Tests {
+
+  enum Untupled {
+    case upair(Int, Int)
+  }
+
+  func sr11212_content_untupled_pattern_tupled1(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair((let x, let y)): return (x, y)
+    // expected-warning@-1 {{enum case 'upair' has 2 associated values}}{{16-17=}}{{31-32=}}
+    // expected-note@-7 {{'upair' declared here}}
+    }
+  }
+
+  func sr11212_content_untupled_pattern_tupled2(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair(let (x, y)): return (x, y)
+    // expected-warning@-1 {{enum case 'upair' has 2 associated values}} // No fix-it as that would require us to peek inside the 'let' :-/
+    // expected-note@-15 {{'upair' declared here}}
+    }
+  }
+
+  func sr11212_content_untupled_pattern_tupled3(u: Untupled) -> (Int, Int) {
+    switch u {
+    case let .upair((x, y)): return (x, y)
+    // expected-warning@-1 {{enum case 'upair' has 2 associated values}}{{20-21=}}{{27-28=}}
+    // expected-note@-23 {{'upair' declared here}}
+    }
+  }
+
+  func sr11212_content_untupled_pattern_untupled1(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair(let x, let y): return (x, y)
+    }
+  }
+
+  func sr11212_content_untupled_pattern_untupled2(u: Untupled) -> (Int, Int) {
+      switch u {
+      case let .upair(x, y): return (x, y)
+      }
+  }
+
+  func sr11212_content_untupled_pattern_ambiguous1(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair(let u_): return u_
+    // expected-warning@-1 {{enum case 'upair' has 2 associated values; matching them as a tuple is deprecated}}
+    // expected-note@-43 {{'upair' declared here}}
+    }
+  }
+
+  func sr11212_content_untupled_pattern_ambiguous2(u: Untupled) -> (Int, Int) {
+    switch u {
+    case let .upair(u_): return u_
+    // expected-warning@-1 {{enum case 'upair' has 2 associated values; matching them as a tuple is deprecated}}
+    // expected-note@-51 {{'upair' declared here}}
+    }
+  }
+
+  enum Tupled {
+    case tpair((Int, Int))
+  }
+
+  func sr11212_content_tupled_pattern_tupled1(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair((let x, let y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_tupled_pattern_tupled2(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair(let (x, y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_tupled_pattern_tupled3(t: Tupled) -> (Int, Int) {
+    switch t {
+    case let .tpair((x, y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_tupled_pattern_untupled1(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair(let x, let y): return (x, y)
+    // expected-warning@-1 {{enum case 'tpair' has one associated value that is a tuple of 2 elements}}{{16-16=(}}{{30-30=)}}
+    // expected-note@-25 {{'tpair' declared here}}
+    }
+  }
+
+  func sr11212_content_tupled_pattern_untupled2(t: Tupled) -> (Int, Int) {
+    switch t {
+    case let .tpair(x, y): return (x, y)
+    // expected-warning@-1 {{enum case 'tpair' has one associated value that is a tuple of 2 elements}}{{20-20=(}}{{26-26=)}}
+    // expected-note@-33 {{'tpair' declared here}}
+    }
+  }
+
+  func sr11212_content_tupled_pattern_ambiguous1(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair(let t_): return t_
+    }
+  }
+
+  func sr11212_content_tupled_pattern_ambiguous2(t: Tupled) -> (Int, Int) {
+    switch t {
+    case let .tpair(t_): return t_
+    }
+  }
+
+  enum Box<T> {
+    case box(T)
+  }
+
+  func sr11212_content_generic_pattern_tupled1(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box((let x, let y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_generic_pattern_tupled2(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box(let (x, y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_generic_pattern_tupled3(b: Box<(Int, Int)>) -> (Int, Int) {
+   switch b {
+   case let .box((x, y)): return (x, y)
+   }
+  }
+
+  func sr11212_content_generic_pattern_untupled1(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box(let x, let y): return (x, y)
+    // expected-warning@-1 {{enum case 'box' has one associated value that is a tuple of 2 elements}}{{14-14=(}}{{28-28=)}}
+    // expected-note@-25 {{'box' declared here}}
+    }
+  }
+
+  func sr11212_content_generic_pattern_untupled2(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case let .box(x, y): return (x, y)
+    // expected-warning@-1 {{enum case 'box' has one associated value that is a tuple of 2 elements}}{{18-18=(}}{{24-24=)}}
+    // expected-note@-33 {{'box' declared here}}
+    }
+  }
+
+  // rdar://problem/58578342
+  func sr11212_content_generic_pattern_untupled3(b: Box<((Int, Int), Int)>) -> (Int, Int, Int) {
+    switch b {
+    case let .box((x, y), z): return (x, y, z)
+    // expected-warning@-1 {{enum case 'box' has one associated value that is a tuple of 2 elements}}{{18-18=(}}{{29-29=)}}
+    // expected-note@-42 {{'box' declared here}}
+    }
+  }
+
+  func sr11212_content_generic_pattern_ambiguous1(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box(let b_): return b_
+    }
+  }
+
+  func sr11212_content_generic_pattern_ambiguous2(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case let .box(b_): return b_
+    }
+  }
+
+} // end SR11212Tests

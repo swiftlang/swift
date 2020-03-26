@@ -24,11 +24,6 @@ set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
 set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "")
 set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
 
-# NOTE(compnerd) save the original compiler for the host swiftReflection that
-# we build
-set(HOST_CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
-set(HOST_CMAKE_C_COMPILER_INITIAL ${CMAKE_C_COMPILER})
-
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
   if(NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
     message(FATAL_ERROR "Building the swift runtime is not supported with ${CMAKE_C_COMPILER_ID}. Use the just-built clang instead.")
@@ -77,7 +72,12 @@ if(SWIFT_BUILD_DYNAMIC_STDLIB)
   list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
 endif()
 if(SWIFT_BUILD_STATIC_STDLIB)
-  list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES STATIC)
+  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
+  if(building_darwin_sdks)
+    message(SEND_ERROR "cannot build static standard library for Darwin SDKs")
+  else()
+    list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES STATIC)
+  endif()
 endif()
 
 function(swift_create_stdlib_targets name variant define_all_alias)
@@ -134,6 +134,9 @@ if(SWIFT_STDLIB_ENABLE_SIB_TARGETS)
 endif()
 swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
 
+# FIXME: Include the toolchain directory before the public directory. Otherwise
+# the clang resource directory symlink stops installing correctly.
+add_subdirectory(toolchain)
 add_subdirectory(public)
 add_subdirectory(private)
 add_subdirectory(tools)

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name devirt_value_metatypes -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name devirt_value_metatypes -emit-sil -enable-spec-devirt -O %s | %FileCheck %s
 
 open class A {
   @inline(never)

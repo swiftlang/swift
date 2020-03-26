@@ -21,12 +21,15 @@ from .llbuild import LLBuild
 from .lldb import LLDB
 from .llvm import LLVM
 from .ninja import Ninja
+from .playgroundsupport import PlaygroundSupport
+from .pythonkit import PythonKit
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
 from .swiftevolve import SwiftEvolve
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
+from .tensorflow import TensorFlowSwiftAPIs
 from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
 
@@ -41,8 +44,11 @@ __all__ = [
     'LLDB',
     'LLVM',
     'Ninja',
+    'PlaygroundSupport',
+    'PythonKit',
     'Swift',
     'SwiftPM',
+    'TensorFlowSwiftAPIs',
     'XCTest',
     'SwiftSyntax',
     'SKStressTester',

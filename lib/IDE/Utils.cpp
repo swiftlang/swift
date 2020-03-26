@@ -19,6 +19,7 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
@@ -345,7 +346,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
     llvm::SmallString<64> Str;
     Str += "-fmodule-name=";
     Str += ClangInvok->getLangOpts()->CurrentModule;
-    CCArgs.push_back(Str.str());
+    CCArgs.push_back(std::string(Str.str()));
   }
 
   if (PPOpts.DetailedRecord) {
@@ -354,7 +355,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
 
   if (!ClangInvok->getFrontendOpts().Inputs.empty()) {
     Invok.getFrontendOptions().ImplicitObjCHeaderPath =
-      ClangInvok->getFrontendOpts().Inputs[0].getFile();
+        ClangInvok->getFrontendOpts().Inputs[0].getFile().str();
   }
 
   return false;
@@ -481,7 +482,7 @@ ide::replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
 static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
   auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
   if (!BufOrErr) {
-    llvm::errs() << BufOrErr.getError().message() << '\n';
+    llvm::errs() << "could not open '" << Path << "': " << BufOrErr.getError().message() << '\n';
     return {};
   }
 
@@ -497,7 +498,7 @@ static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
       std::tie(CurLine, Lines) = Lines.split('\n');
       unsigned Begin = CurLine.find("<string>") + strlen("<string>");
       unsigned End = CurLine.find("</string>");
-      return CurLine.substr(Begin, End-Begin);
+      return CurLine.substr(Begin, End - Begin).str();
     }
   }
 
@@ -508,7 +509,7 @@ std::string ide::getSDKName(StringRef Path) {
   std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
                                    "CanonicalName");
   if (Name.empty() && Path.endswith(".sdk")) {
-    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk"));
+    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk")).str();
   }
   return Name;
 }
@@ -850,7 +851,7 @@ struct swift::ide::SourceEditJsonConsumer::Implementation {
   }
   void accept(SourceManager &SM, CharSourceRange Range,
               llvm::StringRef Text) {
-    AllEdits.push_back({SM, Range, Text});
+    AllEdits.push_back({SM, Range, Text.str()});
   }
 };
 
@@ -954,23 +955,9 @@ bool swift::ide::isFromClang(const Decl *D) {
 }
 
 ClangNode swift::ide::getEffectiveClangNode(const Decl *decl) {
-  // Directly...
-  if (auto clangNode = decl->getClangNode())
-    return clangNode;
-
-  // Or via the nested "Code" enum.
-  if (auto nominal =
-      const_cast<NominalTypeDecl *>(dyn_cast<NominalTypeDecl>(decl))) {
-    auto &ctx = nominal->getASTContext();
-    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    for (auto code : nominal->lookupDirect(ctx.Id_Code, flags)) {
-      if (auto clangDecl = code->getClangDecl())
-        return clangDecl;
-    }
-  }
-
-  return ClangNode();
+  auto &ctx = decl->getASTContext();
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  return importer->getEffectiveClangNode(decl);
 }
 
 /// Retrieve the Clang node for the given extension, if it has one.
@@ -989,4 +976,37 @@ ClangNode swift::ide::extensionGetClangNode(const ExtensionDecl *ext) {
   }
 
   return ClangNode();
+}
+
+std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr) {
+  auto exprTy = expr->getType();
+
+  // Look through unbound instance member accesses.
+  if (auto *dotSyntaxExpr = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr))
+    expr = dotSyntaxExpr->getRHS();
+
+  // Look through the 'self' application.
+  if (auto *selfApplyExpr = dyn_cast<SelfApplyExpr>(expr))
+    expr = selfApplyExpr->getFn();
+
+  // Look through curry thunks.
+  if (auto *closure = dyn_cast<AutoClosureExpr>(expr))
+    if (auto *unwrappedThunk = closure->getUnwrappedCurryThunkExpr())
+      expr = unwrappedThunk;
+
+  // If this is an IUO result, unwrap the optional type.
+  auto refDecl = expr->getReferencedDecl();
+  if (!refDecl) {
+    if (auto *applyExpr = dyn_cast<ApplyExpr>(expr)) {
+      auto fnDecl = applyExpr->getFn()->getReferencedDecl();
+      if (auto *func = fnDecl.getDecl()) {
+        if (func->isImplicitlyUnwrappedOptional()) {
+          if (auto objectTy = exprTy->getOptionalObjectType())
+            exprTy = objectTy;
+        }
+      }
+    }
+  }
+
+  return std::make_pair(exprTy, refDecl);
 }

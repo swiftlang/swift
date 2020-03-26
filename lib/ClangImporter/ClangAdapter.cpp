@@ -77,6 +77,17 @@ importer::getDefinitionForClangTypeDecl(const clang::Decl *D) {
   return None;
 }
 
+const clang::Decl *
+importer::getFirstNonLocalDecl(const clang::Decl *D) {
+  D = D->getCanonicalDecl();
+  auto iter = llvm::find_if(D->redecls(), [](const clang::Decl *next) -> bool {
+    return !next->isLexicallyWithinFunctionOrMethod();
+  });
+  if (iter == D->redecls_end())
+    return nullptr;
+  return *iter;
+}
+
 Optional<clang::Module *>
 importer::getClangSubmoduleForDecl(const clang::Decl *D,
                                    bool allowForwardDeclaration) {
@@ -91,7 +102,7 @@ importer::getClangSubmoduleForDecl(const clang::Decl *D,
   }
 
   if (!actual)
-    actual = D->getCanonicalDecl();
+    actual = getFirstNonLocalDecl(D);
 
   return actual->getImportedOwningModule();
 }
@@ -436,6 +447,21 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     // OpenMP types that don't have Swift equivalents.
     case clang::BuiltinType::OMPArraySection:
       return OmissionTypeName();
+
+    // SVE builtin types that don't have Swift equivalents.
+    case clang::BuiltinType::SveInt8:
+    case clang::BuiltinType::SveInt16:
+    case clang::BuiltinType::SveInt32:
+    case clang::BuiltinType::SveInt64:
+    case clang::BuiltinType::SveUint8:
+    case clang::BuiltinType::SveUint16:
+    case clang::BuiltinType::SveUint32:
+    case clang::BuiltinType::SveUint64:
+    case clang::BuiltinType::SveFloat16:
+    case clang::BuiltinType::SveFloat32:
+    case clang::BuiltinType::SveFloat64:
+    case clang::BuiltinType::SveBool:
+      return OmissionTypeName();
     }
   }
 
@@ -563,33 +589,9 @@ bool importer::isNSNotificationGlobal(const clang::NamedDecl *decl) {
 }
 
 bool importer::hasNativeSwiftDecl(const clang::Decl *decl) {
-  for (auto annotation : decl->specific_attrs<clang::AnnotateAttr>()) {
-    if (annotation->getAnnotation() == SWIFT_NATIVE_ANNOTATION_STRING) {
+  if (auto *attr = decl->getAttr<clang::ExternalSourceSymbolAttr>())
+    if (attr->getGeneratedDeclaration() && attr->getLanguage() == "Swift")
       return true;
-    }
-  }
-
-  if (auto *category = dyn_cast<clang::ObjCCategoryDecl>(decl)) {
-    clang::SourceLocation categoryNameLoc = category->getCategoryNameLoc();
-    if (categoryNameLoc.isMacroID()) {
-      // Climb up to the top-most macro invocation.
-      clang::ASTContext &clangCtx = category->getASTContext();
-      clang::SourceManager &SM = clangCtx.getSourceManager();
-
-      clang::SourceLocation macroCaller =
-          SM.getImmediateMacroCallerLoc(categoryNameLoc);
-      while (macroCaller.isMacroID()) {
-        categoryNameLoc = macroCaller;
-        macroCaller = SM.getImmediateMacroCallerLoc(categoryNameLoc);
-      }
-
-      StringRef macroName = clang::Lexer::getImmediateMacroName(
-          categoryNameLoc, SM, clangCtx.getLangOpts());
-      if (macroName == "SWIFT_EXTENSION")
-        return true;
-    }
-  }
-
   return false;
 }
 
@@ -608,29 +610,6 @@ OptionalTypeKind importer::translateNullability(clang::NullabilityKind kind) {
   }
 
   llvm_unreachable("Invalid NullabilityKind.");
-}
-
-bool importer::hasDesignatedInitializers(
-    const clang::ObjCInterfaceDecl *classDecl) {
-  if (classDecl->hasDesignatedInitializers())
-    return true;
-
-  return false;
-}
-
-bool importer::isDesignatedInitializer(
-    const clang::ObjCInterfaceDecl *classDecl,
-    const clang::ObjCMethodDecl *method) {
-  // If the information is on the AST, use it.
-  if (classDecl->hasDesignatedInitializers()) {
-    auto *methodParent = method->getClassInterface();
-    if (!methodParent ||
-        methodParent->getCanonicalDecl() == classDecl->getCanonicalDecl()) {
-      return method->hasAttr<clang::ObjCDesignatedInitializerAttr>();
-    }
-  }
-
-  return false;
 }
 
 bool importer::isRequiredInitializer(const clang::ObjCMethodDecl *method) {

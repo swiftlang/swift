@@ -242,6 +242,7 @@ bb1:
   br bb3
 
 bb2:
+  destroy_addr %1 : $*Builtin.NativeObject
   br bb3
 
 bb3:
@@ -273,6 +274,7 @@ bb1:
   br bb3
 
 bb2:
+  destroy_addr %1 : $*Builtin.NativeObject
   br bb3
 
 bb3:

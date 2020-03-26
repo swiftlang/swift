@@ -19,6 +19,7 @@
 #define SWIFT_AST_WITNESS_H
 
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
 
@@ -182,11 +183,43 @@ public:
     return {};
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void dump() const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   void dump(llvm::raw_ostream &out) const;
+};
+
+struct TypeWitnessAndDecl {
+  Type witnessType;
+  TypeDecl *witnessDecl = nullptr;
+
+  TypeWitnessAndDecl() = default;
+  TypeWitnessAndDecl(Type ty, TypeDecl *decl)
+    : witnessType(ty), witnessDecl(decl) {}
+
+public:
+  Type getWitnessType() const {
+    return witnessType;
+  }
+
+  TypeDecl *getWitnessDecl() const {
+    return witnessDecl;
+  }
+
+  friend llvm::hash_code hash_value(const TypeWitnessAndDecl &owner) {
+    return llvm::hash_combine(owner.witnessType,
+                              owner.witnessDecl);
+  }
+
+  friend bool operator==(const TypeWitnessAndDecl &lhs,
+                         const TypeWitnessAndDecl &rhs) {
+    return lhs.witnessType->isEqual(rhs.witnessType) &&
+           lhs.witnessDecl == rhs.witnessDecl;
+  }
+
+  friend bool operator!=(const TypeWitnessAndDecl &lhs,
+                         const TypeWitnessAndDecl &rhs) {
+    return !(lhs == rhs);
+  }
 };
 
 } // end namespace swift

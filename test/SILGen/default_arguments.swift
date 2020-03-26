@@ -84,6 +84,25 @@ func testMagicLiterals(file: String = #file,
 //
 // NEGATIVE-NOT: sil hidden [ossa] @$s17default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA2_
 
+// SR-11623
+func genericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #column) -> T { x }
+
+// CHECK-LABEL: sil hidden [ossa] @$s17default_arguments23testGenericMagicLiteralyyF
+func testGenericMagicLiteral() {
+  // CHECK:      [[RET:%[0-9]+]] = alloc_stack $Int
+  // CHECK-NEXT: [[RAWLIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 35
+  // CHECK-NEXT: [[INTTY:%[0-9]+]] = metatype $@thin Int.Type
+  // CHECK-NEXT: // function_ref Swift.Int.init(_builtinIntegerLiteral: Builtin.IntLiteral) -> Swift.Int
+  // CHECK-NEXT: [[LITFN:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+  // CHECK-NEXT: [[LIT:%[0-9]+]] = apply [[LITFN]]([[RAWLIT]], [[INTTY]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  // CHECK-NEXT: [[LITARG:%[0-9]+]] = alloc_stack $Int
+  // CHECK-NEXT: store [[LIT]] to [trivial] [[LITARG]] : $*Int
+  // CHECK-NEXT: // function_ref default_arguments.genericMagicLiteral<A where A: Swift.ExpressibleByIntegerLiteral>(A) -> A
+  // CHECK-NEXT: [[FN:%[0-9]+]] = function_ref @$s17default_arguments19genericMagicLiteralyxxs020ExpressibleByIntegerE0RzlF : $@convention(thin) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // CHECK-NEXT: apply [[FN]]<Int>([[RET]], [[LITARG]]) : $@convention(thin) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  let _: Int = genericMagicLiteral()
+}
+
 func closure(_: () -> ()) {}
 func autoclosure(_: @autoclosure () -> ()) {}
 
@@ -217,16 +236,18 @@ class ReabstractDefaultArgument<T> {
 
 // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments32testDefaultArgumentReabstractionyyF
 // function_ref default_arguments.ReabstractDefaultArgument.__allocating_init <A>(default_arguments.ReabstractDefaultArgument<A>.Type)(a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>
-// CHECK: [[FN:%.*]] = function_ref @$s17default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
-// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Int>() : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
+// CHECK: [[FN:%.*]] = function_ref @$s17default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <τ_0_0, τ_0_0>
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Int>() : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <τ_0_0, τ_0_0>
+// CHECK-NEXT: [[RESULT_CONV:%.*]] = convert_function [[RESULT]]
 // CHECK-NEXT: function_ref reabstraction thunk helper from @escaping @callee_guaranteed (@in_guaranteed Swift.Int, @in_guaranteed Swift.Int) -> (@unowned Swift.Bool) to @escaping @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
 // CHECK-NEXT: [[THUNK:%.*]] = function_ref @$sS2iSbIegnnd_S2iSbIegyyd_TR : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed Int, @in_guaranteed Int) -> Bool) -> Bool
-// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[RESULT]]) : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed Int, @in_guaranteed Int) -> Bool) -> Bool
+// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[RESULT_CONV]]) : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed Int, @in_guaranteed Int) -> Bool) -> Bool
 // CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[FN]]
 // function_ref reabstraction thunk helper from @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_guaranteed (@in_guaranteed Swift.Int, @in_guaranteed Swift.Int) -> (@unowned Swift.Bool)
 // CHECK: [[THUNK:%.*]] = function_ref @$sS2iSbIgyyd_S2iSbIegnnd_TR : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int, @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
 // CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CONV_FN]]) : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int, @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[FN]]
+// CHECK-NEXT: [[CONV_FN_0:%.*]] = convert_function [[FN]]
+// CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CONV_FN_0]]
 // CHECK: [[INITFN:%[0-9]+]] = function_ref @$s17default_arguments25ReabstractDefaultArgumentC{{[_0-9a-zA-Z]*}}fC
 // CHECK-NEXT: apply [[INITFN]]<Int>([[CONV_FN]], 
 
@@ -383,3 +404,42 @@ func stupidGames(x: Int = 3) -> Int {
   return x
 }
 stupidGames(x:)()
+
+func genericMagic<T : ExpressibleByStringLiteral>(x: T = #file) -> T {
+  return x
+}
+
+let _: String = genericMagic()
+
+// SR-11778
+struct CallableWithDefault {
+  func callAsFunction(x: Int = 4) {}
+  func callAsFunction(y: Int, z: String = #function) {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s17default_arguments23testCallableWithDefaultyyAA0deF0VF : $@convention(thin) (CallableWithDefault) -> ()
+func testCallableWithDefault(_ x: CallableWithDefault) {
+  // CHECK: [[DEF_FN:%[0-9]+]] = function_ref @$s17default_arguments19CallableWithDefaultV14callAsFunction1xySi_tFfA_ : $@convention(thin) () -> Int
+  // CHECK: [[DEF:%[0-9]+]] = apply [[DEF_FN]]() : $@convention(thin) () -> Int
+  // CHECK: [[CALL_AS_FN:%[0-9]+]] = function_ref @$s17default_arguments19CallableWithDefaultV14callAsFunction1xySi_tF : $@convention(method) (Int, CallableWithDefault) -> ()
+  // CHECK: apply [[CALL_AS_FN]]([[DEF]], {{%[0-9]+}})
+  x()
+
+  // CHECK: [[RAW_I:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 5
+  // CHECK: [[I:%[0-9]+]] = apply {{%[0-9]+}}([[RAW_I]], {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  // CHECK: [[RAW_STR:%[0-9]+]] = string_literal utf8 "testCallableWithDefault(_:)"
+  // CHECK: [[STR:%[0-9]+]] = apply {{%[0-9]+}}([[RAW_STR]], {{%[0-9]+}}, {{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  // CHECK: [[CALL_AS_FN:%[0-9]+]] = function_ref @$s17default_arguments19CallableWithDefaultV14callAsFunction1y1zySi_SStF : $@convention(method) (Int, @guaranteed String, CallableWithDefault) -> ()
+  // CHECK: apply [[CALL_AS_FN]]([[I]], [[STR]], {{%[0-9]+}})
+  x(y: 5)
+}
+
+// FIXME: Arguably we shouldn't allow calling a constructor like this, as
+// we usually require the user write an explicit '.init'.
+struct WeirdUMEInitCase {
+  static let ty = WeirdUMEInitCase.self
+  init(_ x: Int = 0) {}
+}
+
+let _: WeirdUMEInitCase = .ty()
+let _: WeirdUMEInitCase = .ty(5)

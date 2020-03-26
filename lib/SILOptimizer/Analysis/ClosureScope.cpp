@@ -159,7 +159,7 @@ void ClosureScopeAnalysis::notifyWillDeleteFunction(SILFunction *F) {
 
 ClosureScopeData *ClosureScopeAnalysis::getOrComputeScopeData() {
   if (!scopeData) {
-    scopeData = llvm::make_unique<ClosureScopeData>();
+    scopeData = std::make_unique<ClosureScopeData>();
     scopeData->compute(M);
   }
   return scopeData.get();

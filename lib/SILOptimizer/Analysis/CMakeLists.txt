@@ -7,7 +7,6 @@ silopt_register_sources(
   ArraySemantic.cpp
   BasicCalleeAnalysis.cpp
   CallerAnalysis.cpp
-  CFG.cpp
   ClassHierarchyAnalysis.cpp
   ClosureScope.cpp
   ColdBlockInfo.cpp

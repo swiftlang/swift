@@ -12,6 +12,10 @@ func blackHole(_: Any...) {}
 
 protocol First {
   associatedtype Assoc : First
+
+  // Just to confuse things -- a method with the same name as an
+  // associated type
+  func Assoc(_: Int) -> Int
 }
 
 protocol Second {

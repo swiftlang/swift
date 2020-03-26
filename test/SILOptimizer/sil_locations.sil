@@ -49,7 +49,7 @@ bb0(%0 : $Int64):
   // CHECK-LABEL: sil @inline_test_add : $@convention(thin) (Int64) -> Int64 {
   // CHECK: [[VAL9:%.*]] = apply                               {{.*}} line:38:9:sil
   // CHECK: [[VAL10:%.*]] = apply                         {{.*}} line:39:9:sil
-  // CHECK: [[VAL11:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int64>,             {{.*}} line:40:9:minlined
+  // CHECK: [[VAL11:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int64>,             {{.*}}compiler-generated
   // CHECK: [[PB11:%.*]] = project_box [[VAL11]]          {{.*}} line:40:9:minlined
   // CHECK: store [[VAL10]] to [[PB11]]                   {{.*}} line:40:9:minlined
   // CHECK: [[VAL13:%.*]] = function_ref @plus            {{.*}} line:40:9:minlined

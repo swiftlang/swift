@@ -70,7 +70,7 @@ class DarwinPlatform(Platform):
     @property
     def is_embedded(self):
         """Check if this is a Darwin platform for embedded devices."""
-        return self.name != "macosx"
+        return self.name != "macosx" and self.name != "maccatalyst"
 
     @property
     def supports_benchmark(self):
@@ -117,7 +117,7 @@ class StdlibDeploymentTarget(object):
     OSX = DarwinPlatform("macosx", archs=["x86_64"],
                          sdk_name="OSX")
 
-    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64"],
+    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64", "arm64e"],
                          sdk_name="IOS")
     iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64"],
                                   sdk_name="IOS_SIMULATOR",
@@ -186,6 +186,14 @@ class StdlibDeploymentTarget(object):
         machine = platform.machine()
 
         if system == 'Linux':
+            if 'ANDROID_DATA' in os.environ:
+                if machine.startswith('armv7'):
+                    return StdlibDeploymentTarget.Android.armv7
+                elif machine == 'aarch64':
+                    return StdlibDeploymentTarget.Android.aarch64
+                raise NotImplementedError('Android System with architecture '
+                                          '"%s" is not supported' % machine)
+
             if machine == 'x86_64':
                 return StdlibDeploymentTarget.Linux.x86_64
             elif machine == 'i686':
@@ -228,32 +236,6 @@ class StdlibDeploymentTarget(object):
         raise NotImplementedError('System "%s" with architecture "%s" is not '
                                   'supported' % (system, machine))
 
-    @staticmethod
-    def default_stdlib_deployment_targets():
-        """
-        Return targets for the Swift stdlib, based on the build machine.
-        If the build machine is not one of the recognized ones, return None.
-        """
-
-        host_target = StdlibDeploymentTarget.host_target()
-        if host_target is None:
-            return None
-
-        # OS X build machines configure all Darwin platforms by default.
-        # Put iOS native targets last so that we test them last
-        # (it takes a long time).
-        if host_target == StdlibDeploymentTarget.OSX.x86_64:
-            return [host_target] + \
-                StdlibDeploymentTarget.iOSSimulator.targets + \
-                StdlibDeploymentTarget.AppleTVSimulator.targets + \
-                StdlibDeploymentTarget.AppleWatchSimulator.targets + \
-                StdlibDeploymentTarget.iOS.targets + \
-                StdlibDeploymentTarget.AppleTV.targets + \
-                StdlibDeploymentTarget.AppleWatch.targets
-        else:
-            # All other machines only configure their host stdlib by default.
-            return [host_target]
-
     @classmethod
     def get_target_for_name(cls, name):
         return cls._targets_by_name.get(name)
@@ -261,6 +243,11 @@ class StdlibDeploymentTarget(object):
     @classmethod
     def get_targets_by_name(cls, names):
         return [cls.get_target_for_name(name) for name in names]
+
+    @classmethod
+    def get_target_names(cls):
+        return sorted([name for (name, target) in
+                       cls._targets_by_name.items()])
 
 
 def install_prefix():
@@ -283,3 +270,19 @@ def darwin_toolchain_prefix(darwin_install_prefix):
     directory.
     """
     return os.path.split(darwin_install_prefix)[0]
+
+
+def toolchain_path(install_destdir, install_prefix):
+    """
+    Given the install prefix for a Darwin system, and assuming that that path
+    is to a .xctoolchain directory, return the path to the .xctoolchain
+    directory in the given install directory.
+    This toolchain is being populated during the build-script invocation.
+    Downstream products can use products that were previously installed into
+    this toolchain.
+    """
+    built_toolchain_path = install_destdir
+    if platform.system() == 'Darwin':
+        # The prefix is an absolute path, so concatenate without os.path.
+        built_toolchain_path += darwin_toolchain_prefix(install_prefix)
+    return built_toolchain_path

@@ -1,5 +1,4 @@
 // RUN: %scale-test -Onone --begin 0 --end 10 --step 1 --select transferNodesFromList %s
-// REQUIRES: OS=macosx
 // REQUIRES: asserts
 
 // Test that mandatory inlining is linear on a long series of integer

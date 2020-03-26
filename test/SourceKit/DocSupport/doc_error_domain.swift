@@ -1,6 +1,6 @@
 // REQUIRES: OS=macosx
 // RUN: %sourcekitd-test -req=doc-info -module MyError -- -I %S/Inputs \
-// RUN:         %mcp_opt -sdk %sdk | %sed_clean > %t.response
+// RUN:         -sdk %sdk | %sed_clean > %t.response
 // RUN: %FileCheck -input-file=%t.response %s
 
 // CHECK: struct MyError {

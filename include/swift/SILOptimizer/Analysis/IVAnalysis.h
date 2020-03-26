@@ -91,7 +91,7 @@ public:
   }
 
   std::unique_ptr<IVInfo> newFunctionAnalysis(SILFunction *F) override {
-    return llvm::make_unique<IVInfo>(*F);
+    return std::make_unique<IVInfo>(*F);
   }
 
   /// For now we always invalidate.

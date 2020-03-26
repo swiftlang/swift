@@ -11,8 +11,8 @@
 //
 import resilient_struct
 
-// CHECK-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience9takesSizeyy010resilient_A00D0VF"(%swift.opaque* noalias nocapture)
-// CHECK-LLDB-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience9takesSizeyy010resilient_A00D0VF"(%T16resilient_struct4SizeV* noalias nocapture dereferenceable({{8|16}}))
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience9takesSizeyy010resilient_A00D0VF"(%swift.opaque* noalias nocapture %0)
+// CHECK-LLDB-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience9takesSizeyy010resilient_A00D0VF"(%T16resilient_struct4SizeV* noalias nocapture dereferenceable({{8|16}}) %0)
 public func takesSize(_ s: Size) {}
 
 
@@ -31,5 +31,6 @@ func f() {
 f()
 
 // CHECK: ![[TY:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Size",
-
-// CHECK: ![[V1]] = !DILocalVariable(name: "s1", {{.*}}type: ![[TY]])
+// CHECK: ![[LET_TY:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type,
+// CHECK-SAME:                                baseType: ![[TY:[0-9]+]])
+// CHECK: ![[V1]] = !DILocalVariable(name: "s1", {{.*}}type: ![[LET_TY]])

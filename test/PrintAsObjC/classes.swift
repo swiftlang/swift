@@ -17,7 +17,7 @@
 // RUN: %FileCheck %s < %t/classes.h
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/classes.h
-// RUN: not %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h
+// RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h -include CoreFoundation.h -include objc_generics.h -include SingleGenericClass.h -include CompatibilityAlias.h
 
 // CHECK-NOT: AppKit;
@@ -359,6 +359,14 @@ typealias AliasForNSRect = NSRect
   @objc func testBridgingOptionality(_ a: UnsafePointer<Int>?, b: UnsafeMutablePointer<Int>!, c: AutoreleasingUnsafeMutablePointer<Methods?>?) {}
 }
 
+// CHECK-LABEL: IB_DESIGNABLE
+// CHECK-NEXT: SWIFT_CLASS(
+// CHECK-NEXT: @interface MyDesignableObject : NSObject
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+// NEGATIVE-NOT: @interface NSObject
+@IBDesignable class MyDesignableObject : NSObject {}
+
 // CHECK-LABEL: @interface MyObject : NSObject
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
@@ -517,6 +525,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic) CFAliasForTypeRef _Nullable anyCF2;
 // CHECK-NEXT: @property (nonatomic, weak) IBOutlet id _Null_unspecified outlet;
 // CHECK-NEXT: @property (nonatomic, strong) IBOutlet Properties * _Null_unspecified typedOutlet;
+// CHECK-NEXT: @property (nonatomic) IBInspectable NSInteger inspectable;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * _Nonnull string;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * _Nonnull array;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> * _Nonnull arrayOfArrays;
@@ -608,6 +617,7 @@ public class NonObjCClass { }
 
   @IBOutlet weak var outlet: AnyObject!
   @IBOutlet var typedOutlet: Properties!
+  @IBInspectable var inspectable: Int = 0
 
   @objc var string = "abc"
   @objc var array: Array<AnyObject> = []

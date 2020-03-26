@@ -31,6 +31,7 @@
 #include "swift/Sema/IDETypeChecking.h"
 
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -46,20 +47,25 @@ class StreamDiagConsumer : public DiagnosticConsumer {
 public:
   StreamDiagConsumer(llvm::raw_ostream &OS) : OS(OS) {}
 
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
     // FIXME: Print location info if available.
-    switch (Kind) {
-      case DiagnosticKind::Error: OS << "error: "; break;
-      case DiagnosticKind::Warning: OS << "warning: "; break;
-      case DiagnosticKind::Note: OS << "note: "; break;
-      case DiagnosticKind::Remark: OS << "remark: "; break;
+    switch (Info.Kind) {
+    case DiagnosticKind::Error:
+      OS << "error: ";
+      break;
+    case DiagnosticKind::Warning:
+      OS << "warning: ";
+      break;
+    case DiagnosticKind::Note:
+      OS << "note: ";
+      break;
+    case DiagnosticKind::Remark:
+      OS << "remark: ";
+      break;
     }
-    DiagnosticEngine::formatDiagnosticText(OS, FormatString, FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(OS, Info.FormatString,
+                                           Info.FormatArgs);
   }
 };
 } // end anonymous namespace
@@ -366,16 +372,21 @@ struct CacheKeyHashInfo<ASTKey> {
 struct SwiftASTManager::Implementation {
   explicit Implementation(
       std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
+      std::shared_ptr<GlobalConfig> Config,
       std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath)
-      : EditorDocs(EditorDocs), Stats(Stats),
-        RuntimeResourcePath(RuntimeResourcePath) {}
+      : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
+        RuntimeResourcePath(RuntimeResourcePath),
+        SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
+  }
 
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs;
+  std::shared_ptr<GlobalConfig> Config;
   std::shared_ptr<SwiftStatistics> Stats;
   std::string RuntimeResourcePath;
   SourceManager SourceMgr;
   Cache<ASTKey, ASTProducerRef> ASTCache{ "sourcekit.swift.ASTCache" };
   llvm::sys::Mutex CacheMtx;
+  std::time_t SessionTimestamp;
 
   WorkQueue ASTBuildQueue{ WorkQueue::Dequeuing::Serial,
                            "sourcekit.swift.ASTBuilding" };
@@ -396,8 +407,10 @@ struct SwiftASTManager::Implementation {
 
 SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
+    std::shared_ptr<GlobalConfig> Config,
     std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath)
-    : Impl(*new Implementation(EditorDocs, Stats, RuntimeResourcePath)) {}
+    : Impl(*new Implementation(EditorDocs, Config, Stats,
+                               RuntimeResourcePath)) {}
 
 SwiftASTManager::~SwiftASTManager() {
   delete &Impl;
@@ -434,6 +447,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     llvm::SmallString<128> newFilename;
     if (auto err = FileSystem->getRealPath(input.file(), newFilename))
       newFilename = input.file();
+    llvm::sys::path::native(newFilename);
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
     if (newIsPrimary) {
@@ -451,7 +465,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
   llvm::SmallString<64> Err;
   llvm::raw_svector_ostream OS(Err);
   OS << "'" << PrimaryFile << "' is not part of the input files";
-  Error = OS.str();
+  Error = std::string(OS.str());
   return replacementInputsAndOutputs;
 }
 
@@ -491,7 +505,7 @@ bool SwiftASTManager::initCompilerInvocation(
   Diags.removeConsumer(DiagConsumer);
 
   if (HadError) {
-    Error = ErrOS.str();
+    Error = std::string(ErrOS.str());
     return true;
   }
 
@@ -528,6 +542,27 @@ bool SwiftASTManager::initCompilerInvocation(
 
   // We don't care about LLVMArgs
   FrontendOpts.LLVMArgs.clear();
+
+  // SwiftSourceInfo files provide source location information for decls coming
+  // from loaded modules. For most IDE use cases it either has an undesirable
+  // impact on performance with no benefit (code completion), results in stale
+  // locations being used instead of more up-to-date indexer locations (cursor
+  // info), or has no observable effect (diagnostics, which are filtered to just
+  // those with a location in the primary file, and everything else).
+  if (Impl.Config->shouldOptimizeForIDE())
+    FrontendOpts.IgnoreSwiftSourceInfo = true;
+
+  // To save the time for module validation, consider the lifetime of ASTManager
+  // as a single build session.
+  // NOTE: 'SessionTimestamp - 1' because clang compares it with '<=' that may
+  //       cause unnecessary validations if they happens within one second from
+  //       the SourceKit startup.
+  ImporterOpts.ExtraArgs.push_back("-fbuild-session-timestamp=" +
+                                   std::to_string(Impl.SessionTimestamp - 1));
+  ImporterOpts.ExtraArgs.push_back("-fmodules-validate-once-per-build-session");
+
+  auto &SearchPathOpts = Invocation.getSearchPathOptions();
+  SearchPathOpts.DisableModulesValidateSystemDependencies = true;
 
   // Disable expensive SIL options to reduce time spent in SILGen.
   disableExpensiveSILOptions(Invocation.getSILOptions());
@@ -664,7 +699,7 @@ static FileContent getFileContentFromSnap(ImmutableTextSnapshotRef Snap,
                                           bool IsPrimary, StringRef FilePath) {
   auto Buf = llvm::MemoryBuffer::getMemBufferCopy(
       Snap->getBuffer()->getText(), FilePath);
-  return FileContent(Snap, FilePath, std::move(Buf), IsPrimary,
+  return FileContent(Snap, FilePath.str(), std::move(Buf), IsPrimary,
                      Snap->getStamp());
 }
 
@@ -680,8 +715,8 @@ FileContent SwiftASTManager::Implementation::getFileContent(
   // FIXME: Is there a way to get timestamp and buffer for a file atomically ?
   auto Stamp = getBufferStamp(FilePath, FileSystem);
   auto Buffer = getMemoryBuffer(FilePath, FileSystem, Error);
-  return FileContent(nullptr, UnresolvedPath, std::move(Buffer), IsPrimary,
-                     Stamp);
+  return FileContent(nullptr, UnresolvedPath.str(), std::move(Buffer),
+                     IsPrimary, Stamp);
 }
 
 BufferStamp SwiftASTManager::Implementation::getBufferStamp(
@@ -864,6 +899,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     // Only collect implementation-only dependencies from the main module.
     ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   }
+  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   TopMod->getImportedModules(Imports, ImportFilter);
 
@@ -883,7 +919,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     // getModuleFilename() (by returning an empty path). Note that such modules
     // may be heterogeneous.
     {
-      std::string Path = Mod->getModuleFilename();
+      std::string Path = Mod->getModuleFilename().str();
       if (Path.empty() || Path == TopMod->getModuleFilename())
         continue; // this is a submodule.
       Filenames.push_back(std::move(Path));
@@ -950,7 +986,6 @@ ASTUnitRef ASTProducer::createASTUnit(
 
   if (fileSystem != llvm::vfs::getRealFileSystem()) {
     CompIns.getSourceMgr().setFileSystem(fileSystem);
-    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
   }
 
   if (CompIns.setup(Invocation)) {
@@ -1000,7 +1035,8 @@ ASTUnitRef ASTProducer::createASTUnit(
 
     if (auto SF = CompIns.getPrimarySourceFile()) {
       SILOptions SILOpts = Invocation.getSILOptions();
-      std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, SILOpts);
+      auto &TC = CompIns.getSILTypes();
+      std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, TC, SILOpts);
       runSILDiagnosticPasses(*SILMod);
     }
   }

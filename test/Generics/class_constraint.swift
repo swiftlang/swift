@@ -45,3 +45,14 @@ where T.B.A: AnyObject, U.B: AnyObject, T.B == T.B.A, U.B.A == U.B {
   requiresAnyObject(t.b.a)
   requiresAnyObject(u.b.a)
 }
+
+func test_class_constraint_diagnostics_with_contextual_type() {
+  func foo<T : AnyObject>(_: AnyObject) -> T {} // expected-note 2 {{where 'T' = 'P'}}
+
+  class A : P {}
+
+  // TODO(diagnostics): We could also add a note here that protocols do not conform to themselves
+
+  let _: P = foo(A() as AnyObject) // expected-error {{local function 'foo' requires that 'P' be a class type}}
+  let _: P = foo(A()) // expected-error {{local function 'foo' requires that 'P' be a class type}}
+}

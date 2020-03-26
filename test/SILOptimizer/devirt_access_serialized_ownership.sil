@@ -38,18 +38,18 @@ sil @_TFC14devirt_access21YCfMS0_FT_S0_ : $@convention(thin) (@thick Y.Type) -> 
 sil [ossa] @Case : $@convention(thin) (@owned Y) -> Int {
 bb0(%0 : @owned $Y):
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
   destroy_value %3 : $X
   return %5 : $Int
 }
 
 sil_vtable X {
-  #X.ping!1: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
-  #X.init!initializer.1: @_TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
+  #X.ping: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer: @_TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
 }
 
 sil_vtable Y {
-  #X.ping!1: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
-  #X.init!initializer.1: @_TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
+  #X.ping: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer: @_TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
 }

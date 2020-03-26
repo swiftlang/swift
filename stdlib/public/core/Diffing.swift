@@ -15,8 +15,8 @@
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension CollectionDifference {
   fileprivate func _fastEnumeratedApply(
-    _ consume: (Change) -> Void
-  ) {
+    _ consume: (Change) throws -> Void
+  ) rethrows {
     let totalRemoves = removals.count
     let totalInserts = insertions.count
     var enumeratedRemoves = 0
@@ -41,7 +41,7 @@ extension CollectionDifference {
         preconditionFailure()
       }
 
-      consume(change)
+      try consume(change)
 
       switch change {
       case .remove(_, _, _):
@@ -52,6 +52,9 @@ extension CollectionDifference {
     }
   }
 }
+
+// Error type allows the use of throw to unroll state on application failure
+private enum _ApplicationError : Error { case failed }
 
 extension RangeReplaceableCollection {
   /// Applies the given difference to this collection.
@@ -66,45 +69,54 @@ extension RangeReplaceableCollection {
   ///   number of changes contained by the parameter.
   @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   public func applying(_ difference: CollectionDifference<Element>) -> Self? {
-    var result = Self()
-    var enumeratedRemoves = 0
-    var enumeratedInserts = 0
-    var enumeratedOriginals = 0
-    var currentIndex = self.startIndex
 
     func append(
       into target: inout Self,
       contentsOf source: Self,
       from index: inout Self.Index, count: Int
-    ) {
+    ) throws {
       let start = index
-      source.formIndex(&index, offsetBy: count)
+      if !source.formIndex(&index, offsetBy: count, limitedBy: source.endIndex) {
+        throw _ApplicationError.failed
+      }
       target.append(contentsOf: source[start..<index])
     }
 
-    difference._fastEnumeratedApply { change in
-      switch change {
-      case .remove(offset: let offset, element: _, associatedWith: _):
-        let origCount = offset - enumeratedOriginals
-        append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
-        enumeratedOriginals += origCount + 1 // Removal consumes an original element
-        currentIndex = self.index(after: currentIndex)
-        enumeratedRemoves += 1
-      case .insert(offset: let offset, element: let element, associatedWith: _):
-        let origCount = (offset + enumeratedRemoves - enumeratedInserts) - enumeratedOriginals
-        append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
-        result.append(element)
-        enumeratedOriginals += origCount
-        enumeratedInserts += 1
+    var result = Self()
+    do {
+      var enumeratedRemoves = 0
+      var enumeratedInserts = 0
+      var enumeratedOriginals = 0
+      var currentIndex = self.startIndex
+      try difference._fastEnumeratedApply { change in
+        switch change {
+        case .remove(offset: let offset, element: _, associatedWith: _):
+          let origCount = offset - enumeratedOriginals
+          try append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
+          if currentIndex == self.endIndex {
+            // Removing nonexistent element off the end of the collection
+            throw _ApplicationError.failed
+          }
+          enumeratedOriginals += origCount + 1 // Removal consumes an original element
+          currentIndex = self.index(after: currentIndex)
+          enumeratedRemoves += 1
+        case .insert(offset: let offset, element: let element, associatedWith: _):
+          let origCount = (offset + enumeratedRemoves - enumeratedInserts) - enumeratedOriginals
+          try append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
+          result.append(element)
+          enumeratedOriginals += origCount
+          enumeratedInserts += 1
+        }
+        _internalInvariant(enumeratedOriginals <= self.count)
       }
-      _internalInvariant(enumeratedOriginals <= self.count)
+      if currentIndex < self.endIndex {
+        result.append(contentsOf: self[currentIndex...])
+      }
+      _internalInvariant(result.count == self.count + enumeratedInserts - enumeratedRemoves)
+    } catch {
+      return nil
     }
-    let origCount = self.count - enumeratedOriginals
-    append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
 
-    _internalInvariant(currentIndex == self.endIndex)
-    _internalInvariant(enumeratedOriginals + origCount == self.count)
-    _internalInvariant(result.count == self.count + enumeratedInserts - enumeratedRemoves)
     return result
   }
 }
@@ -167,11 +179,14 @@ extension BidirectionalCollection where Element: Equatable {
 
 // MARK: Internal implementation
 
-// _V is a rudimentary type made to represent the rows of the triangular matrix type used by the Myer's algorithm
+// _V is a rudimentary type made to represent the rows of the triangular matrix
+// type used by the Myer's algorithm.
 //
-// This type is basically an array that only supports indexes in the set `stride(from: -d, through: d, by: 2)` where `d` is the depth of this row in the matrix
-// `d` is always known at allocation-time, and is used to preallocate the structure.
-fileprivate struct _V {
+// This type is basically an array that only supports indexes in the set
+// `stride(from: -d, through: d, by: 2)` where `d` is the depth of this row in
+// the matrix `d` is always known at allocation-time, and is used to preallocate
+// the structure.
+private struct _V {
 
   private var a: [Int]
 #if INTERNAL_CHECKS_ENABLED
@@ -210,7 +225,7 @@ fileprivate struct _V {
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
-fileprivate func _myers<C,D>(
+private func _myers<C,D>(
   from old: C, to new: D,
   using cmp: (C.Element, D.Element) -> Bool
 ) -> CollectionDifference<C.Element>
@@ -307,7 +322,7 @@ fileprivate func _myers<C,D>(
         y &-= 1
       }
 
-      assert((x == prev_x && y > prev_y) || (y == prev_y && x > prev_x))
+      _internalInvariant((x == prev_x && y > prev_y) || (y == prev_y && x > prev_x))
       if y != prev_y {
         changes.append(.insert(offset: prev_y, element: b[prev_y], associatedWith: nil))
       } else {

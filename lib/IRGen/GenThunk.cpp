@@ -46,7 +46,8 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
     return entry;
   }
 
-  auto fnType = getSILModule().Types.getConstantFunctionType(declRef);
+  auto fnType = getSILModule().Types.getConstantFunctionType(
+      getMaximalTypeExpansionContext(), declRef);
   Signature signature = getSignature(fnType);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
@@ -54,8 +55,8 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
   return entry;
 }
 
-static FunctionPointer lookupMethod(IRGenFunction &IGF,
-                                    SILDeclRef declRef) {
+static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
+  auto expansionContext = IGF.IGM.getMaximalTypeExpansionContext();
   auto *decl = cast<AbstractFunctionDecl>(declRef.getDecl());
 
   // Protocol case.
@@ -68,7 +69,8 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF,
   }
 
   // Class case.
-  auto funcTy = IGF.IGM.getSILModule().Types.getConstantFunctionType(declRef);
+  auto funcTy = IGF.IGM.getSILModule().Types.getConstantFunctionType(
+      expansionContext, declRef);
 
   // Load the metadata, or use the 'self' value if we have a static method.
   llvm::Value *self;
@@ -82,7 +84,8 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF,
   else
     self = (IGF.CurFn->arg_end() - 1);
 
-  auto selfTy = funcTy->getSelfParameter().getSILStorageType();
+  auto selfTy = funcTy->getSelfParameter()
+                      .getSILStorageType(IGF.IGM.getSILModule(), funcTy);
 
   llvm::Value *metadata;
   if (selfTy.is<MetatypeType>()) {

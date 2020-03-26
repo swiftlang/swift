@@ -44,7 +44,7 @@ bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                       DiagnosticEngine &Diags);
 bool linkLLVMModules(llvm::Module *Module,
                      std::unique_ptr<llvm::Module> SubModule);
-bool autolinkImportedModules(ModuleDecl *M, IRGenOptions &IRGenOpts);
+bool autolinkImportedModules(ModuleDecl *M, const IRGenOptions &IRGenOpts);
 
 } // end namespace immediate
 } // end namespace swift

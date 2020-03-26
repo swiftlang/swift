@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILFormat.h"
+#include "ModuleFile.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 
 #include "llvm/ADT/DenseMap.h"
@@ -57,6 +57,11 @@ namespace swift {
 
     MutableArrayRef<ModuleFile::PartiallySerialized<SILProperty *>>
     Properties;
+
+    std::unique_ptr<SerializedFuncTable> DifferentiabilityWitnessList;
+    MutableArrayRef<
+        ModuleFile::PartiallySerialized<SILDifferentiabilityWitness *>>
+        DifferentiabilityWitnesses;
 
     /// A declaration will only
     llvm::DenseMap<NormalProtocolConformance *, SILWitnessTable *>
@@ -110,13 +115,28 @@ namespace swift {
     SILValue getLocalValue(serialization::ValueID Id,
                            SILType Type);
 
+    SILType getSILType(Type ty, SILValueCategory category,
+                       SILFunction *inContext);
+
+    SILDifferentiabilityWitness *
+    getSILDifferentiabilityWitnessForReference(StringRef mangledKey);
+
     SILFunction *getFuncForReference(StringRef Name, SILType Ty);
     SILFunction *getFuncForReference(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);
     SILGlobalVariable *getGlobalForReference(StringRef Name);
     SILGlobalVariable *readGlobalVar(StringRef Name);
-    SILWitnessTable *readWitnessTable(serialization::DeclID,
+
+    /// Read and return the witness table identified with \p WId.
+    SILWitnessTable *readWitnessTable(serialization::DeclID WId,
                                       SILWitnessTable *existingWt);
+
+    /// Read the witness table identified with \p WId, return the table or
+    /// the first error if any.
+    llvm::Expected<SILWitnessTable *>
+      readWitnessTableChecked(serialization::DeclID WId,
+                              SILWitnessTable *existingWt);
+
     void readWitnessTableEntries(
            llvm::BitstreamEntry &entry,
            std::vector<SILWitnessTable::Entry> &witnessEntries,
@@ -126,6 +146,8 @@ namespace swift {
     SILDefaultWitnessTable *
     readDefaultWitnessTable(serialization::DeclID,
                             SILDefaultWitnessTable *existingWt);
+    SILDifferentiabilityWitness *
+        readDifferentiabilityWitness(serialization::DeclID);
 
     Optional<KeyPathPatternComponent>
     readKeyPathComponent(ArrayRef<uint64_t> ListOfValues, unsigned &nextValue);
@@ -137,7 +159,7 @@ public:
     FileUnit *getFile() const {
       return MF->getFile();
     }
-    SILFunction *lookupSILFunction(SILFunction *InFunc);
+    SILFunction *lookupSILFunction(SILFunction *InFunc, bool onlyUpdateLinkage);
     SILFunction *lookupSILFunction(StringRef Name,
                                    bool declarationOnly = false);
     bool hasSILFunction(StringRef Name, Optional<SILLinkage> Linkage = None);
@@ -145,6 +167,8 @@ public:
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
     SILDefaultWitnessTable *
     lookupDefaultWitnessTable(SILDefaultWitnessTable *wt);
+    SILDifferentiabilityWitness *
+    lookupDifferentiabilityWitness(StringRef mangledDiffWitnessKey);
 
     /// Invalidate all cached SILFunctions.
     void invalidateFunctionCache();
@@ -169,6 +193,7 @@ public:
       getAllWitnessTables();
       getAllDefaultWitnessTables();
       getAllProperties();
+      getAllDifferentiabilityWitnesses();
     }
 
     /// Deserialize all SILFunctions inside the module and add them to SILMod.
@@ -191,6 +216,10 @@ public:
     /// Deserialize all Property descriptors inside the module and add them
     /// to SILMod.
     void getAllProperties();
+
+    /// Deserialize all DifferentiabilityWitnesses inside the module and add
+    /// them to SILMod.
+    void getAllDifferentiabilityWitnesses();
 
     SILDeserializer(ModuleFile *MF, SILModule &M,
                     DeserializationNotificationHandlerSet *callback);

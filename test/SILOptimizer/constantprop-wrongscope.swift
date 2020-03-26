@@ -13,7 +13,7 @@
 // instructions surrounding it.
 
 // CHECK:   destroy_addr %7 : $*Any, loc {{.*}}:22:19, scope 2
-// CHECK:   dealloc_stack %12 : $*Optional<Any>, loc {{.*}}:22:23, scope 2
+// CHECK:   dealloc_stack %13 : $*Optional<Any>, loc {{.*}}:22:23, scope 2
 // CHECK:   dealloc_stack %7 : $*Any, loc {{.*}}:22:23, scope 2
 // CHECK:   dealloc_stack %6 : $*A, loc {{.*}}:22:7, scope 2
 

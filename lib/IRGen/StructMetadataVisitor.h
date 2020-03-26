@@ -18,6 +18,7 @@
 #define SWIFT_IRGEN_STRUCTMETADATALAYOUT_H
 
 #include "NominalMetadataVisitor.h"
+#include "swift/AST/IRGenOptions.h"
 
 namespace swift {
 namespace irgen {
@@ -61,6 +62,9 @@ public:
       asImpl().addFieldOffset(prop);
 
     asImpl().noteEndOfFieldOffsets();
+
+    if (asImpl().hasTrailingFlags())
+      asImpl().addTrailingFlags();
   }
   
   // Note the start of the field offset vector.
@@ -68,6 +72,11 @@ public:
 
   // Note the end of the field offset vector.
   void noteEndOfFieldOffsets() {}
+
+  bool hasTrailingFlags() {
+    return Target->isGenericContext() &&
+           IGM.shouldPrespecializeGenericMetadata();
+  }
 };
 
 /// An "implementation" of StructMetadataVisitor that just scans through
@@ -87,13 +96,15 @@ public:
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
   void addFieldOffset(VarDecl *) { addInt32(); }
-  void addGenericArgument() { addPointer(); }
-  void addGenericWitnessTable() { addPointer(); }
+  void addGenericArgument(GenericRequirement requirement) { addPointer(); }
+  void addGenericWitnessTable(GenericRequirement requirement) { addPointer(); }
   void noteStartOfTypeSpecificMembers() {}
 
   void noteEndOfFieldOffsets() {
     NextOffset = NextOffset.roundUpToAlignment(super::IGM.getPointerAlignment());
   }
+
+  void addTrailingFlags() { addPointer(); }
 
 private:
   void addPointer() {

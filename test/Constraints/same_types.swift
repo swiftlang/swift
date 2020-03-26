@@ -60,7 +60,7 @@ func fail1<
 >(_ t: T, u: U) -> (X, Y)
   where T.Foo == X, U.Foo == Y, T.Foo == U.Foo { // expected-error{{'U.Foo' cannot be equal to both 'Y' and 'X'}}
   // expected-note@-1{{same-type constraint 'T.Foo' == 'X' written here}}
-  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Y'}}
+  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type '(X, X)' to return type '(X, Y)'}}
 }
 
 func fail2<
@@ -68,7 +68,7 @@ func fail2<
 >(_ t: T, u: U) -> (X, Y)
   where T.Foo == U.Foo, T.Foo == X, U.Foo == Y { // expected-error{{'U.Foo' cannot be equal to both 'Y' and 'X'}}
   // expected-note@-1{{same-type constraint 'T.Foo' == 'X' written here}}
-  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Y'}}
+  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type '(X, X)' to return type '(X, Y)'}}
 }
 
 func test4<T: Barrable>(_ t: T) -> Y where T.Bar == Y {
@@ -98,14 +98,14 @@ func fail4<T: Barrable>(_ t: T) -> (Y, Z)
   where
   T.Bar == Y, // expected-note{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
   T.Bar.Foo == Z { // expected-error{{'T.Bar.Foo' cannot be equal to both 'Z' and 'Y.Foo' (aka 'X')}}
-  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
+  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to return type '(Y, Z)'}}
 }
 
 func fail5<T: Barrable>(_ t: T) -> (Y, Z)
   where
   T.Bar.Foo == Z, // expected-note{{same-type constraint 'T.Bar.Foo' == 'Z' written here}}
   T.Bar == Y { // expected-error{{'T.Bar.Foo' cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'}}
-  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
+  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to return type '(Y, Z)'}}
 }
 
 func test8<T: Fooable>(_ t: T)
@@ -319,4 +319,39 @@ struct Bar<A: P1, B: P1> where A.Assoc == B.Assoc {
     // expected-warning@-2 {{redundant same-type constraint 'A.Assoc' == 'C.Assoc'}}
     fatalError()
   }
+}
+
+protocol P7 {
+  associatedtype A
+  static func fn(args: A)
+}
+
+class R<T>: P7 where T: P7, T.A == T.Type { // expected-note {{'T' declared as parameter to type 'R'}}
+  typealias A = T.Type
+  static func fn(args: T.Type) {}
+}
+
+R.fn(args: R.self) // expected-error {{generic parameter 'T' could not be inferred}}
+// expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+
+// rdar://problem/58607155
+protocol AssocType1 { associatedtype A }
+protocol AssocType2 { associatedtype A }
+
+func rdar58607155() {
+  func f<T1: AssocType1, T2: AssocType2>(t1: T1, t2: T2) where T1.A == T2.A {}
+  // expected-note@-1 2 {{where 'T2' = 'MissingConformance'}}
+  // expected-note@-2 2 {{where 'T1' = 'MissingConformance'}}
+
+  class Conformance: AssocType1, AssocType2 { typealias A = Int }
+  class MissingConformance {}
+
+  // One generic argument has a conformance failure
+  f(t1: MissingConformance(), t2: Conformance()) // expected-error {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType1'}}
+  f(t1: Conformance(), t2: MissingConformance()) // expected-error {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType2'}}
+
+  // Both generic arguments have a conformance failure
+  f(t1: MissingConformance(), t2: MissingConformance())
+  // expected-error@-1 {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType1'}}
+  // expected-error@-2 {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType2'}}
 }

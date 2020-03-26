@@ -10,7 +10,7 @@ endif()
 
 
 list(APPEND CMAKE_MODULE_PATH
-  "${SWIFT_SOURCE_ROOT}/llvm/cmake/modules"
+  "${SWIFT_SOURCE_ROOT}/llvm-project/llvm/cmake/modules"
   "${PROJECT_SOURCE_DIR}/../../../../cmake/modules"
   "${PROJECT_SOURCE_DIR}/../../../cmake/modules")
 
@@ -58,7 +58,7 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "${TOOLCHAIN_DIR}/usr/bin" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${TOOLCHAIN_DIR}/usr/bin" CACHE STRING
   "Path to Swift tools that are executable on the build machine.")
 
-option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
+option(SWIFT_ENABLE_MODULE_INTERFACES
   "Generate .swiftinterface files alongside .swiftmodule files."
   TRUE)
 
@@ -93,6 +93,12 @@ set(SWIFT_BUILD_STANDALONE_OVERLAY TRUE)
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES "SHARED")
 set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES "SHARED")
 
+option(SWIFT_ENABLE_MACCATALYST
+  "Build the overlays with macCatalyst support"
+  FALSE)
+
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "13.0" CACHE STRING
+  "Minimum deployment target version for macCatalyst")
 
 # -----------------------------------------------------------------------------
 
@@ -106,7 +112,6 @@ include(SwiftSharedCMakeConfig)
 include(AddSwift)
 include(SwiftHandleGybSources)
 include(SwiftConfigureSDK)
-include(SwiftSource)
 include(SwiftComponents)
 include(DarwinSDKs)
 

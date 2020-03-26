@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/NullablePtr.h"
@@ -38,9 +39,11 @@ using namespace ast_scope;
 #pragma mark ASTScope
 
 llvm::SmallVector<const ASTScopeImpl *, 0> ASTScope::unqualifiedLookup(
-    SourceFile *SF, DeclName name, SourceLoc loc,
+    SourceFile *SF, DeclNameRef name, SourceLoc loc,
     const DeclContext *startingContext,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
+  if (auto *s = SF->getASTContext().Stats)
+    ++s->getFrontendCounters().NumASTScopeLookups;
   return ASTScopeImpl::unqualifiedLookup(SF, name, loc, startingContext,
                                          consumer);
 }
@@ -51,10 +54,19 @@ Optional<bool> ASTScope::computeIsCascadingUse(
   return ASTScopeImpl::computeIsCascadingUse(history, initialIsCascadingUse);
 }
 
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+
 void ASTScope::dump() const { impl->dump(); }
+
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(pop)
+#endif
+
 void ASTScope::print(llvm::raw_ostream &out) const { impl->print(out); }
-void ASTScope::dumpOneScopeMapLocation(
-    std::pair<unsigned, unsigned> lineCol) const {
+void ASTScope::dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineCol) {
   impl->dumpOneScopeMapLocation(lineCol);
 }
 
@@ -81,20 +93,9 @@ AbstractClosureScope::getClosureIfClosureScope() const {
   return closureExpr;
 }
 
-Decl *ASTScopeImpl::getEnclosingAbstractFunctionOrSubscriptDecl() const {
-  return getParent().get()->getEnclosingAbstractFunctionOrSubscriptDecl();
-}
-Decl *
-AbstractFunctionDeclScope::getEnclosingAbstractFunctionOrSubscriptDecl() const {
-  return decl;
-}
-Decl *SubscriptDeclScope::getEnclosingAbstractFunctionOrSubscriptDecl() const {
-  return decl;
-}
-
 // Conservative, because using precise info would be circular
-SourceRange AttachedPropertyWrapperScope::getCustomAttributesSourceRange(
-    const VarDecl *const vd) {
+SourceRange
+AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(const VarDecl *const vd) {
   SourceRange sr;
   for (auto *attr : vd->getAttrs().getAttributes<CustomAttr>()) {
     if (sr.isInvalid())
@@ -142,7 +143,7 @@ LabeledConditionalStmt *GuardStmtScope::getLabeledConditionalStmt() const {
 #pragma mark getASTContext
 
 ASTContext &ASTScopeImpl::getASTContext() const {
-  if (auto d = getDecl())
+  if (auto d = getDeclIfAny())
     return d.get()->getASTContext();
   if (auto dc = getDeclContext())
     return dc.get()->getASTContext();
@@ -178,7 +179,7 @@ NullablePtr<DeclContext> BraceStmtScope::getDeclContext() const {
 NullablePtr<DeclContext>
 DefaultArgumentInitializerScope::getDeclContext() const {
   auto *dc = decl->getDefaultArgumentInitContext();
-  assert(dc && "If scope exists, this must exist");
+  ASTScopeAssert(dc, "If scope exists, this must exist");
   return dc;
 }
 
@@ -189,17 +190,14 @@ NullablePtr<DeclContext> CaptureListScope::getDeclContext() const {
 }
 
 NullablePtr<DeclContext> AttachedPropertyWrapperScope::getDeclContext() const {
-  return decl->getParentPatternBinding()
-      ->getPatternList()
-      .front()
-      .getInitContext();
+  return decl->getParentPatternBinding()->getInitContext(0);
 }
 
 NullablePtr<DeclContext> AbstractFunctionDeclScope::getDeclContext() const {
   return decl;
 }
 
-NullablePtr<DeclContext> AbstractFunctionParamsScope::getDeclContext() const {
+NullablePtr<DeclContext> ParameterListScope::getDeclContext() const {
   return matchingContext;
 }
 
@@ -215,14 +213,13 @@ std::string GenericTypeOrExtensionScope::getClassName() const {
 DEFINE_GET_CLASS_NAME(ASTSourceFileScope)
 DEFINE_GET_CLASS_NAME(GenericParamScope)
 DEFINE_GET_CLASS_NAME(AbstractFunctionDeclScope)
-DEFINE_GET_CLASS_NAME(AbstractFunctionParamsScope)
+DEFINE_GET_CLASS_NAME(ParameterListScope)
 DEFINE_GET_CLASS_NAME(MethodBodyScope)
 DEFINE_GET_CLASS_NAME(PureFunctionBodyScope)
 DEFINE_GET_CLASS_NAME(DefaultArgumentInitializerScope)
 DEFINE_GET_CLASS_NAME(AttachedPropertyWrapperScope)
 DEFINE_GET_CLASS_NAME(PatternEntryDeclScope)
 DEFINE_GET_CLASS_NAME(PatternEntryInitializerScope)
-DEFINE_GET_CLASS_NAME(PatternEntryUseScope)
 DEFINE_GET_CLASS_NAME(ConditionalClauseScope)
 DEFINE_GET_CLASS_NAME(ConditionalClausePatternUseScope)
 DEFINE_GET_CLASS_NAME(CaptureListScope)
@@ -231,12 +228,14 @@ DEFINE_GET_CLASS_NAME(ClosureParametersScope)
 DEFINE_GET_CLASS_NAME(ClosureBodyScope)
 DEFINE_GET_CLASS_NAME(TopLevelCodeScope)
 DEFINE_GET_CLASS_NAME(SpecializeAttributeScope)
+DEFINE_GET_CLASS_NAME(DifferentiableAttributeScope)
 DEFINE_GET_CLASS_NAME(SubscriptDeclScope)
 DEFINE_GET_CLASS_NAME(VarDeclScope)
+DEFINE_GET_CLASS_NAME(EnumElementScope)
 DEFINE_GET_CLASS_NAME(IfStmtScope)
 DEFINE_GET_CLASS_NAME(WhileStmtScope)
 DEFINE_GET_CLASS_NAME(GuardStmtScope)
-DEFINE_GET_CLASS_NAME(GuardStmtUseScope)
+DEFINE_GET_CLASS_NAME(LookupParentDiversionScope)
 DEFINE_GET_CLASS_NAME(RepeatWhileScope)
 DEFINE_GET_CLASS_NAME(DoCatchStmtScope)
 DEFINE_GET_CLASS_NAME(SwitchStmtScope)
@@ -265,6 +264,15 @@ ExtensionScope::getCorrespondingNominalTypeDecl() const {
   return decl->getExtendedNominal();
 }
 
+void ASTScopeImpl::preOrderDo(function_ref<void(ASTScopeImpl *)> fn) {
+  fn(this);
+  preOrderChildrenDo(fn);
+}
+void ASTScopeImpl::preOrderChildrenDo(function_ref<void(ASTScopeImpl *)> fn) {
+  for (auto *child : getChildren())
+    child->preOrderDo(fn);
+}
+
 void ASTScopeImpl::postOrderDo(function_ref<void(ASTScopeImpl *)> fn) {
   for (auto *child : getChildren())
     child->postOrderDo(fn);
@@ -278,4 +286,23 @@ ArrayRef<StmtConditionElement> ConditionalClauseScope::getCond() const {
 const StmtConditionElement &
 ConditionalClauseScope::getStmtConditionElement() const {
   return getCond()[index];
+}
+
+unsigned ASTScopeImpl::countDescendants() const {
+  unsigned count = 0;
+  const_cast<ASTScopeImpl *>(this)->preOrderDo(
+      [&](ASTScopeImpl *) { ++count; });
+  return count - 1;
+}
+
+// Can fail if a subscope is lazy and not reexpanded
+void ASTScopeImpl::assertThatTreeDoesNotShrink(function_ref<void()> fn) {
+#ifndef NDEBUG
+  unsigned beforeCount = countDescendants();
+#endif
+  fn();
+#ifndef NDEBUG
+  unsigned afterCount = countDescendants();
+  ASTScopeAssert(beforeCount <= afterCount, "shrank?!");
+#endif
 }

@@ -38,13 +38,20 @@ namespace {
 static
 Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
   return llvm::StringSwitch<Optional<PlatformConditionKind>>(Name)
-    .Case("os", PlatformConditionKind::OS)
-    .Case("arch", PlatformConditionKind::Arch)
-    .Case("_endian", PlatformConditionKind::Endianness)
-    .Case("_runtime", PlatformConditionKind::Runtime)
-    .Case("canImport", PlatformConditionKind::CanImport)
-    .Case("targetEnvironment", PlatformConditionKind::TargetEnvironment)
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
+    .Case(IDENTIFIER, PlatformConditionKind::LABEL)
+#include "swift/AST/PlatformConditionKinds.def"
     .Default(None);
+}
+
+/// Get platform condition name from PlatformConditionKind.
+static StringRef getPlatformConditionName(PlatformConditionKind Kind) {
+  switch (Kind) {
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
+  case PlatformConditionKind::LABEL: return IDENTIFIER;
+#include "swift/AST/PlatformConditionKinds.def"
+  }
+  llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
 
 /// Extract source text of the expression.
@@ -265,9 +272,10 @@ public:
       return nullptr;
     }
 
-    std::vector<StringRef> suggestions;
+    PlatformConditionKind suggestedKind = *Kind;
+    std::vector<StringRef> suggestedValues;
     if (!LangOptions::checkPlatformConditionSupported(*Kind, *ArgStr,
-                                                      suggestions)) {
+                                                      suggestedKind, suggestedValues)) {
       if (Kind == PlatformConditionKind::Runtime) {
         // Error for _runtime()
         D.diagnose(Arg->getLoc(),
@@ -288,15 +296,32 @@ public:
         DiagName = "import conditional"; break;
       case PlatformConditionKind::TargetEnvironment:
         DiagName = "target environment"; break;
+      case PlatformConditionKind::PtrAuth:
+        DiagName = "pointer authentication scheme"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }
       auto Loc = Arg->getLoc();
       D.diagnose(Loc, diag::unknown_platform_condition_argument,
                  DiagName, *KindName);
-      for (auto suggestion : suggestions)
+      if (suggestedKind != *Kind) {
+        auto suggestedKindName = getPlatformConditionName(suggestedKind);
+        D.diagnose(Loc, diag::note_typo_candidate, suggestedKindName)
+          .fixItReplace(E->getFn()->getSourceRange(), suggestedKindName);
+      }
+      for (auto suggestion : suggestedValues)
         D.diagnose(Loc, diag::note_typo_candidate, suggestion)
           .fixItReplace(Arg->getSourceRange(), suggestion);
+    }
+    else if (!suggestedValues.empty()) {
+      // The value the user gave has been replaced by something newer.
+      assert(suggestedValues.size() == 1 && "only support one replacement");
+      auto replacement = suggestedValues.front();
+
+      auto Loc = Arg->getLoc();
+      D.diagnose(Loc, diag::renamed_platform_condition_argument,
+                 *ArgStr, replacement)
+        .fixItReplace(Arg->getSourceRange(), replacement);
     }
 
     return E;
@@ -586,7 +611,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
 
   bool shouldEvaluate =
       // Don't evaluate if it's in '-parse' mode, etc.
-      State->PerformConditionEvaluation &&
+      shouldEvaluatePoundIfDecls() &&
       // If it's in inactive #if ... #endif block, there's no point to do it.
       !getScopeInfo().isInactiveConfigBlock();
 
@@ -649,6 +674,8 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
 
     // Parse elements
     SmallVector<ASTNode, 16> Elements;
+    llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
+                                 InInactiveClauseEnvironment || !isActive);
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);
     } else if (SyntaxContext->isEnabled()) {

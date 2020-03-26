@@ -225,13 +225,12 @@ extension _StringGuts {
 
     // TODO(String performance): Local small stack first, before making large
     // array. Also, make a smaller initial array and grow over time.
-    var codeUnits = Array<UInt16>(repeating: 0, count: count)
-
-    codeUnits.withUnsafeMutableBufferPointer {
-      _cocoaStringCopyCharacters(
-        from: cocoa,
-        range: 0..<count,
-        into: $0.baseAddress._unsafelyUnwrappedUnchecked)
+    let codeUnits = Array<UInt16>(unsafeUninitializedCapacity: count) { buf, initializedCount in
+        _cocoaStringCopyCharacters(
+          from: cocoa,
+          range: 0..<count,
+          into: buf.baseAddress._unsafelyUnwrappedUnchecked)
+        initializedCount = count
     }
     return codeUnits.withUnsafeBufferPointer {
       _measureCharacterStrideICU(of: $0, startingAt: i)
@@ -291,13 +290,12 @@ extension _StringGuts {
 
     // TODO(String performance): Local small stack first, before making large
     // array. Also, make a smaller initial array and grow over time.
-    var codeUnits = Array<UInt16>(repeating: 0, count: count)
-
-    codeUnits.withUnsafeMutableBufferPointer {
-      _cocoaStringCopyCharacters(
-        from: cocoa,
-        range: 0..<count,
-        into: $0.baseAddress._unsafelyUnwrappedUnchecked)
+    let codeUnits = Array<UInt16>(unsafeUninitializedCapacity: count) { buf, initializedCount in
+        _cocoaStringCopyCharacters(
+          from: cocoa,
+          range: 0..<count,
+          into: buf.baseAddress._unsafelyUnwrappedUnchecked)
+        initializedCount = count
     }
     return codeUnits.withUnsafeBufferPointer {
       _measureCharacterStrideICU(of: $0, endingAt: i)

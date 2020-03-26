@@ -19,8 +19,12 @@ public func printSomeNumbers(_ gen: IGiveOutInts) {
   // FIXME: Should be DW_TAG_interface_type
   // CHECK: ![[PT:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "IGiveOutInts"
   // CHECK: ![[ARG]] = !DILocalVariable(name: "gen", arg: 1,
-  // CHECK-SAME:                        line: [[@LINE-5]], type: ![[PT]]
-  // CHECK: ![[VAR]] = !DILocalVariable(name: "gen", {{.*}} line: [[@LINE-5]]
+  // CHECK-SAME:                        line: [[@LINE-5]],
+  // CHECK-SAME:                        type: ![[LET_PT:[0-9]+]]
+  // CHECK: ![[LET_PT]] = !DIDerivedType(tag: DW_TAG_const_type,
+  // CHECK-SAME:                         baseType: ![[PT]])
+  // CHECK: ![[VAR]] = !DILocalVariable(name: "gen", {{.*}} line: [[@LINE-8]],
+  // CHECK-SAME:                        type: ![[PT]]
   markUsed(gen.callMe())
   use(&gen)
 }

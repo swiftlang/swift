@@ -3,12 +3,13 @@
 // RUN: cp -r %S/Inputs/bindings-build-record/* %t
 // RUN: %{python} %S/Inputs/touch.py 443865900 %t/*
 
-// RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | %FileCheck %s -check-prefix=MUST-EXEC
+// RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -driver-show-incremental -output-file-map %t/output.json 2>&1 |%FileCheck %s -check-prefix=MUST-EXEC
 
 // MUST-EXEC-NOT: warning
-// MUST-EXEC: inputs: ["./main.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
-// MUST-EXEC: inputs: ["./other.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
-// MUST-EXEC: inputs: ["./yet-another.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
+// MUST-EXEC: inputs: ["./main.swift"], output: {object: "./main.o", swift-dependencies: "./main.swiftdeps"}
+// MUST-EXEC: inputs: ["./other.swift"], output: {object: "./other.o", swift-dependencies: "./other.swiftdeps"}
+// MUST-EXEC: inputs: ["./yet-another.swift"], output: {object: "./yet-another.o", swift-dependencies: "./yet-another.swiftdeps"}
+// MUST-EXEC: Disabling incremental build: could not read build record
 
 // RUN: echo '{version: "'$(%swiftc_driver_plain -version | head -n1)'", inputs: {"./main.swift": [443865900, 0], "./other.swift": [443865900, 0], "./yet-another.swift": [443865900, 0]}, build_time: [443865901, 0]}' > %t/main~buildrecord.swiftdeps
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | %FileCheck %s -check-prefix=NO-EXEC

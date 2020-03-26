@@ -20,8 +20,13 @@
 
 #include "llvm/Support/PrettyStackTrace.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+
+namespace clang {
+  class Type;
+}
 
 namespace swift {
   class ASTContext;
@@ -58,6 +63,17 @@ class PrettyStackTraceDecl : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceDecl(const char *action, const Decl *D)
     : TheDecl(D), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
+/// PrettyStackTraceAnyFunctionRef - Observe that we are processing a specific
+/// function or closure literal.
+class PrettyStackTraceAnyFunctionRef : public llvm::PrettyStackTraceEntry {
+  AnyFunctionRef TheRef;
+  const char *Action;
+public:
+  PrettyStackTraceAnyFunctionRef(const char *action, AnyFunctionRef ref)
+    : TheRef(ref), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
 };
 
@@ -120,6 +136,17 @@ public:
   virtual void print(llvm::raw_ostream &OS) const;
 };
 
+/// PrettyStackTraceClangType - Observe that we are processing a
+/// specific Clang type.
+class PrettyStackTraceClangType : public llvm::PrettyStackTraceEntry {
+  const clang::Type *TheType;
+  const char *Action;
+public:
+  PrettyStackTraceClangType(const char *action, const clang::Type *type)
+    : TheType(type), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
 /// Observe that we are processing a specific type representation.
 class PrettyStackTraceTypeRepr : public llvm::PrettyStackTraceEntry {
   ASTContext &Context;
@@ -150,12 +177,12 @@ void printConformanceDescription(llvm::raw_ostream &out,
 
 class PrettyStackTraceGenericSignature : public llvm::PrettyStackTraceEntry {
   const char *Action;
-  GenericSignature *GenericSig;
+  GenericSignature GenericSig;
   Optional<unsigned> Requirement;
 
 public:
   PrettyStackTraceGenericSignature(const char *action,
-                                   GenericSignature *genericSig,
+                                   GenericSignature genericSig,
                                    Optional<unsigned> requirement = None)
     : Action(action), GenericSig(genericSig), Requirement(requirement) { }
 
@@ -174,6 +201,24 @@ public:
     : Selector(S), Action(action) {}
   void print(llvm::raw_ostream &OS) const override;
 };
+
+/// PrettyStackTraceDifferentiabilityWitness - Observe that we are processing a
+/// specific differentiability witness.
+class PrettyStackTraceDifferentiabilityWitness
+    : public llvm::PrettyStackTraceEntry {
+  const SILDifferentiabilityWitnessKey Key;
+  const char *Action;
+
+public:
+  PrettyStackTraceDifferentiabilityWitness(
+      const char *action, const SILDifferentiabilityWitnessKey key)
+      : Key(key), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
+void printDifferentiabilityWitnessDescription(
+    llvm::raw_ostream &out, const SILDifferentiabilityWitnessKey key,
+    bool addNewline = true);
 
 } // end namespace swift
 

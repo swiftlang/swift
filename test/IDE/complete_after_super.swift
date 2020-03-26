@@ -266,13 +266,13 @@ class SuperDerivedA : SuperBaseA {
   init (a: Float) {
     super.init#^CONSTRUCTOR_SUPER_INIT_1^#
 // CONSTRUCTOR_SUPER_INIT_1: Begin completions
-// CONSTRUCTOR_SUPER_INIT_1-DAG: Pattern/CurrModule: ()[#SuperBaseA#];
+// CONSTRUCTOR_SUPER_INIT_1-DAG: Decl[Constructor]/CurrNominal: ()[#SuperBaseA#]; name=()
 // CONSTRUCTOR_SUPER_INIT_1: End completions
   }
   init (b: Float) {
     super.init(#^CONSTRUCTOR_SUPER_INIT_PAREN_1^#
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: Begin completions, 1 items
-// CONSTRUCTOR_SUPER_INIT_PAREN_1: Pattern/CurrModule: ['('][')'][#SuperBaseA#]; name=
+// CONSTRUCTOR_SUPER_INIT_PAREN_1: Decl[Constructor]/CurrNominal: ['('][')'][#SuperBaseA#]; name=
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: End completions
   }
 
@@ -491,7 +491,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: End completions
   }
-  func instanceFunc1() {
+  override func instanceFunc1() {
     #^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3: Begin completions
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1()[#Void#]{{; name=.+$}}
@@ -504,7 +504,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: End completions
   }
-  func instanceFunc1(_ a: Int) {
+  override func instanceFunc1(_ a: Int) {
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5: Begin completions
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1()[#Void#]{{; name=.+$}}

@@ -48,38 +48,23 @@ typedef struct swift_reflection_section {
   void *End;
 } swift_reflection_section_t;
 
+typedef struct swift_reflection_section_pair {
+  swift_reflection_section_t section;
+  swift_reflection_ptr_t offset; ///< DEPRECATED. Must be zero
+} swift_reflection_section_pair_t;
+
 /// Represents the set of Swift reflection sections of an image.
 /// Not all sections may be present.
+///
+/// DEPRECATED. New RemoteMirror clients should use
+/// \c swift_reflection_addImage .
 typedef struct swift_reflection_info {
-  struct {
-    swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
-  } field;
-
-  struct {
-    swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
-  } associated_types;
-
-  struct {
-    swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
-  } builtin_types;
-
-  struct {
-    swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
-  } capture;
-
-  struct {
-    swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
-  } type_references;
-
-  struct {
-    swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
-  } reflection_strings;
+  swift_reflection_section_pair_t field;
+  swift_reflection_section_pair_t associated_types;
+  swift_reflection_section_pair_t builtin_types;
+  swift_reflection_section_pair_t capture;
+  swift_reflection_section_pair_t type_references;
+  swift_reflection_section_pair_t reflection_strings;
 
   // Start address in local and remote address spaces.
   swift_reflection_ptr_t LocalStartAddress;

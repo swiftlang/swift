@@ -25,7 +25,7 @@ static bool emitFileWithContents(StringRef path, StringRef contents,
   if (llvm::sys::fs::openFileForWrite(path, FD))
     return true;
   if (pathOut)
-    *pathOut = path;
+    *pathOut = path.str();
   llvm::raw_fd_ostream file(FD, /*shouldClose=*/true);
   file << contents;
   return false;
@@ -69,12 +69,13 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   // Set up the importer and emit a bridging PCH.
   swift::LangOptions langOpts;
   langOpts.Target = llvm::Triple("x86_64", "apple", "darwin");
+  swift::TypeCheckerOptions typeckOpts;
   INITIALIZE_LLVM();
   swift::SearchPathOptions searchPathOpts;
   swift::SourceManager sourceMgr;
   swift::DiagnosticEngine diags(sourceMgr);
   std::unique_ptr<ASTContext> context(
-      ASTContext::get(langOpts, searchPathOpts, sourceMgr, diags));
+      ASTContext::get(langOpts, typeckOpts, searchPathOpts, sourceMgr, diags));
   auto importer = ClangImporter::create(*context, options);
 
   std::string PCH = createFilename(cache, "bridging.h.pch");

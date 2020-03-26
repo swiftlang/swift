@@ -53,7 +53,7 @@ extension NSCoder {
     if let theClasses = classes {
       classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }
-    return __NSCoderDecodeObjectOfClassesForKey(self, classesAsNSObjects, key, nil).map { $0 as Any }
+    return __NSCoderDecodeObjectOfClassesForKey(self, classesAsNSObjects, key, nil).map { $0 }
   }
 
   @nonobjc
@@ -62,7 +62,7 @@ extension NSCoder {
     var error: NSError?
     let result = __NSCoderDecodeObject(self, &error)
     try resolveError(error)
-    return result.map { $0 as Any }
+    return result.map { $0 }
   }
 
   @available(*, unavailable, renamed: "decodeTopLevelObject(forKey:)")
@@ -125,7 +125,7 @@ extension NSCoder {
     }
     let result = __NSCoderDecodeObjectOfClassesForKey(self, classesAsNSObjects, key, &error)
     try resolveError(error)
-    return result.map { $0 as Any }
+    return result.map { $0 }
   }
 }
 

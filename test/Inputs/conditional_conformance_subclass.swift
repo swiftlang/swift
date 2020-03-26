@@ -16,7 +16,7 @@ extension Base: P1 where A: P2 {
 
 // witness method for Base.normal
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlAaEP6normalyyFTW"(%T32conditional_conformance_subclass4BaseC.0** noalias nocapture swiftself dereferenceable(8), %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlAaEP6normalyyFTW"(%T32conditional_conformance_subclass4BaseC.0** noalias nocapture swiftself dereferenceable(8) %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[A_P2:%.*]] = load i8*, i8** [[A_P2_PTR]], align 8
@@ -28,7 +28,7 @@ extension Base: P1 where A: P2 {
 
 // witness method for Base.generic
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW"(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_1_0", i8** %"\CF\84_1_0.P3", %T32conditional_conformance_subclass4BaseC.1** noalias nocapture swiftself dereferenceable(8), %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW"(%swift.opaque* noalias nocapture %0, %swift.type* %"\CF\84_1_0", i8** %"\CF\84_1_0.P3", %T32conditional_conformance_subclass4BaseC.1** noalias nocapture swiftself dereferenceable(8) %1, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[A_P2:%.*]] = load i8*, i8** [[A_P2_PTR]], align 8
@@ -47,7 +47,7 @@ public func subclassgeneric_generic<T: P2>(_: T.Type) {
   takes_p1(SubclassGeneric<T>.self)
 }
 
-// CHECK-LABEL: define{{( dllexport| protected)?}} swiftcc void @"$s32conditional_conformance_subclass23subclassgeneric_genericyyxmAA2P2RzlF"(%swift.type*, %swift.type* %T, i8** %T.P2)
+// CHECK-LABEL: define{{( dllexport| protected)?}} swiftcc void @"$s32conditional_conformance_subclass23subclassgeneric_genericyyxmAA2P2RzlF"(%swift.type* %0, %swift.type* %T, i8** %T.P2)
 // CHECK-NEXT:  entry:
 // CHECK:         %conditional.requirement.buffer = alloca [1 x i8**], align 8
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCMa"(i64 0, %swift.type* %T)
@@ -66,8 +66,7 @@ public func subclassgeneric_concrete() {
 
 // CHECK-LABEL: define{{( dllexport| protected)?}} swiftcc void @"$s32conditional_conformance_subclass24subclassgeneric_concreteyyF"()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 0)
-// CHECK-NEXT:    [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT:    [[SubclassGeneric_TYPE:%.*]] = call {{.*}}@"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD"
 // CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGAA4BaseCyxGAA2P1A2A0G0RzlWl"()
 // CHECK-NEXT:    call swiftcc void @"$s32conditional_conformance_subclass8takes_p1yyxmAA2P1RzlF"(%swift.type* [[SubclassGeneric_TYPE]], %swift.type* [[SubclassGeneric_TYPE]], i8** [[Base_P1]])
 // CHECK-NEXT:    ret void
@@ -83,9 +82,10 @@ public func subclassgeneric_concrete() {
 // CHECK-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 255)
-// CHECK-NEXT:    [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-STABLE-ABI-FALSE-NEXT: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 255)
+// CHECK-STABLE-ABI-FALSE-NEXT: [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-STABLE-ABI-FALSE-NEXT: extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-STABLE-ABI-TRUE-NEXT:  [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0

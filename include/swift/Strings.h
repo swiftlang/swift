@@ -106,6 +106,9 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_RAWPOINTER = {
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER =
     {"Builtin.UnsafeValueBuffer"};
 /// The name of the Builtin type for UnknownObject
+///
+/// This no longer exists as an AST-accessible type, but it's still used for 
+/// fields shaped like AnyObject when ObjC interop is enabled.
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNKNOWNOBJECT = {
     "Builtin.UnknownObject"};
 /// The name of the Builtin type for Vector

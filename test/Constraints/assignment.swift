@@ -67,7 +67,13 @@ value(_) // expected-error{{'_' can only appear in a pattern or on the left side
 func f23798944() {
   let s = ""
   if s.count = 0 { // expected-error {{use of '=' in a boolean context, did you mean '=='?}}
+    // expected-error@-1{{cannot assign to property: 'count' is a get-only property}}
   }
 }
 
 .sr_3506 = 0 // expected-error {{type 'Int' has no member 'sr_3506'}}
+
+// SR-1553
+
+func returnsVoid() {}
+_ = returnsVoid() // expected-warning {{using '_' to ignore the result of a Void-returning function is redundant}}{{1-5=}}

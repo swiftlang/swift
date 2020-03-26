@@ -17,6 +17,8 @@
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Watimport-in-framework-header"
 // CHECK-NEXT: #endif
 // CHECK-NEXT: @import Foundation;
+// CHECK-NEXT: #else
+// CHECK-NEXT: #import <Foundation.h>
 // CHECK-NEXT: #endif
 
 // FRAMEWORK-LABEL: #import <Mixed/Mixed.h>

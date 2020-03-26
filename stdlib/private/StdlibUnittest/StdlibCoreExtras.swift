@@ -14,7 +14,7 @@ import SwiftPrivate
 import SwiftPrivateLibcExtras
 #if os(macOS) || os(iOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -266,6 +266,14 @@ public func _isStdlibDebugConfiguration() -> Bool {
 #else
   return false
 #endif
+}
+
+// Return true if the Swift runtime available is at least 5.1
+public func _hasSwift_5_1() -> Bool {
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+    return true
+  }
+  return false
 }
 
 @frozen

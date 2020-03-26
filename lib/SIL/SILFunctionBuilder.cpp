@@ -31,15 +31,17 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
   auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
                                 isBareSILFunction, isTransparent, isSerialized,
-                                entryCount, isDynamic, isThunk, subclassScope);
+                                entryCount, isDynamic, IsNotExactSelfClass,
+                                isThunk, subclassScope);
   fn->setDebugScope(new (mod) SILDebugScope(loc, fn));
   return fn;
 }
 
-void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
-                                               DeclAttributes &Attrs,
-                                               SILModule &M,
-                                               SILDeclRef constant) {
+void SILFunctionBuilder::addFunctionAttributes(
+    SILFunction *F, DeclAttributes &Attrs, SILModule &M,
+    llvm::function_ref<SILFunction *(SILLocation loc, SILDeclRef constant)>
+        getOrCreateDeclaration,
+    SILDeclRef constant) {
 
   for (auto *A : Attrs.getAttributes<SemanticsAttr>())
     F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
@@ -51,8 +53,9 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
         SA->getSpecializationKind() == SpecializeAttr::SpecializationKind::Full
             ? SILSpecializeAttr::SpecializationKind::Full
             : SILSpecializeAttr::SpecializationKind::Partial;
-    F->addSpecializeAttr(SILSpecializeAttr::create(M, SA->getRequirements(),
-                                                   SA->isExported(), kind));
+    F->addSpecializeAttr(
+        SILSpecializeAttr::create(M, SA->getSpecializedSgnature(),
+                                  SA->isExported(), kind));
   }
 
   if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {
@@ -74,12 +77,12 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
           SILFunctionTypeRepresentation::ObjCMethod)
     return;
 
-  auto *replacedFuncAttr = Attrs.getAttribute<DynamicReplacementAttr>();
-  if (!replacedFuncAttr)
+  // Only assign replacements when the thing being replaced is function-like and
+  // explicitly declared.  
+  auto *origDecl = decl->getDynamicallyReplacedDecl();
+  auto *replacedDecl = dyn_cast_or_null<AbstractFunctionDecl>(origDecl);
+  if (!replacedDecl)
     return;
-
-  auto *replacedDecl = replacedFuncAttr->getReplacedFunction();
-  assert(replacedDecl);
 
   if (decl->isObjC()) {
     F->setObjCReplacement(replacedDecl);
@@ -90,8 +93,7 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
     return;
 
   SILDeclRef declRef(replacedDecl, constant.kind, false);
-  auto *replacedFunc =
-      getOrCreateFunction(replacedDecl, declRef, NotForDefinition);
+  auto *replacedFunc = getOrCreateDeclaration(replacedDecl, declRef);
 
   assert(replacedFunc->getLoweredFunctionType() ==
              F->getLoweredFunctionType() ||
@@ -100,12 +102,14 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
   F->setDynamicallyReplacedFunction(replacedFunc);
 }
 
-SILFunction *
-SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
-                                        ForDefinition_t forDefinition,
-                                        ProfileCounter entryCount) {
+SILFunction *SILFunctionBuilder::getOrCreateFunction(
+    SILLocation loc, SILDeclRef constant, ForDefinition_t forDefinition,
+    llvm::function_ref<SILFunction *(SILLocation loc, SILDeclRef constant)>
+        getOrCreateDeclaration,
+    ProfileCounter entryCount) {
   auto nameTmp = constant.mangle();
-  auto constantType = mod.Types.getConstantFunctionType(constant);
+  auto constantType = mod.Types.getConstantFunctionType(
+      TypeExpansionContext::minimal(), constant);
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
   if (auto fn = mod.lookUpFunction(nameTmp)) {
@@ -148,26 +152,46 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
 
   auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, None,
                                 IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
+                                IsNotExactSelfClass,
                                 IsNotThunk, constant.getSubclassScope(),
                                 inlineStrategy, EK);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
 
-  F->setGlobalInit(constant.isGlobal());
+  if (constant.isGlobal())
+    F->setSpecialPurpose(SILFunction::Purpose::GlobalInit);
+
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
 
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    if (decl->isWeakImported(/*forModule=*/nullptr, availCtx))
-      F->setWeakLinked();
+    F->setAvailabilityForLinkage(decl->getAvailabilityForLinkage());
+    F->setAlwaysWeakImported(decl->isAlwaysWeakImported());
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
       // Add attributes for e.g. computed properties.
-      addFunctionAttributes(F, storage->getAttrs(), mod);
+      addFunctionAttributes(F, storage->getAttrs(), mod,
+                            getOrCreateDeclaration);
+                            
+      auto *varDecl = dyn_cast<VarDecl>(storage);
+      if (varDecl && varDecl->getAttrs().hasAttribute<LazyAttr>() &&
+          accessor->getAccessorKind() == AccessorKind::Get) {
+        F->setSpecialPurpose(SILFunction::Purpose::LazyPropertyGetter);
+        
+        // Lazy property getters should not get inlined because they are usually
+        // non-tivial functions (otherwise the user would not implement it as
+        // lazy property). Inlining such getters would most likely not benefit
+        // other optimizations because the top-level switch_enum cannot be
+        // constant folded in most cases.
+        // Also, not inlining lazy property getters enables optimizing them in
+        // CSE.
+        F->setInlineStrategy(NoInline);
+      }
     }
-    addFunctionAttributes(F, decl->getAttrs(), mod, constant);
+    addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
+                          constant);
   }
 
   return F;
@@ -194,6 +218,7 @@ SILFunction *SILFunctionBuilder::createFunction(
     const SILDebugScope *DebugScope) {
   return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
                              isBareSILFunction, isTrans, isSerialized,
-                             entryCount, isDynamic, isThunk, subclassScope,
+                             entryCount, isDynamic, IsNotExactSelfClass,
+                             isThunk, subclassScope,
                              inlineStrategy, EK, InsertBefore, DebugScope);
 }

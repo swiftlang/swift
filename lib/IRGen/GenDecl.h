@@ -20,6 +20,7 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/SIL/SILLocation.h"
 #include "llvm/IR/CallingConv.h"
+#include "llvm/Support/CommandLine.h"
 #include "DebugTypeInfo.h"
 #include "IRGen.h"
 
@@ -51,6 +52,9 @@ namespace irgen {
                  Alignment alignment, DebugTypeInfo DebugType = DebugTypeInfo(),
                  Optional<SILLocation> DebugLoc = None,
                  StringRef DebugName = StringRef(), bool heapAllocated = false);
+
+  llvm::GlobalVariable *
+  createLinkerDirectiveVariable(IRGenModule &IGM, StringRef Name);
 
   void disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariable *var);
 }

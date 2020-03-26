@@ -49,8 +49,9 @@ TYPE("dependencies",        Dependencies,              "d",               "")
 TYPE("autolink",            AutolinkFile,              "autolink",        "")
 TYPE("swiftmodule",         SwiftModuleFile,           "swiftmodule",     "")
 TYPE("swiftdoc",            SwiftModuleDocFile,        "swiftdoc",        "")
-TYPE("swiftinterface",      SwiftParseableInterfaceFile, \
-                                                       "swiftinterface",  "")
+TYPE("swiftinterface",      SwiftModuleInterfaceFile,  "swiftinterface",  "")
+TYPE("private-swiftinterface", PrivateSwiftModuleInterfaceFile,  "private.swiftinterface",  "")
+TYPE("swiftsourceinfo",     SwiftSourceInfoFile,       "swiftsourceinfo", "")
 TYPE("assembly",            Assembly,                  "s",               "")
 TYPE("raw-sil",             RawSIL,                    "sil",             "")
 TYPE("raw-sib",             RawSIB,                    "sib",             "")
@@ -59,12 +60,27 @@ TYPE("llvm-bc",             LLVM_BC,                   "bc",              "")
 TYPE("diagnostics",         SerializedDiagnostics,     "dia",             "")
 TYPE("objc-header",         ObjCHeader,                "h",               "")
 TYPE("swift-dependencies",  SwiftDeps,                 "swiftdeps",       "")
+TYPE("swift-ranges",        SwiftRanges,               "swiftranges",     "")
+TYPE("compiled-source",     CompiledSource,            "compiledsource",  "")
 TYPE("remap",               Remapping,                 "remap",           "")
 TYPE("imported-modules",    ImportedModules,           "importedmodules", "")
 TYPE("tbd",                 TBD,                       "tbd",             "")
+
+// Module traces are used by Apple's internal build infrastructure. Apple
+// engineers can see more details on the "Swift module traces" page in the
+// Swift section of the internal wiki.
 TYPE("module-trace",        ModuleTrace,               "trace.json",      "")
+
 TYPE("index-data",          IndexData,                 "",                "")
-TYPE("opt-record",          OptRecord,                 "opt.yaml",        "")
+TYPE("yaml-opt-record",     YAMLOptRecord,             "opt.yaml",        "")
+TYPE("bitstream-opt-record",BitstreamOptRecord,        "opt.bitstream",   "")
+
+// Overlay files declare wrapper modules, called "separately-imported overlays",
+// that should be automatically imported when a particular module is imported.
+// Cross-import directories conditionalize overlay files so they only take
+// effect when certain other modules are also loaded.
+TYPE("swiftcrossimport",    SwiftCrossImportDir,       "swiftcrossimport","")
+TYPE("swiftoverlay",        SwiftOverlayFile,          "swiftoverlay",    "")
 
 // Misc types
 TYPE("pcm",                 ClangModuleFile,           "pcm",             "")

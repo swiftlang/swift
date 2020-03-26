@@ -48,6 +48,7 @@ class SourceManager {
   std::map<const char *, VirtualFile> VirtualFiles;
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
 
+  Optional<unsigned> findBufferContainingLocInternal(SourceLoc Loc) const;
 public:
   SourceManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
                     llvm::vfs::getRealFileSystem())
@@ -73,6 +74,10 @@ public:
 
     CodeCompletionBufferID = BufferID;
     CodeCompletionOffset = Offset;
+  }
+
+  bool hasCodeCompletionBuffer() const {
+    return CodeCompletionBufferID != 0U;
   }
 
   unsigned getCodeCompletionBufferID() const {
@@ -115,6 +120,9 @@ public:
   /// Because a valid source location always corresponds to a source buffer,
   /// this routine always returns a valid buffer ID.
   unsigned findBufferContainingLoc(SourceLoc Loc) const;
+
+  /// Whether the source location is pointing to any buffer owned by the SourceManager.
+  bool isOwning(SourceLoc Loc) const;
 
   /// Adds a memory buffer to the SourceManager, taking ownership of it.
   unsigned addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer);
@@ -239,15 +247,21 @@ public:
   llvm::Optional<unsigned> resolveOffsetForEndOfLine(unsigned BufferId,
                                                      unsigned Line) const;
 
+  /// Get the length of the line
+  llvm::Optional<unsigned> getLineLength(unsigned BufferId, unsigned Line) const;
+
   SourceLoc getLocForLineCol(unsigned BufferId, unsigned Line, unsigned Col) const {
     auto Offset = resolveFromLineCol(BufferId, Line, Col);
     return Offset.hasValue() ? getLocForOffset(BufferId, Offset.getValue()) :
                                SourceLoc();
   }
 
+  std::string getLineString(unsigned BufferID, unsigned LineNumber);
+
+  SourceLoc getLocFromExternalSource(StringRef Path, unsigned Line, unsigned Col);
 private:
   const VirtualFile *getVirtualFile(SourceLoc Loc) const;
-
+  unsigned getExternalSourceBufferId(StringRef Path);
   int getLineOffset(SourceLoc Loc) const {
     if (auto VFile = getVirtualFile(Loc))
       return VFile->LineOffset;

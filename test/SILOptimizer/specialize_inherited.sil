@@ -39,7 +39,7 @@ bb0(%0 : $Int, %1 : $Int):
 
 // CHECK-LABEL: @$s6callee7inherit8MMStringC_AB6MMFontCSgTg5 : $@convention(method) (@owned MMString, Int, @owned MMStorage<MMString, Optional<MMFont>>) -> Bool {
 // CHECK: [[META:%[0-9]+]] = metatype $@thick MMString.Type
-// CHECK: [[ID3:%[0-9]+]] = witness_method $MMString, #Equatable."=="!1 :
+// CHECK: [[ID3:%[0-9]+]] = witness_method $MMString, #Equatable."==" :
 // CHECK: [[STACK2:%[0-9]+]] = alloc_stack $MMString
 // CHECK: [[STACK3:%[0-9]+]] = alloc_stack $MMString
 // CHECK: apply [[ID3]]<MMString>([[STACK2]], [[STACK3]], [[META]]) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
@@ -48,8 +48,8 @@ bb0(%0 : $Int, %1 : $Int):
 sil [noinline] @callee : $@convention(method) <Key, Value where Key : Hashable> (@in Key, Int, @owned MMStorage<Key, Value>) -> Bool {
 bb0(%0 : $*Key, %1 : $Int, %2 : $MMStorage<Key, Value>):
   %25 = metatype $@thick Key.Type
-  // CHECK: [[ID2:%[0-9]+]] = witness_method $Key, #Equatable."=="!1 :
-  %26 = witness_method $Key, #Equatable."=="!1 : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+  // CHECK: [[ID2:%[0-9]+]] = witness_method $Key, #Equatable."==" :
+  %26 = witness_method $Key, #Equatable."==" : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
   %27 = alloc_stack $Key
   %33 = alloc_stack $Key
   // CHECK: apply [[ID2]]<Key>

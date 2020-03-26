@@ -67,7 +67,28 @@ func outer<T>(t: T) {
 
   func inner2(x: Int = 0) { _ = T.self }
 
-  // CHECK: [[ARG_GENERATOR:%.*]] = function_ref @$s25default_arguments_generic5outer1tyx_tlF6inner2L_1xySi_tlFfA_ : $@convention(thin) <τ_0_0> () -> Int
-  // CHECK: [[ARG:%.*]] = apply [[ARG_GENERATOR]]<T>() : $@convention(thin) <τ_0_0> () -> Int
+  // CHECK: [[ARG_GENERATOR:%.*]] = function_ref @$s25default_arguments_generic5outer1tyx_tlF6inner2L_1xySi_tlFfA_ : $@convention(thin) () -> Int
+  // CHECK: [[ARG:%.*]] = apply [[ARG_GENERATOR]]() : $@convention(thin) () -> Int
   _ = inner2()
+}
+
+protocol StaticIntValue {
+  static var intValue: Int { get }
+}
+
+func f<T : StaticIntValue>(_: T) {
+  // CHECK-LABEL: sil private [ossa] @$s25default_arguments_generic1fyyxAA14StaticIntValueRzlF5innerL_1xySi_tAaCRzlFfA_ : $@convention(thin) <T where T : StaticIntValue> () -> Int
+  // CHECK-LABEL: sil private [ossa] @$s25default_arguments_generic1fyyxAA14StaticIntValueRzlF5innerL_1xySi_tAaCRzlF : $@convention(thin) <T where T : StaticIntValue> (Int) -> ()
+  func inner(x: Int = T.intValue) {}
+
+  // CHECK-LABEL: sil private [ossa] @$s25default_arguments_generic1fyyxAA14StaticIntValueRzlF5otherL_yyAaCRzlF : $@convention(thin) <T where T : StaticIntValue> () -> ()
+  func other() { inner() }
+}
+
+func g<T>(_: T) {
+  { inner() }()
+
+  func inner() {
+    _ = T.self
+  }
 }

@@ -18,14 +18,34 @@
 
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/FileUnit.h"
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/Statistic.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
 
 class ClassDecl;
+class DeclContext;
+class DeclName;
+class DeclNameRef;
+class DestructorDecl;
+class GenericContext;
+class GenericParamList;
+class LookupResult;
+enum class NLKind;
+class SourceLoc;
 class TypeAliasDecl;
 class TypeDecl;
+enum class UnqualifiedLookupFlags;
+namespace ast_scope {
+class ASTScopeImpl;
+class ScopeCreator;
+} // namespace ast_scope
+namespace namelookup {
+enum class ResolutionKind;
+} // namespace namelookup
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -61,10 +81,6 @@ class InheritedDeclsReferencedRequest :
                          unsigned),
                        CacheKind::Uncached> // FIXME: Cache these
 {
-  /// Retrieve the TypeLoc for this inherited type.
-  TypeLoc &getTypeLoc(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                      unsigned index) const;
-
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -145,6 +161,50 @@ public:
   bool isCached() const { return true; }
   Optional<ClassDecl *> getCachedResult() const;
   void cacheResult(ClassDecl *value) const;
+};
+
+class InheritedProtocolsRequest
+    : public SimpleRequest<InheritedProtocolsRequest,
+                           ArrayRef<ProtocolDecl *>(ProtocolDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<ProtocolDecl *>
+  evaluate(Evaluator &evaluator, ProtocolDecl *PD) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+  Optional<ArrayRef<ProtocolDecl *>> getCachedResult() const;
+  void cacheResult(ArrayRef<ProtocolDecl *> decls) const;
+};
+
+/// Requests whether or not this class has designated initializers that are
+/// not public or @usableFromInline.
+class HasMissingDesignatedInitializersRequest :
+    public SimpleRequest<HasMissingDesignatedInitializersRequest,
+                         bool(ClassDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, ClassDecl *subject) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool) const;
 };
 
 /// Request the nominal declaration extended by a given extension declaration.
@@ -231,10 +291,414 @@ public:
   bool isCached() const { return true; }
 };
 
-/// The zone number for name-lookup requests.
-#define SWIFT_NAME_LOOKUP_REQUESTS_TYPEID_ZONE 9
+/// Finds or synthesizes a destructor for the given class.
+class GetDestructorRequest :
+    public SimpleRequest<GetDestructorRequest,
+                         DestructorDecl *(ClassDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
 
-#define SWIFT_TYPEID_ZONE SWIFT_NAME_LOOKUP_REQUESTS_TYPEID_ZONE
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<DestructorDecl *>
+  evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  Optional<DestructorDecl *> getCachedResult() const;
+  void cacheResult(DestructorDecl *value) const;
+};
+
+class GenericParamListRequest :
+    public SimpleRequest<GenericParamListRequest,
+                         GenericParamList *(GenericContext *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<GenericParamList *>
+  evaluate(Evaluator &evaluator, GenericContext *value) const;
+  
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<GenericParamList *> getCachedResult() const;
+  void cacheResult(GenericParamList *value) const;
+};
+
+/// Expand the given ASTScope. Requestified to detect recursion.
+class ExpandASTScopeRequest
+    : public SimpleRequest<ExpandASTScopeRequest,
+                           ast_scope::ASTScopeImpl *(ast_scope::ASTScopeImpl *,
+                                                     ast_scope::ScopeCreator *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ast_scope::ASTScopeImpl *>
+  evaluate(Evaluator &evaluator, ast_scope::ASTScopeImpl *,
+           ast_scope::ScopeCreator *) const;
+
+public:
+  // Separate caching.
+  bool isCached() const;
+  Optional<ast_scope::ASTScopeImpl *> getCachedResult() const;
+  void cacheResult(ast_scope::ASTScopeImpl *) const {}
+};
+
+/// The input type for an unqualified lookup request.
+class UnqualifiedLookupDescriptor {
+  using LookupOptions = OptionSet<UnqualifiedLookupFlags>;
+
+public:
+  DeclNameRef Name;
+  DeclContext *DC;
+  SourceLoc Loc;
+  LookupOptions Options;
+
+  UnqualifiedLookupDescriptor(DeclNameRef name, DeclContext *dc,
+                              SourceLoc loc = SourceLoc(),
+                              LookupOptions options = {})
+      : Name(name), DC(dc), Loc(loc), Options(options) { }
+
+  friend llvm::hash_code hash_value(const UnqualifiedLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.Name, desc.DC, desc.Loc,
+                              desc.Options.toRaw());
+  }
+
+  friend bool operator==(const UnqualifiedLookupDescriptor &lhs,
+                         const UnqualifiedLookupDescriptor &rhs) {
+    return lhs.Name == rhs.Name && lhs.DC == rhs.DC && lhs.Loc == rhs.Loc &&
+           lhs.Options.toRaw() == rhs.Options.toRaw();
+  }
+
+  friend bool operator!=(const UnqualifiedLookupDescriptor &lhs,
+                         const UnqualifiedLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const UnqualifiedLookupDescriptor &desc);
+
+SourceLoc extractNearestSourceLoc(const UnqualifiedLookupDescriptor &desc);
+
+/// Performs unqualified lookup for a DeclName from a given context.
+class UnqualifiedLookupRequest
+    : public SimpleRequest<UnqualifiedLookupRequest,
+                           LookupResult(UnqualifiedLookupDescriptor),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<LookupResult> evaluate(Evaluator &evaluator,
+                                        UnqualifiedLookupDescriptor desc) const;
+};
+
+using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
+
+/// Performs a lookup into a given module and its imports.
+class LookupInModuleRequest
+    : public SimpleRequest<LookupInModuleRequest,
+                           QualifiedLookupResult(
+                               const DeclContext *, DeclName, NLKind,
+                               namelookup::ResolutionKind, const DeclContext *),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<QualifiedLookupResult>
+  evaluate(Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
+           NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
+           const DeclContext *moduleScopeContext) const;
+};
+
+/// Perform \c AnyObject lookup for a given member.
+class AnyObjectLookupRequest
+    : public SimpleRequest<AnyObjectLookupRequest,
+                           QualifiedLookupResult(const DeclContext *,
+                                                 DeclNameRef, NLOptions),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<QualifiedLookupResult> evaluate(Evaluator &evaluator,
+                                                 const DeclContext *dc,
+                                                 DeclNameRef name,
+                                                 NLOptions options) const;
+};
+
+class ModuleQualifiedLookupRequest
+    : public SimpleRequest<ModuleQualifiedLookupRequest,
+                           QualifiedLookupResult(const DeclContext *,
+                                                 ModuleDecl *, DeclNameRef,
+                                                 NLOptions),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<QualifiedLookupResult> evaluate(Evaluator &evaluator,
+                                                 const DeclContext *DC,
+                                                 ModuleDecl *mod, DeclNameRef name,
+                                                 NLOptions opts) const;
+};
+
+class QualifiedLookupRequest
+    : public SimpleRequest<QualifiedLookupRequest,
+                           QualifiedLookupResult(const DeclContext *,
+                                                 SmallVector<NominalTypeDecl *, 4>,
+                                                 DeclNameRef, NLOptions),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<QualifiedLookupResult>
+  evaluate(Evaluator &evaluator, const DeclContext *DC,
+           SmallVector<NominalTypeDecl *, 4> decls,
+           DeclNameRef name,
+           NLOptions opts) const;
+};
+
+/// The input type for a direct lookup request.
+class DirectLookupDescriptor final {
+  using LookupOptions = OptionSet<NominalTypeDecl::LookupDirectFlags>;
+
+public:
+  NominalTypeDecl *DC;
+  DeclName Name;
+  LookupOptions Options;
+
+  DirectLookupDescriptor(NominalTypeDecl *dc, DeclName name,
+                         LookupOptions options = {})
+      : DC(dc), Name(name), Options(options) {}
+
+  friend llvm::hash_code hash_value(const DirectLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.Name, desc.DC, desc.Options.toRaw());
+  }
+
+  friend bool operator==(const DirectLookupDescriptor &lhs,
+                         const DirectLookupDescriptor &rhs) {
+    return lhs.Name == rhs.Name && lhs.DC == rhs.DC &&
+           lhs.Options.toRaw() == rhs.Options.toRaw();
+  }
+
+  friend bool operator!=(const DirectLookupDescriptor &lhs,
+                         const DirectLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const DirectLookupDescriptor &desc);
+
+SourceLoc extractNearestSourceLoc(const DirectLookupDescriptor &desc);
+
+class DirectLookupRequest
+    : public SimpleRequest<DirectLookupRequest,
+                           TinyPtrVector<ValueDecl *>(DirectLookupDescriptor),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<TinyPtrVector<ValueDecl *>>
+  evaluate(Evaluator &evaluator, DirectLookupDescriptor desc) const;
+};
+
+class OperatorLookupDescriptor final {
+public:
+  using Storage = llvm::PointerUnion<FileUnit *, ModuleDecl *>;
+  Storage fileOrModule;
+  Identifier name;
+  bool isCascading;
+  SourceLoc diagLoc;
+
+private:
+  OperatorLookupDescriptor(Storage fileOrModule, Identifier name,
+                           bool isCascading, SourceLoc diagLoc)
+      : fileOrModule(fileOrModule), name(name), isCascading(isCascading),
+        diagLoc(diagLoc) {}
+
+public:
+  /// Retrieves the files to perform lookup in.
+  ArrayRef<FileUnit *> getFiles() const;
+
+  /// If this is for a module lookup, returns the module. Otherwise returns
+  /// \c nullptr.
+  ModuleDecl *getModule() const {
+    return fileOrModule.dyn_cast<ModuleDecl *>();
+  }
+
+  friend llvm::hash_code hash_value(const OperatorLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.fileOrModule, desc.name, desc.isCascading);
+  }
+
+  friend bool operator==(const OperatorLookupDescriptor &lhs,
+                         const OperatorLookupDescriptor &rhs) {
+    return lhs.fileOrModule == rhs.fileOrModule && lhs.name == rhs.name &&
+           lhs.isCascading == rhs.isCascading;
+  }
+
+  friend bool operator!=(const OperatorLookupDescriptor &lhs,
+                         const OperatorLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+
+  static OperatorLookupDescriptor forFile(FileUnit *file, Identifier name,
+                                          bool isCascading, SourceLoc diagLoc) {
+    return OperatorLookupDescriptor(file, name, isCascading, diagLoc);
+  }
+
+  static OperatorLookupDescriptor forModule(ModuleDecl *mod, Identifier name,
+                                            bool isCascading,
+                                            SourceLoc diagLoc) {
+    return OperatorLookupDescriptor(mod, name, isCascading, diagLoc);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const OperatorLookupDescriptor &desc);
+
+SourceLoc extractNearestSourceLoc(const OperatorLookupDescriptor &desc);
+
+template <typename OperatorType>
+class LookupOperatorRequest
+    : public SimpleRequest<LookupOperatorRequest<OperatorType>,
+                           OperatorType *(OperatorLookupDescriptor),
+                           CacheKind::Uncached> {
+  using SimpleRequest<LookupOperatorRequest<OperatorType>,
+                      OperatorType *(OperatorLookupDescriptor),
+                      CacheKind::Uncached>::SimpleRequest;
+
+private:
+  friend SimpleRequest<LookupOperatorRequest<OperatorType>,
+                       OperatorType *(OperatorLookupDescriptor),
+                       CacheKind::Uncached>;
+
+  // Evaluation.
+  llvm::Expected<OperatorType *> evaluate(Evaluator &evaluator,
+                                          OperatorLookupDescriptor desc) const;
+};
+
+using LookupPrefixOperatorRequest = LookupOperatorRequest<PrefixOperatorDecl>;
+using LookupInfixOperatorRequest = LookupOperatorRequest<InfixOperatorDecl>;
+using LookupPostfixOperatorRequest = LookupOperatorRequest<PostfixOperatorDecl>;
+using LookupPrecedenceGroupRequest = LookupOperatorRequest<PrecedenceGroupDecl>;
+
+/// Looks up an operator in a given file or module without looking through
+/// imports.
+class DirectOperatorLookupRequest
+    : public SimpleRequest<DirectOperatorLookupRequest,
+                           TinyPtrVector<OperatorDecl *>(
+                               OperatorLookupDescriptor, OperatorFixity),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<TinyPtrVector<OperatorDecl *>>
+  evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor,
+           OperatorFixity fixity) const;
+};
+
+/// Looks up an precedencegroup in a given file or module without looking
+/// through imports.
+class DirectPrecedenceGroupLookupRequest
+    : public SimpleRequest<DirectPrecedenceGroupLookupRequest,
+                           TinyPtrVector<PrecedenceGroupDecl *>(
+                               OperatorLookupDescriptor),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<TinyPtrVector<PrecedenceGroupDecl *>>
+  evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor) const;
+};
+
+class LookupConformanceDescriptor final {
+public:
+  ModuleDecl *Mod;
+  Type Ty;
+  ProtocolDecl *PD;
+
+  LookupConformanceDescriptor(ModuleDecl *Mod, Type Ty, ProtocolDecl *PD)
+      : Mod(Mod), Ty(Ty), PD(PD) {}
+
+  friend llvm::hash_code hash_value(const LookupConformanceDescriptor &desc) {
+    return llvm::hash_combine(desc.Mod, desc.Ty.getPointer(), desc.PD);
+  }
+
+  friend bool operator==(const LookupConformanceDescriptor &lhs,
+                         const LookupConformanceDescriptor &rhs) {
+    return lhs.Mod == rhs.Mod && lhs.Ty.getPointer() == rhs.Ty.getPointer() &&
+           lhs.PD == rhs.PD;
+  }
+
+  friend bool operator!=(const LookupConformanceDescriptor &lhs,
+                         const LookupConformanceDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const LookupConformanceDescriptor &desc);
+
+SourceLoc extractNearestSourceLoc(const LookupConformanceDescriptor &desc);
+
+class LookupConformanceInModuleRequest
+    : public SimpleRequest<LookupConformanceInModuleRequest,
+                           ProtocolConformanceRef(LookupConformanceDescriptor),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ProtocolConformanceRef> evaluate(
+      Evaluator &evaluator, LookupConformanceDescriptor desc) const;
+};
+
+#define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
@@ -245,14 +709,14 @@ template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
-#define SWIFT_TYPEID(RequestType)                                \
-template<>                                                       \
-inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
-                            const RequestType &request) {        \
-  ++stats.getFrontendCounters().RequestType;                     \
-}
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching, LocOptions)             \
+  template <>                                                                  \
+  inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,              \
+                                     const RequestType &request) {             \
+    ++stats.getFrontendCounters().RequestType;                                 \
+  }
 #include "swift/AST/NameLookupTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 } // end namespace swift
 

@@ -2,5 +2,5 @@
 
 func test(_ x: Int) -> Int {
   return x + nil
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  // expected-error@-1 {{'nil' is not compatible with expected argument type 'Int'}}
 }

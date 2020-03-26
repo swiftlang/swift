@@ -4,34 +4,266 @@ CHANGELOG
 <details>
 <summary>Note: This is in reverse chronological order, so newer entries are added to the top.</summary>
 
-| Contents               |
-| :--------------------- |
-| [Swift Next](#swift-next) |
-| [Swift 5.1](#swift-51) |
-| [Swift 5.0](#swift-50) |
-| [Swift 4.2](#swift-42) |
-| [Swift 4.1](#swift-41) |
-| [Swift 4.0](#swift-40) |
-| [Swift 3.1](#swift-31) |
-| [Swift 3.0](#swift-30) |
-| [Swift 2.2](#swift-22) |
-| [Swift 2.1](#swift-21) |
-| [Swift 2.0](#swift-20) |
-| [Swift 1.2](#swift-12) |
-| [Swift 1.1](#swift-11) |
-| [Swift 1.0](#swift-10) |
+| Version                | Released   | Toolchain   |
+| :--------------------- | :--------- | :---------- |
+| [Swift 5.2](#swift-52) |            |             |
+| [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
+| [Swift 5.0](#swift-50) | 2019-03-25 | Xcode 10.2  |
+| [Swift 4.2](#swift-42) | 2018-09-17 | Xcode 10.0  |
+| [Swift 4.1](#swift-41) | 2018-03-29 | Xcode 9.3   |
+| [Swift 4.0](#swift-40) | 2017-09-19 | Xcode 9.0   |
+| [Swift 3.1](#swift-31) | 2017-03-27 | Xcode 8.3   |
+| [Swift 3.0](#swift-30) | 2016-09-13 | Xcode 8.0   |
+| [Swift 2.2](#swift-22) | 2016-03-21 | Xcode 7.3   |
+| [Swift 2.1](#swift-21) | 2015-10-21 | Xcode 7.1   |
+| [Swift 2.0](#swift-20) | 2015-09-17 | Xcode 7.0   |
+| [Swift 1.2](#swift-12) | 2015-04-08 | Xcode 6.3   |
+| [Swift 1.1](#swift-11) | 2014-12-02 | Xcode 6.1.1 |
+| [Swift 1.0](#swift-10) | 2014-09-15 | Xcode 6.0   |
 
 </details>
 
 Swift Next
 ----------
 
+* [SE-0267][]:
+  
+  Non-generic members that support a generic parameter list, including nested type declarations, are now allowed to carry a contextual `where` clause against outer generic parameters. Previously, such declarations could only be expressed by placing the member inside a dedicated constrained extension.
+
+  ```swift
+  struct Box<Wrapped> {
+    func boxes() -> [Box<Wrapped.Element>] where Wrapped: Sequence { ... }
+  }
+  ```
+  Since contextual `where` clauses are effectively visibility constraints, overrides adopting this feature must be at least as visible as the overridden method. In practice, this implies any instance of `Derived` that can access `Base.foo` must also be able to access `Derived.foo`.
+  
+  ```swift
+  class Base<T> {
+    func foo() where T == Int { ... }
+  }
+  
+  class Derived<U>: Base<U> {
+    // OK, <U where U: Equatable> has broader visibility than <T where T == Int>
+    override func foo() where U: Equatable { ... } 
+  }
+
+* [SR-75][]:
+
+  Unapplied references to protocol methods are now supported. Previously this
+  only worked for methods defined in structs, enums and classes.
+
+  ```swift
+  protocol Cat {
+    func play(catToy: Toy)
+  }
+
+  let fn = Cat.play(catToy:)
+  fn(myCat)(myToy)
+  ```
+
+* [SE-0266][]:
+  
+  Enumerations with no associated values, or only `Comparable` associated values, can opt-in to synthesized `Comparable` conformance by declaring conformance to the `Comparable` protocol. The synthesized implementation orders the cases first by case-declaration order, and then by lexicographic order of the associated values (if any).
+  
+  ```swift
+  enum Foo: Comparable {
+    case a(Int), b(Int), c
+  }
+  
+  // .a(0) < .a(1) < .b(0) < .b(1) < .c
+  ```
+
+* [SE-0269][]:
+
+  When an escaping closure explicitly captures `self` in its capture list, the
+  use of implicit `self` is enabled within that closure. This means that the
+  following code is now valid:
+  
+  ```swift
+  func doStuff(_ stuff: @escaping () -> Void) {}
+  
+  class C {
+    var x = 0
+
+    func method() {
+      doStuff { [self] in
+        x += 1
+      }
+    }
+  }
+  ```
+  
+  This proposal also introduces new diagnostics for inserting `self` into the
+  closure's capture list in addition to the existing 'use `self.` explicitly'
+  fix-it.
+
+Swift 5.2
+---------
+
+* [SR-11841][]:
+
+  When chaining calls to `filter(_:)` on a lazy sequence or collection, the
+  filtering predicates will now be called in the same order as eager filters.
+  
+  ```swift
+  let evens = (1...10).lazy
+      .filter { $0.isMultiple(of: 2) }
+      .filter { print($0); return true }
+  _ = evens.count
+  // Prints 2, 4, 6, 8, and 10 on separate lines
+  ```
+  
+  Previously, the predicates were called in reverse order.
+  
+* [SR-2790][]:
+
+  The compiler will now emit a warning when attempting to pass a temporary
+  pointer argument produced from an array, string, or inout argument to a
+  parameter which is known to escape it. This includes the various initializers 
+  for the `UnsafePointer`/`UnsafeBufferPointer` family of types, as well as
+  memberwise initializers.
+
+  ```swift
+  struct S {
+    var ptr: UnsafePointer<Int8>
+  }
+
+  func foo() {
+    var i: Int8 = 0
+    let ptr = UnsafePointer(&i)
+    // warning: initialization of 'UnsafePointer<Int8>' results in a 
+    // dangling pointer
+    
+    let s1 = S(ptr: [1, 2, 3]) 
+    // warning: passing '[Int8]' to parameter, but argument 'ptr' should be a
+    // pointer that outlives the call to 'init(ptr:)'
+    
+    let s2 = S(ptr: "hello")
+    // warning: passing 'String' to parameter, but argument 'ptr' should be a
+    // pointer that outlives the call to 'init(ptr:)'
+  }
+  ```
+
+  All 3 of the above examples are unsound because each argument produces a
+  temporary pointer only valid for the duration of the call they are passed to.
+  Therefore the returned value in each case references a dangling pointer.
+
+* [SR-2189][]:
+
+  The compiler now supports local functions whose default arguments capture
+  values from outer scopes.
+
+  ```swift
+  func outer(x: Int) -> (Int, Int) {
+    func inner(y: Int = x) -> Int {
+      return y
+    }
+
+    return (inner(), inner(y: 0))
+  }
+  ```
+
+* [SR-11429][]:
+
+  The compiler will now correctly strip argument labels from function references
+  used with the `as` operator in a function call. As a result, the `as` operator
+  can now be used to disambiguate a call to a function with argument labels. 
+  
+  ```swift
+  func foo(x: Int) {}
+  func foo(x: UInt) {}
+  
+  (foo as (Int) -> Void)(5)  // Calls foo(x: Int)
+  (foo as (UInt) -> Void)(5) // Calls foo(x: UInt)
+  ```
+  
+  Previously this was only possible for functions without argument labels.
+  
+  This change also means that a generic type alias can no longer be used to
+  preserve the argument labels of a function reference through the `as`
+  operator. The following is now rejected:
+  
+  ```swift
+  typealias Magic<T> = T
+  func foo(x: Int) {}
+  (foo as Magic)(x: 5) // error: Extraneous argument label 'x:' in call
+  ```
+  
+  The function value must instead be called without argument labels:
+  
+  ```swift
+  (foo as Magic)(5)
+  ```
+
+* [SR-11298][]:
+
+  A class-constrained protocol extension, where the extended protocol does
+  not impose a class constraint, will now infer the constraint implicitly.
+
+  ```swift
+  protocol Foo {}
+  class Bar: Foo {
+    var someProperty: Int = 0
+  }
+
+  // Even though 'Foo' does not impose a class constraint, it is automatically
+  // inferred due to the Self: Bar constraint.
+  extension Foo where Self: Bar {
+    var anotherProperty: Int {
+      get { return someProperty }
+      // As a result, the setter is now implicitly nonmutating, just like it would
+      // be if 'Foo' had a class constraint.
+      set { someProperty = newValue }
+    }
+  }
+  ```
+
+* [SE-0253][]:
+
+  Values of types that declare `func callAsFunction` methods can be called
+  like functions. The call syntax is shorthand for applying
+  `func callAsFunction` methods.
+
+  ```swift
+  struct Adder {
+    var base: Int
+    func callAsFunction(_ x: Int) -> Int {
+      return x + base
+    }
+  }
+  var adder = Adder(base: 3)
+  adder(10) // returns 13, same as `adder.callAsFunction(10)`
+  ```
+
+  * `func callAsFunction` argument labels are required at call sites.
+  * Multiple `func callAsFunction` methods on a single type are supported.
+  * `mutating func callAsFunction` is supported.
+  * `func callAsFunction` works with `throws` and `rethrows`.
+  * `func callAsFunction` works with trailing closures.
+  
+* [SE-0249][]:
+
+  A `\Root.value` key path expression is now allowed wherever a `(Root) -> Value` 
+  function is allowed. Such an expression is implicitly converted to a key path 
+  application of `{ $0[keyPath: \Root.value] }`.
+  
+  For example:
+  
+  ```swift
+  struct User {
+    let email: String
+    let isAdmin: Bool
+  }
+  
+  users.map(\.email) // this is equivalent to: users.map { $0[keyPath: \User.email] }
+  ```
+
 * [SR-4206][]:
 
-  A method override is no longer allowed to have a generic signature with 
+  A method override is no longer allowed to have a generic signature with
   requirements not imposed by the base method. For example:
 
-  ```
+  ```swift
   protocol P {}
   
   class Base {
@@ -64,6 +296,8 @@ Swift Next
 
 Swift 5.1
 ---------
+
+### 2019-09-20 (Xcode 11.0)
 
 * [SR-8974][]:
 
@@ -7710,9 +7944,15 @@ Swift 1.0
 [SE-0242]: <https://github.com/apple/swift-evolution/blob/master/proposals/0242-default-values-memberwise.md>
 [SE-0244]: <https://github.com/apple/swift-evolution/blob/master/proposals/0244-opaque-result-types.md>
 [SE-0245]: <https://github.com/apple/swift-evolution/blob/master/proposals/0245-array-uninitialized-initializer.md>
+[SE-0249]: <https://github.com/apple/swift-evolution/blob/master/proposals/0249-key-path-literal-function-expressions.md>
 [SE-0252]: <https://github.com/apple/swift-evolution/blob/master/proposals/0252-keypath-dynamic-member-lookup.md>
+[SE-0253]: <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
+[SE-0266]: <https://github.com/apple/swift-evolution/blob/master/proposals/0266-synthesized-comparable-for-enumerations.md>
+[SE-0267]: <https://github.com/apple/swift-evolution/blob/master/proposals/0267-where-on-contextually-generic.md>
+[SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
 
+[SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
 [SR-631]: <https://bugs.swift.org/browse/SR-631>
@@ -7722,11 +7962,13 @@ Swift 1.0
 [SR-1529]: <https://bugs.swift.org/browse/SR-1529>
 [SR-2131]: <https://bugs.swift.org/browse/SR-2131>
 [SR-2176]: <https://bugs.swift.org/browse/SR-2176>
+[SR-2189]: <https://bugs.swift.org/browse/SR-2189>
 [SR-2388]: <https://bugs.swift.org/browse/SR-2388>
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-2672]: <https://bugs.swift.org/browse/SR-2672>
 [SR-2688]: <https://bugs.swift.org/browse/SR-2688>
+[SR-2790]: <https://bugs.swift.org/browse/SR-2790>
 [SR-4206]: <https://bugs.swift.org/browse/SR-4206>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>
@@ -7741,3 +7983,6 @@ Swift 1.0
 [SR-8974]: <https://bugs.swift.org/browse/SR-8974>
 [SR-9043]: <https://bugs.swift.org/browse/SR-9043>
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
+[SR-11298]: <https://bugs.swift.org/browse/SR-11298>
+[SR-11429]: <https://bugs.swift.org/browse/SR-11429>
+[SR-11841]: <https://bugs.swift.org/browse/SR-11841>

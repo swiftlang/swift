@@ -13,36 +13,27 @@ func takesIntArray(_: [Int]) { }
 func takesVariadicInt(_: (Int...) -> ()) { }
 func takesVariadicIntInt(_: (Int, Int...) -> ()) { }
 
-func takesVariadicGeneric<T>(_ f: (T...) -> ()) { }
+func takesVariadicGeneric<T>(_ f: (T...) -> ()) { } // expected-note {{in call to function 'takesVariadicGeneric'}}
 
 func variadic() {
   // These work
 
-  // FIXME: Not anymore: rdar://41416758
   takesVariadicInt({let _ = $0})
-  // expected-error@-1 {{cannot convert value of type '(_) -> ()' to expected argument type '(Int...) -> ()'}}
   takesVariadicInt({let _: [Int] = $0})
-  // expected-error@-1 {{cannot convert value of type '(_) -> ()' to expected argument type '(Int...) -> ()'}}
 
   let _: (Int...) -> () = {let _: [Int] = $0}
-  // expected-error@-1 {{cannot convert value of type '(_) -> ()' to specified type '(Int...) -> ()'}}
 
-  // FIXME: Make the rest work
   takesVariadicInt({takesIntArray($0)})
-  // expected-error@-1 {{cannot convert value of type '([Int]) -> ()' to expected argument type '(Int...) -> ()'}}
 
   let _: (Int...) -> () = {takesIntArray($0)}
-  // expected-error@-1 {{cannot convert value of type '([Int]) -> ()' to specified type '(Int...) -> ()'}}
 
   takesVariadicGeneric({takesIntArray($0)})
-  // expected-error@-1 {{cannot convert value of type 'Array<_>' to expected argument type '[Int]'}}
 
+  // FIXME: Problem here is related to multi-statement closure body not being type-checked together with
+  // enclosing context. We could have inferred `$0` to be `[Int]` if `let` was a part of constraint system.
   takesVariadicGeneric({let _: [Int] = $0})
-  // expected-error@-1 {{cannot convert value of type '(_) -> ()' to expected argument type '(_...) -> ()'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
   takesVariadicIntInt({_ = $0; takesIntArray($1)})
-  // expected-error@-1 {{cannot convert value of type '(_, _) -> ()' to expected argument type '(Int, Int...) -> ()'}}
-
   takesVariadicIntInt({_ = $0; let _: [Int] = $1})
-  // expected-error@-1 {{cannot convert value of type '(_, _) -> ()' to expected argument type '(Int, Int...) -> ()'}}
 }

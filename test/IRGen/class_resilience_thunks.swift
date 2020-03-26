@@ -8,7 +8,7 @@
 
 import resilient_class_thunks
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s23class_resilience_thunks21testDispatchThunkBase1b1ty010resilient_a1_C00G0CyxG_xtlF"(%T22resilient_class_thunks4BaseC*, %swift.opaque* noalias nocapture)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s23class_resilience_thunks21testDispatchThunkBase1b1ty010resilient_a1_C00G0CyxG_xtlF"(%T22resilient_class_thunks4BaseC* %0, %swift.opaque* noalias nocapture %1)
 public func testDispatchThunkBase<T>(b: Base<T>, t: T) {
 
   // CHECK: call swiftcc void @"$s22resilient_class_thunks4BaseC6takesTyyxFTj"(%swift.opaque* noalias nocapture {{%.*}}, %T22resilient_class_thunks4BaseC* swiftself %0)
@@ -23,7 +23,7 @@ public func testDispatchThunkBase<T>(b: Base<T>, t: T) {
   // CHECK: ret void
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s23class_resilience_thunks24testDispatchThunkDerived1dy010resilient_a1_C00G0C_tF"(%T22resilient_class_thunks7DerivedC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s23class_resilience_thunks24testDispatchThunkDerived1dy010resilient_a1_C00G0C_tF"(%T22resilient_class_thunks7DerivedC* %0)
 public func testDispatchThunkDerived(d: Derived) {
 
   // CHECK: call swiftcc void @"$s22resilient_class_thunks4BaseC6takesTyyxFTj"(%swift.opaque* noalias nocapture dereferenceable({{4|8}}) {{%.*}}, %T22resilient_class_thunks4BaseC* swiftself {{%.*}})
@@ -48,7 +48,7 @@ open class MyDerived : Base<Int> {
   open override func takesReference(_: Object) {}
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s23class_resilience_thunks27testDispatchThunkMyOverride1d1oyAA0G7DerivedC_010resilient_a1_C06ObjectCtF"(%T23class_resilience_thunks9MyDerivedC*, %T22resilient_class_thunks6ObjectC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s23class_resilience_thunks27testDispatchThunkMyOverride1d1oyAA0G7DerivedC_010resilient_a1_C06ObjectCtF"(%T23class_resilience_thunks9MyDerivedC* %0, %T22resilient_class_thunks6ObjectC* %1)
 public func testDispatchThunkMyOverride(d: MyDerived, o: Object) {
   // CHECK: call swiftcc void @"$s22resilient_class_thunks4BaseC14takesReferenceyyAA6ObjectCFTj"
   d.takesReference(o)

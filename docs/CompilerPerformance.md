@@ -753,7 +753,7 @@ Time,Live,IsEntry,EventName,CounterName,CounterDelta,CounterValue,EntityName,Ent
 40032,0,"entry","typecheck-decl","Sema.NumLazyIterableDeclContexts",40,40,"foo","[test.swift:1:1 - line:1:32]"
 40032,0,"entry","typecheck-decl","Sema.NumTypesDeserialized",106,106,"foo","[test.swift:1:1 - line:1:32]"
 40032,0,"entry","typecheck-decl","Sema.NumUnloadedLazyIterableDeclContexts",40,40,"foo","[test.swift:1:1 - line:1:32]"
-40135,0,"entry","typecheck-decl","Sema.NumDeclsValidated",1,1,"","[test.swift:1:13 - line:1:29]"
+40135,0,"entry","typecheck-decl","Sema.InterfaceTypeRequest",1,1,"","[test.swift:1:13 - line:1:29]"
 ...
 ```
 
@@ -793,7 +793,7 @@ performance between two compilers, say `${OLD}/swiftc` and `${NEW}/swiftc`:
 ```
 $ mkdir stats-old stats-new
 $ ${OLD}/swiftc -stats-output-dir stats-old test.swift
-$ ${OLD}/swiftc -stats-output-dir stats-new test.swift
+$ ${NEW}/swiftc -stats-output-dir stats-new test.swift
 $ utils/process-stats-dir.py --compare-stats-dirs stats-old stats-new
 old     new     delta_pct       name
 1402939 1430732 1.98    AST.NumASTBytesAllocated

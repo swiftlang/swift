@@ -58,9 +58,6 @@ public:
   using BuiltTypeDecl = swift::GenericTypeDecl *; // nominal or type alias
   using BuiltProtocolDecl = swift::ProtocolDecl *;
   explicit ASTBuilder(ASTContext &ctx) : Ctx(ctx) {}
-  
-  /// The resolver to use for type checking, if necessary.
-  LazyResolver *Resolver = nullptr;
 
   ASTContext &getASTContext() { return Ctx; }
   DeclContext *getNotionalDC();

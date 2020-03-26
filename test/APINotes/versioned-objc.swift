@@ -16,7 +16,7 @@ class ProtoWithVersionedUnavailableMemberImpl: ProtoWithVersionedUnavailableMemb
 func testNonGeneric() {
   // CHECK-DIAGS-4:[[@LINE+1]]:{{[0-9]+}}: error: cannot convert value of type 'Any' to specified type 'Int'
   let _: Int = NewlyGenericSub.defaultElement()
-  // CHECK-DIAGS-5:[[@LINE-1]]:{{[0-9]+}}: error: generic parameter 'Element' could not be inferred
+  // CHECK-DIAGS-5:[[@LINE-1]]:{{[0-9]+}}: error: generic class 'NewlyGenericSub' requires that 'Int' be a class type
 
   // CHECK-DIAGS-4:[[@LINE+1]]:{{[0-9]+}}: error: cannot specialize non-generic type 'NewlyGenericSub'
   let _: Int = NewlyGenericSub<Base>.defaultElement()
@@ -166,7 +166,7 @@ extension PrintingInterference {
   func testDroppingRenamedPrints() {
     // CHECK-DIAGS-4: [[@LINE+1]]:{{[0-9]+}}: warning: use of 'print' treated as a reference to instance method
     print(self)
-    // CHECK-DIAGS-5: [[@LINE-1]]:{{[0-9]+}}: error: use of 'print' nearly matches global function 'print(_:separator:terminator:)' in module 'Swift' rather than instance method 'print(_:extra:)'
+    // CHECK-DIAGS-5: [[@LINE-1]]:{{[0-9]+}}: error: use of 'print' refers to instance method rather than global function 'print(_:separator:terminator:)' in module 'Swift'
 
     // CHECK-DIAGS-4-NOT: [[@LINE+1]]:{{[0-9]+}}:
     print(self, extra: self)

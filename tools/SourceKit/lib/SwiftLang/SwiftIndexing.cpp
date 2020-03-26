@@ -184,7 +184,8 @@ static void indexModule(llvm::MemoryBuffer *Input,
     // documentation file.
     // FIXME: refactor the frontend to provide an easy way to figure out the
     // correct filename here.
-    auto FUnit = Loader->loadAST(*Mod, None, std::move(Buf), nullptr,
+    auto FUnit = Loader->loadAST(*Mod, None, /*moduleInterfacePath*/"",
+                                 std::move(Buf), nullptr, nullptr,
                                  /*isFramework*/false,
                                  /*treatAsPartialModule*/false);
 
@@ -197,9 +198,6 @@ static void indexModule(llvm::MemoryBuffer *Input,
 
     Mod->setHasResolvedImports();
   }
-
-  // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(Ctx);
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
   index::indexModule(Mod, IdxDataConsumer);
@@ -216,7 +214,7 @@ static void initTraceInfoImpl(trace::SwiftInvocation &SwiftArgs,
                               ArrayRef<Str> Args) {
   llvm::raw_string_ostream OS(SwiftArgs.Args.Arguments);
   interleave(Args, [&OS](StringRef arg) { OS << arg; }, [&OS] { OS << ' '; });
-  SwiftArgs.Args.PrimaryFile = InputFile;
+  SwiftArgs.Args.PrimaryFile = InputFile.str();
 }
 
 void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
@@ -311,10 +309,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     IdxConsumer.failed("no primary source file found");
     return;
   }
-
-  // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(CI.getASTContext());
-
+  
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
   index::indexSourceFile(CI.getPrimarySourceFile(), IdxDataConsumer);
 }

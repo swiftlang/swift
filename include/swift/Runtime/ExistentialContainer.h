@@ -95,6 +95,8 @@ struct ClassExistentialContainerImpl {
 using ClassExistentialContainer = ClassExistentialContainerImpl<void *>;
 using WeakClassExistentialContainer =
     ClassExistentialContainerImpl<WeakReference>;
+using UnownedClassExistentialContainer =
+    ClassExistentialContainerImpl<UnownedReference>;
 
 } // end swift namespace
 

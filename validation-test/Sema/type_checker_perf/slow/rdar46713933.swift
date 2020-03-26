@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
+// REQUIRES: tools-release,no_asan
 
 func wrap<T>(_ key: String, _ value: T) -> T { return value }
 func wrap<T: ExpressibleByIntegerLiteral>(_ key: String, _ value: T) -> T { return value }

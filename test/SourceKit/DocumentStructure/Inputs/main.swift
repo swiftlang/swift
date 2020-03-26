@@ -135,3 +135,40 @@ class OneMore {
     fatalError()
   }
 }
+
+class Chain<A> {
+  func + (lhs: Chain<A>, rhs: Chain<A>) -> Chain<A> { fatalError() }
+}
+
+public init() {
+    fatalError()
+}
+
+deinit {
+    fatalError()
+}
+
+#if false
+extension Result {
+  func foo() {}
+}
+
+extension Outer {
+  class Inner {
+    deinit {}
+  }
+}
+
+public extension Outer2 {
+  class Inner2 {
+    deinit {}
+  }
+}
+#endif
+
+@objc(FPBarProto)
+protocol BarProtocol {}
+
+var var_with_didset = 10 {
+  didSet { print(oldValue) }
+}

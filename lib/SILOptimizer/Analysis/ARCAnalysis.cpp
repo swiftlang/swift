@@ -15,16 +15,16 @@
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "llvm/ADT/StringSwitch.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -843,7 +843,7 @@ void ConsumedArgToEpilogueReleaseMatcher::collectMatchingDestroyAddresses(
   SILFunction::iterator anotherEpilogueBB =
       (Kind == ExitKind::Return) ? F->findThrowBB() : F->findReturnBB();
 
-  for (auto *arg : F->begin()->getFunctionArguments()) {
+  for (auto *arg : F->begin()->getSILFunctionArguments()) {
     if (arg->isIndirectResult())
       continue;
     if (arg->getArgumentConvention() != SILArgumentConvention::Indirect_In)
@@ -899,7 +899,7 @@ void ConsumedArgToEpilogueReleaseMatcher::collectMatchingReleases(
   // release.
   bool isTrackingInArgs = isOneOfConventions(SILArgumentConvention::Indirect_In,
                                              ArgumentConventions);
-  for (auto &inst : reversed(*block)) {
+  for (auto &inst : llvm::reverse(*block)) {
     if (isTrackingInArgs && isa<DestroyAddrInst>(inst)) {
       // It is probably a destroy addr for an @in argument.
       continue;
@@ -985,131 +985,6 @@ findMatchingReleases(SILBasicBlock *BB) {
   // We've exited the epilogue sequence, try to find out which parameter we
   // have all the epilogue releases for and which one we did not.
   processMatchingReleases();
-}
-
-//===----------------------------------------------------------------------===//
-//                    Code for Determining Final Releases
-//===----------------------------------------------------------------------===//
-
-// Propagate liveness backwards from an initial set of blocks in our
-// LiveIn set.
-static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn,
-                              SILBasicBlock *DefBB) {
-  // First populate a worklist of predecessors.
-  llvm::SmallVector<SILBasicBlock *, 64> Worklist;
-  for (auto *BB : LiveIn)
-    for (auto Pred : BB->getPredecessorBlocks())
-      Worklist.push_back(Pred);
-
-  // Now propagate liveness backwards until we hit the alloc_box.
-  while (!Worklist.empty()) {
-    auto *BB = Worklist.pop_back_val();
-
-    // If it's already in the set, then we've already queued and/or
-    // processed the predecessors.
-    if (BB == DefBB || !LiveIn.insert(BB).second)
-      continue;
-
-    for (auto Pred : BB->getPredecessorBlocks())
-      Worklist.push_back(Pred);
-  }
-}
-
-// Is any successor of BB in the LiveIn set?
-static bool successorHasLiveIn(SILBasicBlock *BB,
-                               llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn) {
-  for (auto &Succ : BB->getSuccessors())
-    if (LiveIn.count(Succ))
-      return true;
-
-  return false;
-}
-
-// Walk backwards in BB looking for the last use of a given
-// value, and add it to the set of release points.
-static bool addLastUse(SILValue V, SILBasicBlock *BB,
-                       ReleaseTracker &Tracker) {
-  for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
-    if (Tracker.isUser(&*I)) {
-      Tracker.trackLastRelease(&*I);
-      return true;
-    }
-  }
-
-  llvm_unreachable("BB is expected to have a use of a closure");
-  return false;
-}
-
-/// TODO: Refactor this code so the decision on whether or not to accept an
-/// instruction.
-bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
-  llvm::SmallPtrSet<SILBasicBlock *, 16> LiveIn;
-  llvm::SmallPtrSet<SILBasicBlock *, 16> UseBlocks;
-
-  // First attempt to get the BB where this value resides.
-  auto *DefBB = V->getParentBlock();
-  if (!DefBB)
-    return false;
-
-  bool seenRelease = false;
-  SILInstruction *OneRelease = nullptr;
-
-  // We'll treat this like a liveness problem where the value is the def. Each
-  // block that has a use of the value has the value live-in unless it is the
-  // block with the value.
-  SmallVector<Operand *, 8> Uses(V->getUses());
-  while (!Uses.empty()) {
-    auto *Use = Uses.pop_back_val();
-    auto *User = Use->getUser();
-    auto *BB = User->getParent();
-
-    if (Tracker.isUserTransitive(User)) {
-      Tracker.trackUser(User);
-      auto *CastInst = cast<SingleValueInstruction>(User);
-      Uses.append(CastInst->getUses().begin(), CastInst->getUses().end());
-      continue;
-    }
-
-    if (!Tracker.isUserAcceptable(User))
-      return false;
-
-    Tracker.trackUser(User);
-
-    if (BB != DefBB)
-      LiveIn.insert(BB);
-
-    // Also keep track of the blocks with uses.
-    UseBlocks.insert(BB);
-
-    // Try to speed up the trivial case of single release/dealloc.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User) ||
-        isa<DestroyValueInst>(User) || isa<ReleaseValueInst>(User)) {
-      if (!seenRelease)
-        OneRelease = User;
-      else
-        OneRelease = nullptr;
-
-      seenRelease = true;
-    }
-  }
-
-  // Only a single release/dealloc? We're done!
-  if (OneRelease) {
-    Tracker.trackLastRelease(OneRelease);
-    return true;
-  }
-
-  propagateLiveness(LiveIn, DefBB);
-
-  // Now examine each block we saw a use in. If it has no successors
-  // that are in LiveIn, then the last use in the block is the final
-  // release/dealloc.
-  for (auto *BB : UseBlocks)
-    if (!successorHasLiveIn(BB, LiveIn))
-      if (!addLastUse(V, BB, Tracker))
-        return false;
-
-  return true;
 }
 
 //===----------------------------------------------------------------------===//

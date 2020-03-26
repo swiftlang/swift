@@ -1,3 +1,4 @@
+// REQUIRES: VENDOR=apple 
 // Validate the the specializations actually exist (if they don't then we're not
 // validating that they end up with the correct linkages):
 // RUN: %target-swift-frontend -emit-sil -o- -O -validate-tbd-against-ir=none %s | %FileCheck %s

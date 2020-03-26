@@ -24,8 +24,6 @@
 
 using namespace swift;
 
-AnyRequest::HolderBase::~HolderBase() { }
-
 std::string AnyRequest::getAsString() const {
   std::string result;
   {
@@ -50,8 +48,9 @@ Evaluator::getAbstractRequestFunction(uint8_t zoneID, uint8_t requestID) const {
 }
 
 void Evaluator::registerRequestFunctions(
-                               uint8_t zoneID,
+                               Zone zone,
                                ArrayRef<AbstractRequestFunction *> functions) {
+  uint8_t zoneID = static_cast<uint8_t>(zone);
 #ifndef NDEBUG
   for (const auto &zone : requestFunctionsByZone) {
     assert(zone.first != zoneID);
@@ -61,8 +60,12 @@ void Evaluator::registerRequestFunctions(
   requestFunctionsByZone.push_back({zoneID, functions});
 }
 
-Evaluator::Evaluator(DiagnosticEngine &diags, bool debugDumpCycles)
-  : diags(diags), debugDumpCycles(debugDumpCycles) { }
+Evaluator::Evaluator(DiagnosticEngine &diags,
+                     bool debugDumpCycles,
+                     bool buildDependencyGraph)
+  : diags(diags),
+    debugDumpCycles(debugDumpCycles),
+    buildDependencyGraph(buildDependencyGraph) { }
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;
@@ -70,35 +73,45 @@ void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   printDependenciesGraphviz(out);
 }
 
-bool Evaluator::checkDependency(const AnyRequest &request) {
-  // If there is an active request, record it's dependency on this request.
-  if (!activeRequests.empty())
-    dependencies[activeRequests.back()].push_back(request);
+bool Evaluator::checkDependency(const ActiveRequest &request) {
+  if (buildDependencyGraph) {
+    // Insert the request into the dependency graph if we haven't already.
+    auto req = AnyRequest(request);
+    dependencies.insert({req, {}});
+
+    // If there is an active request, record it's dependency on this request.
+    if (!activeRequests.empty()) {
+      auto activeDeps = dependencies.find_as(activeRequests.back());
+      assert(activeDeps != dependencies.end());
+      activeDeps->second.push_back(req);
+    }
+  }
 
   // Record this as an active request.
-  if (activeRequests.insert(request)) {
+  if (activeRequests.insert(request))
     return false;
-  }
 
   // Diagnose cycle.
   diagnoseCycle(request);
+  return true;
+}
 
+void Evaluator::diagnoseCycle(const ActiveRequest &request) {
   if (debugDumpCycles) {
     llvm::errs() << "===CYCLE DETECTED===\n";
     llvm::DenseSet<AnyRequest> visitedAnywhere;
     llvm::SmallVector<AnyRequest, 4> visitedAlongPath;
     std::string prefixStr;
-    printDependencies(activeRequests.front(), llvm::errs(), visitedAnywhere,
-                      visitedAlongPath, activeRequests.getArrayRef(),
+    SmallVector<AnyRequest, 8> highlightPath;
+    for (auto &req : activeRequests)
+      highlightPath.push_back(AnyRequest(req));
+    printDependencies(AnyRequest(activeRequests.front()), llvm::errs(),
+                      visitedAnywhere, visitedAlongPath, highlightPath,
                       prefixStr, /*lastChild=*/true);
   }
 
-  return true;
-}
-
-void Evaluator::diagnoseCycle(const AnyRequest &request) {
   request.diagnoseCycle(diags);
-  for (const auto &step : reversed(activeRequests)) {
+  for (const auto &step : llvm::reverse(activeRequests)) {
     if (step == request) return;
 
     step.noteCycleStep(diags);

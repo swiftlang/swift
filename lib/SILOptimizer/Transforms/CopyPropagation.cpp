@@ -127,9 +127,9 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/IndexTrie.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 
@@ -419,7 +419,7 @@ public:
     originalDestroyBlocks.insert(use->getUser()->getParent());
   }
 
-  llvm::iterator_range<BlockSetVec::const_iterator>
+  iterator_range<BlockSetVec::const_iterator>
   getOriginalDestroyBlocks() const {
     return originalDestroyBlocks;
   }
@@ -615,7 +615,7 @@ static bool computeLiveness(CopyPropagationState &pass) {
       // point of the end_borrow.
       if (auto *BBI = dyn_cast<BeginBorrowInst>(user)) {
         for (Operand *use : BBI->getUses()) {
-          if (auto *EBI = dyn_cast<EndBorrowInst>(use->getUser()))
+          if (isa<EndBorrowInst>(use->getUser()))
             computeUseLiveness(use, pass);
         }
         continue;

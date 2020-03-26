@@ -24,31 +24,30 @@ using namespace swift;
 using namespace reflection;
 
 class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
-  std::ostream &OS;
+  FILE *file;
   unsigned Indent;
 
-  std::ostream &indent(unsigned Amount) {
+  FILE * &indent(unsigned Amount) {
     for (unsigned i = 0; i < Amount; ++i)
-      OS << ' ';
-    return OS;
+      fprintf(file, " ");
+    return file;
   }
 
-  std::ostream &printHeader(std::string Name) {
-    indent(Indent) << '(' << Name;
-    return OS;
+  FILE * &printHeader(std::string Name) {
+    fprintf(indent(Indent), "(%s", Name.c_str());
+    return file;
   }
 
-  template<typename T>
-  std::ostream &printField(std::string name, const T &value) {
+  FILE * &printField(std::string name, std::string value) {
     if (!name.empty())
-      OS << " " << name << "=" << value;
+      fprintf(file, " %s=%s", name.c_str(), value.c_str());
     else
-      OS << " " << value;
-    return OS;
+      fprintf(file, " %s", value.c_str());
+    return file;
   }
 
   void printRec(const TypeRef *typeRef) {
-    OS << "\n";
+    fprintf(file, "\n");
 
     Indent += 2;
     visit(typeRef);
@@ -56,14 +55,14 @@ class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   }
 
 public:
-  PrintTypeRef(std::ostream &OS, unsigned Indent)
-    : OS(OS), Indent(Indent) {}
+  PrintTypeRef(FILE *file, unsigned Indent)
+    : file(file), Indent(Indent) {}
 
   void visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     printHeader("builtin");
     auto demangled = Demangle::demangleTypeAsString(B->getMangledName());
     printField("", demangled);
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitNominalTypeRef(const NominalTypeRef *N) {
@@ -86,7 +85,7 @@ public:
     printField("", demangled);
     if (auto parent = N->getParent())
       printRec(parent);
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
@@ -105,14 +104,14 @@ public:
       printRec(param);
     if (auto parent = BG->getParent())
       printRec(parent);
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitTupleTypeRef(const TupleTypeRef *T) {
     printHeader("tuple");
     for (auto element : T->getElements())
       printRec(element);
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -132,7 +131,7 @@ public:
       break;
     }
 
-    OS << '\n';
+    fprintf(file, "\n");
     Indent += 2;
     printHeader("parameters");
 
@@ -142,7 +141,7 @@ public:
 
       if (!flags.isNone()) {
         Indent += 2;
-        OS << '\n';
+        fprintf(file, "\n");
       }
 
       switch (flags.getValueOwnership()) {
@@ -167,17 +166,17 @@ public:
 
       if (!flags.isNone()) {
         Indent -= 2;
-        OS << ')';
+        fprintf(file, ")");
       }
     }
 
     if (parameters.empty())
-      OS << ')';
+      fprintf(file, ")");
 
-    OS << '\n';
+    fprintf(file, "\n");
     printHeader("result");
     printRec(F->getResult());
-    OS << ')';
+    fprintf(file, ")");
 
     Indent -= 2;
   }
@@ -185,12 +184,12 @@ public:
   void visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     printHeader("protocol_composition");
     if (PC->hasExplicitAnyObject())
-      OS << " any_object";
+      fprintf(file, " any_object");
     if (auto superclass = PC->getSuperclass())
       printRec(superclass);
     for (auto protocol : PC->getProtocols())
       printRec(protocol);
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -198,20 +197,20 @@ public:
     if (M->wasAbstract())
       printField("", "was_abstract");
     printRec(M->getInstanceType());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
     printHeader("existential_metatype");
     printRec(EM->getInstanceType());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
     printHeader("generic_type_parameter");
-    printField("depth", GTP->getDepth());
-    printField("index", GTP->getIndex());
-    OS << ')';
+    printField("depth", std::to_string(GTP->getDepth()));
+    printField("index", std::to_string(GTP->getIndex()));
+    fprintf(file, ")");
   }
 
   void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
@@ -219,47 +218,47 @@ public:
     printField("protocol", DM->getProtocol());
     printRec(DM->getBase());
     printField("member", DM->getMember());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
     printHeader("foreign");
     if (!F->getName().empty())
       printField("name", F->getName());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
     printHeader("objective_c_class");
     if (!OC->getName().empty())
       printField("name", OC->getName());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OC) {
     printHeader("objective_c_protocol");
     if (!OC->getName().empty())
       printField("name", OC->getName());
-    OS << ')';
+    fprintf(file, ")");
   }
 
 #define REF_STORAGE(Name, name, ...) \
   void visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
     printHeader(#name "_storage"); \
     printRec(US->getType()); \
-    OS << ')'; \
+    fprintf(file, ")"); \
   }
 #include "swift/AST/ReferenceStorage.def"
 
   void visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     printHeader("sil_box");
     printRec(SB->getBoxedType());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     printHeader("opaque");
-    OS << ')';
+    fprintf(file, ")");
   }
 };
 
@@ -369,12 +368,301 @@ const OpaqueTypeRef *OpaqueTypeRef::get() {
 }
 
 void TypeRef::dump() const {
-  dump(std::cerr);
+  dump(stderr);
 }
 
-void TypeRef::dump(std::ostream &OS, unsigned Indent) const {
-  PrintTypeRef(OS, Indent).visit(this);
-  OS << std::endl;
+void TypeRef::dump(FILE *file, unsigned Indent) const {
+  PrintTypeRef(file, Indent).visit(this);
+  fprintf(file, "\n");
+}
+
+class DemanglingForTypeRef
+    : public TypeRefVisitor<DemanglingForTypeRef, Demangle::NodePointer> {
+  Demangle::Demangler &Dem;
+
+public:
+  DemanglingForTypeRef(Demangle::Demangler &Dem) : Dem(Dem) {}
+
+  Demangle::NodePointer visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    return Dem.demangleType(B->getMangledName());
+  }
+
+  Demangle::NodePointer visitNominalTypeRef(const NominalTypeRef *N) {
+    if (auto parent = N->getParent())
+      assert(false && "not implemented");
+    return Dem.demangleType(N->getMangledName());
+  }
+
+  Demangle::NodePointer
+  visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    Node::Kind nodeKind;
+    Node::Kind genericNodeKind;
+    if (BG->isStruct()) {
+      nodeKind = Node::Kind::Structure;
+      genericNodeKind = Node::Kind::BoundGenericStructure;
+    } else if (BG->isEnum()) {
+      nodeKind = Node::Kind::Enum;
+      genericNodeKind = Node::Kind::BoundGenericEnum;
+    } else if (BG->isClass()) {
+      nodeKind = Node::Kind::Class;
+      genericNodeKind = Node::Kind::BoundGenericClass;
+    } else {
+      nodeKind = Node::Kind::OtherNominalType;
+      genericNodeKind = Node::Kind::BoundGenericOtherNominalType;
+    }
+    auto unspecializedType = Dem.demangleType(BG->getMangledName());
+
+    auto genericArgsList = Dem.createNode(Node::Kind::TypeList);
+    for (auto param : BG->getGenericParams())
+      genericArgsList->addChild(visit(param), Dem);
+
+    auto genericNode = Dem.createNode(genericNodeKind);
+    genericNode->addChild(unspecializedType, Dem);
+    genericNode->addChild(genericArgsList, Dem);
+
+    if (auto parent = BG->getParent())
+      assert(false && "not implemented");
+
+    auto top = Dem.createNode(Node::Kind::Type);
+    top->addChild(genericNode, Dem);
+    return top;
+  }
+
+  Demangle::NodePointer visitTupleTypeRef(const TupleTypeRef *T) {
+    auto tuple = Dem.createNode(Node::Kind::Tuple);
+    if (T->isVariadic()) {
+      auto tupleElt = Dem.createNode(Node::Kind::TupleElement);
+      tupleElt->addChild(Dem.createNode(Node::Kind::VariadicMarker), Dem);
+      tuple->addChild(tupleElt, Dem);
+      return tuple;
+    }
+
+    for (auto element : T->getElements()) {
+      auto tupleElt = Dem.createNode(Node::Kind::TupleElement);
+      tupleElt->addChild(visit(element), Dem);
+      tuple->addChild(tupleElt, Dem);
+    }
+    return tuple;
+  }
+
+  Demangle::NodePointer visitFunctionTypeRef(const FunctionTypeRef *F) {
+    Node::Kind kind;
+    switch (F->getFlags().getConvention()) {
+    case FunctionMetadataConvention::Swift:
+      kind = !F->getFlags().isEscaping() ? Node::Kind::NoEscapeFunctionType
+                                         : Node::Kind::FunctionType;
+      break;
+    case FunctionMetadataConvention::Block:
+      kind = Node::Kind::ObjCBlock;
+      break;
+    case FunctionMetadataConvention::Thin:
+      kind = Node::Kind::ThinFunctionType;
+      break;
+    case FunctionMetadataConvention::CFunctionPointer:
+      kind = Node::Kind::CFunctionPointer;
+      break;
+    }
+
+    SmallVector<std::pair<NodePointer, bool>, 8> inputs;
+    for (const auto &param : F->getParameters()) {
+      auto flags = param.getFlags();
+      auto input = visit(param.getType());
+
+      auto wrapInput = [&](Node::Kind kind) {
+        auto parent = Dem.createNode(kind);
+        parent->addChild(input, Dem);
+        input = parent;
+      };
+      switch (flags.getValueOwnership()) {
+      case ValueOwnership::Default:
+        /* nothing */
+        break;
+      case ValueOwnership::InOut:
+        wrapInput(Node::Kind::InOut);
+        break;
+      case ValueOwnership::Shared:
+        wrapInput(Node::Kind::Shared);
+        break;
+      case ValueOwnership::Owned:
+        wrapInput(Node::Kind::Owned);
+        break;
+      }
+
+      inputs.push_back({input, flags.isVariadic()});
+    }
+    NodePointer totalInput = nullptr;
+    // FIXME: this is copy&paste from Demangle.cpp
+    switch (inputs.size()) {
+    case 1: {
+      auto singleParam = inputs.front();
+
+      // If the sole unlabeled parameter has a non-tuple type, encode
+      // the parameter list as a single type.
+      if (!singleParam.second) {
+        auto singleType = singleParam.first;
+        if (singleType->getKind() == Node::Kind::Type)
+          singleType = singleType->getFirstChild();
+        if (singleType->getKind() != Node::Kind::Tuple) {
+          totalInput = singleParam.first;
+          break;
+        }
+      }
+
+      // Otherwise it requires a tuple wrapper.
+      LLVM_FALLTHROUGH;
+    }
+
+    // This covers both none and multiple parameters.
+    default:
+      auto tuple = Dem.createNode(Node::Kind::Tuple);
+      for (auto &input : inputs) {
+        NodePointer eltType;
+        bool isVariadic;
+        std::tie(eltType, isVariadic) = input;
+
+        // Tuple element := variadic-marker label? type
+        auto tupleElt = Dem.createNode(Node::Kind::TupleElement);
+
+        if (isVariadic)
+          tupleElt->addChild(Dem.createNode(Node::Kind::VariadicMarker), Dem);
+
+        if (eltType->getKind() == Node::Kind::Type) {
+          tupleElt->addChild(eltType, Dem);
+        } else {
+          auto type = Dem.createNode(Node::Kind::Type);
+          type->addChild(eltType, Dem);
+          tupleElt->addChild(type, Dem);
+        }
+
+        tuple->addChild(tupleElt, Dem);
+      }
+      totalInput = tuple;
+      break;
+    }
+
+    NodePointer parameters = Dem.createNode(Node::Kind::ArgumentTuple);
+    NodePointer paramType = Dem.createNode(Node::Kind::Type);
+
+    paramType->addChild(totalInput, Dem);
+    parameters->addChild(paramType, Dem);
+
+    NodePointer resultTy = visit(F->getResult());
+    NodePointer result = Dem.createNode(Node::Kind::ReturnType);
+    result->addChild(resultTy, Dem);
+
+    auto funcNode = Dem.createNode(kind);
+    if (F->getFlags().throws())
+      funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    funcNode->addChild(parameters, Dem);
+    funcNode->addChild(result, Dem);
+    return funcNode;
+  }
+
+  Demangle::NodePointer
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    auto type_list = Dem.createNode(Node::Kind::TypeList);
+    for (auto protocol : PC->getProtocols())
+      type_list->addChild(visit(protocol), Dem);
+
+    auto proto_list = Dem.createNode(Node::Kind::ProtocolList);
+    proto_list->addChild(type_list, Dem);
+
+    auto node = proto_list;
+    if (auto superclass = PC->getSuperclass()) {
+      node = Dem.createNode(Node::Kind::ProtocolListWithClass);
+      node->addChild(proto_list, Dem);
+      node->addChild(visit(superclass), Dem);
+    } else if (PC->hasExplicitAnyObject()) {
+      node = Dem.createNode(Node::Kind::ProtocolListWithAnyObject);
+      node->addChild(proto_list, Dem);
+    }
+    auto typeNode = Dem.createNode(Node::Kind::Type);
+    typeNode->addChild(node, Dem);
+    return typeNode;
+  }
+
+  Demangle::NodePointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    auto node = Dem.createNode(Node::Kind::Metatype);
+    assert(!M->wasAbstract() && "not implemented");
+    node->addChild(visit(M->getInstanceType()), Dem);
+    auto typeNode = Dem.createNode(Node::Kind::Type);
+    typeNode->addChild(node, Dem);
+    return typeNode;
+  }
+
+  Demangle::NodePointer
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
+    auto node = Dem.createNode(Node::Kind::Metatype);
+    node->addChild(visit(EM->getInstanceType()), Dem);
+    return node;
+  }
+
+  Demangle::NodePointer
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
+    assert(false && "not tested");
+    auto node = Dem.createNode(Node::Kind::DependentGenericParamType);
+    node->addChild(Dem.createNode(Node::Kind::Index, GTP->getDepth()), Dem);
+    node->addChild(Dem.createNode(Node::Kind::Index, GTP->getIndex()), Dem);
+    return node;
+  }
+
+  Demangle::NodePointer
+  visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
+    assert(false && "not tested");
+    assert(DM->getProtocol().empty() && "not implemented");
+    auto node = Dem.createNode(Node::Kind::DependentMemberType);
+    node->addChild(visit(DM->getBase()), Dem);
+    node->addChild(Dem.createNode(Node::Kind::Identifier, DM->getMember()),
+                   Dem);
+    return node;
+  }
+
+  Demangle::NodePointer visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    assert(false && "not implemented");
+    return nullptr;
+  }
+
+  Demangle::NodePointer visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    auto module = Dem.createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
+    auto node = Dem.createNode(Node::Kind::Class);
+    node->addChild(module, Dem);
+    node->addChild(Dem.createNode(Node::Kind::Identifier, OC->getName()), Dem);
+    return node;
+  }
+
+  Demangle::NodePointer
+  visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OC) {
+    auto module = Dem.createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
+    auto node = Dem.createNode(Node::Kind::Protocol);
+    node->addChild(module, Dem);
+    node->addChild(Dem.createNode(Node::Kind::Identifier, OC->getName()), Dem);
+    auto typeNode = Dem.createNode(Node::Kind::Type);
+    typeNode->addChild(node, Dem);
+    return typeNode;
+  }
+
+#define REF_STORAGE(Name, name, ...)                                           \
+  Demangle::NodePointer visit##Name##StorageTypeRef(                           \
+      const Name##StorageTypeRef *US) {                                        \
+    auto node = Dem.createNode(Node::Kind::Name);                              \
+    node->addChild(visit(US->getType()), Dem);                                 \
+    return node;                                                               \
+  }
+#include "swift/AST/ReferenceStorage.def"
+
+  Demangle::NodePointer visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    auto node = Dem.createNode(Node::Kind::SILBoxType);
+    node->addChild(visit(SB->getBoxedType()), Dem);
+    return node;
+  }
+
+  Demangle::NodePointer visitOpaqueTypeRef(const OpaqueTypeRef *O) {
+    return Dem.createNode(Node::Kind::OpaqueType);
+  }
+};
+
+Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
+  return DemanglingForTypeRef(Dem).visit(this);
 }
 
 bool TypeRef::isConcrete() const {

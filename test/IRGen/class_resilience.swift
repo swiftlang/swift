@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-runtime-STABLE-ABI-%target-mandates-stable-abi -DINT=i%target-ptrsize
 // RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution -O %t/class_resilience.swift
 
 // CHECK: @"$s16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = hidden global [[INT]] 0
@@ -280,7 +280,7 @@ public class ClassWithResilientThenEmpty {
 
 // ClassWithResilientProperty.color getter
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience26ClassWithResilientPropertyC5colors5Int32Vvg"(%T16class_resilience26ClassWithResilientPropertyC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience26ClassWithResilientPropertyC5colors5Int32Vvg"(%T16class_resilience26ClassWithResilientPropertyC* swiftself %0)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @"$s16class_resilience26ClassWithResilientPropertyC5colors5Int32VvpWvd"
 // CHECK-NEXT: [[PTR:%.*]] = bitcast %T16class_resilience26ClassWithResilientPropertyC* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
@@ -289,30 +289,9 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
 // CHECK: ret i32 [[FIELD_VALUE]]
 
-// ClassWithResilientProperty metadata accessor
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s16class_resilience26ClassWithResilientPropertyCMa"(
-// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s16class_resilience26ClassWithResilientPropertyCMl", i32 0, i32 0)
-// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
-// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
-
-// CHECK: cacheIsNull:
-// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience26ClassWithResilientPropertyCMn" to %swift.type_descriptor*))
-// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
-// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
-// CHECK-NEXT: br label %cont
-
-// CHECK: cont:
-// CHECK-NEXT: [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
-// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
-// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
-// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
-// CHECK-NEXT: ret %swift.metadata_response [[T1]]
-
-
 // ClassWithResilientlySizedProperty.color getter
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32Vvg"(%T16class_resilience33ClassWithResilientlySizedPropertyC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32Vvg"(%T16class_resilience33ClassWithResilientlySizedPropertyC* swiftself %0)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @"$s16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvpWvd"
 // CHECK-NEXT: [[PTR:%.*]] = bitcast %T16class_resilience33ClassWithResilientlySizedPropertyC* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
@@ -321,30 +300,10 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
 // CHECK:      ret i32 [[FIELD_VALUE]]
 
-// ClassWithResilientlySizedProperty metadata accessor
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s16class_resilience33ClassWithResilientlySizedPropertyCMa"(
-// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMl", i32 0, i32 0)
-// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
-// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
-
-// CHECK: cacheIsNull:
-// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn" to %swift.type_descriptor*))
-// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
-// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
-// CHECK-NEXT: br label %cont
-
-// CHECK: cont:
-// CHECK-NEXT: [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
-// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
-// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
-// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
-// CHECK-NEXT: ret %swift.metadata_response [[T1]]
-
 
 // ClassWithIndirectResilientEnum.color getter
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience30ClassWithIndirectResilientEnumC5colors5Int32Vvg"(%T16class_resilience30ClassWithIndirectResilientEnumC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience30ClassWithIndirectResilientEnumC5colors5Int32Vvg"(%T16class_resilience30ClassWithIndirectResilientEnumC* swiftself %0)
 // CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds %T16class_resilience30ClassWithIndirectResilientEnumC, %T16class_resilience30ClassWithIndirectResilientEnumC* %0, i32 0, i32 2
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
@@ -353,7 +312,7 @@ public class ClassWithResilientThenEmpty {
 
 // ResilientChild.field getter
 
-// CHECK-LABEL: define hidden swiftcc i32 @"$s16class_resilience14ResilientChildC5fields5Int32Vvg"(%T16class_resilience14ResilientChildC* swiftself)
+// CHECK-LABEL: define hidden swiftcc i32 @"$s16class_resilience14ResilientChildC5fields5Int32Vvg"(%T16class_resilience14ResilientChildC* swiftself %0)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @"$s16class_resilience14ResilientChildC5fields5Int32VvpWvd"
 // CHECK-NEXT: [[PTR:%.*]] = bitcast %T16class_resilience14ResilientChildC* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
@@ -366,7 +325,7 @@ public class ClassWithResilientThenEmpty {
 
 // ResilientGenericChild.field getter
 
-// CHECK-LABEL: define hidden swiftcc i32 @"$s16class_resilience21ResilientGenericChildC5fields5Int32Vvg"(%T16class_resilience21ResilientGenericChildC* swiftself)
+// CHECK-LABEL: define hidden swiftcc i32 @"$s16class_resilience21ResilientGenericChildC5fields5Int32Vvg"(%T16class_resilience21ResilientGenericChildC* swiftself %0)
 
 // FIXME: we could eliminate the unnecessary isa load by lazily emitting
 // metadata sources in EmitPolymorphicParameters
@@ -393,7 +352,7 @@ public class ClassWithResilientThenEmpty {
 
 // MyResilientChild.field getter
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience16MyResilientChildC5fields5Int32Vvg"(%T16class_resilience16MyResilientChildC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience16MyResilientChildC5fields5Int32Vvg"(%T16class_resilience16MyResilientChildC* swiftself %0)
 // CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds %T16class_resilience16MyResilientChildC, %T16class_resilience16MyResilientChildC* %0, i32 0, i32 2
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[RESULT:%.*]] = load i32, i32* [[PAYLOAD_ADDR]]
@@ -402,7 +361,7 @@ public class ClassWithResilientThenEmpty {
 
 // ResilientGenericOutsideParent.genericExtensionMethod()
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$s15resilient_class29ResilientGenericOutsideParentC0B11_resilienceE22genericExtensionMethodxmyF"(%T15resilient_class29ResilientGenericOutsideParentC* swiftself) #0 {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$s15resilient_class29ResilientGenericOutsideParentC0B11_resilienceE22genericExtensionMethodxmyF"(%T15resilient_class29ResilientGenericOutsideParentC* swiftself %0) {{.*}} {
 // CHECK:      [[ISA_ADDR:%.*]] = bitcast %T15resilient_class29ResilientGenericOutsideParentC* %0 to %swift.type**
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK:      [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$s15resilient_class29ResilientGenericOutsideParentCMo", i32 0, i32 0)
@@ -414,9 +373,30 @@ public class ClassWithResilientThenEmpty {
 // CHECK:       ret %swift.type* [[GENERIC_PARAM]]
 
 
+// ClassWithResilientProperty metadata accessor
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s16class_resilience26ClassWithResilientPropertyCMa"(
+// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s16class_resilience26ClassWithResilientPropertyCMl", i32 0, i32 0)
+// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
+// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK: cacheIsNull:
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience26ClassWithResilientPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
+// CHECK-NEXT: br label %cont
+
+// CHECK: cont:
+// CHECK-NEXT: [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
+// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
+// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
+// CHECK-NEXT: ret %swift.metadata_response [[T1]]
+
+
 // ClassWithResilientProperty metadata initialization function
 
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience26ClassWithResilientPropertyCMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience26ClassWithResilientPropertyCMr"(%swift.type* %0, i8* %1, i8** %2)
 // CHECK: entry:
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [3 x i8**]
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* %0 to [[INT]]*
@@ -434,7 +414,9 @@ public class ClassWithResilientThenEmpty {
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-native:               [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-objc-STABLE-ABI-TRUE: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-objc-STABLE-ABI-FALSE:[[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 // CHECK-NEXT: [[INITDEP_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[INITDEP_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-NEXT: [[INITDEP_PRESENT:%.*]] = icmp eq %swift.type* [[INITDEP_METADATA]], null
@@ -461,16 +443,38 @@ public class ClassWithResilientThenEmpty {
 
 // ClassWithResilientProperty method lookup function
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience26ClassWithResilientPropertyCMu"(%swift.type*, %swift.method_descriptor*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience26ClassWithResilientPropertyCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$s16class_resilience26ClassWithResilientPropertyCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience26ClassWithResilientPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
 
 
+// ClassWithResilientlySizedProperty metadata accessor
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s16class_resilience33ClassWithResilientlySizedPropertyCMa"(
+// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMl", i32 0, i32 0)
+// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
+// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK: cacheIsNull:
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
+// CHECK-NEXT: br label %cont
+
+// CHECK: cont:
+// CHECK-NEXT: [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
+// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
+// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
+// CHECK-NEXT: ret %swift.metadata_response [[T1]]
+
+
+
 // ClassWithResilientlySizedProperty metadata initialization function
 
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience33ClassWithResilientlySizedPropertyCMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience33ClassWithResilientlySizedPropertyCMr"(%swift.type* %0, i8* %1, i8** %2)
 // CHECK: entry:
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [2 x i8**]
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* %0 to [[INT]]*
@@ -488,7 +492,9 @@ public class ClassWithResilientThenEmpty {
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-native:               [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-objc-STABLE-ABI-TRUE: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK-objc-STABLE-ABI-FALSE:[[T0:%.*]] = call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 // CHECK-NEXT: [[INITDEP_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[INITDEP_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-NEXT: [[INITDEP_PRESENT:%.*]] = icmp eq %swift.type* [[INITDEP_METADATA]], null
@@ -515,16 +521,16 @@ public class ClassWithResilientThenEmpty {
 
 // ClassWithResilientlySizedProperty method lookup function
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMu"(%swift.type*, %swift.method_descriptor*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
 
 
 // ResilientChild metadata initialization function
 
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience14ResilientChildCMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience14ResilientChildCMr"(%swift.type* %0, i8* %1, i8** %2)
 
 // Initialize field offset vector...
 // CHECK:      call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 0, [[INT]] 1, i8*** {{.*}}, [[INT]]* {{.*}})
@@ -534,16 +540,31 @@ public class ClassWithResilientThenEmpty {
 
 // ResilientChild method lookup function
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience14ResilientChildCMu"(%swift.type*, %swift.method_descriptor*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience14ResilientChildCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$s16class_resilience14ResilientChildCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience14ResilientChildCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
 
+// ResilientChild.field getter dispatch thunk
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience14ResilientChildC5fields5Int32VvgTj"(%T16class_resilience14ResilientChildC* swiftself %0)
+// CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T16class_resilience14ResilientChildC, %T16class_resilience14ResilientChildC* %0, i32 0, i32 0, i32 0
+// CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
+// CHECK-NEXT: [[BASE_ADDR:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$s16class_resilience14ResilientChildCMo", i32 0, i32 0)
+// CHECK-NEXT: [[BASE:%.*]] = add [[INT]] [[BASE_ADDR]], {{4|8}}
+// CHECK-NEXT: [[METADATA_BYTES:%.*]] = bitcast %swift.type* [[ISA]] to i8*
+// CHECK-NEXT: [[VTABLE_OFFSET_TMP:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[BASE]]
+// CHECK-NEXT: [[VTABLE_OFFSET_ADDR:%.*]] = bitcast i8* [[VTABLE_OFFSET_TMP]] to i32 (%T16class_resilience14ResilientChildC*)**
+// CHECK-NEXT: [[METHOD:%.*]] = load i32 (%T16class_resilience14ResilientChildC*)*, i32 (%T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]]
+// CHECK-arm64e-NEXT: ptrtoint i32 (%T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
+// CHECK-NEXT: [[RESULT:%.*]] = call swiftcc i32 [[METHOD]](%T16class_resilience14ResilientChildC* swiftself %0)
+// CHECK-NEXT: ret i32 [[RESULT]]
 
 // ResilientChild.field setter dispatch thunk
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience14ResilientChildC5fields5Int32VvsTj"(i32, %T16class_resilience14ResilientChildC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience14ResilientChildC5fields5Int32VvsTj"(i32 %0, %T16class_resilience14ResilientChildC* swiftself %1)
 // CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T16class_resilience14ResilientChildC, %T16class_resilience14ResilientChildC* %1, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$s16class_resilience14ResilientChildCMo", i32 0, i32 0)
@@ -552,18 +573,20 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[VTABLE_OFFSET_TMP:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[METADATA_OFFSET]]
 // CHECK-NEXT: [[VTABLE_OFFSET_ADDR:%.*]] = bitcast i8* [[VTABLE_OFFSET_TMP]] to void (i32, %T16class_resilience14ResilientChildC*)**
 // CHECK-NEXT: [[METHOD:%.*]] = load void (i32, %T16class_resilience14ResilientChildC*)*, void (i32, %T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]]
+// CHECK-arm64e-NEXT: ptrtoint void (i32, %T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call swiftcc void [[METHOD]](i32 %0, %T16class_resilience14ResilientChildC* swiftself %1)
 // CHECK-NEXT: ret void
 
 
 // ResilientGenericChild metadata initialization function
 
-// CHECK-LABEL: define internal %swift.type* @"$s16class_resilience21ResilientGenericChildCMi"(%swift.type_descriptor*, i8**, i8*)
-// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
+// CHECK-LABEL: define internal %swift.type* @"$s16class_resilience21ResilientGenericChildCMi"(%swift.type_descriptor* %0, i8** %1, i8* %2)
+// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* {{.*}}, i8** %1, i8* %2)
 // CHECK:              ret %swift.type* [[METADATA]]
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience21ResilientGenericChildCMr"
-// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**)
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8* %0, i8** %1)
 
 // CHECK:              call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* [[METADATA]], [[INT]] 0,
 // CHECK:              ret %swift.metadata_response
@@ -571,8 +594,8 @@ public class ClassWithResilientThenEmpty {
 
 // ResilientGenericChild method lookup function
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience21ResilientGenericChildCMu"(%swift.type*, %swift.method_descriptor*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience21ResilientGenericChildCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$s16class_resilience21ResilientGenericChildCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience21ResilientGenericChildCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }

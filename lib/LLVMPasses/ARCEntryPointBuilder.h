@@ -252,9 +252,10 @@ private:
     auto AttrList = AttributeList::get(M.getContext(), 1, Attribute::NoCapture);
     AttrList = AttrList.addAttribute(
         M.getContext(), AttributeList::FunctionIndex, Attribute::NoUnwind);
-    CheckUnowned = M.getOrInsertFunction("swift_checkUnowned", AttrList,
-                                         Type::getVoidTy(M.getContext()),
-                                         ObjectPtrTy);
+    CheckUnowned = cast<llvm::Function>(
+        M.getOrInsertFunction("swift_checkUnowned", AttrList,
+                              Type::getVoidTy(M.getContext()), ObjectPtrTy)
+            .getCallee());
     if (llvm::Triple(M.getTargetTriple()).isOSBinFormatCOFF() &&
         !llvm::Triple(M.getTargetTriple()).isOSCygMing())
       if (auto *F = llvm::dyn_cast<llvm::Function>(CheckUnowned.get()))

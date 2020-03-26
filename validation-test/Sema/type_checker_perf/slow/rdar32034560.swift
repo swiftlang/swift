@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
-// REQUIRES: rdar42744631
-// REQUIRES: tools-release,no_asserts
+// REQUIRES: rdar42744631,no_asan
+// REQUIRES: tools-release,no_asan
 
 struct S {
   var A: [[UInt32]]

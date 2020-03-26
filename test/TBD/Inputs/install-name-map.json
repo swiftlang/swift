@@ -1,0 +1,16 @@
+[
+  {
+    "module": "Foo",
+    "platforms": ["macOS"],
+    "install_name": "/System/MacOS"
+  },
+  {
+    "module": "Foo",
+    "install_name": "/System/default"
+  },
+  {
+    "module": "Foo",
+    "platforms": ["iOS", "tvOS", "watchOS"],
+    "install_name": "/System/Others"
+  },
+]

@@ -27,13 +27,11 @@ namespace swift {
   class DeclContext;
   class Expr;
   class InFlightDiagnostic;
-  class TypeChecker;
   class Decl;
   class ValueDecl;
 
 /// Diagnose uses of unavailable declarations.
-void diagAvailability(TypeChecker &TC, const Expr *E,
-                      DeclContext *DC);
+void diagAvailability(const Expr *E, DeclContext *DC);
 
 enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose uses of protocols in versions before they were introduced.
@@ -59,7 +57,6 @@ using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 /// context, but for non-expr contexts such as TypeDecls referenced from
 /// TypeReprs.
 bool diagnoseDeclAvailability(const ValueDecl *Decl,
-                              TypeChecker &TC,
                               DeclContext *DC,
                               SourceRange R,
                               DeclAvailabilityFlags Options);

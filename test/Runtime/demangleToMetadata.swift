@@ -245,11 +245,18 @@ struct ConformsToP1: P1 { }
 struct ConformsToP2: P2 { }
 struct ConformsToP3: P3 { }
 
+struct ContextualWhere1<T> {
+  class Nested1 where T: P1 { }
+  struct Nested2 where T == Int { }
+}
+
 DemangleToMetadataTests.test("protocol conformance requirements") {
   expectEqual(CG4<ConformsToP1, ConformsToP2>.self,
     _typeByName("4main3CG4CyAA12ConformsToP1VAA12ConformsToP2VG")!)
   expectEqual(CG4<ConformsToP1, ConformsToP2>.InnerGeneric<ConformsToP3>.self,
     _typeByName("4main3CG4C12InnerGenericVyAA12ConformsToP1VAA12ConformsToP2V_AA12ConformsToP3VG")!)
+  expectEqual(ContextualWhere1<ConformsToP1>.Nested1.self,
+    _typeByName("4main16ContextualWhere1V7Nested1CyAA12ConformsToP1V_G")!)
 
   // Failure cases: failed conformance requirements.
   expectNil(_typeByName("4main3CG4CyAA12ConformsToP1VAA12ConformsToP1VG"))
@@ -274,9 +281,16 @@ struct ConformsToP4c : P4 {
   typealias Assoc2 = ConformsToP2
 }
 
+struct ContextualWhere2<U: P4> {
+  struct Nested1 where U.Assoc1: P1, U.Assoc2: P2 { }
+  enum Nested2 where U.Assoc1 == U.Assoc2 { }
+}
+
 DemangleToMetadataTests.test("associated type conformance requirements") {
   expectEqual(SG5<ConformsToP4a>.self,
     _typeByName("4main3SG5VyAA13ConformsToP4aVG")!)
+  expectEqual(ContextualWhere2<ConformsToP4a>.Nested1.self,
+    _typeByName("4main16ContextualWhere2V7Nested1VyAA13ConformsToP4aV_G")!)
 
   // Failure cases: failed conformance requirements.
   expectNil(_typeByName("4main3SG5VyAA13ConformsToP4bVG"))
@@ -297,12 +311,16 @@ DemangleToMetadataTests.test("same-type requirements") {
   // Concrete type.
   expectEqual(SG7<S>.self,
     _typeByName("4main3SG7VyAA1SVG")!)
+  expectEqual(ContextualWhere1<Int>.Nested2.self,
+    _typeByName("4main16ContextualWhere1V7Nested2VySi_G")!)
 
   // Other associated type.
   expectEqual(SG6<ConformsToP4b>.self,
     _typeByName("4main3SG6VyAA13ConformsToP4bVG")!)
   expectEqual(SG6<ConformsToP4c>.self,
     _typeByName("4main3SG6VyAA13ConformsToP4cVG")!)
+  expectEqual(ContextualWhere2<ConformsToP4b>.Nested2.self,
+    _typeByName("4main16ContextualWhere2V7Nested2OyAA13ConformsToP4bV_G")!)
 
   // Structural type.
   expectEqual(SG8<ConformsToP4d>.self,

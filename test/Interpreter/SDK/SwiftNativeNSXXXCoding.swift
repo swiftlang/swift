@@ -47,14 +47,6 @@ if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
   testSuite.test("NSString") {
     test(type: NSString.self)
   }
-
-  testSuite.test("NSData") {
-    test(type: NSData.self)
-  }
-
-  testSuite.test("NSIndexSet") {
-    test(type: NSIndexSet.self)
-  }
 }
 
 runAllTests()

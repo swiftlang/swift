@@ -7,7 +7,10 @@
 #ifndef SWIFT_ENUM
 #  define SWIFT_ENUM(_name)    \
   enum _name _name;            \
-  enum __attribute__((enum_extensibility(open))) SWIFT_ENUM_EXTRA _name
+  enum __attribute__((enum_extensibility(open))) \
+       __attribute__((external_source_symbol(language="Swift", \
+                      defined_in="swift_name", generated_declaration))) \
+       SWIFT_ENUM_EXTRA _name
 #endif
 
 // Renaming global variables.

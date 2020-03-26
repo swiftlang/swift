@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -sil-verify-all -module-name=test -emit-sil -enforce-exclusivity=unchecked | %FileCheck %s
-// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -Osize -sil-verify-all -module-name=test -emit-sil -enforce-exclusivity=unchecked | %FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -Osize -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 public struct TestOptions: OptionSet {
@@ -16,18 +16,26 @@ public struct TestOptions: OptionSet {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   integer_literal {{.*}}, 15
 // CHECK-NEXT:   struct $Int
-// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   struct $TestOptions
 // CHECK-NEXT:   return
 public func returnTestOptions() -> TestOptions {
     return [.first, .second, .third, .fourth]
 }
 
+// CHECK:      sil @{{.*}}returnEmptyTestOptions{{.*}}
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   integer_literal {{.*}}, 0
+// CHECK-NEXT:   struct $Int
+// CHECK-NEXT:   struct $TestOptions
+// CHECK-NEXT:   return
+public func returnEmptyTestOptions() -> TestOptions {
+    return []
+}
+
 // CHECK:        alloc_global @{{.*}}globalTestOptions{{.*}}
 // CHECK-NEXT:   global_addr
 // CHECK-NEXT:   integer_literal {{.*}}, 15
 // CHECK-NEXT:   struct $Int
-// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   struct $TestOptions
 // CHECK-NEXT:   store
 // CHECK-NEXT:   tuple

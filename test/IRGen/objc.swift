@@ -39,16 +39,14 @@ struct id {
 // Class and methods are [objc] by inheritance.
 class MyBlammo : Blammo {
   func foo() {}
-// CHECK:  define hidden swiftcc void @"$s4objc8MyBlammoC3fooyyF"([[MYBLAMMO]]* swiftself) {{.*}} {
-// CHECK:    call {{.*}} @swift_release
+// CHECK:  define hidden swiftcc void @"$s4objc8MyBlammoC3fooyyF"([[MYBLAMMO]]* swiftself %0) {{.*}} {
 // CHECK:    ret void
 }
 
 // Class and methods are [objc] by inheritance.
 class Test2 : Gizmo {
   func foo() {}
-// CHECK:  define hidden swiftcc void @"$s4objc5Test2C3fooyyF"([[TEST2]]* swiftself) {{.*}} {
-// CHECK:    call {{.*}} @llvm.objc.release
+// CHECK:  define hidden swiftcc void @"$s4objc5Test2C3fooyyF"([[TEST2]]* swiftself %0) {{.*}} {
 // CHECK:    ret void
 
   @objc dynamic func bar() {}
@@ -72,7 +70,7 @@ class Octogenarian : Contrarian {
 @_silgen_name("unknown")
 func unknown(_ x: id) -> id
 
-// CHECK:    define hidden swiftcc %objc_object* @"$s4objc5test0{{[_0-9a-zA-Z]*}}F"(%objc_object*)
+// CHECK:    define hidden swiftcc %objc_object* @"$s4objc5test0{{[_0-9a-zA-Z]*}}F"(%objc_object* %0)
 // CHECK-NOT:  call {{.*}} @swift_unknownObjectRetain
 // CHECK:      call {{.*}} @swift_unknownObjectRetain
 // CHECK-NOT:  call {{.*}} @swift_unknownObjectRelease
@@ -87,7 +85,7 @@ func test0(_ arg: id) -> id {
 }
 
 func test1(_ cell: Blammo) {}
-// CHECK:  define hidden swiftcc void @"$s4objc5test1{{[_0-9a-zA-Z]*}}F"([[BLAMMO]]*) {{.*}} {
+// CHECK:  define hidden swiftcc void @"$s4objc5test1{{[_0-9a-zA-Z]*}}F"([[BLAMMO]]* %0) {{.*}} {
 // CHECK-NEXT:    entry
 // CHECK-NEXT:    alloca
 // CHECK-NEXT:    bitcast
@@ -147,7 +145,7 @@ class WeakObjC {
 // CHECK:  i32 1, !"Objective-C Version", i32 2}
 // CHECK:  i32 1, !"Objective-C Image Info Version", i32 0}
 // CHECK:  i32 1, !"Objective-C Image Info Section", !"__DATA,__objc_imageinfo,regular,no_dead_strip"}
-//   83953408 == (5 << 24) | (1 << 16) | (7 << 8). 
-//     5 and 0 is the current major.minor version. 7 is the Swift ABI version.
-// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 83953408}
+//   84084480 == (5 << 24) | (3 << 16) | (7 << 8). 
+//     5 and 3 is the current major.minor version. 7 is the Swift ABI version.
+// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 84084480}
 // CHECK:  i32 1, !"Swift Version", i32 7}

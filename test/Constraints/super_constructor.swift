@@ -20,8 +20,7 @@ class D : B {
   }
 
   init(g:Int) {
-    super.init("aoeu") // expected-error{{argument labels '(_:)' do not match any available overloads}}
-    // expected-note @-1 {{overloads for 'B.init' exist with these partially matching parameter lists: (a: UnicodeScalar), (b: UnicodeScalar), (x: Int), (z: Float)}}
+    super.init("aoeu") // expected-error{{no exact matches in call to initializer}}
   }
 
   init(h:Int) {
@@ -40,15 +39,15 @@ class B {
   init() {
   }
 
-  init(x:Int) {
+  init(x:Int) { // expected-note{{candidate has partially matching parameter list (x: Int)}}
   }
 
-  init(a:UnicodeScalar) {
+  init(a:UnicodeScalar) { // expected-note {{candidate has partially matching parameter list (a: UnicodeScalar)}}
   }
-  init(b:UnicodeScalar) {
+  init(b:UnicodeScalar) { // expected-note{{candidate has partially matching parameter list (b: UnicodeScalar)}}
   }
 
-  init(z:Float) {
+  init(z:Float) { // expected-note{{candidate has partially matching parameter list (z: Float)}}
     super.init() // expected-error{{'super' members cannot be referenced in a root class}}
   }
 }

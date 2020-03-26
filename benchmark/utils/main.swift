@@ -39,6 +39,7 @@ import CString
 import CSVParsing
 import Calculator
 import CaptureProp
+import ChaCha
 import ChainedFilterMap
 import CharacterLiteralsLarge
 import CharacterLiteralsSmall
@@ -49,6 +50,7 @@ import Codable
 import Combos
 import DataBenchmarks
 import DeadArray
+import DevirtualizeProtocolComposition
 import DictOfArraysToArrayOfDicts
 import DictTest
 import DictTest2
@@ -75,6 +77,7 @@ import ErrorHandling
 import Exclusivity
 import ExistentialPerformance
 import Fibonacci
+import FindStringNaive
 import FlattenList
 import FloatingPointParsing
 import FloatingPointPrinting
@@ -124,6 +127,7 @@ import PopFrontGeneric
 import Prefix
 import PrefixWhile
 import Prims
+import PrimsNonStrongRef
 import PrimsSplit
 import ProtocolDispatch
 import ProtocolDispatch2
@@ -132,6 +136,7 @@ import RC4
 import RGBHistogram
 import Radix2CooleyTukey
 import RandomShuffle
+import RandomTree
 import RandomValues
 import RangeAssignment
 import RangeIteration
@@ -146,6 +151,7 @@ import SequenceAlgos
 import SetTests
 import SevenBoom
 import Sim2DArray
+import SortArrayInClass
 import SortIntPyramids
 import SortLargeExistentials
 import SortLettersInPlace
@@ -161,6 +167,7 @@ import StringEnum
 import StringInterpolation
 import StringMatch
 import StringRemoveDupes
+import StringReplaceSubrange
 import StringTests
 import StringWalk
 import Substring
@@ -212,6 +219,7 @@ registerBenchmark(CString)
 registerBenchmark(CSVParsing)
 registerBenchmark(Calculator)
 registerBenchmark(CaptureProp)
+registerBenchmark(ChaCha)
 registerBenchmark(ChainedFilterMap)
 registerBenchmark(CharacterLiteralsLarge)
 registerBenchmark(CharacterLiteralsSmall)
@@ -225,6 +233,7 @@ registerBenchmark(Combos)
 registerBenchmark(ClassArrayGetter)
 registerBenchmark(DataBenchmarks)
 registerBenchmark(DeadArray)
+registerBenchmark(DevirtualizeProtocolComposition)
 registerBenchmark(DictOfArraysToArrayOfDicts)
 registerBenchmark(Dictionary)
 registerBenchmark(Dictionary2)
@@ -251,6 +260,7 @@ registerBenchmark(ErrorHandling)
 registerBenchmark(Exclusivity)
 registerBenchmark(ExistentialPerformance)
 registerBenchmark(Fibonacci)
+registerBenchmark(FindStringNaive)
 registerBenchmark(FlattenListLoop)
 registerBenchmark(FlattenListFlatMap)
 registerBenchmark(FloatingPointParsing)
@@ -301,6 +311,7 @@ registerBenchmark(PopFrontArrayGeneric)
 registerBenchmark(Prefix)
 registerBenchmark(PrefixWhile)
 registerBenchmark(Prims)
+registerBenchmark(PrimsNonStrongRef)
 registerBenchmark(PrimsSplit)
 registerBenchmark(ProtocolDispatch)
 registerBenchmark(ProtocolDispatch2)
@@ -310,6 +321,7 @@ registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
 registerBenchmark(Radix2CooleyTukey)
 registerBenchmark(RandomShuffle)
+registerBenchmark(RandomTree)
 registerBenchmark(RandomValues)
 registerBenchmark(RangeAssignment)
 registerBenchmark(RangeIteration)
@@ -324,6 +336,7 @@ registerBenchmark(SequenceAlgos)
 registerBenchmark(SetTests)
 registerBenchmark(SevenBoom)
 registerBenchmark(Sim2DArray)
+registerBenchmark(SortArrayInClass)
 registerBenchmark(SortIntPyramids)
 registerBenchmark(SortLargeExistentials)
 registerBenchmark(SortLettersInPlace)
@@ -343,6 +356,7 @@ registerBenchmark(StringInterpolationManySmallSegments)
 registerBenchmark(StringMatch)
 registerBenchmark(StringNormalization)
 registerBenchmark(StringRemoveDupes)
+registerBenchmark(StringReplaceSubrange)
 registerBenchmark(StringTests)
 registerBenchmark(StringWalk)
 registerBenchmark(SubstringTest)

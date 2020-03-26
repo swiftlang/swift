@@ -51,12 +51,10 @@ static inline void storeEnumElement(uint8_t *dst,
     memcpy(dst, &value, 4);
     return;
   }
-  // Store value into first word of destination. Set the rest of the
-  // destination to zero.
-  // NOTE: this is likely to change on big-endian systems.
-#if defined(__BIG_ENDIAN__) && defined(__LP64__)
-  memset(&dst[0], 0, size);
-  memcpy(&dst[std::min(size - 4, size_t(4))], &value, 4);
+  // Store zero extended value in the destination.
+#if defined(__BIG_ENDIAN__)
+  memset(&dst[0], 0, size - 4);
+  memcpy(&dst[size - 4], &value, 4);
 #else
   memcpy(&dst[0], &value, 4);
   memset(&dst[4], 0, size - 4);
@@ -92,10 +90,9 @@ static inline uint32_t loadEnumElement(const uint8_t *src,
     memcpy(&result, src, 4);
     return result;
   }
-  // Load value from the first word of the source.
-  // NOTE: this is likely to change on big-endian systems.
-#if defined(__BIG_ENDIAN__) && defined(__LP64__)
-  memcpy(&result, &src[std::min(size - 4, size_t(4))], 4);
+  // Load value by truncating the source to 4 bytes.
+#if defined(__BIG_ENDIAN__)
+  memcpy(&result, &src[size - 4], 4);
 #else
   memcpy(&result, &src[0], 4);
 #endif

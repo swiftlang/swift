@@ -16,7 +16,7 @@ func foo(options: [AVMediaSelectionOption]) {
 
 func rdar28004686(a: [IndexPath]) {
   _ = a.sorted { (lhs: NSIndexPath, rhs: NSIndexPath) -> Bool in true }
-  // expected-error@-1 {{'NSIndexPath' is not convertible to 'IndexPath'}}
+  // expected-error@-1 {{cannot convert value of type '(NSIndexPath, NSIndexPath) -> Bool' to expected argument type '(IndexPath, IndexPath) throws -> Bool'}}
 }
 
 class Test: NSObject {
@@ -24,6 +24,6 @@ class Test: NSObject {
   func rdar28012273() {
     let categories = ["hello", "world"]
     self.categories = categories.sorted { $0.localizedCaseInsensitiveCompare($1) == ComparisonResult.orderedDescending }
-    // expected-error@-1 {{cannot assign value of type '[String]' to type 'NSArray?'}} {{121-121= as NSArray}}
+    // expected-error@-1 {{cannot assign value of type '[String]' to type 'NSArray'}} {{121-121= as NSArray}}
   }
 }

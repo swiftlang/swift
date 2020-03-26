@@ -19,7 +19,37 @@
     key.column: 19,
     key.filepath: placeholders.swift,
     key.severity: source.diagnostic.severity.error,
-    key.description: "type '()' does not conform to protocol 'Sequence'",
-    key.diagnostic_stage: source.diagnostic.stage.swift.sema
+    key.description: "for-in loop requires '()' to conform to 'Sequence'",
+    key.diagnostic_stage: source.diagnostic.stage.swift.sema,
+    key.ranges: [
+      {
+        key.offset: 75,
+        key.length: 9
+      }
+    ]
+  },
+  {
+    key.line: 8,
+    key.column: 5,
+    key.filepath: placeholders.swift,
+    key.severity: source.diagnostic.severity.warning,
+    key.description: "constant 'myArray' inferred to have type '[()]', which may be unexpected",
+    key.diagnostic_stage: source.diagnostic.stage.swift.sema,
+    key.diagnostics: [
+      {
+        key.line: 8,
+        key.column: 5,
+        key.filepath: placeholders.swift,
+        key.severity: source.diagnostic.severity.note,
+        key.description: "add an explicit type annotation to silence this warning",
+        key.fixits: [
+          {
+            key.offset: 236,
+            key.length: 0,
+            key.sourcetext: ": [()]"
+          }
+        ]
+      }
+    ]
   }
 ]

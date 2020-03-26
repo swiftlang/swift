@@ -7,7 +7,7 @@ import StdlibUnittest
 var OpaqueArchetypes = TestSuite("OpaqueArchetypes")
 
 OpaqueArchetypes.test("test1") {
-  if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 15.0, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
     let o = resilientFunction()
     expectEqual(o.getValue(), expectedResult())
     expectEqual(MemoryLayout.size(ofValue: o), expectedSize())

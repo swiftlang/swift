@@ -13,12 +13,24 @@
 // CHECK-NEXT: @import Base.ExplicitSub;
 // CHECK-NEXT: @import Base.ExplicitSub.ExSub;
 // CHECK-NEXT: @import Base.ImplicitSub.ExSub;
+// CHECK-NEXT: @import CTypesCore;
 // CHECK-NEXT: @import Foundation;
 // CHECK-NEXT: @import MostlyPrivate1;
 // CHECK-NEXT: @import MostlyPrivate1_Private;
 // CHECK-NEXT: @import MostlyPrivate2_Private;
 // CHECK-NEXT: @import ObjectiveC;
 // CHECK-NEXT: @import ctypes.bits;
+
+// CHECK-NEXT: #else
+// CHECK-NEXT: #import <Base.ExplicitSub.h>
+// CHECK-NEXT: #import <Base.ExplicitSub.ExSub.h>
+// CHECK-NEXT: #import <Base.ImplicitSub.ExSub.h>
+// CHECK-NEXT: #import <CTypesCore/values.h>
+// CHECK-NEXT: #import <Foundation.h>
+// CHECK-NEXT: #import <MostlyPrivate1/MostlyPrivate1.h>
+// CHECK-NEXT: #import <MostlyPrivate1_Private/MostlyPrivate1_Private.h>
+// CHECK-NEXT: #import <MostlyPrivate2_Private/MostlyPrivate2_Private.h>
+// CHECK-NEXT: #import <ctypes/bits.h>
 
 // NEGATIVE-NOT: ctypes;
 // NEGATIVE-NOT: ImSub;
@@ -28,6 +40,7 @@
 
 // NEGATIVE-NOT: secretMethod
 
+import CTypesCore
 import ctypes.bits
 import Foundation
 
@@ -48,6 +61,7 @@ import MostlyPrivate2_Private
 
 @objc class Test {
   @objc let word: DWORD = 0
+  @objc let word_core: DWORD_CORE = 0
   @objc let number: TimeInterval = 0.0
 
   @objc let baseI: BaseI = 0
@@ -66,4 +80,8 @@ import MostlyPrivate2_Private
 
 @objc public class TestSubclass: NSObject {
   @_implementationOnly public override func secretMethod() {}
+}
+
+extension SecretClass {
+  private func somethingThatShouldNotBeIncluded() {}
 }

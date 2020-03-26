@@ -3806,30 +3806,81 @@ class TestData : TestDataSuper {
     }
 
     func test_nsdataSequence() {
-        let bytes: [UInt8] = Array(0x00...0xFF)
-        let data = bytes.withUnsafeBytes { NSData(bytes: $0.baseAddress, length: $0.count) }
+        if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+            let bytes: [UInt8] = Array(0x00...0xFF)
+            let data = bytes.withUnsafeBytes { NSData(bytes: $0.baseAddress, length: $0.count) }
 
-        for byte in bytes {
-            expectEqual(data[Int(byte)], byte)
+            for byte in bytes {
+                expectEqual(data[Int(byte)], byte)
+            }
         }
     }
 
     func test_dispatchSequence() {
-        let bytes1: [UInt8] = Array(0x00..<0xF0)
-        let bytes2: [UInt8] = Array(0xF0..<0xFF)
-        var data = DispatchData.empty
-        bytes1.withUnsafeBytes {
-            data.append($0)
-        }
-        bytes2.withUnsafeBytes {
-            data.append($0)
-        }
+        if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+            let bytes1: [UInt8] = Array(0x00..<0xF0)
+            let bytes2: [UInt8] = Array(0xF0..<0xFF)
+            var data = DispatchData.empty
+            bytes1.withUnsafeBytes {
+                data.append($0)
+            }
+            bytes2.withUnsafeBytes {
+                data.append($0)
+            }
 
-        for byte in bytes1 {
-            expectEqual(data[Int(byte)], byte)
+            for byte in bytes1 {
+                expectEqual(data[Int(byte)], byte)
+            }
+            for byte in bytes2 {
+                expectEqual(data[Int(byte)], byte)
+            }
         }
-        for byte in bytes2 {
-            expectEqual(data[Int(byte)], byte)
+    }
+
+    func test_increaseCount() {
+        guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+        let initials: [Range<UInt8>] = [
+            0..<0,
+            0..<2,
+            0..<4,
+            0..<8,
+            0..<16,
+            0..<32,
+            0..<64
+        ]
+        let diffs = [0, 1, 2, 4, 8, 16, 32]
+        for initial in initials {
+            for diff in diffs {
+                var data = Data(initial)
+                data.count += diff
+                expectEqualSequence(
+                    Array(initial) + Array(repeating: 0, count: diff),
+                    data)
+            }
+        }
+    }
+
+    func test_decreaseCount() {
+        guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+        let initials: [Range<UInt8>] = [
+            0..<0,
+            0..<2,
+            0..<4,
+            0..<8,
+            0..<16,
+            0..<32,
+            0..<64
+        ]
+        let diffs = [0, 1, 2, 4, 8, 16, 32]
+        for initial in initials {
+            for diff in diffs {
+                guard initial.count >= diff else { continue }
+                var data = Data(initial)
+                data.count -= diff
+                expectEqualSequence(
+                    initial.dropLast(diff),
+                    data)
+            }
         }
     }
 }
@@ -4151,8 +4202,12 @@ DataTests.test("test_validateMutation_slice_customBacking_withUnsafeMutableBytes
 DataTests.test("test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
 DataTests.test("test_byte_access_of_discontiguousData") { TestData().test_byte_access_of_discontiguousData() }
 DataTests.test("test_rangeOfSlice") { TestData().test_rangeOfSlice() }
-DataTests.test("test_nsdataSequence") { TestData().test_nsdataSequence() }
-DataTests.test("test_dispatchSequence") { TestData().test_dispatchSequence() }
+if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+    DataTests.test("test_nsdataSequence") { TestData().test_nsdataSequence() }
+    DataTests.test("test_dispatchSequence") { TestData().test_dispatchSequence() }
+}
+DataTests.test("test_increaseCount") { TestData().test_increaseCount() }
+DataTests.test("test_decreaseCount") { TestData().test_decreaseCount() }
 
 
 // XCTest does not have a crash detection, whereas lit does

@@ -171,6 +171,14 @@ internal protocol _NSSetCore: _NSCopying, _NSFastEnumeration {
 /// supplies.
 @unsafe_no_objc_tagged_pointer @objc
 internal protocol _NSSet: _NSSetCore {
+  @objc(getObjects:count:) func getObjects(
+    _ buffer: UnsafeMutablePointer<AnyObject>,
+    count: Int
+  )
+
+  @objc(getObjects:) func getObjects(
+    _ buffer: UnsafeMutablePointer<AnyObject>
+  )
 }
 
 /// A shadow for the API of NSNumber we will use in the core

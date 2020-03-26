@@ -332,6 +332,17 @@ public:
     return completeList.getValue();
   }
 
+  Optional<ArrayRef<SILInstruction *>>
+  getPartiallyPostDomReleaseSet(SILArgument *arg) const {
+    auto iter = ArgInstMap.find(arg);
+    if (iter == ArgInstMap.end())
+      return None;
+    auto partialList = iter->second.getPartiallyPostDomReleases();
+    if (!partialList)
+      return None;
+    return partialList;
+  }
+
   ArrayRef<SILInstruction *> getReleasesForArgument(SILValue value) const {
     auto *arg = dyn_cast<SILArgument>(value);
     if (!arg)
@@ -380,47 +391,6 @@ private:
   /// epilogue releases are found.
   void processMatchingReleases();
 };
-
-class ReleaseTracker {
-  llvm::SmallSetVector<SILInstruction *, 4> TrackedUsers;
-  llvm::SmallSetVector<SILInstruction *, 4> FinalReleases;
-  std::function<bool(SILInstruction *)> AcceptableUserQuery;
-  std::function<bool(SILInstruction *)> TransitiveUserQuery;
-
-public:
-  ReleaseTracker(std::function<bool(SILInstruction *)> AcceptableUserQuery,
-                 std::function<bool(SILInstruction *)> TransitiveUserQuery)
-      : TrackedUsers(), FinalReleases(),
-        AcceptableUserQuery(AcceptableUserQuery),
-        TransitiveUserQuery(TransitiveUserQuery) {}
-
-  void trackLastRelease(SILInstruction *Inst) { FinalReleases.insert(Inst); }
-
-  bool isUserAcceptable(SILInstruction *User) const {
-    return AcceptableUserQuery(User);
-  }
-  bool isUserTransitive(SILInstruction *User) const {
-    return TransitiveUserQuery(User);
-  }
-
-  bool isUser(SILInstruction *User) { return TrackedUsers.count(User); }
-
-  void trackUser(SILInstruction *User) { TrackedUsers.insert(User); }
-
-  using range = iterator_range<llvm::SmallSetVector<SILInstruction *, 4>::iterator>;
-
-  // An ordered list of users, with "casts" before their transitive uses.
-  range getTrackedUsers() { return {TrackedUsers.begin(), TrackedUsers.end()}; }
-
-  range getFinalReleases() {
-    return {FinalReleases.begin(), FinalReleases.end()};
-  }
-};
-
-/// Return true if we can find a set of post-dominating final releases. Returns
-/// false otherwise. The FinalRelease set is placed in the out parameter
-/// FinalRelease.
-bool getFinalReleasesForValue(SILValue Value, ReleaseTracker &Tracker);
 
 /// Match a call to a trap BB with no ARC relevant side effects.
 bool isARCInertTrapBB(const SILBasicBlock *BB);

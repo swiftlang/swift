@@ -10,8 +10,6 @@
 // REQUIRES: CPU=x86_64
 // UNSUPPORTED: remote_run
 
-// XFAIL: linux
-
 func sayHello() {
   print("Hello")
 }

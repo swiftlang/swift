@@ -1072,7 +1072,7 @@ public func testCastToPForOptionalFailure() -> Bool {
 struct Underlying : P {
 }
 
-func returnOpaque() -> some P {
+public func returnOpaque() -> some P {
   return Underlying()
 }
 
@@ -1083,6 +1083,7 @@ func returnOpaque() -> some P {
 // MANDATORY:   [[U:%.*]] = alloc_stack $Underlying
 // MANDATORY:   unconditional_checked_cast_addr @_opaqueReturnTypeOf{{.*}}in [[O]] : $*@_opaqueReturnTypeOf{{.*}}to Underlying in [[U]] : $*Underlying
 // MANDATORY:   load [[U]] : $*Underlying
+@inlinable
 public func testCastOpaqueArchetype() {
   let o = returnOpaque() as! Underlying
 }

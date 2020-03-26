@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/generic_structs.sil
-// RUN: %target-swift-frontend %t/generic_structs.sil -emit-ir | %FileCheck %t/generic_structs.sil
+// RUN: %target-swift-frontend -disable-type-layout -disable-generic-metadata-prespecialization %t/generic_structs.sil -emit-ir | %FileCheck %t/generic_structs.sil
 
 // REQUIRES: CPU=x86_64
 
@@ -131,7 +131,7 @@ struct Stringly {
   var size : Builtin.Int64
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i32 } @concrete_instances(i64, i32) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i32 } @concrete_instances(i64 %0, i32 %1) {{.*}} {
 // CHECK: entry:
 // CHECK:   %2 = trunc i32 %1 to i21
 // CHECK:   %3 = zext i21 %2 to i32
@@ -160,8 +160,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   %a = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.a2
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i32*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 8
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 2
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 10
   // CHECK: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i32 [[FIELD_OFFSET]]
@@ -169,8 +168,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   %b = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.b
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i32*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 8
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 3
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 11
   // CHECK: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i32 [[FIELD_OFFSET]]
@@ -179,8 +177,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   %c = struct_element_addr %5 : $*SingleDynamic<B>, #SingleDynamic.x
 
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i32*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 8
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 4
+  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 12
   // CHECK: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_ADDR]], align 8
   // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i32 [[FIELD_OFFSET]]
@@ -194,7 +191,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   return %v : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$s15generic_structs13SingleDynamicVMi"(%swift.type_descriptor*, i8**, i8*)
+// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$s15generic_structs13SingleDynamicVMi"(%swift.type_descriptor* %0, i8** %1, i8* %2)
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2, i64 16)
@@ -202,7 +199,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // CHECK: }
 
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$s15generic_structs13SingleDynamicVMr"
-// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8* %0, i8** %1) {{.*}} {
 //   Lay out fields.
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i32*
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i32, i32* [[T0]], i64 6

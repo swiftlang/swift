@@ -43,7 +43,7 @@ extension CKOperation {
      */
     @available(swift 4.2)
     public var operationID: CKOperation.ID {
-        get { return self.__operationID as CKOperation.ID }
+        get { return self.__operationID }
     }
 }
 

@@ -10,7 +10,7 @@
 // This tests @_fixed_layout classes in resilient modules.
 import fixed_layout_class
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience20useRootClassPropertyyy013fixed_layout_A0026OutsideParentWithResilientF0CF"(%T18fixed_layout_class34OutsideParentWithResilientPropertyC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience20useRootClassPropertyyy013fixed_layout_A0026OutsideParentWithResilientF0CF"(%T18fixed_layout_class34OutsideParentWithResilientPropertyC* %0)
 public func useRootClassProperty(_ o: OutsideParentWithResilientProperty) {
   // CHECK: getelementptr inbounds %T18fixed_layout_class34OutsideParentWithResilientPropertyC, %T18fixed_layout_class34OutsideParentWithResilientPropertyC* %0, i32 0, i32 1
   _ = o.p
@@ -21,7 +21,7 @@ public func useRootClassProperty(_ o: OutsideParentWithResilientProperty) {
   // CHECK: ret void
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience19useSubclassPropertyyy013fixed_layout_A012OutsideChildCF"(%T18fixed_layout_class12OutsideChildC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience19useSubclassPropertyyy013fixed_layout_A012OutsideChildCF"(%T18fixed_layout_class12OutsideChildC* %0)
 public func useSubclassProperty(_ o: OutsideChild) {
   // CHECK: getelementptr inbounds %T18fixed_layout_class13OutsideParentC, %T18fixed_layout_class13OutsideParentC* %4, i32 0, i32 1
   _ = o.property
@@ -30,7 +30,7 @@ public func useSubclassProperty(_ o: OutsideChild) {
   // CHECK: ret void
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience27useGenericRootClassPropertyyy013fixed_layout_A00D13OutsideParentCyxGlF"(%T18fixed_layout_class20GenericOutsideParentC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience27useGenericRootClassPropertyyy013fixed_layout_A00D13OutsideParentCyxGlF"(%T18fixed_layout_class20GenericOutsideParentC* %0)
 public func useGenericRootClassProperty<A>(_ o: GenericOutsideParent<A>) {
   // -- we load the base offset twice, first to get the generic parameter out and
   // then for the property itself.
@@ -52,7 +52,7 @@ public func useGenericRootClassProperty<A>(_ o: GenericOutsideParent<A>) {
   // CHECK: ret void
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience27useGenericRootClassPropertyyy013fixed_layout_A00D13OutsideParentCySiGF"(%T18fixed_layout_class20GenericOutsideParentCySiG*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience27useGenericRootClassPropertyyy013fixed_layout_A00D13OutsideParentCySiGF"(%T18fixed_layout_class20GenericOutsideParentCySiG* %0)
 public func useGenericRootClassProperty(_ o: GenericOutsideParent<Int>) {
   // CHECK: getelementptr inbounds %T18fixed_layout_class20GenericOutsideParentCySiG, %T18fixed_layout_class20GenericOutsideParentCySiG* %0, i32 0, i32 1
   _ = o.property
@@ -60,7 +60,7 @@ public func useGenericRootClassProperty(_ o: GenericOutsideParent<Int>) {
   // CHECK: ret void
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience26useGenericSubclassPropertyyy013fixed_layout_A00D12OutsideChildCyxGlF"(%T18fixed_layout_class19GenericOutsideChildC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience26useGenericSubclassPropertyyy013fixed_layout_A00D12OutsideChildCyxGlF"(%T18fixed_layout_class19GenericOutsideChildC* %0)
 public func useGenericSubclassProperty<A>(_ o: GenericOutsideChild<A>) {
   // -- we load the base offset twice, first to get the generic parameter out and
   // then for the property itself.
@@ -95,7 +95,7 @@ public func useGenericSubclassProperty<A>(_ o: GenericOutsideChild<A>) {
   // CHECK: ret void
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience26useGenericSubclassPropertyyy013fixed_layout_A00D12OutsideChildCySiGF"(%T18fixed_layout_class19GenericOutsideChildCySiG*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience26useGenericSubclassPropertyyy013fixed_layout_A00D12OutsideChildCySiGF"(%T18fixed_layout_class19GenericOutsideChildCySiG* %0)
 public func useGenericSubclassProperty(_ o: GenericOutsideChild<Int>) {
   // CHECK: [[UPCAST:%.*]] = bitcast %T18fixed_layout_class19GenericOutsideChildCySiG* %0 to %T18fixed_layout_class20GenericOutsideParentCySiG*
   // CHECK: getelementptr inbounds %T18fixed_layout_class20GenericOutsideParentCySiG, %T18fixed_layout_class20GenericOutsideParentCySiG* [[UPCAST]], i32 0, i32 1
@@ -107,7 +107,7 @@ public func useGenericSubclassProperty(_ o: GenericOutsideChild<Int>) {
   // CHECK: ret void
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience17callVirtualMethodyy013fixed_layout_A013OutsideParentCF"(%T18fixed_layout_class13OutsideParentC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience17callVirtualMethodyy013fixed_layout_A013OutsideParentCF"(%T18fixed_layout_class13OutsideParentC* %0)
 public func callVirtualMethod(_ o: OutsideParent) {
   // Note: virtual method calls still use dispatch thunks
 
@@ -123,4 +123,4 @@ public func callVirtualMethod(_ o: OutsideParent) {
 
 // Make sure we emit the dispatch thunk:
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience22MyChildOfOutsideParentC9newMethodyyFTj"(%T16class_resilience22MyChildOfOutsideParentC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience22MyChildOfOutsideParentC9newMethodyyFTj"(%T16class_resilience22MyChildOfOutsideParentC* swiftself %0)

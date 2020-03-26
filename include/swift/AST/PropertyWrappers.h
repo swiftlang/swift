@@ -35,16 +35,24 @@ struct PropertyWrapperTypeInfo {
   /// directed.
   VarDecl *valueVar = nullptr;
 
-  /// The initializer init(wrappedValue:) that will be called when the
+  /// Whether there is an init(wrappedValue:) that will be called when the
   /// initializing the property wrapper type from a value of the property type.
-  ///
-  /// This initializer is optional, but if present will be used for the `=`
-  /// initialization syntax.
-  ConstructorDecl *wrappedValueInit = nullptr;
+  enum {
+    NoWrappedValueInit = 0,
+    HasWrappedValueInit,
+    HasInitialValueInit
+  } wrappedValueInit = NoWrappedValueInit;
 
-  /// The initializer `init()` that will be called to default-initialize a
+  /// Whether the init(wrappedValue:), if it exists, has the wrappedValue
+  /// argument as an escaping autoclosure.
+  bool isWrappedValueInitUsingEscapingAutoClosure = false;
+
+  /// The initializer that will be called to default-initialize a
   /// value with an attached property wrapper.
-  ConstructorDecl *defaultInit = nullptr;
+  enum {
+    NoDefaultValueInit = 0,
+    HasDefaultValueInit
+  } defaultInit = NoDefaultValueInit;
 
   /// The property through which the projection value ($foo) will be accessed.
   ///
@@ -76,6 +84,48 @@ struct PropertyWrapperTypeInfo {
         lhs.wrappedValueInit == rhs.wrappedValueInit;
   }
 };
+
+/// Describes the mutability of the operations on a property wrapper or composition.
+struct PropertyWrapperMutability {
+  enum Value: uint8_t {
+    Nonmutating = 0,
+    Mutating = 1,
+    DoesntExist = 2,
+  };
+  
+  Value Getter, Setter;
+  
+  /// Get the mutability of a composed access chained after accessing a wrapper with `this`
+  /// getter and setter mutability.
+  Value composeWith(Value x) {
+    switch (x) {
+    case DoesntExist:
+      return DoesntExist;
+    
+    // If an operation is nonmutating, then its input relies only on the
+    // mutating-ness of the outer wrapper's get operation.
+    case Nonmutating:
+      return Getter;
+        
+    // If it's mutating, then it relies
+    // on a) the outer wrapper having a setter to exist at all, and b) the
+    // mutating-ness of either the getter or setter, since we need both to
+    // perform a writeback cycle.
+    case Mutating:
+      if (Setter == DoesntExist) {
+        return DoesntExist;
+      }
+      return std::max(Getter, Setter);
+    }
+    llvm_unreachable("Unhandled Value in switch");
+  }
+  
+  bool operator==(PropertyWrapperMutability other) const {
+    return Getter == other.Getter && Setter == other.Setter;
+  }
+};
+
+void simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m);
 
 /// Describes the backing property of a property that has an attached wrapper.
 struct PropertyWrapperBackingPropertyInfo {
@@ -142,6 +192,9 @@ void simple_display(
 
 /// Given the initializer for the given property with an attached property
 /// wrapper, dig out the original initialization expression.
+///
+/// Cannot just dig out the getOriginalInit() value because this function checks
+/// types, etc. Erroneous code won't return a result from here.
 Expr *findOriginalPropertyWrapperInitialValue(VarDecl *var, Expr *init);
 
 } // end namespace swift

@@ -114,7 +114,30 @@ public protocol DerivedProtocolRequiementChanges: RequiementChanges {}
 
 public class SuperClassRemoval {}
 
-public struct ClassToStruct {}
+public struct ClassToStruct {
+  public init() {}
+}
+
+open class ClassWithMissingDesignatedInits {
+  // Remove the @_hasMissingDesignatedInitializers attribute
+  public init() {}
+  public convenience init(x: Int) { self.init() }
+}
+
+open class ClassWithoutMissingDesignatedInits {
+  // Add the @_hasMissingDesignatedInitializers attribute by adding an inaccessible
+  // init
+  public init() {}
+  public convenience init(x: Int) { self.init() }
+  internal init(y: Int) {}
+}
+
+public class SubclassWithMissingDesignatedInits: ClassWithMissingDesignatedInits {
+}
+
+public class SubclassWithoutMissingDesignatedInits: ClassWithoutMissingDesignatedInits {
+}
+
 public enum ProtocolToEnum {}
 
 public class SuperClassChange: C8 {}
@@ -198,5 +221,23 @@ public class Zoo {
   @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
   public func getCurrentAnimalInlinable() -> some Animal {
     return Dog()
+  }
+}
+
+public func returnFunctionTypeOwnershipChange() -> (__owned C1) -> () { return { _ in } }
+
+@objc(NewObjCClass)
+public class SwiftObjcClass {
+  @objc(NewObjCFool:NewObjCA:NewObjCB:)
+  public func foo(a:Int, b:Int, c: Int) {}
+}
+
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+open class AddingNewDesignatedInit {
+  public init(_ b: Bool) {}
+  public init() {}
+  public convenience init(foo: Int) {
+    self.init()
+    print(foo)
   }
 }

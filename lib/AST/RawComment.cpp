@@ -19,6 +19,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
@@ -127,7 +128,7 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   return Result;
 }
 
-RawComment Decl::getRawComment() const {
+RawComment Decl::getRawComment(bool SerializedOK) const {
   if (!this->canHaveComment())
     return RawComment();
 
@@ -146,9 +147,24 @@ RawComment Decl::getRawComment() const {
   // Ask the parent module.
   if (auto *Unit =
           dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    if (SerializedOK) {
+      if (const auto *CachedLocs = getSerializedLocs()) {
+        if (!CachedLocs->DocRanges.empty()) {
+          SmallVector<SingleRawComment, 4> SRCs;
+          for (const auto &Range : CachedLocs->DocRanges) {
+            SRCs.push_back({ Range, Context.SourceMgr });
+          }
+          auto RC = RawComment(Context.AllocateCopy(llvm::makeArrayRef(SRCs)));
+
+          if (!RC.isEmpty()) {
+            Context.setRawComment(this, RC);
+            return RC;
+          }
+        }
+      }
+    }
+
     if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
-      swift::markup::MarkupContext MC;
-      Context.setBriefComment(this, C->Brief);
       Context.setRawComment(this, C->Raw);
       return C->Raw;
     }

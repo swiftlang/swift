@@ -23,9 +23,10 @@ class HasGenericFunc {
   }
 }
 
-class HasProp {
+class HasProp { // expected-note {{'HasProp' declared here}}
   var HasProp: HasProp {
-    return HasProp() // expected-error {{cannot call value of non-function type 'HasProp'}}{{19-21=}}
+    return HasProp() // expected-error {{use of 'HasProp' refers to instance method rather than class 'HasProp' in module 'circular_decl_checking'}}
+    // expected-note@-1 {{use 'circular_decl_checking.' to reference the class in module 'circular_decl_checking'}} {{12-12=circular_decl_checking.}}
   }
   var SomethingElse: SomethingElse? { // expected-error {{use of undeclared type 'SomethingElse'}}
     return nil
@@ -66,7 +67,6 @@ class X {
 struct SomeStruct<A> {
   typealias A = A // this is OK now -- the underlying type is the generic parameter 'A'
   typealias B = B // expected-error {{type alias 'B' references itself}}
-  // expected-note@-1 {{type declared here}}
 }
 
 // <rdar://problem/27680407> Infinite recursion when using fully-qualified associatedtype name that has not been defined with typealias

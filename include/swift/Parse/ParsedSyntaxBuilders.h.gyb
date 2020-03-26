@@ -62,9 +62,9 @@ public:
 %     end
 
   Parsed${node.name} build();
-  Parsed${node.name} makeDeferred();
 
 private:
+  Parsed${node.name} makeDeferred();
   Parsed${node.name} record();
   void finishLayout(bool deferred);
 };

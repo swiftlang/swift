@@ -63,7 +63,7 @@
 // Note: we're missing the "compiler is in code completion mode" diagnostic,
 // which is probably just as well.
 // RUN: %sourcekitd-test -req=track-compiles == -req=complete -offset=0 %s -- %s | %FileCheck %s -check-prefix=NODIAGS
-// RUN: %sourcekitd-test -req=track-compiles == -req=complete -pos=2:1 %S/Inputs/sema-error.swift -- %S/Inputs/sema-error.swift | %FileCheck %s -check-prefix=SEMA
+// RUN: %sourcekitd-test -req=track-compiles == -req=complete -pos=2:1 %S/Inputs/sema-error.swift -- %S/Inputs/sema-error.swift | %FileCheck %s -check-prefix=NODIAGS
 
 // FIXME: invalid arguments cause us to early-exit and not send the notifications
 // RUN_DISABLED: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s -invalid-arg | %FileCheck %s -check-prefix=INVALID_ARG

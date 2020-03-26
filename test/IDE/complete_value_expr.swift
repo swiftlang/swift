@@ -199,6 +199,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_ARRAY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_1 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE_CALL_RESULT | %FileCheck %s -check-prefix=COMPLETE_CALL_RESULT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-keywords=false -code-completion-token=BROKEN_CONFORMANCE | %FileCheck %s -check-prefix=BROKEN_CONFORMANCE
 
 // Test code completion of expressions that produce a value.
 
@@ -767,7 +769,7 @@ func testInsideFunctionCall4() {
 func testInsideFunctionCall5() {
   FooStruct().instanceFunc2(42, #^INSIDE_FUNCTION_CALL_5^#
 // INSIDE_FUNCTION_CALL_5: Begin completions
-// INSIDE_FUNCTION_CALL_5-DAG: Keyword/ExprSpecific:               b: [#Argument name#]; name=b:
+// INSIDE_FUNCTION_CALL_5-DAG: Pattern/ExprSpecific: {#b: &Double#}[#inout Double#];
 // INSIDE_FUNCTION_CALL_5: End completions
 }
 
@@ -1432,8 +1434,8 @@ func testInterpolatedString1() {
 }
 
 // FOO_OBJECT_DOT1: Begin completions
-// FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal:      lazyInstanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      lazyInstanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      instanceVar[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceFunc0()[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
@@ -1671,22 +1673,19 @@ func checkOverrideInclusion2(_ arg: Override3) {
 // CHECK_NODUP_RESTATED_REQ-NOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    doo[#Int#]; name=doo
 // CHECK_NODUP_RESTATED_REQ: End completions
 
-// CHECK_NODUP_RESTATED_REQ_NODOT: Begin completions
-// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .foo()[#Void#]; name=foo()
-// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg1: Int#})[#Void#];
-// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[Subscript]/{{Super|CurrNominal}}:      [{#(arg): Bool#}][#Bool#]; name=[arg: Bool]
-// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    .doo[#Int#]; name=doo
-// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg2: Int#})[#Void#];
-// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .foo()[#Void#]; name=foo()
-// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[Subscript]/{{Super|CurrNominal}}:      [{#Bool#}][#Bool#]; name=[Bool]
-// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    .doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ_NODOT: Begin completions, 6 items
+// CHECK_NODUP_RESTATED_REQ_NODOT-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: .foo()[#Void#]; name=foo()
+// CHECK_NODUP_RESTATED_REQ_NODOT-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg1: Int#})[#Void#];
+// CHECK_NODUP_RESTATED_REQ_NODOT-DAG: Decl[Subscript]/{{Super|CurrNominal}}:      [{#(arg): Bool#}][#Bool#]; name=[arg: Bool]
+// CHECK_NODUP_RESTATED_REQ_NODOT-DAG: Decl[InstanceVar]/{{Super|CurrNominal}}:    .doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ_NODOT-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg2: Int#})[#Void#];
 // CHECK_NODUP_RESTATED_REQ_NODOT: End completions
 
 // CHECK_NODUP_RESTATED_REQ_TYPE1: Begin completions, 6 items
-// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/Super: foo({#(self): NoDupReq6#})[#() -> Void#]; name=foo(self: NoDupReq6)
 // CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/Super: roo({#(self): NoDupReq6#})[#(arg1: Int) -> Void#]; name=roo(self: NoDupReq6)
-// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[AssociatedType]/Super: E; name=E
+// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/CurrNominal: foo({#(self): NoDupReq6#})[#() -> Void#]; name=foo(self: NoDupReq6)
 // CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/CurrNominal: roo({#(self): NoDupReq6#})[#(arg2: Int) -> Void#]; name=roo(self: NoDupReq6)
+// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[AssociatedType]/CurrNominal: E; name=E
 // CHECK_NODUP_RESTATED_REQ_TYPE1: End completions
 
 // CHECK_NODUP_RESTATED_REQ_TYPE2: Begin completions, 6 items
@@ -1984,8 +1983,8 @@ func testThrows006() {
 
 // rdar://21346928
 // Just sample some String API to sanity check.
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      unicodeScalars[#String.UnicodeScalarView#]
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal{{.*}}:      {{.*}}unicodeScalars[#String.UnicodeScalarView#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal{{.*}}:      {{.*}}utf16[#String.UTF16View#]
 func testWithAutoClosure1(_ x: String?) {
   (x ?? "autoclosure").#^AUTOCLOSURE1^#
 }
@@ -2172,4 +2171,34 @@ func testInCollectionLiteral(value: SimpleStruct) {
   let _: [String: String] = [
     value.#^IN_DICTIONARY_LITERAL_2^# : "test"
   ]
+}
+
+// rdar://problem/54047322
+struct Resolver<T> {
+  func fulfill(_ value: T) {}
+}
+func wrapSuccess<T>(_ onSuccess: @escaping (T) -> Void) -> (T, Bool) -> Void {
+  fatalError()
+}
+func testWrapSuccess(promise: Int, seal: Resolver<Void>) {
+  wrapSuccess(seal.fulfill)#^COMPLETE_CALL_RESULT^#
+  // COMPLETE_CALL_RESULT: Begin completions
+  // COMPLETE_CALL_RESULT: Pattern/CurrModule:                 ({#Void#}, {#Bool#})[#Void#]; name=(Void, Bool)
+  // COMPLETE_CALL_RESULT: End completions
+}
+
+protocol BrokenConformanceP {
+  static func staticFunc()
+  func instanceFunc()
+}
+extension BrokenConformanceP {
+  static func staticFuncExtension() {}
+}
+struct BrokenConformanceS: BrokenConformanceP {
+}
+func testBrokenConformance(arg: BrokenConformanceS) {
+  arg.#^BROKEN_CONFORMANCE^#
+  // BROKEN_CONFORMANCE: Begin completions, 1 items
+  // BROKEN_CONFORMANCE: Decl[InstanceMethod]/Super: instanceFunc()[#Void#];
+  // BROKEN_CONFORMANCE: End completions
 }

@@ -38,5 +38,5 @@
 // WATCHSIMULATOR64_CPU: "-target-cpu" "core2"
 
 // RUN: not %swift -typecheck -target s390x-unknown-linux-gnu -Xcc -### %s 2>&1 | %FileCheck -check-prefix=S390X_CPU %s
-// S390X_CPU: "-target-cpu" "z196"
+// S390X_CPU: "-target-cpu" "z13"
 

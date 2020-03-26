@@ -41,7 +41,7 @@ extension Dictionary {
   ///
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  fileprivate init(_cocoaDictionary: __shared NSDictionary) {
+  private init(_cocoaDictionary: __shared NSDictionary) {
     assert(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
@@ -64,7 +64,7 @@ extension Dictionary {
 extension Dictionary : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSDictionary {
-    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject,
+    return unsafeBitCast(_bridgeToObjectiveCImpl(),
                          to: NSDictionary.self)
   }
 

@@ -27,7 +27,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -target thumbv7-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-thumbv7 %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target armv7-none-linux-androideabi -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.android.txt
+// RUN: %swiftc_driver_plain -driver-print-jobs -target armv7-none-linux-androideabi -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.android.txt
 // RUN: %FileCheck -check-prefix ANDROID-armv7 %s < %t.android.txt
 // RUN: %FileCheck -check-prefix ANDROID-armv7-NEGATIVE %s < %t.android.txt
 
@@ -36,6 +36,9 @@
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.windows.txt
 // RUN: %FileCheck -check-prefix WINDOWS-x86_64 %s < %t.windows.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -target amd64-unknown-openbsd -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.openbsd.txt
+// RUN: %FileCheck -check-prefix OPENBSD-amd64 %s < %t.openbsd.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-unknown-linux-gnu %s -Lbar -o dynlib.out 2>&1 > %t.linux.dynlib.txt
 // RUN: %FileCheck -check-prefix LINUX_DYNLIB-x86_64 %s < %t.linux.dynlib.txt
@@ -56,7 +59,15 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Xclang-linker -foo -Xclang-linker foopath %s 2>&1 > %t.windows.txt
 // RUN: %FileCheck -check-prefix WINDOWS-clang-linker-order %s < %t.windows.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target wasm32-unknown-wasi -Xclang-linker -flag -Xclang-linker arg %s 2>&1 | %FileCheck -check-prefix WASI-clang-linker-order %s
+
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | %FileCheck -check-prefix DEBUG %s
+
+// RUN: %swiftc_driver_plain -driver-print-jobs -target x86_64-unknown-linux-gnu -toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix LINUX-STDLIB-RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -target x86_64-unknown-linux-gnu -no-toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix LINUX-NO-STDLIB-RPATH %s
+
+// RUN: %swiftc_driver_plain -driver-print-jobs -target armv7-unknown-linux-androideabi -toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix ANDROID-STDLIB-RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -target armv7-unknown-linux-androideabi -no-toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix ANDROID-NO-STDLIB-RPATH %s
 
 // RUN: %empty-directory(%t)
 // RUN: touch %t/a.o
@@ -70,14 +81,20 @@
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple-macosx10.10.txt
 
 // RUN: %empty-directory(%t)
-// RUN: touch %t/a.o
+// RUN: echo "int dummy;" >%t/a.cpp
+// RUN: cc -c %t/a.cpp -o %t/a.o
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-filelist-threshold=0 -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
+// RUN: %swiftc_driver -save-temps -driver-print-jobs  -target x86_64-apple-macosx10.9 %s %t/a.o -driver-filelist-threshold=0 -o linker  2>&1 | tee %t/forFilelistCapture | %FileCheck -check-prefix FILELIST %s
+
+// Extract filelist name and check it out
+// RUN: tail -1 %t/forFilelistCapture | sed 's/.*-filelist //' | sed 's/ .*//' >%t/filelistName
+// RUN: %FileCheck -check-prefix FILELIST-CONTENTS %s < `cat %t/filelistName`
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_LINUX %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
+// RUN: %swiftc_driver -driver-print-jobs -target wasm32-unknown-wasi -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WASI %s
 
 // Here we specify an output file name using '-o'. For ease of writing these
 // tests, we happen to specify the same file name as is inferred in the
@@ -147,7 +164,7 @@
 // LINUX-x86_64: swift
 // LINUX-x86_64: -o [[OBJECTFILE:.*]]
 
-// LINUX-x86_64: clang++{{(\.exe)?"? }}
+// LINUX-x86_64: clang{{(\.exe)?"? }}
 // LINUX-x86_64-DAG: -pie
 // LINUX-x86_64-DAG: [[OBJECTFILE]]
 // LINUX-x86_64-DAG: -lswiftCore
@@ -163,7 +180,7 @@
 // LINUX-armv6: swift
 // LINUX-armv6: -o [[OBJECTFILE:.*]]
 
-// LINUX-armv6: clang++{{(\.exe)?"? }}
+// LINUX-armv6: clang{{(\.exe)?"? }}
 // LINUX-armv6-DAG: -pie
 // LINUX-armv6-DAG: [[OBJECTFILE]]
 // LINUX-armv6-DAG: -lswiftCore
@@ -180,7 +197,7 @@
 // LINUX-armv7: swift
 // LINUX-armv7: -o [[OBJECTFILE:.*]]
 
-// LINUX-armv7: clang++{{(\.exe)?"? }}
+// LINUX-armv7: clang{{(\.exe)?"? }}
 // LINUX-armv7-DAG: -pie
 // LINUX-armv7-DAG: [[OBJECTFILE]]
 // LINUX-armv7-DAG: -lswiftCore
@@ -197,7 +214,7 @@
 // LINUX-thumbv7: swift
 // LINUX-thumbv7: -o [[OBJECTFILE:.*]]
 
-// LINUX-thumbv7: clang++{{(\.exe)?"? }}
+// LINUX-thumbv7: clang{{(\.exe)?"? }}
 // LINUX-thumbv7-DAG: -pie
 // LINUX-thumbv7-DAG: [[OBJECTFILE]]
 // LINUX-thumbv7-DAG: -lswiftCore
@@ -214,12 +231,12 @@
 // ANDROID-armv7: swift
 // ANDROID-armv7: -o [[OBJECTFILE:.*]]
 
-// ANDROID-armv7: clang++{{(\.exe)?"? }}
+// ANDROID-armv7: clang{{(\.exe)?"? }}
 // ANDROID-armv7-DAG: -pie
 // ANDROID-armv7-DAG: [[OBJECTFILE]]
 // ANDROID-armv7-DAG: -lswiftCore
 // ANDROID-armv7-DAG: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift]]
-// ANDROID-armv7-DAG: -target armv7-none-linux-androideabi
+// ANDROID-armv7-DAG: -target armv7-unknown-linux-androideabi
 // ANDROID-armv7-DAG: -F foo -iframework car -F cdr
 // ANDROID-armv7-DAG: -framework bar
 // ANDROID-armv7-DAG: -L baz
@@ -231,7 +248,7 @@
 // CYGWIN-x86_64: swift
 // CYGWIN-x86_64: -o [[OBJECTFILE:.*]]
 
-// CYGWIN-x86_64: clang++{{(\.exe)?"? }}
+// CYGWIN-x86_64: clang{{(\.exe)?"? }}
 // CYGWIN-x86_64-DAG: [[OBJECTFILE]]
 // CYGWIN-x86_64-DAG: -lswiftCore
 // CYGWIN-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift]]
@@ -246,7 +263,7 @@
 // WINDOWS-x86_64: swift
 // WINDOWS-x86_64: -o [[OBJECTFILE:.*]]
 
-// WINDOWS-x86_64: clang++{{(\.exe)?"? }}
+// WINDOWS-x86_64: clang{{(\.exe)?"? }}
 // WINDOWS-x86_64-DAG: [[OBJECTFILE]]
 // WINDOWS-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)windows(/|\\\\)x86_64]]
 // WINDOWS-x86_64-DAG: -F foo -iframework car -F cdr
@@ -255,6 +272,22 @@
 // WINDOWS-x86_64-DAG: -lboo
 // WINDOWS-x86_64-DAG: -Xlinker -undefined
 // WINDOWS-x86_64: -o linker
+
+// OPENBSD-amd64: swift
+// OPENBSD-amd64: -o [[OBJECTFILE:.*]]
+
+// OPENBSD-amd64: clang
+// OPENBSD-amd64-DAG: -fuse-ld=lld
+// OPENBSD-amd64-DAG: [[OBJECTFILE]]
+// OPENBSD-amd64-DAG: -lswiftCore
+// OPENBSD-amd64-DAG: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)]]
+// OPENBSD-amd64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
+// OPENBSD-amd64-DAG: -F foo -iframework car -F cdr
+// OPENBSD-amd64-DAG: -framework bar
+// OPENBSD-amd64-DAG: -L baz
+// OPENBSD-amd64-DAG: -lboo
+// OPENBSD-amd64-DAG: -Xlinker -undefined
+// OPENBSD-amd64: -o linker
 
 
 // COMPLEX: {{(bin/)?}}ld{{"? }}
@@ -272,7 +305,7 @@
 // LINUX_DYNLIB-x86_64: -o [[OBJECTFILE:.*]]
 // LINUX_DYNLIB-x86_64: -o {{"?}}[[AUTOLINKFILE:.*]]
 
-// LINUX_DYNLIB-x86_64: clang++{{(\.exe)?"? }}
+// LINUX_DYNLIB-x86_64: clang{{(\.exe)?"? }}
 // LINUX_DYNLIB-x86_64-DAG: -shared
 // LINUX_DYNLIB-x86_64-DAG: -fuse-ld=gold
 // LINUX_DYNLIB-x86_64-NOT: -pie
@@ -297,7 +330,7 @@
 // LINUX-linker-order: swift
 // LINUX-linker-order: -o [[OBJECTFILE:.*]]
 
-// LINUX-linker-order: clang++{{(\.exe)?"? }}
+// LINUX-linker-order: clang{{(\.exe)?"? }}
 // LINUX-linker-order: -Xlinker -rpath -Xlinker {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)linux}}
 // LINUX-linker-order: -L foo
 // LINUX-linker-order: -Xlinker -rpath -Xlinker customrpath
@@ -306,16 +339,23 @@
 // LINUX-clang-linker-order: swift
 // LINUX-clang-linker-order: -o [[OBJECTFILE:.*]]
 
-// LINUX-clang-linker-order: clang++{{"? }}
+// LINUX-clang-linker-order: clang{{"? }}
 // LINUX-clang-linker-order: -foo foopath
 // LINUX-clang-linker-order: -o {{.*}}
 
 // WINDOWS-clang-linker-order: swift
 // WINDOWS-clang-linker-order: -o [[OBJECTFILE:.*]]
 
-// WINDOWS-clang-linker-order: clang++{{"? }}
+// WINDOWS-clang-linker-order: clang{{"? }}
 // WINDOWS-clang-linker-order: -foo foopath
 // WINDOWS-clang-linker-order: -o {{.*}}
+
+// WASI-clang-linker-order: swift
+// WASI-clang-linker-order: -o [[OBJECTFILE:.*]]
+
+// WASI-clang-linker-order: clang{{"? }}
+// WASI-clang-linker-order: -flag arg
+// WASI-clang-linker-order: -o {{.*}}
 
 // DEBUG: bin{{/|\\\\}}swift{{c?(\.EXE)?}}
 // DEBUG-NEXT: bin{{/|\\\\}}swift{{c?(\.EXE)?}}
@@ -346,10 +386,10 @@
 // FILELIST-NOT: .o{{"? }}
 // FILELIST: -filelist {{"?[^-]}}
 // FILELIST-NOT: .o{{"? }}
-// FILELIST: /a.o{{"? }}
-// FILELIST-NOT: .o{{"? }}
 // FILELIST: -o linker
 
+// FILELIST-CONTENTS: /linker-{{.*}}.o
+// FILELIST-CONTENTS: /a.o
 
 // INFERRED_NAME_DARWIN: bin{{/|\\\\}}swift{{c?(\.EXE)?}}
 // INFERRED_NAME_DARWIN: -module-name LINKER
@@ -357,7 +397,7 @@
 // INFERRED_NAME_DARWIN:  -o libLINKER.dylib
 // INFERRED_NAME_LINUX:   -o libLINKER.so
 // INFERRED_NAME_WINDOWS: -o LINKER.dll
-
+// INFERRED_NAME_WASI: -o libLINKER.so
 
 // Test ld detection. We use hard links to make sure
 // the Swift driver really thinks it's been moved.
@@ -394,6 +434,11 @@
 // RELATIVE_ARCLITE: {{/|\\\\}}DISTINCTIVE-PATH{{/|\\\\}}usr{{/|\\\\}}lib{{/|\\\\}}arc{{/|\\\\}}libarclite_macosx.a
 // RELATIVE_ARCLITE: -o {{[^ ]+}}
 
+// LINUX-STDLIB-RPATH: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)linux]]
+// LINUX-NO-STDLIB-RPATH-NOT: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)linux]]
+
+// ANDROID-STDLIB-RPATH: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)android]]
+// ANDROID-NO-STDLIB-RPATH-NOT: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)android]]
 
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc

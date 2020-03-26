@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <sys/param.h>
 #include <Foundation/Foundation.h>
 #include "format.h"
 
@@ -24,7 +25,7 @@ bool
 _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
     int saved_errno, os_trace_blob_t ob)
 {
-  os_log_fmt_hdr_s hdr = { };
+  os_log_fmt_hdr_s hdr = {0};
   os_trace_blob_add(ob, &hdr, sizeof(hdr));
 
   const char *percent = strchr(format, '%');
@@ -32,7 +33,7 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
   while (percent != NULL) {
     ++percent;
     if (percent[0] != '%') {
-      os_log_fmt_cmd_s cmd = { };
+      os_log_fmt_cmd_s cmd = {0};
       os_log_count_type_t widtht = T_C_NONE;
       os_log_count_type_t prect = T_C_NONE;
       os_log_fmt_cmd_flags_t flags = 0;
@@ -99,159 +100,192 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
             }
             break;
 
-#define encode_width() ({ \
-  if (widtht == T_C_DYNAMIC) { \
-    cmd.cmd_type = OSLF_CMD_TYPE_SCALAR; \
-    encode(int, 0); \
-  }})
+#define encode_width()                                                         \
+  do {                                                                         \
+    if (widtht == T_C_DYNAMIC) {                                               \
+      cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;                                     \
+      encode(int, 0);                                                          \
+    }                                                                          \
+  } while (0)
 
 // clang inconsistency: static precision counts are still marked with the
 // privacy bits of the command they preceed
-#define encode_precision(type) ({ \
-  if (prect != T_C_NONE) { \
-    cmd.cmd_type = type; \
-    cmd.cmd_size = sizeof(int); \
-    if (prect == T_C_STATIC && type == OSLF_CMD_TYPE_COUNT) { \
-      cmd.cmd_flags = flags; \
-    } else if (prect == T_C_DYNAMIC) { \
-      precision = va_arg(args, int); \
-    } \
-    _os_log_encode_arg(ob, &cmd, &precision); \
-    hdr.hdr_cmd_cnt++; \
-    prect = T_C_NONE; \
-  }})
+#define encode_precision(type)                                                 \
+  do {                                                                         \
+    if (prect != T_C_NONE) {                                                   \
+      cmd.cmd_type = type;                                                     \
+      cmd.cmd_size = sizeof(int);                                              \
+      if (prect == T_C_STATIC && type == OSLF_CMD_TYPE_COUNT) {                \
+        cmd.cmd_flags = flags;                                                 \
+      } else if (prect == T_C_DYNAMIC) {                                       \
+        precision = va_arg(args, int);                                         \
+      }                                                                        \
+      _os_log_encode_arg(ob, &cmd, &precision);                                \
+      hdr.hdr_cmd_cnt++;                                                       \
+      prect = T_C_NONE;                                                        \
+    }                                                                          \
+  } while (0)
 
 // scalar data types encode their precision as a scalar
-#define encode_scalar_preamble() ({ \
-  encode_width(); \
-  if (prect == T_C_DYNAMIC) { \
-    encode_precision(OSLF_CMD_TYPE_SCALAR); \
-  }})
+#define encode_scalar_preamble()                                               \
+  do {                                                                         \
+    encode_width();                                                            \
+    if (prect == T_C_DYNAMIC) {                                                \
+      encode_precision(OSLF_CMD_TYPE_SCALAR);                                  \
+    }                                                                          \
+  } while (0)
 
-#define encode_pointer_preamble() ({ \
-  encode_width(); \
-  encode_precision(OSLF_CMD_TYPE_COUNT); \
-})
+#define encode_pointer_preamble()                                              \
+  do {                                                                         \
+    encode_width();                                                            \
+    encode_precision(OSLF_CMD_TYPE_COUNT);                                     \
+  } while (0)
 
-#define encode_nsstring(flags) ({ \
-  NSString *__arg = va_arg(args, NSString *); \
-  const char * _Nullable __var = __arg.UTF8String; \
-  cmd.cmd_flags = flags; \
-  cmd.cmd_size = sizeof(__var); \
-  _os_log_encode_arg(ob, &cmd, &__var); \
-  hdr.hdr_cmd_cnt++; \
-})
+#define encode_nsstring(flags)                                                 \
+  do {                                                                         \
+    NSString *__arg = va_arg(args, NSString *);                                \
+    const char *_Nullable __var = __arg.UTF8String;                            \
+    cmd.cmd_flags = flags;                                                     \
+    cmd.cmd_size = sizeof(__var);                                              \
+    _os_log_encode_arg(ob, &cmd, &__var);                                      \
+    hdr.hdr_cmd_cnt++;                                                         \
+  } while (0)
 
-#define encode_smallint(ty, flags) ({ \
-  int __var = va_arg(args, int); \
-  cmd.cmd_flags = flags; \
-  cmd.cmd_size = sizeof(__var); \
-  _os_log_encode_arg(ob, &cmd, &__var); \
-  hdr.hdr_cmd_cnt++; \
-})
+#define encode_smallint(ty, flags)                                             \
+  do {                                                                         \
+    int __var = va_arg(args, int);                                             \
+    cmd.cmd_flags = flags;                                                     \
+    cmd.cmd_size = sizeof(__var);                                              \
+    _os_log_encode_arg(ob, &cmd, &__var);                                      \
+    hdr.hdr_cmd_cnt++;                                                         \
+  } while (0)
 
-#define encode(ty, flags) ({ \
-  ty __var = va_arg(args, ty); \
-  cmd.cmd_flags = flags; \
-  cmd.cmd_size = sizeof(__var); \
-  _os_log_encode_arg(ob, &cmd, &__var); \
-  hdr.hdr_cmd_cnt++; \
-})
+#define encode(ty, flags)                                                      \
+  do {                                                                         \
+    ty __var = va_arg(args, ty);                                               \
+    cmd.cmd_flags = flags;                                                     \
+    cmd.cmd_size = sizeof(__var);                                              \
+    _os_log_encode_arg(ob, &cmd, &__var);                                      \
+    hdr.hdr_cmd_cnt++;                                                         \
+  } while (0)
 
-          /* fixed types */
-          case 'c': // char
-          case 'd': // integer
-          case 'i': // integer
-          case 'o': // octal
-          case 'u': // unsigned
-          case 'x': // hex
-          case 'X': // upper-hex
-            encode_scalar_preamble();
-            cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;
-            switch (type) {
-              case T_CHAR: encode_smallint(char, flags); break;
-              case T_SHORT: encode_smallint(short, flags); break;
-              case T_INT: encode(int, flags); break;
-              case T_LONG: encode(long, flags); break;
-              case T_LONGLONG: encode(long long, flags); break;
-              case T_SIZE: encode(size_t, flags); break;
-              case T_INTMAX: encode(intmax_t, flags); break;
-              case T_PTRDIFF: encode(ptrdiff_t, flags); break;
-              default: return false;
-            }
-            done = true;
+        /* fixed types */
+        case 'c': // char
+        case 'd': // integer
+        case 'i': // integer
+        case 'o': // octal
+        case 'u': // unsigned
+        case 'x': // hex
+        case 'X': // upper-hex
+          encode_scalar_preamble();
+          cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;
+          switch (type) {
+          case T_CHAR:
+            encode_smallint(char, flags);
             break;
-
-          case 'p': // emit pointers as scalars
-            cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;
-            encode(void *, flags);
-            done = true;
+          case T_SHORT:
+            encode_smallint(short, flags);
             break;
-
-          case 'C': // wchar is treated like %lc
-            encode_scalar_preamble();
-            cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;
-            encode_smallint(wint_t, flags);
-            done = true;
+          case T_INT:
+            encode(int, flags);
             break;
-
-          case 'P': // pointer data
-            encode_pointer_preamble();
-            hdr.hdr_flags |= OSLF_HDR_FLAG_HAS_NON_SCALAR;
-            cmd.cmd_type = OSLF_CMD_TYPE_DATA;
-            cmd.cmd_size = sizeof(void *);
-            encode(void *, flags);
-            done = true;
+          case T_LONG:
+            encode(long, flags);
             break;
-
-          case 'L': // long double
-            long_double = true;
+          case T_LONGLONG:
+            encode(long long, flags);
             break;
-
-          case 'a': case 'A': case 'e': case 'E': // floating types
-          case 'f': case 'F': case 'g': case 'G':
-            encode_scalar_preamble();
-            cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;
-            if (long_double) {
-              encode(long double, flags);
-            } else {
-              encode(double, flags);
-            }
-            done = true;
+          case T_SIZE:
+            encode(size_t, flags);
             break;
-
-          case 's': // Strings sent from Swift as NSString objects
-            encode_pointer_preamble();
-            hdr.hdr_flags |= OSLF_HDR_FLAG_HAS_NON_SCALAR;
-            cmd.cmd_type = OSLF_CMD_TYPE_STRING;
-            encode_nsstring(flags);
-            done = true;
+          case T_INTMAX:
+            encode(intmax_t, flags);
             break;
-
-          case '@': // CFTypeRef aka NSObject *
-            // %@ does not support precision
-            encode_width();
-            hdr.hdr_flags |= OSLF_HDR_FLAG_HAS_NON_SCALAR;
-            cmd.cmd_type = OSLF_CMD_TYPE_OBJECT;
-            encode(void *, flags);
-            done = true;
+          case T_PTRDIFF:
+            encode(ptrdiff_t, flags);
             break;
-
-          case 'm':
-            cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;
-            cmd.cmd_size = sizeof(int);
-            cmd.cmd_flags = flags;
-            _os_log_encode_arg(ob, &cmd, &saved_errno);
-            hdr.hdr_cmd_cnt++;
-            done = true;
-            break;
-
           default:
-            if (isdigit(ch)) { // [0-9]
-              continue;
-            }
-            done = true;
-            break;
+            return false;
+          }
+          done = true;
+          break;
+
+        case 'p': // emit pointers as scalars
+          cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;
+          encode(void *, flags);
+          done = true;
+          break;
+
+        case 'C': // wchar is treated like %lc
+          encode_scalar_preamble();
+          cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;
+          encode_smallint(wint_t, flags);
+          done = true;
+          break;
+
+        case 'P': // pointer data
+          encode_pointer_preamble();
+          hdr.hdr_flags |= OSLF_HDR_FLAG_HAS_NON_SCALAR;
+          cmd.cmd_type = OSLF_CMD_TYPE_DATA;
+          cmd.cmd_size = sizeof(void *);
+          encode(void *, flags);
+          done = true;
+          break;
+
+        case 'L': // long double
+          long_double = true;
+          break;
+
+        case 'a':
+        case 'A':
+        case 'e':
+        case 'E': // floating types
+        case 'f':
+        case 'F':
+        case 'g':
+        case 'G':
+          encode_scalar_preamble();
+          cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;
+          if (long_double) {
+            encode(long double, flags);
+          } else {
+            encode(double, flags);
+          }
+          done = true;
+          break;
+
+        case 's': // Strings sent from Swift as NSString objects
+          encode_pointer_preamble();
+          hdr.hdr_flags |= OSLF_HDR_FLAG_HAS_NON_SCALAR;
+          cmd.cmd_type = OSLF_CMD_TYPE_STRING;
+          encode_nsstring(flags);
+          done = true;
+          break;
+
+        case '@': // CFTypeRef aka NSObject *
+          // %@ does not support precision
+          encode_width();
+          hdr.hdr_flags |= OSLF_HDR_FLAG_HAS_NON_SCALAR;
+          cmd.cmd_type = OSLF_CMD_TYPE_OBJECT;
+          encode(void *, flags);
+          done = true;
+          break;
+
+        case 'm':
+          cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;
+          cmd.cmd_size = sizeof(int);
+          cmd.cmd_flags = flags;
+          _os_log_encode_arg(ob, &cmd, &saved_errno);
+          hdr.hdr_cmd_cnt++;
+          done = true;
+          break;
+
+        default:
+          if (isdigit(ch)) { // [0-9]
+            continue;
+          }
+          done = true;
+          break;
         }
 
         if (done) {

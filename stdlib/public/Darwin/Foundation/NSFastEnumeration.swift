@@ -13,9 +13,9 @@
 @_exported import Foundation // Clang module
 
 /// A dummy value to be used as the target for `mutationsPtr` in fast enumeration implementations.
-fileprivate var _fastEnumerationMutationsTarget: CUnsignedLong = 0
+private var _fastEnumerationMutationsTarget: CUnsignedLong = 0
 /// A dummy pointer to be used as `mutationsPtr` in fast enumeration implementations.
-fileprivate let _fastEnumerationMutationsPtr = UnsafeMutablePointer<CUnsignedLong>(&_fastEnumerationMutationsTarget)
+private let _fastEnumerationMutationsPtr = UnsafeMutablePointer<CUnsignedLong>(&_fastEnumerationMutationsTarget)
 
 //===----------------------------------------------------------------------===//
 // Fast enumeration

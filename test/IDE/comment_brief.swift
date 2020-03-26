@@ -145,8 +145,8 @@ struct Indentation {
 // CHECK-NEXT: Func/briefBlockWithASCIIArt5 {{.*}} BriefComment=[Aaa. Bbb. *Ccc.]
 // CHECK-NEXT: Func/briefBlockWithASCIIArt6 {{.*}} BriefComment=[Aaa.]
 // CHECK-NEXT: Func/briefMixed1 {{.*}} BriefComment=[Aaa. Bbb.]
-// CHECK-NEXT: Func/briefMixed2 {{.*}} BriefComment=[Aaa.]
-// CHECK-NEXT: Func/briefMixed3 {{.*}} BriefComment=[Aaa.]
+// CHECK-NEXT: Func/briefMixed2 {{.*}} BriefComment=[Aaa. Bbb.]
+// CHECK-NEXT: Func/briefMixed3 {{.*}} BriefComment=[Aaa. Bbb.]
 // CHECK-NEXT: Struct/Indentation RawComment=none
 // CHECK-NEXT: Func/Indentation.briefBlockWithASCIIArt1 {{.*}} BriefComment=[Aaa.]
 

@@ -14,7 +14,7 @@
 // RUN:    | %FileCheck %s --check-prefix=FAIL
 
 // RUN: %lldb-moduleimport-test -verbose -dump-module %t/a.out \
-// RUN:    -enable-dwarf-importer | %FileCheck %s --check-prefix=SWIFTONLY
+// RUN:    -dummy-dwarfimporter | %FileCheck %s --check-prefix=SWIFTONLY
 
 // CHECK: Importing basic... ok!
 // FAIL: Importing basic... ok!

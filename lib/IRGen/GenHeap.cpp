@@ -28,10 +28,12 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/SIL/SILModule.h"
 
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -53,6 +55,10 @@ namespace {
                                 FixedTypeInfo> { \
     llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
   public: \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
+                                        SILType T) const override { \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T); \
+    } \
     Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType, \
                                     llvm::Type *type, \
                                     Size size, Alignment alignment, \
@@ -137,6 +143,10 @@ namespace {
                              alignment, IsNotPOD, IsFixedSize), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     enum { IsScalarPOD = false }; \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,                    \
+                                          SILType T) const override {          \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);             \
+    } \
     llvm::Type *getScalarType() const { \
       return ValueTypeAndIsOptional.getPointer(); \
     } \
@@ -316,6 +326,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
                                     elt.getType().getAlignmentMask(IGF, eltTy));
         LLVM_FALLTHROUGH;
       case ElementLayout::Kind::Empty:
+      case ElementLayout::Kind::EmptyTailAllocatedCType:
       case ElementLayout::Kind::Fixed:
         // Don't need to dynamically calculate this offset.
         Offsets.push_back(nullptr);
@@ -471,7 +482,8 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
   ConstantInitBuilder builder(IGM);
   auto fields = builder.beginStruct(IGM.FullBoxMetadataStructTy);
 
-  fields.add(dtorFn);
+  fields.addSignedPointer(dtorFn, IGM.getOptions().PointerAuth.HeapDestructors,
+                          PointerAuthEntity::Special::HeapDestructor);
   fields.addNullPointer(IGM.WitnessTablePtrTy);
   {
     auto kindStruct = fields.beginStruct(IGM.TypeMetadataStructTy);
@@ -1234,6 +1246,32 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
   return fixLifetime;
 }
 
+llvm::Constant *IRGenModule::getFixedClassInitializationFn() {
+  if (FixedClassInitializationFn)
+    return *FixedClassInitializationFn;
+  
+  // If ObjC interop is disabled, we don't need to do fixed class
+  // initialization.
+  llvm::Constant *fn;
+  if (!ObjCInterop) {
+    fn = nullptr;
+  } else {
+    // In new enough ObjC runtimes, objc_opt_self provides a direct fast path
+    // to realize a class.
+    if (getAvailabilityContext()
+         .isContainedIn(Context.getSwift51Availability())) {
+      fn = getObjCOptSelfFn();
+    }
+    // Otherwise, the Swift runtime always provides a `get
+    else {
+      fn = getGetInitializedObjCClassFn();
+    }
+  }
+  
+  FixedClassInitializationFn = fn;
+  return fn;
+}
+
 /// Fix the lifetime of a live value. This communicates to the LLVM level ARC
 /// optimizer not to touch this value.
 void IRGenFunction::emitFixLifetime(llvm::Value *value) {
@@ -1457,7 +1495,9 @@ public:
     }
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
-        boxedInterfaceType.getASTType());
+        boxedInterfaceType,
+        env ? env->getGenericSignature().getCanonicalSignature()
+            : CanGenericSignature());
     llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name,
                                                      boxDescriptor);
     Address rawAddr = project(IGF, allocation, boxedType);
@@ -1524,8 +1564,8 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // TODO: Multi-field boxes
   assert(T->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  auto &eltTI = IGM.getTypeInfoForLowered(
-    T->getFieldLoweredType(IGM.getSILModule(), 0));
+  auto &eltTI = IGM.getTypeInfoForLowered(getSILBoxFieldLoweredType(
+      IGM.getMaximalTypeExpansionContext(), T, IGM.getSILModule().Types, 0));
   if (!eltTI.isFixedSize()) {
     if (!NonFixedBoxTI)
       NonFixedBoxTI = new NonFixedBoxTypeInfo(IGM);
@@ -1573,7 +1613,9 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // Produce a tailored box metadata for the type.
   assert(T->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return new FixedBoxTypeInfo(IGM, T->getFieldType(IGM.getSILModule(), 0));
+  return new FixedBoxTypeInfo(
+      IGM, getSILBoxFieldType(IGM.getMaximalTypeExpansionContext(),
+                              T, IGM.getSILModule().Types, 0));
 }
 
 OwnedAddress
@@ -1583,9 +1625,12 @@ irgen::emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return boxTI.allocate(IGF,
-                      boxType->getFieldType(IGF.IGM.getSILModule(), 0), env,
-                      name);
+  return boxTI.allocate(
+      IGF,
+      getSILBoxFieldType(
+          IGF.IGM.getMaximalTypeExpansionContext(),
+          boxType, IGF.IGM.getSILModule().Types, 0),
+      env, name);
 }
 
 void irgen::emitDeallocateBox(IRGenFunction &IGF,
@@ -1594,8 +1639,10 @@ void irgen::emitDeallocateBox(IRGenFunction &IGF,
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return boxTI.deallocate(IGF, box,
-                          boxType->getFieldType(IGF.IGM.getSILModule(), 0));
+  return boxTI.deallocate(
+      IGF, box,
+      getSILBoxFieldType(IGF.IGM.getMaximalTypeExpansionContext(), boxType,
+                         IGF.IGM.getSILModule().Types, 0));
 }
 
 Address irgen::emitProjectBox(IRGenFunction &IGF,
@@ -1604,8 +1651,10 @@ Address irgen::emitProjectBox(IRGenFunction &IGF,
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return boxTI.project(IGF, box,
-                       boxType->getFieldType(IGF.IGM.getSILModule(), 0));
+  return boxTI.project(
+      IGF, box,
+      getSILBoxFieldType(IGF.IGM.getMaximalTypeExpansionContext(), boxType,
+                         IGF.IGM.getSILModule().Types, 0));
 }
 
 Address irgen::emitAllocateExistentialBoxInBuffer(
@@ -1717,8 +1766,10 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
     SelfKind = SwiftMetatype;
     break;
   case ObjectReference:
-    LocalSelf = emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf,
-                                             MetatypeRepresentation::Thick);
+    LocalSelf = emitDynamicTypeOfHeapObject(*this, LocalSelf,
+                                MetatypeRepresentation::Thick,
+                                SILType::getPrimitiveObjectType(LocalSelfType),
+                                /*allow artificial*/ false);
     SelfKind = SwiftMetatype;
     break;
   }
@@ -1839,9 +1890,25 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 
 /// Given an opaque class instance pointer, produce the type metadata reference
 /// as a %type*.
-llvm::Value *irgen::emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
+///
+/// You should only use this if you have an untyped object pointer with absolutely no type information.
+/// Generally, it's better to use \c emitDynamicTypeOfHeapObject, which will
+/// use the most efficient possible access pattern to get the dynamic type based on
+/// the static type information.
+static llvm::Value *emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
                                                   llvm::Value *object,
                                                   MetatypeRepresentation repr) {
+  if (!IGF.IGM.ObjCInterop) {
+    // Without objc interop, getting the dynamic type of an object is always
+    // just a load of the isa pointer.
+
+    assert(repr == MetatypeRepresentation::Thick
+           && "objc metatypes should not occur without objc interop, "
+              "and thin metadata should not be requested here");
+    return emitLoadOfHeapMetadataRef(IGF, object, IsaEncoding::Pointer,
+                                     /*suppressCast*/ false);
+  }
+  
   object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
   llvm::CallInst *metadata;
   

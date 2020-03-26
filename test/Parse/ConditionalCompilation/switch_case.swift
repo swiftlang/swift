@@ -209,6 +209,7 @@ func foo(x: E, intVal: Int) {
       fallthrough // expected-error {{'fallthrough' from a case which doesn't bind variable 'val'}}
 #if ENABLE_C
     case let val:
+      _ = val
       break
 #endif
     case 2:

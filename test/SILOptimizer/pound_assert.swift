@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
-
-// REQUIRES: optimized_stdlib
+// RUN: %target-swift-frontend -enable-experimental-static-assert -enable-ownership-stripping-after-serialization -emit-sil %s -verify
 // REQUIRES: asserts
 
 //===----------------------------------------------------------------------===//
@@ -23,9 +22,9 @@ func test_assertionFailure() {
 
 func test_nonConstant() {
   #assert(isOne(Int(readLine()!)!)) // expected-error{{#assert condition not constant}}
-    // expected-note@-1 {{cannot evaluate expression as constant here}}
+    // expected-note@-1 {{encountered call to 'isOne(_:)' where the 1st argument is not a constant}}
   #assert(isOne(Int(readLine()!)!), "input is not 1") // expected-error{{#assert condition not constant}}
-    // expected-note@-1 {{cannot evaluate expression as constant here}}
+    // expected-note@-1 {{encountered call to 'isOne(_:)' where the 1st argument is not a constant}}
 }
 
 func loops1(a: Int) -> Int {
@@ -38,7 +37,6 @@ func loops1(a: Int) -> Int {
 
 func loops2(a: Int) -> Int {
   var x = 42
-  // expected-note @+1 {{operation not supported by the evaluator}}
   for i in 0 ... a {
     x += i
   }
@@ -65,17 +63,6 @@ func test_loops() {
   // expected-error @+2 {{#assert condition not constant}}
   // expected-note @+1 {{control-flow loop found during evaluation}}
   #assert(infiniteLoop() == 1)
-}
-
-func recursive(a: Int) -> Int {
-   // expected-note@+1 {{limit exceeded here}}
-  return a == 0 ? 0 : recursive(a: a-1)
-}
-
-func test_recursive() {
-  // expected-error @+2 {{#assert condition not constant}}
-  // expected-note @+1 {{exceeded instruction limit: 512 when evaluating the expression at compile time}}
-  #assert(recursive(a: 20000) > 42)
 }
 
 func conditional(_ x: Int) -> Int {
@@ -458,7 +445,7 @@ struct SPsimp : ProtoSimple {
 func testStructPassedAsProtocols() {
   let s = SPsimp()
   #assert(callProtoSimpleMethod(s) == 0) // expected-error {{#assert condition not constant}}
-    // expected-note@-1 {{cannot evaluate top-level value as constant here}}
+    // expected-note@-1 {{encountered call to 'callProtoSimpleMethod(_:)' where the 1st argument is not a constant}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -647,13 +634,13 @@ func evaluate(intExpr: IntExpr) -> Int {
 
 // TODO: The constant evaluator can't handle indirect enums yet.
 // expected-error @+2 {{#assert condition not constant}}
-// expected-note @+1 {{encountered operation not supported by the evaluator}}
+// expected-note @+1 {{encountered call to 'evaluate(intExpr:)' where the 1st argument is not a constant}}
 #assert(evaluate(intExpr: .int(5)) == 5)
 // expected-error @+2 {{#assert condition not constant}}
-// expected-note @+1 {{encountered operation not supported by the evaluator}}
+// expected-note @+1 {{encountered call to 'evaluate(intExpr:)' where the 1st argument is not a constant}}
 #assert(evaluate(intExpr: .add(.int(5), .int(6))) == 11)
 // expected-error @+2 {{#assert condition not constant}}
-// expected-note @+1 {{encountered operation not supported by the evaluator}}
+// expected-note @+1 {{encountered call to 'evaluate(intExpr:)' where the 1st argument is not a constant}}
 #assert(evaluate(intExpr: .add(.multiply(.int(2), .int(2)), .int(3))) == 7)
 
 // Test address-only enums.
@@ -681,3 +668,68 @@ func evaluate<T>(addressOnlyEnum: AddressOnlyEnum<T>) -> Int {
 
 #assert(evaluate(addressOnlyEnum: .double(IntContainer(value: 1))) == 2)
 #assert(evaluate(addressOnlyEnum: .triple(IntContainer(value: 1))) == 3)
+
+//===----------------------------------------------------------------------===//
+// Arrays
+//===----------------------------------------------------------------------===//
+
+// When the const-evaluator evaluates this struct, it forces evaluation of the
+// `arr` value.
+struct ContainsArray {
+  let x: Int
+  let arr: [Int]
+}
+
+func arrayInitEmptyTopLevel() {
+  let c = ContainsArray(x: 1, arr: Array())
+  #assert(c.x == 1)
+}
+
+func arrayInitEmptyLiteralTopLevel() {
+  // TODO: More work necessary for array initialization using literals to work
+  // at the top level.
+  // expected-note@+1 {{encountered call to 'ContainsArray.init(x:arr:)' where the 2nd argument is not a constant}}
+  let c = ContainsArray(x: 1, arr: [])
+  // expected-error @+1 {{#assert condition not constant}}
+  #assert(c.x == 1)
+}
+
+func arrayInitLiteral() {
+  // TODO: More work necessary for array initialization using literals to work
+  // at the top level.
+  // expected-note @+1 {{encountered call to 'ContainsArray.init(x:arr:)' where the 2nd argument is not a constant}}
+  let c = ContainsArray(x: 1, arr: [2, 3, 4])
+  // expected-error @+1 {{#assert condition not constant}}
+  #assert(c.x == 1)
+}
+
+func arrayInitNonConstantElementTopLevel(x: Int) {
+  // expected-note @+1 {{encountered call to 'ContainsArray.init(x:arr:)' where the 2nd argument is not a constant}}
+  let c = ContainsArray(x: 1, arr: [x])
+  // expected-error @+1 {{#assert condition not constant}}
+  #assert(c.x == 1)
+}
+
+func arrayInitEmptyFlowSensitive() -> ContainsArray {
+  return ContainsArray(x: 1, arr: Array())
+}
+
+func invokeArrayInitEmptyFlowSensitive() {
+  #assert(arrayInitEmptyFlowSensitive().x == 1)
+}
+
+func arrayInitEmptyLiteralFlowSensitive() -> ContainsArray {
+  return ContainsArray(x: 1, arr: [])
+}
+
+func invokeArrayInitEmptyLiteralFlowSensitive() {
+  #assert(arrayInitEmptyLiteralFlowSensitive().x == 1)
+}
+
+func arrayInitLiteralFlowSensitive() -> ContainsArray {
+  return ContainsArray(x: 1, arr: [2, 3, 4])
+}
+
+func invokeArrayInitLiteralFlowSensitive() {
+  #assert(arrayInitLiteralFlowSensitive().x == 1)
+}
