@@ -4369,9 +4369,6 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
   auto &ctx = getASTContext();
 
-  if (ctx.LangOpts.DisableAvailabilityChecking)
-    return false;
-
   // First check whether this declaration is universally unavailable.
   if (D->getAttrs().isUnavailable(ctx))
     return true;
