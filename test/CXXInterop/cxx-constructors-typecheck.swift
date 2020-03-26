@@ -11,3 +11,6 @@ let deletedImplicitly = ConstructorWithParam() // expected-error {{missing argum
 let deletedExplicitly = DefaultConstructorDeleted() // expected-error {{cannot be constructed because it has no accessible initializers}}
 
 let withArg = ConstructorWithParam(42)
+
+// For the time being, we only import constructors marked `noexcept`.
+let potentiallyThrowing = PotentiallyThrowingConstructor() // expected-error {{cannot be constructed because it has no accessible initializers}}

@@ -3893,7 +3893,12 @@ namespace {
 
       AbstractFunctionDecl *result = nullptr;
       if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
-        // TODO: Is failable, throws etc. correct?
+        // For the time being, we only import `noexcept` constructors.
+        // TODO: Import throwing constructors too.
+        auto *prototype = decl->getType()->getAs<clang::FunctionProtoType>();
+        if (!prototype || !prototype->hasNoexceptExceptionSpec())
+          return nullptr;
+
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(

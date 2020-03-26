@@ -1,5 +1,5 @@
 struct ExplicitDefaultConstructor {
-  ExplicitDefaultConstructor() : x(42) {}
+  ExplicitDefaultConstructor() noexcept : x(42) {}
   int x;
 };
 
@@ -17,6 +17,10 @@ struct DefaultConstructorDeleted {
 };
 
 struct ConstructorWithParam {
-  ConstructorWithParam(int val) : x(val) {}
+  ConstructorWithParam(int val) noexcept : x(val) {}
   int x;
+};
+
+struct PotentiallyThrowingConstructor {
+  PotentiallyThrowingConstructor() {}
 };
