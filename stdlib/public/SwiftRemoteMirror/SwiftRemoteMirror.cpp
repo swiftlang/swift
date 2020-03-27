@@ -270,6 +270,16 @@ swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 
+char *
+swift_reflection_copyDemangledNameForTypeRef(
+  SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef) {
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+
+  Demangle::Demangler Dem;
+  auto Name = nodeToString(TR->getDemangling(Dem));
+  return strdup(Name.c_str());
+}
+
 swift_typeref_t
 swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
                                           unsigned Index) {
@@ -517,6 +527,12 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
     std::string MangledName = mangleNode(TR->getDemangling(Dem));
     fprintf(stdout, "Mangled name: %s%s\n", MANGLING_PREFIX_STR,
             MangledName.c_str());
+
+    char *DemangledName =
+      swift_reflection_copyDemangledNameForTypeRef(ContextRef, OpaqueTypeRef);
+    fprintf(stdout, "Demangled name: %s\n", DemangledName);
+    free(DemangledName);
+
 #ifndef NDEBUG
     assert(mangleNode(TR->getDemangling(Dem)) == MangledName &&
            "round-trip diff");
