@@ -1085,7 +1085,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   (void)decl->getDefaultInitializer();
 }
 
-llvm::Expected<bool>
+llvm::Expected<evaluator::SideEffect>
 ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *target,
                                        ImplicitMemberAction action) const {
@@ -1162,7 +1162,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   }
     break;
   }
-  return true;
+  return std::make_tuple<>();
 }
 
 llvm::Expected<bool>

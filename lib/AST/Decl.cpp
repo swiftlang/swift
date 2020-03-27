@@ -4125,7 +4125,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 
   if (auto actionToTake = action) {
     (void)evaluateOrDefault(Context.evaluator,
-        ResolveImplicitMemberRequest{this, actionToTake.getValue()}, false);
+        ResolveImplicitMemberRequest{this, actionToTake.getValue()}, {});
   }
 }
 
@@ -7486,7 +7486,7 @@ LiteralExpr *EnumElementDecl::getRawValueExpr() const {
   (void)evaluateOrDefault(
       getASTContext().evaluator,
       EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Interface},
-      true);
+      {});
   return RawValueExpr;
 }
 
@@ -7496,7 +7496,7 @@ LiteralExpr *EnumElementDecl::getStructuralRawValueExpr() const {
   (void)evaluateOrDefault(
       getASTContext().evaluator,
       EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Structural},
-      true);
+      {});
   return RawValueExpr;
 }
 

@@ -50,7 +50,7 @@ llvm::hash_code hash_value(const SILPipelineExecutionDescriptor &desc);
 /// Executes a SIL pipeline plan on a SIL module.
 class ExecuteSILPipelineRequest
     : public SimpleRequest<ExecuteSILPipelineRequest,
-                           bool(SILPipelineExecutionDescriptor),
+                           evaluator::SideEffect(SILPipelineExecutionDescriptor),
                            CacheKind::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -59,8 +59,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                SILPipelineExecutionDescriptor desc) const;
+  llvm::Expected<evaluator::SideEffect>
+  evaluate(Evaluator &evaluator, SILPipelineExecutionDescriptor desc) const;
 };
 
 void simple_display(llvm::raw_ostream &out,

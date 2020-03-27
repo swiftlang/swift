@@ -973,22 +973,22 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   }
 }
 
-llvm::Expected<bool>
+llvm::Expected<evaluator::SideEffect>
 EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
                                TypeResolutionStage stage) const {
   Type rawTy = ED->getRawType();
   if (!rawTy) {
-    return true;
+    return std::make_tuple<>();
   }
 
   if (!computeAutomaticEnumValueKind(ED)) {
-    return true;
+    return std::make_tuple<>();
   }
 
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ED->mapTypeIntoContext(rawTy);
   if (rawTy->hasError())
-    return true;
+    return std::make_tuple<>();
 
   // Check the raw values of the cases.
   LiteralExpr *prevValue = nullptr;
@@ -1017,7 +1017,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
         valueKind = computeAutomaticEnumValueKind(ED);
         if (!valueKind) {
           elt->setInvalid();
-          return true;
+          return std::make_tuple<>();
         }
       }
       
@@ -1107,7 +1107,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
                        diag::enum_raw_value_incrementing_from_zero);
     }
   }
-  return true;
+  return std::make_tuple<>();
 }
 
 const ConstructorDecl *

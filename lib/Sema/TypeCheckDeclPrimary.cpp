@@ -336,7 +336,7 @@ static void checkInheritanceClause(
 static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
   auto req =
     ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveCodingKeys};
-  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, false);
+  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
 }
 
 // Check for static properties that produce empty option sets

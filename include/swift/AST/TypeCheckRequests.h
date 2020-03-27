@@ -1247,7 +1247,7 @@ public:
 /// Computes the raw values for an enum type.
 class EnumRawValuesRequest :
     public SimpleRequest<EnumRawValuesRequest,
-                         bool (EnumDecl *, TypeResolutionStage),
+                         evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
                          CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1256,7 +1256,7 @@ private:
   friend SimpleRequest;
   
   // Evaluation.
-  llvm::Expected<bool>
+  llvm::Expected<evaluator::SideEffect>
   evaluate(Evaluator &evaluator, EnumDecl *ED, TypeResolutionStage stage) const;
   
 public:
@@ -1266,8 +1266,8 @@ public:
                            
   // Separate caching.
   bool isCached() const;
-  Optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
+  Optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect value) const;
 };
 
 /// Determines if an override is ABI compatible with its base method.
@@ -1718,7 +1718,7 @@ enum class ImplicitMemberAction : uint8_t {
 
 class ResolveImplicitMemberRequest
     : public SimpleRequest<ResolveImplicitMemberRequest,
-                           bool(NominalTypeDecl *, ImplicitMemberAction),
+                           evaluator::SideEffect(NominalTypeDecl *, ImplicitMemberAction),
                            CacheKind::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1727,8 +1727,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, NominalTypeDecl *NTD,
-                                ImplicitMemberAction action) const;
+  llvm::Expected<evaluator::SideEffect>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *NTD,
+           ImplicitMemberAction action) const;
 
 public:
   // Separate caching.
@@ -1984,7 +1985,8 @@ public:
 
 class TypeCheckSourceFileRequest :
     public SimpleRequest<TypeCheckSourceFileRequest,
-                         bool (SourceFile *), CacheKind::SeparatelyCached> {
+                         evaluator::SideEffect (SourceFile *),
+                         CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1992,13 +1994,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, SourceFile *SF) const;
+  llvm::Expected<evaluator::SideEffect>
+  evaluate(Evaluator &evaluator, SourceFile *SF) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<bool> getCachedResult() const;
-  void cacheResult(bool result) const;
+  Optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect) const;
 };
 
 /// Computes whether the specified type or a super-class/super-protocol has the
