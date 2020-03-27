@@ -1855,6 +1855,17 @@ bool Pattern::isNeverDefaultInitializable() const {
   return result;
 }
 
+bool PatternBindingDecl::isDefaultInitializableViaPropertyWrapper(unsigned i) const {
+  if (auto singleVar = getSingleVar()) {
+    if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo(0)) {
+      if (wrapperInfo.defaultInit)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   const auto entry = getPatternList()[i];
 
@@ -1864,14 +1875,14 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
 
   // If the outermost attached property wrapper vends an `init()`, use that
   // for default initialization.
+  if (isDefaultInitializableViaPropertyWrapper(i))
+    return true;
+
+  // If one of the attached wrappers is missing a wrappedValue
+  // initializer, cannot default-initialize.
   if (auto singleVar = getSingleVar()) {
     if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo(0)) {
-      if (wrapperInfo.defaultInit)
-        return true;
-
-      // If one of the attached wrappers is missing an initialValue
-      // initializer, cannot default-initialize.
-      if (!singleVar->allAttachedPropertyWrappersHaveInitialValueInit())
+      if (!singleVar->allAttachedPropertyWrappersHaveWrappedValueInit())
         return false;
     }
   }
@@ -5817,7 +5828,7 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
 
 /// Whether all of the attached property wrappers have an init(wrappedValue:)
 /// initializer.
-bool VarDecl::allAttachedPropertyWrappersHaveInitialValueInit() const {
+bool VarDecl::allAttachedPropertyWrappersHaveWrappedValueInit() const {
   for (unsigned i : indices(getAttachedPropertyWrappers())) {
     if (!getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit)
       return false;
@@ -5922,7 +5933,7 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
 
   // If all property wrappers have a wrappedValue initializer, the property
   // wrapper will be initialized that way.
-  return allAttachedPropertyWrappersHaveInitialValueInit();
+  return allAttachedPropertyWrappersHaveWrappedValueInit();
 }
 
 bool VarDecl::isInnermostPropertyWrapperInitUsesEscapingAutoClosure() const {
