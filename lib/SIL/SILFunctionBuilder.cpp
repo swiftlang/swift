@@ -66,6 +66,25 @@ void SILFunctionBuilder::addFunctionAttributes(
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
 
+  // Validate `@differentiable` attributes by calling `getParameterIndices`.
+  // This is important for:
+  // - Skipping invalid `@differentiable` attributes in non-primary files.
+  // - Preventing duplicate SIL differentiability witness creation for
+  //   `@differentiable` attributes on `AbstractStorageDecl` declarations.
+  //   Such `@differentiable` attributes are deleted and recreated on the getter
+  //   `AccessorDecl` of the `AbstractStorageDecl`.
+  for (auto *A : Attrs.getAttributes<DifferentiableAttr>())
+    (void)A->getParameterIndices();
+
+  // Propagate `@noDerivative` as `[_semantics "autodiff.nonvarying"]`.
+  //
+  // `@noDerivative` implies non-varying semantics for differentiable activity
+  // analysis. SIL values produced from references to `@noDerivative`
+  // declarations will not be marked as varying; these values do not need a
+  // derivative.
+  if (Attrs.hasAttribute<NoDerivativeAttr>())
+    F->addSemanticsAttr("autodiff.nonvarying");
+
   // Propagate @_dynamicReplacement(for:).
   if (constant.isNull())
     return;
