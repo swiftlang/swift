@@ -5600,6 +5600,9 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::AdditiveArithmetic:
     return derived.deriveAdditiveArithmetic(Requirement);
 
+  case KnownProtocolKind::Differentiable:
+    return derived.deriveDifferentiable(Requirement);
+
   default:
     return nullptr;
   }
@@ -5624,6 +5627,8 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveRawRepresentable(AssocType);
   case KnownProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(AssocType);
+  case KnownProtocolKind::Differentiable:
+    return derived.deriveDifferentiable(AssocType);
   default:
     return nullptr;
   }

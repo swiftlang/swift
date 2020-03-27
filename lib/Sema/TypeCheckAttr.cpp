@@ -117,6 +117,7 @@ public:
   // TODO(TF-830): Upstream `@transpose` attribute type-checking from tensorflow
   // branch.
   IGNORED_ATTR(Transpose)
+  IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
