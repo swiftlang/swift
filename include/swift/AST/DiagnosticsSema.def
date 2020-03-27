@@ -2674,6 +2674,8 @@ ERROR(cannot_synthesize_in_crossfile_extension,none,
       "implementation of %0 cannot be automatically synthesized in an extension "
       "in a different file to the type", (Type))
 
+ERROR(broken_additive_arithmetic_requirement,none,
+      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
 ERROR(broken_case_iterable_requirement,none,
       "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,
@@ -2958,6 +2960,12 @@ ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
+NOTE(protocol_witness_missing_differentiable_attr_nonpublic_other_file,none,
+     "non-public %1 %2 must have explicit '%0' attribute to satisfy "
+     "requirement %3 %4 (in protocol %6) because it is declared in a different "
+     "file than the conformance of %5 to %6",
+     (StringRef, DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName,
+      Type, Type))
 
 // @derivative
 ERROR(derivative_attr_expected_result_tuple,none,

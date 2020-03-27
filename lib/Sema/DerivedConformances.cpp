@@ -66,6 +66,9 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveHashable(Nominal);
   }
 
+  if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
+    return canDeriveAdditiveArithmetic(Nominal, DC);
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
         // The presence of a raw type is an explicit declaration that
@@ -217,6 +220,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_intValue))
       return getRequirement(KnownProtocolKind::CodingKey);
 
+    // AdditiveArithmetic.zero
+    if (name.isSimpleName(ctx.Id_zero))
+      return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+
     return nullptr;
   }
 
@@ -227,6 +234,13 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     
     if (func->isOperator() && name.getBaseName() == "==")
       return getRequirement(KnownProtocolKind::Equatable);
+
+    // AdditiveArithmetic.+
+    // AdditiveArithmetic.-
+    if (func->isOperator() && name.getArgumentNames().size() == 2 &&
+        (name.getBaseName() == "+" || name.getBaseName() == "-")) {
+      return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+    }
 
     // Encodable.encode(to: Encoder)
     if (name.isCompoundName() && name.getBaseName() == ctx.Id_encode) {

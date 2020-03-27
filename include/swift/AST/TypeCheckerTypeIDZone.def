@@ -214,6 +214,8 @@ SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeMemberwiseInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolveEffectiveMemberwiseInitRequest,
+              ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
@@ -234,3 +236,6 @@ SWIFT_REQUEST(TypeChecker, ScopedImportLookupRequest,
               ArrayRef<ValueDecl *>(ImportDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureHasExplicitResultRequest,
               bool(ClosureExpr *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LookupAllConformancesInContextRequest,
+              ProtocolConformanceLookupResult(const DeclContext *),
+              Uncached, NoLocationInfo)

@@ -1600,6 +1600,31 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Resolves the effective memberwise initializer for a given type.
+///
+/// An effective memberwise initializer is either a synthesized memberwise
+/// initializer or a user-defined initializer with the same type.
+///
+/// See `NominalTypeDecl::getEffectiveMemberwiseInitializer` for details.
+class ResolveEffectiveMemberwiseInitRequest
+    : public SimpleRequest<ResolveEffectiveMemberwiseInitRequest,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
+                                             NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks whether this type has a synthesized zero parameter default
 /// initializer.
 class HasDefaultInitRequest
@@ -2158,6 +2183,39 @@ private:
 
 public:
   bool isCached() const { return true; }
+};
+
+using ProtocolConformanceLookupResult = SmallVector<ProtocolConformance *, 2>;
+void simple_display(llvm::raw_ostream &out, ConformanceLookupKind kind);
+
+/// Lookup and expand all conformances in the given context.
+///
+/// This request specifically accomodates algorithms for retrieving all
+/// conformances in the primary, even those that are unstated in source but
+/// are implied by other conformances, inherited from other types, or synthesized
+/// by the compiler. A simple case of this is the following:
+///
+/// \code
+/// protocol P {}
+/// protocol Q : P {}
+/// extension T : Q {}
+/// \endcode
+///
+/// Here, a conformance to \c Q has been stated, but a conformance to \c P
+/// must also be reported so it can be checked as well.
+class LookupAllConformancesInContextRequest :
+    public SimpleRequest<LookupAllConformancesInContextRequest,
+                         ProtocolConformanceLookupResult(const DeclContext *),
+                         CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ProtocolConformanceLookupResult>
+  evaluate(Evaluator &evaluator, const DeclContext *DC) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
