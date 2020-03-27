@@ -3030,9 +3030,6 @@ bool ValueDecl::isRecursiveValidation() const {
 
 Type ValueDecl::getInterfaceType() const {
   auto &ctx = getASTContext();
-
-  assert(ctx.areLegacySemanticQueriesEnabled());
-
   if (auto type =
           evaluateOrDefault(ctx.evaluator,
                             InterfaceTypeRequest{const_cast<ValueDecl *>(this)},
@@ -4736,26 +4733,11 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
     setTrailingWhereClause(TrailingWhere);
 }
 
-ArrayRef<ProtocolDecl *>
-ProtocolDecl::getInheritedProtocolsSlow() {
-  Bits.ProtocolDecl.InheritedProtocolsValid = true;
-
-  llvm::SmallVector<ProtocolDecl *, 2> result;
-  SmallPtrSet<const ProtocolDecl *, 2> known;
-  known.insert(this);
-  bool anyObject = false;
-  for (const auto found :
-           getDirectlyInheritedNominalTypeDecls(
-             const_cast<ProtocolDecl *>(this), anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
-      if (known.insert(proto).second)
-        result.push_back(proto);
-    }
-  }
-
-  auto &ctx = getASTContext();
-  InheritedProtocols = ctx.AllocateCopy(result);
-  return InheritedProtocols;
+ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
+  auto *mutThis = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           InheritedProtocolsRequest{mutThis},
+                           {});
 }
 
 llvm::TinyPtrVector<AssociatedTypeDecl *>
@@ -5920,13 +5902,8 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
 }
 
 llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
-  auto &ctx = getASTContext();
-  if (!ctx.areLegacySemanticQueriesEnabled()) {
-    return { };
-  }
-
   auto mutableThis = const_cast<VarDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator,
+  return evaluateOrDefault(getASTContext().evaluator,
                            AttachedPropertyWrappersRequest{mutableThis},
                            { });
 }
@@ -6044,6 +6021,25 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
   // If all property wrappers have a wrappedValue initializer, the property
   // wrapper will be initialized that way.
   return allAttachedPropertyWrappersHaveInitialValueInit();
+}
+
+bool VarDecl::isInnermostPropertyWrapperInitUsesEscapingAutoClosure() const {
+  auto customAttrs = getAttachedPropertyWrappers();
+  if (customAttrs.empty())
+    return false;
+
+  unsigned innermostWrapperIndex = customAttrs.size() - 1;
+  auto typeInfo = getAttachedPropertyWrapperTypeInfo(innermostWrapperIndex);
+  return typeInfo.isWrappedValueInitUsingEscapingAutoClosure;
+}
+
+Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
+  Type valueInterfaceTy = getValueInterfaceType();
+
+  if (isInnermostPropertyWrapperInitUsesEscapingAutoClosure())
+    return FunctionType::get({}, valueInterfaceTy);
+
+  return valueInterfaceTy;
 }
 
 Identifier VarDecl::getObjCPropertyName() const {
@@ -6440,6 +6436,8 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
         return { false, E };
 
       if (auto call = dyn_cast<CallExpr>(E)) {
+        ASTContext &ctx = innermostNominal->getASTContext();
+
         // We're looking for an implicit call.
         if (!call->isImplicit())
           return { true, E };
@@ -6449,9 +6447,19 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
         // property.
         if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
           if (tuple->getNumElements() > 0) {
-            auto elem = tuple->getElement(0);
-            if (elem->isImplicit() && isa<CallExpr>(elem)) {
-              return { true, E };
+            for (unsigned i : range(tuple->getNumElements())) {
+              if (tuple->getElementName(i) == ctx.Id_wrappedValue ||
+                  tuple->getElementName(i) == ctx.Id_initialValue) {
+                auto elem = tuple->getElement(i)->getSemanticsProvidingExpr();
+
+                // Look through autoclosures.
+                if (auto autoclosure = dyn_cast<AutoClosureExpr>(elem))
+                  elem = autoclosure->getSingleExpressionBody();
+
+                if (elem->isImplicit() && isa<CallExpr>(elem)) {
+                  return { true, E };
+                }
+              }
             }
           }
         }
@@ -6464,7 +6472,6 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
 
         // Find the implicit initialValue/wrappedValue argument.
         if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
-          ASTContext &ctx = innermostNominal->getASTContext();
           for (unsigned i : range(tuple->getNumElements())) {
             if (tuple->getElementName(i) == ctx.Id_wrappedValue ||
                 tuple->getElementName(i) == ctx.Id_initialValue) {
@@ -6484,8 +6491,11 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
   if (initArg) {
     initArg = initArg->getSemanticsProvidingExpr();
     if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
-      initArg =
-          autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
+      if (!var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure()) {
+        // Remove the autoclosure part only for non-escaping autoclosures
+        initArg =
+            autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
+      }
     }
   }
   return initArg;
@@ -6894,7 +6904,7 @@ ObjCSelector
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
                                       bool skipIsObjCResolution) const {
   // FIXME: Forces computation of the Objective-C selector.
-  if (getASTContext().areLegacySemanticQueriesEnabled() && !skipIsObjCResolution)
+  if (!skipIsObjCResolution)
     (void)isObjC();
 
   // If there is an @objc attribute with a name, use that name.

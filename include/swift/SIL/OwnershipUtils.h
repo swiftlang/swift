@@ -177,13 +177,13 @@ struct BorrowingOperand {
 
   /// Visit all of the results of the operand's user instruction that are
   /// consuming uses.
-  void visitUserResultConsumingUses(function_ref<void(Operand *)> visitor);
+  void visitUserResultConsumingUses(function_ref<void(Operand *)> visitor) const;
 
   /// Visit all of the "results" of the user of this operand that are borrow
   /// scope introducers for the specific scope that this borrow scope operand
   /// summarizes.
   void
-  visitBorrowIntroducingUserResults(function_ref<void(BorrowedValue)> visitor);
+  visitBorrowIntroducingUserResults(function_ref<void(BorrowedValue)> visitor) const;
 
   /// Passes to visitor all of the consuming uses of this use's using
   /// instruction.
@@ -192,7 +192,7 @@ struct BorrowingOperand {
   /// guaranteed scope by using a worklist and checking if any of the operands
   /// are BorrowScopeOperands.
   void visitConsumingUsesOfBorrowIntroducingUserResults(
-      function_ref<void(Operand *)> visitor);
+      function_ref<void(Operand *)> visitor) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }

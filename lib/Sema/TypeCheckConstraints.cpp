@@ -2352,11 +2352,16 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   }
 }
 
-bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
-                                   DeclContext *DC,
-                                   Type patternType) {
-  auto target = SolutionApplicationTarget::forInitialization(
-      initializer, DC, patternType, pattern, /*bindPatternVarsOneWay=*/false);
+bool TypeChecker::typeCheckBinding(
+    Pattern *&pattern, Expr *&initializer, DeclContext *DC,
+    Type patternType, PatternBindingDecl *PBD, unsigned patternNumber) {
+  SolutionApplicationTarget target =
+    PBD ? SolutionApplicationTarget::forInitialization(
+            initializer, DC, patternType, PBD, patternNumber,
+            /*bindPatternVarsOneWay=*/false)
+        : SolutionApplicationTarget::forInitialization(
+            initializer, DC, patternType, pattern,
+            /*bindPatternVarsOneWay=*/false);
 
   // Type-check the initializer.
   bool unresolvedTypeExprs = false;
@@ -2425,7 +2430,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
     }
   }
 
-  bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC, patternType);
+  bool hadError = TypeChecker::typeCheckBinding(
+      pattern, init, DC, patternType, PBD, patternNumber);
   if (!init) {
     PBD->setInvalid();
     return true;
@@ -2550,7 +2556,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
       InitType = cs.generateConstraints(
-          pattern, elementLocator, /*bindPatternVarsOneWay=*/false);
+          pattern, elementLocator, /*bindPatternVarsOneWay=*/false,
+          /*patternBinding=*/nullptr, /*patternBindingIndex=*/0);
       if (!InitType)
         return true;
 
@@ -3168,10 +3175,6 @@ void Solution::dump(raw_ostream &out) const {
           << ovl.second.openedType->getString(PO) << "\n";
       break;
 
-    case OverloadChoiceKind::BaseType:
-      out << "base type " << choice.getBaseType()->getString(PO) << "\n";
-      break;
-
     case OverloadChoiceKind::KeyPathApplication:
       out << "key path application root "
           << choice.getBaseType()->getString(PO) << "\n";
@@ -3372,10 +3375,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
         out << choice.getDecl()->getBaseName() << ": "
             << resolved.boundType->getString(PO) << " == "
             << resolved.openedType->getString(PO) << "\n";
-        break;
-
-      case OverloadChoiceKind::BaseType:
-        out << "base type " << choice.getBaseType()->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::KeyPathApplication:

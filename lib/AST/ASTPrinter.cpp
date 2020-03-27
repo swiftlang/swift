@@ -103,6 +103,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    bool printSPIs) {
   PrintOptions result;
+  result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
   result.PrintIfConfig = false;
@@ -3585,7 +3586,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   template <typename T>
   void printModuleContext(T *Ty) {
     FileUnit *File = cast<FileUnit>(Ty->getDecl()->getModuleScopeContext());
-    ModuleDecl *Mod = File->getParentModule();
+    const ModuleDecl *Mod =
+        Options.mapModuleToUnderlying(File->getParentModule());
 
     Identifier Name = Mod->getName();
     if (Options.UseExportedModuleNames)

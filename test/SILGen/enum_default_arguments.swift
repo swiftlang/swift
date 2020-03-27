@@ -27,7 +27,7 @@ enum NonTrivialDefaults<T: DefaultInitializable> {
   // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi_SdSSxtcAEmAA20DefaultInitializableRzlFfA2_{{.*}}
   // CHECK: bb0([[OUT:%[0-9]+]] : $*T):
   // CHECK:  [[META:%[0-9]+]] = metatype $@thick T.Type
-  // CHECK:  [[DEF_INIT_WITNESS:%[0-9]+]] = witness_method $T, #DefaultInitializable.init!allocator.1 : <Self where Self : DefaultInitializable> (Self.Type) -> () -> Self : $@convention(witness_method: DefaultInitializable) <τ_0_0 where τ_0_0 : DefaultInitializable> (@thick τ_0_0.Type) -> @out τ_0_0
+  // CHECK:  [[DEF_INIT_WITNESS:%[0-9]+]] = witness_method $T, #DefaultInitializable.init!allocator : <Self where Self : DefaultInitializable> (Self.Type) -> () -> Self : $@convention(witness_method: DefaultInitializable) <τ_0_0 where τ_0_0 : DefaultInitializable> (@thick τ_0_0.Type) -> @out τ_0_0
   // CHECK:  [[LIT:%[0-9]+]] = apply [[DEF_INIT_WITNESS]]<T>([[OUT]], [[META]]) : $@convention(witness_method: DefaultInitializable) <τ_0_0 where τ_0_0 : DefaultInitializable> (@thick τ_0_0.Type) -> @out τ_0_0
   // CHECK:  [[RET:%[0-9]+]] = tuple ()
   // CHECK:  return [[RET]] : $()

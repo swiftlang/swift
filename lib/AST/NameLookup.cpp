@@ -1371,13 +1371,9 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
 ///
 /// This utility is used by qualified name lookup.
 static void configureLookup(const DeclContext *dc,
-                            NLOptions &options,
+                            NLOptions options,
                             ReferencedNameTracker *&tracker,
                             bool &isLookupCascading) {
-  auto &ctx = dc->getASTContext();
-  if (ctx.isAccessControlDisabled())
-    options |= NL_IgnoreAccessControl;
-
   // Find the dependency tracker we'll need for this lookup.
   tracker = nullptr;
   if (auto containingSourceFile =
@@ -1439,7 +1435,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   }
 
   // Check access.
-  if (!(options & NL_IgnoreAccessControl)) {
+  if (!(options & NL_IgnoreAccessControl) &&
+      !dc->getASTContext().isAccessControlDisabled()) {
     return decl->isAccessibleFrom(dc);
   }
 
@@ -1612,7 +1609,6 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
 
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
-  auto &ctx = DC->getASTContext();
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
   while (!stack.empty()) {
     auto current = stack.back();
@@ -1622,9 +1618,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
     // Make sure we've resolved property wrappers, if we need them.
-    if (ctx.areLegacySemanticQueriesEnabled()) {
-      installPropertyWrapperMembersIfNeeded(current, member);
-    }
+    installPropertyWrapperMembersIfNeeded(current, member);
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
@@ -2239,6 +2233,23 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
 
 
   return nullptr;
+}
+
+ArrayRef<ProtocolDecl *>
+InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
+                                    ProtocolDecl *PD) const {
+  llvm::SmallVector<ProtocolDecl *, 2> result;
+  SmallPtrSet<const ProtocolDecl *, 2> known;
+  known.insert(PD);
+  bool anyObject = false;
+  for (const auto found : getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
+      if (known.insert(proto).second)
+        result.push_back(proto);
+    }
+  }
+
+  return PD->getASTContext().AllocateCopy(result);
 }
 
 llvm::Expected<NominalTypeDecl *>

@@ -740,6 +740,39 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Rethrows:
   case DAK_Infix:
     return false;
+  case DAK_Override: {
+    if (!Options.IsForSwiftInterface)
+      break;
+    // When we are printing Swift interface, we have to skip the override keyword
+    // if the overriden decl is invisible from the interface. Otherwise, an error
+    // will occur while building the Swift module because the overriding decl
+    // doesn't override anything.
+    // We couldn't skip every `override` keywords becuase they change the
+    // ABI if the overriden decl is also publically visible.
+    // For public-override-internal case, having `override` doesn't have ABI
+    // implication. Thus we can skip them.
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (auto *BD = VD->getOverriddenDecl()) {
+        if (!BD->hasClangNode() &&
+            VD->isEffectiveLinkageMoreVisibleThan(BD))
+          return false;
+      }
+    }
+    break;
+  }
+  case DAK_Custom: {
+    if (!Options.IsForSwiftInterface)
+      break;
+    // For Swift interface, we should only print function builder attribute
+    // on parameter decls. Printing the attribute elsewhere isn't ABI relevant.
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->getAttachedFunctionBuilder() == this) {
+        if (!isa<ParamDecl>(D))
+          return false;
+      }
+    }
+    break;
+  }
   default:
     break;
   }

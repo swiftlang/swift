@@ -344,22 +344,12 @@ void SILDeclRef::print(raw_ostream &OS) const {
     break;
   }
 
-  auto uncurryLevel = getParameterListCount() - 1;
-  if (uncurryLevel != 0)
-    OS << (isDot ? '.' : '!')  << uncurryLevel;
-
   if (isForeign)
-    OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "foreign";
+    OS << (isDot ? '.' : '!')  << "foreign";
 
-  if (isDirectReference)
-    OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "direct";
-
-  // SWIFT_ENABLE_TENSORFLOW
-  if (autoDiffDerivativeFunctionIdentifier) {
-    auto *autoDiffFuncId = autoDiffDerivativeFunctionIdentifier;
-    OS << ((isDot || uncurryLevel != 0 || isForeign || isDirectReference)
-               ? '.' : '!');
-    switch (autoDiffFuncId->getKind()) {
+  if (derivativeFunctionIdentifier) {
+    OS << ((isDot || isForeign) ? '.' : '!');
+    switch (derivativeFunctionIdentifier->getKind()) {
     case AutoDiffDerivativeFunctionKind::JVP:
       OS << "jvp.";
       break;
@@ -367,9 +357,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
       OS << "vjp.";
       break;
     }
-    OS << autoDiffFuncId->getParameterIndices()->getString();
+    OS << derivativeFunctionIdentifier->getParameterIndices()->getString();
     if (auto derivativeGenSig =
-            autoDiffFuncId->getDerivativeGenericSignature()) {
+            derivativeFunctionIdentifier->getDerivativeGenericSignature()) {
       OS << "." << derivativeGenSig;
     }
   }
@@ -2279,7 +2269,6 @@ public:
     }
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
     *this << "[parameters";
     for (auto i : dfi->getParameterIndices()->getIndices())
@@ -2290,18 +2279,6 @@ public:
       *this << " with_derivative ";
       *this << '{' << getIDAndType(dfi->getJVPFunction()) << ", "
             << getIDAndType(dfi->getVJPFunction()) << '}';
-    }
-  }
-
-  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
-    *this << "[parameters";
-    for (auto i : lfi->getParameterIndices()->getIndices())
-      *this << ' ' << i;
-    *this << "] ";
-    *this << getIDAndType(lfi->getOriginalFunction());
-    if (lfi->hasTransposeFunction()) {
-      *this << " with_transpose ";
-      *this << getIDAndType(lfi->getTransposeFunction());
     }
   }
 
@@ -2320,10 +2297,23 @@ public:
       break;
     }
     *this << "] ";
-    *this << getIDAndType(dfei->getFunctionOperand());
+    *this << getIDAndType(dfei->getOperand());
     if (dfei->hasExplicitExtracteeType()) {
       *this << " as ";
       *this << dfei->getType();
+    }
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
+    *this << "[parameters";
+    for (auto i : lfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    *this << getIDAndType(lfi->getOriginalFunction());
+    if (lfi->hasTransposeFunction()) {
+      *this << " with_transpose ";
+      *this << getIDAndType(lfi->getTransposeFunction());
     }
   }
 

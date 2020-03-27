@@ -37,6 +37,7 @@ class AccessorDecl;
 enum class AccessorKind;
 class ContextualPattern;
 class DefaultArgumentExpr;
+class ClosureExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
@@ -1494,8 +1495,8 @@ struct PrecedenceGroupDescriptor {
 
 void simple_display(llvm::raw_ostream &out, const PrecedenceGroupDescriptor &d);
 
-class LookupPrecedenceGroupRequest
-    : public SimpleRequest<LookupPrecedenceGroupRequest,
+class ValidatePrecedenceGroupRequest
+    : public SimpleRequest<ValidatePrecedenceGroupRequest,
                            PrecedenceGroupDecl *(PrecedenceGroupDescriptor),
                            CacheKind::Cached> {
 public:
@@ -2138,6 +2139,24 @@ private:
 
 public:
   // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Determine whether closure body has any explicit `return`
+/// statements which could produce a non-void result.
+class ClosureHasExplicitResultRequest
+    : public SimpleRequest<ClosureHasExplicitResultRequest, bool(ClosureExpr *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                ClosureExpr *closure) const;
+
+public:
   bool isCached() const { return true; }
 };
 

@@ -156,7 +156,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
   }
   if (auto *VD = dyn_cast<VarDecl>(Member)) {
     // Cannot use static properties on non-metatypes.
-    if (!(LS.isQualified() && LS.isOnMetatype()) && VD->isStatic())
+    if (!LS.isOnMetatype() && VD->isStatic())
       return false;
 
     // Cannot use instance properties on metatypes.
@@ -167,14 +167,16 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
   }
   if (isa<EnumElementDecl>(Member)) {
     // Cannot reference enum elements on non-metatypes.
-    if (!(LS.isQualified() && LS.isOnMetatype()))
+    if (!LS.isOnMetatype())
       return false;
   }
   if (auto CD = dyn_cast<ConstructorDecl>(Member)) {
+    if (!LS.isQualified())
+      return false;
     // Constructors with stub implementations cannot be called in Swift.
     if (CD->hasStubImplementation())
       return false;
-    if (LS.isQualified() && LS.isOnSuperclass()) {
+    if (LS.isOnSuperclass()) {
       // Cannot call initializers from a superclass, except for inherited
       // convenience initializers.
       return LS.isInheritsSuperclassInitializers() && CD->isInheritable();
@@ -415,7 +417,9 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     }
 
     DeclVisibilityKind ReasonForThisProtocol;
-    if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
+    if (Conformance->getKind() == ProtocolConformanceKind::Inherited)
+      ReasonForThisProtocol = getReasonForSuper(Reason);
+    else if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
       ReasonForThisProtocol =
           DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal;
     else
@@ -434,6 +438,9 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           continue;
         }
         if (auto *VD = dyn_cast<ValueDecl>(Member)) {
+          if (!isDeclVisibleInLookupMode(VD, LS, FromContext))
+            continue;
+
           if (!VD->isProtocolRequirement())
             continue;
 
@@ -629,50 +636,61 @@ static void lookupVisibleMemberDeclsImpl(
     }
   }
 
-  llvm::SmallPtrSet<ClassDecl *, 8> Ancestors;
-  do {
-    NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
-    if (!CurNominal)
-      break;
-
-    synthesizeMemberDeclsForLookup(CurNominal, CurrDC);
+  const auto synthesizeAndLookupTypeMembers = [&](NominalTypeDecl *NTD) {
+    synthesizeMemberDeclsForLookup(NTD, CurrDC);
 
     // Look in for members of a nominal type.
     lookupTypeMembers(BaseTy, BaseTy, Consumer, CurrDC, LS, Reason);
+  };
+
+  llvm::SmallPtrSet<ClassDecl *, 8> Ancestors;
+  {
+    const auto NTD = BaseTy->getAnyNominal();
+    if (NTD == nullptr)
+      return;
+
+    synthesizeAndLookupTypeMembers(NTD);
+    // Look into protocols only on the current nominal to avoid repeatedly
+    // visiting inherited conformances.
     lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
                                              Reason, Visited);
-    // If we have a class type, look into its superclass.
-    auto *CurClass = dyn_cast<ClassDecl>(CurNominal);
+
+    const auto CD = dyn_cast<ClassDecl>(NTD);
 
     // FIXME: We check `getSuperclass()` here because we'll be using the
     // superclass Type below, and in ill-formed code `hasSuperclass()` could
     // be true while `getSuperclass()` returns null, because the latter
     // looks for a declaration.
-    if (CurClass && CurClass->getSuperclass()) {
-      // FIXME: This path is no substitute for an actual circularity check.
-      // The real fix is to check that the superclass doesn't introduce a
-      // circular reference before it's written into the AST.
-      if (Ancestors.count(CurClass)) {
-        break;
-      }
+    if (!CD || !CD->getSuperclass())
+      return;
 
-      BaseTy = CurClass->getSuperclass();
-      Reason = getReasonForSuper(Reason);
+    // We have a superclass; switch state and look into the inheritance chain.
+    Ancestors.insert(CD);
 
-      bool InheritsSuperclassInitializers =
-          CurClass->inheritsSuperclassInitializers();
-      if (LS.isOnSuperclass() && !InheritsSuperclassInitializers)
-        LS = LS.withoutInheritsSuperclassInitializers();
-      else if (!LS.isOnSuperclass()) {
-        LS = LS.withOnSuperclass();
-        if (InheritsSuperclassInitializers)
-          LS = LS.withInheritsSuperclassInitializers();
-      }
-    } else {
+    Reason = getReasonForSuper(Reason);
+    BaseTy = CD->getSuperclass();
+
+    LS = LS.withOnSuperclass();
+    if (CD->inheritsSuperclassInitializers())
+      LS = LS.withInheritsSuperclassInitializers();
+  }
+
+  // Look into the inheritance chain.
+  do {
+    const auto CurClass = BaseTy->getClassOrBoundGenericClass();
+
+    // FIXME: This path is no substitute for an actual circularity check.
+    // The real fix is to check that the superclass doesn't introduce a
+    // circular reference before it's written into the AST.
+    if (!Ancestors.insert(CurClass).second)
       break;
-    }
-    Ancestors.insert(CurClass);
-  } while (1);
+
+    synthesizeAndLookupTypeMembers(CurClass);
+
+    BaseTy = CurClass->getSuperclass();
+    if (!CurClass->inheritsSuperclassInitializers())
+      LS = LS.withoutInheritsSuperclassInitializers();
+  } while (BaseTy);
 }
 
 swift::DynamicLookupInfo::DynamicLookupInfo(
@@ -1070,8 +1088,11 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
 
     // Skip initializer contexts, we will not find any declarations there.
     if (isa<Initializer>(DC)) {
+      // For non-'lazy' decls, lookup on the meta type.
+      if (!isa<PatternBindingInitializer>(DC) ||
+          !cast<PatternBindingInitializer>(DC)->getInitializedLazyVar())
+        LS = LS.withOnMetatype();
       DC = DC->getParent();
-      LS = LS.withOnMetatype();
     }
 
     // We don't look for generic parameters if we are in the context of a
@@ -1088,6 +1109,8 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
     if (auto *SE = dyn_cast<SubscriptDecl>(DC)) {
       ExtendedType = SE->getDeclContext()->getSelfTypeInContext();
       DC = DC->getParent();
+      if (SE->isStatic())
+        LS = LS.withOnMetatype();
     } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
 
       // Look for local variables; normally, the parser resolves these
@@ -1117,7 +1140,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())
-            ExtendedType = MetatypeType::get(ExtendedType);
+            LS = LS.withOnMetatype();
       }
     } else if (auto CE = dyn_cast<ClosureExpr>(DC)) {
       if (Loc.isValid()) {

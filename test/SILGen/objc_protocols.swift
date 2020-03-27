@@ -28,11 +28,11 @@ protocol Ansible {
 // CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[THIS:%.*]] : @guaranteed $T):
 // -- Result of runce is autoreleased according to default objc conv
-// CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : {{\$.*}},  #NSRuncing.runce!1.foreign
+// CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : {{\$.*}},  #NSRuncing.runce!foreign
 // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<T>([[THIS:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
 
 // -- Result of copyRuncing is received copy_valued according to -copy family
-// CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : {{\$.*}},  #NSRuncing.copyRuncing!1.foreign
+// CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : {{\$.*}},  #NSRuncing.copyRuncing!foreign
 // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<T>([[THIS:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @owned NSObject
 
 // -- Arguments are not consumed by objc calls
@@ -62,7 +62,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu_'
 
 // CHECK: sil private [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu_AEycfu0_ : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> @owned NSObject {
-// CHECK: objc_method %0 : $T, #NSRuncing.runce!1.foreign : <Self where Self : NSRuncing> (Self) -> () -> NSObject, $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
+// CHECK: objc_method %0 : $T, #NSRuncing.runce!foreign : <Self where Self : NSRuncing> (Self) -> () -> NSObject, $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu_AEycfu0_'
 
 
@@ -71,7 +71,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu1_'
 
 // CHECK: sil private [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu1_AEycfu2_ : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> @owned NSObject
-// CHECK: objc_method %0 : $T, #NSRuncing.runce!1.foreign : <Self where Self : NSRuncing> (Self) -> () -> NSObject, $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
+// CHECK: objc_method %0 : $T, #NSRuncing.runce!foreign : <Self where Self : NSRuncing> (Self) -> () -> NSObject, $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu1_AEycfu2_'
 
 
@@ -80,7 +80,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxmcfu3_'
 
 // CHECK-LABEL: sil private [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxmcfu3_AEycfu4_ : $@convention(thin) <T where T : NSRuncing> (@thick T.Type) -> @owned NSObject
-// CHECK: objc_method %2 : $@objc_metatype T.Type, #NSRuncing.mince!1.foreign : <Self where Self : NSRuncing> (Self.Type) -> () -> NSObject, $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (@objc_metatype τ_0_0.Type) -> @autoreleased NSObject
+// CHECK: objc_method %2 : $@objc_metatype T.Type, #NSRuncing.mince!foreign : <Self where Self : NSRuncing> (Self.Type) -> () -> NSObject, $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (@objc_metatype τ_0_0.Type) -> @autoreleased NSObject
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxmcfu3_AEycfu4_'
 
 
@@ -88,12 +88,12 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK: bb0([[THIS:%.*]] : @guaranteed $NSRuncing):
 // -- Result of runce is autoreleased according to default objc conv
 // CHECK: [[THIS1:%.*]] = open_existential_ref [[THIS]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
-// CHECK: [[METHOD:%.*]] = objc_method [[THIS1]] : $[[OPENED]], #NSRuncing.runce!1.foreign
+// CHECK: [[METHOD:%.*]] = objc_method [[THIS1]] : $[[OPENED]], #NSRuncing.runce!foreign
 // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<[[OPENED]]>([[THIS1]])
 
 // -- Result of copyRuncing is received copy_valued according to -copy family
 // CHECK: [[THIS2:%.*]] = open_existential_ref [[THIS]] : $NSRuncing to $[[OPENED2:@opened(.*) NSRuncing]]
-// CHECK: [[METHOD:%.*]] = objc_method [[THIS2]] : $[[OPENED2]], #NSRuncing.copyRuncing!1.foreign
+// CHECK: [[METHOD:%.*]] = objc_method [[THIS2]] : $[[OPENED2]], #NSRuncing.copyRuncing!foreign
 // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<[[OPENED2]]>([[THIS2:%.*]])
 
 // -- Arguments are not consumed by objc calls
@@ -117,12 +117,12 @@ func objc_protocol_partial_apply(_ x: NSRuncing) {
 // CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened(.*) NSFunging & NSRuncing]]
-  // CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : $[[OPENED]], #NSRuncing.runce!1.foreign
+  // CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : $[[OPENED]], #NSRuncing.runce!foreign
   // CHECK: apply [[METHOD]]<[[OPENED]]>([[THIS]])
   x.runce()
 
   // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened(.*) NSFunging & NSRuncing]]
-  // CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : $[[OPENED]], #NSFunging.funge!1.foreign
+  // CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : $[[OPENED]], #NSFunging.funge!foreign
   // CHECK: apply [[METHOD]]<[[OPENED]]>([[THIS]])
   x.funge()
 }
@@ -243,7 +243,7 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
   // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
   // CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick (@opened([[N]]) Initializable).Type to $@objc_metatype (@opened([[N]]) Initializable).Type
   // CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype (@opened([[N]]) Initializable).Type, $@opened([[N]]) Initializable
-  // CHECK:   [[INIT_WITNESS:%[0-9]+]] = objc_method [[I2_ALLOC]] : $@opened([[N]]) Initializable, #Initializable.init!initializer.1.foreign : {{.*}}
+  // CHECK:   [[INIT_WITNESS:%[0-9]+]] = objc_method [[I2_ALLOC]] : $@opened([[N]]) Initializable, #Initializable.init!initializer.foreign : {{.*}}
   // CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[I]], [[I2_ALLOC]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
   // CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]]) Initializable : $@opened([[N]]) Initializable, $Initializable
   // CHECK:   store [[I2_EXIST_CONTAINER]] to [init] [[PB]] : $*Initializable
@@ -307,7 +307,7 @@ public protocol DangerousEscaper {
 // CHECK:  destroy_addr [[BLOCK_ADDR]] : $*@callee_guaranteed () -> ()
 // CHECK:  dealloc_stack [[BLOCK]] : $*@block_storage @callee_guaranteed () -> ()
 // CHECK:  destroy_value [[CLOSURE_COPY1]] : $@callee_guaranteed () -> ()
-// CHECK:  [[METH:%.*]] = objc_method [[OE]] : {{.*}} DangerousEscaper, #DangerousEscaper.malicious!1.foreign
+// CHECK:  [[METH:%.*]] = objc_method [[OE]] : {{.*}} DangerousEscaper, #DangerousEscaper.malicious!foreign
 // CHECK:  apply [[METH]]<@opened("{{.*}}") DangerousEscaper>([[BLOCK_CLOSURE_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
 // CHECK:  destroy_value [[BLOCK_CLOSURE_COPY]] : $@convention(block) @noescape () -> ()
 // CHECK:  return {{.*}} : $()

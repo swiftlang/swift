@@ -1351,14 +1351,14 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
            .Default(None);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 ///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
-///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)?
-///                      ('.' sil-decl-lang)? ('.' sil-decl-autodiff)?
-///  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
+// SWIFT_ENABLE_TENSORFLOW
+///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)?
 ///                      ('.' sil-decl-autodiff)?
-///  sil-decl-subref ::= '!' sil-decl-lang ('.' sil-decl-autodiff)?
+///  sil-decl-subref ::= '!' sil-decl-lang
+// SWIFT_ENABLE_TENSORFLOW
 ///  sil-decl-subref ::= '!' sil-decl-autodiff
+// SWIFT_ENABLE_TENSORFLOW END
 ///  sil-decl-subref-part ::= 'getter'
 ///  sil-decl-subref-part ::= 'setter'
 ///  sil-decl-subref-part ::= 'allocator'
@@ -1366,44 +1366,34 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 ///  sil-decl-subref-part ::= 'enumelt'
 ///  sil-decl-subref-part ::= 'destroyer'
 ///  sil-decl-subref-part ::= 'globalaccessor'
-///  sil-decl-uncurry-level ::= [0-9]+
 ///  sil-decl-lang ::= 'foreign'
-///  sil-decl-autodiff ::= sil-decl-autodiff-kind '.' sil-decl-autodiff-order
-///                        '.' sil-decl-autodiff-indices
+///  sil-decl-autodiff ::= sil-decl-autodiff-kind '.' sil-decl-autodiff-indices
 ///  sil-decl-autodiff-kind ::= 'jvp'
 ///  sil-decl-autodiff-kind ::= 'vjp'
-///  sil-decl-autodiff-order ::= [0-9]+
-///  sil-decl-autodiff-indices ::= [FM][SU]+
+///  sil-decl-autodiff-indices ::= [SU]+
 bool SILParser::parseSILDeclRef(SILDeclRef &Result,
                                 SmallVectorImpl<ValueDecl *> &values) {
   ValueDecl *VD;
   if (parseSILDottedPath(VD, values))
     return true;
 
-  // Initialize Kind, uncurryLevel and IsObjC.
+  // Initialize SILDeclRef components.
   SILDeclRef::Kind Kind = SILDeclRef::Kind::Func;
-  unsigned uncurryLevel = 0;
   bool IsObjC = false;
-  // SWIFT_ENABLE_TENSORFLOW
-  AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId = nullptr;
+  AutoDiffDerivativeFunctionIdentifier *DerivativeId = nullptr;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
-    Result = SILDeclRef(VD, Kind, /*isCurried=*/false, IsObjC);
-    if (uncurryLevel < Result.getParameterListCount() - 1)
-      Result = Result.asCurried();
+    Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
     return false;
   }
 
-  // Handle sil-constant-kind-and-uncurry-level.
-  // ParseState indicates the value we just handled.
-  // SWIFT_ENABLE_TENSORFLOW
-  // 1 means we just handled Kind, 2 means we just handled uncurryLevel, 3 means
-  // we just handled foreign.
-  // We accept func|getter|setter|...|foreign, an autodiff identifier, or an
-  // integer when ParseState is 0; accept foreign, an autodiff identifier, or an
-  // integer when ParseState is 1; accept foreign or an autodiff identifier when
-  // ParseState is 2; accept an autodiff identifier when ParseState is 3.
+  // Handle SILDeclRef components. ParseState tracks the last parsed component.
+  //
+  // When ParseState is 0, accept kind (`func|getter|setter|...`) and set
+  // ParseState to 1.
+  //
+  // Always accept `foreign` and derivative function identifier.
   unsigned ParseState = 0;
   Identifier Id;
   do {
@@ -1469,31 +1459,23 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (!ParseState && Id.str() == "backinginit") {
         Kind = SILDeclRef::Kind::PropertyWrapperBackingInitializer;
         ParseState = 1;
-      // SWIFT_ENABLE_TENSORFLOW
-      } else if (ParseState < 3 && Id.str() == "foreign") {
+      } else if (Id.str() == "foreign") {
         IsObjC = true;
-        // SWIFT_ENABLE_TENSORFLOW
-        ParseState = 3;
+        break;
       } else if (Id.str() == "jvp" || Id.str() == "vjp") {
-        AutoDiffDerivativeFunctionKind kind;
         IndexSubset *parameterIndices = nullptr;
         GenericSignature derivativeGenSig;
         // Parse derivative function kind.
-        if (Id.str() == "jvp")
-          kind = AutoDiffDerivativeFunctionKind::JVP;
-        else if (Id.str() == "vjp")
-          kind = AutoDiffDerivativeFunctionKind::VJP;
-        else
-          llvm_unreachable("Should only have JVP and VJP here");
+        AutoDiffDerivativeFunctionKind derivativeKind(Id.str());
         if (!P.consumeIf(tok::period)) {
           P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ".");
           return true;
         }
         // Parse parameter indices.
-        parameterIndices = IndexSubset::getFromString(
-            SILMod.getASTContext(), P.Tok.getText());
+        parameterIndices =
+            IndexSubset::getFromString(SILMod.getASTContext(), P.Tok.getText());
         if (!parameterIndices) {
-          P.diagnose(P.Tok, diag::malformed_autodiff_parameter_indices);
+          P.diagnose(P.Tok, diag::invalid_index_subset);
           return true;
         }
         P.consumeToken();
@@ -1507,26 +1489,20 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
           auto *derivativeGenEnv = handleSILGenericParams(genericParams, &P.SF);
           derivativeGenSig = derivativeGenEnv->getGenericSignature();
         }
-        autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
-            kind, parameterIndices, derivativeGenSig,
+        DerivativeId = AutoDiffDerivativeFunctionIdentifier::get(
+            derivativeKind, parameterIndices, derivativeGenSig,
             SILMod.getASTContext());
         break;
-      } else
+      } else {
         break;
-    } else if (ParseState < 2 && P.Tok.is(tok::integer_literal)) {
-      parseIntegerLiteral(P.Tok.getText(), 0, uncurryLevel);
-      P.consumeToken(tok::integer_literal);
-      ParseState = 2;
+      }
     } else
       break;
 
   } while (P.consumeIf(tok::period));
 
   // Construct SILDeclRef.
-  // SWIFT_ENABLE_TENSORFLOW
-  Result = SILDeclRef(VD, Kind, /*isCurried=*/false, IsObjC, autoDiffFuncId);
-  if (uncurryLevel < Result.getParameterListCount() - 1)
-    Result = Result.asCurried();
+  Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
   return false;
 }
 
@@ -5064,7 +5040,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                                  blockType, subMap);
       break;
     }
-    // SWIFT_ENABLE_TENSORFLOW
     case SILInstructionKind::DifferentiableFunctionInst: {
       // e.g. differentiable_function [parameters 0 1 2] %0 : $T
       //
@@ -5096,11 +5071,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         // FIXME(rxwei): Change this to *not* require a type signature once
         // we can infer derivative function types.
         derivativeFunctions = std::make_pair(SILValue(), SILValue());
-        if (P.parseToken(tok::l_brace,
+        if (P.parseToken(
+                tok::l_brace,
                 diag::sil_inst_autodiff_operand_list_expected_lbrace) ||
             parseTypedValueRef(derivativeFunctions->first, B) ||
             P.parseToken(tok::comma,
-                diag::sil_inst_autodiff_operand_list_expected_comma) ||
+                         diag::sil_inst_autodiff_operand_list_expected_comma) ||
             parseTypedValueRef(derivativeFunctions->second, B) ||
             P.parseToken(tok::r_brace,
                          diag::sil_inst_autodiff_operand_list_expected_rbrace))
@@ -5114,7 +5090,38 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           InstLoc, parameterIndicesSubset, original, derivativeFunctions);
       break;
     }
-
+    case SILInstructionKind::DifferentiableFunctionExtractInst: {
+      // Parse the rest of the instruction: an extractee, a differentiable
+      // function operand, an optional explicit extractee type, and a debug
+      // location.
+      NormalDifferentiableFunctionTypeComponent extractee;
+      StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
+      SILValue functionOperand;
+      SourceLoc lastLoc;
+      if (P.parseToken(
+              tok::l_square,
+              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
+          parseSILIdentifierSwitch(
+              extractee, extracteeNames,
+              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
+          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "extractee kind"))
+        return true;
+      if (parseTypedValueRef(functionOperand, B))
+        return true;
+      // Parse an optional explicit extractee type.
+      Optional<SILType> extracteeType = None;
+      if (P.consumeIf(tok::kw_as)) {
+        extracteeType = SILType();
+        if (parseSILType(*extracteeType))
+          return true;
+      }
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createDifferentiableFunctionExtract(
+          InstLoc, extractee, functionOperand, extracteeType);
+      break;
+    }
     case SILInstructionKind::LinearFunctionInst: {
       // e.g. linear_function [parameters 0 1 2] %0 : $T
       // e.g. linear_function [parameters 0 1 2] %0 : $T with_transpose %1 : $T
@@ -5150,38 +5157,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           InstLoc, parameterIndicesSubset, original, transpose);
       break;
     }
-
-    case SILInstructionKind::DifferentiableFunctionExtractInst: {
-      // Parse the rest of the instruction: an extractee, a differentiable
-      // function operand, an optional explicit extractee type, and a debug
-      // location.
-      NormalDifferentiableFunctionTypeComponent extractee;
-      StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
-      SILValue functionOperand;
-      SourceLoc lastLoc;
-      if (P.parseToken(tok::l_square,
-              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
-          parseSILIdentifierSwitch(extractee, extracteeNames,
-              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
-          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
-                       "extractee kind"))
-        return true;
-      if (parseTypedValueRef(functionOperand, B))
-        return true;
-      // Parse an optional explicit extractee type.
-      Optional<SILType> extracteeType = None;
-      if (P.consumeIf(tok::kw_as)) {
-        extracteeType = SILType();
-        if (parseSILType(*extracteeType))
-          return true;
-      }
-      if (parseSILDebugLocation(InstLoc, B))
-        return true;
-      ResultVal = B.createDifferentiableFunctionExtract(
-          InstLoc, extractee, functionOperand, extracteeType);
-      break;
-    }
-
+    // SWIFT_ENABLE_TENSORFLOW
     case SILInstructionKind::LinearFunctionExtractInst: {
       // Parse the rest of the instruction: an extractee, a linear function
       // operand, and a debug location.
@@ -5204,7 +5180,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       break;
     }
     // SWIFT_ENABLE_TENSORFLOW END
-
     case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
       // e.g. differentiability_witness_function
       //      [jvp] [parameters 0 1] [results 0] <T where T: Differentiable>

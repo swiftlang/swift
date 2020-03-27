@@ -24,6 +24,7 @@ namespace swift {
 class AbstractFunctionDecl;
 class BraceStmt;
 class ClosureExpr;
+class CodeCompletionCallbacksFactory;
 class ConstructorDecl;
 class CustomAttr;
 class Decl;

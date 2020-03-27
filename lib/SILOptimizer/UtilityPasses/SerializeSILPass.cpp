@@ -327,9 +327,9 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::DestructureStructInst:
   case SILInstructionKind::DestructureTupleInst:
-  // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::DifferentiableFunctionInst:
   case SILInstructionKind::DifferentiableFunctionExtractInst:
+  // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::LinearFunctionInst:
   case SILInstructionKind::LinearFunctionExtractInst:
   // SWIFT_ENABLE_TENSORFLOW END

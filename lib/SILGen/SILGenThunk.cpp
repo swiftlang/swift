@@ -70,51 +70,6 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   return F;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
-    SILDeclRef derivativeFnDeclRef, CanSILFunctionType constantTy) {
-  auto *autoDiffFuncId =
-      derivativeFnDeclRef.autoDiffDerivativeFunctionIdentifier;
-  assert(autoDiffFuncId);
-  auto *derivativeFnDecl = derivativeFnDeclRef.getDecl();
-
-  SILGenFunctionBuilder builder(*this);
-  auto originalFn = derivativeFnDeclRef.asAutoDiffOriginalFunction();
-  // TODO(TF-685): Use principled thunk mangling.
-  // Do not simply reuse reabstraction thunk mangling.
-  auto name = derivativeFnDeclRef.mangle() + "_vtable_entry_thunk";
-  auto *thunk = builder.getOrCreateFunction(
-      derivativeFnDecl, name, originalFn.getLinkage(ForDefinition), constantTy,
-      IsBare, IsTransparent, derivativeFnDeclRef.isSerialized(), IsNotDynamic,
-      ProfileCounter(), IsThunk);
-  if (!thunk->empty())
-    return thunk;
-
-  if (auto genSig = constantTy->getSubstGenericSignature())
-    thunk->setGenericEnvironment(genSig->getGenericEnvironment());
-  SILGenFunction SGF(*this, *thunk, SwiftModule);
-  SmallVector<ManagedValue, 4> params;
-  auto loc = derivativeFnDeclRef.getAsRegularLocation();
-  SGF.collectThunkParams(loc, params);
-  auto originalFnRef = SGF.emitGlobalFunctionRef(loc, originalFn);
-  auto *loweredIndices = autodiff::getLoweredParameterIndices(
-      autoDiffFuncId->getParameterIndices(),
-      derivativeFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
-  auto diffFn = SGF.B.createDifferentiableFunction(
-      loc, loweredIndices, originalFnRef);
-  auto diffDerivativeFn = SGF.B.createDifferentiableFunctionExtract(
-      loc, NormalDifferentiableFunctionTypeComponent(autoDiffFuncId->getKind()),
-      diffFn);
-  auto autoDiffDerivativeFnSILTy = SILType::getPrimitiveObjectType(constantTy);
-  SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
-                                thunk->getArguments().end());
-  auto apply = SGF.emitApplyWithRethrow(
-      loc, diffDerivativeFn, autoDiffDerivativeFnSILTy,
-      SGF.getForwardingSubstitutionMap(), args);
-  SGF.B.createReturn(loc, apply);
-  return thunk;
-}
-
 ManagedValue
 SILGenFunction::emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
                                      CanSILFunctionType constantTy) {
@@ -179,9 +134,7 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
   
   // If the constant is a thunk we haven't emitted yet, emit it.
   if (!SGM.hasFunction(constant)) {
-    if (constant.isCurried) {
-      llvm_unreachable("Curry thunks should have been built in CSApply");
-    } else if (constant.isForeignToNativeThunk()) {
+    if (constant.isForeignToNativeThunk()) {
       SGM.emitForeignToNativeThunk(constant);
     } else if (constant.isNativeToForeignThunk()) {
       SGM.emitNativeToForeignThunk(constant);
@@ -232,4 +185,49 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   return builder.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, IsSerializable,
       ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
+}
+
+SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
+    SILDeclRef derivativeFnDeclRef, CanSILFunctionType constantTy) {
+  auto *derivativeId = derivativeFnDeclRef.derivativeFunctionIdentifier;
+  assert(derivativeId);
+  auto *derivativeFnDecl = derivativeFnDeclRef.getDecl();
+
+  SILGenFunctionBuilder builder(*this);
+  auto originalFnDeclRef = derivativeFnDeclRef.asAutoDiffOriginalFunction();
+  // TODO(TF-685): Use principled thunk mangling.
+  // Do not simply reuse reabstraction thunk mangling.
+  auto name = derivativeFnDeclRef.mangle() + "_vtable_entry_thunk";
+  auto *thunk = builder.getOrCreateFunction(
+      derivativeFnDecl, name, originalFnDeclRef.getLinkage(ForDefinition),
+      constantTy, IsBare, IsTransparent, derivativeFnDeclRef.isSerialized(),
+      IsNotDynamic, ProfileCounter(), IsThunk);
+  if (!thunk->empty())
+    return thunk;
+
+  if (auto genSig = constantTy->getSubstGenericSignature())
+    thunk->setGenericEnvironment(genSig->getGenericEnvironment());
+  SILGenFunction SGF(*this, *thunk, SwiftModule);
+  SmallVector<ManagedValue, 4> params;
+  auto loc = derivativeFnDeclRef.getAsRegularLocation();
+  SGF.collectThunkParams(loc, params);
+
+  auto originalFn = SGF.emitGlobalFunctionRef(loc, originalFnDeclRef);
+  auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+      derivativeId->getParameterIndices(),
+      derivativeFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
+  auto diffFn =
+      SGF.B.createDifferentiableFunction(loc, loweredParamIndices, originalFn);
+  auto derivativeFn = SGF.B.createDifferentiableFunctionExtract(
+      loc, NormalDifferentiableFunctionTypeComponent(derivativeId->getKind()),
+      diffFn);
+  auto derivativeFnSILTy = SILType::getPrimitiveObjectType(constantTy);
+  SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
+                                thunk->getArguments().end());
+  auto apply =
+      SGF.emitApplyWithRethrow(loc, derivativeFn, derivativeFnSILTy,
+                               SGF.getForwardingSubstitutionMap(), args);
+  SGF.B.createReturn(loc, apply);
+
+  return thunk;
 }

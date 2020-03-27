@@ -8014,51 +8014,53 @@ class TryApplyInst final
          const GenericSpecializationInformation *SpecializationInfo);
 };
 
-// SWIFT_ENABLE_TENSORFLOW
-
-/// `differentiable_function` - given a function, differentiation indices and
-/// its derivative functions, create an `@differentiable` function that
-/// represents a bundle of these functions and configurations.
-class DifferentiableFunctionInst final :
-    public InstructionBaseWithTrailingOperands<
-               SILInstructionKind::DifferentiableFunctionInst,
-               DifferentiableFunctionInst, OwnershipForwardingSingleValueInst> {
+/// DifferentiableFunctionInst - creates a `@differentiable` function-typed
+/// value from an original function operand and derivative function operands
+/// (optional). The differentiation transform canonicalizes
+/// `differentiable_function` instructions, filling in derivative function
+/// operands if missing.
+class DifferentiableFunctionInst final
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::DifferentiableFunctionInst,
+          DifferentiableFunctionInst, OwnershipForwardingSingleValueInst> {
 private:
   friend SILBuilder;
-  /// Differentiation parameter indices.
+  /// Differentiability parameter indices.
   IndexSubset *ParameterIndices;
-  /// Indicates whether derivative functions (JVP/VJP) exist.
+  /// Indicates whether derivative function operands (JVP/VJP) exist.
   bool HasDerivativeFunctions;
 
-  DifferentiableFunctionInst(
-      SILDebugLocation DebugLoc, IndexSubset *ParameterIndices,
-      SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions,
-      bool HasOwnership);
+  DifferentiableFunctionInst(SILDebugLocation DebugLoc,
+                             IndexSubset *ParameterIndices,
+                             SILValue OriginalFunction,
+                             ArrayRef<SILValue> DerivativeFunctions,
+                             bool HasOwnership);
 
-  static SILType getDifferentiableFunctionType(
-      SILValue OriginalFunction, IndexSubset *ParameterIndices);
+  static SILType getDifferentiableFunctionType(SILValue OriginalFunction,
+                                               IndexSubset *ParameterIndices);
 
-  static ValueOwnershipKind getMergedOwnershipKind(
-      SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions);
+  static ValueOwnershipKind
+  getMergedOwnershipKind(SILValue OriginalFunction,
+                         ArrayRef<SILValue> DerivativeFunctions);
 
 public:
-  static DifferentiableFunctionInst *create(
-      SILModule &Module, SILDebugLocation Loc,
-      IndexSubset *ParameterIndices, SILValue OriginalFunction,
-      Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
-      bool HasOwnership);
+  static DifferentiableFunctionInst *
+  create(SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
+         SILValue OriginalFunction,
+         Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
+         bool HasOwnership);
 
-  /// Returns the original function.
+  /// Returns the original function operand.
   SILValue getOriginalFunction() const { return getOperand(0); }
 
-  /// Returns differentiation indices.
+  /// Returns differentiability parameter indices.
   IndexSubset *getParameterIndices() const { return ParameterIndices; }
 
   /// Returns true if derivative functions (JVP/VJP) exist.
   bool hasDerivativeFunctions() const { return HasDerivativeFunctions; }
 
-  /// Returns the derivative functions, namely the JVP and VJP functions, if
-  /// they exist. Otherwise, return None.
+  /// Returns the derivative function operands if they exist.
+  /// Otherwise, return `None`.
   Optional<std::pair<SILValue, SILValue>>
   getOptionalDerivativeFunctionPair() const {
     if (!HasDerivativeFunctions)
@@ -8070,27 +8072,67 @@ public:
     return getAllOperands().drop_front();
   }
 
-  /// Returns the JVP function.
+  /// Returns the JVP function operand.
   SILValue getJVPFunction() const {
     assert(HasDerivativeFunctions);
     return getOperand(1);
   }
 
-  /// Returns the VJP function.
+  /// Returns the VJP function operand.
   SILValue getVJPFunction() const {
     assert(HasDerivativeFunctions);
     return getOperand(2);
   }
 
-  /// Returns the derivative function (JVP or VJP) that matches the given kind.
+  /// Returns the derivative function operand (JVP or VJP) with the given kind.
   SILValue getDerivativeFunction(AutoDiffDerivativeFunctionKind kind) const {
     switch (kind) {
-    case AutoDiffDerivativeFunctionKind::JVP: return getJVPFunction();
-    case AutoDiffDerivativeFunctionKind::VJP: return getVJPFunction();
+    case AutoDiffDerivativeFunctionKind::JVP:
+      return getJVPFunction();
+    case AutoDiffDerivativeFunctionKind::VJP:
+      return getVJPFunction();
     }
   }
 };
 
+/// DifferentiableFunctionExtractInst - extracts either the original or
+/// derivative function value from a `@differentiable` function.
+class DifferentiableFunctionExtractInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::DifferentiableFunctionExtractInst,
+          SingleValueInstruction> {
+private:
+  /// The extractee.
+  NormalDifferentiableFunctionTypeComponent Extractee;
+  /// True if the instruction has an explicit extractee type.
+  bool HasExplicitExtracteeType;
+
+  static SILType
+  getExtracteeType(SILValue function,
+                   NormalDifferentiableFunctionTypeComponent extractee,
+                   SILModule &module);
+
+public:
+  /// Note: explicit extractee type may be specified only in lowered SIL.
+  explicit DifferentiableFunctionExtractInst(
+      SILModule &module, SILDebugLocation debugLoc,
+      NormalDifferentiableFunctionTypeComponent extractee, SILValue function,
+      Optional<SILType> extracteeType = None);
+
+  NormalDifferentiableFunctionTypeComponent getExtractee() const {
+    return Extractee;
+  }
+
+  AutoDiffDerivativeFunctionKind getDerivativeFunctionKind() const {
+    auto kind = Extractee.getAsDerivativeFunctionKind();
+    assert(kind);
+    return *kind;
+  }
+
+  bool hasExplicitExtracteeType() const { return HasExplicitExtracteeType; }
+};
+
+// SWIFT_ENABLE_TENSORFLOW
 /// `linear_function` - given a function, differentiation parameter indices,
 /// result indices, and its derivative functions, create an `@differentiable`
 /// function that represents a bundle of these functions and configurations.
@@ -8131,49 +8173,6 @@ public:
   }
 };
 
-/// `differentiable_function_extract` - given an `@differentiable` function
-/// representing a bundle of the original function and derivative functions,
-/// extract the specified function.
-class DifferentiableFunctionExtractInst
-    : public InstructionBase<
-          SILInstructionKind::DifferentiableFunctionExtractInst,
-          SingleValueInstruction> {
-private:
-  /// The extractee.
-  NormalDifferentiableFunctionTypeComponent Extractee;
-  /// The list containing the `@differentiable` function operand.
-  FixedOperandList<1> Operands;
-  /// True if the instruction has an explicit extractee type.
-  bool HasExplicitExtracteeType;
-
-  static SILType
-  getExtracteeType(
-      SILValue function, NormalDifferentiableFunctionTypeComponent extractee,
-      SILModule &module);
-
-public:
-  /// Note: explicit extractee type may be specified only in lowered SIL.
-  explicit DifferentiableFunctionExtractInst(
-      SILModule &module, SILDebugLocation debugLoc,
-      NormalDifferentiableFunctionTypeComponent extractee,
-      SILValue theFunction, Optional<SILType> extracteeType = None);
-
-  NormalDifferentiableFunctionTypeComponent getExtractee() const {
-    return Extractee;
-  }
-
-  AutoDiffDerivativeFunctionKind getDerivativeFunctionKind() const {
-    auto kind = Extractee.getAsDerivativeFunctionKind();
-    assert(kind);
-    return *kind;
-  }
-
-  SILValue getFunctionOperand() const { return Operands[0].get(); }
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-  bool hasExplicitExtracteeType() const { return HasExplicitExtracteeType; }
-};
-
 /// `linear_function_extract` - given an `@differentiable(linear)` function
 /// representing a bundle of the original function and the transpose function,
 /// extract the specified function.
@@ -8208,6 +8207,8 @@ public:
 };
 // SWIFT_ENABLE_TENSORFLOW END
 
+/// DifferentiabilityWitnessFunctionInst - Looks up a differentiability witness
+/// function for a given original function.
 class DifferentiabilityWitnessFunctionInst
     : public InstructionBase<
           SILInstructionKind::DifferentiabilityWitnessFunctionInst,

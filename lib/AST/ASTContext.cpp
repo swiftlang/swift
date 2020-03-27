@@ -435,14 +435,9 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
-
-  /// For uniquifying `IndexSubset` allocations.
   llvm::FoldingSet<IndexSubset> IndexSubsets;
-
-  /// For uniquifying `AutoDiffDerivativeFunctionIdentifier` allocations.
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
       AutoDiffDerivativeFunctionIdentifiers;
-  // SWIFT_ENABLE_TENSORFLOW END
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -3507,11 +3502,6 @@ SILFunctionType::SILFunctionType(
     }
 
     if (genericSig && patternSubs) {
-      if (patternSubs.hasArchetypes()) {
-        llvm::errs() << "BAD PATTERN SUBS\n";
-        patternSubs.dump();
-        dump();
-      }
       assert(!patternSubs.hasArchetypes()
              && "pattern substitutions should not contain context archetypes");
     }

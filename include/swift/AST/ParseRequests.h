@@ -101,6 +101,24 @@ public:
   void cacheResult(ArrayRef<Decl *> decls) const;
 };
 
+void simple_display(llvm::raw_ostream &out,
+                    const CodeCompletionCallbacksFactory *factory);
+
+class CodeCompletionSecondPassRequest
+    : public SimpleRequest<CodeCompletionSecondPassRequest,
+                           bool(SourceFile *, CodeCompletionCallbacksFactory *),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, SourceFile *SF,
+                CodeCompletionCallbacksFactory *Factory) const;
+};
+
 /// The zone number for the parser.
 #define SWIFT_TYPEID_ZONE Parse
 #define SWIFT_TYPEID_HEADER "swift/AST/ParseTypeIDZone.def"

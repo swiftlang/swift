@@ -26,7 +26,7 @@ bb0(%0 : $A):
 // CHECK:         call swiftcc void bitcast ({ i8*, i32, i64, i64 }* @"$sTa.ptrauth" to void (%swift.refcounted*)*)(%swift.refcounted* swiftself {{%.*}}) [ "ptrauth"(i32 0, i64 {{.*}}) ]
 sil @test0 : $@convention(thin) (@guaranteed A) -> () {
 bb0(%0: $A):
-  %method = objc_method %0 : $A, #A.foo!1.foreign, $@convention(objc_method) (A) -> ()
+  %method = objc_method %0 : $A, #A.foo!foreign, $@convention(objc_method) (A) -> ()
   %partial = partial_apply [callee_guaranteed] %method(%0) : $@convention(objc_method) (A) -> ()
   apply %partial() : $ @callee_guaranteed () -> ()
   %result = tuple ()

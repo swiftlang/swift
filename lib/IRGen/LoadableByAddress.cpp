@@ -2856,19 +2856,18 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
         instr->getOptionalDerivativeFunctionPair());
     break;
   }
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto instr = cast<DifferentiableFunctionExtractInst>(convInstr);
+    // Rewrite `differentiable_function_extract` with explicit extractee type.
+    newInstr = convBuilder.createDifferentiableFunctionExtract(
+        instr->getLoc(), instr->getExtractee(), instr->getOperand(), newType);
+    break;
+  }
   case SILInstructionKind::LinearFunctionInst: {
     auto instr = cast<LinearFunctionInst>(convInstr);
     newInstr = convBuilder.createLinearFunction(
         instr->getLoc(), instr->getParameterIndices(),
         instr->getOriginalFunction(), instr->getOptionalTransposeFunction());
-    break;
-  }
-  case SILInstructionKind::DifferentiableFunctionExtractInst: {
-    auto instr = cast<DifferentiableFunctionExtractInst>(convInstr);
-    // Rewrite `differentiable_function_extract` with explicit extractee type.
-    newInstr = convBuilder.createDifferentiableFunctionExtract(
-        instr->getLoc(), instr->getExtractee(), instr->getFunctionOperand(),
-        newType);
     break;
   }
   case SILInstructionKind::LinearFunctionExtractInst: {

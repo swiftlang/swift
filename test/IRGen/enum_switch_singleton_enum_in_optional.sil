@@ -23,7 +23,7 @@ sil public @switch_singleton_enum_in_optional :
     $@convention(thin) (@in Optional<AnEnum>) -> () {
 entry(%a : $*Optional<AnEnum>):
   switch_enum_addr %a : $*Optional<AnEnum>,
-    case #Optional.some!enumelt.1: some,
+    case #Optional.some!enumelt: some,
     case #Optional.none!enumelt: none
 some:
   unreachable

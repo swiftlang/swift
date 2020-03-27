@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend-typecheck -enable-experimental-differentiable-programming -verify %s
-// REQUIRES: differentiable_programming
 
 import _Differentiation
 
@@ -398,11 +397,6 @@ extension TF_521: Differentiable where T: Differentiable {
   // expected-note @+1 {{possibly intended match 'TF_521<T>.TangentVector' does not conform to 'AdditiveArithmetic'}}
   typealias TangentVector = TF_521
   typealias AllDifferentiableVariables = TF_521
-}
-extension TF_521 where T: Differentiable, T == T.TangentVector {
-  static func _vjpInit(real: T, imaginary: T) -> (TF_521, (TF_521) -> (T, T)) {
-    return (TF_521(real: real, imaginary: imaginary), { ($0.real, $0.imaginary) })
-  }
 }
 // expected-error @+1 {{result type 'TF_521<Float>' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 let _: @differentiable (Float, Float) -> TF_521<Float> = { r, i in

@@ -138,12 +138,12 @@ sil public_external @alloc_RequiredBase : $@convention(method) (@thick RequiredB
 sil public_external @init_RequiredBase : $@convention(method) (@owned RequiredBase) -> @owned RequiredBase
 
 sil_vtable NonRequiredBase {
-  #NonRequiredBase.init!initializer.1: @init_NonRequiredBase
+  #NonRequiredBase.init!initializer: @init_NonRequiredBase
 }
 
 sil_vtable RequiredBase {
-  #NonRequiredBase.init!initializer.1: @init_RequiredBase [override]
-  #RequiredBase.init!allocator.1: @alloc_RequiredBase
+  #NonRequiredBase.init!initializer: @init_RequiredBase [override]
+  #RequiredBase.init!allocator: @alloc_RequiredBase
 }
 
 // rdar://problem/19902523

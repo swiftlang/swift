@@ -11,7 +11,7 @@ class C {
     member = x
 
     // CHECK-NOT: copy_value
-    // CHECK: [[FN:%[0-9]+]] = class_method %1 : $C, #C.member!setter.1
+    // CHECK: [[FN:%[0-9]+]] = class_method %1 : $C, #C.member!setter
     // CHECK: apply [[FN]](%0, %1) : $@convention(method) (Int, @guaranteed C) -> ()
     // CHECK-NOT: destroy_value
   }

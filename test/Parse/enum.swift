@@ -473,7 +473,7 @@ enum SE0036 {
 
   func staticReferenceInInstanceMethod() {
     _ = A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-9=SE0036.}}
-    _ = self.A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-9=SE0036.}}
+    _ = self.A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-13=SE0036}}
     _ = SE0036.A
   }
 

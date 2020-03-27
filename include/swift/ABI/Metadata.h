@@ -2433,10 +2433,6 @@ struct TargetProtocolConformanceDescriptor final
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
 public:
-  using WitnessTableAccessorFn
-    = const TargetWitnessTable<Runtime> *(const TargetMetadata<Runtime>*,
-                                          const TargetWitnessTable<Runtime> **);
-
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<Runtime>;
 

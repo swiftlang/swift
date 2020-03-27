@@ -1659,8 +1659,6 @@ public:
         Importer(static_cast<ClangImporter *>(CurrDeclContext->getASTContext().
           getClangModuleLoader())),
         CompletionContext(CompletionContext) {
-    Ctx.setLegacySemanticQueriesEnabled();
-
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext) {
       CurrentMethod = CurrDeclContext->getInnermostMethodContext();
@@ -2549,16 +2547,22 @@ public:
   }
 
   bool isImplicitlyCurriedInstanceMethod(const AbstractFunctionDecl *FD) {
+    if (FD->isStatic())
+      return false;
+
     switch (Kind) {
     case LookupKind::ValueExpr:
-      return ExprType->is<AnyMetatypeType>() && !FD->isStatic();
+      return ExprType->is<AnyMetatypeType>();
     case LookupKind::ValueInDeclContext:
-      if (InsideStaticMethod &&
-          FD->getDeclContext() == CurrentMethod->getDeclContext() &&
-          !FD->isStatic())
-        return true;
-      if (auto Init = dyn_cast<Initializer>(CurrDeclContext))
-        return FD->getDeclContext() == Init->getParent() && !FD->isStatic();
+      if (InsideStaticMethod)
+        return FD->getDeclContext() == CurrentMethod->getDeclContext();
+      if (auto Init = dyn_cast<Initializer>(CurrDeclContext)) {
+        if (auto PatInit = dyn_cast<PatternBindingInitializer>(Init)) {
+          if (PatInit->getInitializedLazyVar())
+            return false;
+        }
+        return FD->getDeclContext() == Init->getInnermostTypeContext();
+      }
       return false;
     case LookupKind::EnumElement:
     case LookupKind::Type:
@@ -4227,8 +4231,6 @@ public:
                            SourceLoc introducerLoc)
       : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
         ParsedKeywords(ParsedKeywords), introducerLoc(introducerLoc) {
-    Ctx.setLegacySemanticQueriesEnabled();
-
     hasFuncIntroducer = isKeywordSpecified("func");
     hasVarIntroducer = isKeywordSpecified("var") ||
                        isKeywordSpecified("let");

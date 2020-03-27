@@ -2164,24 +2164,30 @@ public:
   // Differentiable programming instructions
   //===--------------------------------------------------------------------===//
 
-  /// Note: explicit function type may be specified only in lowered SIL.
-  DifferentiabilityWitnessFunctionInst *createDifferentiabilityWitnessFunction(
-      SILLocation Loc, DifferentiabilityWitnessFunctionKind WitnessKind,
-      SILDifferentiabilityWitness *Witness,
-      Optional<SILType> FunctionType = None) {
-    return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
-        getModule(), getSILDebugLocation(Loc), WitnessKind, Witness,
-        FunctionType));
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
   DifferentiableFunctionInst *createDifferentiableFunction(
-      SILLocation Loc, IndexSubset *ParameterIndices,
-      SILValue OriginalFunction,
+      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
       Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
     return insert(DifferentiableFunctionInst::create(
         getModule(), getSILDebugLocation(Loc), ParameterIndices,
         OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
+  }
+
+  /// Note: explicit extractee type may be specified only in lowered SIL.
+  DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
+      SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
+      SILValue Function, Optional<SILType> ExtracteeType = None) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc), Extractee, Function,
+        ExtracteeType));
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  DifferentiableFunctionExtractInst *
+  createDifferentiableFunctionExtractOriginal(SILLocation Loc,
+                                              SILValue Function) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc),
+        NormalDifferentiableFunctionTypeComponent::Original, Function));
   }
 
   LinearFunctionInst *createLinearFunction(
@@ -2192,30 +2198,23 @@ public:
         OriginalFunction, TransposeFunction, hasOwnership()));
   }
 
-  /// Note: explicit extractee type may be specified only in lowered SIL.
-  DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
-      SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
-      SILValue TheFunction, Optional<SILType> ExtracteeType = None) {
-    return insert(new (getModule()) DifferentiableFunctionExtractInst(
-        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction,
-        ExtracteeType));
-  }
-
   LinearFunctionExtractInst *createLinearFunctionExtract(
       SILLocation Loc, LinearDifferentiableFunctionTypeComponent Extractee,
-      SILValue TheFunction) {
+      SILValue Function) {
     return insert(new (getModule()) LinearFunctionExtractInst(
-        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
-  }
-
-  DifferentiableFunctionExtractInst *
-  createDifferentiableFunctionExtractOriginal(SILLocation Loc,
-                                              SILValue TheFunction) {
-    return insert(new (getModule()) DifferentiableFunctionExtractInst(
-        getModule(), getSILDebugLocation(Loc),
-        NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
+        getModule(), getSILDebugLocation(Loc), Extractee, Function));
   }
   // SWIFT_ENABLE_TENSORFLOW END
+
+  /// Note: explicit function type may be specified only in lowered SIL.
+  DifferentiabilityWitnessFunctionInst *createDifferentiabilityWitnessFunction(
+      SILLocation Loc, DifferentiabilityWitnessFunctionKind WitnessKind,
+      SILDifferentiabilityWitness *Witness,
+      Optional<SILType> FunctionType = None) {
+    return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
+        getModule(), getSILDebugLocation(Loc), WitnessKind, Witness,
+        FunctionType));
+  }
 
   //===--------------------------------------------------------------------===//
   // Private Helper Methods

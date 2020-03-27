@@ -24,6 +24,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -1551,7 +1552,6 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
     // Declaration choices are handled below.
     break;
 
-  case OverloadChoiceKind::BaseType:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
@@ -1920,7 +1920,6 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::TupleIndex:
-  case OverloadChoiceKind::BaseType:
   case OverloadChoiceKind::KeyPathApplication:
     return {refType, bindConstraintCreated};
   case OverloadChoiceKind::DeclViaDynamic: {
@@ -2022,7 +2021,6 @@ void ConstraintSystem::bindOverloadType(
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::TupleIndex:
-  case OverloadChoiceKind::BaseType:
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::DeclViaDynamic:
     bindTypeOrIUO(openedType);
@@ -2273,10 +2271,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         adjustTypeOfOverloadReference(choice, locator, boundType, refType);
     break;
   }
-
-  case OverloadChoiceKind::BaseType:
-    refType = choice.getBaseType();
-    break;
 
   case OverloadChoiceKind::TupleIndex:
     if (auto lvalueTy = choice.getBaseType()->getAs<LValueType>()) {
@@ -2534,7 +2528,6 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       return DeclName(DynamicMember.getPointer());
 
-    case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::TupleIndex:
       llvm_unreachable("no name!");
   }
@@ -3263,7 +3256,6 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
         // want them to noise up unrelated subscript diagnostics.
         break;
 
-      case OverloadChoiceKind::BaseType:
       case OverloadChoiceKind::TupleIndex:
         // FIXME: Actually diagnose something here.
         break;
@@ -3451,6 +3443,7 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
+    case ConstraintLocator::ClosureBody:
     case ConstraintLocator::ClosureResult:
       if (auto CE = dyn_cast<ClosureExpr>(anchor)) {
         if (CE->hasSingleExpressionBody()) {
@@ -3873,6 +3866,12 @@ bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
          decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
 }
 
+bool constraints::hasExplicitResult(ClosureExpr *closure) {
+  auto &ctx = closure->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ClosureHasExplicitResultRequest{closure}, false);
+}
+
 static bool isOperator(Expr *expr, StringRef expectedName) {
   auto name = getOperatorName(expr);
   return name ? name->is(expectedName) : false;
@@ -4178,6 +4177,8 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.wrappedVar = nullptr;
   expression.isDiscarded = isDiscarded;
   expression.bindPatternVarsOneWay = false;
+  expression.patternBinding = nullptr;
+  expression.patternBindingIndex = 0;
 }
 
 void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
@@ -4258,6 +4259,30 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
   target.expression.bindPatternVarsOneWay = bindPatternVarsOneWay;
   target.maybeApplyPropertyWrapper();
   return target;
+}
+
+SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
+    Expr *initializer, DeclContext *dc, Type patternType,
+    PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
+    bool bindPatternVarsOneWay) {
+    auto result = forInitialization(
+        initializer, dc, patternType,
+        patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
+    result.expression.patternBinding = patternBinding;
+    result.expression.patternBindingIndex = patternBindingIndex;
+    return result;
+}
+
+ContextualPattern
+SolutionApplicationTarget::getInitializationContextualPattern() const {
+  assert(kind == Kind::expression);
+  assert(expression.contextualPurpose == CTP_Initialization);
+  if (expression.patternBinding) {
+    return ContextualPattern::forPatternBindingDecl(
+        expression.patternBinding, expression.patternBindingIndex);
+  }
+
+  return ContextualPattern::forRawPattern(expression.pattern, expression.dc);
 }
 
 bool SolutionApplicationTarget::infersOpaqueReturnType() const {

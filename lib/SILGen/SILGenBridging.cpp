@@ -1606,8 +1606,6 @@ getThunkedForeignFunctionRef(SILGenFunction &SGF,
                              SILDeclRef foreign,
                              ArrayRef<ManagedValue> args,
                              const SILConstantInfo &foreignCI) {
-  assert(!foreign.isCurried
-         && "should not thunk calling convention when curried");
   assert(foreign.isForeign);
 
   // Produce an objc_method when thunking ObjC methods.

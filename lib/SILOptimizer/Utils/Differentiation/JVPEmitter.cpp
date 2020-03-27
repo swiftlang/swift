@@ -929,9 +929,6 @@ void JVPEmitter::prepareForDifferentialGeneration() {
         assert(diffBB->isEntry());
         createEntryArguments(&differential);
         auto *lastArg = diffBB->getArguments().back();
-        llvm::errs() << "LAST ARG TYPE\n";
-        lastArg->getType().dump();
-        diffStructLoweredType.dump();
         assert(lastArg->getType() == diffStructLoweredType);
         differentialStructArguments[&origBB] = lastArg;
       }

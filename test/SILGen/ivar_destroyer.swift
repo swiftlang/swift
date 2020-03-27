@@ -36,42 +36,42 @@ class DerivedClassWithNonTrivialProperties : RootClassWithoutProperties {
 // CHECK-NEXT:    return [[RESULT]]
 
 // CHECK-LABEL: sil_vtable RootClassWithoutProperties {
-// CHECK-NEXT:    #RootClassWithoutProperties.init!allocator.1
+// CHECK-NEXT:    #RootClassWithoutProperties.init!allocator
 // CHECK-NEXT:    #RootClassWithoutProperties.deinit!deallocator
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_vtable RootClassWithTrivialProperties {
-// CHECK-NEXT:    #RootClassWithTrivialProperties.x!getter.1
-// CHECK-NEXT:    #RootClassWithTrivialProperties.x!setter.1
-// CHECK-NEXT:    #RootClassWithTrivialProperties.x!modify.1
-// CHECK-NEXT:    #RootClassWithTrivialProperties.y!getter.1
-// CHECK-NEXT:    #RootClassWithTrivialProperties.y!setter.1
-// CHECK-NEXT:    #RootClassWithTrivialProperties.y!modify.1
-// CHECK-NEXT:    #RootClassWithTrivialProperties.init!allocator.1
+// CHECK-NEXT:    #RootClassWithTrivialProperties.x!getter
+// CHECK-NEXT:    #RootClassWithTrivialProperties.x!setter
+// CHECK-NEXT:    #RootClassWithTrivialProperties.x!modify
+// CHECK-NEXT:    #RootClassWithTrivialProperties.y!getter
+// CHECK-NEXT:    #RootClassWithTrivialProperties.y!setter
+// CHECK-NEXT:    #RootClassWithTrivialProperties.y!modify
+// CHECK-NEXT:    #RootClassWithTrivialProperties.init!allocator
 // CHECK-NEXT:    #RootClassWithTrivialProperties.deinit!deallocator
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_vtable RootClassWithNonTrivialProperties {
-// CHECK-NEXT:    #RootClassWithNonTrivialProperties.x!getter.1
-// CHECK-NEXT:    #RootClassWithNonTrivialProperties.x!setter.1
-// CHECK-NEXT:    #RootClassWithNonTrivialProperties.x!modify.1
-// CHECK-NEXT:    #RootClassWithNonTrivialProperties.init!allocator.1
+// CHECK-NEXT:    #RootClassWithNonTrivialProperties.x!getter
+// CHECK-NEXT:    #RootClassWithNonTrivialProperties.x!setter
+// CHECK-NEXT:    #RootClassWithNonTrivialProperties.x!modify
+// CHECK-NEXT:    #RootClassWithNonTrivialProperties.init!allocator
 // CHECK-NEXT:    #RootClassWithNonTrivialProperties.deinit!deallocator
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_vtable DerivedClassWithTrivialProperties {
-// CHECK-NEXT:    #RootClassWithoutProperties.init!allocator.1
-// CHECK-NEXT:    #DerivedClassWithTrivialProperties.z!getter.1
-// CHECK-NEXT:    #DerivedClassWithTrivialProperties.z!setter.1
-// CHECK-NEXT:    #DerivedClassWithTrivialProperties.z!modify.1
+// CHECK-NEXT:    #RootClassWithoutProperties.init!allocator
+// CHECK-NEXT:    #DerivedClassWithTrivialProperties.z!getter
+// CHECK-NEXT:    #DerivedClassWithTrivialProperties.z!setter
+// CHECK-NEXT:    #DerivedClassWithTrivialProperties.z!modify
 // CHECK-NEXT:    #DerivedClassWithTrivialProperties.deinit!deallocator
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_vtable DerivedClassWithNonTrivialProperties {
-// CHECK-NEXT:    #RootClassWithoutProperties.init!allocator.1
-// CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.z!getter.1
-// CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.z!setter.1
-// CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.z!modify.1
+// CHECK-NEXT:    #RootClassWithoutProperties.init!allocator
+// CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.z!getter
+// CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.z!setter
+// CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.z!modify
 // CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.deinit!deallocator
-// CHECK-NEXT:    #DerivedClassWithNonTrivialProperties!ivardestroyer.1
+// CHECK-NEXT:    #DerivedClassWithNonTrivialProperties!ivardestroyer
 // CHECK-NEXT:  }

@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
@@ -129,12 +130,16 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
 static PrecedenceGroupDecl *lookupPrecedenceGroupForOperator(DeclContext *DC,
                                                              Identifier name,
                                                              SourceLoc loc) {
-  SourceFile *SF = DC->getParentSourceFile();
-  bool isCascading = DC->isCascadingContextForLookup(true);
-  if (auto op = SF->lookupInfixOperator(name, isCascading, loc)) {
+  auto desc = OperatorLookupDescriptor::forFile(
+      DC->getParentSourceFile(), name, DC->isCascadingContextForLookup(true),
+      loc);
+  auto &Ctx = DC->getASTContext();
+  if (auto op = evaluateOrDefault(Ctx.evaluator,
+                                  LookupInfixOperatorRequest{desc},
+                                  nullptr)) {
     return op->getPrecedenceGroup();
   } else {
-    DC->getASTContext().Diags.diagnose(loc, diag::unknown_binop);
+    Ctx.Diags.diagnose(loc, diag::unknown_binop);
   }
   return nullptr;
 }
@@ -803,4 +808,52 @@ llvm::Expected<Expr *> CallerSideDefaultArgExprRequest::evaluate(
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
   }
   return initExpr;
+}
+
+llvm::Expected<bool>
+ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
+                                          ClosureExpr *closure) const {
+  // A walker that looks for 'return' statements that aren't
+  // nested within closures or nested declarations.
+  class FindReturns : public ASTWalker {
+    bool FoundResultReturn = false;
+    bool FoundNoResultReturn = false;
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      return {false, expr};
+    }
+
+    bool walkToDeclPre(Decl *decl) override { return false; }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      // Record return statements.
+      if (auto ret = dyn_cast<ReturnStmt>(stmt)) {
+        if (ret->isImplicit())
+          return {true, stmt};
+
+        // If it has a result, remember that we saw one, but keep
+        // traversing in case there's a no-result return somewhere.
+        if (ret->hasResult()) {
+          FoundResultReturn = true;
+
+          // Otherwise, stop traversing.
+        } else {
+          FoundNoResultReturn = true;
+          return {false, nullptr};
+        }
+      }
+      return {true, stmt};
+    }
+
+  public:
+    bool hasResult() const { return !FoundNoResultReturn && FoundResultReturn; }
+  };
+
+  auto body = closure->getBody();
+  if (!body)
+    return false;
+
+  FindReturns finder;
+  body->walk(finder);
+  return finder.hasResult();
 }

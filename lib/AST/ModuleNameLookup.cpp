@@ -249,11 +249,9 @@ llvm::Expected<QualifiedLookupResult> LookupInModuleRequest::evaluate(
     const DeclContext *moduleScopeContext) const {
   assert(moduleScopeContext->isModuleScopeContext());
 
-  auto &ctx = moduleOrFile->getASTContext();
-  FrontendStatsTracer tracer(ctx.Stats, "lookup-in-module");
-
   QualifiedLookupResult decls;
-  LookupByName lookup(ctx, resolutionKind, name, lookupKind);
+  LookupByName lookup(moduleOrFile->getASTContext(), resolutionKind,
+                      name, lookupKind);
   lookup.lookupInModule(decls, moduleOrFile, {}, moduleScopeContext);
   return decls;
 }

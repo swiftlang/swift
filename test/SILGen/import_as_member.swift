@@ -35,7 +35,7 @@ public func returnNullableStringGlobalVar() -> String? {
 // CHECK:   [[VAL:%.*]] = load [copy] %0 : $*NSString
 // CHECK:   [[BRIDGE:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
 // CHECK:   [[RESULT:%.*]] = apply [[BRIDGE]](
-// CHECK:   [[SOME:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[RESULT]]
+// CHECK:   [[SOME:%.*]] = enum $Optional<String>, #Optional.some!enumelt, [[RESULT]]
 // CHECK:   return [[SOME]] : $Optional<String>
 // CHECK-NEXT: }
 

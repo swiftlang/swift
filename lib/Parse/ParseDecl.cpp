@@ -646,7 +646,7 @@ bool Parser::parseSpecializeAttributeArguments(
           return false;
         }
         if (ParamLabel == "exported") {
-          Exported = isTrue ? true : false;
+          Exported = isTrue;
         }
       }
       if (ParamLabel == "kind") {
@@ -973,12 +973,6 @@ bool Parser::parseDifferentiableAttributeArguments(
     if (isIdentifier(Tok, "wrt")) {
       return false;
     }
-    // Diagnose deprecated 'jvp' and 'vjp'.
-    if (isIdentifier(Tok, "jvp") || isIdentifier(Tok, "vjp")) {
-      diagnose(Tok.getLoc(),
-               diag::attr_differentiable_jvp_vjp_deprecated_error);
-      return true;
-    }
     diagnose(Tok, diag::attr_differentiable_expected_label);
     return true;
   };
@@ -1019,13 +1013,6 @@ bool Parser::parseDifferentiableAttributeArguments(
       return false;
     if (consumeIfTrailingComma())
       return errorAndSkipUntilConsumeRightParen(*this, AttrName);
-  }
-
-  // Diagnose deprecated 'jvp' and 'vjp'.
-  if (isIdentifier(Tok, "jvp") || isIdentifier(Tok, "vjp")) {
-    diagnose(Tok.getLoc(),
-             diag::attr_differentiable_jvp_vjp_deprecated_error);
-    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // If parser has not advanced and token is not 'where' or ')', emit error.

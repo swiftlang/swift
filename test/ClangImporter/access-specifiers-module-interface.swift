@@ -9,31 +9,31 @@
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct PublicEnum : Equatable, RawRepresentable {
-// CHECK-NEXT:     init(_ rawValue: UInt32)
-// CHECK-NEXT:     init(rawValue: UInt32)
-// CHECK-NEXT:     var rawValue: UInt32
-// CHECK-NEXT:     typealias RawValue = UInt32
+// CHECK-NEXT:     init(_ rawValue: [[ENUM_UNDERLYING_TYPE:Int32|UInt32]])
+// CHECK-NEXT:     init(rawValue: [[ENUM_UNDERLYING_TYPE]])
+// CHECK-NEXT:     var rawValue: [[ENUM_UNDERLYING_TYPE]]
+// CHECK-NEXT:     typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:   }
-// CHECK-NEXT:   @frozen enum PublicClosedEnum : UInt32 {
-// CHECK-NEXT:     init?(rawValue: UInt32)
-// CHECK-NEXT:     var rawValue: UInt32 { get }
-// CHECK-NEXT:     typealias RawValue = UInt32
+// CHECK-NEXT:   @frozen enum PublicClosedEnum : [[ENUM_UNDERLYING_TYPE]] {
+// CHECK-NEXT:     init?(rawValue: [[ENUM_UNDERLYING_TYPE]])
+// CHECK-NEXT:     var rawValue: [[ENUM_UNDERLYING_TYPE]] { get }
+// CHECK-NEXT:     typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:     case value1
 // CHECK-NEXT:     @available(swift, obsoleted: 3, renamed: "value1")
 // CHECK-NEXT:     static var Value1: PublicPrivate.PublicClosedEnum { get }
 // CHECK-NEXT:   }
-// CHECK-NEXT:   enum PublicOpenEnum : UInt32 {
-// CHECK-NEXT:     init?(rawValue: UInt32)
-// CHECK-NEXT:     var rawValue: UInt32 { get }
-// CHECK-NEXT:     typealias RawValue = UInt32
+// CHECK-NEXT:   enum PublicOpenEnum : [[ENUM_UNDERLYING_TYPE]] {
+// CHECK-NEXT:     init?(rawValue: [[ENUM_UNDERLYING_TYPE]])
+// CHECK-NEXT:     var rawValue: [[ENUM_UNDERLYING_TYPE]] { get }
+// CHECK-NEXT:     typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:     case value1
 // CHECK-NEXT:     @available(swift, obsoleted: 3, renamed: "value1")
 // CHECK-NEXT:     static var Value1: PublicPrivate.PublicOpenEnum { get }
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct PublicFlagEnum : OptionSet {
-// CHECK-NEXT:     init(rawValue: UInt32)
-// CHECK-NEXT:     let rawValue: UInt32
-// CHECK-NEXT:     typealias RawValue = UInt32
+// CHECK-NEXT:     init(rawValue: [[ENUM_UNDERLYING_TYPE]])
+// CHECK-NEXT:     let rawValue: [[ENUM_UNDERLYING_TYPE]]
+// CHECK-NEXT:     typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:     typealias Element = PublicPrivate.PublicFlagEnum
 // CHECK-NEXT:     typealias ArrayLiteralElement = PublicPrivate.PublicFlagEnum
 // CHECK-NEXT:   }

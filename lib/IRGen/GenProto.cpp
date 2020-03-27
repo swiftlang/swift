@@ -792,27 +792,19 @@ namespace {
     }
 
     void addMethod(SILDeclRef func) {
-      // SWIFT_ENABLE_TENSORFLOW
-      Entries.push_back(WitnessTableEntry::forFunction(func));
-      // SWIFT_ENABLE_TENSORFLOW END
-#if 0 // master
-      auto decl = cast<AbstractFunctionDecl>(func.getDecl());
       // If this assert needs to be changed, be sure to also change
       // ProtocolDescriptorBuilder::getRequirementInfo.
-      assert((isa<ConstructorDecl>(decl)
-                ? (func.kind == SILDeclRef::Kind::Allocator)
-                : (func.kind == SILDeclRef::Kind::Func))
-             && "unexpected kind for protocol witness declaration ref");
-      Entries.push_back(WitnessTableEntry::forFunction(decl));
-#endif
+      assert((isa<ConstructorDecl>(func.getDecl())
+                  ? (func.kind == SILDeclRef::Kind::Allocator)
+                  : (func.kind == SILDeclRef::Kind::Func)) &&
+             "unexpected kind for protocol witness declaration ref");
+      Entries.push_back(WitnessTableEntry::forFunction(func));
     }
 
     void addPlaceholder(MissingMemberDecl *placeholder) {
       for (auto i : range(placeholder->getNumberOfVTableEntries())) {
         (void)i;
-        // SWIFT_ENABLE_TENSORFLOW
         Entries.push_back(WitnessTableEntry::forPlaceholder());
-        // SWIFT_ENABLE_TENSORFLOW END
       }
     }
 
@@ -1325,7 +1317,6 @@ public:
              && "sil witness table does not match protocol");
       assert(entry.getMethodWitness().Requirement == requirement
              && "sil witness table does not match protocol");
-      // SWIFT_ENABLE_TENSORFLOW
       auto piIndex = PI.getFunctionIndex(requirement);
       assert((size_t)piIndex.getValue() ==
               Table.size() - WitnessTableFirstRequirementOffset &&
@@ -2746,12 +2737,8 @@ static void addAbstractConditionalRequirements(
     SpecializedProtocolConformance *specializedConformance,
     llvm::SetVector<GenericRequirement> &requirements) {
   auto subMap = specializedConformance->getSubstitutionMap();
-  auto condRequirements =
-      specializedConformance->getConditionalRequirementsIfAvailable();
-  if (!condRequirements)
-    return;
-
-  for (auto req : *condRequirements) {
+  auto condRequirements = specializedConformance->getConditionalRequirements();
+  for (auto req : condRequirements) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
     auto *proto =
@@ -3284,12 +3271,7 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
 
   // Find the witness we're interested in.
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
-  // SWIFT_ENABLE_TENSORFLOW
   auto index = fnProtoInfo.getFunctionIndex(member);
-  // SWIFT_ENABLE_TENSORFLOW END
-#if 0 // from master
-  auto index = fnProtoInfo.getFunctionIndex(fn);
-#endif
   llvm::Value *slot;
   llvm::Value *witnessFnPtr =
     emitInvariantLoadOfOpaqueWitness(IGF, wtable,

@@ -538,7 +538,6 @@ static void handleSILDeclRef(Serializer &S, const SILDeclRef &Ref,
                              SmallVectorImpl<ValueID> &ListOfValues) {
   ListOfValues.push_back(S.addDeclRef(Ref.getDecl()));
   ListOfValues.push_back((unsigned)Ref.kind);
-  ListOfValues.push_back(Ref.isCurried);
   ListOfValues.push_back(Ref.isForeign);
 }
 
@@ -2154,7 +2153,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     break;
   }
-  // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::DifferentiableFunctionInst: {
     auto *dfi = cast<DifferentiableFunctionInst>(&SI);
     SmallVector<ValueID, 4> trailingInfo;
@@ -2167,12 +2165,27 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       trailingInfo.push_back((unsigned)val->getType().getCategory());
       trailingInfo.push_back(addValueRef(val));
     }
-    SILInstDifferentiableFunctionLayout::emitRecord(Out, ScratchRecord,
+    SILInstDifferentiableFunctionLayout::emitRecord(
+        Out, ScratchRecord,
         SILAbbrCodes[SILInstDifferentiableFunctionLayout::Code],
         paramIndices->getCapacity(), dfi->hasDerivativeFunctions(),
         trailingInfo);
     break;
   }
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto *dfei = cast<DifferentiableFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(dfei->getOperand());
+    auto operandType = dfei->getOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto rawExtractee = (unsigned)dfei->getExtractee();
+    SILInstDifferentiableFunctionExtractLayout::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
+        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
+        rawExtractee, (unsigned)dfei->hasExplicitExtracteeType());
+    break;
+  }
+  // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::LinearFunctionInst: {
     auto *lfi = cast<LinearFunctionInst>(&SI);
     SmallVector<ValueID, 4> trailingInfo;
@@ -2189,18 +2202,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         SILAbbrCodes[SILInstLinearFunctionLayout::Code],
         paramIndices->getCapacity(), lfi->hasTransposeFunction(),
         trailingInfo);
-    break;
-  }
-  case SILInstructionKind::DifferentiableFunctionExtractInst: {
-    auto *dfei = cast<DifferentiableFunctionExtractInst>(&SI);
-    auto operandRef = addValueRef(dfei->getFunctionOperand());
-    auto operandType = dfei->getFunctionOperand()->getType();
-    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
-    auto rawExtractee = (unsigned)dfei->getExtractee();
-    SILInstDifferentiableFunctionExtractLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
-        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
-        rawExtractee, (unsigned)dfei->hasExplicitExtracteeType());
     break;
   }
   case SILInstructionKind::LinearFunctionExtractInst: {
@@ -2609,6 +2610,14 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstNoOperandLayout>();
   registerSILAbbr<SILOneOperandLayout>();
   registerSILAbbr<SILTwoOperandsLayout>();
+  registerSILAbbr<SILInstWitnessMethodLayout>();
+  registerSILAbbr<SILSpecializeAttrLayout>();
+  registerSILAbbr<SILInstDifferentiableFunctionLayout>();
+  registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
+  // SWIFT_ENABLE_TENSORFLOW
+  registerSILAbbr<SILInstLinearFunctionLayout>();
+  registerSILAbbr<SILInstLinearFunctionExtractLayout>();
+  // SWIFT_ENABLE_TENSORFLOW END
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();
@@ -2623,15 +2632,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
   registerSILAbbr<PropertyLayout>();
   registerSILAbbr<DifferentiabilityWitnessLayout>();
-
-  registerSILAbbr<SILInstWitnessMethodLayout>();
-  registerSILAbbr<SILSpecializeAttrLayout>();
-  // SWIFT_ENABLE_TENSORFLOW
-  registerSILAbbr<SILInstDifferentiableFunctionLayout>();
-  registerSILAbbr<SILInstLinearFunctionLayout>();
-  registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
-  registerSILAbbr<SILInstLinearFunctionExtractLayout>();
-  // SWIFT_ENABLE_TENSORFLOW END
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.

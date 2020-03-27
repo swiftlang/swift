@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-module WinSDK [system] [extern_c] {
+module WinSDK [system] {
   module WinSock2 {
     header "WinSock2.h"
     header "WS2tcpip.h"

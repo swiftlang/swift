@@ -12,11 +12,12 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Evaluator.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Subsystems.h"
 
 using namespace swift;
 
@@ -65,6 +66,25 @@ void SuperclassDeclRequest::cacheResult(ClassDecl *value) const {
 
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
     protocolDecl->LazySemanticInfo.SuperclassDecl.setPointerAndInt(value, true);
+}
+
+//----------------------------------------------------------------------------//
+// InheritedProtocolsRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<ArrayRef<ProtocolDecl *>>
+InheritedProtocolsRequest::getCachedResult() const {
+  auto proto = std::get<0>(getStorage());
+  if (!proto->areInheritedProtocolsValid())
+    return None;
+
+  return proto->InheritedProtocols;
+}
+
+void InheritedProtocolsRequest::cacheResult(ArrayRef<ProtocolDecl *> PDs) const {
+  auto proto = std::get<0>(getStorage());
+  proto->InheritedProtocols = PDs;
+  proto->setInheritedProtocolsValid();
 }
 
 //----------------------------------------------------------------------------//
@@ -204,6 +224,49 @@ void swift::simple_display(llvm::raw_ostream &out,
 
 SourceLoc swift::extractNearestSourceLoc(const DirectLookupDescriptor &desc) {
   return extractNearestSourceLoc(desc.DC);
+}
+
+//----------------------------------------------------------------------------//
+// LookupOperatorRequest computation.
+//----------------------------------------------------------------------------//
+
+ArrayRef<FileUnit *> OperatorLookupDescriptor::getFiles() const {
+  if (auto *module = getModule())
+    return module->getFiles();
+
+  // Return an ArrayRef pointing to the FileUnit in the union.
+  return llvm::makeArrayRef(*fileOrModule.getAddrOfPtr1());
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const OperatorLookupDescriptor &desc) {
+  out << "looking up operator ";
+  simple_display(out, desc.name);
+  out << " in ";
+  simple_display(out, desc.fileOrModule);
+}
+
+SourceLoc swift::extractNearestSourceLoc(const OperatorLookupDescriptor &desc) {
+  return desc.diagLoc;
+}
+
+//----------------------------------------------------------------------------//
+// LookupConformanceInModuleRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const LookupConformanceDescriptor &desc) {
+  out << "looking up conformance to ";
+  simple_display(out, desc.PD);
+  out << " for ";
+  out << desc.Ty.getString();
+  out << " in ";
+  simple_display(out, desc.Mod);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const LookupConformanceDescriptor &desc) {
+  return SourceLoc();
 }
 
 // Define request evaluation functions for each of the name lookup requests.

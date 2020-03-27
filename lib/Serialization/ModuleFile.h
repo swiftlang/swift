@@ -747,7 +747,7 @@ public:
   /// Searches the module's operators for one with the given name and fixity.
   ///
   /// If none is found, returns null.
-  OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
+  OperatorDecl *lookupOperator(Identifier name, OperatorFixity fixity);
 
   /// Searches the module's precedence groups for one with the given
   /// name and fixity.
@@ -1002,13 +1002,14 @@ public:
   llvm::Expected<ProtocolConformanceRef>
   readConformanceChecked(llvm::BitstreamCursor &Cursor,
                          GenericEnvironment *genericEnv = nullptr);
-  
+
   /// Read a SILLayout from the given cursor.
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
 
-  /// Read the given normal conformance from the current module file.
-  NormalProtocolConformance *
-  readNormalConformance(serialization::NormalConformanceID id);
+  /// Read the given normal conformance from the current module file,
+  /// returns the conformance or the first error.
+  llvm::Expected<NormalProtocolConformance *>
+  readNormalConformanceChecked(serialization::NormalConformanceID id);
 
   /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();

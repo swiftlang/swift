@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 547; // lazyPropertyGetter flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 549; // differentiable_function, differentiable_function_extract
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -384,19 +384,18 @@ enum class SelfAccessKind : uint8_t {
 };
 using SelfAccessKindField = BCFixed<2>;
   
-/// Translates an operator DeclKind to a Serialization fixity, whose values are
-/// guaranteed to be stable.
-static inline OperatorKind getStableFixity(DeclKind kind) {
-  switch (kind) {
-  case DeclKind::PrefixOperator:
+/// Translates an operator decl fixity to a Serialization fixity, whose values
+/// are guaranteed to be stable.
+static inline OperatorKind getStableFixity(OperatorFixity fixity) {
+  switch (fixity) {
+  case OperatorFixity::Prefix:
     return Prefix;
-  case DeclKind::PostfixOperator:
+  case OperatorFixity::Postfix:
     return Postfix;
-  case DeclKind::InfixOperator:
+  case OperatorFixity::Infix:
     return Infix;
-  default:
-    llvm_unreachable("unknown operator fixity");
   }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 // These IDs must \em not be renumbered or reordered without incrementing

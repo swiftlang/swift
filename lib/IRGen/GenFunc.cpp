@@ -498,7 +498,7 @@ Address irgen::projectBlockStorageCapture(IRGenFunction &IGF,
 }
 
 const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
-  // SWIFT_ENABLE_TENSORFLOW
+  // Handle `@differentiable` and `@differentiable(linear)` functions.
   switch (T->getDifferentiabilityKind()) {
   case DifferentiabilityKind::Normal:
     return convertNormalDifferentiableFunctionType(T);

@@ -1697,7 +1697,7 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
 /// Checks that the someBB only contains obj_method calls (possibly chained) on
 /// the optional value.
 ///
-/// switch_enum %optionalValue, case #Optional.some!enumelt.1: someBB
+/// switch_enum %optionalValue, case #Optional.some!enumelt: someBB
 ///
 /// someBB(%optionalPayload):
 ///    %1 = objc_method %optionalPayload
@@ -1910,7 +1910,7 @@ static bool hasSameUltimateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someB
 /// Simplify switch_enums on class enums that branch to objc_method calls on
 /// that optional on the #Optional.some side to always branch to the some side.
 ///
-/// switch_enum %optionalValue, case #Optional.some!enumelt.1: someBB,
+/// switch_enum %optionalValue, case #Optional.some!enumelt: someBB,
 ///                             case #Optional.none: noneBB
 ///
 /// someBB(%optionalPayload):

@@ -407,11 +407,19 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     }
     if (usePersistentPCH) {
       context.Args.AddLastArg(Arguments, options::OPT_pch_output_dir);
-      if (context.OI.CompilerMode == OutputInfo::Mode::StandardCompile) {
+      switch (context.OI.CompilerMode) {
+      case OutputInfo::Mode::StandardCompile:
+      case OutputInfo::Mode::BatchModeCompile:
         // In the 'multiple invocations for each file' mode we don't need to
         // validate the PCH every time, it has been validated with the initial
         // -emit-pch invocation.
         Arguments.push_back("-pch-disable-validation");
+        break;
+
+      case OutputInfo::Mode::Immediate:
+      case OutputInfo::Mode::REPL:
+      case OutputInfo::Mode::SingleCompile:
+        break;
       }
     }
   }

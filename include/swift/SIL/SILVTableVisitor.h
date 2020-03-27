@@ -37,9 +37,9 @@ struct SortedFuncList {
     Mangle::ASTMangler mangler;
     std::string mangledName;
     if (auto *cd = dyn_cast<ConstructorDecl>(afd))
-      mangledName = mangler.mangleConstructorEntity(cd, 0, 0);
+      mangledName = mangler.mangleConstructorEntity(cd, 0);
     else
-      mangledName = mangler.mangleEntity(afd, 0);
+      mangledName = mangler.mangleEntity(afd);
 
     elts.push_back(std::make_pair(mangledName, afd));
   }
@@ -86,24 +86,24 @@ template <class T> class SILVTableVisitor {
   void maybeAddMethod(FuncDecl *fd) {
     assert(!fd->hasClangNode());
 
-    maybeAddEntry(SILDeclRef(fd, SILDeclRef::Kind::Func));
+    SILDeclRef constant(fd, SILDeclRef::Kind::Func);
+    maybeAddEntry(constant);
 
-    // SWIFT_ENABLE_TENSORFLOW
-    for (auto *DA : fd->getAttrs().getAttributes<DifferentiableAttr>()) {
-      auto constant = SILDeclRef(fd, SILDeclRef::Kind::Func);
+    for (auto *diffAttr : fd->getAttrs().getAttributes<DifferentiableAttr>()) {
       auto jvpConstant = constant.asAutoDiffDerivativeFunction(
           AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
-              DA->getDerivativeGenericSignature(), fd->getASTContext()));
+              AutoDiffDerivativeFunctionKind::JVP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(), fd->getASTContext()));
       maybeAddEntry(jvpConstant);
 
       auto vjpConstant = constant.asAutoDiffDerivativeFunction(
           AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
-              DA->getDerivativeGenericSignature(), fd->getASTContext()));
+              AutoDiffDerivativeFunctionKind::VJP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(), fd->getASTContext()));
       maybeAddEntry(vjpConstant);
     }
-    // SWIFT_ENABLE_TENSORFLOW END
   }
 
   void maybeAddConstructor(ConstructorDecl *cd) {
@@ -113,24 +113,24 @@ template <class T> class SILVTableVisitor {
     // The initializing entry point for designated initializers is only
     // necessary for super.init chaining, which is sufficiently constrained
     // to never need dynamic dispatch.
-    maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
+    SILDeclRef constant(cd, SILDeclRef::Kind::Allocator);
+    maybeAddEntry(constant);
 
-    // SWIFT_ENABLE_TENSORFLOW
-    for (auto *DA : cd->getAttrs().getAttributes<DifferentiableAttr>()) {
-      auto constant = SILDeclRef(cd, SILDeclRef::Kind::Allocator);
+    for (auto *diffAttr : cd->getAttrs().getAttributes<DifferentiableAttr>()) {
       auto jvpConstant = constant.asAutoDiffDerivativeFunction(
           AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
-              DA->getDerivativeGenericSignature(), cd->getASTContext()));
+              AutoDiffDerivativeFunctionKind::JVP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(), cd->getASTContext()));
       maybeAddEntry(jvpConstant);
 
       auto vjpConstant = constant.asAutoDiffDerivativeFunction(
           AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
-              DA->getDerivativeGenericSignature(), cd->getASTContext()));
+              AutoDiffDerivativeFunctionKind::VJP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(), cd->getASTContext()));
       maybeAddEntry(vjpConstant);
     }
-    // SWIFT_ENABLE_TENSORFLOW END
   }
 
   void maybeAddAccessors(AbstractStorageDecl *asd) {

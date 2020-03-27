@@ -528,7 +528,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                 indexStorePath.str(), &diags, outRecordFile);
       if (failed)
         return false;
-      records.emplace_back(outRecordFile, moduleName.str());
+      records.emplace_back(outRecordFile, moduleName.str().str());
       return true;
     });
     indexModule(module, groupIndexConsumer);

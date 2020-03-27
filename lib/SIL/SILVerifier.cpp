@@ -4608,25 +4608,24 @@ public:
             "unknown verfication type");
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   void checkDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
     // FIXME(TF-1197): Re-enable verification after substituted SIL function
     // types.
     return;
-#if 0
+// #if 0
     auto origTy =
         dfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");
     require(!origTy->isDifferentiable(),
             "The original function must not be @differentiable");
-    // Skip lowered SIL: LoadableByAddress changes parameter/result conventions.
+    // Skip verification in lowered SIL: LoadableByAddress changes
+    // parameter/result conventions.
     // TODO: Check that derivative function types match excluding
     // parameter/result conventions in lowered SIL.
     if (F.getModule().getStage() == SILStage::Lowered)
       return;
     if (dfi->hasDerivativeFunctions()) {
       auto jvp = dfi->getJVPFunction();
-      // auto jvpType = jvp->getType().getAs<SILFunctionType>()->getUnsubstitutedType(F.getModule());
       auto jvpType = jvp->getType().getAs<SILFunctionType>();
       require(jvpType, "The JVP function must have a function type");
       require(!jvpType->isDifferentiable(),
@@ -4634,13 +4633,11 @@ public:
       auto expectedJVPType = origTy->getAutoDiffDerivativeFunctionType(
           dfi->getParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::JVP, TC,
-          // LookUpConformanceInModule(M))->getUnsubstitutedType(F.getModule());
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(jvpType),
                       SILType::getPrimitiveObjectType(expectedJVPType),
                       "JVP type does not match expected JVP type");
       auto vjp = dfi->getVJPFunction();
-      // auto vjpType = vjp->getType().getAs<SILFunctionType>()->getUnsubstitutedType(F.getModule());
       auto vjpType = vjp->getType().getAs<SILFunctionType>();
       require(vjpType, "The VJP function must have a function type");
       require(!vjpType->isDifferentiable(),
@@ -4648,15 +4645,23 @@ public:
       auto expectedVJPType = origTy->getAutoDiffDerivativeFunctionType(
           dfi->getParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::VJP, TC,
-          // LookUpConformanceInModule(M))->getUnsubstitutedType(F.getModule());
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(vjpType),
                       SILType::getPrimitiveObjectType(expectedVJPType),
                       "VJP type does not match expected VJP type");
     }
-#endif
+// #endif
   }
 
+  void checkDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *dfei) {
+    auto fnTy = dfei->getOperand()->getType().getAs<SILFunctionType>();
+    require(fnTy, "The function operand must have a function type");
+    require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal,
+            "The function operand must be a '@differentiable' function");
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
   void checkLinearFunctionInst(LinearFunctionInst *lfi) {
     auto origTy =
         lfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
@@ -4686,14 +4691,6 @@ public:
               expectedTransposeType->getUnsubstitutedType(F.getModule())),
           "Transpose type does not match expected transpose type");
     }
-  }
-
-  void checkDifferentiableFunctionExtractInst(
-      DifferentiableFunctionExtractInst *dfei) {
-    auto fnTy = dfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
-    require(fnTy, "The function operand must have a function type");
-    require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal,
-            "The function operand must be a '@differentiable' function");
   }
 
   void checkLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
@@ -5355,9 +5352,6 @@ void SILVTable::verify(const SILModule &M) const {
     // The class context must be the vtable's class, or a superclass thereof.
     assert(theClass->isSuperclassOf(getClass()) &&
            "vtable entry must refer to a member of the vtable's class");
-
-    // All function vtable entries must be at their natural uncurry level.
-    assert(!entry.Method.isCurried && "vtable entry must not be curried");
 
     // Foreign entry points shouldn't appear in vtables.
     assert(!entry.Method.isForeign && "vtable entry must not be foreign");

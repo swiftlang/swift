@@ -352,10 +352,9 @@ std::string LinkEntity::mangleAsString() const {
     assert(isa<AbstractFunctionDecl>(getDecl()));
     std::string Result;
     if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
-      Result = mangler.mangleConstructorEntity(Constructor, isAllocator(),
-                                               /*isCurried=*/false);
+      Result = mangler.mangleConstructorEntity(Constructor, isAllocator());
     } else  {
-      Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
+      Result = mangler.mangleEntity(getDecl());
     }
     Result.append("TI");
     return Result;
@@ -379,10 +378,9 @@ std::string LinkEntity::mangleAsString() const {
     std::string Result;
     if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
       Result =
-          mangler.mangleConstructorEntity(Constructor, isAllocator(),
-                                          /*isCurried=*/false);
+          mangler.mangleConstructorEntity(Constructor, isAllocator());
     } else  {
-      Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
+      Result = mangler.mangleEntity(getDecl());
     }
     Result.append("TX");
     return Result;
@@ -393,10 +391,9 @@ std::string LinkEntity::mangleAsString() const {
     std::string Result;
     if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
       Result =
-          mangler.mangleConstructorEntity(Constructor, isAllocator(),
-                                          /*isCurried=*/false);
+          mangler.mangleConstructorEntity(Constructor, isAllocator());
     } else  {
-      Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
+      Result = mangler.mangleEntity(getDecl());
     }
     Result.append("Tx");
     return Result;

@@ -172,7 +172,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
 
 sil public @useObjcProtocol : $@convention(method) (@guaranteed ProtocolA) -> () {
 bb0(%0 : $ProtocolA):
-  dynamic_method_br %0 : $ProtocolA, #ProtocolA.funcA!1.foreign, bb1, bb2
+  dynamic_method_br %0 : $ProtocolA, #ProtocolA.funcA!foreign, bb1, bb2
 
 bb1(%1 : $@convention(objc_method) (ProtocolA) -> ()):
   %3 = apply %1(%0) : $@convention(objc_method) (ProtocolA) -> ()

@@ -765,7 +765,7 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
       if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
         // The actual variable has a symbol.
         Mangle::ASTMangler mangler;
-        addSymbol(mangler.mangleEntity(VD, false));
+        addSymbol(mangler.mangleEntity(VD));
       }
 
       if (VD->isLazilyInitializedGlobal())

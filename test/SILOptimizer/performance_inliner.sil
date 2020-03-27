@@ -966,7 +966,7 @@ bb2(%7 : $Error):
 }
 
 sil_vtable C {
-  #C.callThrowing!1: @callThrowing
+  #C.callThrowing: @callThrowing
 }
 
 // Test that the inliner doesn't crash if a dynamic-self callee is called from a

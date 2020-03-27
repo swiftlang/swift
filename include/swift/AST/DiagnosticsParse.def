@@ -504,9 +504,9 @@ ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
 ERROR(expected_sil_tuple_index,none,
       "expected tuple element index", ())
-// SWIFT_ENABLE_TENSORFLOW
-ERROR(malformed_autodiff_parameter_indices,none,
-      "malformed autodiff parameter indices", ())
+ERROR(invalid_index_subset,none,
+      "invalid index subset; expected '[SU]+' where 'S' represents set indices "
+      "and 'U' represents unset indices", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -1586,14 +1586,10 @@ ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
-ERROR(attr_differentiable_expected_label,none,"expected 'wrt:' or 'where'", ())
+ERROR(attr_differentiable_expected_label,none,
+      "expected 'wrt:' or 'where' in '@differentiable' attribute", ())
 ERROR(attr_differentiable_unexpected_argument,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
-// TODO(TF-893): Remove this error after the 0.8 release.
-ERROR(attr_differentiable_jvp_vjp_deprecated_error,none,
-        "'jvp:' and 'vjp:' arguments in '@differentiable' attribute are "
-        "deprecated; use '@derivative' attribute for derivative registration "
-        "instead", ())
 
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,
@@ -1622,24 +1618,22 @@ ERROR(sil_autodiff_expected_parameter_index,PointsToFirstBadToken,
       "expected the index of a parameter to differentiate with respect to", ())
 ERROR(sil_autodiff_expected_result_index,PointsToFirstBadToken,
       "expected the index of a result to differentiate from", ())
-// SWIFT_ENABLE_TENSORFLOW
 ERROR(sil_inst_autodiff_operand_list_expected_lbrace,PointsToFirstBadToken,
       "expected '{' to start a derivative function list", ())
 ERROR(sil_inst_autodiff_operand_list_expected_comma,PointsToFirstBadToken,
       "expected ',' between operands in a derivative function list", ())
 ERROR(sil_inst_autodiff_operand_list_expected_rbrace,PointsToFirstBadToken,
       "expected '}' to start a derivative function list", ())
-ERROR(sil_inst_autodiff_num_operand_list_order_mismatch,PointsToFirstBadToken,
-      "the number of operand lists does not match the order", ())
 ERROR(sil_inst_autodiff_expected_differentiable_extractee_kind,PointsToFirstBadToken,
       "expected an extractee kind attribute, which can be one of '[original]', "
       "'[jvp]', and '[vjp]'", ())
+// SWIFT_ENABLE_TENSORFLOW
 ERROR(sil_inst_autodiff_expected_linear_extractee_kind,PointsToFirstBadToken,
       "expected an extractee kind attribute, which can be one of '[original]' "
       "and '[transpose]'", ())
+// SWIFT_ENABLE_TENSORFLOW END
 ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
       "expected an operand of a function type", ())
-// SWIFT_ENABLE_TENSORFLOW END
 ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBadToken,
       "expected a differentiability witness kind, which can be one of '[jvp]', "
       "'[vjp]', or '[transpose]'", ())
@@ -1673,9 +1667,6 @@ ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
-ERROR(where_toplevel_nongeneric,none,
-      "'where' clause cannot be attached to non-generic "
-      "top-level declaration", ())
 ERROR(where_inside_brackets,none,
         "'where' clause next to generic parameters is obsolete, "
         "must be written following the declaration's type", ())

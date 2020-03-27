@@ -2078,8 +2078,10 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
   // wrapper that was initialized with '=', the stored property initializer
   // will be in terms of the original property's type.
   if (auto originalProperty = VD->getOriginalWrappedProperty()) {
-    if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
-      resultTy = originalProperty->getValueInterfaceType()->getCanonicalType();
+    if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
+      resultTy = originalProperty->getPropertyWrapperInitValueInterfaceType()
+                                     ->getCanonicalType();
+    }
   }
 
   auto sig = DC->getGenericSignatureOfContext();
@@ -2098,8 +2100,7 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
 
   auto *DC = VD->getInnermostDeclContext();
   CanType inputType =
-    VD->getParentPattern()->getType()->mapTypeOutOfContext()
-          ->getCanonicalType();
+    VD->getPropertyWrapperInitValueInterfaceType()->getCanonicalType();
 
   auto sig = DC->getGenericSignatureOfContext();
 
@@ -2188,14 +2189,13 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
-  // SWIFT_ENABLE_TENSORFLOW
-  if (auto *autoDiffFuncId = c.autoDiffDerivativeFunctionIdentifier) {
+  if (auto *derivativeId = c.derivativeFunctionIdentifier) {
     auto originalFnTy =
         makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
-    auto *fnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        autoDiffFuncId->getParameterIndices(), autoDiffFuncId->getKind(),
+    auto *derivativeFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
+        derivativeId->getParameterIndices(), derivativeId->getKind(),
         LookUpConformanceInModule(&M));
-    return cast<AnyFunctionType>(fnTy->getCanonicalType());
+    return cast<AnyFunctionType>(derivativeFnTy->getCanonicalType());
   }
 
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
@@ -2389,8 +2389,6 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   }
 
   fn.isForeign = 0;
-  fn.isCurried = 0;
-  fn.isDirectReference = 0;
 
   // See if we've cached the lowered capture list for this function.
   auto found = LoweredCaptures.find(fn);

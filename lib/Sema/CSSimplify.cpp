@@ -135,7 +135,6 @@ static bool areConservativelyCompatibleArgumentLabels(
     decl = choice.getDecl();
     break;
 
-  case OverloadChoiceKind::BaseType:
   // KeyPath application is not filtered in `performMemberLookup`.
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::DynamicMemberLookup:
@@ -2395,10 +2394,7 @@ ConstraintSystem::matchTypesBindTypeVar(
     TypeMatchOptions flags, ConstraintLocatorBuilder locator,
     llvm::function_ref<TypeMatchResult()> formUnsolvedResult) {
   assert(typeVar->is<TypeVariableType>() && "Expected a type variable!");
-  // FIXME: Due to some SE-0110 related code farther up we can end
-  // up with type variables wrapped in parens that will trip this
-  // assert. For now, maintain the existing behavior.
-  // assert(!type->is<TypeVariableType>() && "Expected a non-type variable!");
+  assert(!type->is<TypeVariableType>() && "Expected a non-type variable!");
 
   // Simplify the right-hand type and perform the "occurs" check.
   typeVar = getRepresentative(typeVar);
@@ -3663,6 +3659,7 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
@@ -4104,14 +4101,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return getTypeMatchSuccess();
       }
 
-      assert((type1->is<TypeVariableType>() || type2->is<TypeVariableType>()) &&
-             "Expected a type variable!");
-      // FIXME: Due to some SE-0110 related code farther up we can end
-      // up with type variables wrapped in parens that will trip this
-      // assert. For now, maintain the existing behavior.
-      // assert(
-      //     (!type1->is<TypeVariableType>() || !type2->is<TypeVariableType>())
-      //     && "Expected a non-type variable!");
+      assert((type1->is<TypeVariableType>() != type2->is<TypeVariableType>()) &&
+             "Expected a type variable and a non type variable!");
 
       auto *typeVar = typeVar1 ? typeVar1 : typeVar2;
       auto type = typeVar1 ? type2 : type1;
@@ -4792,9 +4783,21 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // literals and expressions representing an implicit return type of the single
   // expression functions.
   if (auto elt = locator.last()) {
-    if (elt->isClosureResult() || elt->isResultOfSingleExprFunction()) {
-      if (kind >= ConstraintKind::Subtype &&
-          (type1->isUninhabited() || type2->isVoid())) {
+    if (kind >= ConstraintKind::Subtype &&
+        (type1->isUninhabited() || type2->isVoid())) {
+      // A conversion from closure body type to its signature result type.
+      if (auto resultElt = elt->getAs<LocatorPathElt::ClosureBody>()) {
+        // If a single statement closure has explicit `return` let's
+        // forbid conversion to `Void` and report an error instead to
+        // honor user's intent.
+        if (type1->isUninhabited() || !resultElt->hasExplicitReturn()) {
+          increaseScore(SK_FunctionConversion);
+          return getTypeMatchSuccess();
+        }
+      }
+
+      // Single expression function with implicit `return`.
+      if (elt->isResultOfSingleExprFunction()) {
         increaseScore(SK_FunctionConversion);
         return getTypeMatchSuccess();
       }
@@ -6993,6 +6996,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
   }
 
+  bool hasReturn = hasExplicitResult(closure);
+
   // If this is a multi-statement closure its body doesn't participate
   // in type-checking.
   if (closure->hasSingleExpressionBody()) {
@@ -7000,11 +7005,17 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     if (!closureBody)
       return false;
 
-    // Since result of the closure type has to be r-value type, we have
-    // to use equality here.
     addConstraint(
         ConstraintKind::Conversion, getType(closureBody),
         closureType->getResult(),
+        getConstraintLocator(closure, LocatorPathElt::ClosureBody(hasReturn)));
+  } else if (!hasReturn) {
+    // If multi-statement closure doesn't have an explicit result
+    // (no `return` statements) let's default it to `Void`.
+    auto &ctx = getASTContext();
+    addConstraint(
+        ConstraintKind::Defaultable, inferredClosureType->getResult(),
+        ctx.TheEmptyTupleType,
         getConstraintLocator(closure, ConstraintLocator::ClosureResult));
   }
 

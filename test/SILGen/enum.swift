@@ -30,7 +30,7 @@ func Optionable_cases(_ x: Int) {
   _ = Optionable.mere
 
   // CHECK:  [[METATYPE:%.*]] = metatype $@thin Optionable.Type
-  // CHECK:  [[RES:%.*]] = enum $Optionable, #Optionable.mere!enumelt.1, %0 : $Int
+  // CHECK:  [[RES:%.*]] = enum $Optionable, #Optionable.mere!enumelt, %0 : $Int
   _ = Optionable.mere(x)
 }
 
@@ -79,9 +79,9 @@ func AddressOnly_cases(_ s: S) {
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[PHANTOM:%.*]] = alloc_stack $AddressOnly
-  // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[PHANTOM]] : $*AddressOnly, #AddressOnly.phantom!enumelt.1
+  // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[PHANTOM]] : $*AddressOnly, #AddressOnly.phantom!enumelt
   // CHECK-NEXT:  store %0 to [trivial] [[PAYLOAD]]
-  // CHECK-NEXT:  inject_enum_addr [[PHANTOM]] : $*AddressOnly, #AddressOnly.phantom!enumelt.1
+  // CHECK-NEXT:  inject_enum_addr [[PHANTOM]] : $*AddressOnly, #AddressOnly.phantom!enumelt
   // CHECK-NEXT:  destroy_addr [[PHANTOM]]
   // CHECK-NEXT:  dealloc_stack [[PHANTOM]]
 
@@ -131,7 +131,7 @@ func PolyOptionable_specialized_cases(_ t: Int) {
   _ = PolyOptionable<Int>.nought
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin PolyOptionable<Int>.Type
-// CHECK-NEXT:    [[NOUGHT:%.*]] = enum $PolyOptionable<Int>, #PolyOptionable.mere!enumelt.1, %0
+// CHECK-NEXT:    [[NOUGHT:%.*]] = enum $PolyOptionable<Int>, #PolyOptionable.mere!enumelt, %0
   _ = PolyOptionable<Int>.mere(t)
 
 // CHECK:         return
@@ -155,7 +155,7 @@ enum Indirect<T> {
 }
 // CHECK-LABEL: sil{{.*}} @{{.*}}makeIndirectEnum{{.*}} : $@convention(thin) <T> (@in_guaranteed T) -> @owned Indirect<T>
 // CHECK: [[BOX:%.*]] = alloc_box $<τ_0_0> { var (τ_0_0, other: τ_0_0) } <T>
-// CHECK: enum $Indirect<T>, #Indirect.payload!enumelt.1, [[BOX]] : $<τ_0_0> { var (τ_0_0, other: τ_0_0) } <T>
+// CHECK: enum $Indirect<T>, #Indirect.payload!enumelt, [[BOX]] : $<τ_0_0> { var (τ_0_0, other: τ_0_0) } <T>
 func makeIndirectEnum<T>(_ payload: T) -> Indirect<T> {
   return Indirect.payload((payload, other: payload))
 }
@@ -198,7 +198,7 @@ enum SR7799 {
 // CHECK-LABEL: sil hidden [ossa] @$s4enum6sr77993baryAA6SR7799OSg_tF : $@convention(thin) (Optional<SR7799>) -> () {
 // CHECK: bb0(%0 : $Optional<SR7799>):
 // CHECK-NEXT:  debug_value %0 : $Optional<SR7799>, let, name "bar", argno 1
-// CHECK-NEXT:  switch_enum %0 : $Optional<SR7799>, case #Optional.some!enumelt.1: bb1, default bb4
+// CHECK-NEXT:  switch_enum %0 : $Optional<SR7799>, case #Optional.some!enumelt: bb1, default bb4
 // CHECK: bb1([[PHI_ARG:%.*]] : $SR7799):
 // CHECK-NEXT:  switch_enum [[PHI_ARG]] : $SR7799, case #SR7799.one!enumelt: bb2, case #SR7799.two!enumelt: bb3
 func sr7799(bar: SR7799?) {

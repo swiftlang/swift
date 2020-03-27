@@ -143,7 +143,6 @@ static bool sameOverloadChoice(const OverloadChoice &x,
     return false;
 
   switch (x.getKind()) {
-  case OverloadChoiceKind::BaseType:
   case OverloadChoiceKind::KeyPathApplication:
     // FIXME: Compare base types after substitution?
     return true;
@@ -895,7 +894,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::TupleIndex:
       continue;
 
-    case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::KeyPathApplication:
       llvm_unreachable("Never considered different");
 

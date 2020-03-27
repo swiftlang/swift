@@ -4,7 +4,6 @@
 // RUN: %target-sil-opt -enable-experimental-differentiable-programming -disable-sil-linking -enable-sil-verify-all %t/transpose_attr.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
-// REQUIRES: differentiable_programming
 
 // SWIFT_ENABLE_TENSORFLOW
 // This test is enabled on `tensorflow` branch.

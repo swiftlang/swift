@@ -113,23 +113,13 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return false;
 }
 
-SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                       // SWIFT_ENABLE_TENSORFLOW
-                       bool isCurried, bool isForeign,
-                       AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId)
-  : loc(vd), kind(kind),
-    isCurried(isCurried), isForeign(isForeign),
-    // SWIFT_ENABLE_TENSORFLOW
-    isDirectReference(0), defaultArgIndex(0),
-    autoDiffDerivativeFunctionIdentifier(autoDiffFuncId)
-{}
+SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
+                       AutoDiffDerivativeFunctionIdentifier *derivativeId)
+    : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0),
+      derivativeFunctionIdentifier(derivativeId) {}
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
-                       bool isCurried, bool asForeign)
-  // SWIFT_ENABLE_TENSORFLOW
-  : isCurried(isCurried), isDirectReference(0), defaultArgIndex(0),
-    autoDiffDerivativeFunctionIdentifier(nullptr)
-{
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign)
+    : defaultArgIndex(0), derivativeFunctionIdentifier(nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
       // Map FuncDecls directly to Func SILDeclRefs.
@@ -180,7 +170,7 @@ Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
 }
 
 bool SILDeclRef::isThunk() const {
-  return isCurried || isForeignToNativeThunk() || isNativeToForeignThunk();
+  return isForeignToNativeThunk() || isNativeToForeignThunk();
 }
 
 bool SILDeclRef::isClangImported() const {
@@ -253,22 +243,6 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     moduleContext = moduleContext->getParent();
   }
 
-  // Enum constructors and curry thunks either have private or shared
-  // linkage, dependings are essentially the same as thunks, they are
-  // emitted by need and have shared linkage.
-  if (isEnumElement() || isCurried) {
-    switch (d->getEffectiveAccess()) {
-    case AccessLevel::Private:
-    case AccessLevel::FilePrivate:
-      return maybeAddExternal(SILLinkage::Private);
-
-    case AccessLevel::Internal:
-    case AccessLevel::Public:
-    case AccessLevel::Open:
-      return SILLinkage::Shared;
-    }
-  }
-
   // Calling convention thunks have shared linkage.
   if (isForeignToNativeThunk())
     return SILLinkage::Shared;
@@ -319,15 +293,8 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     limit = Limit::NeverPublic;
   }
 
-  // The property wrapper backing initializer is never public for resilient
-  // properties.
-  if (kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
-    if (cast<VarDecl>(d)->isResilient())
-      limit = Limit::NeverPublic;
-  }
-
   // Stored property initializers get the linkage of their containing type.
-  if (isStoredPropertyInitializer()) {
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer()) {
     // Three cases:
     //
     // 1) Type is formally @_fixed_layout/@frozen. Root initializers can be
@@ -509,7 +476,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   // Stored property initializers are inlinable if the type is explicitly
   // marked as @frozen.
-  if (isStoredPropertyInitializer()) {
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer()) {
     auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
@@ -544,18 +511,6 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     if (!isClangImported() &&
         fn->hasForcedStaticDispatch())
       return IsSerialized;
-
-  // Enum element constructors are serializable if the enum is
-  // @usableFromInline or public.
-  if (isEnumElement())
-    return IsSerializable;
-
-  // Currying thunks are serialized if referenced from an inlinable
-  // context -- Sema's semantic checks ensure the serialization of
-  // such a thunk is valid, since it must in turn reference a public
-  // symbol, or dispatch via class_method or witness_method.
-  if (isCurried)
-    return IsSerializable;
 
   if (isForeignToNativeThunk())
     return IsSerializable;
@@ -690,18 +645,17 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   using namespace Mangle;
   ASTMangler mangler;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  if (autoDiffDerivativeFunctionIdentifier) {
+  if (derivativeFunctionIdentifier) {
     std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(
-        autoDiffDerivativeFunctionIdentifier->getParameterIndices(),
+        derivativeFunctionIdentifier->getParameterIndices(),
         getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
     auto &ctx = getDecl()->getASTContext();
     auto *resultIndices = IndexSubset::get(ctx, 1, {0});
     AutoDiffConfig silConfig(
         silParameterIndices, resultIndices,
-        autoDiffDerivativeFunctionIdentifier->getDerivativeGenericSignature());
-    auto derivativeFnKind = autoDiffDerivativeFunctionIdentifier->getKind();
+        derivativeFunctionIdentifier->getDerivativeGenericSignature());
+    auto derivativeFnKind = derivativeFunctionIdentifier->getKind();
     return mangler.mangleAutoDiffDerivativeFunctionHelper(
         originalMangled, derivativeFnKind, silConfig);
   }
@@ -709,8 +663,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   // As a special case, Clang functions and globals don't get mangled at all.
   if (hasDecl()) {
     if (auto clangDecl = getDecl()->getClangDecl()) {
-      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()
-          && !isCurried) {
+      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
         if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
           if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
             std::string s(1, '\01');
@@ -734,8 +687,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     case SILDeclRef::ManglingKind::Default:
       if (isForeign) {
         SKind = ASTMangler::SymbolKind::SwiftAsObjCThunk;
-      } else if (isDirectReference) {
-        SKind = ASTMangler::SymbolKind::DirectMethodReferenceThunk;
       } else if (isForeignToNativeThunk()) {
         SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
       }
@@ -755,8 +706,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // point.
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!NameA->Name.empty() &&
-          !isForeignToNativeThunk() && !isNativeToForeignThunk()
-          && !isCurried) {
+          !isForeignToNativeThunk() && !isNativeToForeignThunk()) {
         return NameA->Name.str();
       }
       
@@ -770,16 +720,14 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     LLVM_FALLTHROUGH;
 
   case SILDeclRef::Kind::EnumElement:
-    return mangler.mangleEntity(getDecl(), isCurried, SKind);
+    return mangler.mangleEntity(getDecl(), SKind);
 
   case SILDeclRef::Kind::Deallocator:
-    assert(!isCurried);
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
                                           /*isDeallocating*/ true,
                                           SKind);
 
   case SILDeclRef::Kind::Destroyer:
-    assert(!isCurried);
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
                                           /*isDeallocating*/ false,
                                           SKind);
@@ -787,42 +735,35 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::Allocator:
     return mangler.mangleConstructorEntity(cast<ConstructorDecl>(getDecl()),
                                            /*allocating*/ true,
-                                           isCurried,
                                            SKind);
 
   case SILDeclRef::Kind::Initializer:
     return mangler.mangleConstructorEntity(cast<ConstructorDecl>(getDecl()),
                                            /*allocating*/ false,
-                                           isCurried,
                                            SKind);
 
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
-    assert(!isCurried);
     return mangler.mangleIVarInitDestroyEntity(cast<ClassDecl>(getDecl()),
                                   kind == SILDeclRef::Kind::IVarDestroyer,
                                   SKind);
 
   case SILDeclRef::Kind::GlobalAccessor:
-    assert(!isCurried);
     return mangler.mangleAccessorEntity(AccessorKind::MutableAddress,
                                         cast<AbstractStorageDecl>(getDecl()),
                                         /*isStatic*/ false,
                                         SKind);
 
   case SILDeclRef::Kind::DefaultArgGenerator:
-    assert(!isCurried);
     return mangler.mangleDefaultArgumentEntity(
                                         cast<DeclContext>(getDecl()),
                                         defaultArgIndex,
                                         SKind);
 
   case SILDeclRef::Kind::StoredPropertyInitializer:
-    assert(!isCurried);
     return mangler.mangleInitializerEntity(cast<VarDecl>(getDecl()), SKind);
 
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
-    assert(!isCurried);
     return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
                                                   SKind);
   }
@@ -830,37 +771,41 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   llvm_unreachable("bad entity kind!");
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
-static bool autoDiffDerivativeFunctionRequiresNewVTableEntry(SILDeclRef ref) {
-  assert(ref.autoDiffDerivativeFunctionIdentifier);
-  auto overridden = ref.getOverridden();
+// FIXME(TF-1213): Also consider derived declaration `@derivative` attributes.
+static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
+  assert(declRef.derivativeFunctionIdentifier &&
+         "Expected a derivative function SILDeclRef");
+  auto overridden = declRef.getOverridden();
   if (!overridden)
     return false;
-  // Get derived `@differentiable` attribute.
-  auto *derivedDA = *llvm::find_if(
-      ref.getDecl()->getAttrs().getAttributes<DifferentiableAttr>(),
-      [&](const DifferentiableAttr *derivedAttr) {
-        return derivedAttr->getParameterIndices() ==
-               ref.autoDiffDerivativeFunctionIdentifier->getParameterIndices();
+  // Get the derived `@differentiable` attribute.
+  auto *derivedDiffAttr = *llvm::find_if(
+      declRef.getDecl()->getAttrs().getAttributes<DifferentiableAttr>(),
+      [&](const DifferentiableAttr *derivedDiffAttr) {
+        return derivedDiffAttr->getParameterIndices() ==
+               declRef.derivativeFunctionIdentifier->getParameterIndices();
       });
-  assert(derivedDA && "Expected `@differentiable` attribute");
-  auto baseDAs =
+  assert(derivedDiffAttr && "Expected `@differentiable` attribute");
+  // Otherwise, if the base `@differentiable` attribute specifies a derivative
+  // function, then the derivative is inherited and no new vtable entry is
+  // needed. Return false.
+  auto baseDiffAttrs =
       overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
-  for (auto *baseDA : baseDAs) {
-    if (baseDA->getParameterIndices() ==
-        ref.autoDiffDerivativeFunctionIdentifier->getParameterIndices())
+  for (auto *baseDiffAttr : baseDiffAttrs) {
+    if (baseDiffAttr->getParameterIndices() ==
+        declRef.derivativeFunctionIdentifier->getParameterIndices())
       return false;
   }
+  // Otherwise, if there is no base `@differentiable` attribute exists, then a
+  // new vtable entry is needed. Return true.
   return true;
 }
 
 bool SILDeclRef::requiresNewVTableEntry() const {
-  // SWIFT_ENABLE_TENSORFLOW
-  if (autoDiffDerivativeFunctionIdentifier)
-    if (autoDiffDerivativeFunctionRequiresNewVTableEntry(*this))
+  if (derivativeFunctionIdentifier)
+    if (derivativeFunctionRequiresNewVTableEntry(*this))
       return true;
-  // SWIFT_ENABLE_TENSORFLOW END
   if (cast<AbstractFunctionDecl>(getDecl())->needsNewVTableEntry())
     return true;
   return false;
@@ -880,10 +825,7 @@ SILDeclRef SILDeclRef::getOverridden() const {
   auto overridden = getDecl()->getOverriddenDecl();
   if (!overridden)
     return SILDeclRef();
-
-  // SWIFT_ENABLE_TENSORFLOW
-  return SILDeclRef(overridden, kind, isCurried, isForeign,
-                    autoDiffDerivativeFunctionIdentifier);
+  return withDecl(overridden);
 }
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
@@ -935,30 +877,26 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (isa<ExtensionDecl>(overridden.getDecl()->getDeclContext()))
       return SILDeclRef();
 
-    // SWIFT_ENABLE_TENSORFLOW
     // JVPs/VJPs are overridden only if the base declaration has a
-    // `@differentiable` with the same parameter indices.
-    if (autoDiffDerivativeFunctionIdentifier) {
+    // `@differentiable` attribute with the same parameter indices.
+    if (derivativeFunctionIdentifier) {
       auto overriddenAttrs =
           overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
       for (const auto *attr : overriddenAttrs) {
         if (attr->getParameterIndices() !=
-            autoDiffDerivativeFunctionIdentifier->getParameterIndices())
+            derivativeFunctionIdentifier->getParameterIndices())
           continue;
-
-        // TODO(TF-1056): Do we need to check generic signature requirements?
-
-        auto dfi = overridden.autoDiffDerivativeFunctionIdentifier;
-        overridden.autoDiffDerivativeFunctionIdentifier =
+        auto *overriddenDerivativeId = overridden.derivativeFunctionIdentifier;
+        overridden.derivativeFunctionIdentifier =
             AutoDiffDerivativeFunctionIdentifier::get(
-                dfi->getKind(), dfi->getParameterIndices(),
+                overriddenDerivativeId->getKind(),
+                overriddenDerivativeId->getParameterIndices(),
                 attr->getDerivativeGenericSignature(),
                 getDecl()->getASTContext());
         return overridden;
       }
       return SILDeclRef();
     }
-    // SWIFT_ENABLE_TENSORFLOW END
     return overridden;
   }
   return SILDeclRef();
@@ -967,9 +905,7 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
 SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
   auto bestOverridden =
     getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-  // SWIFT_ENABLE_TENSORFLOW
-  return SILDeclRef(bestOverridden, kind, isCurried, isForeign,
-                    autoDiffDerivativeFunctionIdentifier);
+  return withDecl(bestOverridden);
 }
 
 AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(
@@ -1136,7 +1072,7 @@ SubclassScope SILDeclRef::getSubclassScope() const {
 }
 
 unsigned SILDeclRef::getParameterListCount() const {
-  if (isCurried || !hasDecl() || kind == Kind::DefaultArgGenerator)
+  if (!hasDecl() || kind == Kind::DefaultArgGenerator)
     return 1;
 
   auto *vd = getDecl();
@@ -1175,8 +1111,7 @@ bool SILDeclRef::canBeDynamicReplacement() const {
 bool SILDeclRef::isDynamicallyReplaceable() const {
   if (kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
-  if (isStoredPropertyInitializer() ||
-      kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer)
+  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer())
     return false;
 
   // Class allocators are not dynamic replaceable.

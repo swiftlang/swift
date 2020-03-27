@@ -122,16 +122,19 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
     sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
-      // SWIFT_ENABLE_TENSORFLOW
-      addMethodAndAutoDiffAssociatedMethodsIfRequired(accessor,
-                                                      SILDeclRef::Kind::Func);
+      if (SILDeclRef::requiresNewWitnessTableEntry(accessor)) {
+        asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
+        addAutoDiffDerivativeMethodsIfRequired(accessor,
+                                               SILDeclRef::Kind::Func);
+      }
     });
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    // SWIFT_ENABLE_TENSORFLOW
-    addMethodAndAutoDiffAssociatedMethodsIfRequired(
-        cd, SILDeclRef::Kind::Allocator);
+    if (SILDeclRef::requiresNewWitnessTableEntry(cd)) {
+      asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
+      addAutoDiffDerivativeMethodsIfRequired(cd, SILDeclRef::Kind::Allocator);
+    }
   }
 
   void visitAccessorDecl(AccessorDecl *func) {
@@ -140,9 +143,10 @@ public:
 
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
-    // SWIFT_ENABLE_TENSORFLOW
-    addMethodAndAutoDiffAssociatedMethodsIfRequired(func,
-                                                    SILDeclRef::Kind::Func);
+    if (SILDeclRef::requiresNewWitnessTableEntry(func)) {
+      asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+      addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
+    }
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
@@ -170,25 +174,23 @@ public:
     // We don't care about diagnostics at this stage.
   }
 
-// SWIFT_ENABLE_TENSORFLOW
 private:
-  void addMethodAndAutoDiffAssociatedMethodsIfRequired(
-      AbstractFunctionDecl *func, SILDeclRef::Kind kind) {
-    if (!SILDeclRef::requiresNewWitnessTableEntry(func))
-      return;
-
-    auto funcDeclRef = SILDeclRef(func, kind);
-    asDerived().addMethod(funcDeclRef);
-
-    for (auto *DA : func->getAttrs().getAttributes<DifferentiableAttr>()) {
-      asDerived().addMethod(funcDeclRef.asAutoDiffDerivativeFunction(
+  void addAutoDiffDerivativeMethodsIfRequired(AbstractFunctionDecl *AFD,
+                                              SILDeclRef::Kind kind) {
+    SILDeclRef declRef(AFD, kind);
+    for (auto *diffAttr : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
+      asDerived().addMethod(declRef.asAutoDiffDerivativeFunction(
           AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
-              DA->getDerivativeGenericSignature(), func->getASTContext())));
-      asDerived().addMethod(funcDeclRef.asAutoDiffDerivativeFunction(
+              AutoDiffDerivativeFunctionKind::JVP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(),
+              AFD->getASTContext())));
+      asDerived().addMethod(declRef.asAutoDiffDerivativeFunction(
           AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
-              DA->getDerivativeGenericSignature(), func->getASTContext())));
+              AutoDiffDerivativeFunctionKind::VJP,
+              diffAttr->getParameterIndices(),
+              diffAttr->getDerivativeGenericSignature(),
+              AFD->getASTContext())));
     }
   }
 };

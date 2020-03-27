@@ -510,6 +510,10 @@ def disable_debugger_shadow_copies : Flag<["-"], "disable-debugger-shadow-copies
            "This option is only useful for testing the compiler.">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def disable_concrete_type_metadata_mangled_name_accessors : Flag<["-"], "disable-concrete-type-metadata-mangled-name-accessors">,
+  HelpText<"Disable concrete type metadata access by mangled name">,
+  Flags<[FrontendOption, HelpHidden]>;
+  
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
 

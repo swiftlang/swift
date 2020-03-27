@@ -38,7 +38,7 @@ func wrap<T>(x x: T) -> T! { return x }
 
 // CHECK-LABEL: sil hidden [ossa] @$s29implicitly_unwrapped_optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
 func wrap_then_unwrap<T>(x x: T) -> T {
-  // CHECK:   switch_enum_addr {{%.*}}, case #Optional.some!enumelt.1: [[OK:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL:bb[0-9]+]]
+  // CHECK:   switch_enum_addr {{%.*}}, case #Optional.some!enumelt: [[OK:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL:bb[0-9]+]]
   // CHECK: [[FAIL]]:
   // CHECK:   unreachable
   // CHECK: [[OK]]:
@@ -48,7 +48,7 @@ func wrap_then_unwrap<T>(x x: T) -> T {
 // CHECK-LABEL: sil hidden [ossa] @$s29implicitly_unwrapped_optional10tuple_bind1xSSSgSi_SStSg_tF : $@convention(thin) (@guaranteed Optional<(Int, String)>) -> @owned Optional<String> {
 func tuple_bind(x x: (Int, String)!) -> String? {
   return x?.1
-  // CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt.1: [[NONNULL:bb[0-9]+]], case #Optional.none!enumelt: [[NULL:bb[0-9]+]]
+  // CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt: [[NONNULL:bb[0-9]+]], case #Optional.none!enumelt: [[NULL:bb[0-9]+]]
   // CHECK: [[NONNULL]](
   // CHECK:   [[STRING:%.*]] = destructure_tuple {{%.*}} : $(Int, String)
   // CHECK-NOT: destroy_value [[STRING]]

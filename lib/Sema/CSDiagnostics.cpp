@@ -661,6 +661,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::ClosureBody:
     case ConstraintLocator::ClosureResult: {
       diagnostic = diag::cannot_convert_closure_result;
       break;
@@ -672,6 +673,15 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
         diagnostic = getDiagnosticFor(CTP_AssignSource);
         fromType = getType(assignExpr->getSrc());
         toType = getType(assignExpr->getDest());
+      }
+      break;
+    }
+    
+    case ConstraintLocator::OptionalPayload: {
+      // If we have an inout expression, this comes from an
+      // InoutToPointer argument mismatch failure.
+      if (isa<InOutExpr>(anchor)) {
+        diagnostic = diag::cannot_convert_argument_value;
       }
       break;
     }
@@ -1904,6 +1914,7 @@ bool ContextualFailure::diagnoseAsError() {
 
   Diag<Type, Type> diagnostic;
   switch (path.back().getKind()) {
+  case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
     auto *closure = cast<ClosureExpr>(getRawAnchor());
     if (closure->hasExplicitResultType() &&
@@ -3710,15 +3721,19 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // Fall back to a fix-it with a full type qualifier
-    if (auto *NTD = Member->getDeclContext()->getSelfNominalTypeDecl()) {
-      auto type = NTD->getSelfInterfaceType();
-      if (auto *SE = dyn_cast<SubscriptExpr>(getRawAnchor())) {
-        auto *baseExpr = SE->getBase();
-        Diag->fixItReplace(baseExpr->getSourceRange(), diag::replace_with_type,
-                           type);
-      } else {
-        Diag->fixItInsert(loc, diag::insert_type_qualification, type);
-      }
+    const Expr *baseExpr = nullptr;
+    if (const auto SE = dyn_cast<SubscriptExpr>(getRawAnchor()))
+      baseExpr = SE->getBase();
+    else if (const auto UDE = dyn_cast<UnresolvedDotExpr>(getRawAnchor()))
+      baseExpr = UDE->getBase();
+
+    // An implicit 'self' reference base expression means we should
+    // prepend with qualification.
+    if (baseExpr && !baseExpr->isImplicit()) {
+      Diag->fixItReplace(baseExpr->getSourceRange(),
+                         diag::replace_with_type, baseTy);
+    } else {
+      Diag->fixItInsert(loc, diag::insert_type_qualification, baseTy);
     }
 
     return true;
@@ -3788,7 +3803,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   if (!(locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
         locator->isLastElement<LocatorPathElt::ContextualType>() ||
         locator->isLastElement<LocatorPathElt::ApplyArgument>() ||
-        locator->isLastElement<LocatorPathElt::ClosureResult>()))
+        locator->isLastElement<LocatorPathElt::ClosureResult>() ||
+        locator->isLastElement<LocatorPathElt::ClosureBody>()))
     return false;
 
   // If this is a misplaced `missng argument` situation, it would be
@@ -4047,7 +4063,8 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
     if (auto objectType = paramType->getOptionalObjectType())
       paramType = objectType;
     funcType = paramType->getAs<FunctionType>();
-  } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
+  } else if (locator->isLastElement<LocatorPathElt::ClosureResult>() ||
+             locator->isLastElement<LocatorPathElt::ClosureBody>()) {
     // Based on the locator we know this this is something like this:
     // `let _: () -> ((Int) -> Void) = { return {} }`.
     funcType = getType(getRawAnchor())

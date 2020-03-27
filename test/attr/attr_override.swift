@@ -579,7 +579,7 @@ class SR_4206_DerivedGeneric_6<T>: SR_4206_BaseConcrete_6 {
   override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{overridden method 'foo' has generic signature <T, T where T : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_2>; expected generic signature to be <T, T where T : SR_4206_Protocol_2>}}
 }
 
-// Where clauses on contextually generic declarations
+// Contextual where clauses on non-generic members
 
 class SR_4206_Base_7<T> {
   func foo1() where T: SR_4206_Protocol_1 {} // expected-note {{overridden declaration is here}}
@@ -598,6 +598,14 @@ class SR_4206_Base_8<T> {
   func foo() where T: SR_4206_Protocol_1 {}
 }
 class SR_4206_Derived_8<T: SR_4206_Protocol_2, U>: SR_4206_Base_8<T> {
+  // Because the generic signature of foo() is the same either way,
+  // it may seem confusing that placing an additional constraint on the
+  // generic parameter declaration directly has a different effect on
+  // overridability in contrast to placing the constraint on foo().
+  // The former (unlike the latter) is accepted because the constraint
+  // in question only affects the ability to initialize an instance of the
+  // subclass — not the visibility of the override itself relative to an
+  // existing instance.
   override func foo() where T: SR_4206_Protocol_1 {} // OK
 }
 

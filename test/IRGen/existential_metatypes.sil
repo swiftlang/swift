@@ -94,7 +94,7 @@ sil @test1 : $@convention(thin) (Optional<@thick Kindable.Type>) -> () {
 bb0(%0 : $Optional<@thick Kindable.Type>):
   // CHECK:     [[TYPE:%.*]] = inttoptr i64 %0 to %swift.type*
   // CHECK:     [[WITNESS:%.*]] = inttoptr i64 %1 to i8**
-  switch_enum %0 : $Optional<@thick Kindable.Type>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+  switch_enum %0 : $Optional<@thick Kindable.Type>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3 : $@thick Kindable.Type):
   %5 = function_ref @use : $@convention(thin) (@thick Kindable.Type) -> ()
@@ -110,9 +110,9 @@ bb3:
 }
 
 sil_witness_table public_external Int: Kindable module existential_metatypes {
-  method #Kindable.kind!getter.1: @int_kind_getter_witness
+  method #Kindable.kind!getter: @int_kind_getter_witness
 }
 
 sil_witness_table public_external Float: Kindable module existential_metatypes {
-  method #Kindable.kind!getter.1: @float_kind_getter_witness
+  method #Kindable.kind!getter: @float_kind_getter_witness
 }

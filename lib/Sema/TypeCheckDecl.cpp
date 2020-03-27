@@ -1253,9 +1253,11 @@ static PrecedenceGroupDecl *
 lookupPrecedenceGroup(const PrecedenceGroupDescriptor &descriptor) {
   auto *dc = descriptor.dc;
   if (auto sf = dc->getParentSourceFile()) {
-    bool cascading = dc->isCascadingContextForLookup(false);
-    return sf->lookupPrecedenceGroup(descriptor.ident, cascading,
-                                     descriptor.nameLoc);
+    auto desc = OperatorLookupDescriptor::forFile(
+        sf, descriptor.ident, dc->isCascadingContextForLookup(false),
+        descriptor.nameLoc);
+    return evaluateOrDefault(sf->getASTContext().evaluator,
+                             LookupPrecedenceGroupRequest{desc}, nullptr);
   } else {
     return dc->getParentModule()->lookupPrecedenceGroup(descriptor.ident,
                                                         descriptor.nameLoc);
@@ -1277,8 +1279,9 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
 
     PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
                                    PrecedenceGroupDescriptor::HigherThan};
-    auto group = evaluateOrDefault(PGD->getASTContext().evaluator,
-                                   LookupPrecedenceGroupRequest{desc}, nullptr);
+    auto group =
+        evaluateOrDefault(PGD->getASTContext().evaluator,
+                          ValidatePrecedenceGroupRequest{desc}, nullptr);
     if (group) {
       rel.Group = group;
       addedHigherThan = true;
@@ -1297,8 +1300,9 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     auto dc = PGD->getDeclContext();
     PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
                                    PrecedenceGroupDescriptor::LowerThan};
-    auto group = evaluateOrDefault(PGD->getASTContext().evaluator,
-                                   LookupPrecedenceGroupRequest{desc}, nullptr);
+    auto group =
+        evaluateOrDefault(PGD->getASTContext().evaluator,
+                          ValidatePrecedenceGroupRequest{desc}, nullptr);
     bool hadError = false;
     if (group) {
       rel.Group = group;
@@ -1332,7 +1336,7 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     checkPrecedenceCircularity(Diags, PGD);
 }
 
-llvm::Expected<PrecedenceGroupDecl *> LookupPrecedenceGroupRequest::evaluate(
+llvm::Expected<PrecedenceGroupDecl *> ValidatePrecedenceGroupRequest::evaluate(
     Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
   if (auto *group = lookupPrecedenceGroup(descriptor)) {
     validatePrecedenceGroup(group);
@@ -1347,7 +1351,7 @@ PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
                                                         SourceLoc nameLoc) {
   return evaluateOrDefault(
       dc->getASTContext().evaluator,
-      LookupPrecedenceGroupRequest({dc, name, nameLoc, None}), nullptr);
+      ValidatePrecedenceGroupRequest({dc, name, nameLoc, None}), nullptr);
 }
 
 static NominalTypeDecl *resolveSingleNominalTypeDecl(
@@ -1723,26 +1727,24 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     FD->diagnose(diag::operator_in_local_scope);
   }
 
+  auto desc = OperatorLookupDescriptor::forFile(
+      FD->getDeclContext()->getParentSourceFile(), operatorName,
+      FD->isCascadingContextForLookup(false), FD->getLoc());
   OperatorDecl *op = nullptr;
-  SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
   if (FD->isUnaryOperator()) {
     if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
-      op = SF.lookupPrefixOperator(operatorName,
-                                   FD->isCascadingContextForLookup(false),
-                                   FD->getLoc());
+      op = evaluateOrDefault(evaluator,
+                             LookupPrefixOperatorRequest{desc}, nullptr);
     } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
-      op = SF.lookupPostfixOperator(operatorName,
-                                    FD->isCascadingContextForLookup(false),
-                                    FD->getLoc());
+      op = evaluateOrDefault(evaluator,
+                             LookupPostfixOperatorRequest{desc}, nullptr);
     } else {
-      auto prefixOp =
-          SF.lookupPrefixOperator(operatorName,
-                                  FD->isCascadingContextForLookup(false),
-                                  FD->getLoc());
-      auto postfixOp =
-          SF.lookupPostfixOperator(operatorName,
-                                   FD->isCascadingContextForLookup(false),
-                                   FD->getLoc());
+      auto prefixOp = evaluateOrDefault(evaluator,
+                                        LookupPrefixOperatorRequest{desc},
+                                        nullptr);
+      auto postfixOp = evaluateOrDefault(evaluator,
+                                         LookupPostfixOperatorRequest{desc},
+                                         nullptr);
 
       // If we found both prefix and postfix, or neither prefix nor postfix,
       // complain. We can't fix this situation.
@@ -1788,9 +1790,9 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
                   static_cast<bool>(postfixOp));
     }
   } else if (FD->isBinaryOperator()) {
-    op = SF.lookupInfixOperator(operatorName,
-                                FD->isCascadingContextForLookup(false),
-                                FD->getLoc());
+    op = evaluateOrDefault(evaluator,
+                           LookupInfixOperatorRequest{desc},
+                           nullptr);
   } else {
     diags.diagnose(FD, diag::invalid_arg_count_for_operator);
     return nullptr;

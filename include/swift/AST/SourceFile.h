@@ -444,6 +444,16 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
+protected:
+  virtual void
+  lookupOperatorDirect(Identifier name, OperatorFixity fixity,
+                       TinyPtrVector<OperatorDecl *> &results) const override;
+
+  virtual void lookupPrecedenceGroupDirect(
+      Identifier name,
+      TinyPtrVector<PrecedenceGroupDecl *> &results) const override;
+
+public:
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void
@@ -468,25 +478,6 @@ public:
   Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
 
   virtual bool walk(ASTWalker &walker) override;
-
-  /// @{
-
-  /// Look up the given operator in this file.
-  ///
-  /// The file must be name-bound already. If the operator is not found, or if
-  /// there is an ambiguity, returns null.
-  ///
-  /// \param isCascading If true, the lookup of this operator may affect
-  /// downstream files.
-  InfixOperatorDecl *lookupInfixOperator(Identifier name, bool isCascading,
-                                         SourceLoc diagLoc = {});
-  PrefixOperatorDecl *lookupPrefixOperator(Identifier name, bool isCascading,
-                                           SourceLoc diagLoc = {});
-  PostfixOperatorDecl *lookupPostfixOperator(Identifier name, bool isCascading,
-                                             SourceLoc diagLoc = {});
-  PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name, bool isCascading,
-                                             SourceLoc diagLoc = {});
-  /// @}
 
   ReferencedNameTracker *getReferencedNameTracker() {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;

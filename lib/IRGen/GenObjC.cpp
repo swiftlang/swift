@@ -1381,7 +1381,6 @@ void irgen::emitObjCIVarInitDestroyDescriptor(
   SILDeclRef declRef = SILDeclRef(cd, 
                                   isDestroyer? SILDeclRef::Kind::IVarDestroyer
                                              : SILDeclRef::Kind::IVarInitializer,
-                                  1, 
                                   /*foreign*/ true);
   Selector selector(declRef);
 
@@ -1410,7 +1409,13 @@ void irgen::emitObjCIVarInitDestroyDescriptor(
 
 llvm::Constant *
 irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
-                                     AbstractFunctionDecl *method) {
+                                     AbstractFunctionDecl *method,
+                                     llvm::StringSet<> &uniqueSelectors) {
+  // Don't emit a selector twice.
+  Selector selector(method);
+  if (!uniqueSelectors.insert(selector.str()).second)
+    return nullptr;
+
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
   return getObjCEncodingForMethod(IGM, methodType, true /*Extended*/, method);
 }

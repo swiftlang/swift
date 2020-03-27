@@ -126,7 +126,7 @@ bb4:
 // CHECK:      return
 sil [ossa] @store_splitting : $@convention(thin) (@inout S, @owned S, @guaranteed TwoCases) -> () {
 bb0(%0 : $*S, %1 : @owned $S, %2 : @guaranteed $TwoCases):
-  switch_enum %2 : $TwoCases, case #TwoCases.A!enumelt: bb1, case #TwoCases.B!enumelt.1: bb2
+  switch_enum %2 : $TwoCases, case #TwoCases.A!enumelt: bb1, case #TwoCases.B!enumelt: bb2
 
 bb1(%4 : @guaranteed $X):
   %5 = enum $TwoCases, #TwoCases.B!enumelt
