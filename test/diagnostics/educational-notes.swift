@@ -1,6 +1,6 @@
-// RUN: not %target-swift-frontend -color-diagnostics -enable-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace
-// RUN: not %target-swift-frontend -no-color-diagnostics -enable-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --check-prefix=NO-COLOR
-// RUN: not %target-swift-frontend -enable-experimental-diagnostic-formatting -enable-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s --check-prefix=CHECK-DESCRIPTIVE
+// RUN: not %target-swift-frontend -color-diagnostics -print-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace
+// RUN: not %target-swift-frontend -no-color-diagnostics -print-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --check-prefix=NO-COLOR
+// RUN: not %target-swift-frontend -enable-experimental-diagnostic-formatting -print-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s --check-prefix=CHECK-DESCRIPTIVE
 
 // A diagnostic with no educational notes
 let x = 1 +
