@@ -1,227 +1,28 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -swift-version 5 -DPTR_SIZE_%target-ptrsize -o %t/OSLogPrototypeExecTest
-// RUN: %target-run %t/OSLogPrototypeExecTest
+// RUN: %target-build-swift %s -swift-version 5 -DPTR_SIZE_%target-ptrsize -o %t/OSLogExecutionTest
+// RUN: %target-run %t/OSLogExecutionTest
 //
-// RUN: %target-build-swift %s -O -swift-version 5 -DPTR_SIZE_%target-ptrsize -o %t/OSLogPrototypeExecTest
-// RUN: %target-run %t/OSLogPrototypeExecTest
+// RUN: %target-build-swift %s -O -swift-version 5 -DPTR_SIZE_%target-ptrsize -o %t/OSLogExecutionTest
+// RUN: %target-run %t/OSLogExecutionTest
 // REQUIRES: executable_test
+//
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 
-// Run-time tests for testing the new OS log APIs that accept string
-// interpolations. The new APIs are still prototypes and must be used only in
-// tests.
+// Run-time tests for testing the correctness of the optimizations that optimize the
+// construction of the format string and the byte buffer from a string interpolation.
+// The tests here are run with -Onone (which includes only mandatory optimizations)
+// and also with full optimizations -O.
 
-import OSLogPrototype
+import OSLogTestHelper
 import StdlibUnittest
 import Foundation
 
 defer { runAllTests() }
 
-internal var OSLogTestSuite = TestSuite("OSLogTest")
-
-if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
-
-  // Following tests check whether valid log calls execute without
-  // compile-time and run-time errors.
-
-  func logMessages(_ h: Logger) {
-    // Test logging of simple messages.
-    h.log("A message with no data")
-
-    // Test logging at specific levels.
-    h.debug("Minimum integer value: \(Int.min)")
-    h.info("Maximum unsigned integer value: \(UInt.max, format: .hex)")
-
-    let privateID: UInt = 0x79abcdef
-    h.error("Private Identifier: \(privateID, format: .hex, privacy: .private)")
-    let addr: UInt = 0x7afebabe
-    h.fault("Invalid address: 0x\(addr, format: .hex, privacy: .public)")
-
-    // Test logging with multiple arguments.
-    let filePermissions: UInt = 0o777
-    let pid = 122225
-    h.error(
-      """
-      Access prevented: process \(pid) initiated by \
-      user: \(privateID, privacy: .private) attempted resetting \
-      permissions to \(filePermissions, format: .octal)
-      """)
-  }
-
-  OSLogTestSuite.test("log with default logger") {
-    let h = Logger()
-    logMessages(h)
-  }
-
-  OSLogTestSuite.test("log with custom logger") {
-    let h =
-      Logger(subsystem: "com.swift.test", category: "OSLogAPIPrototypeTest")
-    logMessages(h)
-  }
-
-  OSLogTestSuite.test("escaping of percents") {
-    let h = Logger()
-    h.log("a = c % d")
-    h.log("Process failed after 99% completion")
-    h.log("Double percents: %%")
-  }
-
-  // A stress test that checks whether the log APIs handle messages with more
-  // than 48 interpolated expressions. Interpolated expressions beyond this
-  // limit must be ignored.
-  OSLogTestSuite.test("messages with too many arguments") {
-    let h = Logger()
-    h.log(
-      level: .error,
-      """
-      \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
-      \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
-      \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
-      \(1) \(1) \(1) \(1) \(1) \(48) \(49)
-      """) // The number 49 should not appear in the logged message.
-  }
-
-  OSLogTestSuite.test("escape characters") {
-    let h = Logger()
-    h.log("\"Imagination is more important than knowledge\" - Einstein")
-    h.log("\'Imagination is more important than knowledge\' - Einstein")
-    h.log("Imagination is more important than knowledge \n - Einstein")
-    h.log("Imagination is more important than knowledge - \\Einstein")
-    h.log("The log message will be truncated here.\0 You won't see this")
-  }
-
-  OSLogTestSuite.test("unicode characters") {
-    let h = Logger()
-    h.log("dollar sign: \u{24}")
-    h.log("black heart: \u{2665}")
-    h.log("sparkling heart: \u{1F496}")
-  }
-
-  OSLogTestSuite.test("raw strings") {
-    let h = Logger()
-    let x = 10
-
-    h.log(#"There is no \(interpolated) value in this string"#)
-    h.log(#"This is not escaped \n"#)
-    h.log(##"'\b' is a printf escape character but not in Swift"##)
-    h.log(##"The interpolated value is \##(x)"##)
-    h.log(#"Sparkling heart should appear in the next line. \#n \#u{1F496}"#)
-  }
-
-  OSLogTestSuite.test("integer types") {
-    let h = Logger()
-    h.log("Smallest 32-bit integer value: \(Int32.min)")
-  }
-
-  OSLogTestSuite.test("dynamic strings") {
-    let h = Logger()
-
-    let smallString = "a"
-    h.log("A small string: \(smallString, privacy: .public)")
-
-    let largeString = "This is a large String"
-    h.log("\(largeString, privacy: .public)")
-
-    let concatString = "hello" + " - " + "world"
-    h.log("A dynamic string: \(concatString, privacy: .public)")
-
-    let interpolatedString = "\(31) trillion digits of pi are known so far"
-    h.log("\(interpolatedString)")
-  }
-
-  OSLogTestSuite.test("NSObject") {
-    let h = Logger()
-
-    let smallNSString: NSString = "a"
-    h.log("A small string: \(smallNSString, privacy: .public)")
-
-    let largeNSString: NSString = "This is a large String"
-    h.log("\(largeNSString, privacy: .public)")
-
-    let nsArray: NSArray = [0, 1, 2]
-    h.log("NS Array: \(nsArray, privacy: .public)")
-
-    let nsDictionary: NSDictionary = [1 : ""]
-    h.log("NS Dictionary: \(nsDictionary, privacy: .public)")
-  }
-
-  OSLogTestSuite.test("integer formatting") {
-    let h = Logger()
-
-    let unsignedOctal: UInt = 0o171
-    // format specifier "0o%lo" output: "0o171"
-    h.log("\(unsignedOctal, format: .octal(includePrefix: true))")
-
-    // format specifier: "%lX" output: "DEADBEEF"
-    let unsignedValue: UInt = 0xdeadbeef
-    h.log("\(unsignedValue, format: .hex(uppercase: true))")
-
-    // format specifier: "%+ld" output: "+20"
-    h.log("\(20, format: .decimal(explicitPositiveSign: true))")
-
-    // format specifier: "+%lu" output: "+2"
-    h.log("\(UInt(2), format: .decimal(explicitPositiveSign: true))")
-
-    // format specifier: "%.10ld" output: "0000000010"
-    h.log("\(10, format: .decimal(minDigits: 10))")
-
-    // format specifier: "%10ld" output: "        10"
-    h.log("\(10, align: .right(columns: 10))")
-
-    // format specifier: "%-5ld" output: "10   "
-    h.log("\(10, align: .left(columns: 5))")
-  }
-
-  func logWithDynamicPrecisionAndAlignment(
-    _ h: Logger,
-    _ value: Int,
-    columns: Int,
-    minDigits: Int
-  ) {
-    h.log(
-      """
-       dynamic precision/alignment:  \
-       \(value,
-        format: .decimal(minDigits: minDigits),
-        align: .right(columns: columns))
-       """)
-  }
-
-  OSLogTestSuite.test("dynamic precision and alignment") {
-    let h = Logger()
-    // Format specifier: "%*.*ld", expected output: "      0019"
-    logWithDynamicPrecisionAndAlignment(h, 19, columns: 10, minDigits: 4)
-    // Prints three stars in a diagonal.
-    for i in 0..<3 {
-      h.log("\("*", align: .right(columns: 10 - i))")
-    }
-  }
-
-  OSLogTestSuite.test("string formatting") {
-    let h = Logger()
-    let smallString = "a"
-    h.log("\(smallString, align: .right(columns: 10), privacy: .public)")
-  }
-
-  OSLogTestSuite.test("Floats and Doubles") {
-    let h = Logger()
-    let x = 1.2 + 0.5
-    let pi: Double = 3.141593
-    let floatPi: Float = 3.141593
-    h.log("A double value: \(x, privacy: .private)")
-    h.log("pi as double: \(pi), pi as float: \(floatPi)")
-  }
-}
-
-// The following tests check the correctness of the format string and the
-// byte buffer constructed by the APIs from a string interpolation.
-// These tests do not perform logging and do not require the os_log ABIs to
-// be available.
-
 internal var InterpolationTestSuite = TestSuite("OSLogInterpolationTest")
 internal let bitsPerByte = 8
 
-/// A struct that exposes methods for checking whether a given byte buffer
+/// A struct that provides methods for checking whether a given byte buffer
 /// conforms to the format expected by the os_log ABI. This struct acts as
 /// a specification of the byte buffer format.
 internal struct OSLogBufferChecker {
@@ -459,9 +260,9 @@ internal struct OSLogBufferChecker {
 }
 
 InterpolationTestSuite.test("integer literal") {
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     "An integer literal \(10)",
-    with: { (formatString, buffer) in
+    assertion: { (formatString, buffer) in
     expectEqual(
       "An integer literal %ld",
       formatString)
@@ -479,9 +280,9 @@ InterpolationTestSuite.test("integer literal") {
 }
 
 InterpolationTestSuite.test("integer with formatting") {
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     "Minimum integer value: \(UInt.max, format: .hex)",
-    with: { (formatString, buffer) in
+    assertion: { (formatString, buffer) in
       expectEqual(
         "Minimum integer value: %lx",
         formatString)
@@ -503,9 +304,9 @@ InterpolationTestSuite.test("integer with formatting") {
 
 InterpolationTestSuite.test("integer with privacy and formatting") {
   let addr: UInt = 0x7afebabe
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     "Access to invalid address: \(addr, format: .hex, privacy: .private)",
-    with: { (formatString, buffer) in
+    assertion: { (formatString, buffer) in
       expectEqual(
         "Access to invalid address: %{private}lx",
         formatString)
@@ -530,13 +331,13 @@ InterpolationTestSuite.test("test multiple arguments") {
   let pid = 122225
   let privateID = 0x79abcdef
 
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     """
     Access prevented: process \(pid, privacy: .public) initiated by \
     user: \(privateID, privacy: .private) attempted resetting \
     permissions to \(filePerms, format: .octal)
     """,
-    with: { (formatString, buffer) in
+    assertion: { (formatString, buffer) in
       expectEqual(
         """
         Access prevented: process %{public}ld initiated by \
@@ -576,14 +377,14 @@ InterpolationTestSuite.test("test multiple arguments") {
 InterpolationTestSuite.test("interpolation of too many arguments") {
   // The following string interpolation has 49 interpolated values. Only 48
   // of these must be present in the generated format string and byte buffer.
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     """
     \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
     \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
     \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
     \(1) \(1) \(1) \(1) \(1) \(1) \(1)
     """,
-    with: { (formatString, buffer) in
+    assertion: { (formatString, buffer) in
       expectEqual(
         String(
           repeating: "%ld ",
@@ -609,9 +410,9 @@ InterpolationTestSuite.test("interpolation of too many arguments") {
 }
 
 InterpolationTestSuite.test("string interpolations with percents") {
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     "a = (c % d)%%",
-    with: { (formatString, buffer) in
+    assertion: { (formatString, buffer) in
 
       expectEqual("a = (c %% d)%%%%", formatString)
 
@@ -624,7 +425,7 @@ InterpolationTestSuite.test("string interpolations with percents") {
 }
 
 InterpolationTestSuite.test("integer types") {
-  _checkFormatStringAndBuffer("Int32 max: \(Int32.max)") {
+  _osLogTestHelper("Int32 max: \(Int32.max)") {
     (formatString, buffer) in
     expectEqual("Int32 max: %d", formatString)
 
@@ -646,7 +447,7 @@ InterpolationTestSuite.test("integer types") {
 InterpolationTestSuite.test("string arguments") {
   let small = "a"
   let large = "this is a large string"
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     "small: \(small, privacy: .public) large: \(large)") {
     (formatString, buffer) in
       expectEqual("small: %{public}s large: %s", formatString)
@@ -676,7 +477,7 @@ InterpolationTestSuite.test("dynamic strings") {
   let concatString = "hello" + " - " + "world"
   let interpolatedString = "\(31) trillion digits of pi are known so far"
 
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     """
     concat: \(concatString, privacy: .public) \
     interpolated: \(interpolatedString, privacy: .private)
@@ -708,7 +509,7 @@ InterpolationTestSuite.test("NSObject") {
   let nsArray: NSArray = [0, 1, 2]
   let nsDictionary: NSDictionary = [1 : ""]
 
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     """
     NSArray: \(nsArray, privacy: .public) \
     NSDictionary: \(nsDictionary)
@@ -748,7 +549,7 @@ InterpolationTestSuite.test("Interpolation of complex expressions") {
   class TestClass<T: TestProto>: NSObject {
     func testFunction() {
       // The following call should not crash.
-      _checkFormatStringAndBuffer("A complex expression \(toString(self))") {
+      _osLogTestHelper("A complex expression \(toString(self))") {
         (formatString, _) in
         expectEqual("A complex expression %s", formatString)
       }
@@ -760,7 +561,7 @@ InterpolationTestSuite.test("Interpolation of complex expressions") {
 
 InterpolationTestSuite.test("Include prefix formatting option") {
   let unsignedValue: UInt = 0o171
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
   "Octal with prefix: \(unsignedValue, format: .octal(includePrefix: true))") {
     (formatString, buffer) in
     expectEqual("Octal with prefix: 0o%lo", formatString)
@@ -769,7 +570,7 @@ InterpolationTestSuite.test("Include prefix formatting option") {
 
 InterpolationTestSuite.test("Hex with uppercase formatting option") {
   let unsignedValue: UInt = 0xcafebabe
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
   "Hex with uppercase: \(unsignedValue, format: .hex(uppercase: true))") {
     (formatString, buffer) in
     expectEqual("Hex with uppercase: %lX", formatString)
@@ -778,7 +579,7 @@ InterpolationTestSuite.test("Hex with uppercase formatting option") {
 
 InterpolationTestSuite.test("Integer with explicit positive sign") {
   let posValue = Int.max
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
   "\(posValue, format: .decimal(explicitPositiveSign: true))") {
     (formatString, buffer) in
     expectEqual("%+ld", formatString)
@@ -787,7 +588,7 @@ InterpolationTestSuite.test("Integer with explicit positive sign") {
 
 InterpolationTestSuite.test("Unsigned integer with explicit positive sign") {
   let posValue = UInt.max
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
   "\(posValue, format: .decimal(explicitPositiveSign: true))") {
     (formatString, buffer) in
     expectEqual("+%lu", formatString)
@@ -796,7 +597,7 @@ InterpolationTestSuite.test("Unsigned integer with explicit positive sign") {
 
 InterpolationTestSuite.test("Integer formatting with precision") {
   let intValue = 1200
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
   "\(intValue, format: .decimal(minDigits: 10))") {
     (formatString, buffer) in
     expectEqual("%.*ld", formatString)
@@ -824,7 +625,7 @@ InterpolationTestSuite.test("Integer formatting with precision") {
 
 InterpolationTestSuite.test("Integer formatting with alignment") {
   let intValue = 10
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     """
     \(intValue, align: .right(columns: 10)) \
     \(intValue, align: .left(columns: 5), privacy: .private)
@@ -836,7 +637,7 @@ InterpolationTestSuite.test("Integer formatting with alignment") {
 
 InterpolationTestSuite.test("Integer formatting with precision and alignment") {
   let intValue = 1200
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
   "\(intValue, format: .decimal(minDigits: 10), align: .left(columns: 7))") {
     (formatString, buffer) in
     expectEqual("%-*.*ld", formatString)
@@ -870,7 +671,7 @@ InterpolationTestSuite.test("Integer formatting with precision and alignment") {
 InterpolationTestSuite.test("String with alignment") {
   let smallString = "a" + "b"
   let concatString = "hello" + " - " + "world"
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     """
     \(smallString, align: .right(columns: 10)) \
     \(concatString, align: .left(columns: 7), privacy: .public)
@@ -884,7 +685,7 @@ InterpolationTestSuite.test("Floats and Doubles") {
   let x = 1.2 + 0.5
   let pi: Double = 3.141593
   let floatPi: Float = 3.141593
-  _checkFormatStringAndBuffer(
+  _osLogTestHelper(
     """
     A double value: \(x, privacy: .private) \
     pi as double: \(pi), pi as float: \(floatPi)
