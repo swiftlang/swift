@@ -7297,7 +7297,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       addExplicitConversionConstraint(fromKeyValue->second, toKeyValue->second,
                                       ForgetChoice,
                                       locator.withPathElement(
-                                        LocatorPathElt::GenericArgument(0)));
+                                        LocatorPathElt::GenericArgument(1)));
       countOptionalInjections();
       return SolutionKind::Solved;
     }
