@@ -5115,12 +5115,15 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // Check all conformances.
   groupChecker.checkAllConformances();
 
-  if (Context.TypeCheckerOpts.DebugGenericSignatures) {
+  if (Context.TypeCheckerOpts.DebugGenericSignatures &&
+      !conformances.empty()) {
     // Now that they're filled out, print out information about the conformances
     // here, when requested.
+    llvm::errs() << "\n";
+    dc->printContext(llvm::errs());
     for (auto conformance : conformances) {
-      dc->printContext(llvm::errs());
       conformance->dump(llvm::errs());
+      llvm::errs() << "\n";
     }
   }
 
