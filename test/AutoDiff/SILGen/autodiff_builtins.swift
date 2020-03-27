@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -parse-stdlib -emit-silgen -enable-experimental-differentiable-programming %s | %FileCheck %s
 
-import _Differentiation
 import Swift
+import _Differentiation
 
 @_silgen_name("f_direct_arity1")
 func f_direct_arity1(_ x: Float) -> Float {
@@ -85,7 +85,6 @@ func applyDerivative_f1_vjp<T: AdditiveArithmetic & Differentiable>(t0: T) -> (T
 // CHECK: return [[PULLBACK]]
 
 // MARK: - applyTranspose
-// TODO(TF-1142): Add linear_function_extracts to this test when they exist.
 
 @_silgen_name("applyTranspose_f_direct_arity1")
 func applyTranspose_f_direct_arity1(_ x: Float) -> Float {
@@ -93,7 +92,13 @@ func applyTranspose_f_direct_arity1(_ x: Float) -> Float {
 }
 // CHECK-LABEL: sil{{.*}}@applyTranspose_f_direct_arity1
 // CHECK: bb0([[X:%.*]] : $Float):
-// CHECK: [[RESULT:%.*]] = apply undef([[X]])
+// CHECK: [[ORIG_FN_THIN:%.*]] = function_ref @f_direct_arity1 : $@convention(thin) (Float) -> Float
+// CHECK: [[ORIG_FN:%.*]] = thin_to_thick_function [[ORIG_FN_THIN]]
+// CHECK: [[LINEAR_FN_ESCAPING:%.*]] = linear_function [parameters 0] [[ORIG_FN]]
+// CHECK: [[LINEAR_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[LINEAR_FN_ESCAPING]]
+// CHECK: [[TRANSPOSE_FN:%.*]] = linear_function_extract [transpose] [[LINEAR_FN]]
+// CHECK: [[RESULT:%.*]] = apply [[TRANSPOSE_FN]]([[X]]) : $@noescape @callee_guaranteed (Float) -> Float
+// CHECK: destroy_value [[LINEAR_FN_ESCAPING]]
 // CHECK: return [[RESULT]]
 
 @_silgen_name("applyTranspose_f_direct_arity2")
@@ -102,8 +107,14 @@ func applyTranspose_f_direct_arity2(_ x: Float) -> (Float, Float) {
 }
 // CHECK-LABEL: sil{{.*}}@applyTranspose_f_direct_arity2
 // CHECK: bb0([[X:%.*]] : $Float)
-// CHECK: [[RESULT:%.*]] = apply undef([[X]])
+// CHECK: [[ORIG_FN_THIN:%.*]] = function_ref @f_direct_arity2 : $@convention(thin) (Float, Float) -> Float
+// CHECK: [[ORIG_FN:%.*]] = thin_to_thick_function [[ORIG_FN_THIN]]
+// CHECK: [[LINEAR_FN_ESCAPING:%.*]] = linear_function [parameters 0 1] [[ORIG_FN]]
+// CHECK: [[LINEAR_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[LINEAR_FN_ESCAPING]]
+// CHECK: [[TRANSPOSE_FN:%.*]] = linear_function_extract [transpose] [[LINEAR_FN]]
+// CHECK: [[RESULT:%.*]] = apply [[TRANSPOSE_FN]]([[X]]) : $@noescape @callee_guaranteed (Float) -> (Float, Float)
 // CHECK: ([[RESULT_0:%.*]], [[RESULT_1:%.*]]) = destructure_tuple [[RESULT]]
+// CHECK: destroy_value [[LINEAR_FN_ESCAPING]]
 // CHECK: [[RETUPLED_RESULT:%.*]] = tuple ([[RESULT_0]] : $Float, [[RESULT_1]] : $Float)
 // CHECK: return [[RETUPLED_RESULT]]
 
@@ -126,11 +137,11 @@ func differentiableFunction_f_direct_arity1() -> @differentiable (Float) -> Floa
 // CHECK: return [[DIFF_FN]]
 
 // MARK: - linearFunction
-// TODO(TF-1142): Add linear_funcion to this test when it exists.
 
 @_silgen_name("linearFunction_f_direct_arity1")
 func linearFunction_f_direct_arity1() -> @differentiable(linear) (Float) -> Float {
   return Builtin.linearFunction_arity1(f_direct_arity1, f_direct_arity1)
 }
 // CHECK-LABEL: sil{{.*}}@linearFunction_f_direct_arity1
-// CHECK: return undef
+// CHECK: [[LINEAR_FN:%.*]] = linear_function
+// CHECK: return [[LINEAR_FN]]

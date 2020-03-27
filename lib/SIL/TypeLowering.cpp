@@ -240,6 +240,19 @@ namespace {
     
     RetTy visitSILFunctionType(CanSILFunctionType type,
                                AbstractionPattern origType) {
+      // Handle `@differentiable` and `@differentiable(linear)` functions.
+      switch (type->getDifferentiabilityKind()) {
+      case DifferentiabilityKind::Normal:
+        return asImpl().visitNormalDifferentiableSILFunctionType(
+            type, getNormalDifferentiableSILFunctionTypeRecursiveProperties(
+                      type, origType));
+      case DifferentiabilityKind::Linear:
+        return asImpl().visitLinearDifferentiableSILFunctionType(
+            type, getLinearDifferentiableSILFunctionTypeRecursiveProperties(
+                      type, origType));
+      case DifferentiabilityKind::NonDifferentiable:
+        break;
+      }
       // Only escaping closures are references.
       bool isSwiftEscaping = type->getExtInfo().isNoEscape() &&
                              type->getExtInfo().getRepresentation() ==
@@ -248,6 +261,53 @@ namespace {
         return asImpl().handleReference(type);
       // No escaping closures are trivial types.
       return asImpl().handleTrivial(type);
+    }
+
+    RecursiveProperties
+    getNormalDifferentiableSILFunctionTypeRecursiveProperties(
+        CanSILFunctionType type, AbstractionPattern origType) {
+      auto &M = TC.M;
+      auto origTy = type->getWithoutDifferentiability();
+      // Pass the `AbstractionPattern` generic signature to
+      // `SILFunctionType:getAutoDiffDerivativeFunctionType` for correct type
+      // lowering.
+      auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
+          type->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::JVP, TC,
+          LookUpConformanceInModule(&M), CanGenericSignature());
+      auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
+          type->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::VJP, TC,
+          LookUpConformanceInModule(&M), CanGenericSignature());
+      RecursiveProperties props;
+      props.addSubobject(classifyType(origType, origTy, TC, Expansion));
+      props.addSubobject(classifyType(origType, jvpTy, TC, Expansion));
+      props.addSubobject(classifyType(origType, vjpTy, TC, Expansion));
+      return props;
+    }
+
+    RecursiveProperties
+    getLinearDifferentiableSILFunctionTypeRecursiveProperties(
+        CanSILFunctionType type, AbstractionPattern origType) {
+      auto &M = TC.M;
+      auto origTy = type->getWithoutDifferentiability();
+      auto transTy = origTy->getAutoDiffTransposeFunctionType(
+          type->getDifferentiabilityParameterIndices(), TC,
+          LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
+      RecursiveProperties props;
+      props.addSubobject(classifyType(origType, origTy, TC, Expansion));
+      props.addSubobject(classifyType(origType, transTy, TC, Expansion));
+      return props;
+    }
+
+    RetTy visitNormalDifferentiableSILFunctionType(
+        CanSILFunctionType type, RecursiveProperties props) {
+      return handleAggregateByProperties(type, props);
+    }
+
+    RetTy visitLinearDifferentiableSILFunctionType(
+        CanSILFunctionType type, RecursiveProperties props) {
+      return handleAggregateByProperties(type, props);
     }
 
     RetTy visitLValueType(CanLValueType type,
@@ -959,6 +1019,106 @@ namespace {
     }
   };
 
+  /// A type lowering for `@differentiable` function types.
+  class NormalDifferentiableSILFunctionTypeLowering final
+      : public LoadableAggTypeLowering<
+                   NormalDifferentiableSILFunctionTypeLowering,
+                   NormalDifferentiableFunctionTypeComponent> {
+  public:
+    using LoadableAggTypeLowering::LoadableAggTypeLowering;
+
+    SILValue emitRValueProject(
+        SILBuilder &B, SILLocation loc, SILValue tupleValue,
+        NormalDifferentiableFunctionTypeComponent extractee,
+        const TypeLowering &eltLowering) const {
+      return B.createDifferentiableFunctionExtract(
+          loc, extractee, tupleValue);
+    }
+
+    SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                              ArrayRef<SILValue> values) const override {
+      assert(values.size() == 3);
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      auto paramIndices = fnTy->getDifferentiabilityParameterIndices();
+      return B.createDifferentiableFunction(
+          loc, paramIndices, values[0], std::make_pair(values[1], values[2]));
+    }
+
+    void lowerChildren(TypeConverter &TC,
+                       SmallVectorImpl<Child> &children) const override {
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      auto numDerivativeFns = 2;
+      children.reserve(numDerivativeFns + 1);
+      auto origFnTy = fnTy->getWithoutDifferentiability();
+      auto paramIndices = fnTy->getDifferentiabilityParameterIndices();
+      children.push_back(Child{
+        NormalDifferentiableFunctionTypeComponent::Original,
+        TC.getTypeLowering(origFnTy, getExpansionContext())
+      });
+      for (AutoDiffDerivativeFunctionKind kind :
+               {AutoDiffDerivativeFunctionKind::JVP,
+                AutoDiffDerivativeFunctionKind::VJP}) {
+        auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
+            paramIndices, 0, kind, TC,
+            LookUpConformanceInModule(&TC.M));
+        auto silTy = SILType::getPrimitiveObjectType(derivativeFnTy);
+        NormalDifferentiableFunctionTypeComponent extractee(kind);
+        // Assert that we have the right extractee. A terrible bug in the past
+        // was caused by implicit conversions from `unsigned` to
+        // `NormalDifferentiableFunctionTypeComponent` which resulted into a
+        // wrong extractee.
+        assert(extractee.getAsDerivativeFunctionKind() == kind);
+        children.push_back(Child{
+            extractee, TC.getTypeLowering(silTy, getExpansionContext())});
+      }
+      assert(children.size() == 3);
+    }
+  };
+
+  /// A type lowering for `@differentiable(linear)` function types.
+  class LinearDifferentiableSILFunctionTypeLowering final
+      : public LoadableAggTypeLowering<
+                   LinearDifferentiableSILFunctionTypeLowering,
+                   LinearDifferentiableFunctionTypeComponent> {
+  public:
+    using LoadableAggTypeLowering::LoadableAggTypeLowering;
+
+    SILValue emitRValueProject(
+        SILBuilder &B, SILLocation loc, SILValue tupleValue,
+        LinearDifferentiableFunctionTypeComponent component,
+        const TypeLowering &eltLowering) const {
+      return B.createLinearFunctionExtract(loc, component, tupleValue);
+    }
+
+    SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                              ArrayRef<SILValue> values) const override {
+      assert(values.size() == 2);
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      auto paramIndices = fnTy->getDifferentiabilityParameterIndices();
+      return B.createLinearFunction(loc, paramIndices, values[0], values[1]);
+    }
+
+    void lowerChildren(TypeConverter &TC,
+                       SmallVectorImpl<Child> &children) const override {
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      children.reserve(2);
+      auto origFnTy = fnTy->getWithoutDifferentiability();
+      auto paramIndices = fnTy->getDifferentiabilityParameterIndices();
+      children.push_back(Child{
+        LinearDifferentiableFunctionTypeComponent::Original,
+        TC.getTypeLowering(origFnTy, getExpansionContext())
+      });
+      auto transposeFnTy = origFnTy->getAutoDiffTransposeFunctionType(
+          paramIndices, TC, LookUpConformanceInModule(&TC.M));
+      auto transposeSILFnTy = SILType::getPrimitiveObjectType(transposeFnTy);
+      children.push_back(Child{
+        LinearDifferentiableFunctionTypeComponent::Transpose,
+        TC.getTypeLowering(transposeSILFnTy, getExpansionContext())
+      });
+      assert(children.size() == 2);
+    }
+  };
+
   class LeafLoadableTypeLowering : public NonTrivialLoadableTypeLowering {
   public:
     LeafLoadableTypeLowering(SILType type, RecursiveProperties properties,
@@ -1355,6 +1515,20 @@ namespace {
 
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
+    }
+
+    TypeLowering *
+    visitNormalDifferentiableSILFunctionType(CanSILFunctionType type,
+                                             RecursiveProperties props) {
+      return handleAggregateByProperties
+          <NormalDifferentiableSILFunctionTypeLowering>(type, props);
+    }
+
+    TypeLowering *
+    visitLinearDifferentiableSILFunctionType(CanSILFunctionType type,
+                                             RecursiveProperties props) {
+      return handleAggregateByProperties
+          <LinearDifferentiableSILFunctionTypeLowering>(type, props);
     }
 
     template <class LoadableLoweringClass>

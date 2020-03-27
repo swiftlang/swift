@@ -5,7 +5,6 @@
 // REQUIRES: executable_test
 
 import _Differentiation
-
 import StdlibUnittest
 
 var DifferentialOperatorTestSuite = TestSuite("Tuple")
