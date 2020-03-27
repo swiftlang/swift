@@ -1486,7 +1486,7 @@ Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
   
 /// Build a call to the init(wrappedValue:) initializers of the property
 /// wrappers, filling in the given \c value as the original value.
-Expr *buildPropertyWrapperInitialValueCall(VarDecl *var,
+Expr *buildPropertyWrapperWrappedValueCall(VarDecl *var,
                                            Type backingStorageType,
                                            Expr *value,
                                            bool ignoreAttributeArgs);
