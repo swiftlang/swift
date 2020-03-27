@@ -425,13 +425,13 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
       case FileUnitKind::ClangModule: {
         auto *LFU = cast<LoadedFile>(FU);
         if (auto F = fileMgr.getFile(LFU->getFilename())) {
-          std::string moduleName = mod->getNameStr().str();
+          StringRef moduleName = mod->getNameStr();
           bool withoutUnitName = true;
           if (FU->getKind() == FileUnitKind::ClangModule) {
             withoutUnitName = false;
             auto clangModUnit = cast<ClangModuleUnit>(LFU);
             if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {
-              moduleName = clangMod->getTopLevelModuleName().str();
+              moduleName = clangMod->getTopLevelModuleName();
               // FIXME: clang's -Rremarks do not seem to go through Swift's
               // diagnostic emitter.
               clang::index::emitIndexDataForModuleFile(clangMod,
@@ -482,7 +482,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   StringRef filename = module->getModuleFilename();
   // If this is a cross-import overlay, make sure we use the name of the
   // underlying module instead.
-  std::string moduleName = getUnderlyingModuleName(module, initialFile);
+  std::string moduleName = getUnderlyingModuleName(module, initialFile).str();
 
   std::string error;
   auto isUptodateOpt = parentUnitWriter.isUnitUpToDateForOutputFile(/*FilePath=*/filename,
