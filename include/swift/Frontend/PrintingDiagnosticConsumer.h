@@ -41,7 +41,6 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   // Educational notes which are buffered until the consumer is finished
   // constructing a snippet.
   SmallVector<std::string, 1> BufferedEducationalNotes;
-  bool HaveOmittedEducationalNotes = false;
 
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());

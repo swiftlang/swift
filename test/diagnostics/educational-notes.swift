@@ -1,7 +1,6 @@
 // RUN: not %target-swift-frontend -color-diagnostics -print-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace
 // RUN: not %target-swift-frontend -no-color-diagnostics -print-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --check-prefix=NO-COLOR
 // RUN: not %target-swift-frontend -enable-experimental-diagnostic-formatting -print-educational-notes -diagnostic-documentation-path %S/test-docs/ -typecheck %s 2>&1 | %FileCheck %s --check-prefix=CHECK-DESCRIPTIVE
-// RUN: not %target-swift-frontend -no-color-diagnostics -typecheck %s 2>&1 | %FileCheck %s --check-prefix=NOTES-DISABLED
 
 // A diagnostic with no educational notes
 let x = 1 +
@@ -40,7 +39,6 @@ extension (Int, Int) {}
 // CHECK-NEXT:--------------
 // CHECK-NEXT:[0m[1mHeader 1[0m
 // CHECK-NEXT:[0m[1mHeader 3[0m
-// CHECK-NOT: remark: additional documentation is available for some diagnostics; use '-print-educational-notes' to view
 
 // NO-COLOR:{{.*}}error: non-nominal type '(Int, Int)' cannot be extended
 // NO-COLOR-NEXT:extension (Int, Int) {}
@@ -69,7 +67,6 @@ extension (Int, Int) {}
 // NO-COLOR-NEXT:--------------
 // NO-COLOR-NEXT:Header 1
 // NO-COLOR-NEXT:Header 3
-// NO-COLOR-NOT: remark: additional documentation is available for some diagnostics; use '-print-educational-notes' to view
 
 // CHECK-DESCRIPTIVE: educational-notes.swift
 // CHECK-DESCRIPTIVE-NEXT:  | // A diagnostic with an educational note
@@ -85,6 +82,3 @@ extension (Int, Int) {}
 // CHECK-DESCRIPTIVE-NEXT:  |
 // CHECK-DESCRIPTIVE-NEXT: Nominal Types
 // CHECK-DESCRIPTIVE-NEXT: -------------
-// CHECK-DESCRIPTIVE-NOT: remark: additional documentation is available for some diagnostics; use '-print-educational-notes' to view
-
-// NOTES-DISABLED: remark: additional documentation is available for some diagnostics; use '-print-educational-notes' to view
