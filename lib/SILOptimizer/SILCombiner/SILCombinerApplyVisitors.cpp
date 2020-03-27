@@ -78,6 +78,104 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
   return true;
 }
 
+ApplyInst *getSingleApplyInBlock(SILBasicBlock &BB) {
+  ApplyInst *Result = nullptr;
+
+  for (auto &I : BB) {
+    if (isa<DebugValueAddrInst>(I) ||
+        isa<DebugValueInst>(I))
+      continue;
+
+    // FIXME: Should also support ClassMethodInst
+    if (isa<WitnessMethodInst>(I) ||
+        isa<ReturnInst>(I))
+      continue;
+
+    if (auto *TI = dyn_cast<TupleInst>(&I))
+      if (TI->getElements().empty())
+        continue;
+
+    if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+      if (Result == nullptr) {
+        Result = AI;
+        continue;
+      }
+    }
+
+    return nullptr;
+  }
+
+  return Result;
+}
+
+static bool foldPartialApplyOfTrivialClosure(PartialApplyInst *PAI,
+                                             SILCombiner *Combiner) {
+  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
+  if (FRI == nullptr)
+    return false;
+
+  auto *F = FRI->getReferencedFunctionOrNull();
+  if (F == nullptr)
+    return false;
+
+  // The referenced function must consist of a single basic block.
+  if (F->getBlocks().size() != 1)
+    return false;
+
+  // The referenced function must not throw.
+  if (F->getLoweredFunctionType()->getOptionalErrorResult())
+    return false;
+
+  // The only non-trivial instructions in the function must be an apply
+  // of a witness_method callee.
+  auto &BB = *F->getBlocks().begin();
+  auto *AI = getSingleApplyInBlock(BB);
+  if (AI == nullptr)
+    return false;
+
+  // The apply instruction must have the same number of arguments as the
+  // function that contains it, and they must be passed in order.
+  auto InnerArgs = AI->getArguments();
+  if (InnerArgs.size() != BB.args_size())
+    return false;
+
+  auto ArgsIter = BB.args_begin();
+  for (auto Arg : InnerArgs) {
+    if (Arg != *(ArgsIter++))
+      return false;
+  }
+
+  SILBuilderWithScope B(PAI);
+
+  // FIXME: Should also support ClassMethodInst
+  auto *WMI = cast<WitnessMethodInst>(AI->getCallee());
+  auto InnerSubs = PAI->getSubstitutionMap();
+  auto Subs = AI->getSubstitutionMap().subst(InnerSubs);
+  auto *NewCallee = B.createWitnessMethod(
+      WMI->getLoc(),
+      WMI->getLookupType().subst(InnerSubs)->getCanonicalType(),
+      WMI->getConformance().subst(WMI->getLookupType(), InnerSubs),
+      WMI->getMember(),
+      WMI->getType().subst(F->getModule().Types, InnerSubs));
+
+  SmallVector<SILValue, 8> NewArgs;
+  auto Args = PAI->getArguments();
+  NewArgs.append(Args.begin(), Args.end());
+
+  auto *NewPAI = B.createPartialApply(
+      PAI->getLoc(),
+      NewCallee,
+      Subs,
+      NewArgs,
+      PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      PAI->isOnStack());
+
+  assert(PAI->getType() == NewPAI->getType());
+  PAI->replaceAllUsesWith(NewPAI);
+  Combiner->eraseInstFromFunction(*PAI);
+  return true;
+}
+
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   if (PAI->getFunction()->hasOwnership())
     return nullptr;
@@ -107,6 +205,11 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   //    partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
   // -> %closure_typeB
   if (foldInverseReabstractionThunks(PAI, this))
+    return nullptr;
+
+  // partial_apply %function_ref => partial_apply %witness_method if
+  // the body of the function_ref is just an apply %witness_method
+  if (foldPartialApplyOfTrivialClosure(PAI, this))
     return nullptr;
 
   bool argsAreKeptAlive = tryOptimizeApplyOfPartialApply(

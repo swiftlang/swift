@@ -589,7 +589,8 @@ replacePartialApplyInst(SILBuilder &builder, SILLocation loc,
   auto convention =
       oldPAI->getType().getAs<SILFunctionType>()->getCalleeConvention();
   auto *newPAI =
-      builder.createPartialApply(loc, newFn, newSubs, newArgs, convention);
+      builder.createPartialApply(loc, newFn, newSubs, newArgs, convention,
+                                 oldPAI->isOnStack());
 
   // Check if any casting is required for the partially-applied function.
   SILValue resultValue = castValueToABICompatibleType(

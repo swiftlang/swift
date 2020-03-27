@@ -1,0 +1,166 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public protocol P {
+}
+
+public struct S : P {
+  init()
+}
+
+public protocol Curryable {
+  func concreteRequirement()
+  func genericRequirement<T>(_: T) where T : P
+  func concreteRequirementSelf() -> Self
+  func genericRequirementSelf<T>(_: T) -> Self where T : P
+  func concreteRequirementInt() -> Int
+  func genericRequirementInt<T>(_: T) -> Int where T : P
+}
+
+public protocol Q {
+  associatedtype S : Curryable
+  associatedtype U : P
+}
+
+// CHECK-LABEL: sil @$concrete_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed () -> () {
+// CHECK: [[FN:%.*]] = witness_method $T.S, #Curryable.concreteRequirement : <Self where Self : Curryable> (Self) -> () -> () : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> ()
+// CHECK: partial_apply [callee_guaranteed] [[FN]]<T.S>(%0) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> ()
+// CHECK: return
+sil @$concrete_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : $*T.S):
+  %fn = function_ref @$concrete_closure_inner : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.S) -> ()
+  %closure = partial_apply [callee_guaranteed] %fn<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.S) -> ()
+  return %closure : $@callee_guaranteed () -> ()
+}
+
+sil private @$concrete_closure_inner : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> () {
+bb0(%0 : $*T.S):
+  %fn = witness_method $T.S, #Curryable.concreteRequirement : <Self where Self : Curryable> (Self) -> () -> () : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> ()
+  %result = apply %fn<T.S>(%0) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> ()
+  %void = tuple ()
+  return %void : $()
+}
+
+// CHECK-LABEL: sil @$generic_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <T.U> {
+// CHECK: [[FN:%.*]] = witness_method $T.S, #Curryable.genericRequirement : <Self where Self : Curryable><T where T : P> (Self) -> (T) -> () : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
+// CHECK: partial_apply [callee_guaranteed] [[FN]]<T.S, T.U>(%0) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> () 
+// CHECK: return
+sil @$generic_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <T.U> {
+bb0(%0 : $*T.S):
+  %fn = function_ref @$generic_closure_inner : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.U, @in_guaranteed τ_0_0.S) -> ()
+  %closure = partial_apply [callee_guaranteed] %fn<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.U, @in_guaranteed τ_0_0.S) -> ()
+  %converted = convert_function %closure : $@callee_guaranteed (@in_guaranteed T.U) -> () to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <T.U>
+  return %converted : $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <T.U>
+}
+
+sil private @$generic_closure_inner : $@convention(thin) <T where T : Q> (@in_guaranteed T.U, @in_guaranteed T.S) -> () {
+bb0(%0 : $*T.U, %1 : $*T.S):
+  %fn = witness_method $T.S, #Curryable.genericRequirement : <Self where Self : Curryable><T where T : P> (Self) -> (T) -> () : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
+  %result = apply %fn<T.S, T.U>(%0, %1) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
+  %void = tuple ()
+  return %void : $()
+}
+
+// CHECK-LABEL: sil @$concrete_self_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T.S> {
+// CHECK: [[FN:%.*]] = witness_method $T.S, #Curryable.concreteRequirementSelf : <Self where Self : Curryable> (Self) -> () -> Self : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK: partial_apply [callee_guaranteed] [[FN]]<T.S>(%0) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK: return
+sil @$concrete_self_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T.S> {
+bb0(%0 : $*T.S):
+  %fn = function_ref @$concrete_self_closure_inner : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.S) -> @out τ_0_0.S
+  %closure = partial_apply [callee_guaranteed] %fn<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.S) -> @out τ_0_0.S
+  %converted = convert_function %closure : $@callee_guaranteed () -> @out T.S to $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T.S>
+  return %converted : $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T.S>
+}
+
+sil private @$concrete_self_closure_inner : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @out T.S {
+bb0(%0 : $*T.S, %1 : $*T.S):
+  %fn = witness_method $T.S, #Curryable.concreteRequirementSelf : <Self where Self : Curryable> (Self) -> () -> Self : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %result = apply %fn<T.S>(%0, %1) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %void = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil @$generic_self_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T.U, T.S> {
+// CHECK: [[FN:%.*]] = witness_method $T.S, #Curryable.genericRequirementSelf : <Self where Self : Curryable><T where T : P> (Self) -> (T) -> Self : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK: partial_apply [callee_guaranteed] [[FN]]<T.S, T.U>(%0) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK: return
+sil @$generic_self_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T.U, T.S> {
+bb0(%0 : $*T.S):
+  %fn = function_ref @$generic_self_closure_inner : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.U, @in_guaranteed τ_0_0.S) -> @out τ_0_0.S
+  %closure = partial_apply [callee_guaranteed] %fn<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.U, @in_guaranteed τ_0_0.S) -> @out τ_0_0.S
+  %converted = convert_function %closure : $@callee_guaranteed (@in_guaranteed T.U) -> @out T.S to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T.U, T.S>
+  return %converted : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T.U, T.S>
+}
+
+sil private @$generic_self_closure_inner : $@convention(thin) <T where T : Q> (@in_guaranteed T.U, @in_guaranteed T.S) -> @out T.S {
+bb0(%0 : $*T.S, %1 : $*T.U, %2 : $*T.S):
+  %fn = witness_method $T.S, #Curryable.genericRequirementSelf : <Self where Self : Curryable><T where T : P> (Self) -> (T) -> Self : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> @out τ_0_0
+  %result = apply %fn<T.S, T.U>(%0, %1, %2) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> @out τ_0_0
+  %void = tuple ()
+  return %void : $()
+}
+
+// CHECK-LABEL: sil @$concrete_int_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed () -> Int {
+// CHECK: [[FN:%.*]] = witness_method $T.S, #Curryable.concreteRequirementInt : <Self where Self : Curryable> (Self) -> () -> Int : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> Int
+// CHECK: partial_apply [callee_guaranteed] [[FN]]<T.S>(%0) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> Int
+// CHECK: return
+sil @$concrete_int_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed () -> Int {
+bb0(%0 : $*T.S):
+  %fn = function_ref @$concrete_int_closure_inner : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.S) -> Int
+  %closure = partial_apply [callee_guaranteed] %fn<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.S) -> Int
+  return %closure : $@callee_guaranteed () -> Int
+}
+
+sil private @$concrete_int_closure_inner : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> Int {
+bb0(%0 : $*T.S):
+  %fn = witness_method $T.S, #Curryable.concreteRequirementInt : <Self where Self : Curryable> (Self) -> () -> Int : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> Int
+  %result = apply %fn<T.S>(%0) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> Int
+  return %result : $Int
+}
+
+// CHECK-LABEL: sil @$generic_int_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Int for <T.U> {
+// CHECK: [[FN:%.*]] = witness_method $T.S, #Curryable.genericRequirementInt : <Self where Self : Curryable><T where T : P> (Self) -> (T) -> Int : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> Int
+// CHECK: partial_apply [callee_guaranteed] [[FN]]<T.S, T.U>(%0) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> Int
+// CHECK: return
+sil @$generic_int_closure : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Int for <T.U> {
+bb0(%0 : $*T.S):
+  %fn = function_ref @$generic_int_closure_inner : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.U, @in_guaranteed τ_0_0.S) -> Int
+  %closure = partial_apply [callee_guaranteed] %fn<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.U, @in_guaranteed τ_0_0.S) -> Int
+  %converted = convert_function %closure : $@callee_guaranteed (@in_guaranteed T.U) -> Int to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Int for <T.U>
+  return %converted : $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Int for <T.U>
+}
+
+sil private @$generic_int_closure_inner : $@convention(thin) <T where T : Q> (@in_guaranteed T.U, @in_guaranteed T.S) -> Int {
+bb0(%0 : $*T.U, %1 : $*T.S):
+  %fn = witness_method $T.S, #Curryable.genericRequirementInt : <Self where Self : Curryable><T where T : P> (Self) -> (T) -> Int : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> Int
+  %result = apply %fn<T.S, T.U>(%0, %1) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable><τ_1_0 where τ_1_0 : P> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> Int
+  return %result : $Int
+}
+
+// CHECK-LABEL: sil @$concrete_closure_throws : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed () -> @error Error {
+// CHECK: [[FN:%.*]] = function_ref @$concrete_closure_inner_throws
+// CHECK: partial_apply [callee_guaranteed] [[FN]]<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.S) -> @error Error
+// CHECK: return
+sil @$concrete_closure_throws : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @owned @callee_guaranteed () -> @error Error {
+bb0(%0 : $*T.S):
+  %fn = function_ref @$concrete_closure_inner_throws : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.S) -> (@error Error)
+  %closure = partial_apply [callee_guaranteed] %fn<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0.S) -> (@error Error)
+  return %closure : $@callee_guaranteed () -> (@error Swift.Error)
+}
+
+sil private @$concrete_closure_inner_throws : $@convention(thin) <T where T : Q> (@in_guaranteed T.S) -> @error Swift.Error {
+bb0(%0 : $*T.S):
+  %fn = witness_method $T.S, #Curryable.concreteRequirement : <Self where Self : Curryable> (Self) -> () -> () : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> ()
+  %result = apply %fn<T.S>(%0) : $@convention(witness_method: Curryable) <τ_0_0 where τ_0_0 : Curryable> (@in_guaranteed τ_0_0) -> ()
+  %void = tuple ()
+  return %void : $()
+}
+
+sil_witness_table [serialized] S: P module sil_combine_curry_thunk {
+}
