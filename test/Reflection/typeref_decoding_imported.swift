@@ -1,6 +1,7 @@
 // XFAIL: OS=windows-msvc
 
 // UNSUPPORTED: CPU=arm64e
+// UNSUPPORTED: CPU=i386 && OS=ios // rdar://problem/60966825
 
 // RUN: %empty-directory(%t)
 

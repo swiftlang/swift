@@ -12,6 +12,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
+// UNSUPPORTED: CPU=i386 && OS=ios // rdar://problem/60966825
 
 12TypeLowering9HasCTypesV
 // CHECK:     (struct TypeLowering.HasCTypes)

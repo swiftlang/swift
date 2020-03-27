@@ -5,6 +5,8 @@
 // SR-10758
 // UNSUPPORTED: linux
 
+// UNSUPPORTED: CPU=i386 && OS=ios // rdar://problem/60966825
+
 sil_stage canonical
 
 import Builtin

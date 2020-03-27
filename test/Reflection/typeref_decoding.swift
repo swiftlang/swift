@@ -7,6 +7,8 @@
 // RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) | %FileCheck %s
 // RUN: %target-swift-reflection-dump -binary-filename %t/TypesToReflect | %FileCheck %s
 
+// UNSUPPORTED: CPU=i386 && OS=ios // rdar://problem/60966825
+
 // CHECK: FIELDS:
 // CHECK: =======
 // CHECK: TypesToReflect.Box

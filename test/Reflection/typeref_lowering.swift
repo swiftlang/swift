@@ -1,5 +1,6 @@
 // REQUIRES: no_asan
 // XFAIL: OS=windows-msvc
+// UNSUPPORTED: CPU=i386 && OS=ios // rdar://problem/60966825
 // RUN: %empty-directory(%t)
 
 // UNSUPPORTED: CPU=arm64e

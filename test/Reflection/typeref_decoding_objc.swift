@@ -6,6 +6,8 @@
 // Disable asan builds until we build swift-reflection-dump and the reflection library with the same compile: rdar://problem/30406870
 // REQUIRES: no_asan
 
+// UNSUPPORTED: CPU=i386 && OS=ios // rdar://problem/60966825
+
 // CHECK: FIELDS:
 // CHECK: =======
 // CHECK: TypesToReflect.OC
