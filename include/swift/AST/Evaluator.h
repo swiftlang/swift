@@ -54,7 +54,7 @@ using AbstractRequestFunction = void(void);
 /// Form the specific request function for the given request type.
 template<typename Request>
 using RequestFunction =
-  llvm::Expected<typename Request::OutputType>(const Request &, Evaluator &);
+  typename Request::OutputType(const Request &, Evaluator &);
 
 /// Pretty stack trace handler for an arbitrary request.
 template<typename Request>

@@ -713,7 +713,7 @@ static const char *getImportKindString(ImportKind kind) {
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
-llvm::Expected<ArrayRef<ValueDecl *>>
+ArrayRef<ValueDecl *>
 ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
                                     ImportDecl *import) const {
   using namespace namelookup;

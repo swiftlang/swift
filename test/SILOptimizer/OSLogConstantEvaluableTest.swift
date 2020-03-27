@@ -15,7 +15,7 @@
 // This test is meant to catch regressions in the OSLog overlay implementation
 // affecting the constant evaluability of functions that are expected to be so.
 
-import OSLogPrototype
+import OSLogTestHelper
 
 // CHECK-LABEL: @init(stringLiteral: String) -> OSLogMessage
 // CHECK-NOT: error:

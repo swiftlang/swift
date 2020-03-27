@@ -684,7 +684,7 @@ static std::pair<const char *, bool> lookupDefaultTypeInfoForKnownProtocol(
   }
 }
 
-llvm::Expected<Type>
+Type
 swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
                                     KnownProtocolKind knownProtocolKind,
                                     const DeclContext *dc) const {
@@ -782,7 +782,7 @@ static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
   llvm_unreachable("Unhandled case in switch");
 }
 
-llvm::Expected<Expr *> CallerSideDefaultArgExprRequest::evaluate(
+Expr *CallerSideDefaultArgExprRequest::evaluate(
     Evaluator &evaluator, DefaultArgumentExpr *defaultExpr) const {
   auto *param = defaultExpr->getParamDecl();
   auto paramTy = defaultExpr->getType();
@@ -810,9 +810,8 @@ llvm::Expected<Expr *> CallerSideDefaultArgExprRequest::evaluate(
   return initExpr;
 }
 
-llvm::Expected<bool>
-ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
-                                          ClosureExpr *closure) const {
+bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
+                                               ClosureExpr *closure) const {
   // A walker that looks for 'return' statements that aren't
   // nested within closures or nested declarations.
   class FindReturns : public ASTWalker {

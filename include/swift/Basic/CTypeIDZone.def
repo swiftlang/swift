@@ -35,6 +35,7 @@ SWIFT_TYPEID_NAMED(void, Void)
 SWIFT_TYPEID_NAMED(std::string, String)
 
 // C++ standard library types.
+SWIFT_TYPEID_NAMED(evaluator::SideEffect, SideEffect)
 SWIFT_TYPEID_TEMPLATE1_NAMED(std::vector, Vector, typename T, T)
 SWIFT_TYPEID_TEMPLATE1_NAMED(std::unique_ptr, UniquePtr, typename T, T)
 

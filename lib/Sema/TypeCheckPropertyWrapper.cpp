@@ -327,7 +327,7 @@ static bool isEscapingAutoclosureArgument(const ConstructorDecl *init,
   return false;
 }
 
-llvm::Expected<PropertyWrapperTypeInfo>
+PropertyWrapperTypeInfo
 PropertyWrapperTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
   // We must have the @propertyWrapper attribute to continue.
@@ -404,7 +404,7 @@ PropertyWrapperTypeInfoRequest::evaluate(
   return result;
 }
 
-llvm::Expected<llvm::TinyPtrVector<CustomAttr *>>
+llvm::TinyPtrVector<CustomAttr *>
 AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
                                           VarDecl *var) const {
   ASTContext &ctx = var->getASTContext();
@@ -519,21 +519,18 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
-llvm::Expected<Type>
-AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
-                                             VarDecl *var,
-                                             unsigned index) const {
+Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
+                                                  VarDecl *var,
+                                                  unsigned index) const {
   // Find the custom attributes for the attached property wrapper.
-  llvm::Expected<llvm::TinyPtrVector<CustomAttr *>> customAttrVal =
-      evaluator(AttachedPropertyWrappersRequest{var});
-  if (!customAttrVal)
-    return customAttrVal.takeError();
+  llvm::TinyPtrVector<CustomAttr *> customAttrVal =
+      evaluateOrDefault(evaluator, AttachedPropertyWrappersRequest{var}, {});
 
   // If there isn't an attached property wrapper at this index, we're done.
-  if (index >= customAttrVal->size())
+  if (index >= customAttrVal.size())
     return Type();
                                                
-  auto customAttr = (*customAttrVal)[index];
+  auto customAttr = customAttrVal[index];
   if (!customAttr)
     return Type();
 
@@ -551,15 +548,13 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   return customAttr->getTypeLoc().getType();
 }
 
-llvm::Expected<Type>
+Type
 PropertyWrapperBackingPropertyTypeRequest::evaluate(
-                                    Evaluator &evaluator, VarDecl *var) const {
-  llvm::Expected<Type> rawTypeResult =
-    evaluator(AttachedPropertyWrapperTypeRequest{var, 0});
-  if (!rawTypeResult)
-    return rawTypeResult;
+    Evaluator &evaluator, VarDecl *var) const {
+  Type rawType =
+      evaluateOrDefault(evaluator,
+                        AttachedPropertyWrapperTypeRequest{var, 0}, Type());
 
-  Type rawType = *rawTypeResult;
   if (!rawType || rawType->hasError())
     return Type();
 

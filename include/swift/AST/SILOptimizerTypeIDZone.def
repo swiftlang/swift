@@ -15,4 +15,5 @@
 //===----------------------------------------------------------------------===//
 
 SWIFT_REQUEST(SILOptimizer, ExecuteSILPipelineRequest,
-              bool(SILPipelineExecutionDescriptor), Uncached, NoLocationInfo)
+              evaluator::SideEffect(SILPipelineExecutionDescriptor),
+              Uncached, NoLocationInfo)

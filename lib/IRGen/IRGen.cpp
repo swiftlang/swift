@@ -1366,7 +1366,7 @@ std::unique_ptr<llvm::Module> swift::performIRGeneration(
       M->getASTContext().evaluator(IRGenWholeModuleRequest{desc}));
 }
 
-llvm::Expected<std::unique_ptr<llvm::Module>>
+std::unique_ptr<llvm::Module>
 IRGenWholeModuleRequest::evaluate(Evaluator &evaluator,
                                   IRGenDescriptor desc) const {
   auto *M = desc.Ctx.get<ModuleDecl *>();
@@ -1401,7 +1401,7 @@ performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
       SF.getASTContext().evaluator(IRGenSourceFileRequest{desc}));
 }
 
-llvm::Expected<std::unique_ptr<llvm::Module>>
+std::unique_ptr<llvm::Module>
 IRGenSourceFileRequest::evaluate(Evaluator &evaluator,
                                  IRGenDescriptor desc) const {
   auto *SF = desc.Ctx.get<SourceFile *>();

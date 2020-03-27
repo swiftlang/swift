@@ -1850,7 +1850,7 @@ public:
 };
 } // end anonymous namespace
 
-llvm::Expected<std::unique_ptr<SILModule>>
+std::unique_ptr<SILModule>
 SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
                                   SILGenDescriptor desc) const {
   auto *unit = desc.context.get<FileUnit *>();
@@ -1866,10 +1866,10 @@ SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
       M->getSILLoader()->getAllForModule(mod->getName(), file);
   }
 
-  return std::move(M);
+  return M;
 }
 
-llvm::Expected<std::unique_ptr<SILModule>>
+std::unique_ptr<SILModule>
 SILGenWholeModuleRequest::evaluate(Evaluator &evaluator,
                                    SILGenDescriptor desc) const {
   auto *mod = desc.context.get<ModuleDecl *>();
@@ -1894,7 +1894,7 @@ SILGenWholeModuleRequest::evaluate(Evaluator &evaluator,
   if (hasSIB)
     M->getSILLoader()->getAllForModule(mod->getName(), nullptr);
 
-  return std::move(M);
+  return M;
 }
 
 std::unique_ptr<SILModule>
