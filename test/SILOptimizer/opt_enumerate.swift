@@ -24,3 +24,12 @@ public func eliminate_bounds_check(_ array: [Int]) {
   }
 }
 
+// CHECK-LABEL: sil @$s4test27eliminate_two_bounds_checksyySaySiGF
+// CHECK-NOT:  cond_fail {{.*}} "Index out of range"
+// CHECK: // end sil function '$s4test27eliminate_two_bounds_checksyySaySiGF'
+public func eliminate_two_bounds_checks(_ array: [Int]) {
+  for (index, x) in array.enumerated() {
+      take(x, array[index])
+  }
+}
+
