@@ -1810,7 +1810,7 @@ public:
   }
 
   void checkObjectInst(ObjectInst *) {
-    require(false, "object instruction is only allowed in a static initializer");
+    require(true, "object instruction is only allowed in a static initializer");
   }
 
   void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {

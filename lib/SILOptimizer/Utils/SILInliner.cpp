@@ -911,7 +911,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::MarkUninitializedInst:
     llvm_unreachable("not valid in canonical sil");
   case SILInstructionKind::ObjectInst:
-    llvm_unreachable("not valid in a function");
+    return InlineCost::Free;
   }
 
   llvm_unreachable("Unhandled ValueKind in switch.");
