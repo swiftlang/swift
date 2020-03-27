@@ -4405,3 +4405,20 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
   AvailabilityContext result = AvailabilityContext::alwaysAvailable();
   return !TypeChecker::isDeclAvailable(D, loc, DC, result);
 }
+
+/// If we aren't certain that we've emitted a diagnostic, emit a fallback
+/// diagnostic.
+void ConstraintSystem::maybeProduceFallbackDiagnostic(
+    SolutionApplicationTarget target) const {
+  if (Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
+    return;
+
+  // Before producing fatal error here, let's check if there are any "error"
+  // diagnostics already emitted or waiting to be emitted. Because they are
+  // a better indication of the problem.
+  ASTContext &ctx = getASTContext();
+  if (ctx.Diags.hadAnyError() || ctx.hasDelayedConformanceErrors())
+    return;
+
+  ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+}

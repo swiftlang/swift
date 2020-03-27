@@ -5,6 +5,8 @@
 
 // BCANALYZER-NOT: UnknownCode
 
+import _Differentiation
+
 func a(_ f: @differentiable (Float) -> Float) {}
 // CHECK: func a(_ f: @differentiable (Float) -> Float)
 

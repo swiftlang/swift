@@ -3659,8 +3659,14 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
       // Check whether this associated type references a protocol to which
       // the base conforms. If not, it's unresolved.
       if (baseEquivClass->conformsTo.find(assocType->getProtocol())
-            == baseEquivClass->conformsTo.end())
-        return ResolvedType::forUnresolved(baseEquivClass);
+          == baseEquivClass->conformsTo.end()) {
+        if (!baseEquivClass->concreteType ||
+            !lookupConformance(type->getCanonicalType(),
+                               baseEquivClass->concreteType,
+                               assocType->getProtocol())) {
+          return ResolvedType::forUnresolved(baseEquivClass);
+        }
+      }
 
       nestedTypeDecl = assocType;
     } else {
@@ -5064,7 +5070,6 @@ public:
       return Action::Continue;
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
     // Infer requirements from `@differentiable` or `@differentiable(linear)`
     // function types.
     // For all non-`@noDerivative` parameter and result types:
@@ -5072,7 +5077,10 @@ public:
     // - `@differentiable(linear)`: add
     //   `T: Differentiable`, `T == T.TangentVector` requirements.
     if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
-      if (fnTy->isDifferentiable()) {
+      auto &ctx = Builder.getASTContext();
+      auto *differentiableProtocol =
+          ctx.getProtocol(KnownProtocolKind::Differentiable);
+      if (differentiableProtocol && fnTy->isDifferentiable()) {
         auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
           Requirement req(RequirementKind::Conformance, type,
                           protocol->getDeclaredType());
@@ -5087,9 +5095,6 @@ public:
           Requirement req(RequirementKind::SameType, firstType, secondType);
           Builder.addRequirement(req, source, nullptr);
         };
-        auto &ctx = Builder.getASTContext();
-        auto *differentiableProtocol =
-            ctx.getProtocol(KnownProtocolKind::Differentiable);
         auto *tangentVectorAssocType =
             differentiableProtocol->getAssociatedType(ctx.Id_TangentVector);
         auto addRequirements = [&](Type type, bool isLinear) {

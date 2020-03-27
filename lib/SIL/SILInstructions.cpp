@@ -656,48 +656,6 @@ DifferentiableFunctionInst *DifferentiableFunctionInst::create(
                                  derivativeFunctions, HasOwnership);
 }
 
-SILType DifferentiableFunctionExtractInst::
-getExtracteeType(
-    SILValue function, NormalDifferentiableFunctionTypeComponent extractee,
-    SILModule &module) {
-  auto fnTy = function->getType().castTo<SILFunctionType>();
-  assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
-  auto originalFnTy = fnTy->getWithoutDifferentiability();
-  auto kindOpt = extractee.getAsDerivativeFunctionKind();
-  if (!kindOpt) {
-    assert(extractee == NormalDifferentiableFunctionTypeComponent::Original);
-    return SILType::getPrimitiveObjectType(originalFnTy);
-  }
-  auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-      fnTy->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0, *kindOpt,
-      module.Types, LookUpConformanceInModule(module.getSwiftModule()));
-  return SILType::getPrimitiveObjectType(resultFnTy);
-}
-
-DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
-    SILModule &module, SILDebugLocation debugLoc,
-    NormalDifferentiableFunctionTypeComponent extractee, SILValue function,
-    Optional<SILType> extracteeType)
-    : UnaryInstructionBase(debugLoc, function,
-                           extracteeType
-                               ? *extracteeType
-                               : getExtracteeType(function, extractee, module)),
-      Extractee(extractee), HasExplicitExtracteeType(extracteeType.hasValue()) {
-#ifndef NDEBUG
-  if (extracteeType.hasValue()) {
-    // Note: explicit extractee type is used to avoid inconsistent typing in:
-    // - Canonical SIL, due to generic specialization.
-    // - Lowered SIL, due to LoadableByAddress.
-    // See `TypeSubstCloner::visitDifferentiableFunctionExtractInst` for an
-    // explanation of how explicit extractee type is used.
-    assert((module.getStage() == SILStage::Canonical ||
-            module.getStage() == SILStage::Lowered) &&
-           "Explicit type is valid only in canonical or lowered SIL");
-  }
-#endif
-}
-
-// SWIFT_ENABLE_TENSORFLOW
 SILType LinearFunctionInst::getLinearFunctionType(
     SILValue OriginalFunction, IndexSubset *ParameterIndices) {
   auto fnTy = OriginalFunction->getType().castTo<SILFunctionType>();
@@ -737,6 +695,46 @@ LinearFunctionInst *LinearFunctionInst::create(
       HasOwnership);
 }
 
+SILType DifferentiableFunctionExtractInst::getExtracteeType(
+    SILValue function, NormalDifferentiableFunctionTypeComponent extractee,
+    SILModule &module) {
+  auto fnTy = function->getType().castTo<SILFunctionType>();
+  assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
+  auto originalFnTy = fnTy->getWithoutDifferentiability();
+  auto kindOpt = extractee.getAsDerivativeFunctionKind();
+  if (!kindOpt) {
+    assert(extractee == NormalDifferentiableFunctionTypeComponent::Original);
+    return SILType::getPrimitiveObjectType(originalFnTy);
+  }
+  auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
+      fnTy->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0, *kindOpt,
+      module.Types, LookUpConformanceInModule(module.getSwiftModule()));
+  return SILType::getPrimitiveObjectType(resultFnTy);
+}
+
+DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
+    SILModule &module, SILDebugLocation debugLoc,
+    NormalDifferentiableFunctionTypeComponent extractee, SILValue function,
+    Optional<SILType> extracteeType)
+    : UnaryInstructionBase(debugLoc, function,
+                           extracteeType
+                               ? *extracteeType
+                               : getExtracteeType(function, extractee, module)),
+      Extractee(extractee), HasExplicitExtracteeType(extracteeType.hasValue()) {
+#ifndef NDEBUG
+  if (extracteeType.hasValue()) {
+    // Note: explicit extractee type is used to avoid inconsistent typing in:
+    // - Canonical SIL, due to generic specialization.
+    // - Lowered SIL, due to LoadableByAddress.
+    // See `TypeSubstCloner::visitDifferentiableFunctionExtractInst` for an
+    // explanation of how explicit extractee type is used.
+    assert((module.getStage() == SILStage::Canonical ||
+            module.getStage() == SILStage::Lowered) &&
+           "Explicit type is valid only in canonical or lowered SIL");
+  }
+#endif
+}
+
 SILType LinearFunctionExtractInst::
 getExtracteeType(
     SILValue function, LinearDifferentiableFunctionTypeComponent extractee,
@@ -761,7 +759,6 @@ LinearFunctionExtractInst::LinearFunctionExtractInst(
     : InstructionBase(debugLoc,
                       getExtracteeType(theFunction, extractee, module)),
       extractee(extractee), operands(this, theFunction) {}
-// SWIFT_ENABLE_TENSORFLOW END
 
 SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
     SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,

@@ -1045,14 +1045,12 @@ public:
   void visitKeyPathInst(KeyPathInst *I);
 
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
+  void visitLinearFunctionInst(LinearFunctionInst *i);
   void
   visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *i);
+  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
   void visitDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *i);
-  // SWIFT_ENABLE_TENSORFLOW
-  void visitLinearFunctionInst(LinearFunctionInst *i);
-  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
-  // SWIFT_ENABLE_TENSORFLOW END
 
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
   void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
@@ -1860,6 +1858,16 @@ void IRGenSILFunction::visitDifferentiableFunctionInst(
   setLoweredExplosion(i, e);
 }
 
+void IRGenSILFunction::
+visitLinearFunctionInst(LinearFunctionInst *i) {
+  auto origExp = getLoweredExplosion(i->getOriginalFunction());
+  Explosion e;
+  e.add(origExp.claimAll());
+  assert(i->hasTransposeFunction());
+  e.add(getLoweredExplosion(i->getTransposeFunction()).claimAll());
+  setLoweredExplosion(i, e);
+}
+
 void IRGenSILFunction::visitDifferentiableFunctionExtractInst(
     DifferentiableFunctionExtractInst *i) {
   unsigned structFieldOffset = i->getExtractee().rawValue;
@@ -1874,17 +1882,6 @@ void IRGenSILFunction::visitDifferentiableFunctionExtractInst(
   Explosion e;
   e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
   (void)diffFnExp.claimAll();
-  setLoweredExplosion(i, e);
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-void IRGenSILFunction::
-visitLinearFunctionInst(LinearFunctionInst *i) {
-  auto origExp = getLoweredExplosion(i->getOriginalFunction());
-  Explosion e;
-  e.add(origExp.claimAll());
-  assert(i->hasTransposeFunction());
-  e.add(getLoweredExplosion(i->getTransposeFunction()).claimAll());
   setLoweredExplosion(i, e);
 }
 
@@ -1904,7 +1901,6 @@ visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
   (void)diffFnExp.claimAll();
   setLoweredExplosion(i, e);
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
     DifferentiabilityWitnessFunctionInst *i) {

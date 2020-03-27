@@ -4,7 +4,7 @@
 // TF-1077: Verify access levels of `TangentVector` types and their memberwise
 // initializers, synthesized during `Differentiable` derived conformances.
 
-// `TangentVector` memberwise initializer access level should default to true,
+// `TangentVector` memberwise initializer access level should default to public,
 // for usability.
 
 public struct PublicStruct: Differentiable {}

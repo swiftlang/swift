@@ -781,12 +781,9 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D,
     // If this is an underscored cross-import overlay, map it to its underlying
     // module instead.
     if (SF) {
-      while (MD->getNameStr().startswith("_")) {
-        auto *Underlying = SF->getModuleShadowedBySeparatelyImportedOverlay(MD);
-        if (!Underlying)
-          break;
+      auto *Underlying = SF->getModuleShadowedBySeparatelyImportedOverlay(MD);
+      if (Underlying)
         MD = Underlying;
-      }
     }
     CurrentModule = MD;
   }

@@ -5090,38 +5090,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           InstLoc, parameterIndicesSubset, original, derivativeFunctions);
       break;
     }
-    case SILInstructionKind::DifferentiableFunctionExtractInst: {
-      // Parse the rest of the instruction: an extractee, a differentiable
-      // function operand, an optional explicit extractee type, and a debug
-      // location.
-      NormalDifferentiableFunctionTypeComponent extractee;
-      StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
-      SILValue functionOperand;
-      SourceLoc lastLoc;
-      if (P.parseToken(
-              tok::l_square,
-              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
-          parseSILIdentifierSwitch(
-              extractee, extracteeNames,
-              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
-          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
-                       "extractee kind"))
-        return true;
-      if (parseTypedValueRef(functionOperand, B))
-        return true;
-      // Parse an optional explicit extractee type.
-      Optional<SILType> extracteeType = None;
-      if (P.consumeIf(tok::kw_as)) {
-        extracteeType = SILType();
-        if (parseSILType(*extracteeType))
-          return true;
-      }
-      if (parseSILDebugLocation(InstLoc, B))
-        return true;
-      ResultVal = B.createDifferentiableFunctionExtract(
-          InstLoc, extractee, functionOperand, extracteeType);
-      break;
-    }
     case SILInstructionKind::LinearFunctionInst: {
       // e.g. linear_function [parameters 0 1 2] %0 : $T
       // e.g. linear_function [parameters 0 1 2] %0 : $T with_transpose %1 : $T
@@ -5157,7 +5125,38 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           InstLoc, parameterIndicesSubset, original, transpose);
       break;
     }
-    // SWIFT_ENABLE_TENSORFLOW
+    case SILInstructionKind::DifferentiableFunctionExtractInst: {
+      // Parse the rest of the instruction: an extractee, a differentiable
+      // function operand, an optional explicit extractee type, and a debug
+      // location.
+      NormalDifferentiableFunctionTypeComponent extractee;
+      StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
+      SILValue functionOperand;
+      SourceLoc lastLoc;
+      if (P.parseToken(
+              tok::l_square,
+              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
+          parseSILIdentifierSwitch(
+              extractee, extracteeNames,
+              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
+          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "extractee kind"))
+        return true;
+      if (parseTypedValueRef(functionOperand, B))
+        return true;
+      // Parse an optional explicit extractee type.
+      Optional<SILType> extracteeType = None;
+      if (P.consumeIf(tok::kw_as)) {
+        extracteeType = SILType();
+        if (parseSILType(*extracteeType))
+          return true;
+      }
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createDifferentiableFunctionExtract(
+          InstLoc, extractee, functionOperand, extracteeType);
+      break;
+    }
     case SILInstructionKind::LinearFunctionExtractInst: {
       // Parse the rest of the instruction: an extractee, a linear function
       // operand, and a debug location.
@@ -5179,7 +5178,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           InstLoc, extractee, functionOperand);
       break;
     }
-    // SWIFT_ENABLE_TENSORFLOW END
     case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
       // e.g. differentiability_witness_function
       //      [jvp] [parameters 0 1] [results 0] <T where T: Differentiable>

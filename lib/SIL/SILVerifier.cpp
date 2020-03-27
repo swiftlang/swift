@@ -4653,15 +4653,6 @@ public:
 #endif
   }
 
-  void checkDifferentiableFunctionExtractInst(
-      DifferentiableFunctionExtractInst *dfei) {
-    auto fnTy = dfei->getOperand()->getType().getAs<SILFunctionType>();
-    require(fnTy, "The function operand must have a function type");
-    require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal,
-            "The function operand must be a '@differentiable' function");
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
   void checkLinearFunctionInst(LinearFunctionInst *lfi) {
     auto origTy =
         lfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
@@ -4693,6 +4684,14 @@ public:
     }
   }
 
+  void checkDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *dfei) {
+    auto fnTy = dfei->getOperand()->getType().getAs<SILFunctionType>();
+    require(fnTy, "The function operand must have a function type");
+    require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal,
+            "The function operand must be a '@differentiable' function");
+  }
+
   void checkLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
     auto fnTy = lfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
     require(fnTy, "The function operand must have a function type");
@@ -4700,7 +4699,6 @@ public:
             "The function operand must be a '@differentiable(linear)' "
             "function");
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   void checkDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *dwfi) {

@@ -912,12 +912,9 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     if (SF) {
       // In a source file we map the imported overlays to the underlying
       // modules they shadow.
-      while (MD->getNameStr().startswith("_")) {
-        auto *Underlying = SF->getModuleShadowedBySeparatelyImportedOverlay(MD);
-        if (!Underlying)
-          break;
+      auto *Underlying = SF->getModuleShadowedBySeparatelyImportedOverlay(MD);
+      if (Underlying)
         MD = Underlying;
-      }
     } else if (MainModule) {
       // In a module interface we need to map the declared overlays of the main
       // module (which are included in its generated interface) back to the main

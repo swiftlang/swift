@@ -1866,7 +1866,6 @@ namespace {
                                  unsigned ordinal,
                                  TypeResolutionOptions options);
 
-    // SWIFT_ENABLE_TENSORFLOW
     /// Returns true if the given type conforms to `Differentiable` in the
     /// module of `DC`. If `tangentVectorEqualsSelf` is true, returns true iff
     /// the given type additionally satisfies `Self == Self.TangentVector`.
@@ -2262,16 +2261,16 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         }
       }
 
-      if (attrs.has(TAK_differentiable) &&
-          !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-        diagnoseInvalid(repr, attrs.getLoc(TAK_differentiable),
-                        diag::experimental_differentiable_programming_disabled);
-      }
-
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
       if (attrs.has(TAK_differentiable)) {
-        diffKind = attrs.linear ? DifferentiabilityKind::Linear
-                                : DifferentiabilityKind::Normal;
+        if (Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+          diffKind = attrs.linear ? DifferentiabilityKind::Linear
+                                  : DifferentiabilityKind::Normal;
+        } else {
+          diagnoseInvalid(
+              repr, attrs.getLoc(TAK_differentiable),
+              diag::experimental_differentiable_programming_disabled);
+        }
       }
 
       // Resolve the function type directly with these attributes.
@@ -2310,16 +2309,16 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         }
       }
 
-      if (attrs.has(TAK_differentiable) &&
-          !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-        diagnoseInvalid(repr, attrs.getLoc(TAK_differentiable),
-                        diag::experimental_differentiable_programming_disabled);
-      }
-
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
       if (attrs.has(TAK_differentiable)) {
-        diffKind = attrs.linear ? DifferentiabilityKind::Linear
-                                : DifferentiabilityKind::Normal;
+        if (Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+          diffKind = attrs.linear ? DifferentiabilityKind::Linear
+                                  : DifferentiabilityKind::Normal;
+        } else {
+          diagnoseInvalid(
+              repr, attrs.getLoc(TAK_differentiable),
+              diag::experimental_differentiable_programming_disabled);
+        }
       }
 
       ty = resolveASTFunctionType(fnRepr, options, rep, /*noescape=*/false,
@@ -2594,7 +2593,6 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   // All non-`@noDerivative` parameters of `@differentiable` and
   // `@differentiable(linear)` function types must be differentiable.
   if (diffKind != DifferentiabilityKind::NonDifferentiable &&
@@ -2610,7 +2608,6 @@ bool TypeResolver::resolveASTFunctionTypeParams(
           return isDifferentiable(param.getPlainType(),
                                   /*tangentVectorEqualsSelf*/ isLinear);
         }) != elements.end();
-    // });
     for (unsigned i = 0, end = inputRepr->getNumElements(); i != end; ++i) {
       auto *eltTypeRepr = inputRepr->getElementType(i);
       auto param = elements[i];
@@ -2628,7 +2625,6 @@ bool TypeResolver::resolveASTFunctionTypeParams(
         diagnostic.fixItInsert(eltTypeRepr->getLoc(), "@noDerivative ");
     }
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   return false;
 }
@@ -2763,7 +2759,6 @@ Type TypeResolver::resolveASTFunctionType(
     break;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   // `@differentiable` and `@differentiable(linear)` function types must return
   // a differentiable type.
   if (extInfo.isDifferentiable() &&
@@ -2776,12 +2771,10 @@ Type TypeResolver::resolveASTFunctionType(
           .highlight(repr->getResultTypeRepr()->getSourceRange());
     }
   }
-// SWIFT_ENABLE_TENSORFLOW END
 
   return fnTy;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 bool TypeResolver::isDifferentiable(Type type, bool tangentVectorEqualsSelf) {
   if (resolution.getStage() != TypeResolutionStage::Contextual)
     type = DC->mapTypeIntoContext(type);
@@ -2795,7 +2788,6 @@ bool TypeResolver::isDifferentiable(Type type, bool tangentVectorEqualsSelf) {
   // Otherwise, return true if `Self == Self.TangentVector`.
   return type->getCanonicalType() == tanSpace->getCanonicalType();
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
                                      TypeResolutionOptions options) {

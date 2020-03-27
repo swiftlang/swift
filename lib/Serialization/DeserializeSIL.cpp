@@ -1153,25 +1153,23 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionInst;
     break;
-  case SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT:
-    SILInstDifferentiableFunctionExtractLayout::readRecord(
-        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr,
-        /*hasExplicitExtracteeType*/ Attr2);
-    RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionExtractInst;
-    break;
-  // SWIFT_ENABLE_TENSORFLOW
   case SIL_INST_LINEAR_FUNCTION:
     SILInstLinearFunctionLayout::readRecord(
         scratch, /*numParams*/ Attr, /*hasTransposeFunction*/ Attr2,
         ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::LinearFunctionInst;
     break;
+  case SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT:
+    SILInstDifferentiableFunctionExtractLayout::readRecord(
+        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr,
+        /*hasExplicitExtracteeType*/ Attr2);
+    RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionExtractInst;
+    break;
   case SIL_INST_LINEAR_FUNCTION_EXTRACT:
     SILInstLinearFunctionExtractLayout::readRecord(
         scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
     RawOpCode = (unsigned)SILInstructionKind::LinearFunctionExtractInst;
     break;
-  // SWIFT_ENABLE_TENSORFLOW END
   }
 
   // FIXME: validate
@@ -2621,19 +2619,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         Loc, paramIndices, operands[0], derivativeFunctions);
     break;
   }
-  case SILInstructionKind::DifferentiableFunctionExtractInst: {
-    auto astTy = MF->getType(TyID);
-    auto silTy = getSILType(astTy, SILValueCategory::Object, Fn);
-    auto val = getLocalValue(ValID, silTy);
-    NormalDifferentiableFunctionTypeComponent extractee(Attr);
-    Optional<SILType> explicitExtracteeType = None;
-    if (Attr2)
-      explicitExtracteeType = silTy;
-    ResultVal = Builder.createDifferentiableFunctionExtract(
-        Loc, extractee, val, explicitExtracteeType);
-    break;
-  }
-  // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::LinearFunctionInst: {
     bool hasLinearFunction = (bool)Attr2;
     unsigned numOperands = hasLinearFunction ? 2 : 1;
@@ -2659,6 +2644,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         Loc, paramIndices, operands[0], transposeFunction);
     break;
   }
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto astTy = MF->getType(TyID);
+    auto silTy = getSILType(astTy, SILValueCategory::Object, Fn);
+    auto val = getLocalValue(ValID, silTy);
+    NormalDifferentiableFunctionTypeComponent extractee(Attr);
+    Optional<SILType> explicitExtracteeType = None;
+    if (Attr2)
+      explicitExtracteeType = silTy;
+    ResultVal = Builder.createDifferentiableFunctionExtract(
+        Loc, extractee, val, explicitExtracteeType);
+    break;
+  }
   case SILInstructionKind::LinearFunctionExtractInst: {
     auto astTy = MF->getType(TyID);
     auto silTy = getSILType(astTy, SILValueCategory::Object, Fn);
@@ -2667,7 +2664,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createLinearFunctionExtract(Loc, extractee, val);
     break;
   }
-  // SWIFT_ENABLE_TENSORFLOW END
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
     StringRef mangledKey = MF->getIdentifierText(ValID);
     auto *witness = getSILDifferentiabilityWitnessForReference(mangledKey);

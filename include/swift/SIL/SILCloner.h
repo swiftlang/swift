@@ -2844,6 +2844,18 @@ void SILCloner<ImplClass>::visitDifferentiableFunctionInst(
                 getOpValue(Inst->getOriginalFunction()), derivativeFns));
 }
 
+template<typename ImplClass>
+void SILCloner<ImplClass>::visitLinearFunctionInst(LinearFunctionInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto transpose = Inst->getOptionalTransposeFunction();
+  if (transpose)
+    transpose = getOpValue(*transpose);
+  recordClonedInstruction(
+      Inst, getBuilder().createLinearFunction(
+                getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
+                getOpValue(Inst->getOriginalFunction()), transpose));
+}
+
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitDifferentiableFunctionExtractInst(
     DifferentiableFunctionExtractInst *Inst) {
@@ -2857,19 +2869,6 @@ void SILCloner<ImplClass>::visitDifferentiableFunctionExtractInst(
                 getOpValue(Inst->getOperand()), explicitExtracteeType));
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-template<typename ImplClass>
-void SILCloner<ImplClass>::visitLinearFunctionInst(LinearFunctionInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  auto transpose = Inst->getOptionalTransposeFunction();
-  if (transpose)
-    transpose = getOpValue(*transpose);
-  recordClonedInstruction(
-      Inst, getBuilder().createLinearFunction(
-                getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
-                getOpValue(Inst->getOriginalFunction()), transpose));
-}
-
 template<typename ImplClass>
 void SILCloner<ImplClass>::
 visitLinearFunctionExtractInst(LinearFunctionExtractInst *Inst) {
@@ -2879,7 +2878,6 @@ visitLinearFunctionExtractInst(LinearFunctionExtractInst *Inst) {
                 getOpLocation(Inst->getLoc()), Inst->getExtractee(),
                 getOpValue(Inst->getFunctionOperand())));
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitDifferentiabilityWitnessFunctionInst(

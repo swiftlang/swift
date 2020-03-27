@@ -522,10 +522,11 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   // about missing conformance just in case.
   auto operatorID = name.getIdentifier();
 
-  auto *applyExpr = cast<ApplyExpr>(findParentExpr(anchor));
-  if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
-    auto lhsType = getType(binaryOp->getArg()->getElement(0));
-    auto rhsType = getType(binaryOp->getArg()->getElement(1));
+  auto *fnType = getType(anchor)->getAs<AnyFunctionType>();
+  auto params = fnType->getParams();
+  if (params.size() == 2) {
+    auto lhsType = params[0].getPlainType();
+    auto rhsType = params[1].getPlainType();
 
     if (lhsType->isEqual(rhsType)) {
       emitDiagnostic(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
@@ -536,7 +537,7 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
     }
   } else {
     emitDiagnostic(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
-                   operatorID.str(), getType(applyExpr->getArg()));
+                   operatorID.str(), params[0].getPlainType());
   }
 
   diagnoseAsNote();

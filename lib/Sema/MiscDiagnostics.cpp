@@ -68,9 +68,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
 
-    /// Keep track of acceptable DiscardAssignmentExpr's.
-    SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
-
     /// Keep track of the arguments to CallExprs.
     SmallPtrSet<Expr *, 2> CallArgs;
 
@@ -229,7 +226,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // If we have an assignment expression, scout ahead for acceptable _'s.
       if (auto *AE = dyn_cast<AssignExpr>(E)) {
         auto destExpr = AE->getDest();
-        markAcceptableDiscardExprs(destExpr);
         // If the user is assigning the result of a function that returns
         // Void to _ then warn, because that is redundant.
         if (auto DAE = dyn_cast<DiscardAssignmentExpr>(destExpr)) {
@@ -244,14 +240,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             }
           }
         }
-      }
-
-      /// Diagnose a '_' that isn't on the immediate LHS of an assignment.
-      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
-        if (!CorrectDiscardAssignmentExprs.count(DAE) &&
-            !DAE->getType()->hasError())
-          Ctx.Diags.diagnose(DAE->getLoc(),
-                             diag::discard_expr_outside_of_assignment);
       }
 
       // Diagnose 'self.init' or 'super.init' nested in another expression
@@ -423,26 +411,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           .highlight(c->getSourceRange())
           .fixItInsertAfter(c->getEndLoc(), " as " + c->getType()->getString());
       }
-    }
-
-
-    /// Scout out the specified destination of an AssignExpr to recursively
-    /// identify DiscardAssignmentExpr in legal places.  We can only allow them
-    /// in simple pattern-like expressions, so we reject anything complex here.
-    void markAcceptableDiscardExprs(Expr *E) {
-      if (!E) return;
-
-      if (auto *PE = dyn_cast<ParenExpr>(E))
-        return markAcceptableDiscardExprs(PE->getSubExpr());
-      if (auto *TE = dyn_cast<TupleExpr>(E)) {
-        for (auto &elt : TE->getElements())
-          markAcceptableDiscardExprs(elt);
-        return;
-      }
-      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E))
-        CorrectDiscardAssignmentExprs.insert(DAE);
-
-      // Otherwise, we can't support this.
     }
 
     void checkMagicIdentifierMismatch(ConcreteDeclRef callee,

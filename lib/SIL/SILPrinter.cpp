@@ -2282,6 +2282,18 @@ public:
     }
   }
 
+  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
+    *this << "[parameters";
+    for (auto i : lfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    *this << getIDAndType(lfi->getOriginalFunction());
+    if (lfi->hasTransposeFunction()) {
+      *this << " with_transpose ";
+      *this << getIDAndType(lfi->getTransposeFunction());
+    }
+  }
+
   void visitDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *dfei) {
     *this << '[';
@@ -2304,19 +2316,6 @@ public:
     }
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
-    *this << "[parameters";
-    for (auto i : lfi->getParameterIndices()->getIndices())
-      *this << ' ' << i;
-    *this << "] ";
-    *this << getIDAndType(lfi->getOriginalFunction());
-    if (lfi->hasTransposeFunction()) {
-      *this << " with_transpose ";
-      *this << getIDAndType(lfi->getTransposeFunction());
-    }
-  }
-
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
     *this << '[';
     switch (lfei->getExtractee()) {
@@ -2330,7 +2329,6 @@ public:
     *this << "] ";
     *this << getIDAndType(lfei->getFunctionOperand());
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   void visitDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *dwfi) {
