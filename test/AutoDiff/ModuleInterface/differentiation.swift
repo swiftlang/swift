@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.swiftinterface -enable-library-evolution -enable-experimental-differentiable-programming %s
 // RUN: %FileCheck %s < %t.swiftinterface
 
+import _Differentiation
+
 public func a(f: @differentiable (Float) -> Float) {}
 // CHECK: public func a(f: @differentiable (Swift.Float) -> Swift.Float)
 
