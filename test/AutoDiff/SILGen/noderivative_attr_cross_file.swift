@@ -7,4 +7,4 @@ func bar(_ x: Float) -> Float {
   return Float(floatToIntNoDerivative(x))
 }
 
-// CHECK: sil hidden [_semantics "autodiff.nonvarying"] @float_to_int_noderivative : $@convention(thin) (Float) -> Int
+// CHECK: sil hidden [_semantics "autodiff.nonvarying"] [ossa] @float_to_int_noderivative : $@convention(thin) (Float) -> Int
