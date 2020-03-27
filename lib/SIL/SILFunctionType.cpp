@@ -4160,22 +4160,25 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
   if (getRepresentation() != other->getRepresentation())
     return ABICompatibilityCheckResult::DifferentFunctionRepresentations;
 
+  bool shouldCheckResults = other->getAllResultsInterfaceType().getASTType()->isUninhabited();
   // Check the results.
-  if (getNumResults() != other->getNumResults())
+  if (shouldCheckResults && getNumResults() != other->getNumResults())
     return ABICompatibilityCheckResult::DifferentNumberOfResults;
 
-  for (unsigned i : indices(getResults())) {
-    auto result1 = getResults()[i];
-    auto result2 = other->getResults()[i];
+  if (shouldCheckResults) {
+    for (unsigned i : indices(getResults())) {
+      auto result1 = getResults()[i];
+      auto result2 = other->getResults()[i];
 
-    if (result1.getConvention() != result2.getConvention())
-      return ABICompatibilityCheckResult::DifferentReturnValueConventions;
+      if (result1.getConvention() != result2.getConvention())
+        return ABICompatibilityCheckResult::DifferentReturnValueConventions;
 
-    if (!areABICompatibleParamsOrReturns(
-                         result1.getSILStorageType(context.getModule(), this),
-                         result2.getSILStorageType(context.getModule(), other),
-                         &context)) {
-      return ABICompatibilityCheckResult::ABIIncompatibleReturnValues;
+      if (!areABICompatibleParamsOrReturns(
+                           result1.getSILStorageType(context.getModule(), this),
+                           result2.getSILStorageType(context.getModule(), other),
+                           &context)) {
+        return ABICompatibilityCheckResult::ABIIncompatibleReturnValues;
+      }
     }
   }
 

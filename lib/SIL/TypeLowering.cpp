@@ -2636,7 +2636,9 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
     return ABIDifference::NeedsThunk;
 
-  if (fnTy1->getNumResults() != fnTy2->getNumResults())
+  bool shouldCheckResults = !fnTy1->getAllResultsInterfaceType().getASTType()->isUninhabited();
+
+  if (shouldCheckResults && fnTy1->getNumResults() != fnTy2->getNumResults())
     return ABIDifference::NeedsThunk;
 
   if (fnTy1->getNumYields() != fnTy2->getNumYields())
@@ -2648,19 +2650,20 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
       fnTy1->getCalleeConvention() != fnTy2->getCalleeConvention())
     return ABIDifference::NeedsThunk;
 
-  for (unsigned i : indices(fnTy1->getResults())) {
-    auto result1 = fnTy1->getResults()[i];
-    auto result2 = fnTy2->getResults()[i];
+  if (shouldCheckResults) {
+    for (unsigned i : indices(fnTy1->getResults())) {
+      auto result1 = fnTy1->getResults()[i];
+      auto result2 = fnTy2->getResults()[i];
+      if (result1.getConvention() != result2.getConvention())
+        return ABIDifference::NeedsThunk;
 
-    if (result1.getConvention() != result2.getConvention())
-      return ABIDifference::NeedsThunk;
-
-    if (checkForABIDifferences(M,
-                               result1.getSILStorageType(M, fnTy1),
-                               result2.getSILStorageType(M, fnTy2),
-             /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
-        != ABIDifference::CompatibleRepresentation)
-      return ABIDifference::NeedsThunk;
+      if (checkForABIDifferences(M,
+                                 result1.getSILStorageType(M, fnTy1),
+                                 result2.getSILStorageType(M, fnTy2),
+               /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
+          != ABIDifference::CompatibleRepresentation)
+        return ABIDifference::NeedsThunk;
+    }
   }
 
   for (unsigned i : indices(fnTy1->getYields())) {
