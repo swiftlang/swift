@@ -1265,6 +1265,21 @@ void DifferentiableAttributeTypeCheckRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
+// CheckRedeclarationRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<evaluator::SideEffect>
+CheckRedeclarationRequest::getCachedResult() const {
+  if (!std::get<0>(getStorage())->alreadyCheckedRedeclaration())
+    return None;
+  return std::make_tuple<>();
+}
+
+void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
+  std::get<0>(getStorage())->setCheckedRedeclaration();
+}
+
+//----------------------------------------------------------------------------//
 // TypeCheckSourceFileRequest computation.
 //----------------------------------------------------------------------------//
 
