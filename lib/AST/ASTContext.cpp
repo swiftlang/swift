@@ -1639,7 +1639,6 @@ void ASTContext::loadObjCMethods(
   }
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void ASTContext::loadDerivativeFunctionConfigurations(
     AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
     llvm::SetVector<AutoDiffConfig> &results) {
@@ -1650,7 +1649,6 @@ void ASTContext::loadDerivativeFunctionConfigurations(
                                                  previousGeneration, results);
   }
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 void ASTContext::verifyAllLoadedModules() const {
 #ifndef NDEBUG

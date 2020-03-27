@@ -779,7 +779,6 @@ public:
                        unsigned previousGeneration,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Load derivative function configurations for the given
   /// AbstractFunctionDecl.
   ///
@@ -792,7 +791,6 @@ public:
   void loadDerivativeFunctionConfigurations(
       AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
       llvm::SetVector<AutoDiffConfig> &results);
-  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Retrieve the Clang module loader for this ASTContext.
   ///

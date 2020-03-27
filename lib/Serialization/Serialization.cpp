@@ -770,9 +770,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, CLASS_MEMBERS_FOR_DYNAMIC_LOOKUP);
   BLOCK_RECORD(index_block, OPERATOR_METHODS);
   BLOCK_RECORD(index_block, OBJC_METHODS);
-  // SWIFT_ENABLE_TENSORFLOW
   BLOCK_RECORD(index_block, DERIVATIVE_FUNCTION_CONFIGURATIONS);
-  // SWIFT_ENABLE_TENSORFLOW END
   BLOCK_RECORD(index_block, ENTRY_POINT);
   BLOCK_RECORD(index_block, LOCAL_DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, GENERIC_SIGNATURE_OFFSETS);
@@ -4807,7 +4805,6 @@ static void writeObjCMethodTable(const index_block::ObjCMethodTableLayout &out,
   out.emit(scratch, tableOffset, hashTableBlob);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 namespace {
   /// Used to serialize derivative function configurations.
   class DerivativeFunctionConfigTableInfo {
@@ -4899,7 +4896,6 @@ static void recordDerivativeFunctionConfig(
          AFD->getGenericSignature()});
   }
 };
-// SWIFT_ENABLE_TENSORFLOW END
 
 /// Recursively walks the members and derived global decls of any nominal types
 /// to build up global tables.
@@ -4910,9 +4906,7 @@ static void collectInterestingNestedDeclarations(
     Serializer::DeclTable &operatorMethodDecls,
     Serializer::ObjCMethodTable &objcMethods,
     Serializer::NestedTypeDeclsTable &nestedTypeDecls,
-    // SWIFT_ENABLE_TENSORFLOW
     Serializer::UniquedDerivativeFunctionConfigTable &derivativeConfigs,
-    // SWIFT_ENABLE_TENSORFLOW END
     bool isLocal = false) {
   const NominalTypeDecl *nominalParent = nullptr;
 
@@ -4949,21 +4943,17 @@ static void collectInterestingNestedDeclarations(
       }
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
     // Record Objective-C methods and derivative function configurations.
     if (auto *func = dyn_cast<AbstractFunctionDecl>(member)) {
       recordObjCMethod(func);
       recordDerivativeFunctionConfig(S, func, derivativeConfigs);
     }
-    // SWIFT_ENABLE_TENSORFLOW END
 
     // Handle accessors.
     if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
       for (auto *accessor : storage->getAllAccessors()) {
         recordObjCMethod(accessor);
-        // SWIFT_ENABLE_TENSORFLOW
         recordDerivativeFunctionConfig(S, accessor, derivativeConfigs);
-        // SWIFT_ENABLE_TENSORFLOW END
       }
     }
 
@@ -4986,9 +4976,7 @@ static void collectInterestingNestedDeclarations(
       collectInterestingNestedDeclarations(S, iterable->getMembers(),
                                            operatorMethodDecls,
                                            objcMethods, nestedTypeDecls,
-                                           // SWIFT_ENABLE_TENSORFLOW
                                            derivativeConfigs,
-                                           // SWIFT_ENABLE_TENSORFLOW END
                                            isLocal);
     }
   }
@@ -5001,9 +4989,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   NestedTypeDeclsTable nestedTypeDecls;
   LocalTypeHashTableGenerator localTypeGenerator, opaqueReturnTypeGenerator;
   ExtensionTable extensionDecls;
-  // SWIFT_ENABLE_TENSORFLOW
   UniquedDerivativeFunctionConfigTable uniquedDerivativeConfigs;
-  // SWIFT_ENABLE_TENSORFLOW END
   bool hasLocalTypes = false;
   bool hasOpaqueReturnTypes = false;
 
@@ -5052,10 +5038,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       } else {
         llvm_unreachable("all top-level declaration kinds accounted for");
       }
-      // SWIFT_ENABLE_TENSORFLOW
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
         recordDerivativeFunctionConfig(*this, AFD, uniquedDerivativeConfigs);
-      // SWIFT_ENABLE_TENSORFLOW END
 
       orderedTopLevelDecls.push_back(addDeclRef(D));
 
@@ -5065,10 +5049,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
         collectInterestingNestedDeclarations(*this, IDC->getMembers(),
                                              operatorMethodDecls, objcMethods,
-                                             // SWIFT_ENABLE_TENSORFLOW
                                              nestedTypeDecls,
                                              uniquedDerivativeConfigs);
-                                             // SWIFT_ENABLE_TENSORFLOW END
       }
     }
 
@@ -5097,11 +5079,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
         collectInterestingNestedDeclarations(*this, IDC->getMembers(),
                                              operatorMethodDecls, objcMethods,
-                                             // SWIFT_ENABLE_TENSORFLOW
                                              nestedTypeDecls,
                                              uniquedDerivativeConfigs,
                                              /*isLocal=*/true);
-                                             // SWIFT_ENABLE_TENSORFLOW END
       }
     }
     
@@ -5164,7 +5144,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       writeNestedTypeDeclsTable(NestedTypeDeclsTable, nestedTypeDecls);
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
     // Convert uniqued derivative function config table to serialization-
     // ready format: turn `GenericSignature` to `GenericSignatureID`.
     DerivativeFunctionConfigTable derivativeConfigs;
@@ -5178,7 +5157,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     index_block::DerivativeFunctionConfigTableLayout DerivativeConfigTable(Out);
     writeDerivativeFunctionConfigs(*this, DerivativeConfigTable,
                                    derivativeConfigs);
-    // SWIFT_ENABLE_TENSORFLOW END
 
     if (entryPointClassID.hasValue()) {
       index_block::EntryPointLayout EntryPoint(Out);
