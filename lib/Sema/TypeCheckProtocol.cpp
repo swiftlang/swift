@@ -438,6 +438,11 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         } else {
           witness->getAttrs().add(newAttr);
           success = true;
+          // Register derivative function configuration.
+          auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+          witnessAFD->addDerivativeFunctionConfiguration(
+              {newAttr->getParameterIndices(), resultIndices,
+               newAttr->getDerivativeGenericSignature()});
         }
       }
       if (!success) {
@@ -5066,6 +5071,12 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
   }
 }
 
+llvm::Expected<SmallVector<ProtocolConformance *, 2>>
+LookupAllConformancesInContextRequest::evaluate(
+    Evaluator &eval, const DeclContext *DC) const {
+  return DC->getLocalConformances(ConformanceLookupKind::All);
+}
+
 void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                              IterableDeclContext *idc) {
   // For anything imported from Clang, lazily check conformances.
@@ -5092,9 +5103,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     tracker = SF->getReferencedNameTracker();
 
   // Check each of the conformances associated with this context.
-  SmallVector<ConformanceDiagnostic, 4> diagnostics;
-  auto conformances = dc->getLocalConformances(ConformanceLookupKind::All,
-                                               &diagnostics);
+  auto conformances =
+      evaluateOrDefault(dc->getASTContext().evaluator,
+                        LookupAllConformancesInContextRequest{dc}, {});
 
   // The conformance checker bundle that checks all conformances in the context.
   auto &Context = dc->getASTContext();
@@ -5151,7 +5162,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                     groupChecker.getUnsatisfiedRequirements().end());
 
   // Diagnose any conflicts attributed to this declaration context.
-  for (const auto &diag : diagnostics) {
+  for (const auto &diag : dc->takeConformanceDiagnostics()) {
     // Figure out the declaration of the existing conformance.
     Decl *existingDecl = dyn_cast<NominalTypeDecl>(diag.ExistingDC);
     if (!existingDecl)
@@ -5594,6 +5605,9 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::AdditiveArithmetic:
     return derived.deriveAdditiveArithmetic(Requirement);
 
+  case KnownProtocolKind::Differentiable:
+    return derived.deriveDifferentiable(Requirement);
+
   default:
     return nullptr;
   }
@@ -5618,6 +5632,8 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveRawRepresentable(AssocType);
   case KnownProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(AssocType);
+  case KnownProtocolKind::Differentiable:
+    return derived.deriveDifferentiable(AssocType);
   default:
     return nullptr;
   }

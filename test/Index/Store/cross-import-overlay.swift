@@ -29,65 +29,65 @@ from__ABAdditionsCAdditions()
 // MAIN-NEXT: target: {{.*}}
 // MAIN-NEXT: is-debug: 1
 // MAIN-NEXT: DEPEND START
-// MAIN-NEXT: Unit | system | Swift | {{.*}}/Swift.swiftmodule
-// MAIN-NEXT: Unit | system | B | {{.*}}/B.swiftmodule/{{.*}}
-// MAIN-NEXT: Unit | system | C | {{.*}}/C.swiftmodule/{{.*}}
-// MAIN-NEXT: Unit | system | A | {{.*}}/__ABAdditionsCAdditions.swiftmodule/{{.*}}
-// MAIN-NEXT: Record | user | {{.*}}/cross-import-overlay.swift
+// MAIN-NEXT: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
+// MAIN-NEXT: Unit | system | B | {{.*}}{{/|\\}}B.swiftmodule{{/|\\}}{{.*}}
+// MAIN-NEXT: Unit | system | C | {{.*}}{{/|\\}}C.swiftmodule{{/|\\}}{{.*}}
+// MAIN-NEXT: Unit | system | A | {{.*}}{{/|\\}}__ABAdditionsCAdditions.swiftmodule{{/|\\}}{{.*}}
+// MAIN-NEXT: Record | user | {{.*}}{{/|\\}}cross-import-overlay.swift
 // MAIN-NEXT: DEPEND END
 //
 // RUN: %FileCheck %s --input-file %t/units --check-prefix=AB_OVERLAY
 // AB_OVERLAY:      module-name: A
-// AB_OVERLAY:      out-file:{{.*}}/_ABAdditions.swiftmodule/{{.*}}
+// AB_OVERLAY:      out-file:{{.*}}{{/|\\}}_ABAdditions.swiftmodule{{/|\\}}{{.*}}
 // AB_OVERLAY-NEXT: target: {{.*}}
 // AB_OVERLAY-NEXT: is-debug: 1
 // AB_OVERLAY-NEXT: DEPEND START
-// AB_OVERLAY-NEXT: Unit | system | A | {{.*}}/A.swiftmodule/{{.*}}
-// AB_OVERLAY-NEXT: Unit | system | B | {{.*}}/B.swiftmodule/{{.*}}
-// AB_OVERLAY-NEXT: Unit | system | Swift | {{.*}}/Swift.swiftmodule
-// AB_OVERLAY-NEXT: Record | system | A | {{.*}}/_ABAdditions.swiftmodule/{{.*}}
+// AB_OVERLAY-NEXT: Unit | system | A | {{.*}}{{/|\\}}A.swiftmodule{{/|\\}}{{.*}}
+// AB_OVERLAY-NEXT: Unit | system | B | {{.*}}{{/|\\}}B.swiftmodule{{/|\\}}{{.*}}
+// AB_OVERLAY-NEXT: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
+// AB_OVERLAY-NEXT: Record | system | A | {{.*}}{{/|\\}}_ABAdditions.swiftmodule{{/|\\}}{{.*}}
 // AB_OVERLAY-NEXT: DEPEND END
 //
 // RUN: %FileCheck %s --input-file %t/units --check-prefix=ABC_OVERLAY
 // ABC_OVERLAY:      module-name: A
-// ABC_OVERLAY:      out-file: {{.*}}/__ABAdditionsCAdditions.swiftmodule/{{.*}}
+// ABC_OVERLAY:      out-file: {{.*}}{{/|\\}}__ABAdditionsCAdditions.swiftmodule{{/|\\}}{{.*}}
 // ABC_OVERLAY-NEXT: target: {{.*}}
 // ABC_OVERLAY-NEXT: is-debug: 1
 // ABC_OVERLAY-NEXT: DEPEND START
-// ABC_OVERLAY-NEXT: Unit | system | C | {{.*}}/C.swiftmodule/{{.*}}
-// ABC_OVERLAY-NEXT: Unit | system | Swift | {{.*}}/Swift.swiftmodule
-// ABC_OVERLAY-NEXT: Unit | system | A | {{.*}}/_ABAdditions.swiftmodule/{{.*}}
-// ABC_OVERLAY-NEXT: Record | system | A | {{.*}}/__ABAdditionsCAdditions.swiftmodule/{{.*}}
+// ABC_OVERLAY-NEXT: Unit | system | C | {{.*}}{{/|\\}}C.swiftmodule{{/|\\}}{{.*}}
+// ABC_OVERLAY-NEXT: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
+// ABC_OVERLAY-NEXT: Unit | system | A | {{.*}}{{/|\\}}_ABAdditions.swiftmodule{{/|\\}}{{.*}}
+// ABC_OVERLAY-NEXT: Record | system | A | {{.*}}{{/|\\}}__ABAdditionsCAdditions.swiftmodule{{/|\\}}{{.*}}
 // ABC_OVERLAY-NEXT: DEPEND END
 //
 // RUN: %FileCheck %s --input-file %t/units --check-prefix=C_MODULE
 // C_MODULE:      module-name: C
-// C_MODULE:      out-file: {{.*}}/C.swiftmodule/{{.*}}
+// C_MODULE:      out-file: {{.*}}{{/|\\}}C.swiftmodule{{/|\\}}{{.*}}
 // C_MODULE-NEXT: target: {{.*}}
 // C_MODULE-NEXT: is-debug: 1
 // C_MODULE-NEXT: DEPEND START
-// C_MODULE-NEXT: Unit | system | Swift | {{.*}}/Swift.swiftmodule
-// C_MODULE-NEXT: Record | system | C | {{.*}}/C.swiftmodule/{{.*}}
+// C_MODULE-NEXT: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
+// C_MODULE-NEXT: Record | system | C | {{.*}}{{/|\\}}C.swiftmodule{{/|\\}}{{.*}}
 // C_MODULE-NEXT: DEPEND END
 //
 // RUN: %FileCheck %s --input-file %t/units --check-prefix=B_MODULE
 // B_MODULE:      module-name: B
-// B_MODULE:      out-file: {{.*}}/B.swiftmodule/{{.*}}
+// B_MODULE:      out-file: {{.*}}{{/|\\}}B.swiftmodule{{/|\\}}{{.*}}
 // B_MODULE-NEXT: target: {{.*}}
 // B_MODULE-NEXT: is-debug: 1
 // B_MODULE-NEXT: DEPEND START
-// B_MODULE-NEXT: Unit | system | Swift | {{.*}}/Swift.swiftmodule
-// B_MODULE-NEXT: Record | system | B | {{.*}}/B.swiftmodule/{{.*}}
+// B_MODULE-NEXT: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
+// B_MODULE-NEXT: Record | system | B | {{.*}}{{/|\\}}B.swiftmodule{{/|\\}}{{.*}}
 // B_MODULE-NEXT: DEPEND END
 //
 // RUN: %FileCheck %s --input-file %t/units --check-prefix=A_MODULE
 // A_MODULE:      module-name: A
-// A_MODULE: out-file: {{.*}}/A.swiftmodule/{{.*}}
+// A_MODULE: out-file: {{.*}}{{/|\\}}A.swiftmodule{{/|\\}}{{.*}}
 // A_MODULE-NEXT: target: {{.*}}
 // A_MODULE-NEXT: is-debug: 1
 // A_MODULE-NEXT: DEPEND START
-// A_MODULE-NEXT: Unit | system | Swift | {{.*}}/Swift.swiftmodule
-// A_MODULE-NEXT: Record | system | A | {{.*}}/A.swiftmodule/{{.*}}
+// A_MODULE-NEXT: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
+// A_MODULE-NEXT: Record | system | A | {{.*}}{{/|\\}}A.swiftmodule{{/|\\}}{{.*}}
 // A_MODULE-NEXT: DEPEND END
 
 

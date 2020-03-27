@@ -5021,7 +5021,8 @@ ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
 void ProtocolDecl::computeKnownProtocolKind() const {
   auto module = getModuleContext();
   if (module != module->getASTContext().getStdlibModule() &&
-      !module->getName().is("Foundation")) {
+      !module->getName().is("Foundation") &&
+      !module->getName().is("_Differentiation")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -7099,8 +7100,10 @@ AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
   prepareDerivativeFunctionConfigurations();
   auto &ctx = getASTContext();
   if (ctx.getCurrentGeneration() > DerivativeFunctionConfigGeneration) {
-    // TODO(TF-1100): Upstream derivative function configuration serialization
-    // logic.
+    unsigned previousGeneration = DerivativeFunctionConfigGeneration;
+    DerivativeFunctionConfigGeneration = ctx.getCurrentGeneration();
+    ctx.loadDerivativeFunctionConfigurations(this, previousGeneration,
+                                             *DerivativeFunctionConfigs);
   }
   return DerivativeFunctionConfigs->getArrayRef();
 }

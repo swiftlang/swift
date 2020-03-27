@@ -993,6 +993,17 @@ void SerializedModuleLoaderBase::loadObjCMethods(
   }
 }
 
+void SerializedModuleLoaderBase::loadDerivativeFunctionConfigurations(
+    AbstractFunctionDecl *originalAFD, unsigned int previousGeneration,
+    llvm::SetVector<AutoDiffConfig> &results) {
+  for (auto &modulePair : LoadedModuleFiles) {
+    if (modulePair.second <= previousGeneration)
+      continue;
+    modulePair.first->loadDerivativeFunctionConfigurations(originalAFD,
+                                                           results);
+  }
+}
+
 std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID,
     const SerializedModuleBaseName &BaseName,

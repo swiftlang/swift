@@ -770,6 +770,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, CLASS_MEMBERS_FOR_DYNAMIC_LOOKUP);
   BLOCK_RECORD(index_block, OPERATOR_METHODS);
   BLOCK_RECORD(index_block, OBJC_METHODS);
+  BLOCK_RECORD(index_block, DERIVATIVE_FUNCTION_CONFIGURATIONS);
   BLOCK_RECORD(index_block, ENTRY_POINT);
   BLOCK_RECORD(index_block, LOCAL_DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, GENERIC_SIGNATURE_OFFSETS);
@@ -2839,7 +2840,7 @@ public:
     extendedType = extendedType->getCanonicalType();
 
     auto conformances = extension->getLocalConformances(
-                          ConformanceLookupKind::All, nullptr);
+                          ConformanceLookupKind::All);
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
     for (auto inherited : extension->getInherited()) {
@@ -3073,7 +3074,7 @@ public:
     auto contextID = S.addDeclContextRef(theStruct->getDeclContext());
 
     auto conformances = theStruct->getLocalConformances(
-                          ConformanceLookupKind::All, nullptr);
+                          ConformanceLookupKind::All);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theStruct->getInherited()) {
@@ -3118,7 +3119,7 @@ public:
     auto contextID = S.addDeclContextRef(theEnum->getDeclContext());
 
     auto conformances = theEnum->getLocalConformances(
-                          ConformanceLookupKind::All, nullptr);
+                          ConformanceLookupKind::All);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theEnum->getInherited()) {
@@ -3176,7 +3177,7 @@ public:
     auto contextID = S.addDeclContextRef(theClass->getDeclContext());
 
     auto conformances = theClass->getLocalConformances(
-                          ConformanceLookupKind::NonInherited, nullptr);
+                          ConformanceLookupKind::NonInherited);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theClass->getInherited()) {
@@ -4781,6 +4782,98 @@ static void writeObjCMethodTable(const index_block::ObjCMethodTableLayout &out,
   out.emit(scratch, tableOffset, hashTableBlob);
 }
 
+namespace {
+  /// Used to serialize derivative function configurations.
+  class DerivativeFunctionConfigTableInfo {
+  public:
+    using key_type = std::string;
+    using key_type_ref = StringRef;
+    using data_type = Serializer::DerivativeFunctionConfigTableData;
+    using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      assert(!key.empty());
+      return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      uint32_t keyLength = key.str().size();
+      assert(keyLength == static_cast<uint16_t>(keyLength));
+      uint32_t dataLength = (sizeof(uint32_t) * 2) * data.size();
+      for (auto entry : data)
+        dataLength += entry.first.size();
+      assert(dataLength == static_cast<uint16_t>(dataLength));
+      endian::Writer writer(out, little);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      out << key;
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      endian::Writer writer(out, little);
+      for (auto &entry : data) {
+        // Write `GenericSignatureID`.
+        writer.write<uint32_t>(entry.second);
+        // Write parameter indices string size, followed by data.
+        writer.write<int32_t>(entry.first.size());
+        out << entry.first;
+      }
+    }
+  };
+} // end anonymous namespace
+
+static void writeDerivativeFunctionConfigs(
+    Serializer &S, const index_block::DerivativeFunctionConfigTableLayout &out,
+    Serializer::DerivativeFunctionConfigTable &derivativeConfigs) {
+  // Create the on-disk hash table.
+  llvm::OnDiskChainedHashTableGenerator<DerivativeFunctionConfigTableInfo>
+      generator;
+  llvm::SmallString<32> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    for (auto &entry : derivativeConfigs)
+      generator.insert(entry.first.get(), entry.second);
+    // Make sure that no bucket is at offset 0.
+    endian::write<uint32_t>(blobStream, 0, little);
+    tableOffset = generator.Emit(blobStream);
+  }
+  SmallVector<uint64_t, 8> scratch;
+  out.emit(scratch, tableOffset, hashTableBlob);
+}
+
+// Records derivative function configurations for the given AbstractFunctionDecl
+// by visiting `@differentiable` and `@derivative` attributes.
+static void recordDerivativeFunctionConfig(
+    Serializer &S, const AbstractFunctionDecl *AFD,
+    Serializer::UniquedDerivativeFunctionConfigTable &derivativeConfigs) {
+  auto &ctx = AFD->getASTContext();
+  Mangle::ASTMangler Mangler;
+  for (auto *attr : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
+    auto mangledName = ctx.getIdentifier(Mangler.mangleDeclAsUSR(AFD, ""));
+    derivativeConfigs[mangledName].insert(
+        {ctx.getIdentifier(attr->getParameterIndices()->getString()),
+         attr->getDerivativeGenericSignature()});
+  }
+  for (auto *attr : AFD->getAttrs().getAttributes<DerivativeAttr>()) {
+    auto *origAFD = attr->getOriginalFunction();
+    auto mangledName = ctx.getIdentifier(Mangler.mangleDeclAsUSR(origAFD, ""));
+    derivativeConfigs[mangledName].insert(
+        {ctx.getIdentifier(attr->getParameterIndices()->getString()),
+         AFD->getGenericSignature()});
+  }
+};
+
 /// Recursively walks the members and derived global decls of any nominal types
 /// to build up global tables.
 template<typename Range>
@@ -4790,6 +4883,7 @@ static void collectInterestingNestedDeclarations(
     Serializer::DeclTable &operatorMethodDecls,
     Serializer::ObjCMethodTable &objcMethods,
     Serializer::NestedTypeDeclsTable &nestedTypeDecls,
+    Serializer::UniquedDerivativeFunctionConfigTable &derivativeConfigs,
     bool isLocal = false) {
   const NominalTypeDecl *nominalParent = nullptr;
 
@@ -4826,14 +4920,17 @@ static void collectInterestingNestedDeclarations(
       }
     }
 
-    // Record Objective-C methods.
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(member))
+    // Record Objective-C methods and derivative function configurations.
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(member)) {
       recordObjCMethod(func);
+      recordDerivativeFunctionConfig(S, func, derivativeConfigs);
+    }
 
     // Handle accessors.
     if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
       for (auto *accessor : storage->getAllAccessors()) {
         recordObjCMethod(accessor);
+        recordDerivativeFunctionConfig(S, accessor, derivativeConfigs);
       }
     }
 
@@ -4856,6 +4953,7 @@ static void collectInterestingNestedDeclarations(
       collectInterestingNestedDeclarations(S, iterable->getMembers(),
                                            operatorMethodDecls,
                                            objcMethods, nestedTypeDecls,
+                                           derivativeConfigs,
                                            isLocal);
     }
   }
@@ -4868,6 +4966,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   NestedTypeDeclsTable nestedTypeDecls;
   LocalTypeHashTableGenerator localTypeGenerator, opaqueReturnTypeGenerator;
   ExtensionTable extensionDecls;
+  UniquedDerivativeFunctionConfigTable uniquedDerivativeConfigs;
   bool hasLocalTypes = false;
   bool hasOpaqueReturnTypes = false;
 
@@ -4916,6 +5015,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       } else {
         llvm_unreachable("all top-level declaration kinds accounted for");
       }
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+        recordDerivativeFunctionConfig(*this, AFD, uniquedDerivativeConfigs);
 
       orderedTopLevelDecls.push_back(addDeclRef(D));
 
@@ -4925,7 +5026,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
         collectInterestingNestedDeclarations(*this, IDC->getMembers(),
                                              operatorMethodDecls, objcMethods,
-                                             nestedTypeDecls);
+                                             nestedTypeDecls,
+                                             uniquedDerivativeConfigs);
       }
     }
 
@@ -4954,7 +5056,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
         collectInterestingNestedDeclarations(*this, IDC->getMembers(),
                                              operatorMethodDecls, objcMethods,
-                                             nestedTypeDecls, /*isLocal=*/true);
+                                             nestedTypeDecls,
+                                             uniquedDerivativeConfigs,
+                                             /*isLocal=*/true);
       }
     }
     
@@ -5016,6 +5120,20 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       index_block::NestedTypeDeclsLayout NestedTypeDeclsTable(Out);
       writeNestedTypeDeclsTable(NestedTypeDeclsTable, nestedTypeDecls);
     }
+
+    // Convert uniqued derivative function config table to serialization-
+    // ready format: turn `GenericSignature` to `GenericSignatureID`.
+    DerivativeFunctionConfigTable derivativeConfigs;
+    for (auto entry : uniquedDerivativeConfigs) {
+      for (auto config : entry.second) {
+        auto paramIndices = config.first.str();
+        auto genSigID = addGenericSignatureRef(config.second);
+        derivativeConfigs[entry.first].push_back({paramIndices, genSigID});
+      }
+    }
+    index_block::DerivativeFunctionConfigTableLayout DerivativeConfigTable(Out);
+    writeDerivativeFunctionConfigs(*this, DerivativeConfigTable,
+                                   derivativeConfigs);
 
     if (entryPointClassID.hasValue()) {
       index_block::EntryPointLayout EntryPoint(Out);

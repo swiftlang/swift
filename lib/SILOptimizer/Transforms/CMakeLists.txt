@@ -24,6 +24,7 @@ silopt_register_sources(
   PerformanceInliner.cpp
   RedundantLoadElimination.cpp
   RedundantOverflowCheckRemoval.cpp
+  RedundantPhiElimination.cpp
   ReleaseDevirtualizer.cpp
   SemanticARCOpts.cpp
   SILCodeMotion.cpp

@@ -431,24 +431,24 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
   // If we have a trailing closure, it maps to the last parameter.
   if (hasTrailingClosure && numParams > 0) {
+    unsigned lastParamIdx = numParams - 1;
+    bool lastAcceptsTrailingClosure =
+        acceptsTrailingClosure(params[lastParamIdx]);
+
     // If the last parameter is defaulted, this might be
     // an attempt to use a trailing closure with previous
     // parameter that accepts a function type e.g.
     //
     // func foo(_: () -> Int, _ x: Int = 0) {}
     // foo { 42 }
-    bool lastAcceptsTrailingClosure = false;
-    unsigned lastParamIdx = numParams - 1;
-    for (unsigned i : indices(params)) {
-      unsigned idx = numParams - 1 - i;
-      if (acceptsTrailingClosure(params[idx])) {
+    if (!lastAcceptsTrailingClosure && numParams > 1 &&
+        paramInfo.hasDefaultArgument(lastParamIdx)) {
+      auto paramType = params[lastParamIdx - 1].getPlainType();
+      // If the parameter before defaulted last accepts.
+      if (paramType->is<AnyFunctionType>()) {
         lastAcceptsTrailingClosure = true;
-        lastParamIdx = idx;
-        break;
+        lastParamIdx -= 1;
       }
-      if (paramInfo.hasDefaultArgument(idx))
-        continue;
-      break;
     }
 
     bool isExtraClosure = false;

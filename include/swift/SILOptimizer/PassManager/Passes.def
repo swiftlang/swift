@@ -253,6 +253,8 @@ PASS(PredictableMemoryAccessOptimizations, "predictable-memaccess-opts",
      "Predictable Memory Access Optimizations for Diagnostics")
 PASS(PredictableDeadAllocationElimination, "predictable-deadalloc-elim",
      "Eliminate dead temporary allocations after diagnostics")
+PASS(RedundantPhiElimination, "redundant-phi-elimination",
+     "Redundant Phi Block Argument Elimination")
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",
