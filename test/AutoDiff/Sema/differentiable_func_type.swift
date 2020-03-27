@@ -52,6 +52,54 @@ func test3<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> @diff
 func test4<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> (U) -> Int) {}
 
 //===----------------------------------------------------------------------===//
+// Function conversion
+//===----------------------------------------------------------------------===//
+
+/// Function with similar signature as `gradient`, for testing purposes.
+func fakeGradient<T, U: FloatingPoint>(of f: @differentiable (T) -> U) {}
+
+func takesOpaqueClosure(f: @escaping (Float) -> Float) {
+  // expected-note @-1 {{did you mean to take a '@differentiable' closure?}} {{38-38=@differentiable }}
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  fakeGradient(of: f)
+}
+
+let globalAddOne: (Float) -> Float = { $0 + 1 }
+// expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+fakeGradient(of: globalAddOne)
+
+func someScope() {
+  let localAddOne: (Float) -> Float = { $0 + 1 }
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  fakeGradient(of: globalAddOne)
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  fakeGradient(of: localAddOne)
+  // The following case is okay during type checking, but will fail in the AD transform.
+  fakeGradient { localAddOne($0) }
+}
+
+func addOne(x: Float) -> Float { x + 1 }
+fakeGradient(of: addOne) // okay
+
+extension Float {
+  static func addOne(x: Float) -> Float { x + 1 }
+  func addOne(x: Float) -> Float { x + 1 }
+}
+fakeGradient(of: Float.addOne) // okay
+fakeGradient(of: Float(1.0).addOne) // okay
+
+// TODO(TF-908): Remove this test once linear-to-differentiable conversion is supported.
+func linearToDifferentiable(_ f: @escaping @differentiable(linear) (Float) -> Float) {
+  // expected-error @+1 {{conversion from '@differentiable(linear)' to '@differentiable' is not yet supported}}
+  _ = f as @differentiable (Float) -> Float
+}
+
+func differentiableToLinear(_ f: @escaping @differentiable (Float) -> Float) {
+  // expected-error @+1 {{a '@differentiable(linear)' function can only be formed from a reference to a 'func' or a literal closure}}
+  _ = f as @differentiable(linear) (Float) -> Float
+}
+
+//===----------------------------------------------------------------------===//
 // Parameter selection (@noDerivative)
 //===----------------------------------------------------------------------===//
 
