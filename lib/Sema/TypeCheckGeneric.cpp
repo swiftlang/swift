@@ -83,7 +83,7 @@ TypeChecker::gatherGenericParamBindingsText(
 
 /// Get the opaque type representing the return type of a declaration, or
 /// create it if it does not yet exist.
-llvm::Expected<OpaqueTypeDecl *>
+OpaqueTypeDecl *
 OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
                                   ValueDecl *originatingDecl) const {
   auto *repr = originatingDecl->getOpaqueResultTypeRepr();
@@ -577,7 +577,7 @@ static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
   return sig->getGenericParams().back()->getDepth();
 }
 
-llvm::Expected<GenericSignature>
+GenericSignature
 GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                   GenericContext *GC) const {
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
@@ -919,7 +919,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   return RequirementCheckResult::SubstitutionFailure;
 }
 
-llvm::Expected<Requirement>
+Requirement
 RequirementRequest::evaluate(Evaluator &evaluator,
                              WhereClauseOwner owner,
                              unsigned index,
@@ -974,9 +974,8 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("unhandled kind");
 }
 
-llvm::Expected<Type>
-StructuralTypeRequest::evaluate(Evaluator &evaluator,
-                                TypeAliasDecl *typeAlias) const {  
+Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
+                                     TypeAliasDecl *typeAlias) const {  
   TypeResolutionOptions options((typeAlias->getGenericParams()
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));

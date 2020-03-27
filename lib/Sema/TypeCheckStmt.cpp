@@ -1895,7 +1895,7 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   }
 }
 
-llvm::Expected<bool>
+bool
 TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
                                             AbstractFunctionDecl *AFD,
                                             SourceLoc endTypeCheckLoc) const {

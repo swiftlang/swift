@@ -1967,7 +1967,7 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
   return overriddenAssocTypes;
 }
 
-llvm::Expected<llvm::TinyPtrVector<ValueDecl *>>
+llvm::TinyPtrVector<ValueDecl *>
 OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // Value to return in error cases
   auto noResults = llvm::TinyPtrVector<ValueDecl *>();
@@ -2082,9 +2082,8 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
                                          OverrideCheckingAttempt::PerfectMatch);
 }
 
-llvm::Expected<bool>
-IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
-                                         ValueDecl *decl) const {
+bool IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
+                                              ValueDecl *decl) const {
   auto base = decl->getOverriddenDecl();
   if (!base)
     return false;

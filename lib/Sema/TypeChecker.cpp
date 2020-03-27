@@ -319,7 +319,7 @@ void swift::performTypeChecking(SourceFile &SF) {
                                  TypeCheckSourceFileRequest{&SF}, {});
 }
 
-llvm::Expected<evaluator::SideEffect>
+evaluator::SideEffect
 TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   assert(SF && "Source file cannot be null!");
   assert(SF->ASTStage != SourceFile::TypeChecked &&

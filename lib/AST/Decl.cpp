@@ -1394,7 +1394,7 @@ createExtensionGenericParams(ASTContext &ctx,
   return toParams;
 }
 
-llvm::Expected<GenericParamList *>
+GenericParamList *
 GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) const {
   if (auto *ext = dyn_cast<ExtensionDecl>(value)) {
     // Create the generic parameter list for the extension by cloning the
@@ -4203,7 +4203,7 @@ synthesizeEmptyFunctionBody(AbstractFunctionDecl *afd, void *context) {
            /*isTypeChecked=*/true };
 }
 
-llvm::Expected<DestructorDecl *>
+DestructorDecl *
 GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   auto &ctx = CD->getASTContext();
   auto *DD = new (ctx) DestructorDecl(CD->getLoc(), CD);
@@ -4268,8 +4268,9 @@ AncestryOptions ClassDecl::checkAncestry() const {
                            AncestryFlags()));
 }
         
-llvm::Expected<AncestryFlags>
-ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator, ClassDecl *value) const {
+AncestryFlags
+ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator,
+                                    ClassDecl *value) const {
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
 
   AncestryOptions result;

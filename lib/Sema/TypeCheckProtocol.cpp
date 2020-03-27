@@ -5066,7 +5066,7 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
   }
 }
 
-llvm::Expected<SmallVector<ProtocolConformance *, 2>>
+SmallVector<ProtocolConformance *, 2>
 LookupAllConformancesInContextRequest::evaluate(
     Evaluator &eval, const DeclContext *DC) const {
   return DC->getLocalConformances(ConformanceLookupKind::All);
@@ -5511,7 +5511,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
   return result;
 }
 
-llvm::Expected<TypeWitnessAndDecl>
+TypeWitnessAndDecl
 TypeWitnessRequest::evaluate(Evaluator &eval,
                              NormalProtocolConformance *conformance,
                              AssociatedTypeDecl *requirement) const {
@@ -5529,7 +5529,7 @@ TypeWitnessRequest::evaluate(Evaluator &eval,
   return known->second;
 }
 
-llvm::Expected<Witness>
+Witness
 ValueWitnessRequest::evaluate(Evaluator &eval,
                               NormalProtocolConformance *conformance,
                               ValueDecl *requirement) const {

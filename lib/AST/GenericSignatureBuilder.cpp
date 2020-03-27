@@ -7348,7 +7348,7 @@ static bool isCanonicalRequest(GenericSignature baseSignature,
   return true;
 }
 
-llvm::Expected<GenericSignature>
+GenericSignature
 AbstractGenericSignatureRequest::evaluate(
          Evaluator &evaluator,
          GenericSignatureImpl *baseSignature,
@@ -7406,7 +7406,7 @@ AbstractGenericSignatureRequest::evaluate(
           canBaseSignature.getPointer(), std::move(canAddedParameters),
           std::move(canAddedRequirements)});
     if (!canSignatureResult || !*canSignatureResult)
-      return canSignatureResult;
+      return GenericSignature();
 
     // Substitute in the original generic parameters to form a more-sugared
     // result closer to what the original request wanted. Note that this
@@ -7461,7 +7461,7 @@ AbstractGenericSignatureRequest::evaluate(
       SourceLoc(), /*allowConcreteGenericParams=*/true);
 }
 
-llvm::Expected<GenericSignature>
+GenericSignature
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator, ModuleDecl *parentModule,
         GenericSignatureImpl *parentSig,

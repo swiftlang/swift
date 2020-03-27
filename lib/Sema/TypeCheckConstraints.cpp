@@ -4197,7 +4197,7 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   return nullptr;
 }
 
-llvm::Expected<bool>
+bool
 IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
                                        DeclContext *dc) const {
   auto options = defaultMemberLookupOptions;
@@ -4269,7 +4269,7 @@ static bool checkForDynamicAttribute(CanType ty,
   return false;
 }
 
-llvm::Expected<bool>
+bool
 HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
                                                  CanType ty) const {
   return checkForDynamicAttribute<DynamicMemberLookupAttr>(ty, [](Type type) {
@@ -4277,7 +4277,7 @@ HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
   });
 }
 
-llvm::Expected<bool>
+bool
 HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
                                              CanType ty) const {
   return checkForDynamicAttribute<DynamicCallableAttr>(ty, [](Type type) {

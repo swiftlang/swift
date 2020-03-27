@@ -986,7 +986,7 @@ static bool hasLinkerDirective(Decl *D) {
   return !getAllMovedPlatformVersions(D).empty();
 }
 
-llvm::Expected<TBDFileAndSymbols>
+TBDFileAndSymbols
 GenerateTBDRequest::evaluate(Evaluator &evaluator,
                              TBDGenDescriptor desc) const {
   auto *M = desc.getParentModule();

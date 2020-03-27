@@ -323,7 +323,7 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
                            ResilienceExpansion::Minimal);
 }
 
-llvm::Expected<ResilienceExpansion>
+ResilienceExpansion
 swift::ResilienceExpansionRequest::evaluate(Evaluator &evaluator,
                                             DeclContext *context) const {
   for (const auto *dc = context->getLocalContext(); dc && dc->isLocalContext();

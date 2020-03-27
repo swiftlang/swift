@@ -827,7 +827,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
       ProtocolConformanceRef::forInvalid());
 }
 
-llvm::Expected<ProtocolConformanceRef>
+ProtocolConformanceRef
 LookupConformanceInModuleRequest::evaluate(
     Evaluator &evaluator, LookupConformanceDescriptor desc) const {
   auto *mod = desc.Mod;
@@ -1185,7 +1185,7 @@ lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
 }
 
 template <typename OperatorType>
-llvm::Expected<OperatorType *> LookupOperatorRequest<OperatorType>::evaluate(
+OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
     Evaluator &evaluator, OperatorLookupDescriptor desc) const {
   auto *file = desc.fileOrModule.get<FileUnit *>();
   auto result =
@@ -1214,7 +1214,7 @@ llvm::Expected<OperatorType *> LookupOperatorRequest<OperatorType>::evaluate(
                                               /*isCascading*/ false);          \
     return result ? *result : nullptr;                                         \
   }                                                                            \
-  template llvm::Expected<Kind##Decl *>                                        \
+  template Kind##Decl *                                                        \
   LookupOperatorRequest<Kind##Decl>::evaluate(Evaluator &e,                    \
                                               OperatorLookupDescriptor d) const;
 
@@ -1224,7 +1224,7 @@ LOOKUP_OPERATOR(PostfixOperator)
 LOOKUP_OPERATOR(PrecedenceGroup)
 #undef LOOKUP_OPERATOR
 
-llvm::Expected<TinyPtrVector<OperatorDecl *>>
+TinyPtrVector<OperatorDecl *>
 DirectOperatorLookupRequest::evaluate(Evaluator &evaluator,
                                       OperatorLookupDescriptor descriptor,
                                       OperatorFixity fixity) const {
@@ -1234,7 +1234,7 @@ DirectOperatorLookupRequest::evaluate(Evaluator &evaluator,
   for (auto *file : descriptor.getFiles())
     file->lookupOperatorDirect(descriptor.name, fixity, results);
 
-  return std::move(results);
+  return results;
 }
 
 void SourceFile::lookupOperatorDirect(
@@ -1268,7 +1268,7 @@ void SourceFile::lookupOperatorDirect(
     results.push_back(op);
 }
 
-llvm::Expected<TinyPtrVector<PrecedenceGroupDecl *>>
+TinyPtrVector<PrecedenceGroupDecl *>
 DirectPrecedenceGroupLookupRequest::evaluate(
     Evaluator &evaluator, OperatorLookupDescriptor descriptor) const {
   // Query each file.
@@ -1277,7 +1277,7 @@ DirectPrecedenceGroupLookupRequest::evaluate(
   for (auto *file : descriptor.getFiles())
     file->lookupPrecedenceGroupDirect(descriptor.name, results);
 
-  return std::move(results);
+  return results;
 }
 
 void SourceFile::lookupPrecedenceGroupDirect(
@@ -2049,7 +2049,7 @@ ArrayRef<Identifier> Decl::getSPIGroups() const {
                            ArrayRef<Identifier>());
 }
 
-llvm::Expected<llvm::ArrayRef<Identifier>>
+llvm::ArrayRef<Identifier>
 SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
   // Applies only to public ValueDecls and ExtensionDecls.
   if (auto vd = dyn_cast<ValueDecl>(decl))

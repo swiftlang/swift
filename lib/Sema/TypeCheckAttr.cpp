@@ -2395,7 +2395,7 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
   }
 }
 
-llvm::Expected<bool>
+bool
 TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
                                          TypeEraserAttr *attr,
                                          ProtocolDecl *protocol) const {
@@ -3097,7 +3097,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   }
 }
 
-llvm::Expected<ValueDecl *>
+ValueDecl *
 DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
                                          ValueDecl *VD) const {
   // Dynamic replacements must be explicit.
@@ -3831,7 +3831,7 @@ bool checkIfDifferentiableProgrammingEnabled(
   return false;
 }
 
-llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
+IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
     Evaluator &evaluator, DifferentiableAttr *attr) const {
   // Skip type-checking for implicit `@differentiable` attributes. We currently
   // assume that all implicit `@differentiable` attributes are valid.

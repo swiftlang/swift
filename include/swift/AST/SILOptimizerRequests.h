@@ -59,7 +59,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<evaluator::SideEffect>
+  evaluator::SideEffect
   evaluate(Evaluator &evaluator, SILPipelineExecutionDescriptor desc) const;
 };
 

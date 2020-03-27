@@ -385,7 +385,7 @@ static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
                            false);
 }
 
-llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
+bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison) const {
   auto &C = decl1->getASTContext();

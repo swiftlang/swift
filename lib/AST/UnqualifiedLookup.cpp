@@ -1274,7 +1274,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
   return factory.isFirstResultEnough();
 }
 
-llvm::Expected<LookupResult>
+LookupResult
 UnqualifiedLookupRequest::evaluate(Evaluator &evaluator,
                                    UnqualifiedLookupDescriptor desc) const {
   SmallVector<LookupResultEntry, 4> results;
