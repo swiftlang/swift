@@ -1,8 +1,8 @@
-add_swift_target_library(swiftOSLogPrototype
+add_swift_target_library(swiftOSLogTestHelper
   IS_SDK_OVERLAY
   SHARED
 
-  OSLog.swift
+  OSLogTestHelper.swift
   OSLogMessage.swift
   OSLogIntegerFormatting.swift
   OSLogStringAlignment.swift
@@ -11,10 +11,10 @@ add_swift_target_library(swiftOSLogPrototype
   OSLogNSObjectType.swift
   OSLogFloatingPointTypes.swift
 
-  SWIFT_MODULE_DEPENDS_IOS Darwin os ObjectiveC
-  SWIFT_MODULE_DEPENDS_OSX Darwin os ObjectiveC
-  SWIFT_MODULE_DEPENDS_TVOS Darwin os ObjectiveC
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin os ObjectiveC
+  SWIFT_MODULE_DEPENDS_IOS Darwin ObjectiveC
+  SWIFT_MODULE_DEPENDS_OSX Darwin ObjectiveC
+  SWIFT_MODULE_DEPENDS_TVOS Darwin ObjectiveC
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin ObjectiveC
   TARGET_SDKS ALL_APPLE_PLATFORMS
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT never_install
