@@ -741,6 +741,19 @@ public:
                        unsigned previousGeneration,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
 
+  /// Load derivative function configurations for the given
+  /// AbstractFunctionDecl.
+  ///
+  /// \param originalAFD The declaration whose derivative function
+  /// configurations should be loaded.
+  ///
+  /// \param previousGeneration The previous generation number. The AST already
+  /// contains derivative function configurations loaded from any generation up
+  /// to and including this one.
+  void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
+      llvm::SetVector<AutoDiffConfig> &results);
+
   /// Retrieve the Clang module loader for this ASTContext.
   ///
   /// If there is no Clang module loader, returns a null pointer.

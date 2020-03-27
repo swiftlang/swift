@@ -417,6 +417,12 @@ private:
       llvm::OnDiskIterableChainedHashTable<DeclUSRTableInfo>;
   std::unique_ptr<SerializedDeclUSRTable> DeclUSRsTable;
 
+  class DerivativeFunctionConfigTableInfo;
+  using SerializedDerivativeFunctionConfigTable =
+      llvm::OnDiskIterableChainedHashTable<DerivativeFunctionConfigTableInfo>;
+  std::unique_ptr<SerializedDerivativeFunctionConfigTable>
+      DerivativeFunctionConfigurations;
+
   /// A blob of 0 terminated string segments referenced in \c SourceLocsTextData
   StringRef SourceLocsTextData;
 
@@ -549,6 +555,12 @@ private:
   /// index_block::DeclMembersLayout format.
   std::unique_ptr<SerializedDeclMembersTable>
   readDeclMembersTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Read an on-disk derivative function configuration table stored in
+  /// index_block::DerivativeFunctionConfigTableLayout format.
+  std::unique_ptr<ModuleFile::SerializedDerivativeFunctionConfigTable>
+  readDerivativeFunctionConfigTable(ArrayRef<uint64_t> fields,
+                                    StringRef blobData);
 
   /// Reads the index block, which contains global tables.
   ///
@@ -773,6 +785,12 @@ public:
                        ObjCSelector selector,
                        bool isInstanceMethod,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
+
+  /// Loads all derivative function configurations for the given
+  /// AbstractFunctionDecl.
+  void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD,
+      llvm::SetVector<AutoDiffConfig> &results);
 
   /// Reports all class members in the module to the given consumer.
   ///
