@@ -440,12 +440,8 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
-<<<<<<< HEAD
     case MatchKind::MissingDifferentiableAttr:
-=======
-    case MatchKind::DifferentiableConflict:
     case MatchKind::EnumCaseWithAssociatedValues:
->>>>>>> [Typechecker] Allow enum cases without payload to witness a static get-only property with Self type protocol requirement
       return false;
     }
 
@@ -475,12 +471,8 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
-<<<<<<< HEAD
     case MatchKind::MissingDifferentiableAttr:
-=======
-    case MatchKind::DifferentiableConflict:
     case MatchKind::EnumCaseWithAssociatedValues:
->>>>>>> [Typechecker] Allow enum cases without payload to witness a static get-only property with Self type protocol requirement
       return false;
     }
 
