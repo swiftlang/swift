@@ -15,7 +15,8 @@ CxxExceptionsTestSuite.test("UncaughtException") {
 }
 
 // Exceptions can be thrown and caught within C++ code if they don't cross any
-// interop boundaries.
+// interop boundaries. In addition, ClangImporter correctly codegens throw and
+// try-catch in a C++ inline function.
 CxxExceptionsTestSuite.test("ExceptionCaughtWithinCpp") {
   expectTrue(callAndCatchExceptions(throwException))
 }
