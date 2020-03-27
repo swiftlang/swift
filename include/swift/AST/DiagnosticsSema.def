@@ -3121,11 +3121,6 @@ ERROR(noderivative_only_on_differentiable_struct_or_class_fields,none,
       "'@noDerivative' is only allowed on stored properties in structure or "
       "class types that declare a conformance to 'Differentiable'", ())
 
-// SWIFT_ENABLE_TENSORFLOW
-// @nonDiff attribute
-WARNING(nondiff_attr_deprecated,none,
-        "'@nondiff' is deprecated; use '@noDerivative' instead", ())
-
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
 //------------------------------------------------------------------------------
