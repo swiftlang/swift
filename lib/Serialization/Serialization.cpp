@@ -2839,7 +2839,7 @@ public:
     extendedType = extendedType->getCanonicalType();
 
     auto conformances = extension->getLocalConformances(
-                          ConformanceLookupKind::All, nullptr);
+                          ConformanceLookupKind::All);
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
     for (auto inherited : extension->getInherited()) {
@@ -3073,7 +3073,7 @@ public:
     auto contextID = S.addDeclContextRef(theStruct->getDeclContext());
 
     auto conformances = theStruct->getLocalConformances(
-                          ConformanceLookupKind::All, nullptr);
+                          ConformanceLookupKind::All);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theStruct->getInherited()) {
@@ -3118,7 +3118,7 @@ public:
     auto contextID = S.addDeclContextRef(theEnum->getDeclContext());
 
     auto conformances = theEnum->getLocalConformances(
-                          ConformanceLookupKind::All, nullptr);
+                          ConformanceLookupKind::All);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theEnum->getInherited()) {
@@ -3176,7 +3176,7 @@ public:
     auto contextID = S.addDeclContextRef(theClass->getDeclContext());
 
     auto conformances = theClass->getLocalConformances(
-                          ConformanceLookupKind::NonInherited, nullptr);
+                          ConformanceLookupKind::NonInherited);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theClass->getInherited()) {
