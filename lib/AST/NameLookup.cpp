@@ -1242,7 +1242,7 @@ NominalTypeDecl::lookupDirect(DeclName name,
                            DirectLookupRequest({this, name, flags}), {});
 }
 
-llvm::Expected<TinyPtrVector<ValueDecl *>>
+TinyPtrVector<ValueDecl *>
 DirectLookupRequest::evaluate(Evaluator &evaluator,
                               DirectLookupDescriptor desc) const {
   const auto &name = desc.Name;
@@ -1570,7 +1570,7 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
   return !decls.empty();
 }
 
-llvm::Expected<QualifiedLookupResult>
+QualifiedLookupResult
 QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                                  SmallVector<NominalTypeDecl *, 4> typeDecls,
                                  DeclNameRef member, NLOptions options) const {
@@ -1709,7 +1709,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclNameRef member,
   return !decls.empty();
 }
 
-llvm::Expected<QualifiedLookupResult>
+QualifiedLookupResult
 ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                                        ModuleDecl *module, DeclNameRef member,
                                        NLOptions options) const {
@@ -1762,7 +1762,7 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   return decls;
 }
 
-llvm::Expected<QualifiedLookupResult>
+QualifiedLookupResult
 AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
                                  DeclNameRef member, NLOptions options) const {
   using namespace namelookup;
@@ -2188,7 +2188,7 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
 }
 
 /// Evaluate a superclass declaration request.
-llvm::Expected<ClassDecl *>
+ClassDecl *
 SuperclassDeclRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *subject) const {
   auto &Ctx = subject->getASTContext();
@@ -2252,7 +2252,7 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   return PD->getASTContext().AllocateCopy(result);
 }
 
-llvm::Expected<NominalTypeDecl *>
+NominalTypeDecl *
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                                  ExtensionDecl *ext) const {
   auto typeRepr = ext->getExtendedTypeRepr();
@@ -2289,7 +2289,7 @@ static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
   return true;
 }
 
-llvm::Expected<NominalTypeDecl *>
+NominalTypeDecl *
 CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                    CustomAttr *attr, DeclContext *dc) const {
   // Find the types referenced by the custom attribute.

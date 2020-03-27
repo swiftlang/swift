@@ -303,7 +303,7 @@ bool CursorInfoResolver::rangeContainsLoc(CharSourceRange Range) const {
   return Range.contains(LocToResolve);
 }
 
-llvm::Expected<ide::ResolvedCursorInfo>
+ide::ResolvedCursorInfo
 CursorInfoRequest::evaluate(Evaluator &eval, CursorInfoOwner CI) const {
   if (!CI.isValid())
     return ResolvedCursorInfo();
@@ -1066,7 +1066,7 @@ RangeInfoOwner::RangeInfoOwner(SourceFile *File, unsigned Offset,
   EndLoc = SM.getLocForOffset(BufferId, Offset + Length);
 }
 
-llvm::Expected<ide::ResolvedRangeInfo>
+ide::ResolvedRangeInfo
 RangeInfoRequest::evaluate(Evaluator &eval, RangeInfoOwner CI) const {
   if (!CI.isValid())
     return ResolvedRangeInfo();
@@ -1092,7 +1092,7 @@ static Type getContextFreeInterfaceType(ValueDecl *VD) {
   return VD->getInterfaceType();
 }
 
-llvm::Expected<ArrayRef<ValueDecl*>>
+ArrayRef<ValueDecl *>
 ProvideDefaultImplForRequest::evaluate(Evaluator &eval, ValueDecl* VD) const {
   // Skip decls that don't have valid names.
   if (!VD->getFullName())
@@ -1126,7 +1126,7 @@ ProvideDefaultImplForRequest::evaluate(Evaluator &eval, ValueDecl* VD) const {
 //----------------------------------------------------------------------------//
 // CollectOverriddenDeclsRequest
 //----------------------------------------------------------------------------//
-llvm::Expected<ArrayRef<ValueDecl*>>
+ArrayRef<ValueDecl *>
 CollectOverriddenDeclsRequest::evaluate(Evaluator &evaluator,
                                         OverridenDeclsOwner Owner) const {
   std::vector<ValueDecl*> results;
@@ -1155,7 +1155,7 @@ CollectOverriddenDeclsRequest::evaluate(Evaluator &evaluator,
 //----------------------------------------------------------------------------//
 // ResolveProtocolNameRequest
 //----------------------------------------------------------------------------//
-llvm::Expected<ProtocolDecl*>
+ProtocolDecl *
 ResolveProtocolNameRequest::evaluate(Evaluator &evaluator,
                                      ProtocolNameOwner Input) const {
   auto &ctx = Input.DC->getASTContext();

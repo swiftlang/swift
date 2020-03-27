@@ -1394,7 +1394,7 @@ createExtensionGenericParams(ASTContext &ctx,
   return toParams;
 }
 
-llvm::Expected<GenericParamList *>
+GenericParamList *
 GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) const {
   if (auto *ext = dyn_cast<ExtensionDecl>(value)) {
     // Create the generic parameter list for the extension by cloning the
@@ -4125,7 +4125,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 
   if (auto actionToTake = action) {
     (void)evaluateOrDefault(Context.evaluator,
-        ResolveImplicitMemberRequest{this, actionToTake.getValue()}, false);
+        ResolveImplicitMemberRequest{this, actionToTake.getValue()}, {});
   }
 }
 
@@ -4203,7 +4203,7 @@ synthesizeEmptyFunctionBody(AbstractFunctionDecl *afd, void *context) {
            /*isTypeChecked=*/true };
 }
 
-llvm::Expected<DestructorDecl *>
+DestructorDecl *
 GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   auto &ctx = CD->getASTContext();
   auto *DD = new (ctx) DestructorDecl(CD->getLoc(), CD);
@@ -4268,8 +4268,9 @@ AncestryOptions ClassDecl::checkAncestry() const {
                            AncestryFlags()));
 }
         
-llvm::Expected<AncestryFlags>
-ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator, ClassDecl *value) const {
+AncestryFlags
+ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator,
+                                    ClassDecl *value) const {
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
 
   AncestryOptions result;
@@ -7489,7 +7490,7 @@ LiteralExpr *EnumElementDecl::getRawValueExpr() const {
   (void)evaluateOrDefault(
       getASTContext().evaluator,
       EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Interface},
-      true);
+      {});
   return RawValueExpr;
 }
 
@@ -7499,7 +7500,7 @@ LiteralExpr *EnumElementDecl::getStructuralRawValueExpr() const {
   (void)evaluateOrDefault(
       getASTContext().evaluator,
       EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Structural},
-      true);
+      {});
   return RawValueExpr;
 }
 

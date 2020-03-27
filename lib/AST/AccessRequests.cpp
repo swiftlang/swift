@@ -36,7 +36,7 @@ namespace swift {
 //----------------------------------------------------------------------------//
 // AccessLevel computation
 //----------------------------------------------------------------------------//
-llvm::Expected<AccessLevel>
+AccessLevel
 AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   assert(!D->hasAccess());
 
@@ -168,7 +168,7 @@ static bool isStoredWithPrivateSetter(VarDecl *VD) {
   return true;
 }
 
-llvm::Expected<AccessLevel>
+AccessLevel
 SetterAccessLevelRequest::evaluate(Evaluator &evaluator,
                                    AbstractStorageDecl *ASD) const {
   assert(!ASD->Accessors.getInt().hasValue());
@@ -205,7 +205,7 @@ void SetterAccessLevelRequest::cacheResult(AccessLevel value) const {
 // DefaultAccessLevel computation
 //----------------------------------------------------------------------------//
 
-llvm::Expected<std::pair<AccessLevel, AccessLevel>>
+std::pair<AccessLevel, AccessLevel>
 DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
                                           ExtensionDecl *ED) const {
   auto &Ctx = ED->getASTContext();
