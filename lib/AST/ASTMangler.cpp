@@ -1517,6 +1517,18 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   if (!fn->isNoEscape())
     OpArgs.push_back('e');
 
+  // Differentiability kind.
+  switch (fn->getExtInfo().getDifferentiabilityKind()) {
+  case DifferentiabilityKind::NonDifferentiable:
+    break;
+  case DifferentiabilityKind::Normal:
+    OpArgs.push_back('d');
+    break;
+  case DifferentiabilityKind::Linear:
+    OpArgs.push_back('l');
+    break;
+  }
+
   // <impl-callee-convention>
   if (fn->getExtInfo().hasContext()) {
     OpArgs.push_back(getParamConvention(fn->getCalleeConvention()));
@@ -2117,6 +2129,18 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
+    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Normal) {
+      if (fn->isNoEscape())
+        return appendOperator("XF");
+      else
+        return appendOperator("XG");
+    }
+    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+      if (fn->isNoEscape())
+        return appendOperator("XH");
+      else
+        return appendOperator("XI");
+    }
     if (isAutoClosure) {
       if (fn->isNoEscape())
         return appendOperator("XK");
