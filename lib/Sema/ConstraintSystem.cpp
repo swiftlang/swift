@@ -4381,8 +4381,8 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
   }
 
   // If not, let's check contextual unavailability.
-  AvailabilityContext result = AvailabilityContext::alwaysAvailable();
-  return !TypeChecker::isDeclAvailable(D, loc, DC, result);
+  auto result = TypeChecker::checkDeclarationAvailability(D, loc, DC);
+  return result.hasValue();
 }
 
 /// If we aren't certain that we've emitted a diagnostic, emit a fallback
