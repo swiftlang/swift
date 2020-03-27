@@ -2189,6 +2189,14 @@ public:
         ExtracteeType));
   }
 
+  DifferentiableFunctionExtractInst *
+  createDifferentiableFunctionExtractOriginal(SILLocation Loc,
+                                              SILValue TheFunction) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc),
+        NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
+  }
+
   LinearFunctionExtractInst *createLinearFunctionExtract(
       SILLocation Loc, LinearDifferentiableFunctionTypeComponent Extractee,
       SILValue TheFunction) {
