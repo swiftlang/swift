@@ -113,6 +113,39 @@ function(get_test_dependencies SDK result_var_name)
   set("${result_var_name}" "${deps}" PARENT_SCOPE)
 endfunction()
 
+function (write_component_test_script test_bin_dir component_suffix component_default_value)
+  file(
+    WRITE
+    ${test_bin_dir}/check-swift-${component_suffix}.sh
+	  "source_test_dir=\"${SWIFT_SOURCE_DIR}/test\"
+bin_test_dir=\"${test_bin_dir}\"
+default_component=\"${component_default_value}\"
+
+dirs_to_test=$(find "\${source_test_dir}"  -type f -name \"*${component_suffix}*\" | grep -o \"\\(.*\\)/\")
+dirs_to_test+=(\${source_test_dir}/\${default_component})
+dirs_to_test=$(echo \${dirs_to_test} | tr ' ' '\\n' | sort -u)
+
+for directory in \${dirs_to_test}
+do
+    rel_path="\${directory\#\"\${source_test_dir}\"}"
+    ${PYTHON_EXECUTABLE} ${LIT} \${bin_test_dir}\${rel_path}
+done\n")
+
+  file(
+    INSTALL
+    ${test_bin_dir}/check-swift-${component_suffix}.sh
+    DESTINATION ${test_bin_dir}/../test
+    FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ
+      GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+
+  file(
+    REMOVE
+    ${test_bin_dir}/check-swift-${component_suffix}.sh
+  )
+
+endfunction()
+
 set(LIT "${LLVM_MAIN_SRC_DIR}/utils/lit/lit.py")
 
 # Incremental mode in lit orders test files by the last modification time
@@ -434,6 +467,10 @@ _Block_release(void) { }\n")
             PROPERTY FOLDER "Tests/check-swift")
       endforeach()
     endforeach()
+
+    write_component_test_script("${test_bin_dir}" "irgen" "IRGen" )
+    write_component_test_script("${test_bin_dir}" "silgen" "SILGen")
+    write_component_test_script("${test_bin_dir}" "typecheck" "Sema")
   endforeach()
   endforeach()
 endforeach()
