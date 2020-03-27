@@ -33,20 +33,6 @@
 
 using namespace swift;
 
-/// Return the protocol requirement with the specified name.
-/// TODO: Move function to shared place for use with other derived conformances.
-static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
-  auto lookup = proto->lookupDirect(name);
-  // Erase declarations that are not protocol requirements.
-  // This is important for removing default implementations of the same name.
-  llvm::erase_if(lookup, [](ValueDecl *v) {
-    return !isa<ProtocolDecl>(v->getDeclContext()) ||
-           !v->isProtocolRequirement();
-  });
-  assert(lookup.size() <= 1 && "Ambiguous protocol requirement");
-  return lookup.front();
-}
-
 /// Get the stored properties of a nominal type that are relevant for
 /// differentiation, except the ones tagged `@noDerivative`.
 static void
@@ -654,8 +640,11 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // The implicit memberwise constructor must be explicitly created so that it
   // can called in `AdditiveArithmetic` and `Differentiable` methods. Normally,
   // the memberwise constructor is synthesized during SILGen, which is too late.
+#if 0
   auto *initDecl = createMemberwiseImplicitConstructor(C, structDecl);
   structDecl->addMember(initDecl);
+  (void)structDecl->getEffectiveMemberwiseInitializer();
+#endif
 
   // After memberwise initializer is synthesized, mark members as implicit.
   for (auto *member : structDecl->getStoredProperties())

@@ -2355,7 +2355,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
   case MatchKind::MissingDifferentiableAttr: {
-    auto witness = match.Witness;
+    auto *witness = match.Witness;
     // Emit a note and fix-it showing the missing requirement `@differentiable`
     // attribute.
     auto *reqAttr = cast<DifferentiableAttr>(match.UnmetAttribute);
@@ -5591,41 +5591,34 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::Decodable:
     return derived.deriveDecodable(Requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::KeyPathIterable:
-    return derived.deriveKeyPathIterable(Requirement);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::TensorArrayProtocol:
-    return derived.deriveTensorArrayProtocol(Requirement);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::TensorGroup:
-    return derived.deriveTensorGroup(Requirement);
-
-  // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::AdditiveArithmetic:
     return derived.deriveAdditiveArithmetic(Requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::KeyPathIterable:
+    return derived.deriveKeyPathIterable(Requirement);
+
+  case KnownProtocolKind::TensorArrayProtocol:
+    return derived.deriveTensorArrayProtocol(Requirement);
+
+  case KnownProtocolKind::TensorGroup:
+    return derived.deriveTensorGroup(Requirement);
+
   case KnownProtocolKind::PointwiseMultiplicative:
     return derived.derivePointwiseMultiplicative(Requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::ElementaryFunctions:
     return derived.deriveElementaryFunctions(Requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::VectorProtocol:
     return derived.deriveVectorProtocol(Requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::EuclideanDifferentiable:
     return derived.deriveEuclideanDifferentiable(Requirement);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   default:
     return nullptr;

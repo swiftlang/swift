@@ -3490,16 +3490,6 @@ public:
   /// Retrieve information about this type as a property wrapper.
   PropertyWrapperTypeInfo getPropertyWrapperTypeInfo() const;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Get effective memberwise initializer for the given nominal type, if it
-  /// exists: either a synthesized memberwise initializer or a user-defined
-  /// initializer with the same signature.
-  ConstructorDecl *getEffectiveMemberwiseInitializer();
-
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Add `@_fixed_layout` attribute to the nominal type, if possible.
-  void addFixedLayoutAttr();
-
 private:
   /// Predicate used to filter StoredPropertyRange.
   struct ToStoredProperty {
@@ -3539,6 +3529,32 @@ public:
   /// Retrieves the synthesized memberwise initializer for this declaration,
   /// or \c nullptr if it does not have one.
   ConstructorDecl *getMemberwiseInitializer() const;
+
+  /// Retrieves the effective memberwise initializer for this declaration, or
+  /// \c nullptr if it does not have one.
+  ///
+  /// An effective memberwise initializer is either a synthesized memberwise
+  /// initializer or a user-defined initializer with the same type.
+  ///
+  /// The access level of the memberwise initializer is set to the minimum of:
+  /// - Public, by default. This enables public nominal types to have public
+  ///   memberwise initializers.
+  ///   - The `public` default is important for synthesized member types, e.g.
+  ///     `TangentVector` structs synthesized during `Differentiable` derived
+  ///     conformances. Manually extending these types to define a public
+  ///     memberwise initializer causes a redeclaration error.
+  /// - The minimum access level of memberwise-initialized properties in the
+  ///   nominal type declaration.
+  ///
+  /// Effective memberwise initializers are used only by derived conformances
+  /// for `Self`-returning protocol requirements like `AdditiveArithmetic.+`.
+  /// Such derived conformances require memberwise initialization.
+  ConstructorDecl *getEffectiveMemberwiseInitializer();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Add `@_fixed_layout` attribute to the nominal type, if possible.
+  void addFixedLayoutAttr();
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Whether this declaration has a synthesized zero parameter default
   /// initializer.

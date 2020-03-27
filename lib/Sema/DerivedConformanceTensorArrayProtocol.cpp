@@ -50,20 +50,6 @@ bool DerivedConformance::canDeriveTensorArrayProtocol(NominalTypeDecl *nominal,
 }
 
 // Return the protocol requirement with the specified name.
-static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
-  auto lookup = proto->lookupDirect(name);
-  lookup.erase(std::remove_if(lookup.begin(), lookup.end(),
-                              [](ValueDecl *v) {
-                                return !isa<ProtocolDecl>(
-                                           v->getDeclContext()) ||
-                                       !v->isProtocolRequirement();
-                              }),
-               lookup.end());
-  assert(lookup.size() == 1 && "Ambiguous protocol requirement");
-  return lookup.front();
-}
-
-// Return the protocol requirement with the specified name.
 static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, DeclName name) {
   auto lookup = proto->lookupDirect(name);
   lookup.erase(std::remove_if(lookup.begin(), lookup.end(),

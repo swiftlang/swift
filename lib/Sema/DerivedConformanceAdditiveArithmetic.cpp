@@ -13,6 +13,12 @@
 // This file implements explicit derivation of the AdditiveArithmetic protocol
 // for struct types.
 //
+// Currently, this is gated by a frontend flag:
+// `-enable-experimental-additive-arithmetic-derivation`.
+//
+// Swift Evolution pitch thread:
+// https://forums.swift.org/t/additivearithmetic-conformance-synthesis-for-structs/26159
+//
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
@@ -47,30 +53,13 @@ static StringRef getMathOperatorName(MathOperator op) {
   }
 }
 
-// Return the protocol requirement with the specified name.
-// TODO: Move function to shared place for use with other derived conformances.
-static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
-  auto lookup = proto->lookupDirect(name);
-  // Erase declarations that are not protocol requirements.
-  // This is important for removing default implementations of the same name.
-  llvm::erase_if(lookup, [](ValueDecl *v) {
-    return !isa<ProtocolDecl>(v->getDeclContext()) ||
-           !v->isProtocolRequirement();
-  });
-  assert(lookup.size() == 1 && "Ambiguous protocol requirement");
-  return lookup.front();
-}
-
-// Return true if given nominal type has a `let` stored with an initial value.
-// TODO: Move function to shared place for use with other derived conformances.
-static bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
-  return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
-    return v->isLet() && v->hasInitialValue();
-  });
-}
-
 bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
                                                      DeclContext *DC) {
+  // Experimental `AdditiveArithmetic` derivation must be enabled.
+  auto &ctx = nominal->getASTContext();
+  if (!ctx.LangOpts.EnableExperimentalAdditiveArithmeticDerivedConformances &&
+      !ctx.LangOpts.EnableExperimentalDifferentiableProgramming)
+    return false;
   // Nominal type must be a struct. (No stored properties is okay.)
   auto *structDecl = dyn_cast<StructDecl>(nominal);
   if (!structDecl)
@@ -213,7 +202,7 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
     auto op = (MathOperator) reinterpret_cast<intptr_t>(ctx);
     return deriveBodyMathOperator(funcDecl, op);
   };
-  operatorDecl->setBodySynthesizer(bodySynthesizer, (void *) op);
+  operatorDecl->setBodySynthesizer(bodySynthesizer, (void *)op);
   operatorDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
@@ -254,10 +243,10 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
       auto *selfDRE =
           new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
       memberExpr =
-         new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
-                               /*Implicit*/ true);
+          new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
+                                /*Implicit*/ true);
     }
-    auto module = nominal->getModuleContext();
+    auto *module = nominal->getModuleContext();
     auto confRef = module->lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to `AdditiveArithmetic`");
     // If conformance reference is not concrete, then concrete witness
@@ -269,7 +258,7 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
     }
     // Otherwise, return reference to concrete witness declaration.
     auto conf = confRef.getConcrete();
-    auto witnessDecl = conf->getWitnessDecl(reqDecl);
+    auto *witnessDecl = conf->getWitnessDecl(reqDecl);
     return new (C) MemberRefExpr(memberExpr, SourceLoc(), witnessDecl,
                                  DeclNameLoc(), /*Implicit*/ true);
   };
@@ -319,8 +308,8 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   auto *getterDecl =
       derived.addGetterToReadOnlyDerivedProperty(propDecl, returnTy);
   getterDecl->setBodySynthesizer(deriveBodyAdditiveArithmetic_zero, nullptr);
-  derived.addMembersToConformanceContext({propDecl, pbDecl});
 
+  derived.addMembersToConformanceContext({propDecl, pbDecl});
   return propDecl;
 }
 
@@ -329,8 +318,6 @@ DerivedConformance::deriveAdditiveArithmetic(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  // Create memberwise initializer for nominal type if it doesn't already exist.
-  getOrCreateEffectiveMemberwiseInitializer(Context, Nominal);
   if (requirement->getBaseName() == Context.getIdentifier("+"))
     return deriveMathOperator(*this, Add);
   if (requirement->getBaseName() == Context.getIdentifier("-"))

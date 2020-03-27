@@ -60,24 +60,11 @@ Expr *buildSelfReference(VarDecl *selfDecl,
 Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                   ASTContext &ctx);
 
-ConstructorDecl *createMemberwiseImplicitConstructor(ASTContext &ctx,
-                                                     NominalTypeDecl *decl);
+/// Returns the protocol requirement with the specified name.
+ValueDecl *getProtocolRequirement(ProtocolDecl *protocol, Identifier name);
 
-// SWIFT_ENABLE_TENSORFLOW
-// Get the effective memberwise initializer of the given nominal type, or create
-// it if it does not exist.
-// Sets the access level of the memberwise initializer to the minimum of:
-// - Public, by default. This enables public nominal types to have public
-//   memberwise initializers.
-//   - NOTE(TF-1077): The `public` default is important for `TangentVector`
-//     structs synthesized during `Differentiable` derived conformances.
-//     Manually extending `TangentVector` structs to define a public
-//     memberwise initializer causes a redeclaration error.
-// - The access level of each memberwise-initialized property in the nominal
-//   type declaration.
-ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
-    ASTContext &ctx, NominalTypeDecl *nominal);
-// SWIFT_ENABLE_TENSORFLOW END
+// Returns true if given nominal type has a `let` stored with an initial value.
+bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal);
 
 } // end namespace swift
 

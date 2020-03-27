@@ -66,7 +66,6 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveHashable(Nominal);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
@@ -74,33 +73,27 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*knownProtocol == KnownProtocolKind::PointwiseMultiplicative)
     return canDerivePointwiseMultiplicative(Nominal, DC);
 
-  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::ElementaryFunctions)
     return canDeriveElementaryFunctions(Nominal, DC);
 
-  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::KeyPathIterable)
     return canDeriveKeyPathIterable(Nominal);
 
-  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::TensorArrayProtocol)
     return canDeriveTensorArrayProtocol(Nominal, DC);
 
-  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::TensorGroup)
     return canDeriveTensorGroup(Nominal, DC);
 
-  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::VectorProtocol)
     return canDeriveVectorProtocol(Nominal, DC);
 
-  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::Differentiable)
     return canDeriveDifferentiable(Nominal, DC);
 
-  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::EuclideanDifferentiable)
     return canDeriveEuclideanDifferentiable(Nominal, DC);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
@@ -267,7 +260,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_intValue))
       return getRequirement(KnownProtocolKind::CodingKey);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // AdditiveArithmetic.zero
     if (name.isSimpleName(ctx.Id_zero))
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
@@ -277,35 +269,30 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_differentiableVectorView))
       return getRequirement(KnownProtocolKind::EuclideanDifferentiable);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // PointwiseMultiplicative.one
     if (name.isSimpleName(ctx.Id_one))
       return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // PointwiseMultiplicative.reciprocal
     if (name.isSimpleName(ctx.Id_reciprocal))
       return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // KeyPathIterable.allKeyPaths
     if (name.isSimpleName(ctx.Id_allKeyPaths))
       return getRequirement(KnownProtocolKind::KeyPathIterable);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // TensorArrayProtocol._tensorHandleCount
     if (name.isSimpleName(ctx.Id_tensorHandleCount))
       return getRequirement(KnownProtocolKind::TensorArrayProtocol);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // TensorArrayProtocol._typeList
     if (name.isSimpleName(ctx.Id_typeList) && !requirement->isStatic())
       return getRequirement(KnownProtocolKind::TensorArrayProtocol);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // TensorGroup._typeList
     if (name.isSimpleName(ctx.Id_typeList))
       return getRequirement(KnownProtocolKind::TensorGroup);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     return nullptr;
   }
@@ -317,6 +304,13 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     
     if (func->isOperator() && name.getBaseName() == "==")
       return getRequirement(KnownProtocolKind::Equatable);
+
+    // AdditiveArithmetic.+
+    // AdditiveArithmetic.-
+    if (func->isOperator() && name.getArgumentNames().size() == 2 &&
+        (name.getBaseName() == "+" || name.getBaseName() == "-")) {
+      return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+    }
 
     // Encodable.encode(to: Encoder)
     if (name.isCompoundName() && name.getBaseName() == ctx.Id_encode) {

@@ -495,20 +495,29 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
 // Experimental feature options
-def enable_experimental_differentiable_programming : Flag<["-"], "enable-experimental-differentiable-programming">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+def enable_experimental_differentiable_programming :
+  Flag<["-"], "enable-experimental-differentiable-programming">,
+  Flags<[FrontendOption]>,
   HelpText<"Enable experimental differentiable programming features">;
 
 // SWIFT_ENABLE_TENSORFLOW
-def enable_experimental_cross_file_derivative_registration : Flag<["-"], "enable-experimental-cross-file-derivative-registration">,
+// TODO(TF-1097): Remove this flag and always enable cross-file derivative registration.
+def enable_experimental_cross_file_derivative_registration :
+  Flag<["-"], "enable-experimental-cross-file-derivative-registration">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental cross-file derivative registration">;
 
 // NOTE: This flag will be removed when JVP/differential generation is robust.
-def enable_experimental_forward_mode_differentiation : Flag<["-"], "enable-experimental-forward-mode-differentiation">,
+def enable_experimental_forward_mode_differentiation :
+  Flag<["-"], "enable-experimental-forward-mode-differentiation">,
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental forward mode differentiation">;
 // SWIFT_ENABLE_TENSORFLOW END
+
+def enable_experimental_additive_arithmetic_derivation :
+  Flag<["-"], "enable-experimental-additive-arithmetic-derivation">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental 'AdditiveArithmetic' derived conformances">;
 
 def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,

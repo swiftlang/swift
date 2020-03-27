@@ -2686,6 +2686,8 @@ ERROR(cannot_synthesize_in_crossfile_extension,none,
       "implementation of %0 cannot be automatically synthesized in an extension "
       "in a different file to the type", (Type))
 
+ERROR(broken_additive_arithmetic_requirement,none,
+      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
 ERROR(broken_case_iterable_requirement,none,
       "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,
@@ -2715,8 +2717,6 @@ ERROR(broken_encodable_requirement,none,
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
 // SWIFT_ENABLE_TENSORFLOW
-ERROR(broken_additive_arithmetic_requirement,none,
-      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
 ERROR(broken_pointwise_multiplicative_requirement,none,
       "PointwiseMultiplicative protocol is broken: unexpected requirement", ())
 ERROR(broken_elementary_functions_requirement,none,
@@ -2744,6 +2744,7 @@ WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
       "an explicit '@noDerivative' attribute"
       "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
       (Identifier, Identifier, bool))
+// SWIFT_ENABLE_TENSORFLOW END
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))

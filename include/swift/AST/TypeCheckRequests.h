@@ -1600,6 +1600,31 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Resolves the effective memberwise initializer for a given type.
+///
+/// An effective memberwise initializer is either a synthesized memberwise
+/// initializer or a user-defined initializer with the same type.
+///
+/// See `NominalTypeDecl::getEffectiveMemberwiseInitializer` for details.
+class ResolveEffectiveMemberwiseInitRequest
+    : public SimpleRequest<ResolveEffectiveMemberwiseInitRequest,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
+                                             NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks whether this type has a synthesized zero parameter default
 /// initializer.
 class HasDefaultInitRequest

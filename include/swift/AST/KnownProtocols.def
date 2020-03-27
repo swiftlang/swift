@@ -79,6 +79,14 @@ PROTOCOL(CodingKey)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 
+PROTOCOL_(ObjectiveCBridgeable)
+PROTOCOL_(DestructorSafeContainer)
+
+PROTOCOL(StringInterpolationProtocol)
+
+PROTOCOL(AdditiveArithmetic)
+PROTOCOL(Differentiable)
+
 // SWIFT_ENABLE_TENSORFLOW
 PROTOCOL(PointwiseMultiplicative)
 PROTOCOL(ElementaryFunctions)
@@ -89,14 +97,6 @@ PROTOCOL(VectorProtocol)
 PROTOCOL(EuclideanDifferentiable)
 PROTOCOL(Expression)
 // SWIFT_ENABLE_TENSORFLOW END
-
-PROTOCOL_(ObjectiveCBridgeable)
-PROTOCOL_(DestructorSafeContainer)
-
-PROTOCOL(StringInterpolationProtocol)
-
-PROTOCOL(AdditiveArithmetic)
-PROTOCOL(Differentiable)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)
