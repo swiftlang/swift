@@ -2350,11 +2350,33 @@ void IRGenSILFunction::visitTryApplyInst(swift::TryApplyInst *i) {
 }
 
 void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
-  const LoweredValue &calleeLV = getLoweredValue(site.getCallee());
-  
   auto origCalleeType = site.getOrigCalleeType();
   auto substCalleeType = site.getSubstCalleeType();
-  
+  if (site.getOrigCalleeType()->isDifferentiable()) {
+    origCalleeType = origCalleeType->getWithoutDifferentiability();
+    substCalleeType = substCalleeType->getWithoutDifferentiability();
+  }
+
+  // If the callee is a differentiable function, we extract the original
+  // function because we want to call the original function.
+  Optional<LoweredValue> diffCalleeOrigFnLV;
+  if (site.getOrigCalleeType()->isDifferentiable()) {
+    auto diffFnExplosion = getLoweredExplosion(site.getCallee());
+    Explosion origFnExplosion;
+    unsigned fieldSize = 1;
+    if (origCalleeType->getRepresentation() ==
+        SILFunctionTypeRepresentation::Thick) {
+      fieldSize = 2;
+    }
+    origFnExplosion.add(diffFnExplosion.getRange(0, 0 + fieldSize));
+    (void)diffFnExplosion.claimAll();
+    diffCalleeOrigFnLV = LoweredValue(origFnExplosion);
+  }
+
+  const LoweredValue &calleeLV =
+      diffCalleeOrigFnLV ? *diffCalleeOrigFnLV :
+                            getLoweredValue(site.getCallee());
+
   auto args = site.getArguments();
   SILFunctionConventions origConv(origCalleeType, getSILModule());
   assert(origConv.getNumSILArguments() == args.size());
@@ -4542,11 +4564,15 @@ void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     swift::ConvertEscapeToNoEscapeInst *i) {
   // This instruction makes the context trivial.
   Explosion in = getLoweredExplosion(i->getOperand());
-  llvm::Value *fn = in.claimNext();
-  llvm::Value *ctx = in.claimNext();
   Explosion out;
-  out.add(fn);
-  out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
+  // Differentiable functions contain multiple pairs of fn and ctx pointer.
+  for (unsigned index : range(in.size() / 2)) {
+    (void)index;
+    llvm::Value *fn = in.claimNext();
+    llvm::Value *ctx = in.claimNext();
+    out.add(fn);
+    out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
+  }
   setLoweredExplosion(i, out);
 }
 
