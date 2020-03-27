@@ -5066,7 +5066,8 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   // `TangentVector` associated type.
   auto *differentiableProtocol =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  assert(differentiableProtocol && "`Differentiable` protocol not found");
+  if (!differentiableProtocol)
+    return cache(None);
   auto associatedTypeLookup =
       differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
   assert(associatedTypeLookup.size() == 1);
