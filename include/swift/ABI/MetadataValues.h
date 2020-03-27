@@ -764,6 +764,14 @@ enum class FunctionMetadataConvention: uint8_t {
   CFunctionPointer = 3,
 };
 
+/// Differentiability kind for function type metadata.
+/// Duplicates `DifferentiabilityKind` in AutoDiff.h.
+enum class FunctionMetadataDifferentiabilityKind: uint8_t {
+  NonDifferentiable = 0b00,
+  Normal = 0b01,
+  Linear = 0b11
+};
+
 /// Flags in a function type metadata record.
 template <typename int_type>
 class TargetFunctionTypeFlags {
@@ -777,6 +785,8 @@ class TargetFunctionTypeFlags {
     ThrowsMask        = 0x01000000U,
     ParamFlagsMask    = 0x02000000U,
     EscapingMask      = 0x04000000U,
+    DifferentiableMask  = 0x08000000U,
+    LinearMask          = 0x10000000U
   };
   int_type Data;
   
@@ -799,6 +809,16 @@ public:
   withThrows(bool throws) const {
     return TargetFunctionTypeFlags<int_type>((Data & ~ThrowsMask) |
                                              (throws ? ThrowsMask : 0));
+  }
+
+  constexpr TargetFunctionTypeFlags<int_type> withDifferentiabilityKind(
+      FunctionMetadataDifferentiabilityKind differentiability) const {
+    return TargetFunctionTypeFlags<int_type>(
+        (Data & ~DifferentiableMask & ~LinearMask) |
+        (differentiability == FunctionMetadataDifferentiabilityKind::Normal
+             ? DifferentiableMask : 0) |
+        (differentiability == FunctionMetadataDifferentiabilityKind::Linear
+             ? LinearMask : 0));
   }
 
   constexpr TargetFunctionTypeFlags<int_type>
@@ -829,6 +849,19 @@ public:
 
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }
 
+  bool isDifferentiable() const {
+    return getDifferentiabilityKind() >=
+        FunctionMetadataDifferentiabilityKind::Normal;
+  }
+
+  FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
+    if (bool(Data & DifferentiableMask))
+      return FunctionMetadataDifferentiabilityKind::Normal;
+    if (bool(Data & LinearMask))
+      return FunctionMetadataDifferentiabilityKind::Linear;
+    return FunctionMetadataDifferentiabilityKind::NonDifferentiable;
+  }
+
   int_type getIntValue() const {
     return Data;
   }
@@ -849,9 +882,10 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 template <typename int_type>
 class TargetParameterTypeFlags {
   enum : int_type {
-    ValueOwnershipMask = 0x7F,
-    VariadicMask       = 0x80,
-    AutoClosureMask    = 0x100,
+    ValueOwnershipMask    = 0x7F,
+    VariadicMask          = 0x80,
+    AutoClosureMask       = 0x100,
+    NoDerivativeMask      = 0x200
   };
   int_type Data;
 
@@ -881,6 +915,7 @@ public:
   bool isNone() const { return Data == 0; }
   bool isVariadic() const { return Data & VariadicMask; }
   bool isAutoClosure() const { return Data & AutoClosureMask; }
+  bool isNoDerivative() const { return Data & NoDerivativeMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);
