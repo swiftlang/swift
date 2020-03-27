@@ -821,7 +821,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
-  Opts.EnableEducationalNotes |= Args.hasArg(OPT_enable_educational_notes);
+  Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
   Opts.EnableExperimentalFormatting |=
       Args.hasArg(OPT_enable_experimental_diagnostic_formatting);
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {

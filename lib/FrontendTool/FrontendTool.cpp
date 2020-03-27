@@ -2150,6 +2150,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (Invocation.getDiagnosticOptions().UseColor)
     PDC.forceColors();
 
+  PDC.setPrintEducationalNotes(
+      Invocation.getDiagnosticOptions().PrintEducationalNotes);
+
   // Temporarily stage the new diagnostic formatting style behind
   // -enable-descriptive-diagnostics
   if (Invocation.getDiagnosticOptions().EnableExperimentalFormatting)
