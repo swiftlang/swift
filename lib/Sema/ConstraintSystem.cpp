@@ -4369,9 +4369,6 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
   auto &ctx = getASTContext();
 
-  if (ctx.LangOpts.DisableAvailabilityChecking)
-    return false;
-
   // First check whether this declaration is universally unavailable.
   if (D->getAttrs().isUnavailable(ctx))
     return true;
@@ -4384,8 +4381,8 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
   }
 
   // If not, let's check contextual unavailability.
-  AvailabilityContext result = AvailabilityContext::alwaysAvailable();
-  return !TypeChecker::isDeclAvailable(D, loc, DC, result);
+  auto result = TypeChecker::checkDeclarationAvailability(D, loc, DC);
+  return result.hasValue();
 }
 
 /// If we aren't certain that we've emitted a diagnostic, emit a fallback
