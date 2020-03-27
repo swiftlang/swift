@@ -3421,56 +3421,10 @@ public:
                              IncludeInstanceMembers);
   }
 
-  template <typename T>
-  void collectOperatorsFromMap(SourceFile::OperatorMap<T> &map,
-                               bool includePrivate,
-                               std::vector<OperatorDecl *> &results) {
-    for (auto &pair : map) {
-      if (pair.second.getPointer() &&
-          (pair.second.getInt() || includePrivate)) {
-        results.push_back(pair.second.getPointer());
-      }
-    }
-  }
-
-  void collectOperatorsFrom(SourceFile *SF,
-                            std::vector<OperatorDecl *> &results) {
-    bool includePrivate = CurrDeclContext->getParentSourceFile() == SF;
-    collectOperatorsFromMap(SF->PrefixOperators, includePrivate, results);
-    collectOperatorsFromMap(SF->PostfixOperators, includePrivate, results);
-    collectOperatorsFromMap(SF->InfixOperators, includePrivate, results);
-  }
-
-  void collectOperatorsFrom(LoadedFile *F,
-                            std::vector<OperatorDecl *> &results) {
-    SmallVector<Decl *, 64> topLevelDecls;
-    F->getTopLevelDecls(topLevelDecls);
-    for (auto D : topLevelDecls) {
-      if (auto op = dyn_cast<OperatorDecl>(D))
-        results.push_back(op);
-    }
-  }
-
-  std::vector<OperatorDecl *> collectOperators() {
-    std::vector<OperatorDecl *> results;
+  void collectOperators(SmallVectorImpl<OperatorDecl *> &results) {
     assert(CurrDeclContext);
-    for (auto import : namelookup::getAllImports(CurrDeclContext)) {
-      for (auto fileUnit : import.second->getFiles()) {
-        switch (fileUnit->getKind()) {
-        case FileUnitKind::Builtin:
-        case FileUnitKind::ClangModule:
-        case FileUnitKind::DWARFModule:
-          continue;
-        case FileUnitKind::Source:
-          collectOperatorsFrom(cast<SourceFile>(fileUnit), results);
-          break;
-        case FileUnitKind::SerializedAST:
-          collectOperatorsFrom(cast<LoadedFile>(fileUnit), results);
-          break;
-        }
-      }
-    }
-    return results;
+    for (auto import : namelookup::getAllImports(CurrDeclContext))
+      import.second->getOperatorDecls(results);
   }
 
   void addPostfixBang(Type resultType) {
@@ -3618,7 +3572,8 @@ public:
 
     Expr *foldedExpr = typeCheckLeadingSequence(LHS, leadingSequence);
 
-    std::vector<OperatorDecl *> operators = collectOperators();
+    SmallVector<OperatorDecl *, 16> operators;
+    collectOperators(operators);
     // FIXME: this always chooses the first operator with the given name.
     llvm::DenseSet<Identifier> seenPostfixOperators;
     llvm::DenseSet<Identifier> seenInfixOperators;

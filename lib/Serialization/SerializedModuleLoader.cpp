@@ -1185,6 +1185,11 @@ void SerializedASTFile::getTopLevelDeclsWhereAttributesMatch(
   File.getTopLevelDecls(results, matchAttributes);
 }
 
+void SerializedASTFile::getOperatorDecls(
+    SmallVectorImpl<OperatorDecl *> &results) const {
+  File.getOperatorDecls(results);
+}
+
 void SerializedASTFile::getPrecedenceGroups(
        SmallVectorImpl<PrecedenceGroupDecl*> &results) const {
   File.getPrecedenceGroups(results);

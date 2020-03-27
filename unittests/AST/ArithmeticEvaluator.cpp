@@ -107,12 +107,12 @@ struct EvaluationRule
 
       // Evaluate the left- and right-hand sides.
       auto lhsValue = evalOrNaN(evaluator, Derived{binary->lhs});
-      if (lhsValue != lhsValue) {
+      if (std::isnan(lhsValue)) {
         brokeCycle = true;
         return lhsValue;
       }
       auto rhsValue = evalOrNaN(evaluator, Derived{binary->rhs});
-      if (rhsValue != rhsValue) {
+      if (std::isnan(rhsValue)) {
         brokeCycle = true;
         return rhsValue;
       }
