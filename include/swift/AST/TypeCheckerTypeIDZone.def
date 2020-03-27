@@ -29,6 +29,9 @@ SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CallerSideDefaultArgExprRequest,
               Expr *(DefaultArgumentExpr *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
+              evaluator::SideEffect(ValueDecl *),
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,

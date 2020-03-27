@@ -2209,6 +2209,27 @@ private:
   evaluate(Evaluator &evaluator, const DeclContext *DC) const;
 };
 
+class CheckRedeclarationRequest :
+    public SimpleRequest<CheckRedeclarationRequest,
+                         evaluator::SideEffect (ValueDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+ private:
+  friend SimpleRequest;
+
+   // Evaluation.
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+
+ public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

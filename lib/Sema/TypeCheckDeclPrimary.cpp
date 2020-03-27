@@ -479,24 +479,18 @@ static void checkRedeclaration(PrecedenceGroupDecl *group) {
 }
 
 /// Check whether \c current is a redeclaration.
-static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
-  // If we've already checked this declaration, don't do it again.
-  if (current->alreadyCheckedRedeclaration())
-    return;
-
-  // Make sure we don't do this checking again.
-  current->setCheckedRedeclaration(true);
-
+evaluator::SideEffect
+CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   // Ignore invalid and anonymous declarations.
   if (current->isInvalid() || !current->hasName())
-    return;
+    return std::make_tuple<>();
 
   // If this declaration isn't from a source file, don't check it.
   // FIXME: Should restrict this to the source file we care about.
   DeclContext *currentDC = current->getDeclContext();
   SourceFile *currentFile = currentDC->getParentSourceFile();
   if (!currentFile || currentDC->isLocalContext())
-    return;
+    return std::make_tuple<>();
 
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
   bool isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
@@ -525,6 +519,7 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
   OverloadSignature currentSig = current->getOverloadSignature();
   CanType currentSigType = current->getOverloadSignatureType();
   ModuleDecl *currentModule = current->getModuleContext();
+  auto &ctx = current->getASTContext();
   for (auto other : otherDefinitions) {
     // Skip invalid declarations and ourselves.
     //
@@ -726,10 +721,11 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
       // set this at the beginning of the function, but we might have swapped
       // the decls for diagnostics; so ensure we also set this for the actual
       // decl we diagnosed on.
-      current->setCheckedRedeclaration(true);
+      current->setCheckedRedeclaration();
       break;
     }
   }
+  return std::make_tuple<>();
 }
 
 static Optional<unsigned>
@@ -1250,10 +1246,12 @@ public:
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       auto &Context = getASTContext();
       TypeChecker::checkForForbiddenPrefix(Context, VD->getBaseName());
-      
-      checkRedeclaration(Context, VD);
 
       // Force some requests, which can produce diagnostics.
+
+      // Check redeclaration.
+      (void) evaluateOrDefault(decl->getASTContext().evaluator,
+                               CheckRedeclarationRequest{VD}, {});
 
       // Compute access level.
       (void) VD->getFormalAccess();
