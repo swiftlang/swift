@@ -1200,8 +1200,16 @@ ERROR(c_function_pointer_from_method,none,
 ERROR(c_function_pointer_from_generic_function,none,
       "a C function pointer cannot be formed from a reference to a generic "
       "function", ())
+ERROR(unsupported_linear_to_differentiable_conversion,none,
+      "conversion from '@differentiable(linear)' to '@differentiable' is not "
+      "yet supported", ())
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
+ERROR(invalid_differentiable_function_conversion_expr,none,
+      "a '@differentiable%select{|(linear)}0' function can only be formed from "
+      "a reference to a 'func' or a literal closure", (bool))
+NOTE(invalid_differentiable_function_conversion_parameter,none,
+     "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_pointer_conversion,none,
       "cannot perform pointer conversion of value of type %0 to autoclosure "
       "result type %1",
@@ -4016,6 +4024,18 @@ ERROR(opaque_type_in_protocol_requirement,none,
 ERROR(attr_only_on_parameters_of_differentiable,none,
       "'%0' may only be used on parameters of '@differentiable' function "
       "types", (StringRef))
+ERROR(differentiable_function_type_invalid_parameter,none,
+      "parameter type '%0' does not conform to 'Differentiable'"
+      "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
+      "function type is '@differentiable%select{|(linear)}1'"
+      "%select{|; did you want to add '@noDerivative' to this parameter?}2",
+      (StringRef, /*tangentVectorEqualsSelf*/ bool,
+       /*hasValidDifferentiabilityParameter*/ bool))
+ERROR(differentiable_function_type_invalid_result,none,
+      "result type '%0' does not conform to 'Differentiable'"
+      "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
+      "function type is '@differentiable%select{|(linear)}1'",
+      (StringRef, bool))
 
 // SIL
 ERROR(opened_non_protocol,none,

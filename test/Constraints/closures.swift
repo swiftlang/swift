@@ -921,14 +921,6 @@ func test_trailing_closure_with_defaulted_last() {
   func foo<T>(fn: () -> T, value: Int = 0) {}
   foo { 42 } // Ok
   foo(fn: { 42 }) // Ok
-
-  func bar<T>(type: T.Type, fn: T, a: Int = 0) {}
-  bar(type: (() -> Int).self) { 42 }
-  bar(type: (() -> Int).self, fn: { 42 })
-
-  func baz(fn: () -> Int, a: Int = 0, b: Int = 0, c: Int = 0) {}
-  baz { 42 }
-  baz(fn: { 42 })
 }
 
 // Test that even in multi-statement closure case we still pick up `(Action) -> Void` over `Optional<(Action) -> Void>`.
