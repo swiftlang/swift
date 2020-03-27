@@ -351,6 +351,10 @@ private:
     case Node::Kind::DependentPseudogenericSignature:
     case Node::Kind::Destructor:
     case Node::Kind::DidSet:
+    case Node::Kind::DifferentiableFunctionType:
+    case Node::Kind::EscapingDifferentiableFunctionType:
+    case Node::Kind::LinearFunctionType:
+    case Node::Kind::EscapingLinearFunctionType:
     case Node::Kind::DirectMethodReferenceAttribute:
     case Node::Kind::Directness:
     case Node::Kind::DynamicAttribute:
@@ -386,6 +390,8 @@ private:
     case Node::Kind::Index:
     case Node::Kind::IVarInitializer:
     case Node::Kind::IVarDestroyer:
+    case Node::Kind::ImplDifferentiable:
+    case Node::Kind::ImplLinear:
     case Node::Kind::ImplEscaping:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplFunctionAttribute:
@@ -1234,6 +1240,22 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "@convention(thin) ";
     printFunctionType(nullptr, Node);
     return nullptr;
+  case Node::Kind::DifferentiableFunctionType:
+    Printer << "@differentiable ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  case Node::Kind::EscapingDifferentiableFunctionType:
+    Printer << "@escaping @differentiable ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  case Node::Kind::LinearFunctionType:
+    Printer << "@differentiable(linear) ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  case Node::Kind::EscapingLinearFunctionType:
+    Printer << "@escaping @differentiable(linear) ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
   case Node::Kind::FunctionType:
   case Node::Kind::UncurriedFunctionType:
     printFunctionType(nullptr, Node);
@@ -2026,6 +2048,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::LabelList:
     return nullptr;
+  case Node::Kind::ImplDifferentiable:
+    Printer << "@differentiable";
+    return nullptr;
+  case Node::Kind::ImplLinear:
+    Printer << "@differentiable(linear)";
+    return nullptr;
   case Node::Kind::ImplEscaping:
     Printer << "@escaping";
     return nullptr;
@@ -2527,6 +2555,14 @@ void NodePrinter::printEntityType(NodePointer Entity, NodePointer type,
         Printer << ' ';
       type = dependentType->getFirstChild();
     }
+    if (type->getKind() == Node::Kind::DifferentiableFunctionType)
+      Printer << "@differentiable ";
+    else if (type->getKind() == Node::Kind::EscapingDifferentiableFunctionType)
+      Printer << "@escaping @differentiable ";
+    else if (type->getKind() == Node::Kind::LinearFunctionType)
+      Printer << "@differentiable(linear) ";
+    else if (type->getKind() == Node::Kind::EscapingLinearFunctionType)
+      Printer << "@escaping @differentiable(linear) ";
     printFunctionType(labelList, type);
   } else {
     print(type);
