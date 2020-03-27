@@ -281,9 +281,9 @@ protocol Composition : P, Q {}
 struct S : Composition {}
 func getComposition() -> P & Q { return S() }
 reflect(any: getComposition())
-// CHECK-64: Mangled name: $s12existentials1P_AA1Qp
+// CHECK-64: Mangled name: $s12existentials1PP_AA1QPp
 // CHECK-64: Demangled name: existentials.P & existentials.Q
-// CHECK-32: Mangled name: $s12existentials1P_AA1Qp
+// CHECK-32: Mangled name: $s12existentials1PP_AA1QPp
 // CHECK-32: Demangled name: existentials.P & existentials.Q
 
 // Metatype:
