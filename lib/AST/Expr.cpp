@@ -349,13 +349,11 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(PointerToPointer, getSubExpr);
   PASS_THROUGH_REFERENCE(ForeignObjectConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(UnevaluatedInstance, getSubExpr);
-  // SWIFT_ENABLE_TENSORFLOW
   PASS_THROUGH_REFERENCE(DifferentiableFunction, getSubExpr);
   PASS_THROUGH_REFERENCE(LinearFunction, getSubExpr);
   PASS_THROUGH_REFERENCE(DifferentiableFunctionExtractOriginal, getSubExpr);
   PASS_THROUGH_REFERENCE(LinearFunctionExtractOriginal, getSubExpr);
   PASS_THROUGH_REFERENCE(LinearToDifferentiableFunction, getSubExpr);
-  // SWIFT_ENABLE_TENSORFLOW END
   PASS_THROUGH_REFERENCE(BridgeToObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
@@ -674,13 +672,11 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::PointerToPointer:
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
-  // SWIFT_ENABLE_TENSORFLOW
   case ExprKind::DifferentiableFunction:
   case ExprKind::LinearFunction:
   case ExprKind::DifferentiableFunctionExtractOriginal:
   case ExprKind::LinearFunctionExtractOriginal:
   case ExprKind::LinearToDifferentiableFunction:
-  // SWIFT_ENABLE_TENSORFLOW END
   case ExprKind::EnumIsCase:
   case ExprKind::ConditionalBridgeFromObjC:
   case ExprKind::BridgeFromObjC:

@@ -1201,19 +1201,16 @@ ERROR(c_function_pointer_from_method,none,
 ERROR(c_function_pointer_from_generic_function,none,
       "a C function pointer cannot be formed from a reference to a generic "
       "function", ())
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-908): Remove this diagnostic once linear-to-differentiable conversion
-// is supported.
 ERROR(unsupported_linear_to_differentiable_conversion,none,
       "conversion from '@differentiable(linear)' to '@differentiable' is not "
       "yet supported", ())
+ERROR(invalid_autoclosure_forwarding,none,
+      "add () to forward @autoclosure parameter", ())
 ERROR(invalid_differentiable_function_conversion_expr,none,
       "a '@differentiable%select{|(linear)}0' function can only be formed from "
       "a reference to a 'func' or a literal closure", (bool))
 NOTE(invalid_differentiable_function_conversion_parameter,none,
      "did you mean to take a '%0' closure?", (StringRef))
-ERROR(invalid_autoclosure_forwarding,none,
-      "add () to forward @autoclosure parameter", ())
 ERROR(invalid_autoclosure_pointer_conversion,none,
       "cannot perform pointer conversion of value of type %0 to autoclosure "
       "result type %1",

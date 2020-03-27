@@ -2189,15 +2189,13 @@ public:
         ExtracteeType));
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   DifferentiableFunctionExtractInst *
   createDifferentiableFunctionExtractOriginal(SILLocation Loc,
-                                              SILValue Function) {
+                                              SILValue TheFunction) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
         getModule(), getSILDebugLocation(Loc),
-        NormalDifferentiableFunctionTypeComponent::Original, Function));
+        NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   LinearFunctionExtractInst *createLinearFunctionExtract(
       SILLocation Loc, LinearDifferentiableFunctionTypeComponent Extractee,

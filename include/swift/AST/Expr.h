@@ -2968,7 +2968,6 @@ public:
   }
 };
 
-// SWIFT_ENABLE_TENSORFLOW
 class DifferentiableFunctionExpr : public ImplicitConversionExpr {
 public:
   DifferentiableFunctionExpr(Expr *subExpr, Type ty)
@@ -3022,7 +3021,7 @@ public:
     return E->getKind() == ExprKind::LinearToDifferentiableFunction;
   }
 };
-// SWIFT_ENABLE_TENSORFLOW END
+
 
 /// Use an opaque type to abstract a value of the underlying concrete type.
 class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
