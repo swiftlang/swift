@@ -5,11 +5,6 @@
 
 // BCANALYZER-NOT: UnknownCode
 
-// SWIFT_ENABLE_TENSORFLOW
-// This test is enabled on `tensorflow` branch.
-// `@differentiable` attribute serialization does not yet work on `master`
-// branch only.
-
 import _Differentiation
 
 // Dummy `Differentiable`-conforming type.
