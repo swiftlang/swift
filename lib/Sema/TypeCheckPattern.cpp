@@ -723,8 +723,8 @@ static TypeResolutionOptions applyContextualPatternOptions(
   return options;
 }
 
-llvm::Expected<Type> PatternTypeRequest::evaluate(
-    Evaluator &evaluator, ContextualPattern pattern) const {
+Type PatternTypeRequest::evaluate(Evaluator &evaluator,
+                                  ContextualPattern pattern) const {
   Pattern *P = pattern.getPattern();
   DeclContext *dc = pattern.getDeclContext();
 

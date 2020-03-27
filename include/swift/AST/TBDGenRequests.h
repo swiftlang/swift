@@ -92,8 +92,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<TBDFileAndSymbols> evaluate(Evaluator &evaluator,
-                                             TBDGenDescriptor desc) const;
+  TBDFileAndSymbols evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
 };
 
 /// Report that a request of the given kind is being evaluated, so it

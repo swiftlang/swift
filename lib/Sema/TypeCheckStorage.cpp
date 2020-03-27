@@ -115,7 +115,7 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
   }
 }
 
-llvm::Expected<ArrayRef<VarDecl *>>
+ArrayRef<VarDecl *>
 StoredPropertiesRequest::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
   if (!hasStoredProperties(decl))
@@ -137,7 +137,7 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
-llvm::Expected<ArrayRef<Decl *>>
+ArrayRef<Decl *>
 StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
                                                    NominalTypeDecl *decl) const {
   if (!hasStoredProperties(decl))
@@ -164,7 +164,7 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
 }
 
 /// Validate the \c entryNumber'th entry in \c binding.
-llvm::Expected<const PatternBindingEntry *>
+const PatternBindingEntry *
 PatternBindingEntryRequest::evaluate(Evaluator &eval,
                                      PatternBindingDecl *binding,
                                      unsigned entryNumber) const {
@@ -288,7 +288,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   return &pbe;
 }
 
-llvm::Expected<bool>
+bool
 IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
   auto storageDC = storage->getDeclContext();
@@ -342,7 +342,7 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("bad impl kind");
 }
 
-llvm::Expected<bool>
+bool
 IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
   // By default, the setter is mutating if we have an instance member of a
@@ -415,7 +415,7 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("bad storage kind");
 }
 
-llvm::Expected<OpaqueReadOwnership>
+OpaqueReadOwnership
 OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
                                      AbstractStorageDecl *storage) const {
   return (storage->getAttrs().hasAttribute<BorrowedAttr>()
@@ -1878,7 +1878,7 @@ createModifyCoroutinePrototype(AbstractStorageDecl *storage,
   return createCoroutineAccessorPrototype(storage, AccessorKind::Modify, ctx);
 }
 
-llvm::Expected<AccessorDecl *>
+AccessorDecl *
 SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
                                     AbstractStorageDecl *storage,
                                     AccessorKind kind) const {
@@ -1906,7 +1906,7 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("Unhandled AccessorKind in switch");
 }
 
-llvm::Expected<bool>
+bool
 RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
                                          VarDecl *var) const {
   // Nameless vars from interface files should not have any accessors.
@@ -1953,7 +1953,7 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-llvm::Expected<bool>
+bool
 RequiresOpaqueModifyCoroutineRequest::evaluate(Evaluator &evaluator,
                                                AbstractStorageDecl *storage) const {
   // Only for mutable storage.
@@ -1997,7 +1997,7 @@ RequiresOpaqueModifyCoroutineRequest::evaluate(Evaluator &evaluator,
 /// If the storage is for a global stored property or a stored property of a
 /// resilient type, we are synthesizing accessors to present a resilient
 /// interface to the storage and they should not be transparent.
-llvm::Expected<bool>
+bool
 IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
                                        AccessorDecl *accessor) const {
   auto *storage = accessor->getStorage();
@@ -2114,7 +2114,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-llvm::Expected<VarDecl *>
+VarDecl *
 LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
                                      VarDecl *VD) const {
   assert(isa<SourceFile>(VD->getDeclContext()->getModuleScopeContext()));
@@ -2288,7 +2288,7 @@ getSetterMutatingness(VarDecl *var, DeclContext *dc) {
     : PropertyWrapperMutability::Nonmutating;
 }
 
-llvm::Expected<Optional<PropertyWrapperMutability>>
+Optional<PropertyWrapperMutability>
 PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
                                            VarDecl *var) const {
   VarDecl *originalVar = var;
@@ -2362,7 +2362,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
   return result;
 }
 
-llvm::Expected<PropertyWrapperBackingPropertyInfo>
+PropertyWrapperBackingPropertyInfo
 PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                                     VarDecl *var) const {
   // Determine the type of the backing property.
@@ -2750,7 +2750,7 @@ static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
   return StorageImplInfo(ReadImplKind::Stored, writeImpl, readWriteImpl);
 }
 
-llvm::Expected<StorageImplInfo>
+StorageImplInfo
 StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
   if (auto *param = dyn_cast<ParamDecl>(storage)) {

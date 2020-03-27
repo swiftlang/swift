@@ -41,8 +41,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<AccessLevel> evaluate(Evaluator &evaluator,
-                                       ValueDecl *decl) const;
+  AccessLevel evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Separate caching.
@@ -65,8 +64,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<AccessLevel>
-  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+  AccessLevel evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
   // Separate caching.
@@ -88,8 +86,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<DefaultAndMax>
-  evaluate(Evaluator &evaluator, ExtensionDecl *decl) const;
+  DefaultAndMax evaluate(Evaluator &evaluator, ExtensionDecl *decl) const;
 
 public:
   // Separate caching.

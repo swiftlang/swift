@@ -69,8 +69,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ide::ResolvedCursorInfo> evaluate(Evaluator &evaluator,
-    CursorInfoOwner CI) const;
+  ide::ResolvedCursorInfo evaluate(Evaluator &evaluator,
+                                   CursorInfoOwner CI) const;
 
 public:
   // Caching
@@ -130,8 +130,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ide::ResolvedRangeInfo> evaluate(Evaluator &evaluator,
-    RangeInfoOwner CI) const;
+  ide::ResolvedRangeInfo evaluate(Evaluator &evaluator,
+                                  RangeInfoOwner CI) const;
 
 public:
   // Caching
@@ -158,8 +158,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ArrayRef<ValueDecl*>> evaluate(Evaluator &evaluator,
-    ValueDecl* VD) const;
+  ArrayRef<ValueDecl*> evaluate(Evaluator &evaluator,
+                                ValueDecl* VD) const;
 
 public:
   // Caching
@@ -219,8 +219,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ArrayRef<ValueDecl*>> evaluate(Evaluator &evaluator,
-    OverridenDeclsOwner Owner) const;
+  ArrayRef<ValueDecl*> evaluate(Evaluator &evaluator,
+                                OverridenDeclsOwner Owner) const;
 
 public:
   // Caching
@@ -271,8 +271,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ProtocolDecl*> evaluate(Evaluator &evaluator,
-    ProtocolNameOwner Input) const;
+  ProtocolDecl *evaluate(Evaluator &evaluator,
+                         ProtocolNameOwner Input) const;
 
 public:
   // Caching

@@ -124,7 +124,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<std::unique_ptr<llvm::Module>>
+  std::unique_ptr<llvm::Module>
   evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
 
 public:
@@ -142,7 +142,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<std::unique_ptr<llvm::Module>>
+  std::unique_ptr<llvm::Module>
   evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
 
 public:

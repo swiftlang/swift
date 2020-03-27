@@ -1121,7 +1121,7 @@ ASTScopeImpl::expandAndBeCurrentDetectingRecursion(ScopeCreator &scopeCreator) {
                            ExpandASTScopeRequest{this, &scopeCreator}, nullptr);
 }
 
-llvm::Expected<ASTScopeImpl *>
+ASTScopeImpl *
 ExpandASTScopeRequest::evaluate(Evaluator &evaluator, ASTScopeImpl *parent,
                                 ScopeCreator *scopeCreator) const {
   auto *insertionPoint = parent->expandAndBeCurrent(*scopeCreator);

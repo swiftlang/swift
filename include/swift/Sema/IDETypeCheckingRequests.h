@@ -72,8 +72,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                DeclApplicabilityOwner Owner) const;
+  bool evaluate(Evaluator &evaluator, DeclApplicabilityOwner Owner) const;
 
 public:
   // Caching
@@ -170,8 +169,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                TypeRelationCheckInput Owner) const;
+  bool evaluate(Evaluator &evaluator, TypeRelationCheckInput Owner) const;
 
 public:
   // Caching
@@ -194,7 +192,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<TypePair> evaluate(Evaluator &evaluator, SubscriptDecl* SD) const;
+  TypePair evaluate(Evaluator &evaluator, SubscriptDecl* SD) const;
 
 public:
   // Caching
@@ -214,7 +212,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type> evaluate(Evaluator &evaluator, SubscriptDecl* SD) const {
+  Type evaluate(Evaluator &evaluator, SubscriptDecl* SD) const {
     return evaluateOrDefault(SD->getASTContext().evaluator,
       RootAndResultTypeOfKeypathDynamicMemberRequest{SD}, TypePair()).
         FirstTy;

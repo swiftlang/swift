@@ -101,7 +101,7 @@ void HasMissingDesignatedInitializersRequest::cacheResult(bool result) const {
   classDecl->setHasMissingDesignatedInitializers(result);
 }
 
-llvm::Expected<bool>
+bool
 HasMissingDesignatedInitializersRequest::evaluate(Evaluator &evaluator,
                                            ClassDecl *subject) const {
   // Short-circuit and check for the attribute here.

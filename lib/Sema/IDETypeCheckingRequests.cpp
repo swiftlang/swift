@@ -84,7 +84,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
                                          /*isExtension=*/false);
 }
 
-llvm::Expected<bool>
+bool
 IsDeclApplicableRequest::evaluate(Evaluator &evaluator,
                                   DeclApplicabilityOwner Owner) const {
   if (auto *VD = dyn_cast<ValueDecl>(Owner.ExtensionOrMember)) {
@@ -96,7 +96,7 @@ IsDeclApplicableRequest::evaluate(Evaluator &evaluator,
   }
 }
 
-llvm::Expected<bool>
+bool
 TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
                                    TypeRelationCheckInput Owner) const {
   Optional<constraints::ConstraintKind> CKind;
@@ -112,7 +112,7 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
                                              *CKind, Owner.DC);
 }
 
-llvm::Expected<TypePair>
+TypePair
 RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
                                               SubscriptDecl *subscript) const {
   if (!isValidKeyPathDynamicMemberLookup(subscript))

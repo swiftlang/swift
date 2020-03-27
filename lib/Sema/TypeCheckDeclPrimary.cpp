@@ -336,7 +336,7 @@ static void checkInheritanceClause(
 static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
   auto req =
     ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveCodingKeys};
-  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, false);
+  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
 }
 
 // Check for static properties that produce empty option sets
@@ -723,9 +723,8 @@ static void checkDefaultArguments(ParameterList *params) {
     (void)param->getTypeCheckedDefaultExpr();
 }
 
-llvm::Expected<Expr *>
-DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
-                                     ParamDecl *param) const {
+Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
+                                           ParamDecl *param) const {
   if (param->getDefaultArgumentKind() == DefaultArgumentKind::Inherited) {
     // Inherited default arguments don't have expressions, but we need to
     // perform a couple of semantic checks to make sure they're valid.
@@ -757,7 +756,7 @@ DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   return initExpr;
 }
 
-llvm::Expected<Initializer *>
+Initializer *
 DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
                                             ParamDecl *param) const {
   auto &ctx = param->getASTContext();

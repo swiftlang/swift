@@ -148,9 +148,9 @@ SourceLoc extractNearestSourceLoc(const std::tuple<First, Rest...> &value) {
 ///
 /// The \c Derived class needs to implement several operations. The most
 /// important one takes an evaluator and the input values, then computes the
-/// final result, optionally bubbling up errors from recursive evaulations:
+/// final result:
 /// \code
-///   llvm::Expected<Output> evaluate(Evaluator &evaluator, Inputs...) const;
+///   Output evaluate(Evaluator &evaluator, Inputs...) const;
 /// \endcode
 ///
 /// Cycle diagnostics can be handled in one of two ways. Either the \c Derived
@@ -194,7 +194,7 @@ class SimpleRequest<Derived, Output(Inputs...), Caching> {
   }
 
   template<size_t ...Indices>
-  llvm::Expected<Output>
+  Output
   callDerived(Evaluator &evaluator, std::index_sequence<Indices...>) const {
     static_assert(sizeof...(Indices) > 0, "Subclass must define evaluate()");
     return asDerived().evaluate(evaluator, std::get<Indices>(storage)...);
@@ -214,7 +214,7 @@ public:
     : storage(inputs...) { }
 
   /// Request evaluation function that will be registered with the evaluator.
-  static llvm::Expected<OutputType>
+  static OutputType
   evaluateRequest(const Derived &request, Evaluator &evaluator) {
     return request.callDerived(evaluator,
                                std::index_sequence_for<Inputs...>());

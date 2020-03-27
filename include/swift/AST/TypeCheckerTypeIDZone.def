@@ -55,8 +55,8 @@ SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
 SWIFT_REQUEST(TypeChecker, EmittedMembersRequest, DeclRange(ClassDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,
-              bool (EnumDecl *, TypeResolutionStage), SeparatelyCached,
-              NoLocationInfo)
+              evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawTypeRequest,
               Type(EnumDecl *, TypeResolutionStage), SeparatelyCached,
               NoLocationInfo)
@@ -182,7 +182,8 @@ SWIFT_REQUEST(TypeChecker, SynthesizeAccessorRequest,
               AccessorDecl *(AbstractStorageDecl *, AccessorKind),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyUntilRequest,
-              bool(AbstractFunctionDecl *, SourceLoc), Cached, NoLocationInfo)
+              bool(AbstractFunctionDecl *, SourceLoc),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, USRGenerationRequest, std::string(const ValueDecl *),
@@ -207,8 +208,8 @@ SWIFT_REQUEST(TypeChecker, PreCheckFunctionBuilderRequest,
               FunctionBuilderClosurePreCheck(AnyFunctionRef),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
-              bool(NominalTypeDecl *, ImplicitMemberAction), Uncached,
-              NoLocationInfo)
+              evaluator::SideEffect(NominalTypeDecl *, ImplicitMemberAction),
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
               llvm::ArrayRef<Identifier>(Decl *),
               Cached, NoLocationInfo)

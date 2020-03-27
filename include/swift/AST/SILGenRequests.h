@@ -89,7 +89,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<std::unique_ptr<SILModule>>
+  std::unique_ptr<SILModule>
   evaluate(Evaluator &evaluator, SILGenDescriptor desc) const;
 
 public:
@@ -107,7 +107,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<std::unique_ptr<SILModule>>
+  std::unique_ptr<SILModule>
   evaluate(Evaluator &evaluator, SILGenDescriptor desc) const;
 
 public:
