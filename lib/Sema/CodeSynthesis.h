@@ -67,6 +67,9 @@ ValueDecl *getProtocolRequirement(ProtocolDecl *protocol, Identifier name);
 // with an initial value.
 bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal);
 
+/// Add `@_fixed_layout` attribute to the nominal type, if possible.
+void addFixedLayoutAttr(NominalTypeDecl *nominal);
+
 } // end namespace swift
 
 #endif

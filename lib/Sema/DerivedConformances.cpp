@@ -69,6 +69,9 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
+  if (*knownProtocol == KnownProtocolKind::Differentiable)
+    return canDeriveDifferentiable(Nominal, DC);
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
         // The presence of a raw type is an explicit declaration that
@@ -242,6 +245,13 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
     }
 
+    // Differentiable.move(along:)
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_move) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_along)
+        return getRequirement(KnownProtocolKind::Differentiable);
+    }
+
     // Encodable.encode(to: Encoder)
     if (name.isCompoundName() && name.getBaseName() == ctx.Id_encode) {
       auto argumentNames = name.getArgumentNames();
@@ -290,6 +300,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // CaseIterable.AllCases
     if (name.isSimpleName(ctx.Id_AllCases))
       return getRequirement(KnownProtocolKind::CaseIterable);
+
+    // Differentiable.TangentVector
+    if (name.isSimpleName(ctx.Id_TangentVector))
+      return getRequirement(KnownProtocolKind::Differentiable);
 
     return nullptr;
   }
