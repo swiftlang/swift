@@ -379,6 +379,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       case clang::TargetInfo::VoidPtrBuiltinVaList:
       case clang::TargetInfo::PowerABIBuiltinVaList:
       case clang::TargetInfo::AAPCSABIBuiltinVaList:
+      case clang::TargetInfo::HexagonBuiltinVaList:
         assert(ClangCtx.getTypeSize(ClangCtx.VoidPtrTy) == ClangTypeSize &&
                "expected va_list type to be sizeof(void *)");
         break;
