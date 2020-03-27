@@ -69,6 +69,9 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
+  if (*knownProtocol == KnownProtocolKind::Differentiable)
+    return canDeriveDifferentiable(Nominal, DC);
+
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::PointwiseMultiplicative)
     return canDerivePointwiseMultiplicative(Nominal, DC);
@@ -87,9 +90,6 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
 
   if (*knownProtocol == KnownProtocolKind::VectorProtocol)
     return canDeriveVectorProtocol(Nominal, DC);
-
-  if (*knownProtocol == KnownProtocolKind::Differentiable)
-    return canDeriveDifferentiable(Nominal, DC);
 
   if (*knownProtocol == KnownProtocolKind::EuclideanDifferentiable)
     return canDeriveEuclideanDifferentiable(Nominal, DC);
@@ -312,6 +312,13 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
     }
 
+    // Differentiable.move(along:)
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_move) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_along)
+        return getRequirement(KnownProtocolKind::Differentiable);
+    }
+
     // Encodable.encode(to: Encoder)
     if (name.isCompoundName() && name.getBaseName() == ctx.Id_encode) {
       auto argumentNames = name.getArgumentNames();
@@ -462,20 +469,19 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_AllCases))
       return getRequirement(KnownProtocolKind::CaseIterable);
 
-    // SWIFT_ENABLE_TENSORFLOW
-    // KeyPathIterable.AllKeyPaths
-    if (name.isSimpleName(ctx.Id_AllKeyPaths))
-      return getRequirement(KnownProtocolKind::KeyPathIterable);
-
-    // SWIFT_ENABLE_TENSORFLOW
     // Differentiable.TangentVector
     if (name.isSimpleName(ctx.Id_TangentVector))
       return getRequirement(KnownProtocolKind::Differentiable);
 
     // SWIFT_ENABLE_TENSORFLOW
+    // KeyPathIterable.AllKeyPaths
+    if (name.isSimpleName(ctx.Id_AllKeyPaths))
+      return getRequirement(KnownProtocolKind::KeyPathIterable);
+
     // VectorProtocol.VectorSpaceScalar
     if (name.isSimpleName(ctx.Id_VectorSpaceScalar))
       return getRequirement(KnownProtocolKind::VectorProtocol);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     return nullptr;
   }

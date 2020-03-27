@@ -3551,11 +3551,6 @@ public:
   /// Such derived conformances require memberwise initialization.
   ConstructorDecl *getEffectiveMemberwiseInitializer();
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Add `@_fixed_layout` attribute to the nominal type, if possible.
-  void addFixedLayoutAttr();
-  // SWIFT_ENABLE_TENSORFLOW END
-
   /// Whether this declaration has a synthesized zero parameter default
   /// initializer.
   bool hasDefaultInitializer() const;

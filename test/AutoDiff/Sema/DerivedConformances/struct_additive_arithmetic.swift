@@ -2,7 +2,7 @@
 
 import _Differentiation
 
-func testAdditiveArithmetic<T : AdditiveArithmetic>(
+func testAdditiveArithmetic<T: AdditiveArithmetic>(
   _ x: inout T
 ) {
   // Test `AdditiveArithmetic` requirements: `zero`, `+`, `-`.
@@ -11,7 +11,7 @@ func testAdditiveArithmetic<T : AdditiveArithmetic>(
   x -= x - zero
 }
 
-struct Empty : AdditiveArithmetic {}
+struct Empty: AdditiveArithmetic {}
 func testEmpty() {
   var empty = Empty()
   testAdditiveArithmetic(&empty)
@@ -27,7 +27,7 @@ func testInt2() {
 }
 
 // Test generic type.
-struct Vector2<T : AdditiveArithmetic>: AdditiveArithmetic {
+struct Vector2<T: AdditiveArithmetic>: AdditiveArithmetic {
   var x: T
   var y: T
 }
@@ -61,14 +61,16 @@ func testMixed(nested: Nested) {
 // Test type in generic context.
 struct A<T> {
   struct B<U, V> {
-    struct GenericContextNested : AdditiveArithmetic {
+    struct GenericContextNested: AdditiveArithmetic {
       var nested: Nested
       var float: Float
       var uint8: UInt8
     }
   }
 }
-func testGenericContext<T, U, V>(nested: Nested) -> A<T>.B<U, V>.GenericContextNested {
+func testGenericContext<T, U, V>(nested: Nested)
+  -> A<T>.B<U, V>.GenericContextNested
+{
   var genericNested =
     A<T>.B<U, V>.GenericContextNested(nested: nested, float: 1, uint8: 1)
   testAdditiveArithmetic(&genericNested)
@@ -79,16 +81,17 @@ func testGenericContext<T, U, V>(nested: Nested) -> A<T>.B<U, V>.GenericContextN
 struct Extended {
   var x: Int
 }
-extension Extended : Equatable, AdditiveArithmetic {}
+extension Extended: Equatable, AdditiveArithmetic {}
 
 // Test extension of generic type.
 struct GenericExtended<T> {
   var x: T
 }
-extension GenericExtended : Equatable, AdditiveArithmetic where T : AdditiveArithmetic {}
+extension GenericExtended: Equatable, AdditiveArithmetic
+where T: AdditiveArithmetic {}
 
 // Test memberwise initializer synthesis.
-struct NoMemberwiseInitializer<T : AdditiveArithmetic> : AdditiveArithmetic {
+struct NoMemberwiseInitializer<T: AdditiveArithmetic>: AdditiveArithmetic {
   var value: T
   init(randomLabel value: T) { self.value = value }
 }
@@ -106,12 +109,12 @@ struct NoMemberwiseInitializerExtended<T> {
   }
 }
 extension NoMemberwiseInitializerExtended: Equatable, AdditiveArithmetic
-  where T : AdditiveArithmetic {}
+where T: AdditiveArithmetic {}
 
 // Test derived conformances in disallowed contexts.
 
 // expected-error @+1 3 {{implementation of 'AdditiveArithmetic' cannot be automatically synthesized in an extension in a different file to the type}}
-extension OtherFileNonconforming : AdditiveArithmetic {}
+extension OtherFileNonconforming: AdditiveArithmetic {}
 
 // expected-error @+1 3 {{implementation of 'AdditiveArithmetic' cannot be automatically synthesized in an extension in a different file to the type}}
-extension GenericOtherFileNonconforming : AdditiveArithmetic {}
+extension GenericOtherFileNonconforming: AdditiveArithmetic {}

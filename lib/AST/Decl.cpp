@@ -4100,26 +4100,6 @@ ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
                            nullptr);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-void NominalTypeDecl::addFixedLayoutAttr() {
-  auto &C = getASTContext();
-  // If nominal already has `@_fixed_layout`, return.
-  if (getAttrs().hasAttribute<FixedLayoutAttr>())
-    return;
-  auto access = getEffectiveAccess();
-  // If nominal does not have at least internal access, return.
-  if (access < AccessLevel::Internal)
-    return;
-  // If nominal is internal, it should have the `@usableFromInline` attribute.
-  if (access == AccessLevel::Internal &&
-      !getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    getAttrs().add(new (C) UsableFromInlineAttr(/*Implicit*/ true));
-  }
-  // Add `@_fixed_layout` to the nominal.
-  getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
-}
-// SWIFT_ENABLE_TENSORFLOW END
-
 bool NominalTypeDecl::hasDefaultInitializer() const {
   // Currently only structs and classes can have default initializers.
   if (!isa<StructDecl>(this) && !isa<ClassDecl>(this))
@@ -5075,8 +5055,10 @@ void ProtocolDecl::computeKnownProtocolKind() const {
   auto module = getModuleContext();
   if (module != module->getASTContext().getStdlibModule() &&
       !module->getName().is("Foundation") &&
+      !module->getName().is("_Differentiation") &&
       // SWIFT_ENABLE_TENSORFLOW
       !module->getName().is("TensorFlow")) {
+      // SWIFT_ENABLE_TENSORFLOW END
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }

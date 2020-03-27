@@ -5600,6 +5600,9 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::AdditiveArithmetic:
     return derived.deriveAdditiveArithmetic(Requirement);
 
+  case KnownProtocolKind::Differentiable:
+    return derived.deriveDifferentiable(Requirement);
+
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::KeyPathIterable:
     return derived.deriveKeyPathIterable(Requirement);
@@ -5618,9 +5621,6 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
 
   case KnownProtocolKind::VectorProtocol:
     return derived.deriveVectorProtocol(Requirement);
-
-  case KnownProtocolKind::Differentiable:
-    return derived.deriveDifferentiable(Requirement);
 
   case KnownProtocolKind::EuclideanDifferentiable:
     return derived.deriveEuclideanDifferentiable(Requirement);
@@ -5650,13 +5650,14 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveRawRepresentable(AssocType);
   case KnownProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(AssocType);
+  case KnownProtocolKind::Differentiable:
+    return derived.deriveDifferentiable(AssocType);
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::KeyPathIterable:
     return derived.deriveKeyPathIterable(AssocType);
   case KnownProtocolKind::VectorProtocol:
     return derived.deriveVectorProtocol(AssocType);
-  case KnownProtocolKind::Differentiable:
-    return derived.deriveDifferentiable(AssocType);
+  // SWIFT_ENABLE_TENSORFLOW END
   default:
     return nullptr;
   }

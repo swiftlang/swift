@@ -66,17 +66,13 @@ void SILFunctionBuilder::addFunctionAttributes(
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
 
-  // NOTE: Validate `@differentiable` attributes by calling
-  // `getParameterIndices`. This is important for:
+  // Validate `@differentiable` attributes by calling `getParameterIndices`.
+  // This is important for:
   // - Skipping invalid `@differentiable` attributes in non-primary files.
   // - Preventing duplicate SIL differentiability witness creation for
   //   `@differentiable` attributes on `AbstractStorageDecl` declarations.
   //   Such `@differentiable` attributes are deleted and recreated on the getter
   //   `AccessorDecl` of the `AbstractStorageDecl`.
-  // NOTE(TF-988): Consider creating SIL differentiability witnesses from
-  // `@differentiable` and `@derivative` attributes here instead of in
-  // `SILGenModule::postEmitFunction`. This supports differentiating external
-  // functions in roundtrip SIL tests.
   for (auto *A : Attrs.getAttributes<DifferentiableAttr>())
     (void)A->getParameterIndices();
 

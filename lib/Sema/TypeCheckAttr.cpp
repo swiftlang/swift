@@ -114,9 +114,7 @@ public:
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
   IGNORED_ATTR(OriginallyDefinedIn)
-  // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(NoDerivative)
-  // SWIFT_ENABLE_TENSORFLOW END
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {

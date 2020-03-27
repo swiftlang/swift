@@ -204,7 +204,10 @@ IDENTIFIER_(nsError)
 IDENTIFIER(OSLogMessage)
 
 // Differentiable programming
+IDENTIFIER(along)
 IDENTIFIER(differential)
+IDENTIFIER(direction)
+IDENTIFIER(move)
 IDENTIFIER(pullback)
 IDENTIFIER(TangentVector)
 IDENTIFIER(zero)
@@ -235,7 +238,6 @@ IDENTIFIER(by)
 IDENTIFIER(scale)
 IDENTIFIER(x)
 // Differentiable
-IDENTIFIER(move)
 IDENTIFIER(differentiableVectorView)
 // SWIFT_ENABLE_TENSORFLOW END
 
