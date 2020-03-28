@@ -332,42 +332,8 @@ static void writeImports(raw_ostream &out,
       allPaths.append(module->getTopLevelModuleName());
       llvm::sys::path::append(allPaths, Buffer.str());
     } else {
-      auto DirPath = header.Entry->getDir()->getName();
-      auto I = llvm::sys::path::begin(DirPath),
-           E = llvm::sys::path::end(DirPath);
-      llvm::SmallVector<StringRef, 4> Comps;
-      // Check if the path of the header contains `/usr/include/` in it.
-      // If so, we print the header include path starting from the next component.
-      // e.g. for .../usr/include/dispatch/dispatch.h, we print
-      // #include "dispatch/dispatch.h" because we could assume /usr/include/ is
-      // in the header search paths.
-      while (true) {
-        StringRef Parts[2] = {*I, StringRef()};
-        ++ I;
-        if (I == E)
-          break;
-        Parts[1] = *I;
-        if (Parts[0] == "usr" && Parts[1] == "include") {
-          ++ I;
-          for (;I != E; ++ I) {
-            Comps.push_back(*I);
-          }
-          break;
-        }
-      };
-      if (!Comps.empty()) {
-        // The header is in a deeper location inside /usr/include/, add the
-        // additional path components before adding the header name.
-        allPaths.append(Comps.front());
-        for (auto c: llvm::makeArrayRef(Comps).slice(1)) {
-          llvm::sys::path::append(allPaths, c);
-        }
-        llvm::sys::path::append(allPaths,
-                                llvm::sys::path::filename(header.NameAsWritten));
-      } else {
-        // Otherwise, import the header directly.
-        allPaths.append(header.NameAsWritten);
-      }
+      // Otherwise, import the header directly.
+      allPaths.append(header.NameAsWritten);
     }
     headerImports.insert(allPaths.str().substr(startIdx));
   };
