@@ -334,7 +334,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       limit = Limit::OnDemand;
     }
   }
-  
+
   auto effectiveAccess = d->getEffectiveAccess();
   
   // Private setter implementations for an internal storage declaration should
