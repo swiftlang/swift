@@ -319,21 +319,6 @@ static void writeImports(raw_ostream &out,
 
   // Track printed names to handle overlay modules.
   llvm::SmallPtrSet<Identifier, 8> seenImports;
-  llvm::SmallString<256> allPaths;
-  llvm::SmallSetVector<StringRef, 8> headerImports;
-  auto insertHeaderPath = [&](clang::Module::Header header,
-                              const clang::Module *module) {
-    auto startIdx = allPaths.size();
-    if (module->IsFramework) {
-      // For framworks, the header import should start from the framework name.
-      allPaths.append(module->getTopLevelModuleName());
-      llvm::sys::path::append(allPaths, header.NameAsWritten);
-    } else {
-      // Otherwise, import the header directly.
-      allPaths.append(header.NameAsWritten);
-    }
-    headerImports.insert(allPaths.str().substr(startIdx));
-  };
   bool includeUnderlying = false;
   for (auto import : sortedImports) {
     if (auto *swiftModule = import.dyn_cast<ModuleDecl *>()) {
@@ -342,22 +327,8 @@ static void writeImports(raw_ostream &out,
         includeUnderlying = true;
         continue;
       }
-      if (seenImports.insert(Name).second) {
+      if (seenImports.insert(Name).second)
         out << "@import " << Name.str() << ";\n";
-        if (auto *clangM = swiftModule->findUnderlyingClangModule()) {
-          if (auto umbrella = clangM->getUmbrellaHeader()) {
-            // If an umbrella header is available, use that.
-            insertHeaderPath(umbrella, clangM);
-          } else {
-            // Collect all headers included in the module.
-            for (auto headers: clangM->Headers) {
-              for (auto header: headers) {
-                insertHeaderPath(header, clangM);
-              }
-            }
-          }
-        }
-      }
     } else {
       const auto *clangModule = import.get<const clang::Module *>();
       assert(clangModule->isSubModule() &&
@@ -365,19 +336,7 @@ static void writeImports(raw_ostream &out,
       out << "@import ";
       ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
       out << ";\n";
-      // Collect all headers included in the submodule
-      for (auto headers: clangModule->Headers) {
-         for (auto header: headers) {
-           insertHeaderPath(header, clangModule);
-         }
-       }
     }
-  }
-  out << "#else\n";
-
-  // We cannot use module import, so use header includes instead.
-  for (auto header: headerImports) {
-    out << "#import <" << header << ">\n";
   }
 
   out << "#endif\n\n";
