@@ -7291,13 +7291,13 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   if (auto fromKeyValue = isDictionaryType(unwrappedFromType)) {
     if (auto toKeyValue = isDictionaryType(unwrappedToType)) {
       addExplicitConversionConstraint(fromKeyValue->first, toKeyValue->first,
-                                      /*allowFixes=*/false,
+                                      ForgetChoice,
                                       locator.withPathElement(
                                         LocatorPathElt::GenericArgument(0)));
       addExplicitConversionConstraint(fromKeyValue->second, toKeyValue->second,
-                                      /*allowFixes=*/false,
+                                      ForgetChoice,
                                       locator.withPathElement(
-                                        LocatorPathElt::GenericArgument(0)));
+                                        LocatorPathElt::GenericArgument(1)));
       countOptionalInjections();
       return SolutionKind::Solved;
     }
@@ -9701,9 +9701,8 @@ void ConstraintSystem::addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
 }
 
 void ConstraintSystem::addExplicitConversionConstraint(
-                                           Type fromType, Type toType,
-                                           bool allowFixes,
-                                           ConstraintLocatorBuilder locator) {
+    Type fromType, Type toType, RememberChoice_t rememberChoice,
+    ConstraintLocatorBuilder locator) {
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
@@ -9721,9 +9720,7 @@ void ConstraintSystem::addExplicitConversionConstraint(
                      fromType, toType, locatorPtr);
   constraints.push_back(bridgingConstraint);
 
-  addDisjunctionConstraint(constraints, locator,
-                           allowFixes ? RememberChoice
-                                      : ForgetChoice);
+  addDisjunctionConstraint(constraints, locator, rememberChoice);
 }
 
 ConstraintSystem::SolutionKind
