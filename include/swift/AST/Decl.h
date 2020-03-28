@@ -4197,6 +4197,22 @@ private:
       other(other) { }
 };
 
+/// The set of known protocols for which derived conformances are supported.
+enum class KnownDerivableProtocolKind : uint8_t {
+  RawRepresentable,
+  OptionSet,
+  CaseIterable,
+  Comparable,
+  Equatable,
+  Hashable,
+  BridgedNSError,
+  CodingKey,
+  Encodable,
+  Decodable,
+  AdditiveArithmetic,
+  Differentiable,
+};
+
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
 ///   protocol Drawable {
@@ -4408,6 +4424,8 @@ public:
     
     return static_cast<KnownProtocolKind>(Bits.ProtocolDecl.KnownProtocol - 2);
   }
+
+  Optional<KnownDerivableProtocolKind> getKnownDerivableProtocolKind() const;
 
   /// Check whether this protocol is of a specific, known protocol kind.
   bool isSpecificProtocol(KnownProtocolKind kind) const {
