@@ -27,11 +27,11 @@ suite.test("UnsafeAtomicLazyReference<${type}>.storeIfNil") {
     expectNil(v.load())
 
     let ref = LifetimeTracked(42)
-    expectTrue(v.initialize(to: ref) === ref)
+    expectTrue(v.storeIfNil(ref) === ref)
     expectTrue(v.load() === ref)
 
     let ref2 = LifetimeTracked(23)
-    expectTrue(v.initialize(to: ref2) === ref)
+    expectTrue(v.storeIfNil(ref2) === ref)
     expectTrue(v.load() === ref)
 
     v.destroy()

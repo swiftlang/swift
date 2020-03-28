@@ -64,15 +64,13 @@ extension UnsafeAtomicLazyReference {
   ///     // multiple threads, but only one of them will get to
   ///     // succeed setting the reference.
   ///     let histogram = ...
-  ///     return _histogram.initialize(to: foo)
+  ///     return _histogram.storeIfNil(foo)
   /// }
   /// ```
   ///
   /// This operation uses acquiring-and-releasing memory ordering.
   @_transparent
-  public func initialize(
-    to desired: __owned Instance
-  ) -> Instance {
+  public func storeIfNil(_ desired: __owned Instance) -> Instance {
     let desiredUnmanaged = Unmanaged.passRetained(desired)
     let desiredPtr = desiredUnmanaged.toOpaque()
     let (current, won) = Builtin.cmpxchg_acqrel_acquire_Word(
