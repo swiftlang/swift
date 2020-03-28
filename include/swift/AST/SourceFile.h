@@ -318,8 +318,8 @@ public:
   enum ASTStage_t {
     /// The source file is not name bound or type checked.
     Unprocessed,
-    /// Name binding has completed.
-    NameBound,
+    /// Import resolution has completed.
+    ImportsResolved,
     /// Type checking has completed.
     TypeChecked
   };

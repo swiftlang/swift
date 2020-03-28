@@ -1182,7 +1182,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
   }
 
   auto &SF = cast<SourceFile>(File);
-  assert(SF.ASTStage >= SourceFile::NameBound);
+  assert(SF.ASTStage >= SourceFile::ImportsResolved);
 
   // Check if the decl exists on the file.
   if (auto *op = OperatorLookup<OP_DECL>::lookup(eval, desc))
