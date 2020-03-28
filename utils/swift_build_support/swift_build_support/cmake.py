@@ -235,18 +235,36 @@ class CMake(object):
                 if len(m) == 1:
                     build_root = m[0]
 
-        cmake_build_dir = os.path.join(build_root, 'cmake-%s' %
+        cmake_install_dir = os.path.join(build_root, 'cmake-%s' %
+                                         self.args.host_target)
+        cmake_build_dir = os.path.join(build_root, 'cmake-%s-build' %
                                        self.args.host_target)
         if not os.path.isdir(cmake_build_dir):
             os.makedirs(cmake_build_dir)
 
         cwd = os.getcwd()
+
+        file_dir = os.path.dirname(os.path.abspath(__file__))
+        cmake_patch_path = os.path.join(file_dir, "cmake-swift.patch")
+        cmake_source_dir = os.path.join(source_root, "cmake")
+        os.chdir(cmake_source_dir)
+        shell.call_without_sleeping(['git', 'apply', cmake_patch_path],
+                                    echo=True)
+
         os.chdir(cmake_build_dir)
-        shell.call_without_sleeping([cmake_bootstrap], echo=True)
+        shell.call_without_sleeping([cmake_bootstrap, '--prefix=%s' %
+                                    cmake_install_dir], echo=True)
         shell.call_without_sleeping(['make', '-j%s' % self.args.build_jobs],
                                     echo=True)
+        shell.call_without_sleeping(['make', 'install'], echo=True)
+
+        os.chdir(cmake_source_dir)
+        # undo the patch so the next time we call this it applies again
+        shell.call_without_sleeping(['git', 'checkout', '-f'],
+                                    echo=True)
+
         os.chdir(cwd)
-        return os.path.join(cmake_build_dir, 'bin', 'cmake')
+        return os.path.join(cmake_install_dir, 'bin', 'cmake')
 
     # For Linux only, determine the version of the installed CMake compared to
     # the source and build the source if necessary. Returns the path to the

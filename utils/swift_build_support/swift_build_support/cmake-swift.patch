@@ -1,0 +1,25 @@
+From dbc2c645465a7045efe4d4d0a791ebbdd514343a Mon Sep 17 00:00:00 2001
+From: Dario Rexin <drexin@apple.com>
+Date: Sat, 28 Mar 2020 15:30:26 -0700
+Subject: [PATCH] Load swift flags in swift module
+
+---
+ Modules/CMakeSwiftInformation.cmake | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Modules/CMakeSwiftInformation.cmake b/Modules/CMakeSwiftInformation.cmake
+index f6510b922f..6d3fe187a7 100644
+--- a/Modules/CMakeSwiftInformation.cmake
++++ b/Modules/CMakeSwiftInformation.cmake
+@@ -47,6 +47,8 @@ set(CMAKE_Swift_FLAGS_RELEASE_INIT "-O")
+ set(CMAKE_Swift_FLAGS_RELWITHDEBINFO_INIT "-O -g")
+ set(CMAKE_Swift_FLAGS_MINSIZEREL_INIT "-Osize")
+ 
++cmake_initialize_per_config_variable(CMAKE_Swift_FLAGS "Swift Compiler Flags")
++
+ # NOTE(compnerd) we do not have an object compile rule since we build the objects as part of the link step
+ if(NOT CMAKE_Swift_COMPILE_OBJECT)
+   set(CMAKE_Swift_COMPILE_OBJECT ":")
+-- 
+2.15.0
+
