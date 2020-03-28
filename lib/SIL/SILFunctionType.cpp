@@ -1082,7 +1082,8 @@ public:
     // type.
 
     // The entire original context could be a generic parameter.
-    if (origType.isTypeParameter()) {
+    if (origType.isTypeParameter() ||
+        origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
       return addSubstitution(origType.getLayoutConstraint(), substType,
                              nullptr, {});
     }
@@ -1252,6 +1253,10 @@ public:
          && !origType.requiresClass())
         || substTL.isAddressOnly()) {
       return true;
+
+    // Functions are always returned directly.
+    } else if (origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
+      return false;
 
     // If the substitution didn't change the type, then a negative
     // response to the above is determinative as well.
