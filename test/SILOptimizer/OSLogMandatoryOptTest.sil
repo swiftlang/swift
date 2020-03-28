@@ -3,7 +3,7 @@
 // SIL tests for the OSLogOptimization pass which performs compile-time analysis
 // and optimization of os log APIs. This test checks specific aspects of the
 // OSLogOptimization pass on hand-crafted SIL code. The tests here do not depend
-// on the os log overlay.
+// on any library.
 
 import Swift
 import Builtin

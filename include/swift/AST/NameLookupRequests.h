@@ -153,7 +153,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ClassDecl *>
+  ClassDecl *
   evaluate(Evaluator &evaluator, NominalTypeDecl *subject) const;
 
 public:
@@ -197,7 +197,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool>
+  bool
   evaluate(Evaluator &evaluator, ClassDecl *subject) const;
 
 public:
@@ -219,7 +219,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<NominalTypeDecl *>
+  NominalTypeDecl *
   evaluate(Evaluator &evaluator, ExtensionDecl *ext) const;
 
 public:
@@ -283,7 +283,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<NominalTypeDecl *>
+  NominalTypeDecl *
   evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
 
 public:
@@ -303,7 +303,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<DestructorDecl *>
+  DestructorDecl *
   evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
 
 public:
@@ -324,7 +324,7 @@ private:
   friend SimpleRequest;
   
   // Evaluation.
-  llvm::Expected<GenericParamList *>
+  GenericParamList *
   evaluate(Evaluator &evaluator, GenericContext *value) const;
   
 public:
@@ -347,7 +347,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ast_scope::ASTScopeImpl *>
+  ast_scope::ASTScopeImpl *
   evaluate(Evaluator &evaluator, ast_scope::ASTScopeImpl *,
            ast_scope::ScopeCreator *) const;
 
@@ -407,8 +407,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<LookupResult> evaluate(Evaluator &evaluator,
-                                        UnqualifiedLookupDescriptor desc) const;
+  LookupResult evaluate(Evaluator &evaluator,
+                        UnqualifiedLookupDescriptor desc) const;
 };
 
 using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
@@ -427,7 +427,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<QualifiedLookupResult>
+  QualifiedLookupResult
   evaluate(Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
            NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
            const DeclContext *moduleScopeContext) const;
@@ -445,10 +445,10 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Expected<QualifiedLookupResult> evaluate(Evaluator &evaluator,
-                                                 const DeclContext *dc,
-                                                 DeclNameRef name,
-                                                 NLOptions options) const;
+  QualifiedLookupResult evaluate(Evaluator &evaluator,
+                                 const DeclContext *dc,
+                                 DeclNameRef name,
+                                 NLOptions options) const;
 };
 
 class ModuleQualifiedLookupRequest
@@ -464,10 +464,10 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<QualifiedLookupResult> evaluate(Evaluator &evaluator,
-                                                 const DeclContext *DC,
-                                                 ModuleDecl *mod, DeclNameRef name,
-                                                 NLOptions opts) const;
+  QualifiedLookupResult evaluate(Evaluator &evaluator,
+                                 const DeclContext *DC,
+                                 ModuleDecl *mod, DeclNameRef name,
+                                 NLOptions opts) const;
 };
 
 class QualifiedLookupRequest
@@ -483,7 +483,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<QualifiedLookupResult>
+  QualifiedLookupResult
   evaluate(Evaluator &evaluator, const DeclContext *DC,
            SmallVector<NominalTypeDecl *, 4> decls,
            DeclNameRef name,
@@ -534,7 +534,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<TinyPtrVector<ValueDecl *>>
+  TinyPtrVector<ValueDecl *>
   evaluate(Evaluator &evaluator, DirectLookupDescriptor desc) const;
 };
 
@@ -598,19 +598,23 @@ template <typename OperatorType>
 class LookupOperatorRequest
     : public SimpleRequest<LookupOperatorRequest<OperatorType>,
                            OperatorType *(OperatorLookupDescriptor),
-                           CacheKind::Uncached> {
+                           CacheKind::Cached> {
   using SimpleRequest<LookupOperatorRequest<OperatorType>,
                       OperatorType *(OperatorLookupDescriptor),
-                      CacheKind::Uncached>::SimpleRequest;
+                      CacheKind::Cached>::SimpleRequest;
 
 private:
   friend SimpleRequest<LookupOperatorRequest<OperatorType>,
                        OperatorType *(OperatorLookupDescriptor),
-                       CacheKind::Uncached>;
+                       CacheKind::Cached>;
 
   // Evaluation.
-  llvm::Expected<OperatorType *> evaluate(Evaluator &evaluator,
-                                          OperatorLookupDescriptor desc) const;
+  OperatorType *
+  evaluate(Evaluator &evaluator, OperatorLookupDescriptor desc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
 };
 
 using LookupPrefixOperatorRequest = LookupOperatorRequest<PrefixOperatorDecl>;
@@ -631,7 +635,7 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Expected<TinyPtrVector<OperatorDecl *>>
+  TinyPtrVector<OperatorDecl *>
   evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor,
            OperatorFixity fixity) const;
 };
@@ -649,7 +653,7 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Expected<TinyPtrVector<PrecedenceGroupDecl *>>
+  TinyPtrVector<PrecedenceGroupDecl *>
   evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor) const;
 };
 
@@ -694,7 +698,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ProtocolConformanceRef> evaluate(
+  ProtocolConformanceRef evaluate(
       Evaluator &evaluator, LookupConformanceDescriptor desc) const;
 };
 

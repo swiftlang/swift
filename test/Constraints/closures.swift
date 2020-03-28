@@ -1004,3 +1004,15 @@ func rdar52204414() {
   let _ = { () -> Void in return 42 }
   // expected-error@-1 {{declared closure result 'Int' is incompatible with contextual type 'Void'}}
 }
+
+// SR-12291 - trailing closure is used as an argument to the last (positionally) parameter
+func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {}
+func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {}
+
+overloaded_with_default { 0 } // Ok (could be ambiguous if trailing was allowed to match `a:` in first overload)
+
+func overloaded_with_default_and_autoclosure<T>(_ a: @autoclosure () -> T, b: Int = 0) {}
+func overloaded_with_default_and_autoclosure<T>(b: Int = 0, c: @escaping () -> T?) {}
+
+overloaded_with_default_and_autoclosure { 42 } // Ok
+overloaded_with_default_and_autoclosure(42) // Ok

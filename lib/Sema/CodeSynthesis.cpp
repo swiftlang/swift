@@ -795,7 +795,7 @@ static void diagnoseMissingRequiredInitializer(
                      diag::required_initializer_here);
 }
 
-llvm::Expected<bool> AreAllStoredPropertiesDefaultInitableRequest::evaluate(
+bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *decl) const {
   assert(!decl->hasClangNode());
 
@@ -849,7 +849,7 @@ static bool areAllStoredPropertiesDefaultInitializable(Evaluator &eval,
       eval, AreAllStoredPropertiesDefaultInitableRequest{decl}, false);
 }
 
-llvm::Expected<bool>
+bool
 HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
                                               NominalTypeDecl *decl) const {
   assert(!decl->hasClangNode());
@@ -1015,7 +1015,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   }
 }
 
-llvm::Expected<bool>
+bool
 InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
                                                 ClassDecl *decl) const {
   // Check if we parsed the @_inheritsConvenienceInitializers attribute.
@@ -1085,7 +1085,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   (void)decl->getDefaultInitializer();
 }
 
-llvm::Expected<bool>
+evaluator::SideEffect
 ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *target,
                                        ImplicitMemberAction action) const {
@@ -1162,10 +1162,10 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   }
     break;
   }
-  return true;
+  return std::make_tuple<>();
 }
 
-llvm::Expected<bool>
+bool
 HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                    StructDecl *decl) const {
   if (!shouldAttemptInitializerSynthesis(decl))
@@ -1190,7 +1190,7 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-llvm::Expected<ConstructorDecl *>
+ConstructorDecl *
 SynthesizeMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                           NominalTypeDecl *decl) const {
   // Create the implicit memberwise constructor.
@@ -1201,7 +1201,7 @@ SynthesizeMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   return ctor;
 }
 
-llvm::Expected<ConstructorDecl *>
+ConstructorDecl *
 ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                                 NominalTypeDecl *decl) const {
   // Compute the access level for the memberwise initializer. The minimum of:
@@ -1288,7 +1288,7 @@ ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   return memberwiseInitDecl;
 }
 
-llvm::Expected<bool>
+bool
 HasDefaultInitRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *decl) const {
   assert(isa<StructDecl>(decl) || isa<ClassDecl>(decl));
@@ -1328,7 +1328,7 @@ synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
            /*isTypeChecked=*/true };
 }
 
-llvm::Expected<ConstructorDecl *>
+ConstructorDecl *
 SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
@@ -1368,4 +1368,22 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
     return v->isLet() && v->hasInitialValue();
   });
+}
+
+void swift::addFixedLayoutAttr(NominalTypeDecl *nominal) {
+  auto &C = nominal->getASTContext();
+  // If nominal already has `@_fixed_layout`, return.
+  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
+    return;
+  auto access = nominal->getEffectiveAccess();
+  // If nominal does not have at least internal access, return.
+  if (access < AccessLevel::Internal)
+    return;
+  // If nominal is internal, it should have the `@usableFromInline` attribute.
+  if (access == AccessLevel::Internal &&
+      !nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    nominal->getAttrs().add(new (C) UsableFromInlineAttr(/*Implicit*/ true));
+  }
+  // Add `@_fixed_layout` to the nominal.
+  nominal->getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
 }

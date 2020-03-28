@@ -1394,7 +1394,7 @@ createExtensionGenericParams(ASTContext &ctx,
   return toParams;
 }
 
-llvm::Expected<GenericParamList *>
+GenericParamList *
 GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) const {
   if (auto *ext = dyn_cast<ExtensionDecl>(value)) {
     // Create the generic parameter list for the extension by cloning the
@@ -1855,6 +1855,17 @@ bool Pattern::isNeverDefaultInitializable() const {
   return result;
 }
 
+bool PatternBindingDecl::isDefaultInitializableViaPropertyWrapper(unsigned i) const {
+  if (auto singleVar = getSingleVar()) {
+    if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo(0)) {
+      if (wrapperInfo.defaultInit)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   const auto entry = getPatternList()[i];
 
@@ -1864,14 +1875,14 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
 
   // If the outermost attached property wrapper vends an `init()`, use that
   // for default initialization.
+  if (isDefaultInitializableViaPropertyWrapper(i))
+    return true;
+
+  // If one of the attached wrappers is missing a wrappedValue
+  // initializer, cannot default-initialize.
   if (auto singleVar = getSingleVar()) {
     if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo(0)) {
-      if (wrapperInfo.defaultInit)
-        return true;
-
-      // If one of the attached wrappers is missing an initialValue
-      // initializer, cannot default-initialize.
-      if (!singleVar->allAttachedPropertyWrappersHaveInitialValueInit())
+      if (!singleVar->allAttachedPropertyWrappersHaveWrappedValueInit())
         return false;
     }
   }
@@ -4125,7 +4136,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 
   if (auto actionToTake = action) {
     (void)evaluateOrDefault(Context.evaluator,
-        ResolveImplicitMemberRequest{this, actionToTake.getValue()}, false);
+        ResolveImplicitMemberRequest{this, actionToTake.getValue()}, {});
   }
 }
 
@@ -4203,7 +4214,7 @@ synthesizeEmptyFunctionBody(AbstractFunctionDecl *afd, void *context) {
            /*isTypeChecked=*/true };
 }
 
-llvm::Expected<DestructorDecl *>
+DestructorDecl *
 GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   auto &ctx = CD->getASTContext();
   auto *DD = new (ctx) DestructorDecl(CD->getLoc(), CD);
@@ -4268,8 +4279,9 @@ AncestryOptions ClassDecl::checkAncestry() const {
                            AncestryFlags()));
 }
         
-llvm::Expected<AncestryFlags>
-ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator, ClassDecl *value) const {
+AncestryFlags
+ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator,
+                                    ClassDecl *value) const {
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
 
   AncestryOptions result;
@@ -5021,7 +5033,8 @@ ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
 void ProtocolDecl::computeKnownProtocolKind() const {
   auto module = getModuleContext();
   if (module != module->getASTContext().getStdlibModule() &&
-      !module->getName().is("Foundation")) {
+      !module->getName().is("Foundation") &&
+      !module->getName().is("_Differentiation")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -5815,7 +5828,7 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
 
 /// Whether all of the attached property wrappers have an init(wrappedValue:)
 /// initializer.
-bool VarDecl::allAttachedPropertyWrappersHaveInitialValueInit() const {
+bool VarDecl::allAttachedPropertyWrappersHaveWrappedValueInit() const {
   for (unsigned i : indices(getAttachedPropertyWrappers())) {
     if (!getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit)
       return false;
@@ -5920,7 +5933,7 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
 
   // If all property wrappers have a wrappedValue initializer, the property
   // wrapper will be initialized that way.
-  return allAttachedPropertyWrappersHaveInitialValueInit();
+  return allAttachedPropertyWrappersHaveWrappedValueInit();
 }
 
 bool VarDecl::isInnermostPropertyWrapperInitUsesEscapingAutoClosure() const {
@@ -7099,8 +7112,10 @@ AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
   prepareDerivativeFunctionConfigurations();
   auto &ctx = getASTContext();
   if (ctx.getCurrentGeneration() > DerivativeFunctionConfigGeneration) {
-    // TODO(TF-1100): Upstream derivative function configuration serialization
-    // logic.
+    unsigned previousGeneration = DerivativeFunctionConfigGeneration;
+    DerivativeFunctionConfigGeneration = ctx.getCurrentGeneration();
+    ctx.loadDerivativeFunctionConfigurations(this, previousGeneration,
+                                             *DerivativeFunctionConfigs);
   }
   return DerivativeFunctionConfigs->getArrayRef();
 }
@@ -7486,7 +7501,7 @@ LiteralExpr *EnumElementDecl::getRawValueExpr() const {
   (void)evaluateOrDefault(
       getASTContext().evaluator,
       EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Interface},
-      true);
+      {});
   return RawValueExpr;
 }
 
@@ -7496,7 +7511,7 @@ LiteralExpr *EnumElementDecl::getStructuralRawValueExpr() const {
   (void)evaluateOrDefault(
       getASTContext().evaluator,
       EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Structural},
-      true);
+      {});
   return RawValueExpr;
 }
 

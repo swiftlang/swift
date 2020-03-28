@@ -1773,6 +1773,11 @@ NodePointer Demangler::demangleImplFunctionType() {
   if (nextIf('e'))
     type->addChild(createNode(Node::Kind::ImplEscaping), *this);
 
+  if (nextIf('d'))
+    type->addChild(createNode(Node::Kind::ImplDifferentiable), *this);
+  if (nextIf('l'))
+    type->addChild(createNode(Node::Kind::ImplLinear), *this);
+
   const char *CAttr = nullptr;
   switch (nextChar()) {
     case 'y': CAttr = "@callee_unowned"; break;
@@ -2791,6 +2796,14 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::ObjCBlock);
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
+    case 'F':
+      return popFunctionType(Node::Kind::DifferentiableFunctionType);
+    case 'G':
+      return popFunctionType(Node::Kind::EscapingDifferentiableFunctionType);
+    case 'H':
+      return popFunctionType(Node::Kind::LinearFunctionType);
+    case 'I':
+      return popFunctionType(Node::Kind::EscapingLinearFunctionType);
     case 'o':
       return createType(createWithChild(Node::Kind::Unowned,
                                         popNode(Node::Kind::Type)));

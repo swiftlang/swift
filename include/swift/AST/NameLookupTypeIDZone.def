@@ -87,13 +87,13 @@ SWIFT_REQUEST(NameLookup, UnqualifiedLookupRequest,
 
 SWIFT_REQUEST(NameLookup, LookupPrefixOperatorRequest,
               PrefixOperatorDecl *(OperatorLookupDescriptor),
-              Uncached, NoLocationInfo)
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, LookupInfixOperatorRequest,
               InfixOperatorDecl *(OperatorLookupDescriptor),
-              Uncached, NoLocationInfo)
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, LookupPostfixOperatorRequest,
               PostfixOperatorDecl *(OperatorLookupDescriptor),
-              Uncached, NoLocationInfo)
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, LookupPrecedenceGroupRequest,
               PrecedenceGroupDecl *(OperatorLookupDescriptor),
-              Uncached, NoLocationInfo)
+              Cached, NoLocationInfo)

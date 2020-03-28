@@ -863,14 +863,14 @@ bool EnumRawValuesRequest::isCached() const {
   return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
 }
 
-Optional<bool> EnumRawValuesRequest::getCachedResult() const {
+Optional<evaluator::SideEffect> EnumRawValuesRequest::getCachedResult() const {
   auto *ED = std::get<0>(getStorage());
   if (ED->LazySemanticInfo.hasCheckedRawValues())
-    return true;
+    return std::make_tuple<>();
   return None;
 }
 
-void EnumRawValuesRequest::cacheResult(bool) const {
+void EnumRawValuesRequest::cacheResult(evaluator::SideEffect) const {
   auto *ED = std::get<0>(getStorage());
   auto flags = ED->LazySemanticInfo.RawTypeAndFlags.getInt() |
       EnumDecl::HasFixedRawValues |
@@ -1265,18 +1265,34 @@ void DifferentiableAttributeTypeCheckRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
+// CheckRedeclarationRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<evaluator::SideEffect>
+CheckRedeclarationRequest::getCachedResult() const {
+  if (!std::get<0>(getStorage())->alreadyCheckedRedeclaration())
+    return None;
+  return std::make_tuple<>();
+}
+
+void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
+  std::get<0>(getStorage())->setCheckedRedeclaration();
+}
+
+//----------------------------------------------------------------------------//
 // TypeCheckSourceFileRequest computation.
 //----------------------------------------------------------------------------//
 
-Optional<bool> TypeCheckSourceFileRequest::getCachedResult() const {
+Optional<evaluator::SideEffect>
+TypeCheckSourceFileRequest::getCachedResult() const {
   auto *SF = std::get<0>(getStorage());
   if (SF->ASTStage == SourceFile::TypeChecked)
-    return true;
+    return std::make_tuple<>();
 
   return None;
 }
 
-void TypeCheckSourceFileRequest::cacheResult(bool result) const {
+void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
   auto *SF = std::get<0>(getStorage());
 
   // Verify that we've checked types correctly.

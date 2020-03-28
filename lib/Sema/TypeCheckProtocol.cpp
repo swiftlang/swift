@@ -438,6 +438,11 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         } else {
           witness->getAttrs().add(newAttr);
           success = true;
+          // Register derivative function configuration.
+          auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+          witnessAFD->addDerivativeFunctionConfiguration(
+              {newAttr->getParameterIndices(), resultIndices,
+               newAttr->getDerivativeGenericSignature()});
         }
       }
       if (!success) {
@@ -5066,7 +5071,7 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
   }
 }
 
-llvm::Expected<SmallVector<ProtocolConformance *, 2>>
+SmallVector<ProtocolConformance *, 2>
 LookupAllConformancesInContextRequest::evaluate(
     Evaluator &eval, const DeclContext *DC) const {
   return DC->getLocalConformances(ConformanceLookupKind::All);
@@ -5511,7 +5516,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
   return result;
 }
 
-llvm::Expected<TypeWitnessAndDecl>
+TypeWitnessAndDecl
 TypeWitnessRequest::evaluate(Evaluator &eval,
                              NormalProtocolConformance *conformance,
                              AssociatedTypeDecl *requirement) const {
@@ -5529,7 +5534,7 @@ TypeWitnessRequest::evaluate(Evaluator &eval,
   return known->second;
 }
 
-llvm::Expected<Witness>
+Witness
 ValueWitnessRequest::evaluate(Evaluator &eval,
                               NormalProtocolConformance *conformance,
                               ValueDecl *requirement) const {
@@ -5600,6 +5605,9 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::AdditiveArithmetic:
     return derived.deriveAdditiveArithmetic(Requirement);
 
+  case KnownProtocolKind::Differentiable:
+    return derived.deriveDifferentiable(Requirement);
+
   default:
     return nullptr;
   }
@@ -5624,6 +5632,8 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveRawRepresentable(AssocType);
   case KnownProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(AssocType);
+  case KnownProtocolKind::Differentiable:
+    return derived.deriveDifferentiable(AssocType);
   default:
     return nullptr;
   }

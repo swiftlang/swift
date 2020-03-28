@@ -74,7 +74,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type>
+  Type
   evaluate(Evaluator &evaluator,
            llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
            unsigned index,
@@ -102,7 +102,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type>
+  Type
   evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl,
            TypeResolutionStage stage) const;
 
@@ -128,7 +128,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type>
+  Type
   evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
            TypeResolutionStage stage) const;
 
@@ -155,7 +155,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<llvm::TinyPtrVector<ValueDecl *>>
+  llvm::TinyPtrVector<ValueDecl *>
   evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
@@ -177,7 +177,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Separate caching.
@@ -200,8 +200,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<CtorInitializerKind>
-      evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
+  CtorInitializerKind
+  evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
 
 public:
   // Caching.
@@ -220,7 +220,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
 
 public:
   // Cycle handling.
@@ -246,7 +246,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
 
 public:
   // Cycle handling.
@@ -272,7 +272,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
 
 public:
   // Cycle handling.
@@ -297,7 +297,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Separate caching.
@@ -318,7 +318,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Separate caching.
@@ -339,8 +339,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ArrayRef<Requirement>> evaluate(Evaluator &evaluator,
-                                                 ProtocolDecl *proto) const;
+  ArrayRef<Requirement>
+  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
   // Separate caching.
@@ -361,7 +361,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type> evaluate(Evaluator &evaluator, AssociatedTypeDecl *decl) const;
+  Type evaluate(Evaluator &evaluator, AssociatedTypeDecl *decl) const;
 
 public:
   // Caching.
@@ -440,10 +440,10 @@ private:
   RequirementRepr &getRequirement() const;
 
   // Evaluation.
-  llvm::Expected<Requirement> evaluate(Evaluator &evaluator,
-                                       WhereClauseOwner,
-                                       unsigned index,
-                                       TypeResolutionStage stage) const;
+  Requirement evaluate(Evaluator &evaluator,
+                       WhereClauseOwner,
+                       unsigned index,
+                       TypeResolutionStage stage) const;
 
 public:
   // Source location
@@ -471,7 +471,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<std::string> evaluate(Evaluator &eval, const ValueDecl *d) const;
+  std::string evaluate(Evaluator &eval, const ValueDecl *d) const;
 
 public:
   // Caching
@@ -491,7 +491,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<std::string> evaluate(Evaluator &eval, const TypeDecl *d) const;
+  std::string evaluate(Evaluator &eval, const TypeDecl *d) const;
 
 public:
   // Caching
@@ -512,8 +512,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type> evaluate(Evaluator &eval, KnownProtocolKind,
-                                const DeclContext *) const;
+  Type evaluate(Evaluator &eval, KnownProtocolKind, const DeclContext *) const;
 
 public:
   // Caching
@@ -534,8 +533,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<PropertyWrapperTypeInfo>
-      evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
+  PropertyWrapperTypeInfo
+  evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
 
 public:
   // Caching
@@ -555,7 +554,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<llvm::TinyPtrVector<CustomAttr *>>
+  llvm::TinyPtrVector<CustomAttr *>
   evaluate(Evaluator &evaluator, VarDecl *) const;
 
 public:
@@ -576,7 +575,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type>
+  Type
   evaluate(Evaluator &evaluator, VarDecl *var, unsigned i) const;
 
 public:
@@ -597,7 +596,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type>
+  Type
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:
@@ -617,7 +616,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Optional<PropertyWrapperMutability>>
+  Optional<PropertyWrapperMutability>
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:
@@ -638,7 +637,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<PropertyWrapperBackingPropertyInfo>
+  PropertyWrapperBackingPropertyInfo
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:
@@ -658,7 +657,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type> evaluate(Evaluator &eval, TypeAliasDecl *d) const;
+  Type evaluate(Evaluator &eval, TypeAliasDecl *d) const;
 
 public:
   // Caching.
@@ -677,8 +676,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ResilienceExpansion> evaluate(Evaluator &eval,
-                                               DeclContext *context) const;
+  ResilienceExpansion evaluate(Evaluator &eval, DeclContext *context) const;
 
 public:
   // Caching.
@@ -701,7 +699,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<CustomAttr *>
+  CustomAttr *
   evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
@@ -721,7 +719,7 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Expected<Type>
+  Type
   evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
@@ -741,7 +739,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<SelfAccessKind>
+  SelfAccessKind
   evaluate(Evaluator &evaluator, FuncDecl *func) const;
 
 public:
@@ -763,7 +761,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool>
+  bool
   evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
 
 public:
@@ -785,7 +783,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool>
+  bool
   evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
 
 public:
@@ -807,7 +805,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<OpaqueReadOwnership>
+  OpaqueReadOwnership
   evaluate(Evaluator &evaluator, AbstractStorageDecl *storage) const;
 
 public:
@@ -829,7 +827,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<VarDecl *>
+  VarDecl *
   evaluate(Evaluator &evaluator, VarDecl *lazyVar) const;
 
 public:
@@ -852,7 +850,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool>
+  bool
   evaluate(Evaluator &evaluator, AbstractFunctionDecl *func,
            SourceLoc endTypeCheckLoc) const;
 
@@ -875,7 +873,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ArrayRef<VarDecl *>>
+  ArrayRef<VarDecl *>
   evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
 
 public:
@@ -899,7 +897,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ArrayRef<Decl *>>
+  ArrayRef<Decl *>
   evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
 
 public:
@@ -917,7 +915,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<StorageImplInfo>
+  StorageImplInfo
   evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
@@ -938,7 +936,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool>
+  bool
   evaluate(Evaluator &evaluator, VarDecl *decl) const;
 
 public:
@@ -959,7 +957,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool>
+  bool
   evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
@@ -980,7 +978,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool>
+  bool
   evaluate(Evaluator &evaluator, AccessorDecl *decl) const;
 
 public:
@@ -1002,7 +1000,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<AccessorDecl *>
+  AccessorDecl *
   evaluate(Evaluator &evaluator, AbstractStorageDecl *decl,
            AccessorKind kind) const;
 
@@ -1024,7 +1022,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<DeclRange>
+  DeclRange
   evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
 
 public:
@@ -1045,7 +1043,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool>
+  bool
   evaluate(Evaluator &evaluator, ValueDecl *value) const;
 
 public:
@@ -1066,8 +1064,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<AncestryFlags>
+  AncestryFlags
   evaluate(Evaluator &evaluator, ClassDecl *value) const;
+
 public:
   // Caching.
   bool isCached() const { return true; }
@@ -1088,7 +1087,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<GenericSignature>
+  GenericSignature
   evaluate(Evaluator &evaluator,
            GenericSignatureImpl *baseSignature,
            SmallVector<GenericTypeParamType *, 2> addedParameters,
@@ -1120,7 +1119,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<GenericSignature>
+  GenericSignature
   evaluate(Evaluator &evaluator,
            ModuleDecl *module,
            GenericSignatureImpl *baseSignature,
@@ -1155,7 +1154,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type> evaluate(Evaluator &eval, ExtensionDecl *) const;
+  Type evaluate(Evaluator &eval, ExtensionDecl *) const;
 public:
   // Caching.
   bool isCached() const { return true; }
@@ -1172,7 +1171,7 @@ private:
   friend SimpleRequest;
   
   // Evaluation.
-  llvm::Expected<OperatorDecl *>
+  OperatorDecl *
   evaluate(Evaluator &evaluator, FuncDecl *value) const;
   
 public:
@@ -1191,7 +1190,7 @@ private:
   friend SimpleRequest;
   
   // Evaluation.
-  llvm::Expected<GenericSignature>
+  GenericSignature
   evaluate(Evaluator &evaluator, GenericContext *value) const;
   
 public:
@@ -1213,8 +1212,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type> evaluate(Evaluator &evaluator,
-                                TypeAliasDecl *decl) const;
+  Type evaluate(Evaluator &evaluator, TypeAliasDecl *decl) const;
 
 public:
   // Caching.
@@ -1236,7 +1234,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<PrecedenceGroupDecl *>
+  PrecedenceGroupDecl *
   evaluate(Evaluator &evaluator, InfixOperatorDecl *PGD) const;
 
 public:
@@ -1247,7 +1245,7 @@ public:
 /// Computes the raw values for an enum type.
 class EnumRawValuesRequest :
     public SimpleRequest<EnumRawValuesRequest,
-                         bool (EnumDecl *, TypeResolutionStage),
+                         evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
                          CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1256,7 +1254,7 @@ private:
   friend SimpleRequest;
   
   // Evaluation.
-  llvm::Expected<bool>
+  evaluator::SideEffect
   evaluate(Evaluator &evaluator, EnumDecl *ED, TypeResolutionStage stage) const;
   
 public:
@@ -1266,8 +1264,8 @@ public:
                            
   // Separate caching.
   bool isCached() const;
-  Optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
+  Optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect value) const;
 };
 
 /// Determines if an override is ABI compatible with its base method.
@@ -1281,7 +1279,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Caching.
@@ -1299,7 +1297,7 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Expected<OpaqueTypeDecl *>
+  OpaqueTypeDecl *
   evaluate(Evaluator &evaluator, ValueDecl *VD) const;
 
 public:
@@ -1319,7 +1317,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool>
+  bool
   evaluate(Evaluator &evaluator, FuncDecl *value) const;
 
 public:
@@ -1343,8 +1341,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                AbstractFunctionDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, AbstractFunctionDecl *decl) const;
 
 public:
   // Separate caching.
@@ -1365,7 +1362,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ParamSpecifier>
+  ParamSpecifier
   evaluate(Evaluator &evaluator, ParamDecl *decl) const;
 
 public:
@@ -1389,7 +1386,7 @@ private:
   TypeLoc &getResultTypeLoc() const;
 
   // Evaluation.
-  llvm::Expected<Type> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  Type evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Separate caching.
@@ -1410,7 +1407,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<const PatternBindingEntry *>
+  const PatternBindingEntry *
   evaluate(Evaluator &evaluator, PatternBindingDecl *PBD, unsigned i) const;
 
 public:
@@ -1430,8 +1427,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<NamedPattern *> evaluate(Evaluator &evaluator,
-                                          VarDecl *VD) const;
+  NamedPattern * evaluate(Evaluator &evaluator, VarDecl *VD) const;
 
 public:
   // Separate caching.
@@ -1451,7 +1447,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type>
+  Type
   evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
@@ -1506,7 +1502,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<PrecedenceGroupDecl *>
+  PrecedenceGroupDecl *
   evaluate(Evaluator &evaluator, PrecedenceGroupDescriptor descriptor) const;
 
 public:
@@ -1533,8 +1529,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                NominalTypeDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
 
 public:
   // Caching.
@@ -1554,8 +1549,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                NominalTypeDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
 
 public:
   // Caching.
@@ -1573,7 +1567,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, StructDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, StructDecl *decl) const;
 
 public:
   // Caching.
@@ -1592,8 +1586,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
-                                             NominalTypeDecl *decl) const;
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
 
 public:
   // Caching.
@@ -1617,8 +1610,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
-                                             NominalTypeDecl *decl) const;
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
 
 public:
   // Caching.
@@ -1637,7 +1629,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+  bool evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *decl) const;
 
 public:
@@ -1657,8 +1649,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
-                                             NominalTypeDecl *decl) const;
+  ConstructorDecl * evaluate(Evaluator &evaluator,
+                             NominalTypeDecl *decl) const;
 
 public:
   // Caching.
@@ -1676,9 +1668,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, DeclContext *DC,
-                                ValueDecl *VD1, ValueDecl *VD2,
-                                bool dynamic) const;
+  bool evaluate(Evaluator &evaluator, DeclContext *DC,
+                ValueDecl *VD1, ValueDecl *VD2,
+                bool dynamic) const;
 
 public:
   // Caching.
@@ -1697,7 +1689,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, ClassDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ClassDecl *decl) const;
 
 public:
   // Separate caching.
@@ -1718,7 +1710,8 @@ enum class ImplicitMemberAction : uint8_t {
 
 class ResolveImplicitMemberRequest
     : public SimpleRequest<ResolveImplicitMemberRequest,
-                           bool(NominalTypeDecl *, ImplicitMemberAction),
+                           evaluator::SideEffect(NominalTypeDecl *,
+                                                 ImplicitMemberAction),
                            CacheKind::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1727,8 +1720,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, NominalTypeDecl *NTD,
-                                ImplicitMemberAction action) const;
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, NominalTypeDecl *NTD,
+           ImplicitMemberAction action) const;
 
 public:
   // Separate caching.
@@ -1747,7 +1741,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<TypeWitnessAndDecl>
+  TypeWitnessAndDecl
   evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance,
            AssociatedTypeDecl *ATD) const;
 
@@ -1769,9 +1763,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Witness> evaluate(Evaluator &evaluator,
-                                   NormalProtocolConformance *conformance,
-                                   ValueDecl *VD) const;
+  Witness evaluate(Evaluator &evaluator,
+                   NormalProtocolConformance *conformance,
+                   ValueDecl *VD) const;
 
 public:
   // Separate caching.
@@ -1802,7 +1796,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<FunctionBuilderBodyPreCheck>
+  FunctionBuilderBodyPreCheck
   evaluate(Evaluator &evaluator, AnyFunctionRef fn) const;
 
 public:
@@ -1822,7 +1816,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, ClassDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ClassDecl *decl) const;
 
 public:
   // Cycle handling.
@@ -1845,7 +1839,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
 
 public:
   // Cycle handling.
@@ -1867,7 +1861,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, EnumDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, EnumDecl *decl) const;
 
 public:
   // Cycle handling.
@@ -1890,7 +1884,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Initializer *> evaluate(Evaluator &evaluator,
+  Initializer * evaluate(Evaluator &evaluator,
                                          ParamDecl *param) const;
 
 public:
@@ -1912,7 +1906,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Expr *> evaluate(Evaluator &evaluator, ParamDecl *param) const;
+  Expr *evaluate(Evaluator &evaluator, ParamDecl *param) const;
 
 public:
   // Separate caching.
@@ -1934,8 +1928,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Expr *> evaluate(Evaluator &evaluator,
-                                  DefaultArgumentExpr *defaultExpr) const;
+  Expr * evaluate(Evaluator &evaluator, DefaultArgumentExpr *defaultExpr) const;
 
 public:
   // Separate caching.
@@ -1956,8 +1949,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, CanType ty,
-                                DeclContext *dc) const;
+  bool evaluate(Evaluator &evaluator, CanType ty, DeclContext *dc) const;
 
 public:
   // Cached.
@@ -1974,8 +1966,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ValueDecl *> evaluate(Evaluator &evaluator,
-                                       ValueDecl *VD) const;
+  ValueDecl * evaluate(Evaluator &evaluator, ValueDecl *VD) const;
 
 public:
   // Caching.
@@ -1984,7 +1975,8 @@ public:
 
 class TypeCheckSourceFileRequest :
     public SimpleRequest<TypeCheckSourceFileRequest,
-                         bool (SourceFile *), CacheKind::SeparatelyCached> {
+                         evaluator::SideEffect (SourceFile *),
+                         CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1992,13 +1984,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, SourceFile *SF) const;
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, SourceFile *SF) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<bool> getCachedResult() const;
-  void cacheResult(bool result) const;
+  Optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect) const;
 };
 
 /// Computes whether the specified type or a super-class/super-protocol has the
@@ -2013,7 +2006,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, CanType ty) const;
+  bool evaluate(Evaluator &evaluator, CanType ty) const;
 
 public:
   bool isCached() const {
@@ -2036,7 +2029,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, CanType ty) const;
+  bool evaluate(Evaluator &evaluator, CanType ty) const;
 
 public:
   bool isCached() const {
@@ -2062,8 +2055,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type> evaluate(
-      Evaluator &evaluator, ContextualPattern pattern) const;
+  Type evaluate(Evaluator &evaluator, ContextualPattern pattern) const;
 
 public:
   bool isCached() const { return true; }
@@ -2085,7 +2077,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<llvm::ArrayRef<Identifier>>
+  llvm::ArrayRef<Identifier>
   evaluate(Evaluator &evaluator, const Decl *decl) const;
 
 public:
@@ -2112,8 +2104,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<IndexSubset *> evaluate(Evaluator &evaluator,
-                                         DifferentiableAttr *attr) const;
+  IndexSubset * evaluate(Evaluator &evaluator,
+                         DifferentiableAttr *attr) const;
 
 public:
   // Separate caching.
@@ -2134,8 +2126,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation
-  llvm::Expected<bool> evaluate(Evaluator &evaluator, TypeEraserAttr *attr,
-                                ProtocolDecl *protocol) const;
+  bool evaluate(Evaluator &evaluator, TypeEraserAttr *attr,
+                ProtocolDecl *protocol) const;
 
 public:
   bool isCached() const { return true; }
@@ -2159,8 +2151,8 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Expected<ArrayRef<ValueDecl *>> evaluate(Evaluator &evaluator,
-                                                 ImportDecl *import) const;
+  ArrayRef<ValueDecl *>
+  evaluate(Evaluator &evaluator, ImportDecl *import) const;
 
 public:
   // Cached.
@@ -2178,8 +2170,7 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                ClosureExpr *closure) const;
+  bool evaluate(Evaluator &evaluator, ClosureExpr *closure) const;
 
 public:
   bool isCached() const { return true; }
@@ -2214,8 +2205,29 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ProtocolConformanceLookupResult>
+  ProtocolConformanceLookupResult
   evaluate(Evaluator &evaluator, const DeclContext *DC) const;
+};
+
+class CheckRedeclarationRequest :
+    public SimpleRequest<CheckRedeclarationRequest,
+                         evaluator::SideEffect (ValueDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+ private:
+  friend SimpleRequest;
+
+   // Evaluation.
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+
+ public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

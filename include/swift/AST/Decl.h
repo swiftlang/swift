@@ -2186,6 +2186,9 @@ public:
   /// Can the pattern at index i be default initialized?
   bool isDefaultInitializable(unsigned i) const;
 
+  /// Can the property wrapper be used to provide default initialization?
+  bool isDefaultInitializableViaPropertyWrapper(unsigned i) const;
+
   /// Does this pattern have a user-provided initializer expression?
   bool isExplicitlyInitialized(unsigned i) const;
 
@@ -2433,6 +2436,7 @@ class ValueDecl : public Decl {
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
   friend class InterfaceTypeRequest;
+  friend class CheckRedeclarationRequest;
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
 protected:
@@ -2454,23 +2458,23 @@ protected:
     Bits.ValueDecl.AlreadyInLookupTable = value;
   }
 
-public:
-  /// Return true if this protocol member is a protocol requirement.
-  ///
-  /// Asserts if this is not a member of a protocol.
-  bool isProtocolRequirement() const;
-
   /// Determine whether we have already checked whether this
   /// declaration is a redeclaration.
-  bool alreadyCheckedRedeclaration() const { 
+  bool alreadyCheckedRedeclaration() const {
     return Bits.ValueDecl.CheckedRedeclaration;
   }
 
   /// Set whether we have already checked this declaration as a
   /// redeclaration.
-  void setCheckedRedeclaration(bool checked) {
-    Bits.ValueDecl.CheckedRedeclaration = checked;
+  void setCheckedRedeclaration() {
+    Bits.ValueDecl.CheckedRedeclaration = true;
   }
+
+public:
+  /// Return true if this protocol member is a protocol requirement.
+  ///
+  /// Asserts if this is not a member of a protocol.
+  bool isProtocolRequirement() const;
 
   void setUserAccessible(bool Accessible) {
     Bits.ValueDecl.IsUserAccessible = Accessible;
@@ -5138,15 +5142,17 @@ public:
   void setTopLevelGlobal(bool b) { Bits.VarDecl.IsTopLevelGlobal = b; }
   
   /// Retrieve the custom attributes that attach property wrappers to this
-  /// property. The returned list contains all of the attached property wrapper attributes in source order,
-  /// which means the outermost wrapper attribute is provided first.
+  /// property. The returned list contains all of the attached property wrapper
+  /// attributes in source order, which means the outermost wrapper attribute
+  /// is provided first.
   llvm::TinyPtrVector<CustomAttr *> getAttachedPropertyWrappers() const;
 
   /// Whether this property has any attached property wrappers.
   bool hasAttachedPropertyWrapper() const;
   
-  /// Whether all of the attached property wrappers have an init(initialValue:) initializer.
-  bool allAttachedPropertyWrappersHaveInitialValueInit() const;
+  /// Whether all of the attached property wrappers have an init(wrappedValue:)
+  /// initializer.
+  bool allAttachedPropertyWrappersHaveWrappedValueInit() const;
   
   /// Retrieve the type of the attached property wrapper as a contextual
   /// type.
@@ -5210,7 +5216,7 @@ public:
   /// \end
   ///
   /// Or when there is no initializer but each composed property wrapper has
-  /// a suitable `init(initialValue:)`.
+  /// a suitable `init(wrappedValue:)`.
   bool isPropertyMemberwiseInitializedWithWrappedType() const;
 
   /// Whether the innermost property wrapper's initializer's 'wrappedValue' parameter
@@ -5796,6 +5802,7 @@ public:
 private:
   ParameterList *Params;
 
+private:
   /// The generation at which we last loaded derivative function configurations.
   unsigned DerivativeFunctionConfigGeneration = 0;
   /// Prepare to traverse the list of derivative function configurations.
@@ -5809,6 +5816,13 @@ private:
   ///   configurations from imported modules.
   struct DerivativeFunctionConfigurationList;
   DerivativeFunctionConfigurationList *DerivativeFunctionConfigs = nullptr;
+
+public:
+  /// Get all derivative function configurations.
+  ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
+
+  /// Add the given derivative function configuration.
+  void addDerivativeFunctionConfiguration(AutoDiffConfig config);
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
@@ -6128,12 +6142,6 @@ public:
   /// Tests if this is a function returning a DynamicSelfType, or a
   /// constructor.
   bool hasDynamicSelfResult() const;
-
-  /// Get all derivative function configurations.
-  ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
-
-  /// Add the given derivative function configuration.
-  void addDerivativeFunctionConfiguration(AutoDiffConfig config);
 
   using DeclContext::operator new;
   using Decl::getASTContext;

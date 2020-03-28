@@ -243,7 +243,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
               decls.end());
 }
 
-llvm::Expected<QualifiedLookupResult> LookupInModuleRequest::evaluate(
+QualifiedLookupResult
+LookupInModuleRequest::evaluate(
     Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
     NLKind lookupKind, ResolutionKind resolutionKind,
     const DeclContext *moduleScopeContext) const {

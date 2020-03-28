@@ -517,6 +517,10 @@ Types
   FUNCTION-KIND ::= 'C'                      // C function pointer type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
+  FUNCTION-KIND ::= 'F'                      // @differentiable function type
+  FUNCTION-KIND ::= 'G'                      // @differentiable function type (escaping)
+  FUNCTION-KIND ::= 'H'                      // @differentiable(linear) function type
+  FUNCTION-KIND ::= 'I'                      // @differentiable(linear) function type (escaping)
 
   function-signature ::= params-type params-type throws? // results and parameters
 
@@ -585,13 +589,17 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? PARAM-CONVENTION* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? PARAM-CONVENTION* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION)?
 
   PATTERN-SUBS ::= 's'                       // has pattern substitutions
   INVOCATION-SUB ::= 'I'                     // has invocation substitutions
   PSEUDO-GENERIC ::= 'P'
 
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
+
+  DIFFERENTIABILITY-KIND ::= DIFFERENTIABLE | LINEAR
+  DIFFERENTIABLE ::= 'd'                     // @differentiable
+  LINEAR ::= 'l'                             // @differentiable(linear)
 
   CALLEE-CONVENTION ::= 'y'                  // @callee_unowned
   CALLEE-CONVENTION ::= 'g'                  // @callee_guaranteed

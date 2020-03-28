@@ -1231,12 +1231,30 @@ namespace {
         break;
       }
 
+      FunctionMetadataDifferentiabilityKind metadataDifferentiabilityKind;
+      switch (type->getDifferentiabilityKind()) {
+      case DifferentiabilityKind::NonDifferentiable:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::NonDifferentiable;
+        break;
+      case DifferentiabilityKind::Normal:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Normal;
+        break;
+      case DifferentiabilityKind::Linear:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Linear;
+        break;
+      }
+
       auto flagsVal = FunctionTypeFlags()
                           .withNumParameters(numParams)
                           .withConvention(metadataConvention)
                           .withThrows(type->throws())
                           .withParameterFlags(hasFlags)
-                          .withEscaping(isEscaping);
+                          .withEscaping(isEscaping)
+                          .withDifferentiabilityKind(
+                              metadataDifferentiabilityKind);
 
       auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                           flagsVal.getIntValue());

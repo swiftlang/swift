@@ -166,7 +166,7 @@ static bool shouldUseObjCUSR(const Decl *D) {
   return false;
 }
 
-llvm::Expected<std::string>
+std::string
 swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
                                       const ValueDecl *D) const {
   if (auto *VD = dyn_cast<VarDecl>(D))
@@ -254,7 +254,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
   return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
 }
 
-llvm::Expected<std::string>
+std::string
 swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
                                             const TypeDecl *D) const {
   if (isa<ModuleDecl>(D))

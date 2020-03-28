@@ -81,6 +81,12 @@ void simple_display(llvm::raw_ostream &out, ArithmeticExpr *expr) {
   }
 }
 
+/// Helper to short-circuit errors to NaN.
+template<typename Request>
+static double evalOrNaN(Evaluator &evaluator, const Request &request) {
+  return evaluateOrDefault(evaluator, request, NAN);
+}
+
 /// Rule to evaluate the value of the expression.
 template<typename Derived, CacheKind Caching>
 struct EvaluationRule
@@ -89,8 +95,9 @@ struct EvaluationRule
   using SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
       ::SimpleRequest;
 
-  llvm::Expected<double>
-  evaluate(Evaluator &evaluator, ArithmeticExpr *expr) const {
+  static bool brokeCycle;
+
+  double evaluate(Evaluator &evaluator, ArithmeticExpr *expr) const {
     switch (expr->kind) {
     case ArithmeticExpr::Kind::Literal:
       return static_cast<Literal *>(expr)->value;
@@ -99,19 +106,23 @@ struct EvaluationRule
       auto binary = static_cast<Binary *>(expr);
 
       // Evaluate the left- and right-hand sides.
-      auto lhsValue = evaluator(Derived{binary->lhs});
-      if (!lhsValue)
+      auto lhsValue = evalOrNaN(evaluator, Derived{binary->lhs});
+      if (std::isnan(lhsValue)) {
+        brokeCycle = true;
         return lhsValue;
-      auto rhsValue = evaluator(Derived{binary->rhs});
-      if (!rhsValue)
+      }
+      auto rhsValue = evalOrNaN(evaluator, Derived{binary->rhs});
+      if (std::isnan(rhsValue)) {
+        brokeCycle = true;
         return rhsValue;
+      }
 
       switch (binary->operatorKind) {
       case Binary::OperatorKind::Sum:
-        return *lhsValue + *rhsValue;
+        return lhsValue + rhsValue;
 
       case Binary::OperatorKind::Product:
-        return *lhsValue * *rhsValue;
+        return lhsValue * rhsValue;
       }
     }
     }
@@ -119,6 +130,9 @@ struct EvaluationRule
 
   SourceLoc getNearestLoc() const { return SourceLoc(); }
 };
+
+template<typename Derived, CacheKind Caching>
+bool EvaluationRule<Derived, Caching>::brokeCycle = false;
 
 struct InternallyCachedEvaluationRule :
 EvaluationRule<InternallyCachedEvaluationRule, CacheKind::Cached>
@@ -191,12 +205,6 @@ static AbstractRequestFunction *arithmeticRequestFunctions[] = {
 #include "ArithmeticEvaluatorTypeIDZone.def"
 #undef SWIFT_REQUEST
 };
-
-/// Helper to short-circuit errors to NaN.
-template<typename Request>
-static double evalOrNaN(Evaluator &evaluator, const Request &request) {
-  return evaluateOrDefault(evaluator, request, NAN);
-}
 
 
 TEST(ArithmeticEvaluator, Simple) {
@@ -342,15 +350,42 @@ TEST(ArithmeticEvaluator, Cycle) {
                                      arithmeticRequestFunctions);
 
   // Evaluate when there is a cycle.
-  bool cycleDetected = false;
-  auto result = evaluator(UncachedEvaluationRule(sum));
-  if (auto err = result.takeError()) {
-    llvm::handleAllErrors(std::move(err),
-      [&](const CyclicalRequestError<UncachedEvaluationRule> &E) {
-        cycleDetected = true;
-      });
-  }
-  EXPECT_TRUE(cycleDetected);
+  UncachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   UncachedEvaluationRule(product))));
+  EXPECT_TRUE(UncachedEvaluationRule::brokeCycle);
+
+  // Cycle-breaking result is cached.
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   UncachedEvaluationRule(product))));
+  UncachedEvaluationRule::brokeCycle = false;
+  EXPECT_FALSE(UncachedEvaluationRule::brokeCycle);
+
+  // Evaluate when there is a cycle.
+  evaluator.clearCache();
+  InternallyCachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   InternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(InternallyCachedEvaluationRule::brokeCycle);
+
+  // Cycle-breaking result is cached.
+  InternallyCachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   InternallyCachedEvaluationRule(product))));
+  EXPECT_FALSE(InternallyCachedEvaluationRule::brokeCycle);
+
+  // Evaluate when there is a cycle.
+  evaluator.clearCache();
+  ExternallyCachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   ExternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(ExternallyCachedEvaluationRule::brokeCycle);
+
+  // Cycle-breaking result is cached.
+  ExternallyCachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   ExternallyCachedEvaluationRule(product))));
+  EXPECT_FALSE(ExternallyCachedEvaluationRule::brokeCycle);
 
   // Dependency printing.
   std::string productDependencies;
