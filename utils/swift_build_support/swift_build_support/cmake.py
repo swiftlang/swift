@@ -243,7 +243,7 @@ class CMake(object):
         cwd = os.getcwd()
         os.chdir(cmake_build_dir)
         shell.call_without_sleeping([cmake_bootstrap], echo=True)
-        shell.call_without_sleeping(['make', '-j%s' % self.args.build_jobs],
+        shell.call_without_sleeping(['make', '-DCMAKE_USE_OPENSSL=OFF', '-j%s' % self.args.build_jobs],
                                     echo=True)
         os.chdir(cwd)
         return os.path.join(cmake_build_dir, 'bin', 'cmake')
