@@ -100,7 +100,7 @@ extension ${swiftType}: AtomicProtocol {
   @_transparent @_alwaysEmitIntoClient
   public static func atomicLoad(
     at address: UnsafeMutablePointer<${swiftType}>,
-    ordering: AtomicLoadOrdering = .sequentiallyConsistent
+    ordering: AtomicLoadOrdering
   ) -> ${swiftType} {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder) in loadOrderings():
@@ -118,7 +118,7 @@ extension ${swiftType}: AtomicProtocol {
   public static func atomicStore(
     at address: UnsafeMutablePointer<${swiftType}>,
     _ desired: ${swiftType},
-    ordering: AtomicStoreOrdering = .sequentiallyConsistent
+    ordering: AtomicStoreOrdering
   ) {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder) in storeOrderings():
@@ -139,7 +139,7 @@ extension ${swiftType}: AtomicProtocol {
   public static func atomicExchange(
     at address: UnsafeMutablePointer<${swiftType}>,
     _ desired: ${swiftType},
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) -> ${swiftType} {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder, _) in rmwOrderings():
@@ -171,7 +171,7 @@ extension ${swiftType}: AtomicProtocol {
     at address: UnsafeMutablePointer<${swiftType}>,
     expected: ${swiftType},
     desired: ${swiftType},
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: ${swiftType}) {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder, failureOrder) in rmwOrderings():
@@ -261,7 +261,7 @@ extension ${swiftType}: AtomicInteger {
   public static func atomicLoadThen${name}(
     at address: UnsafeMutablePointer<Self>,
     ${label} operand: Self${defaultValue},
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) -> Self {
     switch ordering {
     % for (swiftOrder, _, _, llvmOrder, failureOrder) in rmwOrderings():

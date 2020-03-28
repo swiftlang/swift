@@ -69,7 +69,7 @@ extension UnsafeAtomicPointer {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func load(
-    ordering: AtomicLoadOrdering = .sequentiallyConsistent
+    ordering: AtomicLoadOrdering
   ) -> Value {
     Value.atomicLoad(at: _ptr, ordering: ordering)
   }
@@ -80,7 +80,7 @@ extension UnsafeAtomicPointer {
   @_transparent @_alwaysEmitIntoClient
   public func store(
     _ desired: Value,
-    ordering: AtomicStoreOrdering = .sequentiallyConsistent
+    ordering: AtomicStoreOrdering
   ) {
     Value.atomicStore(at: _ptr, desired, ordering: ordering)
   }
@@ -93,7 +93,7 @@ extension UnsafeAtomicPointer {
   @_transparent @_alwaysEmitIntoClient
   public func exchange(
     _ desired: Value,
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) -> Value {
     Value.atomicExchange(at: _ptr, desired, ordering: ordering)
   }
@@ -118,7 +118,7 @@ extension UnsafeAtomicPointer {
   public func compareExchange(
     expected: Value,
     desired: Value,
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Value) {
     Value.atomicCompareExchange(
       at: _ptr,
@@ -176,7 +176,7 @@ extension UnsafeAtomicPointer where Value: AtomicInteger {
   @_transparent @_alwaysEmitIntoClient
   public func loadThen${name}(
     ${label} operand: Value${defaultValue(name)},
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) -> Value {
     Value.atomicLoadThen${name}(
       at: _ptr,
@@ -199,7 +199,7 @@ extension UnsafeAtomicPointer where Value: AtomicInteger {
   @_transparent @_alwaysEmitIntoClient
   public func ${lowerFirst(name)}ThenLoad(
     ${label} operand: Value${defaultValue(name)},
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) -> Value {
     Value.atomicLoadThen${name}(
       at: _ptr,
@@ -217,7 +217,7 @@ extension UnsafeAtomicPointer where Value: AtomicInteger {
   @_transparent @_alwaysEmitIntoClient
   public func wrappingIncrement(
     by operand: Value = 1,
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) {
     _ = Value.atomicLoadThenWrappingIncrement(
       at: _ptr,
@@ -234,7 +234,7 @@ extension UnsafeAtomicPointer where Value: AtomicInteger {
   @_transparent @_alwaysEmitIntoClient
   public func wrappingDecrement(
     by operand: Value = 1,
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) {
     _ = Value.atomicLoadThenWrappingDecrement(
       at: _ptr,

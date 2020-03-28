@@ -125,7 +125,7 @@ extension ${swiftType}: AtomicProtocol {
   @_transparent @_alwaysEmitIntoClient
   public static func atomicLoad(
     at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicLoadOrdering = .sequentiallyConsistent
+    ordering: AtomicLoadOrdering
   ) -> Self {
     let raw: Builtin.${builtinType}
     switch ordering {
@@ -145,7 +145,7 @@ extension ${swiftType}: AtomicProtocol {
   public static func atomicStore(
     at address: UnsafeMutablePointer<AtomicStorage>,
     _ desired: Self,
-    ordering: AtomicStoreOrdering = .sequentiallyConsistent
+    ordering: AtomicStoreOrdering
   ) {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder) in storeOrderings():
@@ -166,7 +166,7 @@ extension ${swiftType}: AtomicProtocol {
   public static func atomicExchange(
     at address: UnsafeMutablePointer<AtomicStorage>,
     _ desired: Self,
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) -> Self {
     let rawResult: Builtin.${builtinType}
     switch ordering {
@@ -201,7 +201,7 @@ extension ${swiftType}: AtomicProtocol {
     at address: UnsafeMutablePointer<AtomicStorage>,
     expected: Self,
     desired: Self,
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self) {
     let old: Builtin.${builtinType}
     let won: Builtin.Int1
@@ -353,7 +353,7 @@ extension ${swiftType}: NullableAtomic {
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalLoad(
     at address: UnsafeMutablePointer<NullableAtomicStorage>,
-    ordering: AtomicLoadOrdering = .sequentiallyConsistent
+    ordering: AtomicLoadOrdering
   ) -> Self? {
     let raw: Builtin.${builtinType}
     switch ordering {
@@ -373,7 +373,7 @@ extension ${swiftType}: NullableAtomic {
   public static func atomicOptionalStore(
     at address: UnsafeMutablePointer<NullableAtomicStorage>,
     _ desired: Self?,
-    ordering: AtomicStoreOrdering = .sequentiallyConsistent
+    ordering: AtomicStoreOrdering
   ) {
     switch ordering {
 %   for (swiftOrder, _, _, llvmOrder) in storeOrderings():
@@ -394,7 +394,7 @@ extension ${swiftType}: NullableAtomic {
   public static func atomicOptionalExchange(
     at address: UnsafeMutablePointer<NullableAtomicStorage>,
     _ desired: Self?,
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) -> Self? {
     let rawResult: Builtin.${builtinType}
     switch ordering {
@@ -429,7 +429,7 @@ extension ${swiftType}: NullableAtomic {
     at address: UnsafeMutablePointer<NullableAtomicStorage>,
     expected: Self?,
     desired: Self?,
-    ordering: AtomicUpdateOrdering = .sequentiallyConsistent
+    ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self?) {
     let old: Builtin.${builtinType}
     let won: Builtin.Int1

@@ -75,22 +75,6 @@ suite.test("UnsafeAtomicPointer<${type}>.create-destroy") {
   expectEqual(w.load(ordering: .relaxed), 42)
 }
 
-//----------------------------------------------------------------------
-
-suite.test("UnsafeAtomicPointer<${type}>.load.default-order") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
-    return
-  }
-
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: 0)
-  defer { v.destroy() }
-  expectEqual(v.load(), 0)
-
-  let w = UnsafeAtomicPointer<${type}>.create(initialValue: 23)
-  defer { w.destroy() }
-  expectEqual(w.load(), 23)
-}
-
 % for order in loadOrderings:
 suite.test("UnsafeAtomicPointer<${type}>.load.${order}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
@@ -106,23 +90,6 @@ suite.test("UnsafeAtomicPointer<${type}>.load.${order}") {
   expectEqual(w.load(ordering: .${order}), 23)
 }
 % end
-
-//----------------------------------------------------------------------
-
-suite.test("UnsafeAtomicPointer<${type}>.store.default-order") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
-    return
-  }
-
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: 0)
-  defer { v.destroy() }
-
-  v.store(23)
-  expectEqual(v.load(ordering: .relaxed), 23)
-
-  v.store(42)
-  expectEqual(v.load(ordering: .relaxed), 42)
-}
 
 % for order in storeOrderings:
 suite.test("UnsafeAtomicPointer<${type}>.store.${order}") {
@@ -141,23 +108,6 @@ suite.test("UnsafeAtomicPointer<${type}>.store.${order}") {
 }
 % end
 
-//----------------------------------------------------------------------
-
-suite.test("UnsafeAtomicPointer<${type}>.exchange.default-order") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
-    return
-  }
-
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: 0)
-  defer { v.destroy() }
-
-  expectEqual(v.exchange(42), 0)
-  expectEqual(v.load(ordering: .relaxed), 42)
-
-  expectEqual(v.exchange(23), 42)
-  expectEqual(v.load(ordering: .relaxed), 23)
-}
-
 % for order in rmwOrderings:
 suite.test("UnsafeAtomicPointer<${type}>.exchange.${order}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
@@ -174,38 +124,6 @@ suite.test("UnsafeAtomicPointer<${type}>.exchange.${order}") {
   expectEqual(v.load(ordering: .relaxed), 23)
 }
 % end
-
-//----------------------------------------------------------------------
-
-suite.test("UnsafeAtomicPointer<${type}>.compareExchange.default-order") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
-    return
-  }
-
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: 0)
-  defer { v.destroy() }
-
-  var (exchanged, original) = v.compareExchange(
-    expected: 0,
-    desired: 1)
-  expectTrue(exchanged)
-  expectEqual(original, 0)
-  expectEqual(v.load(ordering: .relaxed), 1)
-
-  (exchanged, original) = v.compareExchange(
-    expected: 0,
-    desired: 2)
-  expectFalse(exchanged)
-  expectEqual(original, 1)
-  expectEqual(v.load(ordering: .relaxed), 1)
-
-  (exchanged, original) = v.compareExchange(
-    expected: 1,
-    desired: 2)
-  expectTrue(exchanged)
-  expectEqual(original, 1)
-  expectEqual(v.load(ordering: .relaxed), 2)
-}
 
 % for order in rmwOrderings:
 suite.test("UnsafeAtomicPointer<${type}>.compareExchange.${order}") {
@@ -241,8 +159,6 @@ suite.test("UnsafeAtomicPointer<${type}>.compareExchange.${order}") {
   expectEqual(v.load(ordering: .relaxed), 2)
 }
 % end
-
-//----------------------------------------------------------------------
 
 % for order in rmwOrderings:
 %   for failorder in loadOrderings:
@@ -284,32 +200,7 @@ suite.test("UnsafeAtomicPointer<${type}>.compareExchange.${order}.${failorder}")
 %   end
 % end
 
-//----------------------------------------------------------------------
-
 % for (name, _, operator, label, _) in integerOperations:
-suite.test("UnsafeAtomicPointer<${type}>.loadThen${name}.default-order") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
-    return
-  }
-
-  let a: ${type} = 3
-  let b: ${type} = 8
-  let c: ${type} = 12
-  let result1: ${type} = a ${operator} b
-  let result2: ${type} = result1 ${operator} c
-
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: a)
-  defer { v.destroy() }
-
-  let old1 = v.loadThen${name}(${argLabel(label)}b)
-  expectEqual(old1, a)
-  expectEqual(v.load(ordering: .relaxed), result1)
-
-  let old2 = v.loadThen${name}(${argLabel(label)}c)
-  expectEqual(old2, result1)
-  expectEqual(v.load(ordering: .relaxed), result2)
-}
-
 %   for order in rmwOrderings:
 suite.test("UnsafeAtomicPointer<${type}>.loadThen${name}.${order}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
@@ -336,32 +227,7 @@ suite.test("UnsafeAtomicPointer<${type}>.loadThen${name}.${order}") {
 %   end
 % end
 
-//----------------------------------------------------------------------
-
 % for (name, _, operator, label, _) in integerOperations:
-suite.test("UnsafeAtomicPointer<${type}>.${lowerFirst(name)}ThenLoad.default-order") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
-    return
-  }
-
-  let a: ${type} = 3
-  let b: ${type} = 8
-  let c: ${type} = 12
-  let result1: ${type} = a ${operator} b
-  let result2: ${type} = result1 ${operator} c
-
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: a)
-  defer { v.destroy() }
-
-  let new1 = v.${lowerFirst(name)}ThenLoad(${argLabel(label)}b)
-  expectEqual(new1, result1)
-  expectEqual(v.load(ordering: .relaxed), result1)
-
-  let new2 = v.${lowerFirst(name)}ThenLoad(${argLabel(label)}c)
-  expectEqual(new2, result2)
-  expectEqual(v.load(ordering: .relaxed), result2)
-}
-
 %   for order in rmwOrderings:
 suite.test("UnsafeAtomicPointer<${type}>.${lowerFirst(name)}ThenLoad.${order}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
@@ -387,7 +253,5 @@ suite.test("UnsafeAtomicPointer<${type}>.${lowerFirst(name)}ThenLoad.${order}") 
 }
 %   end
 % end
-
-//----------------------------------------------------------------------
 
 % end
