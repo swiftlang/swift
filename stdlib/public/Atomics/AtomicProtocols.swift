@@ -14,7 +14,7 @@ import Swift
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol AtomicProtocol {
-  associatedtype AtomicStorage = Self
+  associatedtype AtomicStorage
 
   static func atomicStorage(for value: Self) -> AtomicStorage
 

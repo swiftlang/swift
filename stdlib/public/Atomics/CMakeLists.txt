@@ -13,6 +13,7 @@
 add_swift_target_library(swiftAtomics ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   AtomicMemoryOrderings.swift
   AtomicProtocols.swift
+  AtomicRepresentable.swift
   UnsafeAtomicLazyReference.swift
 
   GYB_SOURCES
