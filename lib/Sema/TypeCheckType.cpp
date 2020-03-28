@@ -977,7 +977,9 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
                                            Type parentTy,
                                            SourceLoc loc,
                                            TypeDecl *typeDecl) {
-  auto protocol = dyn_cast<ProtocolDecl>(typeDecl->getDeclContext());
+  assert(isa<AssociatedTypeDecl>(typeDecl) || isa<TypeAliasDecl>(typeDecl));
+
+  const auto protocol = dyn_cast<ProtocolDecl>(typeDecl->getDeclContext());
 
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
@@ -991,16 +993,18 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
 
   // If any errors have occurred, don't bother diagnosing this cross-file
   // issue.
-  ASTContext &ctx = dc->getASTContext();
+  const auto &ctx = dc->getASTContext();
   if (ctx.Diags.hadAnyError())
     return;
 
-  auto diagCode =
-    (!protocol || (conformance && !conformance->getConditionalRequirementsIfAvailable()))
-          ? diag::unsupported_recursion_in_associated_type_reference
-          : diag::broken_associated_type_witness;
+  const auto diagCode =
+    ((!protocol && !cast<TypeAliasDecl>(typeDecl)->isImplicit()) ||
+     (conformance && !conformance->getConditionalRequirementsIfAvailable()))
+      ? diag::unsupported_recursion_in_associated_type_reference
+      : diag::broken_associated_type_witness;
 
-  ctx.Diags.diagnose(loc, diagCode, isa<TypeAliasDecl>(typeDecl), typeDecl->getFullName(), parentTy);
+  ctx.Diags.diagnose(loc, diagCode, isa<TypeAliasDecl>(typeDecl),
+                     typeDecl->getFullName(), parentTy);
 }
 
 /// Returns a valid type or ErrorType in case of an error.

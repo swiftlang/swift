@@ -1,6 +1,7 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -print-ast | %FileCheck %s -check-prefix=DEFAULT_TYPE_WITNESS
 // RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
+// RUN: %target-typecheck-verify-swift
 
 protocol P1 {}
 protocol P2 {}
@@ -208,10 +209,10 @@ func subclass_bad() {
 struct InheritEqual<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual
 // CHECK-NEXT:  (normal_conformance type=InheritEqual<T> protocol=P2
 // CHECK-NEXT:    conforms_to: T P1)
 extension InheritEqual: P2 where T: P1 {} // expected-note {{requirement from conditional conformance of 'InheritEqual<U>' to 'P2'}}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual
 // CHECK-NEXT:  (normal_conformance type=InheritEqual<T> protocol=P5
 // CHECK-NEXT:    (normal_conformance type=InheritEqual<T> protocol=P2
@@ -238,10 +239,10 @@ extension InheritLess: P5 {} // expected-error{{type 'T' does not conform to pro
 struct InheritMore<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore
 // CHECK-NEXT:  (normal_conformance type=InheritMore<T> protocol=P2
 // CHECK-NEXT:    conforms_to: T P1)
 extension InheritMore: P2 where T: P1 {} // expected-note {{requirement from conditional conformance of 'InheritMore<U>' to 'P2'}}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore
 // CHECK-NEXT:  (normal_conformance type=InheritMore<T> protocol=P5
 // CHECK-NEXT:    (normal_conformance type=InheritMore<T> protocol=P2
@@ -429,3 +430,87 @@ func sr_10992_foo(_ fn: (SR_10992_S<String>) -> Void) {}
 func sr_10992_bar(_ fn: (SR_10992_P) -> Void) {
   sr_10992_foo(fn) // expected-error {{global function 'sr_10992_foo' requires that 'String' conform to 'SR_10992_P'}}
 }
+
+// SR-7516
+
+protocol SR_7516_P1 { associatedtype X = Void } // expected-note {{protocol requires nested type 'X'; do you want to add it?}}
+protocol SR_7516_P2 { associatedtype X = Bool }
+protocol SR_7516_P3 { associatedtype X = Void }
+protocol SR_7516_P4 { associatedtype X } // expected-note {{protocol requires nested type 'X'; do you want to add it?}}
+
+struct SR_7516_S1<T> {
+  class InnerBase<U: Sequence> where U.Element == X {}
+  class InnerDerived: InnerBase<[X]> {}
+  // expected-error@-2 {{'SR_7516_S1<T>.X' (aka '()') requires the types 'T' and 'Never' be equivalent}}
+  // expected-error@-2 {{'SR_7516_S1<T>.X' (aka '()') requires the types 'T' and 'Never' be equivalent}}
+}
+extension SR_7516_S1: SR_7516_P1 where T == Never { // expected-note 2{{requirement specified as 'T' == 'Never' [with T = T]}}
+  func bar(arg: X) {}
+// DEFAULT_TYPE_WITNESS: extension SR_7516_S1 : SR_7516_P1
+// DEFAULT_TYPE_WITNESS-NEXT: internal func bar(arg: X)
+// DEFAULT_TYPE_WITNESS-NEXT: internal typealias X = Void
+}
+
+struct SR_7516_S2<T>: SR_7516_P1 {
+// DEFAULT_TYPE_WITNESS: struct SR_7516_S2<T> : SR_7516_P1
+// DEFAULT_TYPE_WITNESS-NEXT: internal typealias X = Void
+}
+extension SR_7516_S2: SR_7516_P2 where T == Never {}
+extension SR_7516_S2 {
+  func foo(arg: X) {}
+}
+
+struct SR_7516_S3<T>: SR_7516_P1 {
+  let bar: X
+// DEFAULT_TYPE_WITNESS: struct SR_7516_S3<T> : SR_7516_P1
+// DEFAULT_TYPE_WITNESS-NEXT: internal let bar: X
+// DEFAULT_TYPE_WITNESS-NEXT: internal typealias X = Void
+}
+extension SR_7516_S3: SR_7516_P4 where T == Never {}
+
+struct SR_7516_S4<T>: SR_7516_P4 { // expected-error {{type 'SR_7516_S4<T>' does not conform to protocol 'SR_7516_P4'}}
+  let bar: X
+}
+extension SR_7516_S4: SR_7516_P1 where T == Never {} // expected-error {{type 'SR_7516_S4<T>' does not conform to protocol 'SR_7516_P1'}}
+
+class SR_7516_C1<T> {
+  var bar: X { fatalError() } // expected-error {{'SR_7516_C1<T>.X' (aka '()') requires the types 'T' and 'Never' be equivalent}}
+}
+// FIXME: Should this be an ambiguous situation where the user is
+// required to provide an explicit witness for X?
+extension SR_7516_C1: SR_7516_P1 where T == Never {
+  func foo(arg: X) {}
+}
+extension SR_7516_C1: SR_7516_P3 where T == Never { // expected-note 2{{requirement specified as 'T' == 'Never' [with T = T]}}
+
+// DEFAULT_TYPE_WITNESS: extension SR_7516_C1 : SR_7516_P3
+// DEFAULT_TYPE_WITNESS-NEXT: internal typealias X = Void
+}
+extension SR_7516_C1 {
+  typealias Y = X // expected-error {{'SR_7516_C1<T>.X' (aka '()') requires the types 'T' and 'Never' be equivalent}}
+}
+
+enum SR_7516_E1<T, U> {
+  // FIXME: Diagnostics QoI
+  case never(X) // expected-error {{type 'T' does not conform to protocol 'Equatable'}}
+}
+extension SR_7516_E1: SR_7516_P1 where T: Equatable {
+// DEFAULT_TYPE_WITNESS: extension SR_7516_E1 : SR_7516_P1
+// DEFAULT_TYPE_WITNESS-NEXT: internal typealias X = Void
+}
+extension SR_7516_E1: SR_7516_P4 where T: Equatable, U: Equatable {
+  func foo(arg: X) {}
+}
+
+struct SR_7516_S5<T> {
+  var bar: X { fatalError() }
+}
+extension SR_7516_S5: SR_7516_P2 where T == Never {}
+extension SR_7516_S5: SR_7516_P3 where T == String {}
+extension SR_7516_S5: SR_7516_P1 {
+  func foo(arg: X) {}
+// DEFAULT_TYPE_WITNESS: extension SR_7516_S5 : SR_7516_P1
+// DEFAULT_TYPE_WITNESS-NEXT: internal func foo(arg: X)
+// DEFAULT_TYPE_WITNESS-NEXT: internal typealias X = Void
+}
+extension SR_7516_S5: SR_7516_P4 where T: Equatable {}

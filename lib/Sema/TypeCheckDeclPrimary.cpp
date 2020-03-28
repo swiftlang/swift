@@ -1736,6 +1736,11 @@ public:
     // Check for circular inheritance of the raw type.
     (void)ED->hasCircularRawValue();
 
+    // Resolve all the type witnesses we need now to correctly diagnose
+    // references to default type witnesses with unsatisfied requirements
+    // once we start realizing types in members.
+    TypeChecker::resolveTypeWitnessesForConditionalConformances(ED);
+
     for (Decl *member : ED->getMembers())
       visit(member);
 
@@ -1774,6 +1779,11 @@ public:
     checkUnsupportedNestedType(SD);
 
     checkGenericParams(SD);
+
+    // Resolve all the type witnesses we need now to correctly diagnose
+    // references to default type witnesses with unsatisfied requirements
+    // once we start realizing types in members.
+    TypeChecker::resolveTypeWitnessesForConditionalConformances(SD);
 
     // Force lowering of stored properties.
     (void) SD->getStoredProperties();
@@ -1904,6 +1914,11 @@ public:
 
     // Check for circular inheritance.
     (void)CD->hasCircularInheritance();
+
+    // Resolve all the type witnesses we need now to correctly diagnose
+    // references to default type witnesses with unsatisfied requirements
+    // once we start realizing types in members.
+    TypeChecker::resolveTypeWitnessesForConditionalConformances(CD);
 
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();

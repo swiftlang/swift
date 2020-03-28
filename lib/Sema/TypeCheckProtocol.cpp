@@ -5055,6 +5055,69 @@ LookupAllConformancesInContextRequest::evaluate(
   return DC->getLocalConformances(ConformanceLookupKind::All);
 }
 
+void TypeChecker::resolveTypeWitnessesForConditionalConformances(
+                                          const NominalTypeDecl *nominal) {
+  // Non-generic types won't have conditional conformances.
+  const auto genericSig = nominal->getGenericSignature();
+  if (!genericSig)
+    return;
+
+  // Collect all the normal conformances for this nominal.
+  SmallVector<NormalProtocolConformance *, 2> conformances;
+  for (const auto conf: nominal->getAllConformances())
+    if (const auto normal = dyn_cast<NormalProtocolConformance>(conf))
+      conformances.push_back(normal);
+
+  // If the conditional requirements of a conformance are satisfied by those
+  // of another conformance, we want default type witnesses for the former,
+  // more general conformance, to be able to satisfy type requirements for
+  // the latter conformance in case of associated type collisions – but not
+  // vice versa (granted that the protocols do not match, of course).
+  // E.g., both conformances below should associate 'A' with a single
+  // type witness synthesized for the less constrained conformance to P1.
+  //
+  // protocol P1 { associatedtype A = Int }
+  // protocol P2 { associatedtype A }
+  //
+  // struct Foo<T>: P1 { }
+  // extension Foo: P2 where T == String { }
+  //
+  // To achieve this behavior, conformance X, whose conditional requirements
+  // are satisfied by those of conformance Y, must be checked before Y.
+  //
+  // First off, move all regular conformances to the front.
+  const auto it = llvm::partition(conformances,
+                                  [](const NormalProtocolConformance *conf) {
+    const auto reqs = conf->getConditionalRequirementsIfAvailable();
+    return reqs && reqs->empty();
+  });
+
+  // If there are no conditional conformances, there's nothing to resolve.
+  if (it == conformances.end())
+    return;
+
+  // Then, sort the remaining conditional conformances from less
+  // to more constrained.
+  std::sort(it, conformances.end(),
+            [](const NormalProtocolConformance *conf1,
+               const NormalProtocolConformance *conf2) {
+    const auto ext1 = cast<ExtensionDecl>(conf1->getDeclContext());
+    const auto ext2 = cast<ExtensionDecl>(conf2->getDeclContext());
+
+    return ext1->getGenericSignature()
+        ->requirementsNotSatisfiedBy(ext2->getGenericSignature()).empty();
+  });
+
+  for (const auto conf: conformances) {
+    llvm::SetVector<ValueDecl *> missingWitnesses;
+    ConformanceChecker checker(nominal->getASTContext(), conf,
+                               missingWitnesses,
+                               /*suppressDiagnostics*/true);
+    checker.resolveTypeWitnesses();
+    checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
+  }
+}
+
 void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                              IterableDeclContext *idc) {
   // For anything imported from Clang, lazily check conformances.
