@@ -877,9 +877,7 @@ public:
   void visitDestroyValueInst(DestroyValueInst *i);
   void visitAutoreleaseValueInst(AutoreleaseValueInst *i);
   void visitSetDeallocatingInst(SetDeallocatingInst *i);
-  void visitObjectInst(ObjectInst *i)  {
-    llvm_unreachable("object instruction cannot appear in a function");
-  }
+  void visitObjectInst(ObjectInst *i);
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
   void visitEnumInst(EnumInst *i);
@@ -3448,6 +3446,13 @@ void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
   Explosion in = getLoweredExplosion(i->getOperand());
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
       .consume(*this, in, getDefaultAtomicity());
+}
+
+void IRGenSILFunction::visitObjectInst(swift::ObjectInst *i) {
+  Explosion out;
+  for (SILValue elt : i->getAllElements())
+    out.add(getLoweredExplosion(elt).claimAll());
+  setLoweredExplosion(i, out);
 }
 
 void IRGenSILFunction::visitStructInst(swift::StructInst *i) {
