@@ -325,12 +325,9 @@ static void writeImports(raw_ostream &out,
                               const clang::Module *module) {
     auto startIdx = allPaths.size();
     if (module->IsFramework) {
-      SmallString<64> Buffer(header.NameAsWritten);
-      llvm::sys::path::replace_path_prefix(Buffer, "Headers/", StringRef());
-      llvm::sys::path::replace_path_prefix(Buffer, "PrivateHeaders/", StringRef());
       // For framworks, the header import should start from the framework name.
       allPaths.append(module->getTopLevelModuleName());
-      llvm::sys::path::append(allPaths, Buffer.str());
+      llvm::sys::path::append(allPaths, header.NameAsWritten);
     } else {
       // Otherwise, import the header directly.
       allPaths.append(header.NameAsWritten);
