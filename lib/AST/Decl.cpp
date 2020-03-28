@@ -5049,6 +5049,41 @@ void ProtocolDecl::computeKnownProtocolKind() const {
   const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = value;
 }
 
+Optional<KnownDerivableProtocolKind>
+    ProtocolDecl::getKnownDerivableProtocolKind() const {
+  const auto knownKind = getKnownProtocolKind();
+  if (!knownKind)
+      return None;
+
+  switch (*knownKind) {
+  case KnownProtocolKind::RawRepresentable:
+    return KnownDerivableProtocolKind::RawRepresentable;
+  case KnownProtocolKind::OptionSet:
+    return KnownDerivableProtocolKind::OptionSet;
+  case KnownProtocolKind::CaseIterable:
+    return KnownDerivableProtocolKind::CaseIterable;
+  case KnownProtocolKind::Comparable:
+    return KnownDerivableProtocolKind::Comparable;
+  case KnownProtocolKind::Equatable:
+    return KnownDerivableProtocolKind::Equatable;
+  case KnownProtocolKind::Hashable:
+    return KnownDerivableProtocolKind::Hashable;
+  case KnownProtocolKind::BridgedNSError:
+    return KnownDerivableProtocolKind::BridgedNSError;
+  case KnownProtocolKind::CodingKey:
+    return KnownDerivableProtocolKind::CodingKey;
+  case KnownProtocolKind::Encodable:
+    return KnownDerivableProtocolKind::Encodable;
+  case KnownProtocolKind::Decodable:
+    return KnownDerivableProtocolKind::Decodable;
+  case KnownProtocolKind::AdditiveArithmetic:
+    return KnownDerivableProtocolKind::AdditiveArithmetic;
+  case KnownProtocolKind::Differentiable:
+    return KnownDerivableProtocolKind::Differentiable;
+  default: return None;
+  }
+}
+
 bool ProtocolDecl::hasCircularInheritedProtocols() const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<ProtocolDecl *>(this);
