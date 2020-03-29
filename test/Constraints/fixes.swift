@@ -182,6 +182,14 @@ var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{val
 // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{49-49=(}} {{53-53= ?? <#default value#>)}}
 // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{53-53=!}}
 
+func makeArray<T>(_ x: T) -> [T] { [x] }
+
+func sr12399(_ x: Int?) {
+  _ = Set(0...10).subtracting(makeArray(x)) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{42-42= ?? <#default value#>}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{42-42=!}}
+}
+
 func moreComplexUnwrapFixes() {
   struct S {
     let value: Int
@@ -347,4 +355,11 @@ func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
 
   _ = \S.[nil] // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
   _ = \S.[fn] // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{13-13=()}}
+}
+
+func sr12426(a: Any, _ str: String?) {
+  a == str // expected-error {{cannot convert value of type 'Any' to expected argument type 'String'}}
+  // expected-error@-1 {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
+  // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }
