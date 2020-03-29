@@ -84,8 +84,6 @@ public:
 
   // We can give these reasonable default implementations.
 
-  void initialize(IRGenFunction &IGF, Address dest, Address src,
-                  IsTake_t isTake, SILType T, bool isOutlined) const;
   void initializeWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
                           SILType T, bool isOutlined) const override;
 

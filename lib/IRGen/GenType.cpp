@@ -141,28 +141,6 @@ TypeInfo::nativeParameterValueSchema(IRGenModule &IGM) const {
   return *nativeParameterSchema;
 }
 
-void FixedTypeInfo::initialize(IRGenFunction &IGF, Address dest, Address src,
-                IsTake_t isTake, SILType T, bool isOutlined) const {
-  if (isTake == IsTake) {
-    initializeWithTake(IGF, dest, src, T, isOutlined);
-    return;
-  }
-  
-  // Prefer loads and stores if we won't make a million of them.
-  // Maybe this should also require the scalars to have a fixed offset.
-  ExplosionSchema schema = getSchema();
-  if (!schema.containsAggregate() && schema.size() <= 4) {
-    auto &loadableTI = cast<LoadableTypeInfo>(*this);
-    Explosion copy;
-    loadableTI.loadAsCopy(IGF, src, copy);
-    loadableTI.initialize(IGF, copy, dest, isOutlined);
-    return;
-  }
-
-  // Otherwise, use a memcpy.
-  IGF.emitMemCpy(dest, src, getFixedSize());
-}
-
 /// Copy a value from one object to a new object, directly taking
 /// responsibility for anything it might have.  This is like C++
 /// move-initialization, except the old object will not be destroyed.
