@@ -2978,8 +2978,8 @@ namespace {
 
       // Add a conversion constraint for the direct conversion between
       // types.
-      CS.addExplicitConversionConstraint(fromType, toType,
-                                         /*allowFixes=*/true, locator);
+      CS.addExplicitConversionConstraint(fromType, toType, RememberChoice,
+                                         locator);
 
       // If the result type was declared IUO, add a disjunction for
       // bindings for the result of the coercion.

@@ -165,6 +165,9 @@ class OverlayFile;
 ///
 /// \sa FileUnit
 class ModuleDecl : public DeclContext, public TypeDecl {
+  friend class DirectOperatorLookupRequest;
+  friend class DirectPrecedenceGroupLookupRequest;
+
 public:
   typedef ArrayRef<Located<Identifier>> AccessPathTy;
   typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;
@@ -619,6 +622,12 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const;
+
+  /// Finds all operator decls of this module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const;
 
   /// Finds all precedence group decls of this module.
   ///

@@ -316,14 +316,6 @@ public:
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
 
-  template <typename T>
-  using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;
-
-  OperatorMap<InfixOperatorDecl*> InfixOperators;
-  OperatorMap<PostfixOperatorDecl*> PostfixOperators;
-  OperatorMap<PrefixOperatorDecl*> PrefixOperators;
-  OperatorMap<PrecedenceGroupDecl*> PrecedenceGroups;
-
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.
   const SourceFileKind Kind;
@@ -455,6 +447,9 @@ protected:
 
 public:
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const override;
 
   virtual void
   getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &results) const override;

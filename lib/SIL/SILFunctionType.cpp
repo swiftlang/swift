@@ -1082,10 +1082,8 @@ public:
     // type.
 
     // The entire original context could be a generic parameter.
-    // SWIFT_ENABLE_TENSORFLOW
     if (origType.isTypeParameter() ||
         origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
-    // SWIFT_ENABLE_TENSORFLOW END
       return addSubstitution(origType.getLayoutConstraint(), substType,
                              nullptr, {});
     }
@@ -1256,11 +1254,9 @@ public:
         || substTL.isAddressOnly()) {
       return true;
 
-    // SWIFT_ENABLE_TENSORFLOW
     // Functions are always returned directly.
     } else if (origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
       return false;
-    // SWIFT_ENABLE_TENSORFLOW END
 
     // If the substitution didn't change the type, then a negative
     // response to the above is determinative as well.

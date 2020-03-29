@@ -898,17 +898,21 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
       currentSnippet = std::make_unique<AnnotatedSourceSnippet>(SM);
       annotateSnippetWithInfo(SM, Info, *currentSnippet);
     }
-    for (auto path : Info.EducationalNotePaths) {
-      if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
-        BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
+    if (PrintEducationalNotes) {
+      for (auto path : Info.EducationalNotePaths) {
+        if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
+          BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
+      }
     }
   } else {
     printDiagnostic(SM, Info);
 
-    for (auto path : Info.EducationalNotePaths) {
-      if (auto buffer = SM.getFileSystem()->getBufferForFile(path)) {
-        printMarkdown(buffer->get()->getBuffer(), Stream, ForceColors);
-        Stream << "\n";
+    if (PrintEducationalNotes) {
+      for (auto path : Info.EducationalNotePaths) {
+        if (auto buffer = SM.getFileSystem()->getBufferForFile(path)) {
+          printMarkdown(buffer->get()->getBuffer(), Stream, ForceColors);
+          Stream << "\n";
+        }
       }
     }
 

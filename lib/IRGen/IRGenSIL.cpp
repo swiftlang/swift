@@ -2352,26 +2352,30 @@ void IRGenSILFunction::visitTryApplyInst(swift::TryApplyInst *i) {
 void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   auto origCalleeType = site.getOrigCalleeType();
   auto substCalleeType = site.getSubstCalleeType();
-
-  // SWIFT_ENABLE_TENSORFLOW
-  Optional<LoweredValue> tmpCalleeLV;
   if (site.getOrigCalleeType()->isDifferentiable()) {
-    auto adFnExp = getLoweredExplosion(site.getCallee());
-    Explosion e;
+    origCalleeType = origCalleeType->getWithoutDifferentiability();
+    substCalleeType = substCalleeType->getWithoutDifferentiability();
+  }
+
+  // If the callee is a differentiable function, we extract the original
+  // function because we want to call the original function.
+  Optional<LoweredValue> diffCalleeOrigFnLV;
+  if (site.getOrigCalleeType()->isDifferentiable()) {
+    auto diffFnExplosion = getLoweredExplosion(site.getCallee());
+    Explosion origFnExplosion;
     unsigned fieldSize = 1;
     if (origCalleeType->getRepresentation() ==
         SILFunctionTypeRepresentation::Thick) {
       fieldSize = 2;
     }
-    e.add(adFnExp.getRange(0, 0 + fieldSize));
-    (void)adFnExp.claimAll();
-    tmpCalleeLV = LoweredValue(e);
-
-    origCalleeType = origCalleeType->getWithoutDifferentiability();
-    substCalleeType = substCalleeType->getWithoutDifferentiability();
+    origFnExplosion.add(diffFnExplosion.getRange(0, 0 + fieldSize));
+    (void)diffFnExplosion.claimAll();
+    diffCalleeOrigFnLV = LoweredValue(origFnExplosion);
   }
+
   const LoweredValue &calleeLV =
-      tmpCalleeLV ? *tmpCalleeLV : getLoweredValue(site.getCallee());
+      diffCalleeOrigFnLV ? *diffCalleeOrigFnLV :
+                            getLoweredValue(site.getCallee());
 
   auto args = site.getArguments();
   SILFunctionConventions origConv(origCalleeType, getSILModule());
@@ -4558,12 +4562,10 @@ void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
 
 void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     swift::ConvertEscapeToNoEscapeInst *i) {
-  // SWIFT_ENABLE_TENSORFLOW
-  // This instruction makes the context(s) trivial. A function contains multiple
-  // function pointers and contexts when it's differentiable.
+  // This instruction makes the context trivial.
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out;
-  // SWIFT_ENABLE_TENSORFLOW
+  // Differentiable functions contain multiple pairs of fn and ctx pointer.
   for (unsigned index : range(in.size() / 2)) {
     (void)index;
     llvm::Value *fn = in.claimNext();

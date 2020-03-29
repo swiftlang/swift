@@ -598,19 +598,23 @@ template <typename OperatorType>
 class LookupOperatorRequest
     : public SimpleRequest<LookupOperatorRequest<OperatorType>,
                            OperatorType *(OperatorLookupDescriptor),
-                           CacheKind::Uncached> {
+                           CacheKind::Cached> {
   using SimpleRequest<LookupOperatorRequest<OperatorType>,
                       OperatorType *(OperatorLookupDescriptor),
-                      CacheKind::Uncached>::SimpleRequest;
+                      CacheKind::Cached>::SimpleRequest;
 
 private:
   friend SimpleRequest<LookupOperatorRequest<OperatorType>,
                        OperatorType *(OperatorLookupDescriptor),
-                       CacheKind::Uncached>;
+                       CacheKind::Cached>;
 
   // Evaluation.
   OperatorType *
   evaluate(Evaluator &evaluator, OperatorLookupDescriptor desc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
 };
 
 using LookupPrefixOperatorRequest = LookupOperatorRequest<PrefixOperatorDecl>;

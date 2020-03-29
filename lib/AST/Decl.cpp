@@ -1888,6 +1888,17 @@ bool Pattern::isNeverDefaultInitializable() const {
   return result;
 }
 
+bool PatternBindingDecl::isDefaultInitializableViaPropertyWrapper(unsigned i) const {
+  if (auto singleVar = getSingleVar()) {
+    if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo(0)) {
+      if (wrapperInfo.defaultInit)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   const auto entry = getPatternList()[i];
 
@@ -1897,14 +1908,14 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
 
   // If the outermost attached property wrapper vends an `init()`, use that
   // for default initialization.
+  if (isDefaultInitializableViaPropertyWrapper(i))
+    return true;
+
+  // If one of the attached wrappers is missing a wrappedValue
+  // initializer, cannot default-initialize.
   if (auto singleVar = getSingleVar()) {
     if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo(0)) {
-      if (wrapperInfo.defaultInit)
-        return true;
-
-      // If one of the attached wrappers is missing an initialValue
-      // initializer, cannot default-initialize.
-      if (!singleVar->allAttachedPropertyWrappersHaveInitialValueInit())
+      if (!singleVar->allAttachedPropertyWrappersHaveWrappedValueInit())
         return false;
     }
   }
@@ -5074,6 +5085,57 @@ void ProtocolDecl::computeKnownProtocolKind() const {
   const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = value;
 }
 
+Optional<KnownDerivableProtocolKind>
+    ProtocolDecl::getKnownDerivableProtocolKind() const {
+  const auto knownKind = getKnownProtocolKind();
+  if (!knownKind)
+      return None;
+
+  switch (*knownKind) {
+  case KnownProtocolKind::RawRepresentable:
+    return KnownDerivableProtocolKind::RawRepresentable;
+  case KnownProtocolKind::OptionSet:
+    return KnownDerivableProtocolKind::OptionSet;
+  case KnownProtocolKind::CaseIterable:
+    return KnownDerivableProtocolKind::CaseIterable;
+  case KnownProtocolKind::Comparable:
+    return KnownDerivableProtocolKind::Comparable;
+  case KnownProtocolKind::Equatable:
+    return KnownDerivableProtocolKind::Equatable;
+  case KnownProtocolKind::Hashable:
+    return KnownDerivableProtocolKind::Hashable;
+  case KnownProtocolKind::BridgedNSError:
+    return KnownDerivableProtocolKind::BridgedNSError;
+  case KnownProtocolKind::CodingKey:
+    return KnownDerivableProtocolKind::CodingKey;
+  case KnownProtocolKind::Encodable:
+    return KnownDerivableProtocolKind::Encodable;
+  case KnownProtocolKind::Decodable:
+    return KnownDerivableProtocolKind::Decodable;
+  case KnownProtocolKind::AdditiveArithmetic:
+    return KnownDerivableProtocolKind::AdditiveArithmetic;
+  case KnownProtocolKind::Differentiable:
+    return KnownDerivableProtocolKind::Differentiable;
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::PointwiseMultiplicative:
+    return KnownDerivableProtocolKind::PointwiseMultiplicative;
+  case KnownProtocolKind::ElementaryFunctions:
+    return KnownDerivableProtocolKind::ElementaryFunctions;
+  case KnownProtocolKind::KeyPathIterable:
+    return KnownDerivableProtocolKind::KeyPathIterable;
+  case KnownProtocolKind::TensorArrayProtocol:
+    return KnownDerivableProtocolKind::TensorArrayProtocol;
+  case KnownProtocolKind::TensorGroup:
+    return KnownDerivableProtocolKind::TensorGroup;
+  case KnownProtocolKind::VectorProtocol:
+    return KnownDerivableProtocolKind::VectorProtocol;
+  case KnownProtocolKind::EuclideanDifferentiable:
+    return KnownDerivableProtocolKind::EuclideanDifferentiable;
+  // SWIFT_ENABLE_TENSORFLOW END
+  default: return None;
+  }
+}
+
 bool ProtocolDecl::hasCircularInheritedProtocols() const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<ProtocolDecl *>(this);
@@ -5853,7 +5915,7 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
 
 /// Whether all of the attached property wrappers have an init(wrappedValue:)
 /// initializer.
-bool VarDecl::allAttachedPropertyWrappersHaveInitialValueInit() const {
+bool VarDecl::allAttachedPropertyWrappersHaveWrappedValueInit() const {
   for (unsigned i : indices(getAttachedPropertyWrappers())) {
     if (!getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit)
       return false;
@@ -5958,7 +6020,7 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
 
   // If all property wrappers have a wrappedValue initializer, the property
   // wrapper will be initialized that way.
-  return allAttachedPropertyWrappersHaveInitialValueInit();
+  return allAttachedPropertyWrappersHaveWrappedValueInit();
 }
 
 bool VarDecl::isInnermostPropertyWrapperInitUsesEscapingAutoClosure() const {

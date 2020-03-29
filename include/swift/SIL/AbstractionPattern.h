@@ -188,7 +188,6 @@ class AbstractionPattern {
     /// The partially-applied curried imported type of a C++ method. OrigType is
     /// valid and is a function type. CXXMethod is valid.
     PartialCurriedCXXMethodType,
-    // SWIFT_ENABLE_TENSORFLOW
     /// A Swift function whose parameters and results are opaque. This is
     /// like `AP::Type<T>((T) -> T)`, except that the number of parameters is
     /// unspecified.
@@ -248,7 +247,6 @@ class AbstractionPattern {
     /// - The reabstraction %2 => %5 similarly uses pattern
     ///   `AP::OpaqueDerivativeFunction`.
     OpaqueDerivativeFunction,
-    // SWIFT_ENABLE_TENSORFLOW END
   };
 
   class EncodedForeignErrorInfo {
@@ -299,9 +297,7 @@ class AbstractionPattern {
   static constexpr const unsigned NumOtherDataBits = 28;
   static constexpr const unsigned MaxOtherData = (1 << NumOtherDataBits) - 1;
 
-  // SWIFT_ENABLE_TENSORFLOW
   unsigned TheKind : 33 - NumOtherDataBits;
-  // SWIFT_ENABLE_TENSORFLOW END
   unsigned OtherData : NumOtherDataBits;
   CanType OrigType;
   union {
@@ -447,7 +443,6 @@ public:
     return AbstractionPattern(Kind::Invalid);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   static AbstractionPattern getOpaqueFunction() {
     return AbstractionPattern(Kind::OpaqueFunction);
   }
@@ -455,7 +450,6 @@ public:
   static AbstractionPattern getOpaqueDerivativeFunction() {
     return AbstractionPattern(Kind::OpaqueDerivativeFunction);
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   bool hasGenericSignature() const {
     switch (getKind()) {
@@ -475,10 +469,8 @@ public:
     case Kind::Invalid:
     case Kind::Opaque:
     case Kind::Tuple:
-    // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
-    // SWIFT_ENABLE_TENSORFLOW END
       return false;
     }
     llvm_unreachable("Unhandled AbstractionPatternKind in switch");
@@ -807,12 +799,10 @@ public:
       llvm_unreachable("opaque pattern has no type");
     case Kind::Tuple:
       llvm_unreachable("open-coded tuple pattern has no type");
-    // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
       llvm_unreachable("opaque function pattern has no type");
     case Kind::OpaqueDerivativeFunction:
       llvm_unreachable("opaque derivative function pattern has no type");
-    // SWIFT_ENABLE_TENSORFLOW END
     case Kind::ClangType:
     case Kind::CurriedObjCMethodType:
     case Kind::PartialCurriedObjCMethodType:
@@ -846,10 +836,8 @@ public:
     case Kind::Invalid:
     case Kind::Opaque:
     case Kind::Tuple:
-    // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
-    // SWIFT_ENABLE_TENSORFLOW END
       llvm_unreachable("type cannot be replaced on pattern without type");
     case Kind::ClangType:
     case Kind::CurriedObjCMethodType:
@@ -885,10 +873,8 @@ public:
     case Kind::Tuple:
     case Kind::Type:
     case Kind::Discard:
-    // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
-    // SWIFT_ENABLE_TENSORFLOW END
       return false;
     case Kind::ClangType:
     case Kind::PartialCurriedObjCMethodType:
@@ -945,12 +931,10 @@ public:
     return CXXMethod;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   bool isOpaqueFunctionOrOpaqueDerivativeFunction() const {
     return (getKind() == Kind::OpaqueFunction ||
             getKind() == Kind::OpaqueDerivativeFunction);
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   EncodedForeignErrorInfo getEncodedForeignErrorInfo() const {
     assert(hasStoredForeignErrorInfo());
@@ -974,10 +958,8 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
-    // SWIFT_ENABLE_TENSORFLOW END
       return false;
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
@@ -999,10 +981,8 @@ public:
       return typename CanTypeWrapperTraits<TYPE>::type();
     case Kind::Tuple:
       return typename CanTypeWrapperTraits<TYPE>::type();
-    // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
-    // SWIFT_ENABLE_TENSORFLOW END
       return typename CanTypeWrapperTraits<TYPE>::type();
     case Kind::ClangType:
     case Kind::PartialCurriedObjCMethodType:
@@ -1042,10 +1022,8 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
-    // SWIFT_ENABLE_TENSORFLOW END
       // We assume that the Clang type might provide additional structure.
       return false;
     case Kind::Type:
@@ -1073,10 +1051,8 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
-    // SWIFT_ENABLE_TENSORFLOW END
       return false;
     case Kind::Tuple:
       return true;
@@ -1102,10 +1078,8 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
-    // SWIFT_ENABLE_TENSORFLOW
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
-    // SWIFT_ENABLE_TENSORFLOW END
       llvm_unreachable("pattern is not a tuple");      
     case Kind::Tuple:
       return getNumTupleElements_Stored();
@@ -1141,18 +1115,16 @@ public:
   /// it.
   AbstractionPattern getReferenceStorageReferentType() const;
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Given that the value being abstracted is a function type, return the
   /// abstraction pattern for the derivative function.
   ///
   /// The arguments are the same as the arguments to
   /// `AnyFunctionType::getAutoDiffDerivativeFunctionType()`.
   AbstractionPattern getAutoDiffDerivativeFunctionType(
-      IndexSubset *indices, AutoDiffDerivativeFunctionKind kind,
+      IndexSubset *parameterIndices, AutoDiffDerivativeFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature derivativeGenericSignature = GenericSignature(),
       bool makeSelfParamFirst = false);
-  // SWIFT_ENABLE_TENSORFLOW END
 
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS) const;

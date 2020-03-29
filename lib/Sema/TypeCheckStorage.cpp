@@ -199,23 +199,9 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     }
   }
 
-  // Check the pattern. We treat type-checking a PatternBindingDecl like
-  // type-checking an expression because that's how the initial binding is
-  // checked, and they have the same effect on the file's dependencies.
-  //
-  // In particular, it's /not/ correct to check the PBD's DeclContext because
-  // top-level variables in a script file are accessible from other files,
-  // even though the PBD is inside a TopLevelCodeDecl.
+  // Check the pattern.
   auto contextualPattern =
       ContextualPattern::forPatternBindingDecl(binding, entryNumber);
-  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
-
-  if (binding->isInitialized(entryNumber)) {
-    // If we have an initializer, we can also have unknown types.
-    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-  }
-
   Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
   if (patternType->hasError()) {
     swift::setBoundVarsTypeError(pattern, Context);
@@ -2477,7 +2463,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   }
   
   // Get the property wrapper information.
-  if (!var->allAttachedPropertyWrappersHaveInitialValueInit() &&
+  if (!var->allAttachedPropertyWrappersHaveWrappedValueInit() &&
       !originalInitialValue) {
     return PropertyWrapperBackingPropertyInfo(
         backingVar, storageVar, nullptr, nullptr, nullptr);
@@ -2491,7 +2477,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   OpaqueValueExpr *origValue =
       new (ctx) OpaqueValueExpr(var->getSourceRange(), origValueType,
                                 /*isPlaceholder=*/true);
-  Expr *initializer = buildPropertyWrapperInitialValueCall(
+  Expr *initializer = buildPropertyWrapperWrappedValueCall(
       var, storageType, origValue,
       /*ignoreAttributeArgs=*/!originalInitialValue);
   typeCheckSynthesizedWrapperInitializer(

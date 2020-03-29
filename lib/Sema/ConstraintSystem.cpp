@@ -4200,17 +4200,26 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   if (Expr *initializer = expression.expression) {
     // Form init(wrappedValue:) call(s).
     Expr *wrappedInitializer =
-        buildPropertyWrapperInitialValueCall(
+        buildPropertyWrapperWrappedValueCall(
             singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
     if (!wrappedInitializer)
       return;
 
     backingInitializer = wrappedInitializer;
-  } else if (auto outermostArg = outermostWrapperAttr->getArg()) {
+  } else {
     Type outermostWrapperType =
         singleVar->getAttachedPropertyWrapperType(0);
     if (!outermostWrapperType)
       return;
+
+    // Retrieve the outermost wrapper argument. If there isn't one, we're
+    // performing default initialization.
+    auto outermostArg = outermostWrapperAttr->getArg();
+    if (!outermostArg) {
+      SourceLoc fakeParenLoc = outermostWrapperAttr->getRange().End;
+      outermostArg = TupleExpr::createEmpty(
+          ctx, fakeParenLoc, fakeParenLoc, /*Implicit=*/true);
+    }
 
     auto typeExpr = TypeExpr::createImplicitHack(
         outermostWrapperAttr->getTypeLoc().getLoc(),
@@ -4221,8 +4230,6 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
         outermostWrapperAttr->getArgumentLabelLocs(),
         /*hasTrailingClosure=*/false,
         /*implicit=*/false);
-  } else {
-    llvm_unreachable("No initializer anywhere?");
   }
   wrapperAttrs[0]->setSemanticInit(backingInitializer);
 

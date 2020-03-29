@@ -334,10 +334,8 @@ namespace {
 
     RetTy visitAbstractTypeParamType(CanType type,
                                      AbstractionPattern origType) {
-      // SWIFT_ENABLE_TENSORFLOW
       if (origType.isTypeParameterOrOpaqueArchetype() ||
           origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
-      // SWIFT_ENABLE_TENSORFLOW END
         if (origType.requiresClass()) {
           return asImpl().handleReference(type);
         } else {

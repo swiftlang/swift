@@ -359,6 +359,17 @@ we know to ignore swift_getGenericMetadata 84 times, i.e.::
 
     (lldb) br set -i 84 -n GlobalARCOpts::run
 
+A final trick is that one can use the -R option to stop at a relative assembly
+address in lldb. Specifically, lldb resolves the breakpoint normally and then
+just adds the argument -R to the address. So for instance, if I want to stop at
+the address at +38 in the function with the name 'foo', I would write::
+
+    (lldb) br set -R 38 -n foo
+
+Then lldb would add 38 to the offset of foo and break there. This is really
+useful in contexts where one wants to set a breakpoint at an assembly address
+that is stable across multiple different invocations of lldb.
+
 LLDB Scripts
 ~~~~~~~~~~~~
 

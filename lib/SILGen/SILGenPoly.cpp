@@ -3273,13 +3273,10 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
                              toType->getCalleeConvention());
 }
 
-static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
-                                        SILLocation loc,
-                                        ManagedValue fn,
-                                        AbstractionPattern inputOrigType,
-                                        CanAnyFunctionType inputSubstType,
-                                        AbstractionPattern outputOrigType,
-                                        CanAnyFunctionType outputSubstType);
+static ManagedValue createDifferentiableFunctionThunk(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue fn,
+    AbstractionPattern inputOrigType, CanAnyFunctionType inputSubstType,
+    AbstractionPattern outputOrigType, CanAnyFunctionType outputSubstType);
 
 /// Create a reabstraction thunk.
 static ManagedValue createThunk(SILGenFunction &SGF,
@@ -3307,12 +3304,12 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   auto expectedType = substExpectedType
     ->getUnsubstitutedType(SGF.SGM.M);
 
-  // SWIFT_ENABLE_TENSORFLOW
   assert(sourceType->isDifferentiable() == expectedType->isDifferentiable() &&
          "thunks can't change differentiability");
   if (sourceType->isDifferentiable()) {
-    return createAutoDiffThunk(SGF, loc, fn, inputOrigType, inputSubstType,
-                               outputOrigType, outputSubstType);
+    return createDifferentiableFunctionThunk(SGF, loc, fn, inputOrigType,
+                                             inputSubstType, outputOrigType,
+                                             outputSubstType);
   }
 
   // We can't do bridging here.
@@ -3374,21 +3371,17 @@ static ManagedValue createThunk(SILGenFunction &SGF,
       loc, thunkedFn, SILType::getPrimitiveObjectType(substExpectedType));
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 /// Create a reabstraction thunk for a @differentiable function.
-static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
-                                        SILLocation loc,
-                                        ManagedValue fn,
-                                        AbstractionPattern inputOrigType,
-                                        CanAnyFunctionType inputSubstType,
-                                        AbstractionPattern outputOrigType,
-                                        CanAnyFunctionType outputSubstType) {
+static ManagedValue createDifferentiableFunctionThunk(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue fn,
+    AbstractionPattern inputOrigType, CanAnyFunctionType inputSubstType,
+    AbstractionPattern outputOrigType, CanAnyFunctionType outputSubstType) {
   // Applies a thunk to all the components by extracting them, applying thunks
   // to all of them, and then putting them back together.
   auto sourceType = fn.getType().castTo<SILFunctionType>();
 
-  auto withoutDifferentiablePattern = [](AbstractionPattern pattern)
-      -> AbstractionPattern {
+  auto withoutDifferentiablePattern =
+      [](AbstractionPattern pattern) -> AbstractionPattern {
     auto patternType = pattern.getAs<AnyFunctionType>();
     // If pattern does not store an `AnyFunctionType`, return original pattern.
     // This logic handles opaque abstraction patterns.
@@ -3406,8 +3399,8 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   auto outputOrigTypeNotDiff = withoutDifferentiablePattern(outputOrigType);
   CanAnyFunctionType outputSubstTypeNotDiff(
       outputSubstType->getWithoutDifferentiability());
-  auto &expectedTLNotDiff = SGF.getTypeLowering(outputOrigTypeNotDiff,
-                                                outputSubstTypeNotDiff);
+  auto &expectedTLNotDiff =
+      SGF.getTypeLowering(outputOrigTypeNotDiff, outputSubstTypeNotDiff);
   // `differentiable_function_extract` takes `@guaranteed` values.
   auto borrowedFnValue = fn.borrow(SGF, loc);
   SILValue original = SGF.B.createDifferentiableFunctionExtractOriginal(
