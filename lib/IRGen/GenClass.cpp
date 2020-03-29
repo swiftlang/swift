@@ -491,11 +491,19 @@ void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
                                bool isOutlined) const {
   auto classType = IGF.IGM.getLoweredType(getClass()->TypeDecl::getDeclaredInterfaceType());
   for (auto *prop : getClass()->getStoredProperties()) {
+    auto *exploded = src.claimNext();
+    // If the src is an address, just project and store. Then we're done.
+    if (exploded->getType()->isPointerTy()) {
+      addr = asDerived().projectScalar(IGF, addr);
+      IGF.Builder.CreateStore(exploded, addr);
+      return;
+    }
+    // Otherwise, create GEP/init for each element in src.
     auto propType = IGF.IGM.getLoweredType(prop->getType());
     const auto &propTypeInfo = cast<LoadableTypeInfo>(IGF.getTypeInfo(propType));
     auto propAddr = projectPhysicalClassMemberAddress(IGF, addr.getAddress(), classType, propType, prop);
     Explosion propExplosion;
-    propExplosion.add(src.claimNext());
+    propExplosion.add(exploded);
     propTypeInfo.initialize(IGF, propExplosion, propAddr, isOutlined);
   }
 }
