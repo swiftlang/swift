@@ -51,4 +51,4 @@ var _: HasClosure = .factoryOpt(3)
 // expected-note@-2 {{coalesce}}
 // expected-note@-3 {{force-unwrap}}
 // FIXME: we should accept this
-var _: HasClosure = .factoryOpt!(4) // expected-error {{type 'Optional<_>' has no member 'factoryOpt'}}
+var _: HasClosure = .factoryOpt!(4) // expected-error {{cannot infer contextual base in reference to member 'factoryOpt'}}
