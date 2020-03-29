@@ -484,8 +484,20 @@ swift::matchWitness(
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
-  if (req->getKind() != witness->getKind())
-    return RequirementMatch(witness, MatchKind::KindConflict);
+  if (req->getKind() != witness->getKind()) {
+    // An enum case can witness:
+    // 1. A static get-only property requirement, as long as the property's
+    //    type is `Self` or it matches the type of the enum explicitly.
+    // 2. A static function requirement, if the enum case has a payload
+    //    and the payload types and labels match the function and the
+    //    function returns `Self` or the type of the enum.
+    //
+    // If there are any discrepencies, we'll diagnose it later. For now,
+    // let's assume the match is valid.
+    if (!((isa<VarDecl>(req) || isa<FuncDecl>(req)) &&
+          isa<EnumElementDecl>(witness)))
+      return RequirementMatch(witness, MatchKind::KindConflict);
+  }
 
   // If we're currently validating the witness, bail out.
   if (witness->isRecursiveValidation())
@@ -502,7 +514,8 @@ swift::matchWitness(
   // Perform basic matching of the requirement and witness.
   bool decomposeFunctionType = false;
   bool ignoreReturnType = false;
-  if (auto funcReq = dyn_cast<FuncDecl>(req)) {
+  if (isa<FuncDecl>(req) && isa<FuncDecl>(witness)) {
+    auto funcReq = cast<FuncDecl>(req);
     auto funcWitness = cast<FuncDecl>(witness);
 
     // Either both must be 'static' or neither.
@@ -564,6 +577,18 @@ swift::matchWitness(
   } else if (isa<ConstructorDecl>(witness)) {
     decomposeFunctionType = true;
     ignoreReturnType = true;
+  } else if (isa<EnumElementDecl>(witness)) {
+    auto enumCase = cast<EnumElementDecl>(witness);
+    if (enumCase->hasAssociatedValues() && isa<VarDecl>(req))
+      return RequirementMatch(witness, MatchKind::EnumCaseWithAssociatedValues);
+    auto isValid = isa<VarDecl>(req) || isa<FuncDecl>(req);
+    if (!isValid)
+      return RequirementMatch(witness, MatchKind::KindConflict);
+    if (!cast<ValueDecl>(req)->isStatic())
+      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
+    if (isa<VarDecl>(req) &&
+        cast<VarDecl>(req)->getParsedAccessor(AccessorKind::Set))
+      return RequirementMatch(witness, MatchKind::SettableConflict);
   }
 
   // If the requirement is @objc, the witness must not be marked with @nonobjc.
@@ -2182,7 +2207,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   if (match.Kind != MatchKind::RenamedMatch &&
       !match.Witness->getAttrs().hasAttribute<ImplementsAttr>() &&
       match.Witness->getFullName() &&
-      req->getFullName() != match.Witness->getFullName())
+      req->getFullName() != match.Witness->getFullName() &&
+      !isa<EnumElementDecl>(match.Witness))
     return;
 
   // Form a string describing the associated type deductions.
@@ -2234,7 +2260,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
 
   case MatchKind::TypeConflict: {
-    if (!isa<TypeDecl>(req)) {
+    if (!isa<TypeDecl>(req) && !isa<EnumElementDecl>(match.Witness)) {
       computeFixitsForOverridenDeclaration(match.Witness, req, [&](bool){
         return diags.diagnose(match.Witness,
                               diag::protocol_witness_type_conflict,
@@ -2278,6 +2304,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     auto witness = match.Witness;
     auto diag = diags.diagnose(witness, diag::protocol_witness_static_conflict,
                                !req->isInstanceMember());
+    if (isa<EnumElementDecl>(witness))
+      break;
     if (req->isInstanceMember()) {
       SourceLoc loc;
       if (auto FD = dyn_cast<FuncDecl>(witness)) {
@@ -2403,6 +2431,9 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     }
     break;
   }
+  case MatchKind::EnumCaseWithAssociatedValues:
+    diags.diagnose(match.Witness, diag::protocol_witness_enum_case_payload);
+    break;
   }
 }
 
@@ -3325,12 +3356,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           auto &diags = proto->getASTContext().Diags;
           {
             SourceLoc diagLoc = getLocForDiagnosingWitness(conformance,witness);
-            auto diag = diags.diagnose(diagLoc,
-                                       diag::witness_argument_name_mismatch,
-                                       isa<ConstructorDecl>(witness),
-                                       witness->getFullName(),
-                                       proto->getDeclaredType(),
-                                       requirement->getFullName());
+            auto diag = diags.diagnose(
+                diagLoc, diag::witness_argument_name_mismatch,
+                witness->getDescriptiveKind(), witness->getFullName(),
+                proto->getDeclaredType(), requirement->getFullName());
             if (diagLoc == witness->getLoc()) {
               fixDeclarationName(diag, witness, requirement->getFullName());
             } else {
@@ -5560,56 +5589,56 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
                                                   ValueDecl *Requirement) {
   // Note: whenever you update this function, also update
   // DerivedConformance::getDerivableRequirement.
-  auto *protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
+  const auto protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
 
-  auto knownKind = protocol->getKnownProtocolKind();
-  
-  if (!knownKind)
+  const auto derivableKind = protocol->getKnownDerivableProtocolKind();
+  if (!derivableKind)
     return nullptr;
 
-  auto Decl = DC->getInnermostDeclarationDeclContext();
+  const auto Decl = DC->getInnermostDeclarationDeclContext();
   if (Decl->isInvalid())
     return nullptr;
 
   DerivedConformance derived(TypeDecl->getASTContext(), Decl, TypeDecl,
                              protocol);
 
-  switch (*knownKind) {
-  case KnownProtocolKind::RawRepresentable:
+  switch (*derivableKind) {
+  case KnownDerivableProtocolKind::RawRepresentable:
     return derived.deriveRawRepresentable(Requirement);
 
-  case KnownProtocolKind::CaseIterable:
+  case KnownDerivableProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(Requirement);
 
-  case KnownProtocolKind::Comparable:
+  case KnownDerivableProtocolKind::Comparable:
     return derived.deriveComparable(Requirement);
 
-  case KnownProtocolKind::Equatable:
+  case KnownDerivableProtocolKind::Equatable:
     return derived.deriveEquatable(Requirement);
 
-  case KnownProtocolKind::Hashable:
+  case KnownDerivableProtocolKind::Hashable:
     return derived.deriveHashable(Requirement);
 
-  case KnownProtocolKind::BridgedNSError:
+  case KnownDerivableProtocolKind::BridgedNSError:
     return derived.deriveBridgedNSError(Requirement);
 
-  case KnownProtocolKind::CodingKey:
+  case KnownDerivableProtocolKind::CodingKey:
     return derived.deriveCodingKey(Requirement);
 
-  case KnownProtocolKind::Encodable:
+  case KnownDerivableProtocolKind::Encodable:
     return derived.deriveEncodable(Requirement);
 
-  case KnownProtocolKind::Decodable:
+  case KnownDerivableProtocolKind::Decodable:
     return derived.deriveDecodable(Requirement);
 
-  case KnownProtocolKind::AdditiveArithmetic:
+  case KnownDerivableProtocolKind::AdditiveArithmetic:
     return derived.deriveAdditiveArithmetic(Requirement);
 
-  case KnownProtocolKind::Differentiable:
+  case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
 
-  default:
-    return nullptr;
+  case KnownDerivableProtocolKind::OptionSet:
+      llvm_unreachable(
+          "When possible, OptionSet is derived via memberwise init synthesis");
   }
 }
 

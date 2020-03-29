@@ -1847,7 +1847,7 @@ public:
         return SemanticContextKind::ExpressionSpecific;
       return SemanticContextKind::CurrentNominal;
 
-    case DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal:
+    case DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal:
     case DeclVisibilityKind::MemberOfSuper:
       return SemanticContextKind::Super;
 
@@ -1891,6 +1891,9 @@ public:
             D, dynamicLookupInfo.getKeyPathDynamicMember().originalVisibility,
             {});
       }
+
+    case DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal:
+      llvm_unreachable("should not see this kind");
     }
     llvm_unreachable("unhandled kind");
   }
@@ -3052,6 +3055,10 @@ public:
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
+    assert(Reason !=
+             DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal &&
+           "Including derived requirement in non-override lookup");
+
     if (D->shouldHideFromEditor())
       return;
 
@@ -3328,7 +3335,8 @@ public:
     if (isIUO) {
       if (Type Unwrapped = ExprType->getOptionalObjectType()) {
         lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                 IncludeInstanceMembers);
+                                 IncludeInstanceMembers,
+                                 /*includeDerivedRequirements*/false);
         return true;
       }
       assert(IsUnwrappedOptional && "IUOs should be optional if not bound/forced");
@@ -3348,7 +3356,8 @@ public:
           CodeCompletionResult::MaxNumBytesToErase) {
         if (!tryTupleExprCompletions(Unwrapped)) {
           lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                   IncludeInstanceMembers);
+                                   IncludeInstanceMembers,
+                                   /*includeDerivedRequirements*/false);
         }
       }
       return true;
@@ -3418,7 +3427,8 @@ public:
     tryUnwrappedCompletions(ExprType, isIUO);
 
     lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
-                             IncludeInstanceMembers);
+                             IncludeInstanceMembers,
+                             /*includeDerivedRequirements*/false);
   }
 
   void collectOperators(SmallVectorImpl<OperatorDecl *> &results) {
@@ -3893,7 +3903,8 @@ public:
     llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
     llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
     lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
-                             /*includeInstanceMembers=*/false);
+                             /*includeInstanceMembers=*/false,
+                             /*includeDerivedRequirements*/false);
   }
 
   void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
@@ -3954,7 +3965,8 @@ public:
     NeedLeadingDot = !HaveDot;
     lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType),
                              CurrDeclContext,
-                             IncludeInstanceMembers);
+                             IncludeInstanceMembers,
+                             /*includeDerivedRequirements*/false);
     if (BaseType->isAnyExistentialType()) {
       addKeyword("Protocol", MetatypeType::get(BaseType));
       addKeyword("Type", ExistentialMetatypeType::get(BaseType));
@@ -3987,7 +3999,8 @@ public:
     this->BaseType = selfTy;
     NeedLeadingDot = false;
     lookupVisibleMemberDecls(*this, MetatypeType::get(selfTy),
-                             CurrDeclContext, IncludeInstanceMembers);
+                             CurrDeclContext, IncludeInstanceMembers,
+                             /*includeDerivedRequirements*/false);
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
@@ -4253,7 +4266,7 @@ public:
   Type getOpaqueResultType(const ValueDecl *VD, DeclVisibilityKind Reason,
                            DynamicLookupInfo dynamicLookupInfo) {
     if (Reason !=
-        DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal)
+        DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal)
       return nullptr;
 
     auto currTy = CurrDeclContext->getDeclaredTypeInContext();
@@ -4469,12 +4482,18 @@ public:
     bool needRequired = false;
     auto C = CurrDeclContext->getSelfClassDecl();
     if (C && !isKeywordSpecified("required")) {
-      if (Reason ==
-            DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal &&
-          !C->isFinal())
-        needRequired = true;
-      else if (Reason == DeclVisibilityKind::MemberOfSuper && CD->isRequired())
-        needRequired = true;
+      switch (Reason) {
+      case DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal:
+      case DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal:
+        if (!C->isFinal())
+          needRequired = true;
+        break;
+      case DeclVisibilityKind::MemberOfSuper:
+        if (CD->isRequired())
+          needRequired = true;
+        break;
+      default: break;
+      }
     }
 
     llvm::SmallString<256> DeclStr;
@@ -4594,7 +4613,7 @@ public:
           continue;
         addTypeAlias(
             ATD,
-            DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal,
+            DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal,
             {});
       }
     }
@@ -4612,7 +4631,8 @@ public:
       // Look for overridable static members too.
       Type Meta = MetatypeType::get(CurrTy);
       lookupVisibleMemberDecls(*this, Meta, CurrDeclContext,
-                               /*includeInstanceMembers=*/true);
+                               /*includeInstanceMembers=*/true,
+                               /*includeDerivedRequirements*/true);
       addDesignatedInitializers(NTD);
       addAssociatedTypes(NTD);
     }

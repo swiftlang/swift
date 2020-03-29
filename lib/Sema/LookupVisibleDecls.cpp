@@ -57,9 +57,14 @@ private:
   /// Should instance members be included even if lookup is performed on a type?
   unsigned IncludeInstanceMembers : 1;
 
+  /// Should derived protocol requirements be included?
+  /// This option is only for override completion lookup.
+  unsigned IncludeDerivedRequirements : 1;
+
   LookupState()
       : IsQualified(0), IsOnMetatype(0), IsOnSuperclass(0),
-        InheritsSuperclassInitializers(0), IncludeInstanceMembers(0) {}
+        InheritsSuperclassInitializers(0), IncludeInstanceMembers(0),
+        IncludeDerivedRequirements(0) {}
 
 public:
   LookupState(const LookupState &) = default;
@@ -83,6 +88,9 @@ public:
     return InheritsSuperclassInitializers;
   }
   bool isIncludingInstanceMembers() const { return IncludeInstanceMembers; }
+  bool isIncludingDerivedRequirements() const {
+    return IncludeDerivedRequirements;
+  }
 
   LookupState withOnMetatype() const {
     auto Result = *this;
@@ -111,6 +119,12 @@ public:
   LookupState withIncludedInstanceMembers() const {
     auto Result = *this;
     Result.IncludeInstanceMembers = 1;
+    return Result;
+  }
+
+  LookupState withIncludedDerivedRequirements() const {
+    auto Result = *this;
+    Result.IncludeDerivedRequirements = 1;
     return Result;
   }
 };
@@ -380,7 +394,7 @@ namespace {
 static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
   switch (Reason) {
   case DeclVisibilityKind::MemberOfCurrentNominal:
-  case DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal:
+  case DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal:
   case DeclVisibilityKind::MemberOfSuper:
     return DeclVisibilityKind::MemberOfSuper;
 
@@ -421,36 +435,47 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
       ReasonForThisProtocol = getReasonForSuper(Reason);
     else if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
       ReasonForThisProtocol =
-          DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal;
+          DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal;
     else
       ReasonForThisProtocol = getReasonForSuper(Reason);
 
     if (auto NormalConformance = dyn_cast<NormalProtocolConformance>(
           Conformance->getRootConformance())) {
       for (auto Member : Proto->getMembers()) {
+        // Skip associated types and value requirements that aren't visible
+        // or have a corresponding witness.
         if (auto *ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
-          // Skip type decls if they aren't visible, or any type that has a
-          // witness. This cuts down on duplicates.
           if (areTypeDeclsVisibleInLookupMode(LS) &&
               !Conformance->hasTypeWitness(ATD)) {
             Consumer.foundDecl(ATD, ReasonForThisProtocol);
           }
-          continue;
-        }
-        if (auto *VD = dyn_cast<ValueDecl>(Member)) {
+        } else if (auto *VD = dyn_cast<ValueDecl>(Member)) {
           if (!isDeclVisibleInLookupMode(VD, LS, FromContext))
             continue;
 
           if (!VD->isProtocolRequirement())
             continue;
 
-          // Skip value requirements that have corresponding witnesses. This
-          // cuts down on duplicates.
-          auto witness = NormalConformance->getWitness(VD);
-          if (witness && witness.getDecl()->getFullName() == VD->getFullName())
-            continue;
+          // Whether the given witness corresponds to a derived requirement.
+          const auto isDerivedRequirement = [Proto](const ValueDecl *Witness) {
+            return Witness->isImplicit() &&
+                Proto->getKnownDerivableProtocolKind();
+          };
+          DeclVisibilityKind ReasonForThisDecl = ReasonForThisProtocol;
+          if (const auto Witness = NormalConformance->getWitness(VD)) {
+            if (Witness.getDecl()->getFullName() == VD->getFullName()) {
+              if (LS.isIncludingDerivedRequirements() &&
+                  Reason == DeclVisibilityKind::MemberOfCurrentNominal &&
+                  isDerivedRequirement(Witness.getDecl())) {
+                ReasonForThisDecl =
+                    DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal;
+              } else {
+                continue;
+              }
+            }
+          }
 
-          Consumer.foundDecl(VD, ReasonForThisProtocol);
+          Consumer.foundDecl(VD, ReasonForThisDecl);
         }
       }
     }
@@ -553,6 +578,9 @@ static void lookupVisibleMemberDeclsImpl(
     LookupState subLS = LookupState::makeQualified().withOnMetatype();
     if (LS.isIncludingInstanceMembers()) {
       subLS = subLS.withIncludedInstanceMembers();
+    }
+    if (LS.isIncludingDerivedRequirements()) {
+      subLS = subLS.withIncludedDerivedRequirements();
     }
 
     // Just perform normal dot lookup on the type see if we find extensions or
@@ -756,7 +784,8 @@ template <> struct DenseMapInfo<FoundDeclTy> {
 // If a class 'Base' conforms to 'Proto', and my base type is a subclass
 // 'Derived' of 'Base', use 'Base' not 'Derived' as the 'Self' type in the
 // substitution map.
-static Type getBaseTypeForMember(ModuleDecl *M, ValueDecl *OtherVD, Type BaseTy) {
+static Type getBaseTypeForMember(ModuleDecl *M, const ValueDecl *OtherVD,
+                                 Type BaseTy) {
   if (auto *Proto = OtherVD->getDeclContext()->getSelfProtocolDecl()) {
     if (BaseTy->getClassOrBoundGenericClass()) {
       if (auto Conformance = M->lookupConformance(BaseTy, Proto)) {
@@ -804,7 +833,7 @@ public:
     removeShadowedDecls(Decls, DC);
 
     size_t index = 0;
-    for (auto DeclAndReason : Results) {
+    for (const auto DeclAndReason : Results) {
       if (index >= Decls.size())
         break;
       if (DeclAndReason.D != Decls[index])
@@ -812,16 +841,15 @@ public:
 
       index++;
 
-      auto *VD = DeclAndReason.D;
-      auto Reason = DeclAndReason.Reason;
-      auto dynamicLookupInfo = DeclAndReason.dynamicLookupInfo;
+      auto *const VD = DeclAndReason.D;
+      const auto Reason = DeclAndReason.Reason;
 
       // If this kind of declaration doesn't participate in overriding, there's
       // no filtering to do here.
       if (!isa<AbstractFunctionDecl>(VD) &&
           !isa<AbstractStorageDecl>(VD) &&
           !isa<AssociatedTypeDecl>(VD)) {
-        FilteredResults.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
+        FilteredResults.insert(DeclAndReason);
         continue;
       }
 
@@ -831,7 +859,7 @@ public:
       auto &PossiblyConflicting = DeclsByName[VD->getBaseName()];
 
       if (VD->isInvalid()) {
-        FilteredResults.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
+        FilteredResults.insert(DeclAndReason);
         PossiblyConflicting.push_back(VD);
         continue;
       }
@@ -867,7 +895,7 @@ public:
       bool FoundConflicting = false;
       for (auto I = PossiblyConflicting.begin(), E = PossiblyConflicting.end();
            I != E; ++I) {
-        auto *OtherVD = *I;
+        auto *const OtherVD = *I;
         if (OtherVD->isRecursiveValidation())
           continue;
 
@@ -889,20 +917,23 @@ public:
                         /*wouldConflictInSwift5*/nullptr,
                         /*skipProtocolExtensionCheck*/true)) {
           FoundConflicting = true;
-          if (VD->getFormalAccess() > OtherVD->getFormalAccess() ||
+          // Prefer derived requirements over their witnesses.
+          if (Reason ==
+                DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal ||
+              VD->getFormalAccess() > OtherVD->getFormalAccess() ||
               //Prefer available one.
               (!AvailableAttr::isUnavailable(VD) &&
                AvailableAttr::isUnavailable(OtherVD))) {
             FilteredResults.remove(
                 FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
-            FilteredResults.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
+            FilteredResults.insert(DeclAndReason);
             *I = VD;
           }
         }
       }
 
       if (!FoundConflicting) {
-        FilteredResults.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
+        FilteredResults.insert(DeclAndReason);
         PossiblyConflicting.push_back(VD);
       }
     }
@@ -1276,11 +1307,15 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
                                      const DeclContext *CurrDC,
                                      bool includeInstanceMembers,
+                                     bool includeDerivedRequirements,
                                      GenericSignatureBuilder *GSB) {
   assert(CurrDC);
   LookupState ls = LookupState::makeQualified();
   if (includeInstanceMembers) {
     ls = ls.withIncludedInstanceMembers();
+  }
+  if (includeDerivedRequirements) {
+    ls = ls.withIncludedDerivedRequirements();
   }
 
   ::lookupVisibleMemberDecls(BaseTy, Consumer, CurrDC, ls,
