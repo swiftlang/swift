@@ -449,6 +449,8 @@ public:
     Type ResultTy = TheFunc->getBodyResultType();
     if (!ResultTy || ResultTy->hasError())
       return nullptr;
+    
+    Expr *E = RS->getResult();
 
     if (!RS->hasResult()) {
 
