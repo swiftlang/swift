@@ -3518,6 +3518,11 @@ NOTE(make_init_failable,none,
 ERROR(return_init_non_nil,none,
       "'nil' is the only return value permitted in an initializer",
       ())
+ERROR(nil_missing_in_failable_init,none,
+      "'nil' is missing in the failable initializer return", ())
+NOTE(add_nil_failable_init,none,
+      "add 'nil' to the failable initializer return", ())
+
 
 WARNING(if_always_true,none,
         "'if' condition is always true", ())

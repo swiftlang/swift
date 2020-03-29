@@ -451,6 +451,21 @@ public:
       return nullptr;
 
     if (!RS->hasResult()) {
+
+      // If the return statement in a failable initializer is missing a 'nil',
+      // show an error and provide a fix
+      if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
+                                          TheFunc->getAbstractFunctionDecl())) {
+        if (ctor->isFailable()) {                                    
+          getASTContext().Diags.diagnose(RS->getReturnLoc(),
+                                         diag::nil_missing_in_failable_init)
+            .highlight(E->getSourceRange());
+          getASTContext().Diags.diagnose(RS->getReturnLoc(), diag::add_nil_failable_init)  
+            .fixItInsertAfter(RS->getReturnLoc(), "nil");
+        }
+      }
+
+
       if (!ResultTy->isVoid())
         getASTContext().Diags.diagnose(RS->getReturnLoc(),
                                        diag::return_expr_missing);
@@ -480,8 +495,6 @@ public:
         return RS;
       }
     }
-
-    Expr *E = RS->getResult();
 
     // In an initializer, the only expression allowed is "nil", which indicates
     // failure from a failable initializer.

@@ -282,3 +282,14 @@ struct InitiateFailureS {
     return nil // ok
   }
 }
+
+class SR12421 {
+    let label: String
+    init?(label: String?) { 
+        guard let actualLabel = label else {
+            return // expected-error{{'nil' is missing in the failable initializer return}}
+                   // expected-note{{add 'nil' to the failable initializer return}}
+        }
+        self.label = actualLabel
+    }
+}
