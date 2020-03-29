@@ -3906,7 +3906,6 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   return getThunkedResult();
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     SILFunction *customDerivativeFn, SILFunction *originalFn,
     const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind) {
