@@ -3357,9 +3357,37 @@ private:
       llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
           verifyThatArgumentIsHashable);
 
-public:
+  /// Describes a direction of optional wrapping, either increasing optionality
+  /// or decreasing optionality.
+  enum class OptionalWrappingDirection {
+    /// Unwrap an optional type T? to T.
+    Unwrap,
+
+    /// Promote a type T to optional type T?.
+    Promote
+  };
+
+  /// Attempts to find a constraint that involves \p typeVar and satisfies
+  /// \p predicate, looking through optional object constraints if necessary. If
+  /// multiple candidates are found, returns the first one.
+  ///
+  /// \param optionalDirection The direction to travel through optional object
+  /// constraints, either increasing or decreasing optionality.
+  ///
+  /// \param predicate Checks whether a given constraint is the one being
+  /// searched for. The type variable passed is the current representative
+  /// after looking through the optional object constraints.
+  ///
+  /// \returns The constraint found along with the number of optional object
+  /// constraints looked through, or \c None if no constraint was found.
+  Optional<std::pair<Constraint *, unsigned>> findConstraintThroughOptionals(
+      TypeVariableType *typeVar, OptionalWrappingDirection optionalDirection,
+      llvm::function_ref<bool(Constraint *, TypeVariableType *)> predicate);
+
   /// Attempt to simplify the set of overloads corresponding to a given
   /// function application constraint.
+  ///
+  /// \param disjunction The disjunction for the set of overloads.
   ///
   /// \param fnTypeVar The type variable that describes the set of
   /// overloads for the function.
@@ -3368,11 +3396,38 @@ public:
   /// (as the function parameters) and the expected result type of the
   /// call.
   ///
-  /// \returns \c fnType, or some simplified form of it if this function
-  /// was able to find a single overload or derive some common structure
-  /// among the overloads.
-  Type simplifyAppliedOverloads(TypeVariableType *fnTypeVar,
-                                const FunctionType *argFnType,
+  /// \param numOptionalUnwraps The number of unwraps required to get the
+  /// underlying function from the overload choice.
+  ///
+  /// \returns \c true if an error was encountered, \c false otherwise.
+  bool simplifyAppliedOverloadsImpl(Constraint *disjunction,
+                                    TypeVariableType *fnTypeVar,
+                                    const FunctionType *argFnType,
+                                    unsigned numOptionalUnwraps,
+                                    ConstraintLocatorBuilder locator);
+
+public:
+  /// Attempt to simplify the set of overloads corresponding to a given
+  /// bind overload disjunction.
+  ///
+  /// \param disjunction The disjunction for the set of overloads.
+  ///
+  /// \returns \c true if an error was encountered, \c false otherwise.
+  bool simplifyAppliedOverloads(Constraint *disjunction,
+                                ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify the set of overloads corresponding to a given
+  /// function application constraint.
+  ///
+  /// \param fnType The type that describes the set of overloads for the
+  /// function.
+  ///
+  /// \param argFnType The call signature, which includes the call arguments
+  /// (as the function parameters) and the expected result type of the
+  /// call.
+  ///
+  /// \returns \c true if an error was encountered, \c false otherwise.
+  bool simplifyAppliedOverloads(Type fnType, const FunctionType *argFnType,
                                 ConstraintLocatorBuilder locator);
 
   /// Retrieve the type that will be used when matching the given overload.
