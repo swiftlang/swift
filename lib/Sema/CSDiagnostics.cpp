@@ -2278,6 +2278,22 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
     return;
 }
 
+static InFlightDiagnostic emitMissingNullaryCallDiagnostic(ConstraintSystem &cs,
+                                                           FunctionType *srcFT,
+                                                           Expr *anchor) {
+  auto &diags = cs.getASTContext().Diags;
+  if (auto declRefExpr = dyn_cast<DeclRefExpr>(anchor)) {
+    if (auto decl = declRefExpr->getDecl())
+      return diags.diagnose(anchor->getLoc(), diag::missing_nullary_call_decl,
+                            srcFT, decl->getDescriptiveKind(),
+                            decl->getBaseName(), srcFT->getResult(),
+                            !srcFT->getParams().empty());
+  }
+
+  return diags.diagnose(anchor->getLoc(), diag::missing_nullary_call, srcFT,
+                        srcFT->getResult(), !srcFT->getParams().empty());
+}
+
 bool ContextualFailure::diagnoseMissingFunctionCall() const {
   if (getLocator()->isLastElement<LocatorPathElt::RValueAdjustment>())
     return false;
@@ -2310,8 +2326,7 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
   }
 
   auto *anchor = getAnchor();
-  emitDiagnostic(anchor->getLoc(), diag::missing_nullary_call,
-                 srcFT->getResult())
+  emitMissingNullaryCallDiagnostic(getConstraintSystem(), srcFT, anchor)
       .highlight(anchor->getSourceRange())
       .fixItInsertAfter(anchor->getEndLoc(), "()");
 
@@ -3049,8 +3064,7 @@ bool MissingCallFailure::diagnoseAsError() {
     case ConstraintLocator::ContextualType:
     case ConstraintLocator::ApplyArgToParam: {
       auto fnType = getType(baseExpr)->castTo<FunctionType>();
-      emitDiagnostic(baseExpr->getLoc(), diag::missing_nullary_call,
-                     fnType->getResult())
+      emitMissingNullaryCallDiagnostic(getConstraintSystem(), fnType, baseExpr)
           .fixItInsertAfter(baseExpr->getEndLoc(), "()");
       return true;
     }
@@ -3099,8 +3113,7 @@ bool MissingCallFailure::diagnoseAsError() {
   if (auto *AE = dyn_cast<AssignExpr>(baseExpr)) {
     auto *srcExpr = AE->getSrc();
     if (auto *fnType = getType(srcExpr)->getAs<FunctionType>()) {
-      emitDiagnostic(srcExpr->getLoc(), diag::missing_nullary_call,
-                     fnType->getResult())
+      emitMissingNullaryCallDiagnostic(getConstraintSystem(), fnType, srcExpr)
           .highlight(srcExpr->getSourceRange())
           .fixItInsertAfter(srcExpr->getEndLoc(), "()");
       return true;

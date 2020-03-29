@@ -16,7 +16,7 @@ var d2 : () -> Int = { 4 }
 
 var d3 : () -> Float = { 4 }
 
-var d4 : () -> Int = { d2 }  // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{26-26=()}}
+var d4 : () -> Int = { d2 }  // expected-error{{cannot convert value of type '() -> Int' (reference to var 'd2') to expected type 'Int'; did you mean to call it with '()'?}} {{26-26=()}}
 
 if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
   var e0 : [Int]

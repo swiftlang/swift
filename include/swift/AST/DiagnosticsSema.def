@@ -1038,8 +1038,14 @@ NOTE(note_init_parameter,none,
 
 
 ERROR(missing_nullary_call,none,
-     "function produces expected type %0; did you mean to call it with '()'?",
-     (Type))
+     "cannot convert value of type %0 to expected type %1; did you mean to call"
+     " it with '()'%select{| using its default arguments}2?",
+     (Type, Type, bool))
+ERROR(missing_nullary_call_decl,none,
+     "cannot convert value of type %0 (reference to %1 %2) to expected type %3;"
+     " did you mean to call it with '()'"
+     "%select{| using its default arguments}4?",
+     (Type, DescriptiveDeclKind, DeclName, Type, bool))
 ERROR(optional_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to a value of type %1",
      (Type, Type))

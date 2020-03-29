@@ -120,7 +120,7 @@ foo(b:
 // CHECK: [[#LINE-1]] | extension A {
 // CHECK: [[#LINE]]   |   let x: Int = { 42 }()
 // CHECK:             |                ~~~~~~++
-// CHECK:             |                ^ error: function produces expected type 'Int'; did you mean to call it with '()'?
+// CHECK:             |                ^ error: cannot convert value of type '() -> Int' to expected type 'Int'; did you mean to call it with '()'? [insert '()']
 // CHECK:             |                ^ note: Remove '=' to make 'x' a computed property [remove '= ' and replace 'let' with 'var']
 // CHECK: [[#LINE+1]] | }
 

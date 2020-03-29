@@ -24,27 +24,27 @@ func f7(_ a: A, _: Int) -> Int { }
 func forgotCall() {
   // Simple cases
   var x: Int
-  x = f1 // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}{{9-9=()}}
+  x = f1 // expected-error{{cannot convert value of type '() -> Int' (reference to global function 'f1') to expected type 'Int'; did you mean to call it with '()'?}}{{9-9=()}}
   x = f2 // expected-error{{cannot assign value of type '(Int) -> Int' to type 'Int'}}
   x = f3 // expected-error{{cannot assign value of type '(Int...) -> Int' to type 'Int'}}
 
   // With a supertype conversion
   var a = A()
-  a = f4 // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}{{9-9=()}}
+  a = f4 // expected-error{{cannot convert value of type '() -> B' (reference to global function 'f4') to expected type 'B'; did you mean to call it with '()'?}}{{9-9=()}}
 
   // As a call
-  f5(f4) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}{{8-8=()}}
-  f6(f4, f2) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}{{8-8=()}}
-  // expected-error@-1 {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{12-12=()}}
+  f5(f4) // expected-error{{cannot convert value of type '() -> B' (reference to global function 'f4') to expected type 'B'; did you mean to call it with '()'?}}{{8-8=()}}
+  f6(f4, f2) // expected-error{{cannot convert value of type '(Int) -> Int' (reference to global function 'f2') to expected type 'Int'; did you mean to call it with '()' using its default arguments?}}{{12-12=()}}
+  // expected-error@-1 {{cannot convert value of type '() -> B' (reference to global function 'f4') to expected type 'B'; did you mean to call it with '()'?}} {{8-8=()}}
 
   // With overloading: only one succeeds.
-  a = createB // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}
+  a = createB // expected-error{{cannot convert value of type '() -> B' to expected type 'B'; did you mean to call it with '()'?}}
 
-  let _: A = createB // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}} {{21-21=()}}
-  let _: B = createB // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}} {{21-21=()}}
+  let _: A = createB // expected-error{{cannot convert value of type '() -> B' to expected type 'B'; did you mean to call it with '()'?}} {{21-21=()}}
+  let _: B = createB // expected-error{{cannot convert value of type '() -> B' to expected type 'B'; did you mean to call it with '()'?}} {{21-21=()}}
 
   // With overloading, pick the fewest number of fixes.
-  var b = f7(f4, f1) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}
+  var b = f7(f4, f1) // expected-error{{cannot convert value of type '() -> B' (reference to global function 'f4') to expected type 'B'; did you mean to call it with '()'?}}
   b.iAmAB()
 }
 
@@ -339,7 +339,7 @@ func test_explicit_call_with_overloads() {
   }
 
   foo(S().foo)
-  // expected-error@-1 {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{14-14=()}}
+  // expected-error@-1 {{cannot convert value of type '(Int, String) -> Int' to expected type 'Int'; did you mean to call it with '()' using its default arguments?}} {{14-14=()}}
 }
 
 // SR-11476
@@ -354,7 +354,7 @@ func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
   // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{12-12=!}}
 
   _ = \S.[nil] // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
-  _ = \S.[fn] // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{13-13=()}}
+  _ = \S.[fn] // expected-error {{cannot convert value of type '() -> Int' (reference to parameter 'fn') to expected type 'Int'; did you mean to call it with '()'?}} {{13-13=()}}
 }
 
 func sr12426(a: Any, _ str: String?) {
