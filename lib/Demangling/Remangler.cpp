@@ -1221,7 +1221,6 @@ void Remangler::mangleFunctionType(Node *node) {
   Buffer << 'c';
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void Remangler::mangleDifferentiableFunctionType(Node *node) {
   mangleFunctionSignature(node);
   Buffer << "XF";
@@ -1241,7 +1240,6 @@ void Remangler::mangleEscapingLinearFunctionType(Node *node) {
   mangleFunctionSignature(node);
   Buffer << "XI";
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 void Remangler::mangleGenericProtocolWitnessTable(Node *node) {
   mangleSingleChildNode(node);
@@ -1400,7 +1398,6 @@ void Remangler::mangleIVarDestroyer(Node *node) {
   Buffer << "fE";
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void Remangler::mangleImplDifferentiable(Node *node) {
   Buffer << 'd';
 }
@@ -1408,7 +1405,6 @@ void Remangler::mangleImplDifferentiable(Node *node) {
 void Remangler::mangleImplLinear(Node *node) {
   Buffer << 'l';
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 void Remangler::mangleImplEscaping(Node *node) {
   Buffer << 'e';
@@ -1491,14 +1487,12 @@ void Remangler::mangleImplFunctionType(Node *node) {
   Buffer << PseudoGeneric;
   for (NodePointer Child : *node) {
     switch (Child->getKind()) {
-      // SWIFT_ENABLE_TENSORFLOW
       case Node::Kind::ImplDifferentiable:
         Buffer << 'd';
         break;
       case Node::Kind::ImplLinear:
         Buffer << 'l';
         break;
-      // SWIFT_ENABLE_TENSORFLOW END
       case Node::Kind::ImplEscaping:
         Buffer << 'e';
         break;

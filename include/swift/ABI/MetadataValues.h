@@ -785,7 +785,6 @@ class TargetFunctionTypeFlags {
     ThrowsMask        = 0x01000000U,
     ParamFlagsMask    = 0x02000000U,
     EscapingMask      = 0x04000000U,
-    // SWIFT_ENABLE_TENSORFLOW
     DifferentiableMask  = 0x08000000U,
     LinearMask          = 0x10000000U
   };
@@ -812,6 +811,16 @@ public:
                                              (throws ? ThrowsMask : 0));
   }
 
+  constexpr TargetFunctionTypeFlags<int_type> withDifferentiabilityKind(
+      FunctionMetadataDifferentiabilityKind differentiability) const {
+    return TargetFunctionTypeFlags<int_type>(
+        (Data & ~DifferentiableMask & ~LinearMask) |
+        (differentiability == FunctionMetadataDifferentiabilityKind::Normal
+             ? DifferentiableMask : 0) |
+        (differentiability == FunctionMetadataDifferentiabilityKind::Linear
+             ? LinearMask : 0));
+  }
+
   constexpr TargetFunctionTypeFlags<int_type>
   withParameterFlags(bool hasFlags) const {
     return TargetFunctionTypeFlags<int_type>((Data & ~ParamFlagsMask) |
@@ -824,17 +833,6 @@ public:
                                              (isEscaping ? EscapingMask : 0));
   }
   
-  // SWIFT_ENABLE_TENSORFLOW
-  constexpr TargetFunctionTypeFlags<int_type> withDifferentiabilityKind(
-      FunctionMetadataDifferentiabilityKind differentiability) const {
-    return TargetFunctionTypeFlags<int_type>(
-        (Data & ~DifferentiableMask & ~LinearMask) |
-        (differentiability == FunctionMetadataDifferentiabilityKind::Normal
-             ? DifferentiableMask : 0) |
-        (differentiability == FunctionMetadataDifferentiabilityKind::Linear
-             ? LinearMask : 0));
-  }
-
   unsigned getNumParameters() const { return Data & NumParametersMask; }
 
   FunctionMetadataConvention getConvention() const {
@@ -848,12 +846,14 @@ public:
   bool isEscaping() const {
     return bool (Data & EscapingMask);
   }
-  
-  // SWIFT_ENABLE_TENSORFLOW
+
+  bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }
+
   bool isDifferentiable() const {
     return getDifferentiabilityKind() >=
         FunctionMetadataDifferentiabilityKind::Normal;
   }
+
   FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
     if (bool(Data & DifferentiableMask))
       return FunctionMetadataDifferentiabilityKind::Normal;
@@ -861,8 +861,6 @@ public:
       return FunctionMetadataDifferentiabilityKind::Linear;
     return FunctionMetadataDifferentiabilityKind::NonDifferentiable;
   }
-
-  bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }
 
   int_type getIntValue() const {
     return Data;
@@ -884,7 +882,6 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 template <typename int_type>
 class TargetParameterTypeFlags {
   enum : int_type {
-    // SWIFT_ENABLE_TENSORFLOW
     ValueOwnershipMask    = 0x7F,
     VariadicMask          = 0x80,
     AutoClosureMask       = 0x100,
@@ -918,7 +915,6 @@ public:
   bool isNone() const { return Data == 0; }
   bool isVariadic() const { return Data & VariadicMask; }
   bool isAutoClosure() const { return Data & AutoClosureMask; }
-  // SWIFT_ENABLE_TENSORFLOW
   bool isNoDerivative() const { return Data & NoDerivativeMask; }
 
   ValueOwnership getValueOwnership() const {

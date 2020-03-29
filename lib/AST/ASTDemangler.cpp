@@ -365,7 +365,6 @@ Type ASTBuilder::createFunctionType(
     auto parameterFlags = ParameterTypeFlags()
                               .withValueOwnership(ownership)
                               .withVariadic(flags.isVariadic())
-                              // SWIFT_ENABLE_TENSORFLOW
                               .withAutoClosure(flags.isAutoClosure())
                               .withNoDerivative(flags.isNoDerivative());
 
@@ -408,9 +407,7 @@ Type ASTBuilder::createFunctionType(
 
   FunctionType::ExtInfo incompleteExtInfo(
     FunctionTypeRepresentation::Swift,
-    noescape, flags.throws(),
-    diffKind,
-    /*clangFunctionType*/nullptr);
+    noescape, flags.throws(), diffKind, /*clangFunctionType*/nullptr);
 
   const clang::Type *clangFunctionType = nullptr;
   if (representation == FunctionTypeRepresentation::CFunctionPointer)
