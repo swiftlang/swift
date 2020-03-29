@@ -1168,6 +1168,26 @@ void Remangler::mangleThinFunctionType(Node *node) {
   mangleChildNodes(node); // argument tuple, result type
 }
 
+void Remangler::mangleDifferentiableFunctionType(Node *node) {
+  Buffer << "XF";
+  mangleChildNodes(node); // argument tuple, result type
+}
+
+void Remangler::mangleEscapingDifferentiableFunctionType(Node *node) {
+  Buffer << "XG";
+  mangleChildNodes(node); // argument tuple, result type
+}
+
+void Remangler::mangleLinearFunctionType(Node *node) {
+  Buffer << "XH";
+  mangleChildNodes(node); // argument tuple, result type
+}
+
+void Remangler::mangleEscapingLinearFunctionType(Node *node) {
+  Buffer << "XI";
+  mangleChildNodes(node); // argument tuple, result type
+}
+
 void Remangler::mangleArgumentTuple(Node *node) {
   mangleSingleChildNode(node);
 }
@@ -1256,6 +1276,16 @@ void Remangler::mangleImplYield(Node *node) {
   assert(node->getNumChildren() == 2);
   Buffer << 'Y';
   mangleChildNodes(node); // impl convention, type
+}
+
+void Remangler::mangleImplDifferentiable(Node *node) {
+  // TODO(TF-750): Check if this code path actually triggers and add a test.
+  Buffer << 'd';
+}
+
+void Remangler::mangleImplLinear(Node *node) {
+  // TODO(TF-750): Check if this code path actually triggers and add a test.
+  Buffer << 'l';
 }
 
 void Remangler::mangleImplEscaping(Node *node) {

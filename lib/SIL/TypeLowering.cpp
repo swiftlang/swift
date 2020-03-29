@@ -268,7 +268,8 @@ namespace {
 
     RetTy visitAbstractTypeParamType(CanType type,
                                      AbstractionPattern origType) {
-      if (origType.isTypeParameterOrOpaqueArchetype()) {
+      if (origType.isTypeParameterOrOpaqueArchetype() ||
+          origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
         if (origType.requiresClass()) {
           return asImpl().handleReference(type);
         } else {

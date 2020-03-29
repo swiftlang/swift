@@ -655,10 +655,14 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   C.NumDecls += SF->getTopLevelDecls().size();
   C.NumLocalTypeDecls += SF->LocalTypeDecls.size();
   C.NumObjCMethods += SF->ObjCMethods.size();
-  C.NumInfixOperators += SF->InfixOperators.size();
-  C.NumPostfixOperators += SF->PostfixOperators.size();
-  C.NumPrefixOperators += SF->PrefixOperators.size();
-  C.NumPrecedenceGroups += SF->PrecedenceGroups.size();
+
+  SmallVector<OperatorDecl *, 2> operators;
+  SF->getOperatorDecls(operators);
+  C.NumOperators += operators.size();
+
+  SmallVector<PrecedenceGroupDecl *, 2> groups;
+  SF->getPrecedenceGroups(groups);
+  C.NumPrecedenceGroups += groups.size();
 
   auto bufID = SF->getBufferID();
   if (bufID.hasValue()) {
@@ -2145,6 +2149,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   if (Invocation.getDiagnosticOptions().UseColor)
     PDC.forceColors();
+
+  PDC.setPrintEducationalNotes(
+      Invocation.getDiagnosticOptions().PrintEducationalNotes);
 
   // Temporarily stage the new diagnostic formatting style behind
   // -enable-descriptive-diagnostics

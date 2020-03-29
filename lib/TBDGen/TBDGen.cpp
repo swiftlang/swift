@@ -482,21 +482,23 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
       }
     };
 
-    rootConformance->forEachValueWitness(
-        [&](ValueDecl *valueReq, Witness witness) {
-          auto witnessDecl = witness.getDecl();
-          if (isa<AbstractFunctionDecl>(valueReq)) {
-            addSymbolIfNecessary(valueReq, witnessDecl);
-          } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
-            auto witnessStorage = cast<AbstractStorageDecl>(witnessDecl);
-            storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
-              auto witnessAccessor =
-                witnessStorage->getSynthesizedAccessor(
-                  reqtAccessor->getAccessorKind());
-              addSymbolIfNecessary(reqtAccessor, witnessAccessor);
-            });
-          }
-        });
+    rootConformance->forEachValueWitness([&](ValueDecl *valueReq,
+                                             Witness witness) {
+      auto witnessDecl = witness.getDecl();
+      if (isa<AbstractFunctionDecl>(valueReq)) {
+        addSymbolIfNecessary(valueReq, witnessDecl);
+      } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
+        if (auto witnessStorage = dyn_cast<AbstractStorageDecl>(witnessDecl)) {
+          storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
+            auto witnessAccessor = witnessStorage->getSynthesizedAccessor(
+                reqtAccessor->getAccessorKind());
+            addSymbolIfNecessary(reqtAccessor, witnessAccessor);
+          });
+        } else if (isa<EnumElementDecl>(witnessDecl)) {
+          addSymbolIfNecessary(valueReq, witnessDecl);
+        }
+      }
+    });
   }
 }
 

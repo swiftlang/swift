@@ -365,7 +365,8 @@ Type ASTBuilder::createFunctionType(
     auto parameterFlags = ParameterTypeFlags()
                               .withValueOwnership(ownership)
                               .withVariadic(flags.isVariadic())
-                              .withAutoClosure(flags.isAutoClosure());
+                              .withAutoClosure(flags.isAutoClosure())
+                              .withNoDerivative(flags.isNoDerivative());
 
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
   }
@@ -386,6 +387,19 @@ Type ASTBuilder::createFunctionType(
     break;
   }
 
+  DifferentiabilityKind diffKind;
+  switch (flags.getDifferentiabilityKind()) {
+  case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
+    diffKind = DifferentiabilityKind::NonDifferentiable;
+    break;
+  case FunctionMetadataDifferentiabilityKind::Normal:
+    diffKind = DifferentiabilityKind::Normal;
+    break;
+  case FunctionMetadataDifferentiabilityKind::Linear:
+    diffKind = DifferentiabilityKind::Linear;
+    break;
+  }
+
   auto noescape =
     (representation == FunctionTypeRepresentation::Swift
      || representation == FunctionTypeRepresentation::Block)
@@ -393,9 +407,7 @@ Type ASTBuilder::createFunctionType(
 
   FunctionType::ExtInfo incompleteExtInfo(
     FunctionTypeRepresentation::Swift,
-    noescape, flags.throws(),
-    DifferentiabilityKind::NonDifferentiable,
-    /*clangFunctionType*/nullptr);
+    noescape, flags.throws(), diffKind, /*clangFunctionType*/nullptr);
 
   const clang::Type *clangFunctionType = nullptr;
   if (representation == FunctionTypeRepresentation::CFunctionPointer)

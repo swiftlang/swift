@@ -2855,8 +2855,14 @@ public:
   }
 
   /// Add an explicit conversion constraint (e.g., \c 'x as T').
+  ///
+  /// \param fromType The type of the expression being converted.
+  /// \param toType The type to convert to.
+  /// \param rememberChoice Whether the conversion disjunction should record its
+  /// choice.
+  /// \param locator The locator.
   void addExplicitConversionConstraint(Type fromType, Type toType,
-                                       bool allowFixes,
+                                       RememberChoice_t rememberChoice,
                                        ConstraintLocatorBuilder locator);
 
   /// Add a disjunction constraint.
