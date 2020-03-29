@@ -489,16 +489,18 @@ ClassTypeInfo::getClassLayout(IRGenModule &IGM, SILType classType,
 
 void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
                                bool isOutlined) const {
-  auto classType = IGF.IGM.getLoweredType(getClass()->TypeDecl::getDeclaredInterfaceType());
+  // If the src is an address, just project and store. Then we're done.
+  auto *exploded = src.getAll().front();
+  if (src.size() == 1 && exploded->getType() == addr->getType()->getPointerElementType()) {
+    IGF.Builder.CreateStore(exploded, addr);
+    src.reset();
+    return;
+  }
+
+  // Otherwise, create GEP/init for each element in src.
+  auto classType = IGF.IGM.getLoweredType(getClass()->getDeclaredInterfaceType());
   for (auto *prop : getClass()->getStoredProperties()) {
-    auto *exploded = src.claimNext();
-    // If the src is an address, just project and store. Then we're done.
-    if (exploded->getType()->isPointerTy()) {
-      addr = asDerived().projectScalar(IGF, addr);
-      IGF.Builder.CreateStore(exploded, addr);
-      return;
-    }
-    // Otherwise, create GEP/init for each element in src.
+    exploded = src.claimNext();
     auto propType = IGF.IGM.getLoweredType(prop->getType());
     const auto &propTypeInfo = cast<LoadableTypeInfo>(IGF.getTypeInfo(propType));
     auto propAddr = projectPhysicalClassMemberAddress(IGF, addr.getAddress(), classType, propType, prop);
