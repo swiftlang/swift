@@ -1,0 +1,54 @@
+// RUN: %target-sil-opt %s | %FileCheck %s
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+@propertyWrapper struct Observable<Value> {
+  @_hasStorage private var stored: Value { get set }
+  init(wrappedValue: Value)
+  @available(*, unavailable, message: "must be in a class")
+  var wrappedValue: Value { get set }
+  static subscript<EnclosingSelf>(_enclosingInstance observed: EnclosingSelf, wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>, storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Observable<Value>>) -> Value { get set }
+}
+
+class ValidSR_12430 {
+  init(value: String)
+  var y: String { get set }
+  @_hasStorage final var _y: Observable<String> { get set }
+  @objc deinit
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers13ValidSR_12430C5valueACSS_tcfc
+// CHECK: assign_by_wrapper [enclosingSelfAccess] {{%.*}} : $String to {{%.*}} : $*Observable<String>, init {{%.*}} : $@callee_guaranteed (@owned String) -> @owned Observable<String>, set {{%.*}} : $@callee_guaranteed (@owned String) -> () // id: {{%.*}}
+// CHECK: return
+sil hidden [ossa] @$s17property_wrappers13ValidSR_12430C5valueACSS_tcfc : $@convention(method) (@owned String, @owned ValidSR_12430) -> @owned ValidSR_12430 {
+bb0(%0 : @owned $String, %1 : @owned $ValidSR_12430):
+  debug_value %0 : $String, let, name "value", argno 1 // id: %2
+  debug_value %1 : $ValidSR_12430, let, name "self", argno 2 // id: %3
+  %4 = mark_uninitialized [rootself] %1 : $ValidSR_12430 // users: %22, %21, %5
+  %5 = begin_borrow %4 : $ValidSR_12430           // users: %20, %13, %8
+  %6 = begin_borrow %0 : $String                  // users: %19, %7
+  %7 = copy_value %6 : $String                    // user: %15
+  %8 = ref_element_addr %5 : $ValidSR_12430, #ValidSR_12430._y // user: %9
+  %9 = begin_access [modify] [dynamic] %8 : $*Observable<String> // users: %16, %15
+  %10 = function_ref @$s17property_wrappers13ValidSR_12430C1ySSvpfP : $@convention(thin) (@owned String) -> @owned Observable<String> // user: %11
+  %11 = partial_apply [callee_guaranteed] %10() : $@convention(thin) (@owned String) -> @owned Observable<String> // users: %18, %15
+  %12 = function_ref @$s17property_wrappers13ValidSR_12430C1ySSvs : $@convention(method) (@owned String, @guaranteed ValidSR_12430) -> () // user: %14
+  %13 = copy_value %5 : $ValidSR_12430            // user: %14
+  %14 = partial_apply [callee_guaranteed] %12(%13) : $@convention(method) (@owned String, @guaranteed ValidSR_12430) -> () // users: %17, %15
+  assign_by_wrapper [enclosingSelfAccess] %7 : $String to %9 : $*Observable<String>, init %11 : $@callee_guaranteed (@owned String) -> @owned Observable<String>, set %14 : $@callee_guaranteed (@owned String) -> () // id: %15
+  end_access %9 : $*Observable<String>            // id: %16
+  destroy_value %14 : $@callee_guaranteed (@owned String) -> () // id: %17
+  destroy_value %11 : $@callee_guaranteed (@owned String) -> @owned Observable<String> // id: %18
+  end_borrow %6 : $String                         // id: %19
+  end_borrow %5 : $ValidSR_12430                  // id: %20
+  %21 = copy_value %4 : $ValidSR_12430            // user: %24
+  destroy_value %4 : $ValidSR_12430               // id: %22
+  destroy_value %0 : $String                      // id: %23
+  return %21 : $ValidSR_12430                     // id: %24
+} // end sil function '$s17property_wrappers13ValidSR_12430C5valueACSS_tcfc'
+
+sil [ossa] @$s17property_wrappers13ValidSR_12430C1ySSvpfP : $@convention(thin) (@owned String) -> @owned Observable<String>
+sil [ossa] @$s17property_wrappers13ValidSR_12430C1ySSvs : $@convention(method) (@owned String, @guaranteed ValidSR_12430) -> ()

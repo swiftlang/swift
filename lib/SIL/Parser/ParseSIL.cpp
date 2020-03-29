@@ -3610,6 +3610,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SILValue Src, DestAddr, InitFn, SetFn;
     SourceLoc DestLoc;
     AssignOwnershipQualifier AssignQualifier;
+    bool HasEnclosingSelfAccess = false;
+
+    if (P.consumeIf(tok::l_square)) {
+      if (parseVerbatim("enclosingSelfAccess") ||
+          P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+        return true;
+      HasEnclosingSelfAccess = true;
+    }
+
     if (parseTypedValueRef(Src, B) || parseVerbatim("to") ||
         parseAssignOwnershipQualifier(AssignQualifier, *this) ||
         parseTypedValueRef(DestAddr, DestLoc, B) ||
@@ -3626,7 +3635,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     }
 
-    ResultVal = B.createAssignByWrapper(InstLoc, Src, DestAddr, InitFn, SetFn,
+    ResultVal = B.createAssignByWrapper(InstLoc, HasEnclosingSelfAccess, Src,
+                                        DestAddr, InitFn, SetFn,
                                         AssignQualifier);
     break;
   }

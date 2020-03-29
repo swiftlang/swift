@@ -1240,6 +1240,7 @@ void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createAssignByWrapper(getOpLocation(Inst->getLoc()),
+                                      Inst->hasEnclosingSelfAccess(),
                                       getOpValue(Inst->getSrc()),
                                       getOpValue(Inst->getDest()),
                                       getOpValue(Inst->getInitializer()),

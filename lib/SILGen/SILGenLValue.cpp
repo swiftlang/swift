@@ -1512,7 +1512,13 @@ namespace {
           Mval = Mval.materialize(SGF, loc);
         }
 
-        SGF.B.createAssignByWrapper(loc, Mval.forward(SGF), proj.forward(SGF),
+        auto typeInfo = field->getAttachedPropertyWrapperTypeInfo(0);
+        bool hasEnclosingSelfAccess =
+            typeInfo.enclosingInstanceWrappedSubscript ||
+            typeInfo.enclosingInstanceProjectedSubscript;
+
+        SGF.B.createAssignByWrapper(loc, hasEnclosingSelfAccess,
+                                     Mval.forward(SGF), proj.forward(SGF),
                                      initFn.getValue(), setterFn.getValue(),
                                      AssignOwnershipQualifier::Unknown);
         return;

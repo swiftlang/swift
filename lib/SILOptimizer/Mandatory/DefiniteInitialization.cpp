@@ -1934,6 +1934,10 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
       assert(InitKind == IsInitialization);
       AI->setOwnershipQualifier(AssignOwnershipQualifier::Reinit);
     } else {
+      if (AI->hasEnclosingSelfAccess() && InitKind != IsInitialization &&
+          getSelfInitializedAtInst(AI) != DIKind::Yes) {
+        diagnose(Module, Inst->getLoc(), diag::self_closure_use_uninit);
+      }
       AI->setOwnershipQualifier((InitKind == IsInitialization
                                  ? AssignOwnershipQualifier::Init
                                  : AssignOwnershipQualifier::Reassign));

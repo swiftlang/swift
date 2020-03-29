@@ -1081,6 +1081,7 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
 }
 
 AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
+                                           bool HasEnclosingSelfAccess,
                                            SILValue Src, SILValue Dest,
                                            SILValue Initializer,
                                            SILValue Setter,
@@ -1089,6 +1090,8 @@ AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
   assert(Initializer->getType().is<SILFunctionType>());
   SILInstruction::Bits.AssignByWrapperInst.OwnershipQualifier =
       unsigned(Qualifier);
+  SILInstruction::Bits.AssignByWrapperInst.HasEnclosingSelfAccess =
+      HasEnclosingSelfAccess;
 }
 
 MarkFunctionEscapeInst *

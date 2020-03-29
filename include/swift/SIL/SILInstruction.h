@@ -3931,7 +3931,8 @@ class AssignByWrapperInst
     : public AssignInstBase<SILInstructionKind::AssignByWrapperInst, 4> {
   friend SILBuilder;
 
-  AssignByWrapperInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
+  AssignByWrapperInst(SILDebugLocation DebugLoc, bool HasEnclosingSelfAccess,
+                       SILValue Src, SILValue Dest,
                        SILValue Initializer, SILValue Setter,
                        AssignOwnershipQualifier Qualifier =
                          AssignOwnershipQualifier::Unknown);
@@ -3940,6 +3941,14 @@ public:
 
   SILValue getInitializer() { return Operands[2].get(); }
   SILValue getSetter() { return  Operands[3].get(); }
+
+  bool hasEnclosingSelfAccess() const {
+    return SILInstruction::Bits.AssignByWrapperInst.HasEnclosingSelfAccess;
+  }
+  void setHasEnclosingSelfAccess(bool hasEnclosingSelfAccess) {
+    SILInstruction::Bits.AssignByWrapperInst.HasEnclosingSelfAccess =
+        hasEnclosingSelfAccess;
+  }
 
   AssignOwnershipQualifier getOwnershipQualifier() const {
     return AssignOwnershipQualifier(

@@ -1409,6 +1409,8 @@ public:
   }
 
   void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
+    if (AI->hasEnclosingSelfAccess())
+      *this << "[enclosingSelfAccess] ";
     *this << getIDAndType(AI->getSrc()) << " to ";
     printAssignOwnershipQualifier(AI->getOwnershipQualifier());
     *this << getIDAndType(AI->getDest())

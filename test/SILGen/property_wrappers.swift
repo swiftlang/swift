@@ -678,6 +678,58 @@ struct HasStaticWrapper {
 }
 
 @propertyWrapper
+struct Observable<Value> {
+  private var stored: Value
+
+  init(wrappedValue: Value) {
+    self.stored = wrappedValue
+  }
+
+  @available(*, unavailable, message: "must be in a class")
+  var wrappedValue: Value {
+    get { fatalError("called wrappedValue getter") }
+    set { fatalError("called wrappedValue setter") }
+  }
+
+  static subscript<EnclosingSelf>(
+      _enclosingInstance observed: EnclosingSelf,
+      wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,
+      storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Self>
+    ) -> Value {
+    get {
+      observed[keyPath: storageKeyPath].stored
+    }
+    set {
+      observed[keyPath: storageKeyPath].stored = newValue
+    }
+  }
+}
+
+class Superclass {
+  var x: Int = 0
+}
+
+class ValidSR_12430: Superclass {
+
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s17property_wrappers13ValidSR_12430C5valueACSS_tcfC : $@convention(method) (@owned String, @thick ValidSR_12430.Type) -> @owned ValidSR_12430 {
+  init(value: String) {
+    // CHECK: assign_by_wrapper [enclosingSelfAccess] {{%.*}} : $String to {{%.*}} : $*Observable<String>, init {{%.*}} : $@callee_guaranteed (@owned String) -> @owned Observable<String>, set {{%.*}} : $@callee_guaranteed (@owned String) -> () // id: {{%.*}}
+    self.y = value
+
+    super.init()
+
+    // CHECK: assign_by_wrapper [enclosingSelfAccess] {{%.*}} : $String to {{%.*}} : $*Observable<String>, init {{%.*}} : $@callee_guaranteed (@owned String) -> @owned Observable<String>, set {{%.*}} : $@callee_guaranteed (@owned String) -> () // id: {{%.*}}
+    self.z = value
+  }
+
+  @Observable
+  var y: String
+
+  @Observable
+  var z: String = ""
+}
+
+@propertyWrapper
 struct ObservedObject<ObjectType : AnyObject > {
   var wrappedValue: ObjectType
 

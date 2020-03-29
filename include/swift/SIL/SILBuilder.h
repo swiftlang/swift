@@ -858,12 +858,14 @@ public:
   }
 
   AssignByWrapperInst *createAssignByWrapper(SILLocation Loc,
+                                               bool HasEnclosingSelfAccess,
                                                SILValue Src, SILValue Dest,
                                                SILValue Initializer,
                                                SILValue Setter,
                                           AssignOwnershipQualifier Qualifier) {
     return insert(new (getModule())
-                  AssignByWrapperInst(getSILDebugLocation(Loc), Src, Dest,
+                  AssignByWrapperInst(getSILDebugLocation(Loc),
+                                       HasEnclosingSelfAccess, Src, Dest,
                                        Initializer, Setter, Qualifier));
   }
 

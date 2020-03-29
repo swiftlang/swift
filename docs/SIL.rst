@@ -2529,9 +2529,9 @@ assign_by_wrapper
 ``````````````````
 ::
 
-  sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+  sil-instruction ::= 'assign_by_wrapper' '[enclosingSelfAccess]'? sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
 
-  assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
+  assign_by_wrapper [enclosingSelfAccess] %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
   // $S can be a value or address type
   // $T must be the type of a property wrapper.
   // $F must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and returning $T
@@ -2539,6 +2539,9 @@ assign_by_wrapper
 
 Similar to the ``assign`` instruction, but the assignment is done via a
 delegate.
+
+``[enclosingSelfAccess]`` indicates the property wrapper setter allows
+arbitrary access to the class instance containing the wrapped property.
 
 In case of an initialization, the function ``%2`` is called with ``%0`` as
 argument. The result is stored to ``%1``. In case ``%2`` is an address type,
