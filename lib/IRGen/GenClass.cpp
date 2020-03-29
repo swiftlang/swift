@@ -102,6 +102,10 @@ namespace {
     StructLayout *createLayoutWithTailElems(IRGenModule &IGM,
                                             SILType classType,
                                             ArrayRef<SILType> tailTypes) const;
+    
+    using HeapTypeInfo<ClassTypeInfo>::initialize;
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
+                    bool isOutlined) const override;
   };
 } // end anonymous namespace
 
@@ -482,6 +486,20 @@ ClassTypeInfo::getClassLayout(IRGenModule &IGM, SILType classType,
 
   return *Layout;
 }
+
+void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
+                               bool isOutlined) const {
+  auto classType = IGF.IGM.getLoweredType(getClass()->TypeDecl::getDeclaredInterfaceType());
+  for (auto *prop : getClass()->getStoredProperties()) {
+    auto propType = IGF.IGM.getLoweredType(prop->getType());
+    const auto &propTypeInfo = cast<LoadableTypeInfo>(IGF.getTypeInfo(propType));
+    auto propAddr = projectPhysicalClassMemberAddress(IGF, addr.getAddress(), classType, propType, prop);
+    Explosion propExplosion;
+    propExplosion.add(src.claimNext());
+    propTypeInfo.initialize(IGF, propExplosion, propAddr, isOutlined);
+  }
+}
+  
 
 /// Cast the base to i8*, apply the given inbounds offset (in bytes,
 /// as a size_t), and cast to a pointer to the given type.

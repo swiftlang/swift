@@ -1038,6 +1038,9 @@ void DSEContext::processLoadInst(SILInstruction *I, DSEKind Kind) {
 
 void DSEContext::processStoreInst(SILInstruction *I, DSEKind Kind) {
   auto *SI = cast<StoreInst>(I);
+  // TODO: for some reason these stores are removed when they shouldn't be.
+  if (isa<ObjectInst>(SI->getSrc()))
+    return;
   processWrite(I, SI->getSrc(), SI->getDest(), Kind);
 }
 

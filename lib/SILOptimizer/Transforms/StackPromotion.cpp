@@ -12,6 +12,7 @@
 
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
@@ -51,6 +52,13 @@ private:
   /// Tries to promote the allocation \p ARI.
   bool tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
                        DeadEndBlocks &DEBlocks);
+
+  /// Tries to promote the allocation \p ARI to an object. This optimization will only happen if the class type
+  /// has a compiler-generated constructor and destructor. The promotion happens by scanning all uses in
+  /// dominance order. If all members are accounted for by ref_element_addr instruction before we find any
+  /// other use, then we can use those values to promote this alloc_ref to an object.
+  bool tryPromoteToObject(AllocRefInst *allocRef,
+                          ValueLifetimeAnalysis::Frontier &frontier);
 };
 
 void StackPromotion::run() {
@@ -84,10 +92,11 @@ void StackPromotion::run() {
 bool StackPromotion::promoteInBlock(SILBasicBlock *BB, EscapeAnalysis *EA,
                                     DeadEndBlocks &DEBlocks) {
   bool Changed = false;
-  for (auto Iter = BB->begin(); Iter != BB->end();) {
-    // The allocation instruction may be moved, so increment Iter prior to
-    // doing the optimization.
-    SILInstruction *I = &*Iter++;
+  SmallVector<SILInstruction*, 64> allInstructions;
+  for (SILInstruction &inst : *BB) {
+    allInstructions.push_back(&inst);
+  }
+  for (auto *I : allInstructions) {
     if (auto *ARI = dyn_cast<AllocRefInst>(I)) {
       // Don't stack promote any allocation inside a code region which ends up
       // in a no-return block. Such allocations may missing their final release.
@@ -141,6 +150,9 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
     return false;
   }
   NumStackPromoted++;
+  
+  if (tryPromoteToObject(ARI, Frontier))
+    return true;
 
   // We set the [stack] attribute in the alloc_ref.
   ARI->setStackAllocatable();
@@ -150,6 +162,136 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
     SILBuilder B(FrontierInst);
     B.createDeallocRef(ARI->getLoc(), ARI, true);
   }
+  return true;
+}
+
+static void getOrderedNonDebugUses(SILValue v, DominanceInfo *domInfo,
+                                   SmallVectorImpl<Operand*> &uses) {
+  auto unsorted = getNonDebugUses(v);
+  uses.append(unsorted.begin(), unsorted.end());
+  llvm::sort(uses, [&domInfo](Operand *a, Operand *b) {
+    return domInfo->dominates(a->getUser(), b->getUser());
+  });
+}
+
+bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
+                                        ValueLifetimeAnalysis::Frontier &frontier) {
+  DominanceInfo *domInfo = PM->getAnalysis<DominanceAnalysis>()->get(allocRef->getFunction());
+  auto *classDecl = allocRef->getType().getClassOrBoundGenericClass();
+  if (!classDecl || !classDecl->getDestructor()->isImplicit())
+    return false;
+  
+  SmallVector<Operand*, 24> uses;
+  getOrderedNonDebugUses(allocRef, domInfo, uses);
+  if (llvm::any_of(uses, [](Operand *use) {
+    auto user = use->getUser();
+    return !isa<RefElementAddrInst>(user) && !isa<SetDeallocatingInst>(user) && !isa<DeallocRefInst>(user) && !isa<DebugValueInst>(user) && !isa<StrongReleaseInst>(user);
+  }))
+    return false;
+  
+  SmallVector<VarDecl*, 8> props;
+  for (auto *prop : classDecl->getStoredProperties()) {
+    props.push_back(prop);
+  }
+  
+  llvm::reverse(props);
+  SmallVector<RefElementAddrInst *, 8> propertyInitializers;
+  for (auto *use : uses) {
+    auto propRef = dyn_cast<RefElementAddrInst>(use->getUser());
+    if (!propRef)
+      return false;
+    
+    if (propRef->getField() != props.pop_back_val())
+      return false;
+
+    propertyInitializers.push_back(propRef);
+
+    if (props.empty())
+      break;
+  }
+  
+  SmallVector<StoreInst*, 8> deadStores;
+  SmallVector<SILValue, 8> elements;
+  for (auto *init : propertyInitializers) {
+    SmallVector<Operand*, 6> refElementUses;
+    getOrderedNonDebugUses(init, domInfo, refElementUses);
+    auto frontUser = refElementUses.front()->getUser();
+    if (auto *beginAccess = dyn_cast<BeginAccessInst>(frontUser)) {
+      SmallVector<Operand*, 4> beginAccessUses;
+      getOrderedNonDebugUses(beginAccess, domInfo, beginAccessUses);
+      frontUser = beginAccessUses.front()->getUser();
+    }
+    if (auto *store = dyn_cast<StoreInst>(frontUser)) {
+      elements.push_back(store->getSrc());
+      deadStores.push_back(store);
+    } else {
+      return false;
+    }
+  }
+  
+  SILInstruction *lastElement = nullptr;
+  for (auto first = elements.rbegin(); first != elements.rend(); ++first) {
+    auto inst = first->getDefiningInstruction();
+    if (!inst)
+      continue;
+
+    if (!lastElement || domInfo->dominates(lastElement, inst))
+      lastElement = inst;
+  }
+  
+  // If we didn't find anything, that means that all the elements are arguments,
+  // or there aren't any elements. Either way, we know that putting where the
+  // alloc_ref is will work.
+  if (!lastElement)
+    lastElement = allocRef;
+  
+  for (auto *init : propertyInitializers) {
+    if (llvm::any_of(init->getUses(), [&domInfo, &lastElement](Operand *use) {
+      return domInfo->dominates(use->getUser(), lastElement);
+    }))
+      return false;
+  }
+
+  SILBuilder builder(std::next(lastElement->getIterator()));
+  auto object = builder.createObject(allocRef->getLoc(), allocRef->getType(),
+                                     elements, elements.size());
+  auto allocStack = builder.createAllocStack(allocRef->getLoc(), allocRef->getType());
+  builder.createStore(allocRef->getLoc(), object, allocStack,
+                      StoreOwnershipQualifier::Unqualified);
+  
+  SmallVector<Operand *, 8> users(allocRef->use_begin(), allocRef->use_end());
+  for (auto *use : users) {
+    auto user = use->getUser();
+
+    // The only user that still may not dominate object is a debug_value.
+    if (isa<SetDeallocatingInst>(user) || isa<DeallocRefInst>(user) ||
+        isa<DebugValueInst>(user) || isa<StrongReleaseInst>(user))
+      user->eraseFromParent();
+    
+    if (auto ref = dyn_cast<RefElementAddrInst>(user)) {
+      // We need to move the ref_element_addr up.
+      if (domInfo->dominates(ref, allocStack)) {
+        auto newRef = builder.createRefElementAddr(ref->getLoc(), allocStack,
+                                                   ref->getField());
+        ref->replaceAllUsesWith(newRef);
+        ref->eraseFromParent();
+      }
+    }
+  }
+  
+  for (auto *store : deadStores) {
+    store->eraseFromParent();
+  }
+  
+  for (SILInstruction *frontierInst : frontier) {
+    SILBuilderWithScope destroyAddrBuilder(frontierInst);
+    destroyAddrBuilder.createDestroyAddr(allocStack->getLoc(), allocStack);
+    destroyAddrBuilder.createDeallocStack(allocStack->getLoc(), allocStack);
+  }
+
+  allocRef->replaceAllUsesWith(allocStack);
+  allocRef->eraseFromParent();
+  
   return true;
 }
 

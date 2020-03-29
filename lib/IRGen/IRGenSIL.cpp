@@ -3560,10 +3560,18 @@ void IRGenSILFunction::visitStructElementAddrInst(
 }
 
 void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
+  SILType baseTy = i->getOperand()->getType();
+
+  if (i->getOperand()->getType().isAddress()) {
+    Address base = getLoweredAddress(i->getOperand());
+    auto fieldAddr = projectPhysicalClassMemberAddress(*this, base.getAddress(), baseTy, i->getType(), i->getField());
+    setLoweredAddress(i, fieldAddr.getAddress());
+    return;
+  }
+
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *value = base.claimNext();
 
-  SILType baseTy = i->getOperand()->getType();
   Address field = projectPhysicalClassMemberAddress(*this, value, baseTy,
                                                     i->getType(), i->getField())
                       .getAddress();
@@ -3626,6 +3634,9 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   SILType objType = i->getSrc()->getType().getObjectType();
 
   const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
+  if (objType.getClassOrBoundGenericClass()) {
+    // projectPhysicalClassMemberAddress
+  }
   switch (i->getOwnershipQualifier()) {
   case StoreOwnershipQualifier::Unqualified:
   case StoreOwnershipQualifier::Init:

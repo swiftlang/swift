@@ -2805,7 +2805,7 @@ public:
   }
 
   void checkRefElementAddrInst(RefElementAddrInst *EI) {
-    requireReferenceValue(EI->getOperand(), "Operand of ref_element_addr");
+    // requireReferenceValue(EI->getOperand(), "Operand of ref_element_addr");
     require(EI->getType().isAddress(),
             "result of ref_element_addr must be lvalue");
     require(!EI->getField()->isStatic(),
