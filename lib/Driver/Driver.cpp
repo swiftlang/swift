@@ -2107,11 +2107,21 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     // On ELF platforms there's no built in autolinking mechanism, so we
     // pull the info we need from the .o files directly and pass them as an
     // argument input file to the linker.
+    const auto &Triple = TC.getTriple();
     SmallVector<const Action *, 2> AutolinkExtractInputs;
     for (const Action *A : AllLinkerInputs)
-      if (A->getType() == file_types::TY_Object)
+      if (A->getType() == file_types::TY_Object) {
+        // Shared objects on ELF platforms don't have a swift1_autolink_entries
+        // section in them because the section in the .o files is marked as
+        // SHF_EXCLUDE.
+        if (auto *IA = dyn_cast<InputAction>(A)) {
+          StringRef ObjectName = IA->getInputArg().getValue();
+          if (Triple.getObjectFormat() == llvm::Triple::ELF &&
+              ObjectName.endswith(".so"))
+            continue;
+        }
         AutolinkExtractInputs.push_back(A);
-    const auto &Triple = TC.getTriple();
+      }
     const bool AutolinkExtractRequired =
         (Triple.getObjectFormat() == llvm::Triple::ELF && !Triple.isPS4()) ||
         Triple.getObjectFormat() == llvm::Triple::Wasm ||
