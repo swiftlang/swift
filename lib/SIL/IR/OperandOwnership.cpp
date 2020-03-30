@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "LinearLifetimeCheckerPrivate.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
@@ -36,7 +35,6 @@ private:
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
 
   const Operand &op;
-  LinearLifetimeChecker::ErrorBehaviorKind errorBehavior;
   bool checkingSubObject;
 
 public:
@@ -49,9 +47,8 @@ public:
   /// like struct_extract.
   OperandOwnershipKindClassifier(
       SILModule &mod, const Operand &op,
-      LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
       bool checkingSubObject)
-      : mod(mod), op(op), errorBehavior(errorBehavior),
+      : mod(mod), op(op),
         checkingSubObject(checkingSubObject) {}
 
   bool isCheckingSubObject() const { return checkingSubObject; }
@@ -1050,7 +1047,6 @@ OperandOwnershipKindMap
 Operand::getOwnershipKindMap(bool isForwardingSubValue) const {
   OperandOwnershipKindClassifier classifier(
       getUser()->getModule(), *this,
-      LinearLifetimeChecker::ErrorBehaviorKind::ReturnFalse,
       isForwardingSubValue);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }
