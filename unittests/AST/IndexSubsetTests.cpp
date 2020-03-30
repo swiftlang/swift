@@ -210,3 +210,119 @@ TEST(IndexSubset, FindPrevious) {
   EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 1), 0);
   EXPECT_EQ(indices1->findPrevious(/*endIndex*/ 0), -1);
 }
+
+TEST(IndexSubset, Lowering) {
+  TestContext testCtx;
+  auto &C = testCtx.Ctx;
+  // ((T, T)) -> ()
+  EXPECT_EQ(
+      autodiff::getLoweredParameterIndices(
+          IndexSubset::get(C, 1, {0}),
+          FunctionType::get({
+              FunctionType::Param(
+                  TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
+              C.TheEmptyTupleType)),
+      IndexSubset::get(C, 2, {0, 1}));
+  // ((), (T, T)) -> ()
+  EXPECT_EQ(
+      autodiff::getLoweredParameterIndices(
+          IndexSubset::get(C, 2, {1}),
+          FunctionType::get({
+              FunctionType::Param(C.TheEmptyTupleType),
+              FunctionType::Param(
+                  TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
+                                 C.TheEmptyTupleType)),
+      IndexSubset::get(C, 2, {0, 1}));
+  // (T, (T, T)) -> ()
+  EXPECT_EQ(
+    autodiff::getLoweredParameterIndices(
+      IndexSubset::get(C, 2, {1}),
+      FunctionType::get({
+          FunctionType::Param(C.TheAnyType),
+          FunctionType::Param(
+            TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
+        C.TheEmptyTupleType)),
+    IndexSubset::get(C, 3, {1, 2}));
+  // (T, (T, T)) -> ()
+  EXPECT_EQ(
+    autodiff::getLoweredParameterIndices(
+      IndexSubset::get(C, 2, {0, 1}),
+      FunctionType::get({
+          FunctionType::Param(C.TheAnyType),
+          FunctionType::Param(
+            TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
+        C.TheEmptyTupleType)),
+    IndexSubset::get(C, 3, {0, 1, 2}));
+  // (T, ((T, T)), (T, T), T) -> ()
+  EXPECT_EQ(
+    autodiff::getLoweredParameterIndices(
+      IndexSubset::get(C, 4, {0, 1, 3}),
+      FunctionType::get({
+          FunctionType::Param(C.TheAnyType),
+          FunctionType::Param(
+              TupleType::get({
+                  TupleType::get({C.TheAnyType, C.TheAnyType}, C)}, C)),
+          FunctionType::Param(
+            TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
+          FunctionType::Param(C.TheAnyType)},
+        C.TheEmptyTupleType)),
+    IndexSubset::get(C, 6, {0, 1, 2, 5}));
+  // Method (T) -> ((T, T), (T, T), T) -> ()
+  // TODO(TF-874): Fix this unit test.
+  // The current actual result is:
+  // `(autodiff_index_subset capacity=6 indices=(0, 1, 4))`.
+#if 0
+  EXPECT_EQ(
+    autodiff::getLoweredParameterIndices(
+      IndexSubset::get(C, 4, {0, 1, 3}),
+      FunctionType::get(
+          {FunctionType::Param(C.TheAnyType)},
+          FunctionType::get({
+              FunctionType::Param(
+                  TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
+              FunctionType::Param(
+                  TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
+              FunctionType::Param(C.TheAnyType)},
+              C.TheEmptyTupleType)->withExtInfo(
+                  FunctionType::ExtInfo().withSILRepresentation(
+                  SILFunctionTypeRepresentation::Method)))),
+    IndexSubset::get(C, 6, {0, 1, 4, 5}));
+#endif
+}
+
+TEST(IndexSubset, GetSubsetParameterTypes) {
+  TestContext testCtx;
+  auto &C = testCtx.Ctx;
+  // (T, T) -> ()
+  {
+    SmallVector<AnyFunctionType::Param, 8> params;
+    auto *functionType = FunctionType::get({FunctionType::Param(C.TheAnyType),
+                                            FunctionType::Param(C.TheAnyType)},
+                                           C.TheEmptyTupleType);
+    functionType->getSubsetParameters(IndexSubset::get(C, 1, {0}), params);
+    AnyFunctionType::Param expected[] = {AnyFunctionType::Param(C.TheAnyType)};
+    EXPECT_TRUE(std::equal(params.begin(), params.end(), expected,
+                           [](auto param1, auto param2) {
+                             return param1.getPlainType()->isEqual(param2.getPlainType());
+                           }));
+  }
+  // (T) -> (T, T) -> ()
+  {
+    SmallVector<AnyFunctionType::Param, 8> params;
+    auto *functionType =
+        FunctionType::get({FunctionType::Param(C.TheIEEE16Type)},
+                          FunctionType::get({FunctionType::Param(C.TheAnyType),
+                                             FunctionType::Param(C.TheAnyType)},
+                                            C.TheEmptyTupleType));
+    functionType->getSubsetParameters(IndexSubset::get(C, 3, {0, 1, 2}),
+                                      params);
+    AnyFunctionType::Param expected[] = {
+        AnyFunctionType::Param(C.TheIEEE16Type),
+        AnyFunctionType::Param(C.TheAnyType),
+        AnyFunctionType::Param(C.TheAnyType)};
+    EXPECT_TRUE(std::equal(
+        params.begin(), params.end(), expected, [](auto param1, auto param2) {
+          return param1.getPlainType()->isEqual(param2.getPlainType());
+        }));
+  }
+}
