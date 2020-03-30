@@ -3573,19 +3573,22 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   }
   auto derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
 
+  auto originalFnType = original->getLoweredFunctionType();
   SmallVector<unsigned, 8> parameterAndResultIndices(
       rawParameterAndResultIndices.begin(), rawParameterAndResultIndices.end());
   assert(parameterAndResultIndices.size() ==
              numParameterIndices + numResultIndices &&
          "Parameter/result indices count mismatch");
-  auto *parameterIndices = IndexSubset::get(
-      MF->getContext(), original->getLoweredFunctionType()->getNumParameters(),
-      ArrayRef<unsigned>(parameterAndResultIndices)
-          .take_front(numParameterIndices));
-  auto *resultIndices = IndexSubset::get(
-      MF->getContext(), original->getLoweredFunctionType()->getNumResults(),
-      ArrayRef<unsigned>(parameterAndResultIndices)
-          .take_back(numResultIndices));
+  auto *parameterIndices =
+      IndexSubset::get(MF->getContext(), originalFnType->getNumParameters(),
+                       ArrayRef<unsigned>(parameterAndResultIndices)
+                           .take_front(numParameterIndices));
+  auto numResults = originalFnType->getNumResults() +
+                    originalFnType->getNumIndirectMutatingParameters();
+  auto *resultIndices =
+      IndexSubset::get(MF->getContext(), numResults,
+                       ArrayRef<unsigned>(parameterAndResultIndices)
+                           .take_back(numResultIndices));
 
   AutoDiffConfig config(parameterIndices, resultIndices, derivativeGenSig);
   auto *diffWitness =
