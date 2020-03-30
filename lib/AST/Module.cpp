@@ -1182,7 +1182,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
   }
 
   auto &SF = cast<SourceFile>(File);
-  assert(SF.ASTStage >= SourceFile::NameBound);
+  assert(SF.ASTStage >= SourceFile::ImportsResolved);
 
   // Check if the decl exists on the file.
   if (auto *op = OperatorLookup<OP_DECL>::lookup(eval, desc))
@@ -1351,14 +1351,14 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 void
 SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modules,
                                ModuleDecl::ImportFilter filter) const {
-  // FIXME: Ideally we should assert that the file has been name bound before
-  // calling this function. However unfortunately that can cause issues for
-  // overlays which can depend on a Clang submodule for the underlying framework
-  // they are overlaying, which causes us to attempt to load the overlay again.
-  // We need to find a way to ensure that an overlay dependency with the same
-  // name as the overlay always loads the underlying Clang module. We currently
-  // handle this for a direct import from the overlay, but not when it happens
-  // through other imports.
+  // FIXME: Ideally we should assert that the file has had its imports resolved
+  // before calling this function. However unfortunately that can cause issues
+  // for overlays which can depend on a Clang submodule for the underlying
+  // framework they are overlaying, which causes us to attempt to load the
+  // overlay again. We need to find a way to ensure that an overlay dependency
+  // with the same name as the overlay always loads the underlying Clang module.
+  // We currently handle this for a direct import from the overlay, but not when
+  // it happens through other imports.
   assert(filter && "no imports requested?");
   for (auto desc : Imports) {
     ModuleDecl::ImportFilter requiredFilter;
