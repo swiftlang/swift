@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/Enum.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
