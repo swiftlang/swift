@@ -52,6 +52,24 @@ public func differentiableFunction<T, U, R>(
     /*vjp*/ vjp)
 }
 
+/// Create a differentiable function from a vector-Jacobian products function.
+@inlinable
+public func differentiableFunction<T, U, V, R>(
+  from vjp: @escaping (T, U, V)
+           -> (value: R, pullback: (R.TangentVector)
+             -> (T.TangentVector, U.TangentVector, V.TangentVector))
+) -> @differentiable (T, U, V) -> R {
+  Builtin.differentiableFunction_arity3(
+    /*original*/ { vjp($0, $1, $2).value },
+    /*jvp*/ { _, _, _ in
+      fatalError("""
+        Functions formed with `differentiableFunction(from:)` cannot yet \
+        be used with differential-producing differential operators.
+        """)
+    },
+    /*vjp*/ vjp)
+}
+
 /// Returns `x` like an identity function. When used in a context where `x` is
 /// being differentiated with respect to, this function will not produce any 
 /// derivative at `x`.
