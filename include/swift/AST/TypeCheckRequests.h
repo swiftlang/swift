@@ -842,7 +842,7 @@ public:
 class TypeCheckFunctionBodyUntilRequest :
     public SimpleRequest<TypeCheckFunctionBodyUntilRequest,
                          bool(AbstractFunctionDecl *, SourceLoc),
-                         CacheKind::Cached> {
+                         CacheKind::Cached|CacheKind::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -856,6 +856,10 @@ private:
 
 public:
   bool isCached() const { return true; }
+
+public:
+  // Incremental dependencies.
+  evaluator::DependencySource readDependencySource(Evaluator &) const;
 };
 
 /// Request to obtain a list of stored properties in a nominal type.
@@ -1973,10 +1977,10 @@ public:
   bool isCached() const { return true; }
 };
 
-class TypeCheckSourceFileRequest :
-    public SimpleRequest<TypeCheckSourceFileRequest,
-                         evaluator::SideEffect (SourceFile *),
-                         CacheKind::SeparatelyCached> {
+class TypeCheckSourceFileRequest
+    : public SimpleRequest<
+          TypeCheckSourceFileRequest, evaluator::SideEffect(SourceFile *),
+          CacheKind::SeparatelyCached | CacheKind::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1992,6 +1996,10 @@ public:
   bool isCached() const { return true; }
   Optional<evaluator::SideEffect> getCachedResult() const;
   void cacheResult(evaluator::SideEffect) const;
+
+public:
+  // Incremental dependencies.
+  evaluator::DependencySource readDependencySource(Evaluator &) const;
 };
 
 /// Computes whether the specified type or a super-class/super-protocol has the

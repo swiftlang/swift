@@ -17,6 +17,7 @@
 #define SWIFT_PARSE_REQUESTS_H
 
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
 
 namespace swift {
@@ -82,9 +83,9 @@ public:
 
 /// Parse the top-level decls of a SourceFile.
 class ParseSourceFileRequest
-    : public SimpleRequest<ParseSourceFileRequest,
-                           ArrayRef<Decl *>(SourceFile *),
-                           CacheKind::SeparatelyCached> {
+    : public SimpleRequest<
+          ParseSourceFileRequest, ArrayRef<Decl *>(SourceFile *),
+          CacheKind::SeparatelyCached | CacheKind::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -99,6 +100,9 @@ public:
   bool isCached() const { return true; }
   Optional<ArrayRef<Decl *>> getCachedResult() const;
   void cacheResult(ArrayRef<Decl *> decls) const;
+
+public:
+  evaluator::DependencySource readDependencySource(Evaluator &) const;
 };
 
 void simple_display(llvm::raw_ostream &out,
@@ -107,7 +111,7 @@ void simple_display(llvm::raw_ostream &out,
 class CodeCompletionSecondPassRequest
     : public SimpleRequest<CodeCompletionSecondPassRequest,
                            bool(SourceFile *, CodeCompletionCallbacksFactory *),
-                           CacheKind::Uncached> {
+                           CacheKind::Uncached|CacheKind::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -117,6 +121,9 @@ private:
   // Evaluation.
   bool evaluate(Evaluator &evaluator, SourceFile *SF,
                 CodeCompletionCallbacksFactory *Factory) const;
+
+public:
+  evaluator::DependencySource readDependencySource(Evaluator &) const;
 };
 
 /// The zone number for the parser.

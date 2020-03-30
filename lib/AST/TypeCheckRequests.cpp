@@ -1283,6 +1283,11 @@ void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
 // TypeCheckSourceFileRequest computation.
 //----------------------------------------------------------------------------//
 
+evaluator::DependencySource
+TypeCheckSourceFileRequest::readDependencySource(Evaluator &e) const {
+  return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
+}
+
 Optional<evaluator::SideEffect>
 TypeCheckSourceFileRequest::getCachedResult() const {
   auto *SF = std::get<0>(getStorage());
@@ -1323,4 +1328,18 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
     }
 #endif
   }
+}
+
+//----------------------------------------------------------------------------//
+// TypeCheckFunctionBodyUntilRequest computation.
+//----------------------------------------------------------------------------//
+
+evaluator::DependencySource
+TypeCheckFunctionBodyUntilRequest::readDependencySource(Evaluator &e) const {
+  // We're going under a function body scope, unconditionally flip the scope
+  // to private.
+  return {
+    std::get<0>(getStorage())->getParentSourceFile(),
+    evaluator::DependencyScope::Private
+  };
 }

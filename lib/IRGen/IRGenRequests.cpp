@@ -48,6 +48,15 @@ SourceLoc swift::extractNearestSourceLoc(const IRGenDescriptor &desc) {
   return SourceLoc();
 }
 
+evaluator::DependencySource
+IRGenSourceFileRequest::readDependencySource(Evaluator &e) const {
+  auto &desc = std::get<0>(getStorage());
+  return {
+    desc.Ctx.dyn_cast<SourceFile *>(),
+    evaluator::DependencyScope::Cascading
+  };
+}
+
 // Define request evaluation functions for each of the IRGen requests.
 static AbstractRequestFunction *irGenRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
