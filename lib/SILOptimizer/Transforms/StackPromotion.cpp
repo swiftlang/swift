@@ -116,6 +116,7 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
   if (ARI->isObjC() || ARI->canAllocOnStack())
     return false;
 
+  EA->invalidate(ARI->getFunction(), swift::AliasAnalysis::InvalidationKind::Everything);
   auto *ConGraph = EA->getConnectionGraph(ARI->getFunction());
   auto *contentNode = ConGraph->getValueContent(ARI);
   if (!contentNode)

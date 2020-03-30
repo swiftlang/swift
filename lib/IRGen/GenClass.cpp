@@ -491,19 +491,31 @@ void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
                                bool isOutlined) const {
   // If the src is an address, just project and store. Then we're done.
   auto *exploded = src.getAll().front();
-  if (src.size() == 1 && exploded->getType() == addr->getType()->getPointerElementType()) {
+  if (exploded->getType() == addr->getType()->getPointerElementType()) {
     IGF.Builder.CreateStore(exploded, addr);
-    src.reset();
+    (void)src.claimNext();
+    return;
+  }
+  
+  auto classType = IGF.IGM.getLoweredType(getClass()->getDeclaredInterfaceType());
+  if (exploded->getType() == addr->getType()) {
+    // `HeapTypeInfo<ClassTypeInfo>::initialize(IGF, src, addr, isOutlined);
+     IGF.emitMemCpy(addr.getAddress(), exploded, getFixedSize(), addr.getAlignment());
+     (void)src.claimNext();
+//    cast<LoadableTypeInfo>(this)->initializeWithCopy(IGF, addr, Address(exploded, addr.getAlignment()), classType, isOutlined);
     return;
   }
 
   // Otherwise, create GEP/init for each element in src.
-  auto classType = IGF.IGM.getLoweredType(getClass()->getDeclaredInterfaceType());
   for (auto *prop : getClass()->getStoredProperties()) {
     exploded = src.claimNext();
     auto propType = IGF.IGM.getLoweredType(prop->getType());
     const auto &propTypeInfo = cast<LoadableTypeInfo>(IGF.getTypeInfo(propType));
-    auto propAddr = projectPhysicalClassMemberAddress(IGF, addr.getAddress(), classType, propType, prop);
+    auto offset = getClassFieldOffset(IGF.IGM, classType, prop);
+    auto propAddr = IGF.emitByteOffsetGEP(addr.getAddress(),
+                                          IGF.IGM.getInt32(offset.getValue()),
+                                          propTypeInfo);
+    // auto propAddr = projectPhysicalClassMemberAddress(IGF, addr.getAddress(), classType, propType, prop);
     Explosion propExplosion;
     propExplosion.add(exploded);
     propTypeInfo.initialize(IGF, propExplosion, propAddr, isOutlined);

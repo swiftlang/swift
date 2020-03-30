@@ -67,7 +67,7 @@ StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
 
   auto *type = getStorageType();
   // Classes will return a pointer type but we want the element type.
-  if (T.getClassOrBoundGenericClass())
+  if (T.getClassOrBoundGenericClass() && false)
     type = type->getPointerElementType();
   
   Address alloca =

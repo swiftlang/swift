@@ -3452,7 +3452,19 @@ void IRGenSILFunction::visitObjectInst(swift::ObjectInst *i) {
   Explosion out;
   for (SILValue elt : i->getAllElements())
     out.add(getLoweredExplosion(elt).claimAll());
-  setLoweredExplosion(i, out);
+
+  SILType objType = i->getType().getObjectType();
+  const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
+  // TODO: this shouldn't be a stack alloc but, this is the easiest way to
+  // maintain compatibility with alloc_ref.
+  Address alloca = createAlloca(typeInfo.getStorageType()->getPointerElementType(),
+                                typeInfo.getFixedAlignment());
+  Builder.CreateLifetimeStart(alloca, typeInfo.getFixedSize());
+  typeInfo.initialize(*this, out, alloca, false);
+
+  Explosion e;
+  e.add(alloca.getAddress());
+  setLoweredExplosion(i, e);
 }
 
 void IRGenSILFunction::visitStructInst(swift::StructInst *i) {
@@ -3564,7 +3576,16 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
 
   if (i->getOperand()->getType().isAddress()) {
     Address base = getLoweredAddress(i->getOperand());
-    auto fieldAddr = projectPhysicalClassMemberAddress(*this, base.getAddress(), baseTy, i->getType(), i->getField());
+    //
+    // assert(getIndexedTypeX(IGM.Int8PtrPtrTy, { IGM.getInt32(0), IGM.getInt32(0) }));
+    // auto bytePtr = Builder.CreateBitCast(base.getAddress(), base->getType()->getPointerElementType());
+//    auto newAddr = Builder.CreateInBoundsGEP(base.getAddress(), { IGM.getInt32(0), IGM.getInt32(0), IGM.getInt32(0) });
+//    auto newAddr = emitByteOffsetGEP(base.getAddress(), IGM.getInt32(0), base->getType()->getPointerElementType()->getPointerElementType());
+    // newAddr = Builder.CreateGEP(newAddr, { IGM.getInt32(0), IGM.getInt32(0) });
+    // newAddr = Builder.CreateBitCast(newAddr, base->getType()->getPointerElementType());
+    // For dumb reasons, if we get an address here it means we're taking the address of the element of a class in a stack alloc which means we're taking the address of an element of a class double pointer. It's OK to load the first pointer because the pointer we load will still allow us to have a reference to the element.
+    auto classAddr = Builder.CreateLoad(base);
+    auto fieldAddr = projectPhysicalClassMemberAddress(*this, classAddr, baseTy, i->getType(), i->getField());
     setLoweredAddress(i, fieldAddr.getAddress());
     return;
   }
