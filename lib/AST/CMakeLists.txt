@@ -124,15 +124,17 @@ if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
   else()
     set(clangBasicDep "${LLVM_LIBRARY_OUTPUT_INTDIR}/libclangBasic.a")
   endif()
+  target_link_libraries(swiftAST PUBLIC
+    swiftBasic)
   target_link_libraries(swiftAST PRIVATE
-    swiftBasic
     swiftSyntax
     ${clangBasicDep})
   target_compile_definitions(swiftAST PRIVATE
     SWIFT_BUILD_ONLY_SYNTAXPARSERLIB=1)
 else()
+  target_link_libraries(swiftAST PUBLIC
+    swiftBasic)
   target_link_libraries(swiftAST PRIVATE
-    swiftBasic
     swiftMarkup
     swiftSyntax)
 endif()
