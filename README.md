@@ -102,6 +102,10 @@ which can be installed via a package manager:
 **[Homebrew](https://brew.sh/)**
 
     brew install cmake ninja
+    
+You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle) to install all of these dependencies:
+
+    brew bundle
 
 **[MacPorts](https://macports.org)**
 
