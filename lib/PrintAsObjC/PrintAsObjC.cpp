@@ -319,58 +319,6 @@ static void writeImports(raw_ostream &out,
 
   // Track printed names to handle overlay modules.
   llvm::SmallPtrSet<Identifier, 8> seenImports;
-  llvm::SmallString<256> allPaths;
-  llvm::SmallSetVector<StringRef, 8> headerImports;
-  auto insertHeaderPath = [&](clang::Module::Header header,
-                              const clang::Module *module) {
-    auto startIdx = allPaths.size();
-    if (module->IsFramework) {
-      SmallString<64> Buffer(header.NameAsWritten);
-      llvm::sys::path::replace_path_prefix(Buffer, "Headers/", StringRef());
-      llvm::sys::path::replace_path_prefix(Buffer, "PrivateHeaders/", StringRef());
-      // For framworks, the header import should start from the framework name.
-      allPaths.append(module->getTopLevelModuleName());
-      llvm::sys::path::append(allPaths, Buffer.str());
-    } else {
-      auto DirPath = header.Entry->getDir()->getName();
-      auto I = llvm::sys::path::begin(DirPath),
-           E = llvm::sys::path::end(DirPath);
-      llvm::SmallVector<StringRef, 4> Comps;
-      // Check if the path of the header contains `/usr/include/` in it.
-      // If so, we print the header include path starting from the next component.
-      // e.g. for .../usr/include/dispatch/dispatch.h, we print
-      // #include "dispatch/dispatch.h" because we could assume /usr/include/ is
-      // in the header search paths.
-      while (true) {
-        StringRef Parts[2] = {*I, StringRef()};
-        ++ I;
-        if (I == E)
-          break;
-        Parts[1] = *I;
-        if (Parts[0] == "usr" && Parts[1] == "include") {
-          ++ I;
-          for (;I != E; ++ I) {
-            Comps.push_back(*I);
-          }
-          break;
-        }
-      };
-      if (!Comps.empty()) {
-        // The header is in a deeper location inside /usr/include/, add the
-        // additional path components before adding the header name.
-        allPaths.append(Comps.front());
-        for (auto c: llvm::makeArrayRef(Comps).slice(1)) {
-          llvm::sys::path::append(allPaths, c);
-        }
-        llvm::sys::path::append(allPaths,
-                                llvm::sys::path::filename(header.NameAsWritten));
-      } else {
-        // Otherwise, import the header directly.
-        allPaths.append(header.NameAsWritten);
-      }
-    }
-    headerImports.insert(allPaths.str().substr(startIdx));
-  };
   bool includeUnderlying = false;
   for (auto import : sortedImports) {
     if (auto *swiftModule = import.dyn_cast<ModuleDecl *>()) {
@@ -379,22 +327,8 @@ static void writeImports(raw_ostream &out,
         includeUnderlying = true;
         continue;
       }
-      if (seenImports.insert(Name).second) {
+      if (seenImports.insert(Name).second)
         out << "@import " << Name.str() << ";\n";
-        if (auto *clangM = swiftModule->findUnderlyingClangModule()) {
-          if (auto umbrella = clangM->getUmbrellaHeader()) {
-            // If an umbrella header is available, use that.
-            insertHeaderPath(umbrella, clangM);
-          } else {
-            // Collect all headers included in the module.
-            for (auto headers: clangM->Headers) {
-              for (auto header: headers) {
-                insertHeaderPath(header, clangM);
-              }
-            }
-          }
-        }
-      }
     } else {
       const auto *clangModule = import.get<const clang::Module *>();
       assert(clangModule->isSubModule() &&
@@ -402,19 +336,7 @@ static void writeImports(raw_ostream &out,
       out << "@import ";
       ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
       out << ";\n";
-      // Collect all headers included in the submodule
-      for (auto headers: clangModule->Headers) {
-         for (auto header: headers) {
-           insertHeaderPath(header, clangModule);
-         }
-       }
     }
-  }
-  out << "#else\n";
-
-  // We cannot use module import, so use header includes instead.
-  for (auto header: headerImports) {
-    out << "#import <" << header << ">\n";
   }
 
   out << "#endif\n\n";
