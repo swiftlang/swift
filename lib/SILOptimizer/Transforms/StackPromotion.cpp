@@ -211,6 +211,9 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
       break;
   }
   
+  if (!props.empty())
+    return false;
+  
   SmallVector<StoreInst*, 8> deadStores;
   SmallVector<SILValue, 8> elements;
   for (auto *init : propertyInitializers) {
@@ -292,6 +295,8 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
 
   allocRef->replaceAllUsesWith(allocStack);
   allocRef->eraseFromParent();
+
+  llvm::errs() << "Promoted to object in stack. Function: " << object->getFunction()->getName() << "\n";
   
   return true;
 }

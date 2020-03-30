@@ -3449,10 +3449,6 @@ void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
 }
 
 void IRGenSILFunction::visitObjectInst(swift::ObjectInst *i) {
-  Explosion out;
-  for (SILValue elt : i->getAllElements())
-    out.add(getLoweredExplosion(elt).claimAll());
-
   SILType objType = i->getType().getObjectType();
   const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
   // TODO: this shouldn't be a stack alloc but, this is the easiest way to
@@ -3460,8 +3456,18 @@ void IRGenSILFunction::visitObjectInst(swift::ObjectInst *i) {
   Address alloca = createAlloca(typeInfo.getStorageType()->getPointerElementType(),
                                 typeInfo.getFixedAlignment());
   Builder.CreateLifetimeStart(alloca, typeInfo.getFixedSize());
-  typeInfo.initialize(*this, out, alloca, false);
 
+  auto propsArr = i->getType().getClassOrBoundGenericClass()->getStoredProperties();
+  SmallVector<VarDecl*, 8> props(propsArr.begin(), propsArr.end());
+  for (SILValue elt : i->getAllElements()) {
+    auto prop = props.pop_back_val();
+    auto elementExplosion = getLoweredExplosion(elt);
+    auto propType = IGM.getLoweredType(prop->getType());
+    const auto &propTypeInfo = cast<LoadableTypeInfo>(getTypeInfo(propType));
+    auto propAddr = projectPhysicalClassMemberAddress(*this, alloca.getAddress(), objType, propType, prop);
+    propTypeInfo.initialize(*this, elementExplosion, propAddr, false);
+  }
+  
   Explosion e;
   e.add(alloca.getAddress());
   setLoweredExplosion(i, e);
