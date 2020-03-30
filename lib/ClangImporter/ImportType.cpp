@@ -320,6 +320,7 @@ namespace {
 
       // OpenMP types that don't have Swift equivalents.
       case clang::BuiltinType::OMPArraySection:
+      case clang::BuiltinType::OMPArrayShaping:
         return Type();
 
       // SVE builtin types that don't have Swift equivalents.
