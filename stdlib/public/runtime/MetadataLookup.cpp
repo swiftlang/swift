@@ -1174,6 +1174,8 @@ public:
   using BuiltType = const Metadata *;
   using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
+  using BuiltProtocolConformance = const WitnessTable *;
+  using BuiltProtocolConformanceDecl = const ProtocolConformanceDescriptor *;
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
@@ -1473,6 +1475,40 @@ public:
     // Mangled types for building metadata don't contain sugared types
     return BuiltType();
   }
+  
+  const WitnessTable *
+  createConcreteProtocolConformance(const Metadata *conformingType,
+                                    const ProtocolConformanceDescriptor *conformanceDecl,
+                                    ArrayRef<const WitnessTable *> args);
+  
+  const WitnessTable *
+  createDependentProtocolConformanceRoot(const Metadata *conformingType,
+                                         ProtocolDescriptorRef requirement,
+                                         unsigned index);
+  
+  const WitnessTable *
+  createDependentProtocolConformanceAssociated(const WitnessTable *base,
+                                               const Metadata *conformingType,
+                                               ProtocolDescriptorRef requirement,
+                                               unsigned index);
+  
+  const WitnessTable *
+  createDependentProtocolConformanceInherited(const WitnessTable *base,
+                                              ProtocolDescriptorRef requirement,
+                                              unsigned index);
+  
+  const ProtocolConformanceDescriptor *
+  createProtocolConformanceDeclInTypeModule(const Metadata *conformingType,
+                                            ProtocolDescriptorRef protocol);
+  
+  const ProtocolConformanceDescriptor *
+  createProtocolConformanceDeclInProtocolModule(const Metadata *conformingType,
+                                                ProtocolDescriptorRef protocol);
+
+  const ProtocolConformanceDescriptor *
+  createProtocolConformanceDeclRetroactive(const Metadata *conformingType,
+                                           ProtocolDescriptorRef protocol,
+                                           StringRef moduleName);
 };
 
 }
