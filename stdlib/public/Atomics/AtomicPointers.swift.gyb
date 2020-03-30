@@ -14,7 +14,9 @@
   def atomicTypes():
     return [
       # Swift                     AtomicStorage              Builtin
+      ("UnsafeRawPointer",        "UnsafeRawPointer",        "RawPointer"),
       ("UnsafeMutableRawPointer", "UnsafeMutableRawPointer", "RawPointer"),
+      ("UnsafePointer",           "UnsafePointer",           "RawPointer"),
       ("UnsafeMutablePointer",    "UnsafeMutablePointer",    "RawPointer"),
       ("Unmanaged",               "UnsafeMutableRawPointer", "RawPointer"),
     ]
@@ -22,7 +24,9 @@
   def nullableAtomicTypes():
     return [
       # Swift                     AtomicStorage                Builtin
+      ("UnsafeRawPointer",        "UnsafeRawPointer?",         "RawPointer"),
       ("UnsafeMutableRawPointer", "UnsafeMutableRawPointer?",  "RawPointer"),
+      ("UnsafePointer",           "UnsafePointer?",            "RawPointer"),
       ("UnsafeMutablePointer",    "UnsafeMutablePointer?",     "RawPointer"),
       ("Unmanaged",               "UnsafeMutableRawPointer?",  "RawPointer"),
     ]

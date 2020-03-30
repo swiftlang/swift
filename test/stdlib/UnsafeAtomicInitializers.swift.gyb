@@ -17,11 +17,15 @@
     ("UInt8",   "UInt8",  "UInt8",  "0"),
 
     # id             type                          storage                      initial
+    ("URP",          "UnsafeRawPointer",           "UnsafeRawPointer",          "UnsafeRawPointer(UnsafeMutableRawPointer.allocate(byteCount: 8, alignment: 8))"),
+    ("UP",           "UnsafePointer<Bar>",         "UnsafePointer<Bar>",        "UnsafePointer(UnsafeMutablePointer<Bar>.allocate(capacity: 1))"),
     ("UMRP",         "UnsafeMutableRawPointer",    "UnsafeMutableRawPointer",   ".allocate(byteCount: 8, alignment: 8)"),
     ("UMP",          "UnsafeMutablePointer<Bar>",  "UnsafeMutablePointer<Bar>", ".allocate(capacity: 1)"),
     ("Unmanaged",    "Unmanaged<Foo>",             "UnsafeMutableRawPointer",   "Unmanaged.passRetained(Foo()).toOpaque()"),
 
     # id             type                                   storage                                initial
+    ("URPOpt",       "Optional<UnsafeRawPointer>",          "Optional<UnsafeRawPointer>",          "nil"),
+    ("UPOpt",        "Optional<UnsafePointer<Bar>>",        "Optional<UnsafePointer<Bar>>",        "nil"),
     ("UMRPOpt",      "Optional<UnsafeMutableRawPointer>",   "Optional<UnsafeMutableRawPointer>",   "nil"),
     ("UMPOpt",       "Optional<UnsafeMutablePointer<Bar>>", "Optional<UnsafeMutablePointer<Bar>>", "nil"),
     ("UnmanagedOpt", "Optional<Unmanaged<Foo>>",            "Optional<UnsafeMutableRawPointer>",   "nil"),
