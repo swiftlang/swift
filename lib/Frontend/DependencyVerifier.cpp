@@ -427,7 +427,7 @@ bool DependencyVerifier::parseExpectations(
 
 bool DependencyVerifier::constructObligations(const SourceFile *SF,
                                               ObligationMap &Obligations) {
-  auto *tracker = SF->getReferencedNameTracker();
+  auto *tracker = SF->getConfiguredReferencedNameTracker();
   assert(tracker && "Constructed source file without referenced name tracker!");
 
   auto &Ctx = SF->getASTContext();
@@ -490,7 +490,7 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
 bool DependencyVerifier::verifyObligations(
     const SourceFile *SF, const std::vector<Expectation> &ExpectedDependencies,
     ObligationMap &OM, llvm::StringMap<Expectation> &NegativeExpectations) {
-  auto *tracker = SF->getReferencedNameTracker();
+  auto *tracker = SF->getConfiguredReferencedNameTracker();
   assert(tracker && "Constructed source file without referenced name tracker!");
   auto &diags = SF->getASTContext().Diags;
   for (auto &expectation : ExpectedDependencies) {

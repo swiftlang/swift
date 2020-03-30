@@ -2565,7 +2565,18 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
 
 void SourceFile::createReferencedNameTracker() {
   assert(!ReferencedNames && "This file already has a name tracker.");
+  assert(!RequestReferencedNames && "This file already has a name tracker.");
   ReferencedNames.emplace(ReferencedNameTracker());
+  RequestReferencedNames.emplace(ReferencedNameTracker());
+}
+
+const ReferencedNameTracker *
+SourceFile::getConfiguredReferencedNameTracker() const {
+  if (getASTContext().LangOpts.EnableRequestBasedIncrementalDependencies) {
+    return getRequestBasedReferencedNameTracker();
+  } else {
+    return getReferencedNameTracker();
+  }
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {

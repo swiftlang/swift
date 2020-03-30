@@ -1033,6 +1033,16 @@ def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
   Flags<[FrontendOption]>,
   HelpText<"Disable parser lookup & use ast scope lookup only (experimental)">;
 
+def enable_request_based_incremental_dependencies : Flag<["-"],
+  "enable-request-based-incremental-dependencies">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable request-based name tracking">;
+
+def disable_request_based_incremental_dependencies : Flag<["-"],
+  "disable-request-based-incremental-dependencies">,
+  Flags<[FrontendOption]>,
+  HelpText<"Disable request-based name tracking">;
+
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
