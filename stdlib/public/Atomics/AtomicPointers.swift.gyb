@@ -143,8 +143,8 @@ extension ${swiftType}: AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
-    at address: UnsafeMutablePointer<AtomicStorage>,
     _ desired: Self,
+    at address: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicStoreOrdering
   ) {
     switch ordering {
@@ -164,8 +164,8 @@ extension ${swiftType}: AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
-    at address: UnsafeMutablePointer<AtomicStorage>,
     _ desired: Self,
+    at address: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self {
     let rawResult: Builtin.${builtinType}
@@ -198,9 +198,9 @@ extension ${swiftType}: AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
-    at address: UnsafeMutablePointer<AtomicStorage>,
     expected: Self,
     desired: Self,
+    at address: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self) {
     let old: Builtin.${builtinType}
@@ -255,9 +255,9 @@ extension ${swiftType}: AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
-    at address: UnsafeMutablePointer<AtomicStorage>,
     expected: Self,
     desired: Self,
+    at address: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering, // Note: no default
     failureOrdering: AtomicLoadOrdering // Note: no default
   ) -> (exchanged: Bool, original: Self) {
@@ -371,8 +371,8 @@ extension ${swiftType}: NullableAtomic {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalStore(
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
     _ desired: Self?,
+    at address: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicStoreOrdering
   ) {
     switch ordering {
@@ -392,8 +392,8 @@ extension ${swiftType}: NullableAtomic {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalExchange(
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
     _ desired: Self?,
+    at address: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self? {
     let rawResult: Builtin.${builtinType}
@@ -426,9 +426,9 @@ extension ${swiftType}: NullableAtomic {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalCompareExchange(
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
     expected: Self?,
     desired: Self?,
+    at address: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self?) {
     let old: Builtin.${builtinType}
@@ -483,9 +483,9 @@ extension ${swiftType}: NullableAtomic {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalCompareExchange(
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
     expected: Self?,
     desired: Self?,
+    at address: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicUpdateOrdering, // Note: no default
     failureOrdering: AtomicLoadOrdering // Note: no default
   ) -> (exchanged: Bool, original: Self?) {

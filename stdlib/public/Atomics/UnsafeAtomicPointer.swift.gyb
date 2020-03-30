@@ -82,7 +82,7 @@ extension UnsafeAtomicPointer {
     _ desired: Value,
     ordering: AtomicStoreOrdering
   ) {
-    Value.atomicStore(at: _ptr, desired, ordering: ordering)
+    Value.atomicStore(desired, at: _ptr, ordering: ordering)
   }
 
   /// Atomically sets the current value to `desired` and returns the previous
@@ -95,7 +95,7 @@ extension UnsafeAtomicPointer {
     _ desired: Value,
     ordering: AtomicUpdateOrdering
   ) -> Value {
-    Value.atomicExchange(at: _ptr, desired, ordering: ordering)
+    Value.atomicExchange(desired, at: _ptr, ordering: ordering)
   }
 
   /// Perform an atomic compare and exchange operation with
@@ -121,9 +121,9 @@ extension UnsafeAtomicPointer {
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Value) {
     Value.atomicCompareExchange(
-      at: _ptr,
       expected: expected,
       desired: desired,
+      at: _ptr,
       ordering: ordering)
   }
 
@@ -153,9 +153,9 @@ extension UnsafeAtomicPointer {
     failureOrdering: AtomicLoadOrdering // Note: no default
   ) -> (exchanged: Bool, original: Value) {
     Value.atomicCompareExchange(
-      at: _ptr,
       expected: expected,
       desired: desired,
+      at: _ptr,
       ordering: ordering,
       failureOrdering: failureOrdering)
   }
@@ -179,8 +179,8 @@ extension UnsafeAtomicPointer where Value: AtomicInteger {
     ordering: AtomicUpdateOrdering
   ) -> Value {
     Value.atomicLoadThen${name}(
-      at: _ptr,
       ${argLabel(label)}operand,
+      at: _ptr,
       ordering: ordering)
   }
   % end
@@ -202,8 +202,8 @@ extension UnsafeAtomicPointer where Value: AtomicInteger {
     ordering: AtomicUpdateOrdering
   ) -> Value {
     Value.atomicLoadThen${name}(
-      at: _ptr,
       ${argLabel(label)}operand,
+      at: _ptr,
       ordering: ordering) ${op} operand
   }
   % end
@@ -220,8 +220,8 @@ extension UnsafeAtomicPointer where Value: AtomicInteger {
     ordering: AtomicUpdateOrdering
   ) {
     _ = Value.atomicLoadThenWrappingIncrement(
-      at: _ptr,
       by: operand,
+      at: _ptr,
       ordering: ordering)
   }
 
@@ -237,8 +237,8 @@ extension UnsafeAtomicPointer where Value: AtomicInteger {
     ordering: AtomicUpdateOrdering
   ) {
     _ = Value.atomicLoadThenWrappingDecrement(
-      at: _ptr,
       by: operand,
+      at: _ptr,
       ordering: ordering)
   }
 }

@@ -45,26 +45,26 @@ extension AtomicRepresentable {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
-    at address: UnsafeMutablePointer<AtomicStorage>,
     _ desired: Self,
+    at address: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicStoreOrdering
   ) {
     RawValue.atomicStore(
-      at: address,
       desired.rawValue,
+      at: address,
       ordering: ordering)
   }
 
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
-    at address: UnsafeMutablePointer<AtomicStorage>,
     _ desired: Self,
+    at address: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self {
     let raw = RawValue.atomicExchange(
-      at: address,
       desired.rawValue,
+      at: address,
       ordering: ordering)
     return Self(rawValue: raw)!
   }
@@ -72,15 +72,15 @@ extension AtomicRepresentable {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
-    at address: UnsafeMutablePointer<AtomicStorage>,
     expected: Self,
     desired: Self,
+    at address: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self) {
     let (exchanged, raw) = RawValue.atomicCompareExchange(
-      at: address,
       expected: expected.rawValue,
       desired: desired.rawValue,
+      at: address,
       ordering: ordering)
     return (exchanged, Self(rawValue: raw)!)
   }
@@ -88,16 +88,16 @@ extension AtomicRepresentable {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
-    at address: UnsafeMutablePointer<AtomicStorage>,
     expected: Self,
     desired: Self,
+    at address: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering, // Note: no default
     failureOrdering: AtomicLoadOrdering // Note: no default
   ) -> (exchanged: Bool, original: Self) {
     let (exchanged, raw) = RawValue.atomicCompareExchange(
-      at: address,
       expected: expected.rawValue,
       desired: desired.rawValue,
+      at: address,
       ordering: ordering,
       failureOrdering: failureOrdering)
     return (exchanged, Self(rawValue: raw)!)

@@ -116,8 +116,8 @@ extension ${swiftType}: AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
-    at address: UnsafeMutablePointer<${swiftType}>,
     _ desired: ${swiftType},
+    at address: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicStoreOrdering
   ) {
     switch ordering {
@@ -137,8 +137,8 @@ extension ${swiftType}: AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
-    at address: UnsafeMutablePointer<${swiftType}>,
     _ desired: ${swiftType},
+    at address: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicUpdateOrdering
   ) -> ${swiftType} {
     switch ordering {
@@ -168,9 +168,9 @@ extension ${swiftType}: AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
-    at address: UnsafeMutablePointer<${swiftType}>,
     expected: ${swiftType},
     desired: ${swiftType},
+    at address: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: ${swiftType}) {
     switch ordering {
@@ -219,9 +219,9 @@ extension ${swiftType}: AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
-    at address: UnsafeMutablePointer<${swiftType}>,
     expected: ${swiftType},
     desired: ${swiftType},
+    at address: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicUpdateOrdering, // Note: no default
     failureOrdering: AtomicLoadOrdering // Note: no default
   ) -> (exchanged: Bool, original: ${swiftType}) {
@@ -259,8 +259,8 @@ extension ${swiftType}: AtomicInteger {
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
   public static func atomicLoadThen${name}(
-    at address: UnsafeMutablePointer<Self>,
     ${label} operand: Self${defaultValue},
+    at address: UnsafeMutablePointer<Self>,
     ordering: AtomicUpdateOrdering
   ) -> Self {
     switch ordering {
