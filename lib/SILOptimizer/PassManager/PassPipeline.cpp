@@ -498,7 +498,7 @@ static void addSerializePipeline(SILPassPipelinePlan &P) {
 }
 
 static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("MidLevel");
+  P.startPipeline("MidLevel,Function", true /*isFunctionPassPipeline*/);
   addFunctionPasses(P, OptimizationLevelKind::MidLevel);
 
   // Specialize partially applied functions with dead arguments as a preparation
@@ -561,7 +561,7 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("LowLevel");
+  P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
 
   // Should be after FunctionSignatureOpts and before the last inliner.
   P.addReleaseDevirtualizer();
