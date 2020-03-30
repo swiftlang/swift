@@ -1,4 +1,0 @@
-module CTypesCore [system] [extern_c] {
-  umbrella header "values.h"
-  export *
-}
