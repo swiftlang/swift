@@ -270,7 +270,6 @@ public:
 public:
   constexpr static bool isDependencySource = detail::isDependencySource(Caching);
   constexpr static bool isDependencySink = detail::isDependencySink(Caching);
-  constexpr static bool reportsDependencyReads = isDependencySource || isDependencySink;
 
   using OutputType = Output;
   

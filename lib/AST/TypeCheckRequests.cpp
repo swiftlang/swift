@@ -157,6 +157,33 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
     protocolDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 }
 
+evaluator::DependencySource
+SuperclassTypeRequest::readDependencySource(Evaluator &e) const {
+  const auto access = std::get<0>(getStorage())->getFormalAccess();
+  return {
+    e.getActiveDependencySource(),
+    evaluator::getScopeForAccessLevel(access)
+  };
+}
+
+void SuperclassTypeRequest::writeDependencySink(Evaluator &eval,
+                                                Type value) const {
+  if (!value)
+    return;
+
+  // FIXME: This is compatible with the existing name tracking scheme, but
+  // ignoring this name when we fail to look up a class is bogus.
+  ClassDecl *Super = value->getClassOrBoundGenericClass();
+  if (!Super)
+    return;
+
+  auto *tracker = eval.getActiveDependencyTracker();
+  if (!tracker)
+    return;
+
+  tracker->addUsedMember({Super, Identifier()}, eval.isActiveSourceCascading());
+}
+
 //----------------------------------------------------------------------------//
 // Enum raw type computation.
 //----------------------------------------------------------------------------//
@@ -1277,6 +1304,81 @@ CheckRedeclarationRequest::getCachedResult() const {
 
 void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
   std::get<0>(getStorage())->setCheckedRedeclaration();
+}
+
+evaluator::DependencySource
+CheckRedeclarationRequest::readDependencySource(Evaluator &eval) const {
+  auto *current = std::get<0>(getStorage());
+  auto *currentDC = current->getDeclContext();
+  return {
+    currentDC->getParentSourceFile(),
+    evaluator::getScopeForAccessLevel(current->getFormalAccess())
+  };
+}
+
+void CheckRedeclarationRequest::writeDependencySink(
+    Evaluator &eval, evaluator::SideEffect) const {
+  auto *tracker = eval.getActiveDependencyTracker();
+  if (!tracker)
+    return;
+
+  auto *current = std::get<0>(getStorage());
+  if (!current->hasName())
+    return;
+
+  DeclContext *currentDC = current->getDeclContext();
+  SourceFile *currentFile = currentDC->getParentSourceFile();
+  if (!currentFile || currentDC->isLocalContext())
+    return;
+
+  if (currentDC->isTypeContext()) {
+    if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
+      tracker->addUsedMember({nominal, current->getBaseName()},
+                             eval.isActiveSourceCascading());
+    }
+  } else {
+    tracker->addTopLevelName(current->getBaseName(),
+                             eval.isActiveSourceCascading());
+  }
+}
+
+//----------------------------------------------------------------------------//
+// LookupAllConformancesInContextRequest computation.
+//----------------------------------------------------------------------------//
+
+evaluator::DependencySource
+LookupAllConformancesInContextRequest::readDependencySource(
+    Evaluator &eval) const {
+  auto *dc = std::get<0>(getStorage());
+  AccessLevel defaultAccess;
+  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+    const NominalTypeDecl *nominal = ext->getExtendedNominal();
+    if (!nominal) {
+      return {
+        eval.getActiveDependencySource(),
+        evaluator::DependencyScope::Cascading
+      };
+    }
+    defaultAccess = nominal->getFormalAccess();
+  } else {
+    defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
+  }
+  return {
+    eval.getActiveDependencySource(),
+    evaluator::getScopeForAccessLevel(defaultAccess)
+  };
+}
+
+void LookupAllConformancesInContextRequest::writeDependencySink(
+    Evaluator &eval, ProtocolConformanceLookupResult conformances) const {
+  auto *tracker = eval.getActiveDependencyTracker();
+  if (!tracker)
+    return;
+
+  for (auto conformance : conformances) {
+    tracker->addUsedMember({conformance->getProtocol(), Identifier()},
+                           eval.isActiveSourceCascading());
+  }
 }
 
 //----------------------------------------------------------------------------//

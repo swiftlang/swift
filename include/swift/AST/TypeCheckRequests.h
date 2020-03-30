@@ -91,10 +91,11 @@ public:
 };
 
 /// Request the superclass type for the given class.
-class SuperclassTypeRequest :
-    public SimpleRequest<SuperclassTypeRequest,
-                         Type(NominalTypeDecl *, TypeResolutionStage),
-                         CacheKind::SeparatelyCached> {
+class SuperclassTypeRequest
+    : public SimpleRequest<
+          SuperclassTypeRequest, Type(NominalTypeDecl *, TypeResolutionStage),
+          CacheKind::SeparatelyCached | CacheKind::DependencySink |
+              CacheKind::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -110,10 +111,16 @@ public:
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
 
+public:
   // Separate caching.
   bool isCached() const;
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+
+public:
+  // Incremental dependencies
+  evaluator::DependencySource readDependencySource(Evaluator &e) const;
+  void writeDependencySink(Evaluator &eval, Type t) const;
 };
 
 /// Request the raw type of the given enum.
@@ -2202,10 +2209,11 @@ void simple_display(llvm::raw_ostream &out, ConformanceLookupKind kind);
 ///
 /// Here, a conformance to \c Q has been stated, but a conformance to \c P
 /// must also be reported so it can be checked as well.
-class LookupAllConformancesInContextRequest :
-    public SimpleRequest<LookupAllConformancesInContextRequest,
-                         ProtocolConformanceLookupResult(const DeclContext *),
-                         CacheKind::Uncached> {
+class LookupAllConformancesInContextRequest
+    : public SimpleRequest<LookupAllConformancesInContextRequest,
+                           ProtocolConformanceLookupResult(const DeclContext *),
+                           CacheKind::Uncached | CacheKind::DependencySink |
+                               CacheKind::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2215,12 +2223,19 @@ private:
   // Evaluation.
   ProtocolConformanceLookupResult
   evaluate(Evaluator &evaluator, const DeclContext *DC) const;
+
+public:
+  // Incremental dependencies
+  evaluator::DependencySource readDependencySource(Evaluator &eval) const;
+  void writeDependencySink(Evaluator &eval,
+                           ProtocolConformanceLookupResult r) const;
 };
 
-class CheckRedeclarationRequest :
-    public SimpleRequest<CheckRedeclarationRequest,
-                         evaluator::SideEffect (ValueDecl *),
-                         CacheKind::SeparatelyCached> {
+class CheckRedeclarationRequest
+    : public SimpleRequest<
+          CheckRedeclarationRequest, evaluator::SideEffect(ValueDecl *),
+          CacheKind::SeparatelyCached | CacheKind::DependencySource |
+              CacheKind::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2236,6 +2251,10 @@ public:
   bool isCached() const { return true; }
   Optional<evaluator::SideEffect> getCachedResult() const;
   void cacheResult(evaluator::SideEffect) const;
+
+public:
+  evaluator::DependencySource readDependencySource(Evaluator &eval) const;
+  void writeDependencySink(Evaluator &eval, evaluator::SideEffect) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

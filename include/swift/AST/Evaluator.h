@@ -464,16 +464,27 @@ private:
   }
 
 private:
+  // Report the result of evaluating a request that is not a dependency sink -
+  // which is to say do nothing.
   template <typename Request,
             typename std::enable_if<!Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
-                             const typename Request::OutputType &o) const {}
+                             const typename Request::OutputType &o) {}
 
+  // Report the result of evaluating a request that is a dependency sink.
   template <typename Request,
             typename std::enable_if<Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
                              const typename Request::OutputType &o) {
     r.writeDependencySink(*this, o);
+  }
+
+  /// If there is an active dependency source, returns its
+  /// \c ReferencedNameTracker. Else, returns \c nullptr.
+  ReferencedNameTracker *getActiveDependencyTracker() const {
+    if (auto *source = getActiveDependencySource())
+      return source->getRequestBasedReferencedNameTracker();
+    return nullptr;
   }
 
 public:
@@ -496,18 +507,12 @@ public:
 
   /// Returns the active dependency's source file, or \c nullptr if no
   /// dependency source is active.
+  ///
+  /// If there is no active scope, the result always cascades.
   SourceFile *getActiveDependencySource() const {
     if (dependencySources.empty())
       return nullptr;
     return dependencySources.back().getPointer();
-  }
-
-  /// If there is an active dependency source, returns its
-  /// \c ReferencedNameTracker. Else, returns \c nullptr.
-  ReferencedNameTracker *getActiveDependencyTracker() const {
-    if (auto *source = getActiveDependencySource())
-      return source->getRequestBasedReferencedNameTracker();
-    return nullptr;
   }
 
 public:

@@ -5147,6 +5147,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       groupChecker.addConformance(normal);
     }
 
+    // FIXME(Evaluator Incremental Dependencies): Remove this. It is duplicating
+    // both the manual and automatic edges registered when lookup runs for the
+    // protocol named in the conformance.
     if (tracker)
       tracker->addUsedMember({conformance->getProtocol(), Identifier()},
                              defaultAccess > AccessLevel::FilePrivate);

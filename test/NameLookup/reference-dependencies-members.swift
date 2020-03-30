@@ -65,7 +65,7 @@ extension OtherStruct {
   // DEPENDS-MEMBER-DAG: - ["{{.+}}11OtherStructV", "foo"]
   // DEPENDS-MEMBER-DAG: - ["{{.+}}11OtherStructV", "bar"]
   // DEPENDS-MEMBER-DAG: - !private ["{{.+}}11OtherStructV", "baz"]
-  // DEPENDS-MEMBER-NEGATIVE-NOT: - ["{{.+}}11OtherStructV", ""]
+  // DEPENDS-MEMBER-DAG: - ["{{.+}}11OtherStructV", ""]
   func foo() {}
   var bar: () { return () }
   private func baz() {}

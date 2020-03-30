@@ -20,8 +20,6 @@
 // RUN: %FileCheck -check-prefix=PROVIDES-MEMBER-NEGATIVE %s < %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=DEPENDS-NOMINAL %s < %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=DEPENDS-MEMBER %s < %t-processed.swiftdeps
-// RUN: %FileCheck -check-prefix=DEPENDS-MEMBER-NEGATIVE %s < %t-processed.swiftdeps
-
 
 // PROVIDES-NOMINAL-DAG:  nominal implementation  4main4BaseC '' true
 // PROVIDES-NOMINAL-DAG:  nominal interface  4main4BaseC '' true
@@ -62,7 +60,7 @@ extension OtherStruct {
   // PROVIDES-MEMBER-DAG:  member interface  4main11OtherStructV foo true
   // PROVIDES-MEMBER-DAG:  member interface  4main11OtherStructV bar true
   // PROVIDES-MEMBER-DAG:  member interface  4main11OtherStructV baz true
-  // DEPENDS-MEMBER-NEGATIVE-NOT::  potentialMember interface  4main11OtherStructV baz false
+  // DEPENDS-MEMBER-DAG:  potentialMember interface  4main11OtherStructV '' true
   func foo() {}
   var bar: () { return () }
   private func baz() {}

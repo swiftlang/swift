@@ -73,7 +73,7 @@ inline DependencyScope getScopeForAccessLevel(AccessLevel l) {
   }
 }
 
-// A \c DependencySource is a currently defined to be a parent source file and
+// A \c DependencySource is currently defined to be a parent source file and
 // an associated dependency scope.
 //
 // The \c SourceFile instance is an artifact of the current dependency system,
