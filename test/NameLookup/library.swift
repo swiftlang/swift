@@ -21,7 +21,7 @@ var c = 1
 var d = 2
 var e = 3
 
-// Name-binding with imports
+// Name lookup with imports.
 import imported_module
 func over1(_ x: UInt64) {} // expected-note{{found this candidate}}
 func over2(_ x: UInt32) {}

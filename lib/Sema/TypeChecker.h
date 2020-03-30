@@ -423,7 +423,7 @@ Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
 
 /// Validate the given type.
 ///
-/// Type validation performs name binding, checking of generic arguments,
+/// Type validation performs name lookup, checking of generic arguments,
 /// and so on to determine whether the given type is well-formed and can
 /// be used as a type.
 ///

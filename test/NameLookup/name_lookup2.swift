@@ -23,7 +23,7 @@ var importedunion: unionSearchFlags = .backwards
 var notimported : MaybeInt // expected-error {{use of undeclared type 'MaybeInt'}}
 
 //===----------------------------------------------------------------------===//
-// Name binding stress test
+// Name lookup stress test
 //===----------------------------------------------------------------------===//
 
 var callee1 : () -> (Int,Int,Int)           // Takes nothing, returns tuple.
@@ -62,13 +62,12 @@ func test_varname_binding() {
 // ForwardIndex referencing of types.
 //===----------------------------------------------------------------------===//
 
-// We allow namebinding to look forward past a var declaration in the
-// main module
+// Lookup can find a decl declared later in the main module.
 var x : x_ty
 typealias x_ty = Int
 
-// We allow namebinding to look forward past a function declaration (and other
-// declarations which never have side-effects) in the main module
+// We allow name lookup to look forward past a function declaration (and other
+// declarations which never have side-effects) in the main module.
 func fy() -> y_ty { return 1 }
 typealias y_ty = Int
 

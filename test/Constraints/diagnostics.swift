@@ -100,11 +100,11 @@ func f7() -> (c: Int, v: A) {
 }
 
 func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
-// expected-note@-1 {{required by global function 'f8' where 'T' = '(Int, Double)'}}
+// expected-note@-1 {{required by global function 'f8' where 'T' = 'Tup' (aka '(Int, Double)')}}
 f8(3, f4) // expected-error {{global function 'f8' requires that 'Int' conform to 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{type '(Int, Double)' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
+f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -404,11 +404,11 @@ f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to ex
 f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-let f8 = f7(2)
-_ = f8(1)
-f8(10)          // expected-warning {{result of call to function returning 'Int' is unused}}
-f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
+let f10 = f7(2)
+_ = f10(1)
+f10(10)          // expected-warning {{result of call to function returning 'Int' is unused}}
+f10(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+f10(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 
@@ -1405,3 +1405,13 @@ func foo(frame: Frame) {
     // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
 
 }
+
+// Make sure we prefer the conformance failure.
+func f11(_ n: Int) {}
+func f11<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
+f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform to 'P2'}}
+
+// FIXME: Arguably we should also prefer the conformance failure in this case.
+let f12: (Int) -> Void = { _ in }
+func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}
+f12(3, f4)// expected-error {{extra argument in call}}

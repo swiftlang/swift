@@ -118,33 +118,32 @@ namespace swift {
                               bool TokenizeInterpolatedString = true,
                               ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
-  /// Once parsing is complete, this walks the AST to resolve imports, record
-  /// operators, and do other top-level validation.
-  void performNameBinding(SourceFile &SF);
+  /// This walks the AST to resolve imports.
+  void performImportResolution(SourceFile &SF);
 
   /// Once type-checking is complete, this instruments code with calls to an
   /// intrinsic that record the expected values of local variables so they can
   /// be compared against the results from the debugger.
   void performDebuggerTestingTransform(SourceFile &SF);
 
-  /// Once parsing and name-binding are complete, this optionally transforms the
-  /// ASTs to add calls to external logging functions.
+  /// Once type checking is complete, this optionally transforms the ASTs to add
+  /// calls to external logging functions.
   ///
   /// \param HighPerformance True if the playground transform should omit
   /// instrumentation that has a high runtime performance impact.
   void performPlaygroundTransform(SourceFile &SF, bool HighPerformance);
   
-  /// Once parsing and name-binding are complete this optionally walks the ASTs
-  /// to add calls to externally provided functions that simulate
-  /// "program counter"-like debugging events. See the comment at the top of
-  /// lib/Sema/PCMacro.cpp for a description of the calls inserted.
+  /// Once type checking is complete this optionally walks the ASTs to add calls
+  /// to externally provided functions that simulate "program counter"-like
+  /// debugging events. See the comment at the top of lib/Sema/PCMacro.cpp for a
+  /// description of the calls inserted.
   void performPCMacro(SourceFile &SF);
 
   /// Bind all 'extension' visible from \p SF to the extended nominal.
   void bindExtensions(SourceFile &SF);
 
-  /// Once parsing and name-binding are complete, this walks the AST to resolve
-  /// types and diagnose problems therein.
+  /// Once import resolution is complete, this walks the AST to resolve types
+  /// and diagnose problems therein.
   void performTypeChecking(SourceFile &SF);
 
   /// Now that we have type-checked an entire module, perform any type

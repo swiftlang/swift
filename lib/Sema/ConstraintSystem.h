@@ -2323,8 +2323,8 @@ public:
   /// system, to avoid.
   ///
   /// FIXME: This caching should almost certainly be performed at the
-  /// module level, since type checking occurs after name binding,
-  /// and no new names are introduced after name binding.
+  /// module level, since type checking occurs after import resolution,
+  /// and no new names are introduced after that point.
   ///
   /// \returns A reference to the member-lookup result.
   LookupResult &lookupMember(Type base, DeclNameRef name);

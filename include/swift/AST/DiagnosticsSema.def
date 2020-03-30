@@ -661,7 +661,7 @@ NOTE(add_return_type_note,none,
      "did you mean to add a return type?", ())
 
 //------------------------------------------------------------------------------
-// MARK: Name Binding
+// MARK: Import Resolution
 //------------------------------------------------------------------------------
 
 ERROR(sema_no_import,Fatal,

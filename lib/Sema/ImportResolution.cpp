@@ -1,8 +1,8 @@
-//===--- NameBinding.cpp - Name Binding -----------------------------------===//
+//===--- ImportResolution.cpp - Import Resolution -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,11 +11,10 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file performs import resolution.
-//  FIXME: Rename NameBinding to ImportResolution.
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "swift-name-binding"
+#define DEBUG_TYPE "swift-import-resolution"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleLoader.h"
@@ -41,7 +40,7 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-// MARK: NameBinder and supporting types
+// MARK: ImportResolver and supporting types
 //===----------------------------------------------------------------------===//
 
 using ImportedModule = ModuleDecl::ImportedModule;
@@ -50,246 +49,243 @@ using ImportOptions = SourceFile::ImportOptions;
 using ImportFlags = SourceFile::ImportFlags;
 
 namespace {
-  /// Represents an import which the NameBinder knows exists, but which has not
-  /// yet had its options checked, module loaded, or cross-imports found.
+/// Represents an import which the ImportResolver knows exists, but which has
+/// not yet had its options checked, module loaded, or cross-imports found.
+///
+/// An UnboundImport may represent a physical ImportDecl written in the
+/// source, or it may represent a cross-import overlay that has been found and
+/// needs to be loaded.
+struct UnboundImport {
+  /// The source location to use when diagnosing errors for this import.
+  SourceLoc importLoc;
+
+  /// The options for this import, such as "exported" or
+  /// "implementation-only". Use this field, not \c attrs, to determine the
+  /// behavior expected for this import.
+  ImportOptions options;
+
+  /// If \c options includes \c PrivateImport, the filename we should import
+  /// private declarations from.
+  StringRef privateImportFileName;
+
+  /// The module names being imported. There will usually be just one for the
+  /// top-level module, but a submodule import will have more.
+  ModuleDecl::AccessPathTy modulePath;
+
+  /// If this is a scoped import, the names of the declaration being imported;
+  /// otherwise empty. (Currently the compiler doesn't support nested scoped
+  /// imports, so there should always be zero or one elements, but
+  /// \c AccessPathTy is the common currency type for this.)
+  ModuleDecl::AccessPathTy declPath;
+
+  // Names of explicitly imported SPI groups via @_spi.
+  ArrayRef<Identifier> spiGroups;
+
+  /// If this UnboundImport directly represents an ImportDecl, contains the
+  /// ImportDecl it represents. This should only be used for diagnostics and
+  /// for updating the AST; if you want to read information about the import,
+  /// get it from the other fields in \c UnboundImport rather than from the
+  /// \c ImportDecl.
   ///
-  /// An UnboundImport may represent a physical ImportDecl written in the
-  /// source, or it may represent a cross-import overlay that has been found and
-  /// needs to be loaded.
-  struct UnboundImport {
-    /// The source location to use when diagnosing errors for this import.
-    SourceLoc importLoc;
+  /// If this UnboundImport represents a cross-import, contains the declaring
+  /// module's \c ModuleDecl.
+  PointerUnion<ImportDecl *, ModuleDecl *> importOrUnderlyingModuleDecl;
 
-    /// The options for this import, such as "exported" or
-    /// "implementation-only". Use this field, not \c attrs, to determine the
-    /// behavior expected for this import.
-    ImportOptions options;
+  NullablePtr<ImportDecl> getImportDecl() const {
+    return importOrUnderlyingModuleDecl.is<ImportDecl *>() ?
+           importOrUnderlyingModuleDecl.get<ImportDecl *>() : nullptr;
+  }
 
-    /// If \c options includes \c PrivateImport, the filename we should import
-    /// private declarations from.
-    StringRef privateImportFileName;
+  NullablePtr<ModuleDecl> getUnderlyingModule() const {
+    return importOrUnderlyingModuleDecl.is<ModuleDecl *>() ?
+           importOrUnderlyingModuleDecl.get<ModuleDecl *>() : nullptr;
+  }
 
-    /// The module names being imported. There will usually be just one for the
-    /// top-level module, but a submodule import will have more.
-    ModuleDecl::AccessPathTy modulePath;
+  /// Create an UnboundImport for a user-written import declaration.
+  explicit UnboundImport(ImportDecl *ID);
 
-    /// If this is a scoped import, the names of the declaration being imported;
-    /// otherwise empty. (Currently the compiler doesn't support nested scoped
-    /// imports, so there should always be zero or one elements, but
-    /// \c AccessPathTy is the common currency type for this.)
-    ModuleDecl::AccessPathTy declPath;
+  /// Create an UnboundImport for a cross-import overlay.
+  explicit UnboundImport(ASTContext &ctx,
+                         const UnboundImport &base, Identifier overlayName,
+                         const ImportedModuleDesc &declaringImport,
+                         const ImportedModuleDesc &bystandingImport);
 
-    // Names of explicitly imported SPI groups via @_spi.
-    ArrayRef<Identifier> spiGroups;
+  /// Diagnoses if the import would simply load the module \p SF already
+  /// belongs to, with no actual effect.
+  ///
+  /// Some apparent self-imports do actually load a different module; this
+  /// method allows them.
+  bool checkNotTautological(const SourceFile &SF);
 
-    /// If this UnboundImport directly represents an ImportDecl, contains the
-    /// ImportDecl it represents. This should only be used for diagnostics and
-    /// for updating the AST; if you want to read information about the import,
-    /// get it from the other fields in \c UnboundImport rather than from the
-    /// \c ImportDecl.
-    ///
-    /// If this UnboundImport represents a cross-import, contains the declaring
-    /// module's \c ModuleDecl.
-    PointerUnion<ImportDecl *, ModuleDecl *> importOrUnderlyingModuleDecl;
+  /// Make sure the module actually loaded, and diagnose if it didn't.
+  bool checkModuleLoaded(ModuleDecl *M, SourceFile &SF);
 
-    NullablePtr<ImportDecl> getImportDecl() const {
-      return importOrUnderlyingModuleDecl.is<ImportDecl *>() ?
-             importOrUnderlyingModuleDecl.get<ImportDecl *>() : nullptr;
-    }
+  /// Find the top-level module for this module; that is, if \p M is the
+  /// module \c Foo.Bar.Baz, this finds \c Foo.
+  ///
+  /// Specifically, this method returns:
+  ///
+  /// \li \p M if \p M is a top-level module.
+  /// \li \c nullptr if \p M is a submodule of \c SF's parent module. (This
+  ///     corner case can occur in mixed-source frameworks, where Swift code
+  ///     can import a Clang submodule of itself.)
+  /// \li The top-level parent (i.e. ancestor with no parent) module above
+  ///     \p M otherwise.
+  NullablePtr<ModuleDecl> getTopLevelModule(ModuleDecl *M, SourceFile &SF);
 
-    NullablePtr<ModuleDecl> getUnderlyingModule() const {
-      return importOrUnderlyingModuleDecl.is<ModuleDecl *>() ?
-             importOrUnderlyingModuleDecl.get<ModuleDecl *>() : nullptr;
-    }
+  /// Diagnose any errors concerning the \c @_exported, \c @_implementationOnly,
+  /// \c @testable, or \c @_private attributes, including a
+  /// non-implementation-only import of a fragile library from a resilient one.
+  void validateOptions(NullablePtr<ModuleDecl> topLevelModule, SourceFile &SF);
 
-    /// Create an UnboundImport for a user-written import declaration.
-    explicit UnboundImport(ImportDecl *ID);
+  /// Create an \c ImportedModuleDesc from the information in this
+  /// UnboundImport.
+  ImportedModuleDesc makeDesc(ModuleDecl *module) const {
+    return ImportedModuleDesc({ declPath, module }, options,
+                              privateImportFileName, spiGroups);
+  }
 
-    /// Create an UnboundImport for a cross-import overlay.
-    explicit UnboundImport(ASTContext &ctx,
-                           const UnboundImport &base, Identifier overlayName,
-                           const ImportedModuleDesc &declaringImport,
-                           const ImportedModuleDesc &bystandingImport);
+private:
+  void validatePrivate(ModuleDecl *topLevelModule);
+  void validateImplementationOnly(ASTContext &ctx);
+  void validateTestable(ModuleDecl *topLevelModule);
+  void validateResilience(NullablePtr<ModuleDecl> topLevelModule,
+                          SourceFile &SF);
 
-    /// Diagnoses if the import would simply load the module \p SF already
-    /// belongs to, with no actual effect.
-    ///
-    /// Some apparent self-imports do actually load a different module; this
-    /// method allows them.
-    bool checkNotTautological(const SourceFile &SF);
+  /// Diagnoses an inability to import \p modulePath in this situation and, if
+  /// \p attrs is provided and has an \p attrKind, invalidates the attribute and
+  /// offers a fix-it to remove it.
+  void diagnoseInvalidAttr(DeclAttrKind attrKind, DiagnosticEngine &diags,
+                           Diag<Identifier> diagID);
+};
 
-    /// Make sure the module actually loaded, and diagnose if it didn't.
-    bool checkModuleLoaded(ModuleDecl *M, SourceFile &SF);
+class ImportResolver final : public DeclVisitor<ImportResolver> {
+  friend DeclVisitor<ImportResolver>;
 
-    /// Find the top-level module for this module; that is, if \p M is the
-    /// module \c Foo.Bar.Baz, this finds \c Foo.
-    ///
-    /// Specifically, this method returns:
-    ///
-    /// \li \p M if \p M is a top-level module.
-    /// \li \c nullptr if \p M is a submodule of \c SF's parent module. (This
-    ///     corner case can occur in mixed-source frameworks, where Swift code
-    ///     can import a Clang submodule of itself.)
-    /// \li The top-level parent (i.e. ancestor with no parent) module above
-    ///     \p M otherwise.
-    NullablePtr<ModuleDecl> getTopLevelModule(ModuleDecl *M, SourceFile &SF);
+  SourceFile &SF;
+  ASTContext &ctx;
 
-    /// Diagnose any errors concerning the \c @_exported, \c @_implementationOnly,
-    /// \c @testable, or \c @_private attributes, including a
-    /// non-implementation-only import of a fragile library from a resilient one.
-    void validateOptions(NullablePtr<ModuleDecl> topLevelModule, SourceFile &SF);
+  /// Imports which still need their options checked, modules loaded, and
+  /// cross-imports found.
+  SmallVector<UnboundImport, 4> unboundImports;
 
-    /// Create an \c ImportedModuleDesc from the information in this
-    /// UnboundImport.
-    ImportedModuleDesc makeDesc(ModuleDecl *module) const {
-      return ImportedModuleDesc({ declPath, module }, options,
-                                privateImportFileName, spiGroups);
-    }
+  /// The list of fully bound imports.
+  SmallVector<ImportedModuleDesc, 16> boundImports;
 
-  private:
-    void validatePrivate(ModuleDecl *topLevelModule);
-    void validateImplementationOnly(ASTContext &ctx);
-    void validateTestable(ModuleDecl *topLevelModule);
-    void validateResilience(NullablePtr<ModuleDecl> topLevelModule,
-                            SourceFile &SF);
+  /// All imported modules, including by re-exports, and including submodules.
+  llvm::DenseSet<ImportedModuleDesc> visibleModules;
 
-    /// Diagnoses an inability to import \p modulePath in this situation and, if
-    /// \p attrs is provided and has an \p attrKind, invalidates the attribute and
-    /// offers a fix-it to remove it.
-    void diagnoseInvalidAttr(DeclAttrKind attrKind, DiagnosticEngine &diags,
-                             Diag<Identifier> diagID);
-  };
+  /// \c visibleModules but without the submodules.
+  ///
+  /// We use a \c SmallSetVector here because this doubles as the worklist for
+  /// cross-importing, so we want to keep it in order; this is feasible
+  /// because this set is usually fairly small, while \c visibleModules is
+  /// often enormous.
+  SmallSetVector<ImportedModuleDesc, 64> crossImportableModules;
 
-  class NameBinder final : public DeclVisitor<NameBinder> {
-    friend DeclVisitor<NameBinder>;
+  /// The subset of \c crossImportableModules which may declare cross-imports.
+  ///
+  /// This is a performance optimization. Since most modules do not register
+  /// any cross-imports, we can usually compare against this list, which is
+  /// much, much smaller than \c crossImportableModules.
+  SmallVector<ImportedModuleDesc, 16> crossImportDeclaringModules;
 
-    SourceFile &SF;
-    ASTContext &ctx;
+  /// The index of the next module in \c visibleModules that should be
+  /// cross-imported.
+  size_t nextModuleToCrossImport = 0;
 
-    /// Imports which still need their options checked, modules loaded, and
-    /// cross-imports found.
-    SmallVector<UnboundImport, 4> unboundImports;
+public:
+  ImportResolver(SourceFile &SF) : SF(SF), ctx(SF.getASTContext()) {}
 
-    /// The list of fully bound imports.
-    SmallVector<ImportedModuleDesc, 16> boundImports;
+  /// Retrieve the finalized imports.
+  ArrayRef<ImportedModuleDesc> getFinishedImports() const {
+    return boundImports;
+  }
 
-    /// All imported modules, including by re-exports, and including submodules.
-    llvm::DenseSet<ImportedModuleDesc> visibleModules;
+private:
+  // We only need to visit import decls.
+  void visitImportDecl(ImportDecl *ID);
 
-    /// \c visibleModules but without the submodules.
-    ///
-    /// We use a \c SmallSetVector here because this doubles as the worklist for
-    /// cross-importing, so we want to keep it in order; this is feasible
-    /// because this set is usually fairly small, while \c visibleModules is
-    /// often enormous.
-    SmallSetVector<ImportedModuleDesc, 64> crossImportableModules;
+  // Ignore other decls.
+  void visitDecl(Decl *D) {}
 
-    /// The subset of \c crossImportableModules which may declare cross-imports.
-    ///
-    /// This is a performance optimization. Since most modules do not register
-    /// any cross-imports, we can usually compare against this list, which is
-    /// much, much smaller than \c crossImportableModules.
-    SmallVector<ImportedModuleDesc, 16> crossImportDeclaringModules;
+  template<typename ...ArgTypes>
+  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
+    return ctx.Diags.diagnose(std::forward<ArgTypes>(Args)...);
+  }
 
-    /// The index of the next module in \c visibleModules that should be
-    /// cross-imported.
-    size_t nextModuleToCrossImport = 0;
+  /// Check a single unbound import, bind it, add it to \c boundImports,
+  /// and add its cross-import overlays to \c unboundImports.
+  void bindImport(UnboundImport &&I);
 
-  public:
-    NameBinder(SourceFile &SF)
-      : SF(SF), ctx(SF.getASTContext())
-    { }
+  /// Adds \p I and \p M to \c boundImports and \c visibleModules.
+  void addImport(const UnboundImport &I, ModuleDecl *M);
 
-    /// Retrieve the finalized imports.
-    ArrayRef<ImportedModuleDesc> getFinishedImports() const {
-      return boundImports;
-    }
+  /// Adds \p desc and everything it re-exports to \c visibleModules using
+  /// the settings from \c desc.
+  void addVisibleModules(ImportedModuleDesc desc);
 
-  private:
-    // We only need to visit import decls.
-    void visitImportDecl(ImportDecl *ID);
+  /// * If \p I is a cross-import overlay, registers \p M as overlaying
+  ///   \p I.underlyingModule in \c SF.
+  /// * Discovers any cross-imports between \p I and previously bound imports,
+  ///   then adds them to \c unboundImports using source locations from \p I.
+  void crossImport(ModuleDecl *M, UnboundImport &I);
 
-    // Ignore other decls.
-    void visitDecl(Decl *D) {}
+  /// Discovers any cross-imports between \p newImport and
+  /// \p oldImports and adds them to \c unboundImports, using source
+  /// locations from \p I.
+  void findCrossImportsInLists(UnboundImport &I,
+                               ArrayRef<ImportedModuleDesc> declaring,
+                               ArrayRef<ImportedModuleDesc> bystanding,
+                               bool shouldDiagnoseRedundantCrossImports);
 
-    template<typename ...ArgTypes>
-    InFlightDiagnostic diagnose(ArgTypes &&...Args) {
-      return ctx.Diags.diagnose(std::forward<ArgTypes>(Args)...);
-    }
+  /// Discovers any cross-imports between \p declaringImport and
+  /// \p bystandingImport and adds them to \c unboundImports, using source
+  /// locations from \p I.
+  void findCrossImports(UnboundImport &I,
+                        const ImportedModuleDesc &declaringImport,
+                        const ImportedModuleDesc &bystandingImport,
+                        bool shouldDiagnoseRedundantCrossImports);
 
-    /// Check a single unbound import, bind it, add it to \c boundImports,
-    /// and add its cross-import overlays to \c unboundImports.
-    void bindImport(UnboundImport &&I);
-
-    /// Adds \p I and \p M to \c boundImports and \c visibleModules.
-    void addImport(const UnboundImport &I, ModuleDecl *M);
-
-    /// Adds \p desc and everything it re-exports to \c visibleModules using
-    /// the settings from \c desc.
-    void addVisibleModules(ImportedModuleDesc desc);
-
-    /// * If \p I is a cross-import overlay, registers \p M as overlaying
-    ///   \p I.underlyingModule in \c SF.
-    /// * Discovers any cross-imports between \p I and previously bound imports,
-    ///   then adds them to \c unboundImports using source locations from \p I.
-    void crossImport(ModuleDecl *M, UnboundImport &I);
-
-    /// Discovers any cross-imports between \p newImport and
-    /// \p oldImports and adds them to \c unboundImports, using source
-    /// locations from \p I.
-    void findCrossImportsInLists(UnboundImport &I,
-                                 ArrayRef<ImportedModuleDesc> declaring,
-                                 ArrayRef<ImportedModuleDesc> bystanding,
-                                 bool shouldDiagnoseRedundantCrossImports);
-
-    /// Discovers any cross-imports between \p declaringImport and
-    /// \p bystandingImport and adds them to \c unboundImports, using source
-    /// locations from \p I.
-    void findCrossImports(UnboundImport &I,
-                          const ImportedModuleDesc &declaringImport,
-                          const ImportedModuleDesc &bystandingImport,
-                          bool shouldDiagnoseRedundantCrossImports);
-
-    /// Load a module referenced by an import statement.
-    ///
-    /// Returns null if no module can be loaded.
-    ModuleDecl *getModule(ArrayRef<Located<Identifier>> ModuleID);
-  };
+  /// Load a module referenced by an import statement.
+  ///
+  /// Returns null if no module can be loaded.
+  ModuleDecl *getModule(ArrayRef<Located<Identifier>> ModuleID);
+};
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
-// MARK: performNameBinding
+// MARK: performImportResolution
 //===----------------------------------------------------------------------===//
 
-/// performNameBinding - Once parsing is complete, this walks the AST to
-/// resolve imports.
+/// performImportResolution - This walks the AST to resolve imports.
 ///
-/// Most names are actually bound by the type checker, but before we can
-/// type-check a source file, we need to make declarations imported from other
-/// modules available. Name binding processes top-level \c ImportDecl nodes
-/// to perform this task, along with related validation.
+/// Before we can type-check a source file, we need to make declarations
+/// imported from other modules available. This is done by processing top-level
+/// \c ImportDecl nodes, along with related validation.
 ///
-/// Name binding operates on a parsed but otherwise unvalidated AST.
-void swift::performNameBinding(SourceFile &SF) {
+/// Import resolution operates on a parsed but otherwise unvalidated AST.
+void swift::performImportResolution(SourceFile &SF) {
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
-                             "Name binding");
+                             "Import resolution");
 
   // Make sure we skip adding the standard library imports if the
   // source file is empty.
-  if (SF.ASTStage == SourceFile::NameBound || SF.getTopLevelDecls().empty()) {
-    SF.ASTStage = SourceFile::NameBound;
+  if (SF.ASTStage == SourceFile::ImportsResolved ||
+      SF.getTopLevelDecls().empty()) {
+    SF.ASTStage = SourceFile::ImportsResolved;
     return;
   }
 
-  NameBinder Binder(SF);
+  ImportResolver resolver(SF);
 
   // Resolve each import declaration.
   for (auto D : SF.getTopLevelDecls())
-    Binder.visit(D);
+    resolver.visit(D);
 
-  SF.addImports(Binder.getFinishedImports());
+  SF.addImports(resolver.getFinishedImports());
 
-  SF.ASTStage = SourceFile::NameBound;
+  SF.ASTStage = SourceFile::ImportsResolved;
   verify(SF);
 }
 
@@ -297,7 +293,7 @@ void swift::performNameBinding(SourceFile &SF) {
 // MARK: Import handling generally
 //===----------------------------------------------------------------------===//
 
-void NameBinder::visitImportDecl(ImportDecl *ID) {
+void ImportResolver::visitImportDecl(ImportDecl *ID) {
   assert(unboundImports.empty());
 
   unboundImports.emplace_back(ID);
@@ -305,7 +301,7 @@ void NameBinder::visitImportDecl(ImportDecl *ID) {
     bindImport(unboundImports.pop_back_val());
 }
 
-void NameBinder::bindImport(UnboundImport &&I) {
+void ImportResolver::bindImport(UnboundImport &&I) {
   auto ID = I.getImportDecl();
 
   if (!I.checkNotTautological(SF)) {
@@ -343,7 +339,7 @@ void NameBinder::bindImport(UnboundImport &&I) {
     ID.get()->setModule(M);
 }
 
-void NameBinder::addImport(const UnboundImport &I, ModuleDecl *M) {
+void ImportResolver::addImport(const UnboundImport &I, ModuleDecl *M) {
   auto importDesc = I.makeDesc(M);
   addVisibleModules(importDesc);
   boundImports.push_back(importDesc);
@@ -353,7 +349,8 @@ void NameBinder::addImport(const UnboundImport &I, ModuleDecl *M) {
 // MARK: Import module loading
 //===----------------------------------------------------------------------===//
 
-ModuleDecl *NameBinder::getModule(ArrayRef<Located<Identifier>> modulePath) {
+ModuleDecl *
+ImportResolver::getModule(ArrayRef<Located<Identifier>> modulePath) {
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
 
@@ -667,7 +664,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
 
   // If we weren't able to load the module referenced by the import, we're done.
   // The fact that we failed to load the module has already been diagnosed by
-  // name binding.
+  // import resolution.
   auto *module = import->getModule();
   if (!module)
     return ArrayRef<ValueDecl *>();
@@ -676,8 +673,8 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   ///
   /// We validate the scope by making sure that the named declaration exists
   /// and is of the kind indicated by the keyword. This can't be done until
-  /// we've performed name binding, since that can introduce additional imports
-  /// (such as cross-import overlays) which could provide the declaration.
+  /// we've performed import resolution, since that can introduce additional
+  /// imports (such as cross-import overlays) which could provide the declaration.
   auto &ctx = module->getASTContext();
   auto declPath = import->getDeclPath();
   auto modulePath = import->getModulePath();
@@ -789,16 +786,16 @@ UnboundImport::UnboundImport(ASTContext &ctx,
     options |= ImportFlags::ImplementationOnly;
 }
 
-void NameBinder::crossImport(ModuleDecl *M, UnboundImport &I) {
+void ImportResolver::crossImport(ModuleDecl *M, UnboundImport &I) {
   // FIXME: There is a fundamental problem with this find-as-we-go approach:
   // The '@_exported import'-ed modules in this module's other files should be
   // taken into account, but they haven't been bound yet, and binding them would
   // require cross-importing. Chicken, meet egg.
   //
-  // The way to fix this is probably to restructure name binding so we first
-  // bind all exported imports in all files, then bind all other imports in each
-  // file. This may become simpler if we bind all ImportDecls before we start
-  // computing cross-imports, but I haven't figured that part out yet.
+  // The way to fix this is probably to restructure import resolution so we
+  // first bind all exported imports in all files, then bind all other imports
+  // in each file. This may become simpler if we bind all ImportDecls before we
+  // start computing cross-imports, but I haven't figured that part out yet.
   //
   // Fixing this is tracked within Apple by rdar://problem/59527118. I haven't
   // filed an SR because I plan to address it myself, but if this comment is
@@ -855,11 +852,10 @@ void NameBinder::crossImport(ModuleDecl *M, UnboundImport &I) {
   nextModuleToCrossImport = crossImportableModules.size();
 }
 
-void
-NameBinder::findCrossImportsInLists(UnboundImport &I,
-                                    ArrayRef<ImportedModuleDesc> declaring,
-                                    ArrayRef<ImportedModuleDesc> bystanding,
-                                    bool shouldDiagnoseRedundantCrossImports) {
+void ImportResolver::findCrossImportsInLists(
+    UnboundImport &I, ArrayRef<ImportedModuleDesc> declaring,
+    ArrayRef<ImportedModuleDesc> bystanding,
+    bool shouldDiagnoseRedundantCrossImports) {
   for (auto &declaringImport : declaring) {
     if (!canCrossImport(declaringImport))
       continue;
@@ -874,10 +870,10 @@ NameBinder::findCrossImportsInLists(UnboundImport &I,
   }
 }
 
-void NameBinder::findCrossImports(UnboundImport &I,
-                                  const ImportedModuleDesc &declaringImport,
-                                  const ImportedModuleDesc &bystandingImport,
-                                  bool shouldDiagnoseRedundantCrossImports) {
+void ImportResolver::findCrossImports(
+    UnboundImport &I, const ImportedModuleDesc &declaringImport,
+    const ImportedModuleDesc &bystandingImport,
+    bool shouldDiagnoseRedundantCrossImports) {
   assert(&declaringImport != &bystandingImport);
 
   LLVM_DEBUG(
@@ -935,7 +931,7 @@ static bool isSubmodule(ModuleDecl* M) {
   return clangMod && clangMod->Parent;
 }
 
-void NameBinder::addVisibleModules(ImportedModuleDesc importDesc) {
+void ImportResolver::addVisibleModules(ImportedModuleDesc importDesc) {
   // FIXME: namelookup::getAllImports() doesn't quite do what we need (mainly
   // w.r.t. scoped imports), but it seems like we could extend it to do so, and
   // then eliminate most of this.
