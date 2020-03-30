@@ -3451,11 +3451,16 @@ void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
 void IRGenSILFunction::visitObjectInst(swift::ObjectInst *i) {
   SILType objType = i->getType().getObjectType();
   const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
+  llvm::Value *metadata = emitClassHeapMetadataRef(*this, objType.getASTType(),
+                                                   MetadataValueType::TypeMetadata,
+                                                   MetadataState::Complete);
   // TODO: this shouldn't be a stack alloc but, this is the easiest way to
   // maintain compatibility with alloc_ref.
   Address alloca = createAlloca(typeInfo.getStorageType()->getPointerElementType(),
                                 typeInfo.getFixedAlignment());
-  Builder.CreateLifetimeStart(alloca, typeInfo.getFixedSize());
+  auto classAddr = Builder.CreateBitCast(alloca, IGM.RefCountedPtrTy);
+  auto classVal = emitInitStackObjectCall(metadata, classAddr.getAddress(), "reference.new");
+  classVal = Builder.CreateBitCast(classVal, typeInfo.getStorageType());
 
   auto propsArr = i->getType().getClassOrBoundGenericClass()->getStoredProperties();
   SmallVector<VarDecl*, 8> props(propsArr.begin(), propsArr.end());
@@ -3464,12 +3469,12 @@ void IRGenSILFunction::visitObjectInst(swift::ObjectInst *i) {
     auto elementExplosion = getLoweredExplosion(elt);
     auto propType = IGM.getLoweredType(prop->getType());
     const auto &propTypeInfo = cast<LoadableTypeInfo>(getTypeInfo(propType));
-    auto propAddr = projectPhysicalClassMemberAddress(*this, alloca.getAddress(), objType, propType, prop);
+    auto propAddr = projectPhysicalClassMemberAddress(*this, classVal, objType, propType, prop);
     propTypeInfo.initialize(*this, elementExplosion, propAddr, false);
   }
   
   Explosion e;
-  e.add(alloca.getAddress());
+  e.add(classVal);
   setLoweredExplosion(i, e);
 }
 
