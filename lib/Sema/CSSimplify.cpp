@@ -1369,37 +1369,12 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 static unsigned
 assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
                                ConstraintLocatorBuilder locator) {
+  assert(requirementType);
+
+  unsigned impact = 1;
   auto *anchor = locator.getAnchor();
   if (!anchor)
-    return 1;
-
-  if (requirementType && cs.simplifyType(requirementType)->isStdlibType()) {
-    if (auto last = locator.last()) {
-      if (auto requirement = last->getAs<LocatorPathElt::AnyRequirement>()) {
-        auto kind = requirement->getRequirementKind();
-        if (kind == RequirementKind::Conformance)
-          return 3;
-      }
-    }
-  }
-
-  // If this requirement is associated with an overload choice let's
-  // tie impact to how many times this requirement type is mentioned.
-  if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor)) {
-    if (!(requirementType && requirementType->is<TypeVariableType>()))
-      return 1;
-
-    unsigned choiceImpact = 0;
-    if (auto choice = cs.findSelectedOverloadFor(ODRE)) {
-      auto *typeVar = requirementType->castTo<TypeVariableType>();
-      choice->openedType.visit([&](Type type) {
-        if (type->isEqual(typeVar))
-          ++choiceImpact;
-      });
-    }
-
-    return choiceImpact == 0 ? 1 : choiceImpact;
-  }
+    return impact;
 
   // If this requirement is associated with a member reference and it
   // was possible to check it before overload choice is bound, that means
@@ -1417,13 +1392,53 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   // fix for same-type requirement higher impact vs. requirement associated
   // with method itself e.g. `func foo<U>() -> U where U : P {}` because
   // `foo` is accessible from any `S` regardless of what `T` is.
+  //
+  // Don't add this impact with the others, as we want to keep it consistent
+  // across requirement failures to present the user with a choice.
   if (isa<UnresolvedDotExpr>(anchor) || isa<UnresolvedMemberExpr>(anchor)) {
     auto *calleeLoc = cs.getCalleeLocator(cs.getConstraintLocator(locator));
     if (!cs.findSelectedOverloadFor(calleeLoc))
       return 10;
   }
 
-  return 1;
+  // Increase the impact of a conformance fix for a standard library type,
+  // as it's unlikely to be a good suggestion. Also do the same for the builtin
+  // compiler types Any and AnyObject, which cannot conform to protocols.
+  // FIXME: We ought not to have the is<TypeVariableType>() condition here, but
+  // removing it currently regresses the diagnostic for the test case for
+  // rdar://60727310. Once we better handle the separation of conformance fixes
+  // from argument mismatches in cases like SR-12438, we should be able to
+  // remove it from the condition.
+  auto resolvedTy = cs.simplifyType(requirementType);
+  if ((requirementType->is<TypeVariableType>() && resolvedTy->isStdlibType()) ||
+      resolvedTy->isAny() || resolvedTy->isAnyObject()) {
+    if (auto last = locator.last()) {
+      if (auto requirement = last->getAs<LocatorPathElt::AnyRequirement>()) {
+        auto kind = requirement->getRequirementKind();
+        if (kind == RequirementKind::Conformance)
+          impact += 2;
+      }
+    }
+  }
+
+  // If this requirement is associated with an overload choice let's
+  // tie impact to how many times this requirement type is mentioned.
+  if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor)) {
+    if (auto *typeVar = requirementType->getAs<TypeVariableType>()) {
+      unsigned choiceImpact = 0;
+      if (auto choice = cs.findSelectedOverloadFor(ODRE)) {
+        choice->openedType.visit([&](Type type) {
+          if (type->isEqual(typeVar))
+            ++choiceImpact;
+        });
+      }
+      // If the type is used multiple times in the signature, increase the
+      // impact for every additional use.
+      if (choiceImpact > 1)
+        impact += choiceImpact - 1;
+    }
+  }
+  return impact;
 }
 
 /// Attempt to fix missing arguments by introducing type variables
@@ -3301,6 +3316,17 @@ bool ConstraintSystem::repairFailures(
     if (hasFixFor(loc, FixKind::AllowInvalidUseOfTrailingClosure))
       return true;
 
+    // Don't attempt to fix an argument being passed to a
+    // _OptionalNilComparisonType parameter. Such an overload should only take
+    // effect when a nil literal is used in valid code, and doesn't offer any
+    // useful fixes for invalid code.
+    if (auto *nominal = rhs->getAnyNominal()) {
+      if (nominal->isStdlibDecl() &&
+          nominal->getName() == getASTContext().Id_OptionalNilComparisonType) {
+        return false;
+      }
+    }
+
     if (repairByInsertingExplicitCall(lhs, rhs))
       break;
 
@@ -5061,6 +5087,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ConstraintKind kind,
                                  ConstraintLocatorBuilder locator,
                                  TypeMatchOptions flags) {
+  const auto rawType = type;
   auto *typeVar = type->getAs<TypeVariableType>();
 
   // Dig out the fixed type to which this type refers.
@@ -5232,7 +5259,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
       if (auto *fix =
               fixRequirementFailure(*this, type, protocolTy, anchor, path)) {
-        auto impact = assessRequirementFailureImpact(*this, typeVar, locator);
+        auto impact = assessRequirementFailureImpact(*this, rawType, locator);
         if (!recordFix(fix, impact)) {
           // Record this conformance requirement as "fixed".
           recordFixedRequirement(type, RequirementKind::Conformance,
