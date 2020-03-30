@@ -5411,8 +5411,11 @@ public:
     };
 
     // Bounds check.  FIXME: overflow
-    if (2 * numParams + 2 * numResults + 2 * unsigned(hasErrorResult)
-          > variableData.size()) {
+    unsigned entriesPerParam =
+        diffKind != DifferentiabilityKind::NonDifferentiable ? 3 : 2;
+    if (entriesPerParam * numParams + 2 * numResults +
+            2 * unsigned(hasErrorResult) >
+        variableData.size()) {
       MF.fatal();
     }
 
