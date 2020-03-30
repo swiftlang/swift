@@ -1271,10 +1271,11 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
 
-/// ErrorType - This represents a type that was erroneously constructed.  This
-/// is produced when parsing types and when name binding type aliases, and is
-/// installed in declaration that use these erroneous types.  All uses of a
-/// declaration of invalid type should be ignored and not re-diagnosed.
+/// ErrorType - Represents the type of an erroneously constructed declaration,
+/// expression, or type. When creating ErrorTypes, an associated error
+/// diagnostic should always be emitted. That way when later stages of
+/// compilation encounter an ErrorType installed by earlier phases they do not
+/// have to emit further diagnostics to abort compilation.
 class ErrorType final : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
@@ -6410,11 +6411,11 @@ inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
     llvm_unreachable("Undefined function type");
   }
 }
-  
+
 /// If this is a method in a type or extension thereof, compute
 /// and return a parameter to be used for the 'self' argument.  The type of
 /// the parameter is the empty Type() if no 'self' argument should exist. This
-/// can only be used after name binding has resolved types.
+/// can only be used after types have been resolved.
 ///
 /// \param isInitializingCtor Specifies whether we're computing the 'self'
 /// type of an initializing constructor, which accepts an instance 'self'

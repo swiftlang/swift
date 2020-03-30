@@ -2013,7 +2013,7 @@ ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name,
   if (name.empty() || name.front().empty())
     return getContext().TheBuiltinModule;
 
-  // FIXME: duplicated from NameBinder::getModule
+  // FIXME: duplicated from ImportResolver::getModule
   if (name.size() == 1 &&
       name.front() == FileContext->getParentModule()->getName()) {
     if (!UnderlyingModule && allowLoading) {

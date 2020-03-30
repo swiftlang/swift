@@ -3135,8 +3135,8 @@ namespace {
     }
     
     Type visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
-      // If there are UnresolvedPatterns floating around after name binding,
-      // they are pattern productions in invalid positions. However, we will
+      // If there are UnresolvedPatterns floating around after pattern type
+      // checking, they are definitely invalid. However, we will
       // diagnose that condition elsewhere; to avoid unnecessary noise errors,
       // just plop an open type variable here.
       
