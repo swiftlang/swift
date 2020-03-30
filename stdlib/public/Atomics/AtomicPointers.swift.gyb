@@ -33,28 +33,28 @@
 
   def rmwOrderings():
     return [
-      # Swift enum case,         API name,                 documentation name,        llvm name,   failure name
-      ('relaxed',                'Relaxed',                'relaxed',                 'monotonic', 'monotonic'),
-      ('acquiring',              'Acquiring',              'acquiring',               'acquire',   'acquire'),
-      ('releasing',              'Releasing',              'releasing',               'release',   'monotonic'),
-      ('acquiringAndReleasing',  'AcquiringAndReleasing',  'acquiring-and-releasing', 'acqrel',    'acquire'),
-      ('sequentiallyConsistent', 'Serialized',             'sequentially consistent', 'seqcst',    'seqcst'),
+      # Swift enum case,         llvm name,   failure name
+      ('relaxed',                'monotonic', 'monotonic'),
+      ('acquiring',              'acquire',   'acquire'),
+      ('releasing',              'release',   'monotonic'),
+      ('acquiringAndReleasing',  'acqrel',    'acquire'),
+      ('sequentiallyConsistent', 'seqcst',    'seqcst'),
     ]
 
   def loadOrderings():
     return [
-      # Swift enum case,         API name,     doc name,                  llvm name
-      ('relaxed',                'Relaxed',    'relaxed',                 'monotonic'),
-      ('acquiring',              'Acquiring',  'acquiring',               'acquire'),
-      ('sequentiallyConsistent', 'Serialized', 'sequentially consistent', 'seqcst'),
+      # Swift enum case,         llvm name
+      ('relaxed',                'monotonic'),
+      ('acquiring',              'acquire'),
+      ('sequentiallyConsistent', 'seqcst'),
     ]
 
   def storeOrderings():
     return [
-      # Swift enum case,         API name,     doc name,                  llvm name
-      ('relaxed',                'Relaxed',    'relaxed',                 'monotonic'),
-      ('releasing',              'Releasing',  'releasing',               'release'),
-      ('sequentiallyConsistent', 'Serialized', 'sequentially consistent', 'seqcst'),
+      # Swift enum case,         llvm name
+      ('relaxed',                'monotonic'),
+      ('releasing',              'release'),
+      ('sequentiallyConsistent', 'seqcst'),
     ]
 
   def caseStatementForOrdering(ordering):
@@ -133,7 +133,7 @@ extension ${swiftType}: AtomicProtocol {
   ) -> Self {
     let raw: Builtin.${builtinType}
     switch ordering {
-%   for (swiftOrder, _, _, llvmOrder) in loadOrderings():
+%   for (swiftOrder, llvmOrder) in loadOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       raw = Builtin.atomicload_${llvmOrder}_${builtinType}(
         address._atomicRawValue)
@@ -152,7 +152,7 @@ extension ${swiftType}: AtomicProtocol {
     ordering: AtomicStoreOrdering
   ) {
     switch ordering {
-%   for (swiftOrder, _, _, llvmOrder) in storeOrderings():
+%   for (swiftOrder, llvmOrder) in storeOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       Builtin.atomicstore_${llvmOrder}_${builtinType}(
         address._rawValue,
@@ -174,7 +174,7 @@ extension ${swiftType}: AtomicProtocol {
   ) -> Self {
     let rawResult: Builtin.${builtinType}
     switch ordering {
-%   for (swiftOrder, _, _, llvmOrder, _) in rmwOrderings():
+%   for (swiftOrder, llvmOrder, _) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       rawResult = Builtin.atomicrmw_xchg_${llvmOrder}_${builtinType}(
         address._rawValue,
@@ -210,7 +210,7 @@ extension ${swiftType}: AtomicProtocol {
     let old: Builtin.${builtinType}
     let won: Builtin.Int1
     switch ordering {
-%   for (swiftOrder, _, _, llvmOrder, failureOrder) in rmwOrderings():
+%   for (swiftOrder, llvmOrder, failureOrder) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       (old, won) = Builtin.cmpxchg_${llvmOrder}_${failureOrder}_${builtinType}(
         address._rawValue,
@@ -268,8 +268,8 @@ extension ${swiftType}: AtomicProtocol {
     let old: Builtin.${builtinType}
     let won: Builtin.Int1
     switch (ordering, failureOrdering) {
-% for (swiftSuccess, _, _, llvmSuccess, _) in rmwOrderings():
-%   for (swiftFailure, _, _, llvmFailure) in loadOrderings():
+% for (swiftSuccess, llvmSuccess, _) in rmwOrderings():
+%   for (swiftFailure, llvmFailure) in loadOrderings():
     case (.${swiftSuccess}, .${swiftFailure}):
       (old, won) = Builtin.cmpxchg_${llvmOrders(llvmSuccess, llvmFailure)}_${builtinType}(
         address._rawValue,
@@ -361,7 +361,7 @@ extension ${swiftType}: NullableAtomic {
   ) -> Self? {
     let raw: Builtin.${builtinType}
     switch ordering {
-%   for (swiftOrder, _, _, llvmOrder) in loadOrderings():
+%   for (swiftOrder, llvmOrder) in loadOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       raw = Builtin.atomicload_${llvmOrder}_${builtinType}(
         address._rawValue)
@@ -380,7 +380,7 @@ extension ${swiftType}: NullableAtomic {
     ordering: AtomicStoreOrdering
   ) {
     switch ordering {
-%   for (swiftOrder, _, _, llvmOrder) in storeOrderings():
+%   for (swiftOrder, llvmOrder) in storeOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       Builtin.atomicstore_${llvmOrder}_${builtinType}(
         address._rawValue,
@@ -402,7 +402,7 @@ extension ${swiftType}: NullableAtomic {
   ) -> Self? {
     let rawResult: Builtin.${builtinType}
     switch ordering {
-%   for (swiftOrder, _, _, llvmOrder, _) in rmwOrderings():
+%   for (swiftOrder, llvmOrder, _) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       rawResult = Builtin.atomicrmw_xchg_${llvmOrder}_${builtinType}(
         address._rawValue,
@@ -438,7 +438,7 @@ extension ${swiftType}: NullableAtomic {
     let old: Builtin.${builtinType}
     let won: Builtin.Int1
     switch ordering {
-%   for (swiftOrder, _, _, llvmOrder, failureOrder) in rmwOrderings():
+%   for (swiftOrder, llvmOrder, failureOrder) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       (old, won) = Builtin.cmpxchg_${llvmOrder}_${failureOrder}_${builtinType}(
         address._rawValue,
@@ -496,8 +496,8 @@ extension ${swiftType}: NullableAtomic {
     let old: Builtin.${builtinType}
     let won: Builtin.Int1
     switch (ordering, failureOrdering) {
-% for (swiftSuccess, _, _, llvmSuccess, _) in rmwOrderings():
-%   for (swiftFailure, _, _, llvmFailure) in loadOrderings():
+% for (swiftSuccess, llvmSuccess, _) in rmwOrderings():
+%   for (swiftFailure, llvmFailure) in loadOrderings():
     case (.${swiftSuccess}, .${swiftFailure}):
       (old, won) = Builtin.cmpxchg_${llvmOrders(llvmSuccess, llvmFailure)}_${builtinType}(
         address._rawValue,
