@@ -4865,12 +4865,27 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   }
 
   if (locator->isForSequenceElementType()) {
-    diagnostic.emplace(
-        emitDiagnostic(anchor->getLoc(),
-                       contextualType->isExistentialType()
-                           ? diag::cannot_convert_sequence_element_protocol
-                           : diag::cannot_convert_sequence_element_value,
-                       eltType, contextualType));
+    auto &cs = getConstraintSystem();
+    // If this is a conversion failure related to binding of `for-each`
+    // statement it has to be diagnosed as pattern match if there are
+    // holes present in the contextual type.
+    if (cs.getContextualTypePurpose(anchor) ==
+            ContextualTypePurpose::CTP_ForEachStmt &&
+        contextualType->hasHole()) {
+      diagnostic.emplace(emitDiagnostic(
+          anchor->getLoc(),
+          (contextualType->is<TupleType>() && !eltType->is<TupleType>())
+              ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
+              : diag::cannot_match_unresolved_expr_pattern_with_value,
+          eltType));
+    } else {
+      diagnostic.emplace(
+          emitDiagnostic(anchor->getLoc(),
+                         contextualType->isExistentialType()
+                             ? diag::cannot_convert_sequence_element_protocol
+                             : diag::cannot_convert_sequence_element_value,
+                         eltType, contextualType));
+    }
   }
 
   if (!diagnostic)
