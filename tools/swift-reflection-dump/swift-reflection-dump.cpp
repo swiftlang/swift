@@ -478,9 +478,16 @@ public:
     case DLQ_GetPtrAuthMask: {
       // We don't try to sign pointers at all in our view of the object
       // mapping.
-      auto result = static_cast<uintptr_t *>(outBuffer);
-      *result = (uintptr_t)~0ull;
-      return true;
+      if (wordSize == 4) {
+        auto result = static_cast<uint32_t *>(outBuffer);
+        *result = (uint32_t)~0ull;
+        return true;
+      } else if (wordSize == 8) {
+        auto result = static_cast<uint64_t *>(outBuffer);
+        *result = (uint64_t)~0ull;
+        return true;
+      }
+      return false;
     }
     case DLQ_GetObjCReservedLowBits: {
       auto result = static_cast<uint8_t *>(outBuffer);
