@@ -26,7 +26,7 @@ var i: Int = b.my_identity()
 
 
 // CHECK-EXPANDED:      ***Complete scope map***
-// CHECK-EXPANDED-NEXT: ASTSourceFileScope {{.*}}, (uncached) [1:1 - 6{{.*}}:1] 'SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameBinding{{[/\\]}}scope_map_top_level.swift'
+// CHECK-EXPANDED-NEXT: ASTSourceFileScope {{.*}}, (uncached) [1:1 - 6{{.*}}:1] 'SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameLookup{{[/\\]}}scope_map_top_level.swift'
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [4:1 - 4:13]
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [4:11 - 4:13]
 // CHECK-EXPANDED-NEXT: `-TopLevelCodeScope {{.*}}, [6:1 - 21:28]

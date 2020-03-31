@@ -441,5 +441,34 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
   // V !: P3 in InnerTEqualsConformsToP1
 }
 
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  DemangleToMetadataTests.test("Round-trip with _mangledTypeName and _typeByName") {
+    func roundTrip<T>(_ type: T.Type) {
+      let mangledName: String? = _mangledTypeName(type)
+      let recoveredType: Any.Type? = _typeByName(mangledName!)
+      expectEqual(String(reflecting: type), String(reflecting: recoveredType!))
+      expectEqual(type, recoveredType! as! T.Type)
+    }
+
+    roundTrip(Int.self)
+    roundTrip(String.self)
+    roundTrip(ConformsToP2AndP3.self)
+    roundTrip(SG12<ConformsToP1AndP2, ConformsToP1AndP2>.self)
+    roundTrip(SG12<ConformsToP1AndP2, ConformsToP1AndP2>.InnerTEqualsU<ConformsToP3>.self)
+    roundTrip(SG12<ConformsToP1, ConformsToP2>.InnerTEqualsConformsToP1<ConformsToP3>.self)
+    roundTrip(SG12<ConformsToP1, ConformsToP2>.InnerUEqualsConformsToP2<ConformsToP3>.self)
+  }
+
+  DemangleToMetadataTests.test("Check _mangledTypeName, _typeName use appropriate cache keys") {
+    // sanity check that name functions use the right keys to store cached names:
+    for _ in 1...2 {
+      expectEqual("Si", _mangledTypeName(Int.self)!)
+      expectEqual("Swift.Int", _typeName(Int.self, qualified: true))
+      expectEqual("Int", _typeName(Int.self, qualified: false))
+    }
+  }
+}
+
+
 runAllTests()
 
