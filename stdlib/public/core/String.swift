@@ -407,15 +407,12 @@ extension String {
       return
     }
 
-    if let contigBytes = codeUnits as? _HasContiguousBytes,
-       contigBytes._providesContiguousBytesNoCopy
-    {
-      self = contigBytes.withUnsafeBytes { rawBufPtr in
-        return String._fromUTF8Repairing(
-          UnsafeBufferPointer(
-            start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-            count: rawBufPtr.count)).0
-      }
+    if let str = codeUnits.withContiguousStorageIfAvailable({
+      (buffer: UnsafeBufferPointer<C.Element>) -> String in
+      return String._fromUTF8Repairing(
+        UnsafeRawBufferPointer(buffer).bindMemory(to: UInt8.self)).0
+    }) {
+      self = str
       return
     }
 

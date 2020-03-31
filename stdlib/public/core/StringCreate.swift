@@ -228,26 +228,28 @@ extension String {
       return _slowFromCodeUnits(input, encoding: encoding, repair: repair)
     }
 
-    var result:String? = nil
+    // Needed for double-optional due to returning optional string in
+    // _fromASCIIValidating in withContiguousStorageIfAvailable
+    let resultOpt: String?
 
-    if let contigBytes = input as? _HasContiguousBytes,
-      contigBytes._providesContiguousBytesNoCopy {
-      result = contigBytes.withUnsafeBytes { rawBufPtr in
-        let buffer = UnsafeBufferPointer(
-          start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-          count: rawBufPtr.count)
-        return String._fromASCIIValidating(buffer)
-      }
+    if let strOpt = input.withContiguousStorageIfAvailable({
+      (buffer: UnsafeBufferPointer<Input.Element>) -> String? in
+      return String._fromASCIIValidating(
+        UnsafeRawBufferPointer(buffer).bindMemory(to: UInt8.self))
+    }) {
+      resultOpt = strOpt
     } else {
-      result = Array(input).withUnsafeBufferPointer {
+      resultOpt = Array(input).withUnsafeBufferPointer {
         let buffer = UnsafeRawBufferPointer($0).bindMemory(to: UInt8.self)
         return String._fromASCIIValidating(buffer)
       }
     }
 
-    return result != nil ?
-      (result!, repairsMade: false) :
-      _slowFromCodeUnits(input, encoding: encoding, repair: repair)
+    guard let result = resultOpt else {
+      return _slowFromCodeUnits(input, encoding: encoding, repair: repair)
+    }
+
+    return (result, repairsMade: false)
   }
 
   public // @testable
