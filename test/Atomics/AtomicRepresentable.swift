@@ -18,7 +18,7 @@ suite.test("AtomicRepresentable.load") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
-  let v = UnsafeAtomicPointer<State>.create(initialValue: .starting)
+  let v = UnsafeAtomic<State>.create(initialValue: .starting)
   defer { v.destroy() }
   expectEqual(v.load(ordering: .relaxed), State.starting)
 }
@@ -27,7 +27,7 @@ suite.test("AtomicRepresentable.store") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
-  let v = UnsafeAtomicPointer<State>.create(initialValue: .starting)
+  let v = UnsafeAtomic<State>.create(initialValue: .starting)
   defer { v.destroy() }
   expectEqual(State.starting, v.load(ordering: .relaxed))
   v.store(.running, ordering: .relaxed)
@@ -38,7 +38,7 @@ suite.test("AtomicRepresentable.exchange") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
-  let v = UnsafeAtomicPointer<State>.create(initialValue: .starting)
+  let v = UnsafeAtomic<State>.create(initialValue: .starting)
   defer { v.destroy() }
   expectEqual(State.starting, v.load(ordering: .relaxed))
   expectEqual(State.starting, v.exchange(.running, ordering: .relaxed))
@@ -51,7 +51,7 @@ suite.test("AtomicRepresentable.compareExchange") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
-  let v = UnsafeAtomicPointer<State>.create(initialValue: .starting)
+  let v = UnsafeAtomic<State>.create(initialValue: .starting)
   defer { v.destroy() }
   expectEqual(State.starting, v.load(ordering: .relaxed))
 

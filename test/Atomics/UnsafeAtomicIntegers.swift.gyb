@@ -61,43 +61,43 @@ let suite = TestSuite("UnsafeAtomicIntegers")
 
 % for type in atomicTypes:
 
-suite.test("UnsafeAtomicPointer<${type}>.create-destroy") {
+suite.test("UnsafeAtomic<${type}>.create-destroy") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
 
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: 0)
+  let v = UnsafeAtomic<${type}>.create(initialValue: 0)
   defer { v.destroy() }
   expectEqual(v.load(ordering: .relaxed), 0)
 
-  let w = UnsafeAtomicPointer<${type}>.create(initialValue: 42)
+  let w = UnsafeAtomic<${type}>.create(initialValue: 42)
   defer { w.destroy() }
   expectEqual(w.load(ordering: .relaxed), 42)
 }
 
 % for order in loadOrderings:
-suite.test("UnsafeAtomicPointer<${type}>.load.${order}") {
+suite.test("UnsafeAtomic<${type}>.load.${order}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
 
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: 0)
+  let v = UnsafeAtomic<${type}>.create(initialValue: 0)
   defer { v.destroy() }
   expectEqual(v.load(ordering: .${order}), 0)
 
-  let w = UnsafeAtomicPointer<${type}>.create(initialValue: 23)
+  let w = UnsafeAtomic<${type}>.create(initialValue: 23)
   defer { w.destroy() }
   expectEqual(w.load(ordering: .${order}), 23)
 }
 % end
 
 % for order in storeOrderings:
-suite.test("UnsafeAtomicPointer<${type}>.store.${order}") {
+suite.test("UnsafeAtomic<${type}>.store.${order}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
 
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: 0)
+  let v = UnsafeAtomic<${type}>.create(initialValue: 0)
   defer { v.destroy() }
 
   v.store(23, ordering: .${order})
@@ -109,12 +109,12 @@ suite.test("UnsafeAtomicPointer<${type}>.store.${order}") {
 % end
 
 % for order in rmwOrderings:
-suite.test("UnsafeAtomicPointer<${type}>.exchange.${order}") {
+suite.test("UnsafeAtomic<${type}>.exchange.${order}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
 
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: 0)
+  let v = UnsafeAtomic<${type}>.create(initialValue: 0)
   defer { v.destroy() }
 
   expectEqual(v.exchange(42, ordering: .${order}), 0)
@@ -126,12 +126,12 @@ suite.test("UnsafeAtomicPointer<${type}>.exchange.${order}") {
 % end
 
 % for order in rmwOrderings:
-suite.test("UnsafeAtomicPointer<${type}>.compareExchange.${order}") {
+suite.test("UnsafeAtomic<${type}>.compareExchange.${order}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
 
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: 0)
+  let v = UnsafeAtomic<${type}>.create(initialValue: 0)
   defer { v.destroy() }
 
   var (exchanged, original) = v.compareExchange(
@@ -162,12 +162,12 @@ suite.test("UnsafeAtomicPointer<${type}>.compareExchange.${order}") {
 
 % for order in rmwOrderings:
 %   for failorder in loadOrderings:
-suite.test("UnsafeAtomicPointer<${type}>.compareExchange.${order}.${failorder}") {
+suite.test("UnsafeAtomic<${type}>.compareExchange.${order}.${failorder}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
 
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: 0)
+  let v = UnsafeAtomic<${type}>.create(initialValue: 0)
   defer { v.destroy() }
 
   var (exchanged, original) = v.compareExchange(
@@ -202,7 +202,7 @@ suite.test("UnsafeAtomicPointer<${type}>.compareExchange.${order}.${failorder}")
 
 % for (name, _, operator, label, _) in integerOperations:
 %   for order in rmwOrderings:
-suite.test("UnsafeAtomicPointer<${type}>.loadThen${name}.${order}") {
+suite.test("UnsafeAtomic<${type}>.loadThen${name}.${order}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
@@ -213,7 +213,7 @@ suite.test("UnsafeAtomicPointer<${type}>.loadThen${name}.${order}") {
   let result1: ${type} = a ${operator} b
   let result2: ${type} = result1 ${operator} c
 
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: a)
+  let v = UnsafeAtomic<${type}>.create(initialValue: a)
   defer { v.destroy() }
 
   let old1 = v.loadThen${name}(${argLabel(label)}b, ordering: .${order})
@@ -229,7 +229,7 @@ suite.test("UnsafeAtomicPointer<${type}>.loadThen${name}.${order}") {
 
 % for (name, _, operator, label, _) in integerOperations:
 %   for order in rmwOrderings:
-suite.test("UnsafeAtomicPointer<${type}>.${lowerFirst(name)}ThenLoad.${order}") {
+suite.test("UnsafeAtomic<${type}>.${lowerFirst(name)}ThenLoad.${order}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
@@ -240,7 +240,7 @@ suite.test("UnsafeAtomicPointer<${type}>.${lowerFirst(name)}ThenLoad.${order}") 
   let result1: ${type} = a ${operator} b
   let result2: ${type} = result1 ${operator} c
 
-  let v = UnsafeAtomicPointer<${type}>.create(initialValue: a)
+  let v = UnsafeAtomic<${type}>.create(initialValue: a)
   defer { v.destroy() }
 
   let new1 = v.${lowerFirst(name)}ThenLoad(${argLabel(label)}b, ordering: .${order})

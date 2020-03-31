@@ -74,7 +74,7 @@ public class Bar {}
 // SECTIONING-LABEL: // load_${label}_relaxed(_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func load_${label}_relaxed(
-  _ value: UnsafeAtomicPointer<${type}>
+  _ value: UnsafeAtomic<${type}>
 ) -> ${type} {
   // CHECK: builtin "atomicload_monotonic_${builtin}"
   // EXCLUSIONS-NOT: builtin "atomicload_acquire_${builtin}"
@@ -86,7 +86,7 @@ public func load_${label}_relaxed(
 // SECTIONING-LABEL: // load_${label}_acquiring(_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func load_${label}_acquiring(
-  _ value: UnsafeAtomicPointer<${type}>
+  _ value: UnsafeAtomic<${type}>
 ) -> ${type} {
   // EXCLUSIONS-NOT: builtin "atomicload_monotonic_${builtin}"
   // CHECK: builtin "atomicload_acquire_${builtin}"
@@ -98,7 +98,7 @@ public func load_${label}_acquiring(
 // SECTIONING-LABEL: // load_${label}_sequential(_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func load_${label}_sequential(
-  _ value: UnsafeAtomicPointer<${type}>
+  _ value: UnsafeAtomic<${type}>
 ) -> ${type} {
   // EXCLUSIONS-NOT: builtin "atomicload_monotonic_${builtin}"
   // EXCLUSIONS-NOT: builtin "atomicload_acquire_${builtin}"
@@ -114,7 +114,7 @@ public func load_${label}_sequential(
 // SECTIONING-LABEL: // store_${label}_relaxed(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func store_${label}_relaxed(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ desired: ${type}
 ) {
   // CHECK: builtin "atomicstore_monotonic_${builtin}"
@@ -127,7 +127,7 @@ public func store_${label}_relaxed(
 // SECTIONING-LABEL: // store_${label}_releasing(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func store_${label}_releasing(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ desired: ${type}
 ) {
   // EXCLUSIONS-NOT: builtin "atomicstore_monotonic_${builtin}"
@@ -140,7 +140,7 @@ public func store_${label}_releasing(
 // SECTIONING-LABEL: // store_${label}_sequential(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func store_${label}_sequential(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ desired: ${type}
 ) {
   // EXCLUSIONS-NOT: builtin "atomicstore_monotonic_${builtin}"
@@ -157,7 +157,7 @@ public func store_${label}_sequential(
 // SECTIONING-LABEL: // exchange_${label}_relaxed(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func exchange_${label}_relaxed(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ desired: ${type}
 ) -> ${type}  {
   // CHECK: builtin "atomicrmw_xchg_monotonic_${builtin}"
@@ -172,7 +172,7 @@ public func exchange_${label}_relaxed(
 // SECTIONING-LABEL: // exchange_${label}_acquiring(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func exchange_${label}_acquiring(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ desired: ${type}
 ) -> ${type}  {
   // EXCLUSIONS-NOT: builtin "atomicrmw_xchg_monotonic_${builtin}"
@@ -187,7 +187,7 @@ public func exchange_${label}_acquiring(
 // SECTIONING-LABEL: // exchange_${label}_releasing(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func exchange_${label}_releasing(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ desired: ${type}
 ) -> ${type}  {
   // EXCLUSIONS-NOT: builtin "atomicrmw_xchg_monotonic_${builtin}"
@@ -202,7 +202,7 @@ public func exchange_${label}_releasing(
 // SECTIONING-LABEL: // exchange_${label}_acquiringAndReleasing(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func exchange_${label}_acquiringAndReleasing(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ desired: ${type}
 ) -> ${type}  {
   // EXCLUSIONS-NOT: builtin "atomicrmw_xchg_monotonic_${builtin}"
@@ -217,7 +217,7 @@ public func exchange_${label}_acquiringAndReleasing(
 // SECTIONING-LABEL: // exchange_${label}_sequential(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func exchange_${label}_sequential(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ desired: ${type}
 ) -> ${type}  {
   // EXCLUSIONS-NOT: builtin "atomicrmw_xchg_monotonic_${builtin}"
@@ -236,7 +236,7 @@ public func exchange_${label}_sequential(
 // SECTIONING-LABEL: // compareExchange_${label}_relaxed(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func compareExchange_${label}_relaxed(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
@@ -255,7 +255,7 @@ public func compareExchange_${label}_relaxed(
 // SECTIONING-LABEL: // compareExchange_${label}_acquiring(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func compareExchange_${label}_acquiring(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
@@ -274,7 +274,7 @@ public func compareExchange_${label}_acquiring(
 // SECTIONING-LABEL: // compareExchange_${label}_releasing(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func compareExchange_${label}_releasing(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
@@ -293,7 +293,7 @@ public func compareExchange_${label}_releasing(
 // SECTIONING-LABEL: // compareExchange_${label}_acquiringAndReleasing(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func compareExchange_${label}_acquiringAndReleasing(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
@@ -312,7 +312,7 @@ public func compareExchange_${label}_acquiringAndReleasing(
 // SECTIONING-LABEL: // compareExchange_${label}_sequential(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func compareExchange_${label}_sequential(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
@@ -337,7 +337,7 @@ public func compareExchange_${label}_sequential(
 // SECTIONING-LABEL: // compareExchange2_${label}_relaxed_relaxed(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func compareExchange2_${label}_relaxed_relaxed(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
@@ -358,7 +358,7 @@ public func compareExchange2_${label}_relaxed_relaxed(
 // SECTIONING-LABEL: // compareExchange2_${label}_acquiring_relaxed(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func compareExchange2_${label}_acquiring_relaxed(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
@@ -379,7 +379,7 @@ public func compareExchange2_${label}_acquiring_relaxed(
 // SECTIONING-LABEL: // compareExchange2_${label}_acquiring_acquiring(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func compareExchange2_${label}_acquiring_acquiring(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
@@ -400,7 +400,7 @@ public func compareExchange2_${label}_acquiring_acquiring(
 // SECTIONING-LABEL: // compareExchange2_${label}_sequential_acquiring(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func compareExchange2_${label}_sequential_acquiring(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
@@ -422,7 +422,7 @@ public func compareExchange2_${label}_sequential_acquiring(
 // SECTIONING-LABEL: // compareExchange2_${label}_releasing_acquiring(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func compareExchange2_${label}_releasing_acquiring(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
@@ -447,7 +447,7 @@ public func compareExchange2_${label}_releasing_acquiring(
 // SECTIONING-LABEL: // compareExchange2_${label}_relaxed_sequential(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func compareExchange2_${label}_relaxed_sequential(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
@@ -477,7 +477,7 @@ public func compareExchange2_${label}_relaxed_sequential(
 // SECTIONING-LABEL: // ${operation}_${label}_relaxed(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func ${operation}_${label}_relaxed(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ operand: ${type}
 ) -> ${type} {
   // CHECK: builtin "atomicrmw_${llvmOp}_monotonic_${builtin}"
@@ -492,7 +492,7 @@ public func ${operation}_${label}_relaxed(
 // SECTIONING-LABEL: // ${operation}_${label}_acquiring(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func ${operation}_${label}_acquiring(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ operand: ${type}
 ) -> ${type} {
   // CHECK: builtin "atomicrmw_${llvmOp}_acquire_${builtin}"
@@ -507,7 +507,7 @@ public func ${operation}_${label}_acquiring(
 // SECTIONING-LABEL: // ${operation}_${label}_releasing(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func ${operation}_${label}_releasing(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ operand: ${type}
 ) -> ${type} {
   // CHECK: builtin "atomicrmw_${llvmOp}_release_${builtin}"
@@ -522,7 +522,7 @@ public func ${operation}_${label}_releasing(
 // SECTIONING-LABEL: // ${operation}_${label}_acquiringAndReleasing(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func ${operation}_${label}_acquiringAndReleasing(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ operand: ${type}
 ) -> ${type} {
   // CHECK: builtin "atomicrmw_${llvmOp}_acqrel_${builtin}"
@@ -539,7 +539,7 @@ public func ${operation}_${label}_acquiringAndReleasing(
 // SECTIONING-LABEL: // ${operation}_${label}_sequential(_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func ${operation}_${label}_sequential(
-  _ value: UnsafeAtomicPointer<${type}>,
+  _ value: UnsafeAtomic<${type}>,
   _ operand: ${type}
 ) -> ${type} {
   // CHECK: builtin "atomicrmw_${llvmOp}_seqcst_${builtin}"

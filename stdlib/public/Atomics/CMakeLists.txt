@@ -21,7 +21,7 @@ add_swift_target_library(swiftAtomics ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   GYB_SOURCES
   AtomicIntegerConformances.swift.gyb
   AtomicPointerConformances.swift.gyb
-  UnsafeAtomicPointer.swift.gyb
+  UnsafeAtomic.swift.gyb
 
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS} "-parse-stdlib"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
