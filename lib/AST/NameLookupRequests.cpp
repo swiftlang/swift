@@ -98,7 +98,7 @@ InheritedProtocolsRequest::readDependencySource(Evaluator &e) const {
   if (!PD->getParentSourceFile())
     return { nullptr, e.getActiveSourceScope() };
   return {
-    e.getActiveDependencySource(),
+    e.getActiveDependencySourceOrNull(),
     evaluator::getScopeForAccessLevel(PD->getFormalAccess())
   };
 }
@@ -186,7 +186,7 @@ void ExtendedNominalRequest::writeDependencySink(
   auto *SF = std::get<0>(getStorage())->getParentSourceFile();
   if (!SF)
     return;
-  if (SF != eval.getActiveDependencySource())
+  if (SF != eval.getActiveDependencySourceOrNull())
     return;
   tracker.addUsedMember({value, Identifier()},
                         eval.isActiveSourceCascading());
@@ -217,7 +217,7 @@ GetDestructorRequest::readDependencySource(Evaluator &eval) const {
   // valid 'deinit' declaration cannot occur outside of the
   // definition of a type.
   return {
-    eval.getActiveDependencySource(),
+    eval.getActiveDependencySourceOrNull(),
     evaluator::DependencyScope::Private
   };
 }
@@ -393,7 +393,7 @@ void LookupConformanceInModuleRequest::writeDependencySink(
   if (!Adoptee)
     return;
 
-  auto *source = eval.getActiveDependencySource();
+  auto *source = eval.getActiveDependencySourceOrNull();
   assert(source && "Missing dependency source?");
 
   // Decline to record conformances defined outside of the active module.

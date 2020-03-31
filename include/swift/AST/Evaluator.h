@@ -483,7 +483,7 @@ private:
   /// If there is an active dependency source, returns its
   /// \c ReferencedNameTracker. Else, returns \c nullptr.
   ReferencedNameTracker *getActiveDependencyTracker() const {
-    if (auto *source = getActiveDependencySource())
+    if (auto *source = getActiveDependencySourceOrNull())
       return source->getRequestBasedReferencedNameTracker();
     return nullptr;
   }
@@ -508,7 +508,12 @@ public:
 
   /// Returns the active dependency's source file, or \c nullptr if no
   /// dependency source is active.
-  SourceFile *getActiveDependencySource() const {
+  ///
+  /// The use of this accessor is strongly discouraged, as it implies that a
+  /// dependency sink is seeking to filter out names based on the files they
+  /// come from. Existing callers are being migrated to more reasonable ways
+  /// of judging the relevancy of a dependency.
+  SourceFile *getActiveDependencySourceOrNull() const {
     if (dependencySources.empty())
       return nullptr;
     return dependencySources.back().getPointer();

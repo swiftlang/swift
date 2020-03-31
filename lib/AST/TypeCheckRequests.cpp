@@ -161,7 +161,7 @@ evaluator::DependencySource
 SuperclassTypeRequest::readDependencySource(Evaluator &e) const {
   const auto access = std::get<0>(getStorage())->getFormalAccess();
   return {
-    e.getActiveDependencySource(),
+    e.getActiveDependencySourceOrNull(),
     evaluator::getScopeForAccessLevel(access)
   };
 }
@@ -1348,7 +1348,7 @@ LookupAllConformancesInContextRequest::readDependencySource(
     const NominalTypeDecl *nominal = ext->getExtendedNominal();
     if (!nominal) {
       return {
-        eval.getActiveDependencySource(),
+        eval.getActiveDependencySourceOrNull(),
         evaluator::DependencyScope::Cascading
       };
     }
@@ -1357,7 +1357,7 @@ LookupAllConformancesInContextRequest::readDependencySource(
     defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
   }
   return {
-    eval.getActiveDependencySource(),
+    eval.getActiveDependencySourceOrNull(),
     evaluator::getScopeForAccessLevel(defaultAccess)
   };
 }

@@ -46,6 +46,9 @@ enum class RequestFlags {
   ///
   /// This bit is optional.  High-level requests
   /// (e.g. \c TypeCheckSourceFileRequest) will require it.
+  ///
+  /// For further discussion on incremental dependencies
+  /// see DependencyAnalysis.rst.
   DependencySource = 1 << 3,
   /// This request introduces the sink component of a source-sink
   /// incremental dependency pair and is a consumer of the current
@@ -53,6 +56,9 @@ enum class RequestFlags {
   ///
   /// This bit is optional. Name lookup requests
   /// (e.g. \c DirectLookupRequest) will require it.
+  ///
+  /// For further discussion on incremental dependencies
+  /// see DependencyAnalysis.rst.
   DependencySink = 1 << 4,
 };
 
