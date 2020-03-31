@@ -53,10 +53,12 @@ private:
   bool tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
                        DeadEndBlocks &DEBlocks);
 
-  /// Tries to promote the allocation \p ARI to an object. This optimization will only happen if the class type
-  /// has a compiler-generated constructor and destructor. The promotion happens by scanning all uses in
-  /// dominance order. If all members are accounted for by ref_element_addr instruction before we find any
-  /// other use, then we can use those values to promote this alloc_ref to an object.
+  /// Tries to promote the allocation \p ARI to an object. This optimization
+  /// will only happen if the class type has a compiler-generated constructor
+  /// and destructor. The promotion happens by scanning all uses in dominance
+  /// order. If all members are accounted for by ref_element_addr instruction
+  /// before we find any other use, then we can use those values to promote this
+  /// alloc_ref to an object.
   bool tryPromoteToObject(AllocRefInst *allocRef,
                           ValueLifetimeAnalysis::Frontier &frontier);
 };
@@ -92,7 +94,7 @@ void StackPromotion::run() {
 bool StackPromotion::promoteInBlock(SILBasicBlock *BB, EscapeAnalysis *EA,
                                     DeadEndBlocks &DEBlocks) {
   bool Changed = false;
-  SmallVector<SILInstruction*, 64> allInstructions;
+  SmallVector<SILInstruction *, 64> allInstructions;
   for (SILInstruction &inst : *BB) {
     allInstructions.push_back(&inst);
   }
@@ -116,7 +118,8 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
   if (ARI->isObjC() || ARI->canAllocOnStack())
     return false;
 
-  EA->invalidate(ARI->getFunction(), swift::AliasAnalysis::InvalidationKind::Everything);
+  EA->invalidate(ARI->getFunction(),
+                 swift::AliasAnalysis::InvalidationKind::Everything);
   auto *ConGraph = EA->getConnectionGraph(ARI->getFunction());
   auto *contentNode = ConGraph->getValueContent(ARI);
   if (!contentNode)
@@ -151,7 +154,7 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
     return false;
   }
   NumStackPromoted++;
-  
+
   if (tryPromoteToObject(ARI, Frontier))
     return true;
 
@@ -167,7 +170,7 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
 }
 
 static void getOrderedNonDebugUses(SILValue v, DominanceInfo *domInfo,
-                                   SmallVectorImpl<Operand*> &uses) {
+                                   SmallVectorImpl<Operand *> &uses) {
   auto unsorted = getNonDebugUses(v);
   uses.append(unsorted.begin(), unsorted.end());
   llvm::sort(uses, [&domInfo](Operand *a, Operand *b) {
@@ -175,29 +178,31 @@ static void getOrderedNonDebugUses(SILValue v, DominanceInfo *domInfo,
   });
 }
 
-bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
-                                        ValueLifetimeAnalysis::Frontier &frontier) {
-  DominanceInfo *domInfo = PM->getAnalysis<DominanceAnalysis>()->get(allocRef->getFunction());
+bool StackPromotion::tryPromoteToObject(
+    AllocRefInst *allocRef, ValueLifetimeAnalysis::Frontier &frontier) {
+  DominanceInfo *domInfo =
+      PM->getAnalysis<DominanceAnalysis>()->get(allocRef->getFunction());
   auto *classDecl = allocRef->getType().getClassOrBoundGenericClass();
   if (!classDecl || !classDecl->getDestructor()->isImplicit() ||
-      (classDecl->getAsGenericContext() && classDecl->getAsGenericContext()->isGeneric()))
+      (classDecl->getAsGenericContext() &&
+       classDecl->getAsGenericContext()->isGeneric()))
     return false;
-  
-  SmallVector<VarDecl*, 8> props;
+
+  SmallVector<VarDecl *, 8> props;
   for (auto *prop : classDecl->getStoredProperties()) {
     props.push_back(prop);
   }
-  
-  SmallVector<Operand*, 24> uses;
+
+  SmallVector<Operand *, 24> uses;
   getOrderedNonDebugUses(allocRef, domInfo, uses);
-  
+
   llvm::reverse(props);
   SmallVector<RefElementAddrInst *, 8> propertyInitializers;
   for (auto *use : uses) {
     auto propRef = dyn_cast<RefElementAddrInst>(use->getUser());
     if (!propRef)
       return false;
-    
+
     if (propRef->getField() != props.pop_back_val())
       return false;
 
@@ -206,18 +211,18 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
     if (props.empty())
       break;
   }
-  
+
   if (!props.empty())
     return false;
-  
-  SmallVector<StoreInst*, 8> deadStores;
+
+  SmallVector<StoreInst *, 8> deadStores;
   SmallVector<SILValue, 8> elements;
   for (auto *init : propertyInitializers) {
-    SmallVector<Operand*, 6> refElementUses;
+    SmallVector<Operand *, 6> refElementUses;
     getOrderedNonDebugUses(init, domInfo, refElementUses);
     auto frontUser = refElementUses.front()->getUser();
     if (auto *beginAccess = dyn_cast<BeginAccessInst>(frontUser)) {
-      SmallVector<Operand*, 4> beginAccessUses;
+      SmallVector<Operand *, 4> beginAccessUses;
       getOrderedNonDebugUses(beginAccess, domInfo, beginAccessUses);
       frontUser = beginAccessUses.front()->getUser();
     }
@@ -228,7 +233,7 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
       return false;
     }
   }
-  
+
   SILInstruction *lastElement = nullptr;
   for (auto first = elements.rbegin(); first != elements.rend(); ++first) {
     auto inst = first->getDefiningInstruction();
@@ -238,24 +243,24 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
     if (!lastElement || domInfo->dominates(lastElement, inst))
       lastElement = inst;
   }
-  
+
   // If we didn't find anything, that means that all the elements are arguments,
   // or there aren't any elements. Either way, we know that putting where the
   // alloc_ref is will work.
   if (!lastElement)
     lastElement = allocRef;
-  
+
   for (auto *init : propertyInitializers) {
     if (llvm::any_of(init->getUses(), [&domInfo, &lastElement](Operand *use) {
-      return domInfo->dominates(use->getUser(), lastElement);
-    }))
+          return domInfo->dominates(use->getUser(), lastElement);
+        }))
       return false;
   }
 
   SILBuilder builder(std::next(lastElement->getIterator()));
   auto object = builder.createObject(allocRef->getLoc(), allocRef->getType(),
                                      elements, elements.size());
-  
+
   SmallVector<Operand *, 8> users(allocRef->use_begin(), allocRef->use_end());
   for (auto *use : users) {
     auto user = use->getUser();
@@ -264,7 +269,7 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
     if (isa<SetDeallocatingInst>(user) || isa<DeallocRefInst>(user) ||
         isa<DebugValueInst>(user) || isa<StrongReleaseInst>(user))
       user->eraseFromParent();
-    
+
     if (auto ref = dyn_cast<RefElementAddrInst>(user)) {
       // We need to move the ref_element_addr up.
       if (domInfo->dominates(ref, object)) {
@@ -275,7 +280,7 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
       }
     }
   }
-  
+
   for (auto *store : deadStores) {
     store->eraseFromParent();
   }
@@ -283,8 +288,9 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
   allocRef->replaceAllUsesWith(object);
   allocRef->eraseFromParent();
 
-  llvm::errs() << "Promoted to object in stack. Function: " << object->getFunction()->getName() << "\n";
-  
+  llvm::errs() << "Promoted to object in stack. Function: "
+               << object->getFunction()->getName() << "\n";
+
   return true;
 }
 
