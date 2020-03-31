@@ -1813,7 +1813,7 @@ public:
     auto *classDecl = objectInst->getType().getClassOrBoundGenericClass();
     require(classDecl, "Type of object instruction must be a class");
     require(!classDecl->getAsGenericContext() ||
-            !classDecl->getAsGenericContext()->isGeneric(),
+                !classDecl->getAsGenericContext()->isGeneric(),
             "Generics are not yet supported in object instructions");
   }
 
