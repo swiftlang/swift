@@ -1763,7 +1763,7 @@ public:
   }
 
   void addModuleName(
-      const ModuleDecl *MD,
+      ModuleDecl *MD,
       Optional<CodeCompletionResult::NotRecommendedReason> R = None) {
 
     // Don't add underscored cross-import overlay modules.
@@ -3293,16 +3293,29 @@ public:
   bool tryModuleCompletions(Type ExprType, bool TypesOnly = false) {
     if (auto MT = ExprType->getAs<ModuleType>()) {
       ModuleDecl *M = MT->getModule();
-      if (CurrModule != M) {
-        // Only use the cache if it is not the current module.
+
+      // Only lookup this module's symbols from the cache if it is not the
+      // current module.
+      if (M == CurrModule)
+        return false;
+
+      // If the module is shadowed by a separately imported overlay(s), look up
+      // the symbols from the overlay(s) instead.
+      SmallVector<ModuleDecl *, 1> ShadowingOrOriginal;
+      if (auto *SF = CurrDeclContext->getParentSourceFile()) {
+        SF->getSeparatelyImportedOverlays(M, ShadowingOrOriginal);
+        if (ShadowingOrOriginal.empty())
+          ShadowingOrOriginal.push_back(M);
+      }
+      for (ModuleDecl *M: ShadowingOrOriginal) {
         RequestedResultsTy Request = RequestedResultsTy::fromModule(M)
             .needLeadingDot(needDot())
             .withModuleQualifier(false);
         if (TypesOnly)
           Request = Request.onlyTypes();
         RequestedCachedResults.push_back(Request);
-        return true;
       }
+      return true;
     }
     return false;
   }
