@@ -64,7 +64,7 @@ StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
     auto addr = getUndefAddress();
     return { addr };
   }
-
+  
   Address alloca =
     IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
   IGF.Builder.CreateLifetimeStart(alloca, getFixedSize());

@@ -102,6 +102,10 @@ namespace {
     StructLayout *createLayoutWithTailElems(IRGenModule &IGM,
                                             SILType classType,
                                             ArrayRef<SILType> tailTypes) const;
+    
+    using HeapTypeInfo<ClassTypeInfo>::initialize;
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
+                    bool isOutlined) const override;
   };
 } // end anonymous namespace
 
@@ -482,6 +486,29 @@ ClassTypeInfo::getClassLayout(IRGenModule &IGM, SILType classType,
 
   return *Layout;
 }
+
+void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
+                               bool isOutlined) const {
+  // If the address is a poitner to the exploded type then we can simply emit a
+  // store and be done.
+  auto *exploded = src.getAll().front();
+  if (exploded->getType() == addr->getType()->getPointerElementType()) {
+    IGF.Builder.CreateStore(exploded, addr);
+    (void)src.claimNext();
+    return;
+  }
+  
+  // If both are the same (address) type then just emit a memcpy.
+  if (exploded->getType() == addr->getType()) {
+    IGF.emitMemCpy(addr.getAddress(), exploded, getFixedSize(), addr.getAlignment());
+    (void)src.claimNext();
+    return;
+  }
+
+  // Otherwise, bail to the default implementation.
+  HeapTypeInfo<ClassTypeInfo>::initialize(IGF, src, addr, isOutlined);
+}
+  
 
 /// Cast the base to i8*, apply the given inbounds offset (in bytes,
 /// as a size_t), and cast to a pointer to the given type.
