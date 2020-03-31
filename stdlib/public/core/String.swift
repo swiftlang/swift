@@ -427,7 +427,7 @@ extension String {
     }
     return
   }
-  
+
   /// Creates a new string with the specified capacity in UTF-8 code units, and
   /// then calls the given closure with a buffer covering the string's
   /// uninitialized memory.
@@ -484,7 +484,7 @@ extension String {
       initializingUTF8With: initializer
     )
   }
-  
+
   @inline(__always)
   internal init(
     _uninitializedCapacity capacity: Int,
@@ -503,7 +503,7 @@ extension String {
       }
       return
     }
-    
+
     self = try String._fromLargeUTF8Repairing(
       uninitializedCapacity: capacity,
       initializingWith: initializer)
@@ -968,12 +968,12 @@ extension _StringGutsSlice {
     var outputBuffer = outputBuffer
     var icuInputBuffer = icuInputBuffer
     var icuOutputBuffer = icuOutputBuffer
-  
+
     var index = range.lowerBound
     let cachedEndIndex = range.upperBound
-  
+
     var hasBufferOwnership = false
-    
+
     defer {
       if hasBufferOwnership {
         outputBuffer.deallocate()
@@ -981,7 +981,7 @@ extension _StringGutsSlice {
         icuOutputBuffer.deallocate()
       }
     }
-    
+
     while index < cachedEndIndex {
       let result = _foreignNormalize(
         readIndex: index,
@@ -1017,9 +1017,9 @@ internal func _fastWithNormalizedCodeUnitsImpl(
 
   var index = String.Index(_encodedOffset: 0)
   let cachedEndIndex = String.Index(_encodedOffset: sourceBuffer.count)
-  
+
   var hasBufferOwnership = false
-  
+
   defer {
     if hasBufferOwnership {
       outputBuffer.deallocate()
@@ -1027,7 +1027,7 @@ internal func _fastWithNormalizedCodeUnitsImpl(
       icuOutputBuffer.deallocate()
     }
   }
-  
+
   while index < cachedEndIndex {
     let result = _fastNormalize(
       readIndex: index,

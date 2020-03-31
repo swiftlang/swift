@@ -50,7 +50,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
 }
 
 extension String {
-  
+
   internal static func _uncheckedFromASCII(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String {
@@ -61,7 +61,7 @@ extension String {
     let storage = __StringStorage.create(initializingFrom: input, isASCII: true)
     return storage.asString
   }
-  
+
   @usableFromInline
   internal static func _fromASCII(
     _ input: UnsafeBufferPointer<UInt8>
@@ -69,7 +69,7 @@ extension String {
     _internalInvariant(_allASCII(input), "not actually ASCII")
     return _uncheckedFromASCII(input)
   }
-  
+
   internal static func _fromASCIIValidating(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String? {
@@ -101,7 +101,7 @@ extension String {
         return (repairUTF8(input, firstKnownBrokenRange: initialRange), true)
     }
   }
-  
+
   internal static func _fromLargeUTF8Repairing(
     uninitializedCapacity capacity: Int,
     initializingWith initializer: (
@@ -111,7 +111,7 @@ extension String {
     let result = try __StringStorage.create(
       uninitializedCodeUnitCapacity: capacity,
       initializingUncheckedUTF8With: initializer)
-    
+
     switch validateUTF8(result.codeUnits) {
     case .success(let info):
       result._updateCountAndFlags(
@@ -181,7 +181,7 @@ extension String {
 
     return contents.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
   }
-  
+
   @inline(never) // slow path
   private static func _slowFromCodeUnits<
     Input: Collection,
@@ -209,7 +209,7 @@ extension String {
     let str = contents.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
     return (str, repaired)
   }
-  
+
   @usableFromInline @inline(never) // can't be inlined w/out breaking ABI
   @_specialize(
     where Input == UnsafeBufferPointer<UInt8>, Encoding == Unicode.ASCII)
@@ -227,9 +227,9 @@ extension String {
     guard _fastPath(encoding == Unicode.ASCII.self) else {
       return _slowFromCodeUnits(input, encoding: encoding, repair: repair)
     }
-    
+
     var result:String? = nil
-    
+
     if let contigBytes = input as? _HasContiguousBytes,
       contigBytes._providesContiguousBytesNoCopy {
       result = contigBytes.withUnsafeBytes { rawBufPtr in
@@ -244,7 +244,7 @@ extension String {
         return String._fromASCIIValidating(buffer)
       }
     }
-    
+
     return result != nil ?
       (result!, repairsMade: false) :
       _slowFromCodeUnits(input, encoding: encoding, repair: repair)
