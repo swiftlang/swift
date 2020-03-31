@@ -336,10 +336,10 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
   BufferIndirectlyCausingDiagnosticRAII cpr(*SF);
 
-  // Make sure that name binding has been completed before doing any type
+  // Make sure that import resolution has been completed before doing any type
   // checking.
-  performNameBinding(*SF);
-                                  
+  performImportResolution(*SF);
+
   // Could build scope maps here because the AST is stable now.
 
   {
@@ -367,7 +367,6 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     // Type check the top-level elements of the source file.
     for (auto D : SF->getTopLevelDecls()) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-        // Immediately perform global name-binding etc.
         TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
         TypeChecker::contextualizeTopLevelCode(TLCD);
       } else {

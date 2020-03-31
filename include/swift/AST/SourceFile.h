@@ -23,9 +23,8 @@ class PersistentParserState;
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
-/// the REPL). Since it contains raw source, it must be parsed and name-bound
-/// before being used for anything; a full type-check is also necessary for
-/// IR generation.
+/// the REPL). Since it contains raw source, it must be type checked for IR
+/// generation.
 class SourceFile final : public FileUnit {
   friend class ParseSourceFileRequest;
 
@@ -128,7 +127,7 @@ private:
 
   /// This is the list of modules that are imported by this module.
   ///
-  /// This is filled in by the Name Binding phase.
+  /// This is filled in by the import resolution phase.
   ArrayRef<ImportedModuleDesc> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
@@ -316,10 +315,10 @@ public:
   const SourceFileKind Kind;
 
   enum ASTStage_t {
-    /// The source file is not name bound or type checked.
+    /// The source file has not had its imports resolved or been type checked.
     Unprocessed,
-    /// Name binding has completed.
-    NameBound,
+    /// Import resolution has completed.
+    ImportsResolved,
     /// Type checking has completed.
     TypeChecked
   };

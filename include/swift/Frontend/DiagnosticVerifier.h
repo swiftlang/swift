@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,30 +18,88 @@
 #ifndef SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 #define SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 
+#include "llvm/ADT/SmallString.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
-  class DependencyTracker;
-  class FileUnit;
-  class SourceManager;
-  class SourceFile;
+class DependencyTracker;
+class FileUnit;
+class SourceManager;
+class SourceFile;
 
-  /// Set up the specified source manager so that diagnostics are captured
-  /// instead of being printed.
-  void enableDiagnosticVerifier(SourceManager &SM);
+// MARK: - DependencyVerifier
+bool verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
+                        ArrayRef<FileUnit *> SFs);
+bool verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
+                        ArrayRef<SourceFile *> SFs);
 
-  /// Verify that captured diagnostics meet with the expectations of the source
-  /// files corresponding to the specified \p BufferIDs and tear down our
-  /// support for capturing and verifying diagnostics.
-  ///
-  /// This returns true if there are any mismatches found.
-  bool verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
-                         bool autoApplyFixes, bool ignoreUnknown);
+// MARK: - DiagnosticVerifier
+struct ExpectedFixIt;
 
-  bool verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
-                          ArrayRef<FileUnit *> SFs);
-  bool verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
-                          ArrayRef<SourceFile *> SFs);
+struct CapturedDiagnosticInfo {
+  llvm::SmallString<128> Message;
+  llvm::SmallString<32> FileName;
+  DiagnosticKind Classification;
+  SourceLoc Loc;
+  unsigned Line;
+  unsigned Column;
+  SmallVector<DiagnosticInfo::FixIt, 2> FixIts;
+
+  CapturedDiagnosticInfo(llvm::SmallString<128> Message,
+                         llvm::SmallString<32> FileName,
+                         DiagnosticKind Classification, SourceLoc Loc,
+                         unsigned Line, unsigned Column,
+                         SmallVector<DiagnosticInfo::FixIt, 2> FixIts)
+      : Message(Message), FileName(FileName), Classification(Classification),
+        Loc(Loc), Line(Line), Column(Column), FixIts(FixIts) {}
+};
+/// This class implements support for -verify mode in the compiler.  It
+/// buffers up diagnostics produced during compilation, then checks them
+/// against expected-error markers in the source file.
+class DiagnosticVerifier : public DiagnosticConsumer {
+  SourceManager &SM;
+  std::vector<CapturedDiagnosticInfo> CapturedDiagnostics;
+  ArrayRef<unsigned> BufferIDs;
+  bool AutoApplyFixes;
+  bool IgnoreUnknown;
+
+public:
+  explicit DiagnosticVerifier(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
+                              bool AutoApplyFixes, bool IgnoreUnknown)
+      : SM(SM), BufferIDs(BufferIDs), AutoApplyFixes(AutoApplyFixes),
+        IgnoreUnknown(IgnoreUnknown) {}
+
+  virtual void handleDiagnostic(SourceManager &SM,
+                                const DiagnosticInfo &Info) override;
+
+  virtual bool finishProcessing() override;
+
+private:
+  /// Result of verifying a file.
+  struct Result {
+    /// Were there any errors? All of the following are considered errors:
+    /// - Expected diagnostics that were not present
+    /// - Unexpected diagnostics that were present
+    /// - Errors in the definition of expected diagnostics
+    bool HadError;
+    bool HadUnexpectedDiag;
+  };
+
+  /// verifyFile - After the file has been processed, check to see if we
+  /// got all of the expected diagnostics and check to see if there were any
+  /// unexpected ones.
+  Result verifyFile(unsigned BufferID);
+
+  bool checkForFixIt(const ExpectedFixIt &Expected,
+                     const CapturedDiagnosticInfo &D, StringRef buffer);
+
+  // Render the verifier syntax for a given set of fix-its.
+  std::string renderFixits(ArrayRef<DiagnosticInfo::FixIt> fixits,
+                           StringRef InputFile);
+
+  void printRemainingDiagnostics() const;
+};
 }
 
 #endif

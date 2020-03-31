@@ -326,7 +326,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
 
     // Re-process the whole file (parsing will be lazily triggered). Still
     // re-use imported modules.
-    performNameBinding(*newSF);
+    performImportResolution(*newSF);
     bindExtensions(*newSF);
 
 #ifndef NDEBUG

@@ -1,56 +1,32 @@
+
+set(SIL_SOURCES)
+
+function(_list_transform newvar)
+  set(sources ${ARGN})
+  set(dir ${CMAKE_CURRENT_SOURCE_DIR})
+  set(tmp)
+  foreach (s ${sources})
+    list(APPEND tmp "${dir}/${s}")
+  endforeach()
+  set(${newvar} "${tmp}" PARENT_SCOPE)
+endfunction()
+
+macro(sil_register_sources)
+  precondition(new_transformed_sources
+    NEGATE
+    MESSAGE "Expected this to be empty since we clear after each run")
+  _list_transform(new_transformed_sources ${ARGN})
+  list_union("${SIL_SOURCES}" "${new_transformed_sources}" out)
+  set(SIL_SOURCES "${out}" PARENT_SCOPE)
+  set(new_transformed_sources)
+endmacro()
+
+add_subdirectory(IR)
+add_subdirectory(Utils)
+add_subdirectory(Verifier)
+
 add_swift_host_library(swiftSIL STATIC
-  AbstractionPattern.cpp
-  BasicBlockUtils.cpp
-  Bridging.cpp
-  DebugUtils.cpp
-  Dominance.cpp
-  DynamicCasts.cpp
-  InstructionUtils.cpp
-  MemAccessUtils.cpp
-  Linker.cpp
-  LinearLifetimeChecker.cpp
-  LoopInfo.cpp
-  MemoryLifetime.cpp
-  Notifications.cpp
-  OperandOwnership.cpp
-  OptimizationRemark.cpp
-  OwnershipUtils.cpp
-  PrettyStackTrace.cpp
-  Projection.cpp
-  SIL.cpp
-  SILArgument.cpp
-  SILBasicBlock.cpp
-  SILBuilder.cpp
-  SILConstants.cpp
-  SILCoverageMap.cpp
-  SILDebugScope.cpp
-  SILDeclRef.cpp
-  SILDefaultWitnessTable.cpp
-  SILDifferentiabilityWitness.cpp
-  SILFunction.cpp
-  SILFunctionType.cpp
-  SILGlobalVariable.cpp
-  SILInstruction.cpp
-  SILInstructions.cpp
-  SILInstructionWorklist.cpp
-  SILLocation.cpp
-  SILModule.cpp
-  SILFunctionBuilder.cpp
-  SILOpenedArchetypesTracker.cpp
-  SILPrinter.cpp
-  SILProfiler.cpp
-  SILRemarkStreamer.cpp
-  SILSuccessor.cpp
-  SILType.cpp
-  SILUndef.cpp
-  SILValue.cpp
-  SILVerifier.cpp
-  SILOwnershipVerifier.cpp
-  SILVTable.cpp
-  SILWitnessTable.cpp
-  TypeLowering.cpp
-  ValueOwnership.cpp
-  ValueUtils.cpp)
+  ${SIL_SOURCES})
 target_link_libraries(swiftSIL PRIVATE
   swiftSema
   swiftSerialization)

@@ -2438,11 +2438,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_Transpose: {
       auto abbrCode = S.DeclTypeAbbrCodes[TransposeDeclAttrLayout::Code];
       auto *attr = cast<TransposeAttr>(DA);
-      // NOTE(TF-838): `@transpose` attribute serialization is blocked by
-      // `@transpose` attribute type-checking (TF-830), which resolves
-      // the original declaration.
-      if (!attr->getOriginalFunction())
-        return;
       assert(attr->getOriginalFunction() &&
              "`@transpose` attribute should have original declaration set "
              "during construction or parsing");

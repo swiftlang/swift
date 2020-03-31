@@ -2013,7 +2013,7 @@ ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name,
   if (name.empty() || name.front().empty())
     return getContext().TheBuiltinModule;
 
-  // FIXME: duplicated from NameBinder::getModule
+  // FIXME: duplicated from ImportResolver::getModule
   if (name.size() == 1 &&
       name.front() == FileContext->getParentModule()->getName()) {
     if (!UnderlyingModule && allowLoading) {
@@ -5411,8 +5411,11 @@ public:
     };
 
     // Bounds check.  FIXME: overflow
-    if (2 * numParams + 2 * numResults + 2 * unsigned(hasErrorResult)
-          > variableData.size()) {
+    unsigned entriesPerParam =
+        diffKind != DifferentiabilityKind::NonDifferentiable ? 3 : 2;
+    if (entriesPerParam * numParams + 2 * numResults +
+            2 * unsigned(hasErrorResult) >
+        variableData.size()) {
       MF.fatal();
     }
 
