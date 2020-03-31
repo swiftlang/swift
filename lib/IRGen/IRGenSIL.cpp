@@ -3452,32 +3452,40 @@ void IRGenSILFunction::visitObjectInst(swift::ObjectInst *i) {
   SILType objType = i->getType().getObjectType();
   // TODO: Currently generic classes aren't allowed but in the future we could
   // support this.
-  assert(!objType.getClassOrBoundGenericClass()->getAsGenericContext() || !objType.getClassOrBoundGenericClass()->getAsGenericContext()->isGeneric() && "Generics are not yet supported");
+  assert(!objType.getClassOrBoundGenericClass()->getAsGenericContext() ||
+         !objType.getClassOrBoundGenericClass()
+                 ->getAsGenericContext()
+                 ->isGeneric() &&
+             "Generics are not yet supported");
 
   const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
-  llvm::Value *metadata = emitClassHeapMetadataRef(*this, objType.getASTType(),
-                                                   MetadataValueType::TypeMetadata,
-                                                   MetadataState::Complete);
+  llvm::Value *metadata = emitClassHeapMetadataRef(
+      *this, objType.getASTType(), MetadataValueType::TypeMetadata,
+      MetadataState::Complete);
   // TODO: this shouldn't be a stack alloc but, in order to maintain
   // compatibility with alloc_ref we have to be a pointer.
-  Address alloca = createAlloca(typeInfo.getStorageType()->getPointerElementType(),
-                                typeInfo.getFixedAlignment());
+  Address alloca =
+      createAlloca(typeInfo.getStorageType()->getPointerElementType(),
+                   typeInfo.getFixedAlignment());
   auto classAddr = Builder.CreateBitCast(alloca, IGM.RefCountedPtrTy);
-  auto classVal = emitInitStackObjectCall(metadata, classAddr.getAddress(), "reference.new");
+  auto classVal = emitInitStackObjectCall(metadata, classAddr.getAddress(),
+                                          "reference.new");
   classVal = Builder.CreateBitCast(classVal, typeInfo.getStorageType());
   // Match each property in the class decl to elements in the object
   // instruction.
-  auto propsArr = i->getType().getClassOrBoundGenericClass()->getStoredProperties();
-  SmallVector<VarDecl*, 8> props(propsArr.begin(), propsArr.end());
+  auto propsArr =
+      i->getType().getClassOrBoundGenericClass()->getStoredProperties();
+  SmallVector<VarDecl *, 8> props(propsArr.begin(), propsArr.end());
   for (SILValue elt : i->getAllElements()) {
     auto prop = props.pop_back_val();
     auto elementExplosion = getLoweredExplosion(elt);
     auto propType = IGM.getLoweredType(prop->getType());
     const auto &propTypeInfo = cast<LoadableTypeInfo>(getTypeInfo(propType));
-    auto propAddr = projectPhysicalClassMemberAddress(*this, classVal, objType, propType, prop);
+    auto propAddr = projectPhysicalClassMemberAddress(*this, classVal, objType,
+                                                      propType, prop);
     propTypeInfo.initialize(*this, elementExplosion, propAddr, false);
   }
-  
+
   Explosion e;
   e.add(classVal);
   setLoweredExplosion(i, e);

@@ -1809,8 +1809,12 @@ public:
     checkGlobalAccessInst(GVI);
   }
 
-  void checkObjectInst(ObjectInst *) {
-    require(true, "object instruction is only allowed in a static initializer");
+  void checkObjectInst(ObjectInst *objectInst) {
+    auto *classDecl = objectInst->getType().getClassOrBoundGenericClass();
+    require(classDecl, "Type of object instruction must be a class");
+    require(!classDecl->getAsGenericContext() ||
+                !classDecl->getAsGenericContext()->isGeneric(),
+            "Generics are not yet supported in object instructions");
   }
 
   void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {

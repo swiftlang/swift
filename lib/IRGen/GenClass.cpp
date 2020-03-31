@@ -102,7 +102,7 @@ namespace {
     StructLayout *createLayoutWithTailElems(IRGenModule &IGM,
                                             SILType classType,
                                             ArrayRef<SILType> tailTypes) const;
-    
+
     using HeapTypeInfo<ClassTypeInfo>::initialize;
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
                     bool isOutlined) const override;
@@ -497,10 +497,11 @@ void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
     (void)src.claimNext();
     return;
   }
-  
+
   // If both are the same (address) type then just emit a memcpy.
   if (exploded->getType() == addr->getType()) {
-    IGF.emitMemCpy(addr.getAddress(), exploded, getFixedSize(), addr.getAlignment());
+    IGF.emitMemCpy(addr.getAddress(), exploded, getFixedSize(),
+                   addr.getAlignment());
     (void)src.claimNext();
     return;
   }
@@ -508,7 +509,6 @@ void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
   // Otherwise, bail to the default implementation.
   HeapTypeInfo<ClassTypeInfo>::initialize(IGF, src, addr, isOutlined);
 }
-  
 
 /// Cast the base to i8*, apply the given inbounds offset (in bytes,
 /// as a size_t), and cast to a pointer to the given type.

@@ -1,0 +1,105 @@
+// RUN: %swift -disable-legacy-type-info -module-name run %s -emit-ir -o - | %FileCheck %s
+
+// REQUIRES: CODEGENERATOR=X86
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class Foo {
+  @_hasStorage @_hasInitialValue var x: Int { get set }
+  @objc deinit
+  init()
+}
+
+class Bar {
+  @_hasStorage @_hasInitialValue var x: Int { get set }
+  @_hasStorage @_hasInitialValue var y: Int { get set }
+  @_hasStorage @_hasInitialValue var z: Int { get set }
+  @objc deinit
+  init()
+}
+
+// CHECK-LABEL: define swiftcc i64 @foouser
+// CHECK: entry
+// CHECK: [[ALLOC:%.*]] = alloca %T3run3FooC
+// CHECK: [[META:%.*]] = call swiftcc %swift.metadata_response @"$s3run3FooCMa"
+// CHECK: [[META_E:%.*]] = extractvalue %swift.metadata_response [[META]]
+// CHECK: [[REF:%.*]] = bitcast %T3run3FooC* [[ALLOC]] to %swift.refcounted*
+// CHECK: [[OBJ_R:%.*]] = call %swift.refcounted* @swift_initStackObject({{.*}}[[META_E]], {{.*}}[[REF]])
+// CHECK: [[OBJ:%.*]] = bitcast %swift.refcounted* [[OBJ_R]] to %T3run3FooC*
+
+// CHECK: [[X_PTR:%.*]] = getelementptr inbounds %T3run3FooC, %T3run3FooC* [[OBJ]], i32 0, i32 1
+// CHECK: [[X:%.*]] = getelementptr inbounds %TSi, %TSi* [[X_PTR]], i32 0, i32 0
+// CHECK: store i64 0, i64* [[X]]
+
+// CHECK: [[X_PTR1:%.*]] = getelementptr inbounds %T3run3FooC, %T3run3FooC* [[OBJ]], i32 0, i32 1
+// CHECK: [[X1:%.*]] = getelementptr inbounds %TSi, %TSi* [[X_PTR1]], i32 0, i32 0
+// CHECK: [[X_VAL:%.*]] = load i64, i64* [[X1]]
+// CHECK: [[ADDED:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[X_VAL]], i64 1)
+// CHECK: [[SUM:%.*]] = extractvalue { i64, i1 } [[ADDED]], 0
+
+// CHECK: [[X2:%.*]] = getelementptr inbounds %TSi, %TSi* [[X_PTR1]], i32 0, i32 0
+// CHECK: store i64 [[SUM]], i64* [[X2]]
+// CHECK: [[X3:%.*]] = getelementptr inbounds %TSi, %TSi* [[X_PTR1]], i32 0, i32 0
+// CHECK: [[OUT:%.*]] = load i64, i64* [[X3]]
+// CHECK: ret i64 [[OUT]]
+sil @foouser : $@convention(thin) () -> Int {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 0          // user: %2
+  %2 = struct $Int (%1 : $Builtin.Int64)          // user: %3
+  %3 = object $Foo (%2 : $Int)                    // user: %4
+  %4 = ref_element_addr %3 : $Foo, #Foo.x         // users: %17, %5
+  %5 = begin_access [modify] [dynamic] [no_nested_conflict] %4 : $*Int // users: %7, %15, %16
+  %6 = integer_literal $Builtin.Int64, 1          // user: %10
+  %7 = struct_element_addr %5 : $*Int, #Int._value // user: %8
+  %8 = load %7 : $*Builtin.Int64                  // user: %10
+  %9 = integer_literal $Builtin.Int1, -1          // user: %10
+  %10 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int64, %6 : $Builtin.Int64, %9 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // users: %12, %11
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 0 // user: %14
+  %12 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 1 // user: %13
+  cond_fail %12 : $Builtin.Int1, "arithmetic overflow" // id: %13
+  %14 = struct $Int (%11 : $Builtin.Int64)        // user: %15
+  store %14 to %5 : $*Int                         // id: %15
+  end_access %5 : $*Int                           // id: %16
+  %17 = begin_access [read] [static] [no_nested_conflict] %4 : $*Int // users: %19, %18
+  %18 = load %17 : $*Int                          // user: %20
+  end_access %17 : $*Int                          // id: %19
+  return %18 : $Int                               // id: %20
+} // end sil function 'foouser'
+
+sil_vtable Foo {
+  
+}
+
+// CHECK-LABEL: define swiftcc i64 @baruser
+// CHECK: [[ALLOC:%.*]] = alloca %T3run3BarC
+// CHECK: [[META:%.*]] = call swiftcc %swift.metadata_response @"$s3run3BarCMa"
+// CHECK: [[META_E:%.*]] = extractvalue %swift.metadata_response [[META]]
+// CHECK: [[REF:%.*]] = bitcast %T3run3BarC* [[ALLOC]] to %swift.refcounted*
+// CHECK: [[OBJ_R:%.*]] = call %swift.refcounted* @swift_initStackObject({{.*}}[[META_E]], {{.*}}[[REF]])
+// CHECK: [[OBJ:%.*]] = bitcast %swift.refcounted* [[OBJ_R]] to %T3run3BarC*
+// CHECK: [[X_PTR:%.*]] = getelementptr inbounds %T3run3BarC, %T3run3BarC* [[OBJ]], i32 0, i32 3
+// CHECK: [[X:%.*]] = getelementptr inbounds %TSi, %TSi* [[X_PTR]], i32 0, i32 0
+// CHECK: store i64 0, i64* [[X]]
+// CHECK: [[Y_PTR:%.*]] = getelementptr inbounds %T3run3BarC, %T3run3BarC* [[OBJ]], i32 0, i32 2
+// CHECK: [[Y:%.*]] = getelementptr inbounds %TSi, %TSi* [[Y_PTR]], i32 0, i32 0
+// CHECK: store i64 0, i64* [[Y]]
+// CHECK: [[Z_PTR:%.*]] = getelementptr inbounds %T3run3BarC, %T3run3BarC* [[OBJ]], i32 0, i32 1
+// CHECK: [[Z:%.*]] = getelementptr inbounds %TSi, %TSi* [[Z_PTR]], i32 0, i32 0
+// CHECK: store i64 0, i64* [[Z]]
+sil @baruser : $@convention(thin) () -> Int {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = struct $Int (%1 : $Builtin.Int64)
+  %3 = object $Bar (%2 : $Int, %2 : $Int, %2 : $Int)
+
+  return %2 : $Int
+}
+
+
+sil_vtable Bar {
+  
+}
