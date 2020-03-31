@@ -1682,25 +1682,6 @@ protected:
     return nullptr;
   }
 
-private:
-  template <template <class R> class M>
-  MetadataRef _readMetadata(StoredPointer address) {
-    return _readMetadata(address, sizeof(M<Runtime>));
-  }
-
-  MetadataRef _readMetadata(StoredPointer address, size_t sizeAfter) {
-    auto size = sizeAfter;
-    uint8_t *buffer = (uint8_t *) malloc(size);
-    if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
-      free(buffer);
-      return nullptr;
-    }
-
-    auto metadata = reinterpret_cast<TargetMetadata<Runtime>*>(buffer);
-    MetadataCache.insert(std::make_pair(address, OwnedMetadataRef(metadata)));
-    return MetadataRef(address, metadata);
-  }
-
   StoredPointer
   readAddressOfNominalTypeDescriptor(MetadataRef &metadata,
                                      bool skipArtificialSubclasses = false) {
@@ -1708,6 +1689,9 @@ private:
     case MetadataKind::Class: {
       auto classMeta = cast<TargetClassMetadata<Runtime>>(metadata);
       while (true) {
+        if (!classMeta->isTypeMetadata())
+          return 0;
+
         StoredSignedPointer descriptorAddressSigned = classMeta->getDescriptionAsSignedPointer();
         StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
 
@@ -1753,7 +1737,26 @@ private:
       return 0;
     }
   }
-  
+
+private:
+  template <template <class R> class M>
+  MetadataRef _readMetadata(StoredPointer address) {
+    return _readMetadata(address, sizeof(M<Runtime>));
+  }
+
+  MetadataRef _readMetadata(StoredPointer address, size_t sizeAfter) {
+    auto size = sizeAfter;
+    uint8_t *buffer = (uint8_t *) malloc(size);
+    if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
+      free(buffer);
+      return nullptr;
+    }
+
+    auto metadata = reinterpret_cast<TargetMetadata<Runtime>*>(buffer);
+    MetadataCache.insert(std::make_pair(address, OwnedMetadataRef(metadata)));
+    return MetadataRef(address, metadata);
+  }
+
   /// Returns Optional(ParentContextDescriptorRef()) if there's no parent descriptor.
   /// Returns None if there was an error reading the parent descriptor.
   Optional<ParentContextDescriptorRef>
