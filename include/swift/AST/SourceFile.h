@@ -194,16 +194,6 @@ private:
   /// mechanism which is not SourceFile-dependent.)
   SeparatelyImportedOverlayMap separatelyImportedOverlays;
 
-  using SeparatelyImportedOverlayReverseMap =
-    llvm::SmallDenseMap<ModuleDecl *, ModuleDecl *>;
-
-  /// A lazily populated mapping from a separately imported overlay to its
-  /// underlying shadowed module.
-  ///
-  /// This is used by tooling to substitute the name of the underlying module
-  /// wherever the overlay's name would otherwise be reported.
-  SeparatelyImportedOverlayReverseMap separatelyImportedOverlaysReversed;
-
   /// A pointer to PersistentParserState with a function reference to its
   /// deleter to handle the fact that it's forward declared.
   using ParserStatePtr =
@@ -384,7 +374,6 @@ public:
   /// \returns true if the overlay was added; false if it already existed.
   bool addSeparatelyImportedOverlay(ModuleDecl *overlay,
                                     ModuleDecl *declaring) {
-    separatelyImportedOverlaysReversed.clear();
     return std::get<1>(separatelyImportedOverlays[declaring].insert(overlay));
   }
 
@@ -401,12 +390,6 @@ public:
     auto &value = std::get<1>(*i);
     overlays.append(value.begin(), value.end());
   }
-
-  /// Retrieves a module shadowed by the provided separately imported overlay
-  /// \p shadowed. If such a module is returned, it should be presented to users
-  /// as owning the symbols in \p overlay.
-  ModuleDecl *
-  getModuleShadowedBySeparatelyImportedOverlay(const ModuleDecl *overlay);
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
