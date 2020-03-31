@@ -10,6 +10,7 @@ add_swift_host_library(swiftSema STATIC
   CSFix.cpp
   CSDiagnostics.cpp
   CodeSynthesis.cpp
+  ConstantnessSemaDiagnostics.cpp
   Constraint.cpp
   ConstraintGraph.cpp
   ConstraintLocator.cpp
