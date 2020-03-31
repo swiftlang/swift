@@ -81,10 +81,10 @@ protocol P1 {}
 
 protocol P2 {}
 
-extension () {} // expected-error {{non-nominal type '()' cannot be extended}}
+extension () {} // expected-error {{non-nominal type '()' cannot be extended}} {{educational-notes=nominal-types}}
 
 typealias TupleAlias = (x: Int, y: Int)
-extension TupleAlias {} // expected-error{{non-nominal type 'TupleAlias' (aka '(x: Int, y: Int)') cannot be extended}}
+extension TupleAlias {} // expected-error{{non-nominal type 'TupleAlias' (aka '(x: Int, y: Int)') cannot be extended}} {{educational-notes=nominal-types}}
 
 // Test property accessors in extended types
 class C {}
