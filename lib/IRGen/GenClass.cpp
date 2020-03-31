@@ -43,6 +43,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/raw_ostream.h"
+#include "clang/AST/DeclObjC.h"
 
 #include "Callee.h"
 #include "ClassLayout.h"
@@ -2706,6 +2707,14 @@ llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
                                             ProtocolDecl *proto) {
   assert(proto->isObjC() && "not an objc protocol");
   PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", proto);
+  if (llvm::Triple(IGM.Module.getTargetTriple()).isOSDarwin()) {
+    // Use the clang to generate the protocol metadata if there is a clang node.
+    if (auto clangDecl = proto->getClangDecl()) {
+      if (auto objcMethodDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)) {
+        return IGM.emitClangProtocolObject(objcMethodDecl);
+      }
+    }
+  }
   ClassDataBuilder builder(IGM, proto);
   return builder.emitProtocol();
 }

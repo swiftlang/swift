@@ -24,6 +24,7 @@
 #include "clang/AST/GlobalDecl.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
+#include "clang/CodeGen/CodeGenABITypes.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
@@ -393,6 +394,83 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   ObjCProtocols.insert({proto, pair});
   
   return pair;
+}
+
+static std::pair<uint64_t, llvm::ConstantArray *>
+getProtocolRefsList(llvm::Constant *protocol) {
+  // We expect to see a structure like this.
+  // @"_OBJC_PROTOCOL_$_MyProto" = weak hidden global %struct._protocol_t {
+  //  i8* null,
+  //  i8* getelementptr inbounds ([8 x i8],
+  //    [8 x i8]* @OBJC_CLASS_NAME_, i32 0, i32 0),
+  //  %struct._objc_protocol_list* bitcast (
+  //    { i64, [2 x %struct._protocol_t*] }*
+  //       @"_OBJC_$_PROTOCOL_REFS_MyProto" to %struct._objc_protocol_list*),
+  //  %struct.__method_list_t* null,
+  //  %struct.__method_list_t* null,
+  //  %struct.__method_list_t* null,
+  //  %struct.__method_list_t* null,
+  //  %struct._prop_list_t* null, i32 96, i32 0,
+  //  i8** getelementptr inbounds ([1 x i8*],
+  //    [1 x i8*]* @"_OBJC_$_PROTOCOL_METHOD_TYPES_MyProto", i32 0, i32 0),
+  //  i8* null, %struct._prop_list_t* null }, align 8
+  auto protocolVar = cast<llvm::GlobalVariable>(protocol);
+  auto protocolStruct =
+      cast<llvm::ConstantStruct>(protocolVar->getInitializer());
+  auto objCProtocolList = cast<llvm::Constant>(protocolStruct->getOperand(2));
+  if (objCProtocolList->isNullValue()) {
+    return std::make_pair(0, nullptr);
+  }
+  auto bitcast = cast<llvm::ConstantExpr>(objCProtocolList);
+  assert(bitcast->getOpcode() == llvm::Instruction::BitCast);
+  auto protocolRefsVar = cast<llvm::GlobalVariable>(bitcast->getOperand(0));
+  auto sizeListPair =
+      cast<llvm::ConstantStruct>(protocolRefsVar->getInitializer());
+  auto size =
+      cast<llvm::ConstantInt>(sizeListPair->getOperand(0))->getZExtValue();
+  auto protocolRefsList =
+      cast<llvm::ConstantArray>(sizeListPair->getOperand(1));
+  return std::make_pair(size, protocolRefsList);
+}
+
+static void updateProtocolRefs(IRGenModule &IGM,
+                               const clang::ObjCProtocolDecl *objcProtocol,
+                               llvm::Constant *protocol) {
+
+  // Get the clang importer to map ObjCProtocolDecl to ProtocolDecl.
+  auto &astContext = IGM.getSwiftModule()->getASTContext();
+  auto *clangImporter =
+      static_cast<ClangImporter *>(astContext.getClangModuleLoader());
+  assert(clangImporter && "Must have a clang importer");
+
+  // Get the array containining the protocol refs.
+  unsigned protocolRefsSize;
+  llvm::ConstantArray *protocolRefs;
+  std::tie(protocolRefsSize, protocolRefs) = getProtocolRefsList(protocol);
+  unsigned currentIdx = 0;
+  for (auto inheritedObjCProtocol : objcProtocol->protocols()) {
+    assert(currentIdx < protocolRefsSize);
+    auto oldVar = protocolRefs->getOperand(currentIdx);
+    // Map the objc protocol to swift protocol.
+    auto optionalDecl = clangImporter->importDeclCached(inheritedObjCProtocol);
+    auto inheritedSwiftProtocol = cast<ProtocolDecl>(*optionalDecl);
+    // Get the objc protocol record we use in Swift.
+    auto record = IGM.getAddrOfObjCProtocolRecord(inheritedSwiftProtocol,
+                                                  NotForDefinition);
+    auto newOpd = llvm::ConstantExpr::getBitCast(record, oldVar->getType());
+    if (newOpd != oldVar)
+      oldVar->replaceAllUsesWith(newOpd);
+    ++currentIdx;
+  }
+  assert(currentIdx == protocolRefsSize);
+}
+
+llvm::Constant *IRGenModule::emitClangProtocolObject(
+    const clang::ObjCProtocolDecl *objcProtocol) {
+  auto clangProto =
+      clang::CodeGen::emitObjCProtocolObject(getClangCGM(), objcProtocol);
+  updateProtocolRefs(*this, objcProtocol, clangProto);
+  return clangProto;
 }
 
 void IRGenModule::emitLazyObjCProtocolDefinition(ProtocolDecl *proto) {

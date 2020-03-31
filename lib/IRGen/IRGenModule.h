@@ -79,6 +79,7 @@ namespace clang {
   class Decl;
   class GlobalDecl;
   class Type;
+  class ObjCProtocolDecl;
   class PointerAuthSchema;
   namespace CodeGen {
     class CGFunctionInfo;
@@ -1083,6 +1084,9 @@ public:
                                           SILLocation diagLoc);
   llvm::Constant *getAddrOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaqueType,
                                                 ConstantInit forDefinition);
+  llvm::Constant *
+  emitClangProtocolObject(const clang::ObjCProtocolDecl *objcProtocol);
+
   ConstantReference getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto);
 
   ConstantIntegerLiteral getConstantIntegerLiteral(APInt value);
