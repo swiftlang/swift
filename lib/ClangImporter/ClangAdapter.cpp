@@ -446,6 +446,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
 
     // OpenMP types that don't have Swift equivalents.
     case clang::BuiltinType::OMPArraySection:
+    case clang::BuiltinType::OMPArrayShaping:
       return OmissionTypeName();
 
     // SVE builtin types that don't have Swift equivalents.
