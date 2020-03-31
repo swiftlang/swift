@@ -1274,7 +1274,8 @@ OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
 
 template <typename OperatorType>
 void LookupOperatorRequest<OperatorType>::writeDependencySink(
-    Evaluator &evaluator, OperatorType *o) const {
+    Evaluator &evaluator, ReferencedNameTracker &reqTracker,
+    OperatorType *o) const {
   auto &desc = std::get<0>(this->getStorage());
   auto *FU = desc.fileOrModule.template get<FileUnit *>();
   auto shouldRegisterDependencyEdge = [&FU](OperatorType *o) -> bool {
@@ -1294,10 +1295,7 @@ void LookupOperatorRequest<OperatorType>::writeDependencySink(
     return;
   }
 
-  auto *reqTracker = evaluator.getActiveDependencyTracker();
-  if (!reqTracker)
-    return;
-  reqTracker->addTopLevelName(desc.name, desc.isCascading);
+  reqTracker.addTopLevelName(desc.name, desc.isCascading);
 }
 
 #define LOOKUP_OPERATOR(Kind)                                                  \
@@ -1311,7 +1309,8 @@ void LookupOperatorRequest<OperatorType>::writeDependencySink(
   LookupOperatorRequest<Kind##Decl>::evaluate(Evaluator &e,                    \
                                               OperatorLookupDescriptor) const; \
   template                                                                     \
-  void LookupOperatorRequest<Kind##Decl>::writeDependencySink(Evaluator &, Kind##Decl *) const;     \
+  void LookupOperatorRequest<Kind##Decl>::writeDependencySink(                 \
+           Evaluator &, ReferencedNameTracker &, Kind##Decl *) const;          \
 
 LOOKUP_OPERATOR(PrefixOperator)
 LOOKUP_OPERATOR(InfixOperator)

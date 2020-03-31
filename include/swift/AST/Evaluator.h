@@ -476,7 +476,8 @@ private:
             typename std::enable_if<Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
                              const typename Request::OutputType &o) {
-    r.writeDependencySink(*this, o);
+    if (auto *tracker = getActiveDependencyTracker())
+      r.writeDependencySink(*this, *tracker, o);
   }
 
   /// If there is an active dependency source, returns its

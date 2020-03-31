@@ -104,14 +104,11 @@ InheritedProtocolsRequest::readDependencySource(Evaluator &e) const {
 }
 
 void InheritedProtocolsRequest::writeDependencySink(
-    Evaluator &eval, ArrayRef<ProtocolDecl *> PDs) const {
-  auto *tracker = eval.getActiveDependencyTracker();
-  if (!tracker)
-    return;
-
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    ArrayRef<ProtocolDecl *> PDs) const {
   for (auto *parentProto : PDs) {
-    tracker->addUsedMember({parentProto, Identifier()},
-                           eval.isActiveSourceCascading());
+    tracker.addUsedMember({parentProto, Identifier()},
+                          eval.isActiveSourceCascading());
   }
 }
 
@@ -179,8 +176,9 @@ void ExtendedNominalRequest::cacheResult(NominalTypeDecl *value) const {
   ext->setExtendedNominal(value);
 }
 
-void ExtendedNominalRequest::writeDependencySink(Evaluator &eval,
-                                                 NominalTypeDecl *value) const {
+void ExtendedNominalRequest::writeDependencySink(
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    NominalTypeDecl *value) const {
   if (!value)
     return;
 
@@ -190,12 +188,8 @@ void ExtendedNominalRequest::writeDependencySink(Evaluator &eval,
     return;
   if (SF != eval.getActiveDependencySource())
     return;
-  auto *tracker = eval.getActiveDependencyTracker();
-  if (!tracker)
-    return;
-
-  tracker->addUsedMember({value, Identifier()},
-                         eval.isActiveSourceCascading());
+  tracker.addUsedMember({value, Identifier()},
+                        eval.isActiveSourceCascading());
 }
 
 //----------------------------------------------------------------------------//
@@ -311,13 +305,11 @@ SourceLoc swift::extractNearestSourceLoc(const OperatorLookupDescriptor &desc) {
 }
 
 void DirectLookupRequest::writeDependencySink(
-    Evaluator &eval, TinyPtrVector<ValueDecl *> result) const {
-  auto *tracker = eval.getActiveDependencyTracker();
-  if (!tracker)
-    return;
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    TinyPtrVector<ValueDecl *> result) const {
   auto &desc = std::get<0>(getStorage());
-  tracker->addUsedMember({desc.DC, desc.Name.getBaseName()},
-                         eval.isActiveSourceCascading());
+  tracker.addUsedMember({desc.DC, desc.Name.getBaseName()},
+                        eval.isActiveSourceCascading());
 }
 
 //----------------------------------------------------------------------------//
@@ -335,14 +327,11 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 void AnyObjectLookupRequest::writeDependencySink(
-    Evaluator &eval, QualifiedLookupResult l) const {
+    Evaluator &eval, ReferencedNameTracker &reqTracker,
+    QualifiedLookupResult l) const {
   auto member = std::get<1>(getStorage());
-
-  auto *reqTracker = eval.getActiveDependencyTracker();
-  if (!reqTracker)
-    return;
-  reqTracker->addDynamicLookupName(member.getBaseName(),
-                                   eval.isActiveSourceCascading());
+  reqTracker.addDynamicLookupName(member.getBaseName(),
+                                  eval.isActiveSourceCascading());
 }
 
 SourceLoc
@@ -374,7 +363,8 @@ ModuleQualifiedLookupRequest::readDependencySource(Evaluator &eval) const {
 }
 
 void ModuleQualifiedLookupRequest::writeDependencySink(
-    Evaluator &eval, QualifiedLookupResult l) const {
+    Evaluator &eval, ReferencedNameTracker &reqTracker,
+    QualifiedLookupResult l) const {
   auto *DC = std::get<0>(getStorage());
   auto *module = std::get<1>(getStorage());
   auto member = std::get<2>(getStorage());
@@ -384,12 +374,8 @@ void ModuleQualifiedLookupRequest::writeDependencySink(
       module != DC->getModuleScopeContext()->getParentModule()) {
     return;
   }
-
-  auto *reqTracker = eval.getActiveDependencyTracker();
-  if (!reqTracker)
-    return;
-  reqTracker->addTopLevelName(member.getBaseName(),
-                              eval.isActiveSourceCascading());
+  reqTracker.addTopLevelName(member.getBaseName(),
+                            eval.isActiveSourceCascading());
 }
 
 //----------------------------------------------------------------------------//
@@ -397,7 +383,8 @@ void ModuleQualifiedLookupRequest::writeDependencySink(
 //----------------------------------------------------------------------------//
 
 void LookupConformanceInModuleRequest::writeDependencySink(
-    Evaluator &eval, ProtocolConformanceRef lookupResult) const {
+    Evaluator &eval, ReferencedNameTracker &reqTracker,
+    ProtocolConformanceRef lookupResult) const {
   if (lookupResult.isInvalid() || !lookupResult.isConcrete())
     return;
 
@@ -407,19 +394,15 @@ void LookupConformanceInModuleRequest::writeDependencySink(
     return;
 
   auto *source = eval.getActiveDependencySource();
-  if (!source)
-    return;
-  auto reqTracker = eval.getActiveDependencyTracker();
-  if (!reqTracker)
-    return;
+  assert(source && "Missing dependency source?");
 
   // Decline to record conformances defined outside of the active module.
   auto *conformance = lookupResult.getConcrete();
   if (source->getParentModule() !=
       conformance->getDeclContext()->getParentModule())
     return;
-  reqTracker->addUsedMember({Adoptee, Identifier()},
-                            eval.isActiveSourceCascading());
+  reqTracker.addUsedMember({Adoptee, Identifier()},
+                           eval.isActiveSourceCascading());
 }
 
 //----------------------------------------------------------------------------//
@@ -441,14 +424,11 @@ UnqualifiedLookupRequest::readDependencySource(Evaluator &) const {
 }
 
 void UnqualifiedLookupRequest::writeDependencySink(Evaluator &eval,
+                                                   ReferencedNameTracker &track,
                                                    LookupResult res) const {
-  auto reqTracker = eval.getActiveDependencyTracker();
-  if (!reqTracker)
-    return;
-
   auto &desc = std::get<0>(getStorage());
-  reqTracker->addTopLevelName(desc.Name.getBaseName(),
-                              eval.isActiveSourceCascading());
+  track.addTopLevelName(desc.Name.getBaseName(),
+                        eval.isActiveSourceCascading());
 }
 
 //----------------------------------------------------------------------------//

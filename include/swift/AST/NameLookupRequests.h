@@ -189,7 +189,7 @@ public:
 public:
   // Incremental dependencies
   evaluator::DependencySource readDependencySource(Evaluator &e) const;
-  void writeDependencySink(Evaluator &evaluator,
+  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
                            ArrayRef<ProtocolDecl *> result) const;
 };
 
@@ -239,7 +239,7 @@ public:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator,
+  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
                            NominalTypeDecl *result) const;
 };
 
@@ -432,7 +432,8 @@ private:
 public:
   // Incremental dependencies
   evaluator::DependencySource readDependencySource(Evaluator &) const;
-  void writeDependencySink(Evaluator &eval, LookupResult res) const;
+  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+                           LookupResult res) const;
 };
 
 using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
@@ -476,7 +477,8 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &eval, QualifiedLookupResult l) const;
+  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+                           QualifiedLookupResult l) const;
 };
 
 class ModuleQualifiedLookupRequest
@@ -484,7 +486,8 @@ class ModuleQualifiedLookupRequest
                            QualifiedLookupResult(const DeclContext *,
                                                  ModuleDecl *, DeclNameRef,
                                                  NLOptions),
-                           CacheKind::Uncached | CacheKind::DependencySource | CacheKind::DependencySink> {
+                           CacheKind::Uncached | CacheKind::DependencySource |
+                              CacheKind::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -500,7 +503,7 @@ private:
 public:
   // Incremental dependencies
   evaluator::DependencySource readDependencySource(Evaluator &) const;
-  void writeDependencySink(Evaluator &eval,
+  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
                            QualifiedLookupResult lookupResult) const;
 };
 
@@ -577,7 +580,7 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator,
+  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
                            TinyPtrVector<ValueDecl *> result) const;
 };
 
@@ -662,7 +665,7 @@ public:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator,
+  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
                            OperatorType *o) const;
 };
 
@@ -752,7 +755,7 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator,
+  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
                            ProtocolConformanceRef result) const;
 };
 

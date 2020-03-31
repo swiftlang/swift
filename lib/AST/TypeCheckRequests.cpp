@@ -167,6 +167,7 @@ SuperclassTypeRequest::readDependencySource(Evaluator &e) const {
 }
 
 void SuperclassTypeRequest::writeDependencySink(Evaluator &eval,
+                                                ReferencedNameTracker &tracker,
                                                 Type value) const {
   if (!value)
     return;
@@ -176,12 +177,7 @@ void SuperclassTypeRequest::writeDependencySink(Evaluator &eval,
   ClassDecl *Super = value->getClassOrBoundGenericClass();
   if (!Super)
     return;
-
-  auto *tracker = eval.getActiveDependencyTracker();
-  if (!tracker)
-    return;
-
-  tracker->addUsedMember({Super, Identifier()}, eval.isActiveSourceCascading());
+  tracker.addUsedMember({Super, Identifier()}, eval.isActiveSourceCascading());
 }
 
 //----------------------------------------------------------------------------//
@@ -1317,11 +1313,8 @@ CheckRedeclarationRequest::readDependencySource(Evaluator &eval) const {
 }
 
 void CheckRedeclarationRequest::writeDependencySink(
-    Evaluator &eval, evaluator::SideEffect) const {
-  auto *tracker = eval.getActiveDependencyTracker();
-  if (!tracker)
-    return;
-
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    evaluator::SideEffect) const {
   auto *current = std::get<0>(getStorage());
   if (!current->hasName())
     return;
@@ -1333,12 +1326,12 @@ void CheckRedeclarationRequest::writeDependencySink(
 
   if (currentDC->isTypeContext()) {
     if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
-      tracker->addUsedMember({nominal, current->getBaseName()},
-                             eval.isActiveSourceCascading());
+      tracker.addUsedMember({nominal, current->getBaseName()},
+                            eval.isActiveSourceCascading());
     }
   } else {
-    tracker->addTopLevelName(current->getBaseName(),
-                             eval.isActiveSourceCascading());
+    tracker.addTopLevelName(current->getBaseName(),
+                            eval.isActiveSourceCascading());
   }
 }
 
@@ -1370,14 +1363,11 @@ LookupAllConformancesInContextRequest::readDependencySource(
 }
 
 void LookupAllConformancesInContextRequest::writeDependencySink(
-    Evaluator &eval, ProtocolConformanceLookupResult conformances) const {
-  auto *tracker = eval.getActiveDependencyTracker();
-  if (!tracker)
-    return;
-
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    ProtocolConformanceLookupResult conformances) const {
   for (auto conformance : conformances) {
-    tracker->addUsedMember({conformance->getProtocol(), Identifier()},
-                           eval.isActiveSourceCascading());
+    tracker.addUsedMember({conformance->getProtocol(), Identifier()},
+                          eval.isActiveSourceCascading());
   }
 }
 

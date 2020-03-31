@@ -120,7 +120,8 @@ public:
 public:
   // Incremental dependencies
   evaluator::DependencySource readDependencySource(Evaluator &e) const;
-  void writeDependencySink(Evaluator &eval, Type t) const;
+  void writeDependencySink(Evaluator &eval,
+                           ReferencedNameTracker &tracker, Type t) const;
 };
 
 /// Request the raw type of the given enum.
@@ -2227,7 +2228,7 @@ private:
 public:
   // Incremental dependencies
   evaluator::DependencySource readDependencySource(Evaluator &eval) const;
-  void writeDependencySink(Evaluator &eval,
+  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
                            ProtocolConformanceLookupResult r) const;
 };
 
@@ -2254,7 +2255,8 @@ public:
 
 public:
   evaluator::DependencySource readDependencySource(Evaluator &eval) const;
-  void writeDependencySink(Evaluator &eval, evaluator::SideEffect) const;
+  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+                           evaluator::SideEffect) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

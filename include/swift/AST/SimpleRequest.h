@@ -234,7 +234,8 @@ SourceLoc extractNearestSourceLoc(const std::tuple<First, Rest...> &value) {
 /// \c CacheKind::DependencySource should be specified along with
 /// one of the 3 caching kinds defined above.
 /// \code
-///   void writeDependencySink(Evaluator &, Output value) const;
+///   void writeDependencySink(Evaluator &,
+///                            ReferencedNameTracker &, Output) const;
 /// \endcode
 template<typename Derived, typename Signature, CacheKind Caching>
 class SimpleRequest;
