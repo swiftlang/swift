@@ -179,21 +179,17 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
                                         ValueLifetimeAnalysis::Frontier &frontier) {
   DominanceInfo *domInfo = PM->getAnalysis<DominanceAnalysis>()->get(allocRef->getFunction());
   auto *classDecl = allocRef->getType().getClassOrBoundGenericClass();
-  if (!classDecl || !classDecl->getDestructor()->isImplicit())
-    return false;
-  
-  SmallVector<Operand*, 24> uses;
-  getOrderedNonDebugUses(allocRef, domInfo, uses);
-  if (llvm::any_of(uses, [](Operand *use) {
-    auto user = use->getUser();
-    return !isa<RefElementAddrInst>(user) && !isa<SetDeallocatingInst>(user) && !isa<DeallocRefInst>(user) && !isa<DebugValueInst>(user) && !isa<StrongReleaseInst>(user);
-  }))
+  if (!classDecl || !classDecl->getDestructor()->isImplicit() ||
+      (classDecl->getAsGenericContext() && classDecl->getAsGenericContext()->isGeneric()))
     return false;
   
   SmallVector<VarDecl*, 8> props;
   for (auto *prop : classDecl->getStoredProperties()) {
     props.push_back(prop);
   }
+  
+  SmallVector<Operand*, 24> uses;
+  getOrderedNonDebugUses(allocRef, domInfo, uses);
   
   llvm::reverse(props);
   SmallVector<RefElementAddrInst *, 8> propertyInitializers;
@@ -259,9 +255,6 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
   SILBuilder builder(std::next(lastElement->getIterator()));
   auto object = builder.createObject(allocRef->getLoc(), allocRef->getType(),
                                      elements, elements.size());
-  auto allocStack = builder.createAllocStack(allocRef->getLoc(), allocRef->getType());
-  builder.createStore(allocRef->getLoc(), object, allocStack,
-                      StoreOwnershipQualifier::Unqualified);
   
   SmallVector<Operand *, 8> users(allocRef->use_begin(), allocRef->use_end());
   for (auto *use : users) {
@@ -274,8 +267,8 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
     
     if (auto ref = dyn_cast<RefElementAddrInst>(user)) {
       // We need to move the ref_element_addr up.
-      if (domInfo->dominates(ref, allocStack)) {
-        auto newRef = builder.createRefElementAddr(ref->getLoc(), allocStack,
+      if (domInfo->dominates(ref, object)) {
+        auto newRef = builder.createRefElementAddr(ref->getLoc(), object,
                                                    ref->getField());
         ref->replaceAllUsesWith(newRef);
         ref->eraseFromParent();
@@ -286,14 +279,8 @@ bool StackPromotion::tryPromoteToObject(AllocRefInst *allocRef,
   for (auto *store : deadStores) {
     store->eraseFromParent();
   }
-  
-  for (SILInstruction *frontierInst : frontier) {
-    SILBuilderWithScope destroyAddrBuilder(frontierInst);
-    destroyAddrBuilder.createDestroyAddr(allocStack->getLoc(), allocStack);
-    destroyAddrBuilder.createDeallocStack(allocStack->getLoc(), allocStack);
-  }
 
-  allocRef->replaceAllUsesWith(allocStack);
+  allocRef->replaceAllUsesWith(object);
   allocRef->eraseFromParent();
 
   llvm::errs() << "Promoted to object in stack. Function: " << object->getFunction()->getName() << "\n";

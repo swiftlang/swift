@@ -3450,6 +3450,8 @@ void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
 
 void IRGenSILFunction::visitObjectInst(swift::ObjectInst *i) {
   SILType objType = i->getType().getObjectType();
+  // TODO: we could support this in the future.
+  assert(!objType.getClassOrBoundGenericClass()->getAsGenericContext() || !objType.getClassOrBoundGenericClass()->getAsGenericContext()->isGeneric() && "Generics are not yet supported");
   const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
   llvm::Value *metadata = emitClassHeapMetadataRef(*this, objType.getASTType(),
                                                    MetadataValueType::TypeMetadata,
@@ -3586,6 +3588,7 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
   SILType baseTy = i->getOperand()->getType();
 
   if (i->getOperand()->getType().isAddress()) {
+    assert(false);
     Address base = getLoweredAddress(i->getOperand());
     //
     // assert(getIndexedTypeX(IGM.Int8PtrPtrTy, { IGM.getInt32(0), IGM.getInt32(0) }));

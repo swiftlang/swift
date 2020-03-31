@@ -489,10 +489,6 @@ ClassTypeInfo::getClassLayout(IRGenModule &IGM, SILType classType,
 
 void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
                                bool isOutlined) const {
-  HeapTypeInfo<ClassTypeInfo>::initialize(IGF, src, addr, isOutlined);
-  return;
-  
-  // If the src is an address, just project and store. Then we're done.
   auto *exploded = src.getAll().front();
   if (exploded->getType() == addr->getType()->getPointerElementType()) {
     IGF.Builder.CreateStore(exploded, addr);
@@ -500,6 +496,7 @@ void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
     return;
   }
   
+  // If the src is an address, just project and store. Then we're done.
   auto classType = IGF.IGM.getLoweredType(getClass()->getDeclaredInterfaceType());
   if (exploded->getType() == addr->getType()) {
     // `HeapTypeInfo<ClassTypeInfo>::initialize(IGF, src, addr, isOutlined);
@@ -508,6 +505,9 @@ void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
 //    cast<LoadableTypeInfo>(this)->initializeWithCopy(IGF, addr, Address(exploded, addr.getAlignment()), classType, isOutlined);
     return;
   }
+
+  HeapTypeInfo<ClassTypeInfo>::initialize(IGF, src, addr, isOutlined);
+  return;
 
   // Otherwise, create GEP/init for each element in src.
   for (auto *prop : getClass()->getStoredProperties()) {
