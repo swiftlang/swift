@@ -3876,7 +3876,7 @@ static void recordConformanceDependency(DeclContext *DC,
   if (!SF)
     return;
 
-  auto *tracker = SF->getReferencedNameTracker();
+  auto *tracker = SF->getLegacyReferencedNameTracker();
   if (!tracker)
     return;
 
@@ -5129,7 +5129,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   SourceFile *SF = dc->getParentSourceFile();
   ReferencedNameTracker *tracker = nullptr;
   if (SF)
-    tracker = SF->getReferencedNameTracker();
+    tracker = SF->getLegacyReferencedNameTracker();
 
   // Check each of the conformances associated with this context.
   auto conformances =

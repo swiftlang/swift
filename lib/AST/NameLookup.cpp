@@ -715,7 +715,7 @@ void namelookup::recordLookupOfTopLevelName(DeclContext *topLevelContext,
   auto SF = dyn_cast<SourceFile>(topLevelContext);
   if (!SF)
     return;
-  auto *nameTracker = SF->getReferencedNameTracker();
+  auto *nameTracker = SF->getLegacyReferencedNameTracker();
   if (!nameTracker)
     return;
   nameTracker->addTopLevelName(name.getBaseName(), isCascading);
@@ -1381,7 +1381,7 @@ static void configureLookup(const DeclContext *dc,
   tracker = nullptr;
   if (auto containingSourceFile =
           dyn_cast<SourceFile>(dc->getModuleScopeContext())) {
-    tracker = containingSourceFile->getReferencedNameTracker();
+    tracker = containingSourceFile->getLegacyReferencedNameTracker();
   }
 
   auto checkLookupCascading = [dc, options]() -> Optional<bool> {

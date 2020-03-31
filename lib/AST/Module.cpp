@@ -2604,7 +2604,7 @@ SourceFile::getConfiguredReferencedNameTracker() const {
   if (getASTContext().LangOpts.EnableRequestBasedIncrementalDependencies) {
     return getRequestBasedReferencedNameTracker();
   } else {
-    return getReferencedNameTracker();
+    return getLegacyReferencedNameTracker();
   }
 }
 

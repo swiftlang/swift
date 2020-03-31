@@ -466,10 +466,10 @@ public:
 
   virtual bool walk(ASTWalker &walker) override;
 
-  ReferencedNameTracker *getReferencedNameTracker() {
+  ReferencedNameTracker *getLegacyReferencedNameTracker() {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
-  const ReferencedNameTracker *getReferencedNameTracker() const {
+  const ReferencedNameTracker *getLegacyReferencedNameTracker() const {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
 

@@ -492,7 +492,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   if (!currentFile || currentDC->isLocalContext())
     return std::make_tuple<>();
 
-  ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
+  ReferencedNameTracker *tracker = currentFile->getLegacyReferencedNameTracker();
   bool isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
 
   // Find other potential definitions.
@@ -1962,7 +1962,7 @@ public:
         // for the superclass will run (un)qualified lookup which will register
         // the appropriate edge, then SuperclassTypeRequest registers the
         // potential member edge.
-        if (auto *tracker = SF->getReferencedNameTracker()) {
+        if (auto *tracker = SF->getLegacyReferencedNameTracker()) {
           bool isPrivate =
               CD->getFormalAccess() <= AccessLevel::FilePrivate;
           tracker->addUsedMember({Super, Identifier()}, !isPrivate);
@@ -2067,7 +2067,7 @@ public:
     (void)PD->hasCircularInheritedProtocols();
 
     if (SF) {
-      if (auto *tracker = SF->getReferencedNameTracker()) {
+      if (auto *tracker = SF->getLegacyReferencedNameTracker()) {
         bool isNonPrivate = (PD->getFormalAccess() > AccessLevel::FilePrivate);
         // FIXME(Evaluator Incremental Dependencies): Remove this. Type lookup
         // for the ancestor protocols will run (un)qualified lookup which will
