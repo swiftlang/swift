@@ -489,6 +489,8 @@ ClassTypeInfo::getClassLayout(IRGenModule &IGM, SILType classType,
 
 void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
                                bool isOutlined) const {
+  // If the address is a poitner to the exploded type then we can simply emit a
+  // store and be done.
   auto *exploded = src.getAll().front();
   if (exploded->getType() == addr->getType()->getPointerElementType()) {
     IGF.Builder.CreateStore(exploded, addr);
@@ -496,36 +498,15 @@ void ClassTypeInfo::initialize(IRGenFunction &IGF, Explosion &src, Address addr,
     return;
   }
   
-  // If the src is an address, just project and store. Then we're done.
-  auto classType = IGF.IGM.getLoweredType(getClass()->getDeclaredInterfaceType());
+  // If both are the same (address) type then just emit a memcpy.
   if (exploded->getType() == addr->getType()) {
-    // `HeapTypeInfo<ClassTypeInfo>::initialize(IGF, src, addr, isOutlined);
-     IGF.emitMemCpy(addr.getAddress(), exploded, getFixedSize(), addr.getAlignment());
-     (void)src.claimNext();
-//    cast<LoadableTypeInfo>(this)->initializeWithCopy(IGF, addr, Address(exploded, addr.getAlignment()), classType, isOutlined);
+    IGF.emitMemCpy(addr.getAddress(), exploded, getFixedSize(), addr.getAlignment());
+    (void)src.claimNext();
     return;
   }
 
+  // Otherwise, bail to the default implementation.
   HeapTypeInfo<ClassTypeInfo>::initialize(IGF, src, addr, isOutlined);
-  return;
-
-  // Otherwise, create GEP/init for each element in src.
-  for (auto *prop : getClass()->getStoredProperties()) {
-    exploded = src.claimNext();
-    auto propType = IGF.IGM.getLoweredType(prop->getType());
-    const auto &propTypeInfo = cast<LoadableTypeInfo>(IGF.getTypeInfo(propType));
-//    auto offset = getClassFieldOffset(IGF.IGM, classType, prop);
-//    auto propAddr = IGF.emitByteOffsetGEP(addr.getAddress(),
-//                                          IGF.IGM.getInt32(offset.getValue()),
-//                                          propTypeInfo);
-    auto propAddr = projectPhysicalClassMemberAddress(IGF, addr.getAddress(), classType, propType, prop);
-    Explosion propExplosion;
-    propExplosion.add(exploded);
-    llvm::errs() << "prop explo and addr respectfully: \n";
-    propExplosion.dump();
-    propAddr.getAddress()->dump();
-    propTypeInfo.initialize(IGF, propExplosion, propAddr, isOutlined);
-  }
 }
   
 

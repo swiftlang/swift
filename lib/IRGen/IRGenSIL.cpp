@@ -3450,20 +3450,23 @@ void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
 
 void IRGenSILFunction::visitObjectInst(swift::ObjectInst *i) {
   SILType objType = i->getType().getObjectType();
-  // TODO: we could support this in the future.
+  // TODO: Currently generic classes aren't allowed but in the future we could
+  // support this.
   assert(!objType.getClassOrBoundGenericClass()->getAsGenericContext() || !objType.getClassOrBoundGenericClass()->getAsGenericContext()->isGeneric() && "Generics are not yet supported");
+
   const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
   llvm::Value *metadata = emitClassHeapMetadataRef(*this, objType.getASTType(),
                                                    MetadataValueType::TypeMetadata,
                                                    MetadataState::Complete);
-  // TODO: this shouldn't be a stack alloc but, this is the easiest way to
-  // maintain compatibility with alloc_ref.
+  // TODO: this shouldn't be a stack alloc but, in order to maintain
+  // compatibility with alloc_ref we have to be a pointer.
   Address alloca = createAlloca(typeInfo.getStorageType()->getPointerElementType(),
                                 typeInfo.getFixedAlignment());
   auto classAddr = Builder.CreateBitCast(alloca, IGM.RefCountedPtrTy);
   auto classVal = emitInitStackObjectCall(metadata, classAddr.getAddress(), "reference.new");
   classVal = Builder.CreateBitCast(classVal, typeInfo.getStorageType());
-
+  // Match each property in the class decl to elements in the object
+  // instruction.
   auto propsArr = i->getType().getClassOrBoundGenericClass()->getStoredProperties();
   SmallVector<VarDecl*, 8> props(propsArr.begin(), propsArr.end());
   for (SILValue elt : i->getAllElements()) {
@@ -3585,28 +3588,10 @@ void IRGenSILFunction::visitStructElementAddrInst(
 }
 
 void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
-  SILType baseTy = i->getOperand()->getType();
-
-  if (i->getOperand()->getType().isAddress()) {
-    assert(false);
-    Address base = getLoweredAddress(i->getOperand());
-    //
-    // assert(getIndexedTypeX(IGM.Int8PtrPtrTy, { IGM.getInt32(0), IGM.getInt32(0) }));
-    // auto bytePtr = Builder.CreateBitCast(base.getAddress(), base->getType()->getPointerElementType());
-//    auto newAddr = Builder.CreateInBoundsGEP(base.getAddress(), { IGM.getInt32(0), IGM.getInt32(0), IGM.getInt32(0) });
-//    auto newAddr = emitByteOffsetGEP(base.getAddress(), IGM.getInt32(0), base->getType()->getPointerElementType()->getPointerElementType());
-    // newAddr = Builder.CreateGEP(newAddr, { IGM.getInt32(0), IGM.getInt32(0) });
-    // newAddr = Builder.CreateBitCast(newAddr, base->getType()->getPointerElementType());
-    // For dumb reasons, if we get an address here it means we're taking the address of the element of a class in a stack alloc which means we're taking the address of an element of a class double pointer. It's OK to load the first pointer because the pointer we load will still allow us to have a reference to the element.
-    auto classAddr = Builder.CreateLoad(base);
-    auto fieldAddr = projectPhysicalClassMemberAddress(*this, classAddr, baseTy, i->getType(), i->getField());
-    setLoweredAddress(i, fieldAddr.getAddress());
-    return;
-  }
-
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *value = base.claimNext();
 
+  SILType baseTy = i->getOperand()->getType();
   Address field = projectPhysicalClassMemberAddress(*this, value, baseTy,
                                                     i->getType(), i->getField())
                       .getAddress();
@@ -3669,9 +3654,6 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   SILType objType = i->getSrc()->getType().getObjectType();
 
   const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
-  if (objType.getClassOrBoundGenericClass()) {
-    // projectPhysicalClassMemberAddress
-  }
   switch (i->getOwnershipQualifier()) {
   case StoreOwnershipQualifier::Unqualified:
   case StoreOwnershipQualifier::Init:

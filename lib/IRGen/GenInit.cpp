@@ -64,14 +64,9 @@ StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
     auto addr = getUndefAddress();
     return { addr };
   }
-
-  auto *type = getStorageType();
-  // Classes will return a pointer type but we want the element type.
-  if (T.getClassOrBoundGenericClass() && false)
-    type = type->getPointerElementType();
   
   Address alloca =
-    IGF.createAlloca(type, getFixedAlignment(), name);
+    IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
   IGF.Builder.CreateLifetimeStart(alloca, getFixedSize());
   
   return { alloca };
