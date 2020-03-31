@@ -71,6 +71,13 @@ struct SwiftModuleDetails: Codable {
 struct ClangModuleDetails: Codable {
   /// The path to the module map used to build this module.
   var moduleMapPath: String
+
+  /// The context hash used to discriminate this module file.
+  var contextHash: String
+
+  /// The Clang command line arguments that need to be passed through
+  /// to the -emit-pcm action to build this module.
+  var commandLine: [String] = []
 }
 
 struct ModuleDependencies: Codable {

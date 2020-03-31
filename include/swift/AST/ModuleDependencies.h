@@ -94,16 +94,26 @@ public:
   /// The module map file used to generate the Clang module.
   const std::string moduleMapFile;
 
+  /// The context hash describing the configuration options for this module.
+  const std::string contextHash;
+
+  /// Partial (Clang) command line that can be used to build this module.
+  const std::vector<std::string> nonPathCommandLine;
+
   /// The file dependencies
   const std::vector<std::string> fileDependencies;
 
   ClangModuleDependenciesStorage(
       const std::string &compiledModulePath,
       const std::string &moduleMapFile,
+      const std::string &contextHash,
+      const std::vector<std::string> &nonPathCommandLine,
       const std::vector<std::string> &fileDependencies
   ) : ModuleDependenciesStorageBase(/*isSwiftModule=*/false,
                                     compiledModulePath),
       moduleMapFile(moduleMapFile),
+      contextHash(contextHash),
+      nonPathCommandLine(nonPathCommandLine),
       fileDependencies(fileDependencies) { }
 
   ModuleDependenciesStorageBase *clone() const override {
@@ -158,11 +168,13 @@ public:
   static ModuleDependencies forClangModule(
       const std::string &compiledModulePath,
       const std::string &moduleMapFile,
+      const std::string &contextHash,
+      const std::vector<std::string> &nonPathCommandLine,
       const std::vector<std::string> &fileDependencies) {
     return ModuleDependencies(
-        std::make_unique<ClangModuleDependenciesStorage>(compiledModulePath,
-                                                         moduleMapFile,
-                                                         fileDependencies));
+        std::make_unique<ClangModuleDependenciesStorage>(
+          compiledModulePath, moduleMapFile, contextHash, nonPathCommandLine,
+          fileDependencies));
   }
 
   /// Retrieve the path to the compiled module.

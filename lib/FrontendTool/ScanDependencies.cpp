@@ -301,6 +301,16 @@ static void writeJSON(llvm::raw_ostream &out,
       // Module map file.
       writeJSONSingleField(out, "moduleMapPath",
                            clangDeps->moduleMapFile, 5,
+                           /*trailingComma=*/true);
+
+      // Context hash.
+      writeJSONSingleField(out, "contextHash",
+                           clangDeps->contextHash, 5,
+                           /*trailingComma=*/true);
+
+      // Command line.
+      writeJSONSingleField(out, "commandLine",
+                           clangDeps->nonPathCommandLine, 5,
                            /*trailingComma=*/false);
     }
 

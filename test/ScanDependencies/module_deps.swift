@@ -74,6 +74,12 @@ import E
 // CHECK: "moduleMapPath"
 // CHECK-SAME: module.modulemap
 
+// CHECK: "contextHash"
+// CHECK-SAME: "{{.*}}"
+
+// CHECK: "commandLine": [
+// CHECK-NEXT: "-remove-preceeding-explicit-module-build-incompatible-options"
+
 /// --------Swift module E
 // CHECK: "swift": "E"
 // CHECK-LABEL: modulePath": "E.swiftmodule"

@@ -209,7 +209,10 @@ static void recordModuleDependencies(
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencies::forClangModule(
         clangModuleDep.ImplicitModulePCMPath,
-        clangModuleDep.ClangModuleMapFile, fileDeps);
+        clangModuleDep.ClangModuleMapFile,
+        clangModuleDep.ContextHash,
+        clangModuleDep.NonPathCommandLine,
+        fileDeps);
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
       dependencies.addModuleDependency(moduleName.ModuleName, alreadyAddedModules);
     }
