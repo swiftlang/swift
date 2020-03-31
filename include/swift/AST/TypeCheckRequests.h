@@ -65,7 +65,7 @@ class InheritedTypeRequest :
                          Type(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>,
                               unsigned,
                               TypeResolutionStage),
-                         CacheKind::SeparatelyCached>
+                         RequestFlags::SeparatelyCached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -94,8 +94,8 @@ public:
 class SuperclassTypeRequest
     : public SimpleRequest<
           SuperclassTypeRequest, Type(NominalTypeDecl *, TypeResolutionStage),
-          CacheKind::SeparatelyCached | CacheKind::DependencySink |
-              CacheKind::DependencySource> {
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySink |
+              RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -128,7 +128,7 @@ public:
 class EnumRawTypeRequest :
     public SimpleRequest<EnumRawTypeRequest,
                          Type(EnumDecl *, TypeResolutionStage),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -155,7 +155,7 @@ public:
 class OverriddenDeclsRequest :
   public SimpleRequest<OverriddenDeclsRequest,
                        llvm::TinyPtrVector<ValueDecl *>(ValueDecl *),
-                       CacheKind::SeparatelyCached> {
+                       RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -177,7 +177,7 @@ public:
 class IsObjCRequest :
     public SimpleRequest<IsObjCRequest,
                          bool(ValueDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -200,7 +200,7 @@ void simple_display(llvm::raw_ostream &out, CtorInitializerKind initKind);
 class InitKindRequest :
     public SimpleRequest<InitKindRequest,
                          CtorInitializerKind(ConstructorDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -220,7 +220,7 @@ public:
 class ProtocolRequiresClassRequest :
     public SimpleRequest<ProtocolRequiresClassRequest,
                          bool(ProtocolDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -246,7 +246,7 @@ public:
 class ExistentialConformsToSelfRequest :
     public SimpleRequest<ExistentialConformsToSelfRequest,
                          bool(ProtocolDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -272,7 +272,7 @@ public:
 class ExistentialTypeSupportedRequest :
     public SimpleRequest<ExistentialTypeSupportedRequest,
                          bool(ProtocolDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -297,7 +297,7 @@ public:
 class IsFinalRequest :
     public SimpleRequest<IsFinalRequest,
                          bool(ValueDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -318,7 +318,7 @@ public:
 class IsDynamicRequest :
     public SimpleRequest<IsDynamicRequest,
                          bool(ValueDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -339,7 +339,7 @@ public:
 class RequirementSignatureRequest :
     public SimpleRequest<RequirementSignatureRequest,
                          ArrayRef<Requirement>(ProtocolDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -361,7 +361,7 @@ public:
 class DefaultDefinitionTypeRequest :
     public SimpleRequest<DefaultDefinitionTypeRequest,
                          Type(AssociatedTypeDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -437,7 +437,7 @@ class RequirementRequest :
     public SimpleRequest<RequirementRequest,
                          Requirement(WhereClauseOwner, unsigned,
                                      TypeResolutionStage),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -470,7 +470,7 @@ public:
 class USRGenerationRequest :
     public SimpleRequest<USRGenerationRequest,
                          std::string(const ValueDecl*),
-                         CacheKind::Cached>
+                         RequestFlags::Cached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -490,7 +490,7 @@ public:
 class MangleLocalTypeDeclRequest :
     public SimpleRequest<MangleLocalTypeDeclRequest,
                          std::string(const TypeDecl*),
-                         CacheKind::Cached>
+                         RequestFlags::Cached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -512,7 +512,7 @@ void simple_display(llvm::raw_ostream &out, const KnownProtocolKind);
 class DefaultTypeRequest
     : public SimpleRequest<DefaultTypeRequest,
                            Type(KnownProtocolKind, const DeclContext *),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -533,7 +533,7 @@ public:
 class PropertyWrapperTypeInfoRequest
   : public SimpleRequest<PropertyWrapperTypeInfoRequest,
                          PropertyWrapperTypeInfo(NominalTypeDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -554,7 +554,7 @@ public:
 class AttachedPropertyWrappersRequest :
     public SimpleRequest<AttachedPropertyWrappersRequest,
                          llvm::TinyPtrVector<CustomAttr *>(VarDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -575,7 +575,7 @@ public:
 class AttachedPropertyWrapperTypeRequest :
     public SimpleRequest<AttachedPropertyWrapperTypeRequest,
                          Type(VarDecl *, unsigned),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -596,7 +596,7 @@ public:
 class PropertyWrapperBackingPropertyTypeRequest :
     public SimpleRequest<PropertyWrapperBackingPropertyTypeRequest,
                          Type(VarDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -616,7 +616,7 @@ public:
 class PropertyWrapperMutabilityRequest :
     public SimpleRequest<PropertyWrapperMutabilityRequest,
                          Optional<PropertyWrapperMutability> (VarDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -637,7 +637,7 @@ public:
 class PropertyWrapperBackingPropertyInfoRequest :
     public SimpleRequest<PropertyWrapperBackingPropertyInfoRequest,
                          PropertyWrapperBackingPropertyInfo(VarDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -657,7 +657,7 @@ public:
 class StructuralTypeRequest :
     public SimpleRequest<StructuralTypeRequest,
                          Type(TypeAliasDecl*),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -676,7 +676,7 @@ public:
 class ResilienceExpansionRequest :
     public SimpleRequest<ResilienceExpansionRequest,
                          ResilienceExpansion(DeclContext*),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -699,7 +699,7 @@ void simple_display(llvm::raw_ostream &out,
 class AttachedFunctionBuilderRequest :
     public SimpleRequest<AttachedFunctionBuilderRequest,
                          CustomAttr *(ValueDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -720,7 +720,7 @@ public:
 class FunctionBuilderTypeRequest :
     public SimpleRequest<FunctionBuilderTypeRequest,
                          Type(ValueDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -739,7 +739,7 @@ public:
 class SelfAccessKindRequest :
     public SimpleRequest<SelfAccessKindRequest,
                          SelfAccessKind(FuncDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -761,7 +761,7 @@ public:
 class IsGetterMutatingRequest :
     public SimpleRequest<IsGetterMutatingRequest,
                          bool(AbstractStorageDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -783,7 +783,7 @@ public:
 class IsSetterMutatingRequest :
     public SimpleRequest<IsSetterMutatingRequest,
                          bool(AbstractStorageDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -805,7 +805,7 @@ public:
 class OpaqueReadOwnershipRequest :
     public SimpleRequest<OpaqueReadOwnershipRequest,
                          OpaqueReadOwnership(AbstractStorageDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -827,7 +827,7 @@ public:
 class LazyStoragePropertyRequest :
     public SimpleRequest<LazyStoragePropertyRequest,
                          VarDecl *(VarDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -850,7 +850,7 @@ public:
 class TypeCheckFunctionBodyUntilRequest :
     public SimpleRequest<TypeCheckFunctionBodyUntilRequest,
                          bool(AbstractFunctionDecl *, SourceLoc),
-                         CacheKind::Cached|CacheKind::DependencySource> {
+                         RequestFlags::Cached|RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -877,7 +877,7 @@ public:
 class StoredPropertiesRequest :
     public SimpleRequest<StoredPropertiesRequest,
                          ArrayRef<VarDecl *>(NominalTypeDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -901,7 +901,7 @@ public:
 class StoredPropertiesAndMissingMembersRequest :
     public SimpleRequest<StoredPropertiesAndMissingMembersRequest,
                          ArrayRef<Decl *>(NominalTypeDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -919,7 +919,7 @@ public:
 class StorageImplInfoRequest :
     public SimpleRequest<StorageImplInfoRequest,
                          StorageImplInfo(AbstractStorageDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -940,7 +940,7 @@ public:
 class RequiresOpaqueAccessorsRequest :
     public SimpleRequest<RequiresOpaqueAccessorsRequest,
                          bool(VarDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -961,7 +961,7 @@ public:
 class RequiresOpaqueModifyCoroutineRequest :
     public SimpleRequest<RequiresOpaqueModifyCoroutineRequest,
                          bool(AbstractStorageDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -982,7 +982,7 @@ public:
 class IsAccessorTransparentRequest :
     public SimpleRequest<IsAccessorTransparentRequest,
                          bool(AccessorDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1004,7 +1004,7 @@ class SynthesizeAccessorRequest :
     public SimpleRequest<SynthesizeAccessorRequest,
                          AccessorDecl *(AbstractStorageDecl *,
                                         AccessorKind),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1026,7 +1026,7 @@ public:
 class EmittedMembersRequest :
     public SimpleRequest<EmittedMembersRequest,
                          DeclRange(ClassDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1047,7 +1047,7 @@ public:
 class IsImplicitlyUnwrappedOptionalRequest :
     public SimpleRequest<IsImplicitlyUnwrappedOptionalRequest,
                          bool(ValueDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1068,7 +1068,7 @@ public:
 class ClassAncestryFlagsRequest :
     public SimpleRequest<ClassAncestryFlagsRequest,
                          AncestryFlags (ClassDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1091,7 +1091,7 @@ class AbstractGenericSignatureRequest :
                          GenericSignature (GenericSignatureImpl *,
                                            SmallVector<GenericTypeParamType *, 2>,
                                            SmallVector<Requirement, 2>),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1123,7 +1123,7 @@ class InferredGenericSignatureRequest :
                                             SmallVector<Requirement, 2>,
                                             SmallVector<TypeLoc, 2>,
                                             bool),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1158,7 +1158,7 @@ void simple_display(llvm::raw_ostream &out, const TypeLoc source);
 class ExtendedTypeRequest
     : public SimpleRequest<ExtendedTypeRequest,
                            Type(ExtensionDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1175,7 +1175,7 @@ public:
 class FunctionOperatorRequest :
     public SimpleRequest<FunctionOperatorRequest,
                          OperatorDecl *(FuncDecl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
   
@@ -1194,7 +1194,7 @@ public:
 class GenericSignatureRequest :
     public SimpleRequest<GenericSignatureRequest,
                          GenericSignature (GenericContext *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
   
@@ -1216,7 +1216,7 @@ public:
 class UnderlyingTypeRequest :
     public SimpleRequest<UnderlyingTypeRequest,
                          Type(TypeAliasDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1238,7 +1238,7 @@ public:
 class OperatorPrecedenceGroupRequest
     : public SimpleRequest<OperatorPrecedenceGroupRequest,
                            PrecedenceGroupDecl *(InfixOperatorDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1258,7 +1258,7 @@ public:
 class EnumRawValuesRequest :
     public SimpleRequest<EnumRawValuesRequest,
                          evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
   
@@ -1283,7 +1283,7 @@ public:
 /// Determines if an override is ABI compatible with its base method.
 class IsABICompatibleOverrideRequest
     : public SimpleRequest<IsABICompatibleOverrideRequest, bool(ValueDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1302,7 +1302,7 @@ public:
 class OpaqueResultTypeRequest
     : public SimpleRequest<OpaqueResultTypeRequest,
                            OpaqueTypeDecl *(ValueDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1321,7 +1321,7 @@ public:
 class IsStaticRequest :
     public SimpleRequest<IsStaticRequest,
                          bool(FuncDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1345,7 +1345,7 @@ public:
 class NeedsNewVTableEntryRequest
     : public SimpleRequest<NeedsNewVTableEntryRequest,
                            bool(AbstractFunctionDecl *),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1366,7 +1366,7 @@ public:
 class ParamSpecifierRequest
     : public SimpleRequest<ParamSpecifierRequest,
                            ParamSpecifier(ParamDecl *),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1388,7 +1388,7 @@ public:
 class ResultTypeRequest
     : public SimpleRequest<ResultTypeRequest,
                            Type(ValueDecl *),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1411,7 +1411,7 @@ class PatternBindingEntryRequest
     : public SimpleRequest<PatternBindingEntryRequest,
                            const PatternBindingEntry *(PatternBindingDecl *,
                                                        unsigned),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1431,7 +1431,7 @@ public:
 
 class NamingPatternRequest
     : public SimpleRequest<NamingPatternRequest, NamedPattern *(VarDecl *),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1451,7 +1451,7 @@ public:
 class InterfaceTypeRequest :
     public SimpleRequest<InterfaceTypeRequest,
                          Type (ValueDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1506,7 +1506,7 @@ void simple_display(llvm::raw_ostream &out, const PrecedenceGroupDescriptor &d);
 class ValidatePrecedenceGroupRequest
     : public SimpleRequest<ValidatePrecedenceGroupRequest,
                            PrecedenceGroupDecl *(PrecedenceGroupDescriptor),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1533,7 +1533,7 @@ public:
 /// values.
 class AreAllStoredPropertiesDefaultInitableRequest
     : public SimpleRequest<AreAllStoredPropertiesDefaultInitableRequest,
-                           bool(NominalTypeDecl *), CacheKind::Cached> {
+                           bool(NominalTypeDecl *), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1553,7 +1553,7 @@ public:
 /// conformance.
 class HasUserDefinedDesignatedInitRequest
     : public SimpleRequest<HasUserDefinedDesignatedInitRequest,
-                           bool(NominalTypeDecl *), CacheKind::Cached> {
+                           bool(NominalTypeDecl *), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1571,7 +1571,7 @@ public:
 /// Checks whether this type has a synthesized memberwise initializer.
 class HasMemberwiseInitRequest
     : public SimpleRequest<HasMemberwiseInitRequest, bool(StructDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1590,7 +1590,7 @@ public:
 class SynthesizeMemberwiseInitRequest
     : public SimpleRequest<SynthesizeMemberwiseInitRequest,
                            ConstructorDecl *(NominalTypeDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1614,7 +1614,7 @@ public:
 class ResolveEffectiveMemberwiseInitRequest
     : public SimpleRequest<ResolveEffectiveMemberwiseInitRequest,
                            ConstructorDecl *(NominalTypeDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1633,7 +1633,7 @@ public:
 /// initializer.
 class HasDefaultInitRequest
     : public SimpleRequest<HasDefaultInitRequest, bool(NominalTypeDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1653,7 +1653,7 @@ public:
 class SynthesizeDefaultInitRequest
     : public SimpleRequest<SynthesizeDefaultInitRequest,
                            ConstructorDecl *(NominalTypeDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1672,7 +1672,7 @@ public:
 class CompareDeclSpecializationRequest
     : public SimpleRequest<CompareDeclSpecializationRequest,
                            bool(DeclContext *, ValueDecl *, ValueDecl *, bool),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1693,7 +1693,7 @@ public:
 /// convenience initializers.
 class InheritsSuperclassInitializersRequest
     : public SimpleRequest<InheritsSuperclassInitializersRequest,
-                           bool(ClassDecl *), CacheKind::SeparatelyCached> {
+                           bool(ClassDecl *), RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1724,7 +1724,7 @@ class ResolveImplicitMemberRequest
     : public SimpleRequest<ResolveImplicitMemberRequest,
                            evaluator::SideEffect(NominalTypeDecl *,
                                                  ImplicitMemberAction),
-                           CacheKind::Uncached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1745,7 +1745,7 @@ class TypeWitnessRequest
     : public SimpleRequest<TypeWitnessRequest,
                            TypeWitnessAndDecl(NormalProtocolConformance *,
                                               AssociatedTypeDecl *),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1767,7 +1767,7 @@ public:
 class ValueWitnessRequest
     : public SimpleRequest<ValueWitnessRequest,
                            Witness(NormalProtocolConformance *, ValueDecl *),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1800,7 +1800,7 @@ enum class FunctionBuilderBodyPreCheck : uint8_t {
 class PreCheckFunctionBuilderRequest
     : public SimpleRequest<PreCheckFunctionBuilderRequest,
                            FunctionBuilderBodyPreCheck(AnyFunctionRef),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1820,7 +1820,7 @@ public:
 /// hierarchy.
 class HasCircularInheritanceRequest
     : public SimpleRequest<HasCircularInheritanceRequest, bool(ClassDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1843,7 +1843,7 @@ public:
 /// inherited protocols.
 class HasCircularInheritedProtocolsRequest
     : public SimpleRequest<HasCircularInheritedProtocolsRequest,
-                           bool(ProtocolDecl *), CacheKind::Cached> {
+                           bool(ProtocolDecl *), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1865,7 +1865,7 @@ public:
 /// Computes whether an enum's raw value has a circular reference.
 class HasCircularRawValueRequest
     : public SimpleRequest<HasCircularRawValueRequest, bool(EnumDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1888,7 +1888,7 @@ public:
 class DefaultArgumentInitContextRequest
     : public SimpleRequest<DefaultArgumentInitContextRequest,
                            Initializer *(ParamDecl *),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1910,7 +1910,7 @@ public:
 /// parameter.
 class DefaultArgumentExprRequest
     : public SimpleRequest<DefaultArgumentExprRequest, Expr *(ParamDecl *),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1932,7 +1932,7 @@ public:
 class CallerSideDefaultArgExprRequest
     : public SimpleRequest<CallerSideDefaultArgExprRequest,
                            Expr *(DefaultArgumentExpr *),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1953,7 +1953,7 @@ public:
 /// implementation of a \c callAsFunction method.
 class IsCallableNominalTypeRequest
     : public SimpleRequest<IsCallableNominalTypeRequest,
-                           bool(CanType, DeclContext *), CacheKind::Cached> {
+                           bool(CanType, DeclContext *), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1970,7 +1970,7 @@ public:
 
 class DynamicallyReplacedDeclRequest
     : public SimpleRequest<DynamicallyReplacedDeclRequest,
-                           ValueDecl *(ValueDecl *), CacheKind::Cached> {
+                           ValueDecl *(ValueDecl *), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1988,7 +1988,7 @@ public:
 class TypeCheckSourceFileRequest
     : public SimpleRequest<
           TypeCheckSourceFileRequest, evaluator::SideEffect(SourceFile *),
-          CacheKind::SeparatelyCached | CacheKind::DependencySource> {
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2014,7 +2014,7 @@ public:
 /// @dynamicMemberLookup attribute on it.
 class HasDynamicMemberLookupAttributeRequest
     : public SimpleRequest<HasDynamicMemberLookupAttributeRequest,
-                           bool(CanType), CacheKind::Cached> {
+                           bool(CanType), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2037,7 +2037,7 @@ public:
 /// @dynamicCallable attribute on it.
 class HasDynamicCallableAttributeRequest
     : public SimpleRequest<HasDynamicCallableAttributeRequest,
-                           bool(CanType), CacheKind::Cached> {
+                           bool(CanType), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2063,7 +2063,7 @@ public:
 /// allowed.
 class PatternTypeRequest
     : public SimpleRequest<PatternTypeRequest, Type(ContextualPattern),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2085,7 +2085,7 @@ public:
 class SPIGroupsRequest :
     public SimpleRequest<SPIGroupsRequest,
                          llvm::ArrayRef<Identifier>(const Decl *),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2112,7 +2112,7 @@ public:
 class DifferentiableAttributeTypeCheckRequest
     : public SimpleRequest<DifferentiableAttributeTypeCheckRequest,
                            IndexSubset *(DifferentiableAttr *),
-                           CacheKind::SeparatelyCached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2134,7 +2134,7 @@ public:
 class TypeEraserHasViableInitRequest
     : public SimpleRequest<TypeEraserHasViableInitRequest,
                            bool(TypeEraserAttr *, ProtocolDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2160,7 +2160,7 @@ public:
 class ScopedImportLookupRequest
     : public SimpleRequest<ScopedImportLookupRequest,
                            ArrayRef<ValueDecl *>(ImportDecl *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2179,7 +2179,7 @@ public:
 /// statements which could produce a non-void result.
 class ClosureHasExplicitResultRequest
     : public SimpleRequest<ClosureHasExplicitResultRequest, bool(ClosureExpr *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2213,8 +2213,9 @@ void simple_display(llvm::raw_ostream &out, ConformanceLookupKind kind);
 class LookupAllConformancesInContextRequest
     : public SimpleRequest<LookupAllConformancesInContextRequest,
                            ProtocolConformanceLookupResult(const DeclContext *),
-                           CacheKind::Uncached | CacheKind::DependencySink |
-                               CacheKind::DependencySource> {
+                           RequestFlags::Uncached |
+                               RequestFlags::DependencySink |
+                               RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2235,8 +2236,8 @@ public:
 class CheckRedeclarationRequest
     : public SimpleRequest<
           CheckRedeclarationRequest, evaluator::SideEffect(ValueDecl *),
-          CacheKind::SeparatelyCached | CacheKind::DependencySource |
-              CacheKind::DependencySink> {
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySource |
+              RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 

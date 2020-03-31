@@ -508,8 +508,6 @@ public:
 
   /// Returns the active dependency's source file, or \c nullptr if no
   /// dependency source is active.
-  ///
-  /// If there is no active scope, the result always cascades.
   SourceFile *getActiveDependencySource() const {
     if (dependencySources.empty())
       return nullptr;

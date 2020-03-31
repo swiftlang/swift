@@ -32,7 +32,7 @@ namespace swift {
 class Evaluator;
 
 /// Describes how the result for a particular request will be cached.
-enum class CacheKind {
+enum class RequestFlags {
   /// The result for a particular request should never be cached.
   Uncached = 1 << 0,
   /// The result for a particular request should be cached within the
@@ -56,9 +56,9 @@ enum class CacheKind {
   DependencySink = 1 << 4,
 };
 
-static constexpr inline CacheKind operator|(CacheKind lhs, CacheKind rhs) {
-  return CacheKind(static_cast<std::underlying_type<CacheKind>::type>(lhs) |
-                   static_cast<std::underlying_type<CacheKind>::type>(rhs));
+static constexpr inline RequestFlags operator|(RequestFlags lhs, RequestFlags rhs) {
+  return RequestFlags(static_cast<std::underlying_type<RequestFlags>::type>(lhs) |
+                   static_cast<std::underlying_type<RequestFlags>::type>(rhs));
 }
 
 /// -------------------------------------------------------------------------
@@ -142,25 +142,25 @@ namespace detail {
 }
 
 namespace detail {
-constexpr bool cacheContains(CacheKind kind, CacheKind needle) {
-  using cache_t = std::underlying_type<CacheKind>::type;
+constexpr bool cacheContains(RequestFlags kind, RequestFlags needle) {
+  using cache_t = std::underlying_type<RequestFlags>::type;
   return (static_cast<cache_t>(kind) & static_cast<cache_t>(needle))
       == static_cast<cache_t>(needle);
 }
-constexpr bool isEverCached(CacheKind kind) {
-  return !cacheContains(kind, CacheKind::Uncached);
+constexpr bool isEverCached(RequestFlags kind) {
+  return !cacheContains(kind, RequestFlags::Uncached);
 }
 
-constexpr bool hasExternalCache(CacheKind kind) {
-  return cacheContains(kind, CacheKind::SeparatelyCached);
+constexpr bool hasExternalCache(RequestFlags kind) {
+  return cacheContains(kind, RequestFlags::SeparatelyCached);
 }
 
-constexpr bool isDependencySource(CacheKind kind) {
-  return cacheContains(kind, CacheKind::DependencySource);
+constexpr bool isDependencySource(RequestFlags kind) {
+  return cacheContains(kind, RequestFlags::DependencySource);
 }
 
-constexpr bool isDependencySink(CacheKind kind) {
-  return cacheContains(kind, CacheKind::DependencySink);
+constexpr bool isDependencySink(RequestFlags kind) {
+  return cacheContains(kind, RequestFlags::DependencySink);
 }
 } // end namespace detail
 
@@ -211,7 +211,7 @@ SourceLoc extractNearestSourceLoc(const std::tuple<First, Rest...> &value) {
 /// the source location from the first input that provides one.
 ///
 /// Value caching is determined by the \c Caching parameter. When
-/// \c Caching == CacheKind::SeparatelyCached, the \c Derived class is
+/// \c Caching == RequestFlags::SeparatelyCached, the \c Derived class is
 /// responsible for implementing the two operations responsible to managing
 /// the cache:
 /// \code
@@ -222,7 +222,7 @@ SourceLoc extractNearestSourceLoc(const std::tuple<First, Rest...> &value) {
 /// Incremental dependency tracking occurs automatically during
 /// request evaluation. To support that system, high-level requests that define
 /// dependency sources should override \c readDependencySource()
-/// and specify \c CacheKind::DependencySource in addition to one of
+/// and specify \c RequestFlags::DependencySource in addition to one of
 /// the 3 caching kinds defined above.
 /// \code
 ///   evaluator::DependencySource readDependencySource(Evaluator &) const;
@@ -231,16 +231,16 @@ SourceLoc extractNearestSourceLoc(const std::tuple<First, Rest...> &value) {
 /// Requests that define dependency sinks should instead override
 /// \c writeDependencySink() and use the given evaluator and request
 /// result to write an edge into the dependency tracker. In addition,
-/// \c CacheKind::DependencySource should be specified along with
+/// \c RequestFlags::DependencySource should be specified along with
 /// one of the 3 caching kinds defined above.
 /// \code
 ///   void writeDependencySink(Evaluator &,
 ///                            ReferencedNameTracker &, Output) const;
 /// \endcode
-template<typename Derived, typename Signature, CacheKind Caching>
+template<typename Derived, typename Signature, RequestFlags Caching>
 class SimpleRequest;
 
-template<typename Derived, CacheKind Caching, typename Output,
+template<typename Derived, RequestFlags Caching, typename Output,
          typename ...Inputs>
 class SimpleRequest<Derived, Output(Inputs...), Caching> {
   std::tuple<Inputs...> storage;

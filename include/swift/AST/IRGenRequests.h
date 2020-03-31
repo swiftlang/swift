@@ -117,7 +117,7 @@ void reportEvaluatedRequest(UnifiedStatsReporter &stats,
 class IRGenSourceFileRequest
     : public SimpleRequest<IRGenSourceFileRequest,
                            std::unique_ptr<llvm::Module>(IRGenDescriptor),
-                           CacheKind::Uncached|CacheKind::DependencySource> {
+                           RequestFlags::Uncached|RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -139,7 +139,7 @@ public:
 class IRGenWholeModuleRequest
     : public SimpleRequest<IRGenWholeModuleRequest,
                            std::unique_ptr<llvm::Module>(IRGenDescriptor),
-                           CacheKind::Uncached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 

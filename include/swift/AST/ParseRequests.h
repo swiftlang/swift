@@ -43,7 +43,7 @@ void simple_display(llvm::raw_ostream &out, const FingerprintAndMembers &value);
 class ParseMembersRequest
     : public SimpleRequest<ParseMembersRequest,
                            FingerprintAndMembers(IterableDeclContext *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -63,7 +63,7 @@ public:
 class ParseAbstractFunctionBodyRequest :
     public SimpleRequest<ParseAbstractFunctionBodyRequest,
                          BraceStmt *(AbstractFunctionDecl *),
-                         CacheKind::SeparatelyCached>
+                         RequestFlags::SeparatelyCached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -85,7 +85,7 @@ public:
 class ParseSourceFileRequest
     : public SimpleRequest<
           ParseSourceFileRequest, ArrayRef<Decl *>(SourceFile *),
-          CacheKind::SeparatelyCached | CacheKind::DependencySource> {
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -111,7 +111,7 @@ void simple_display(llvm::raw_ostream &out,
 class CodeCompletionSecondPassRequest
     : public SimpleRequest<CodeCompletionSecondPassRequest,
                            bool(SourceFile *, CodeCompletionCallbacksFactory *),
-                           CacheKind::Uncached|CacheKind::DependencySource> {
+                           RequestFlags::Uncached|RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
