@@ -18,6 +18,7 @@
 #ifndef SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 #define SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 
+#include "llvm/ADT/SmallString.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 
