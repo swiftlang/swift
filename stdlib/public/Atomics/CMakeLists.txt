@@ -11,14 +11,16 @@
 #===----------------------------------------------------------------------===#
 
 add_swift_target_library(swiftAtomics ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  AtomicInteger.swift
   AtomicMemoryOrderings.swift
-  AtomicProtocols.swift
+  AtomicProtocol.swift
   AtomicRepresentable.swift
+  NullableAtomic.swift
   UnsafeAtomicLazyReference.swift
 
   GYB_SOURCES
-  AtomicIntegers.swift.gyb
-  AtomicPointers.swift.gyb
+  AtomicIntegerConformances.swift.gyb
+  AtomicPointerConformances.swift.gyb
   UnsafeAtomicPointer.swift.gyb
 
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS} "-parse-stdlib"

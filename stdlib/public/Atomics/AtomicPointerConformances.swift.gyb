@@ -262,8 +262,8 @@ extension ${swiftType}: AtomicProtocol {
     expected: Self,
     desired: Self,
     at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicUpdateOrdering, // Note: no default
-    failureOrdering: AtomicLoadOrdering // Note: no default
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self) {
     let old: Builtin.${builtinType}
     let won: Builtin.Int1
@@ -490,8 +490,8 @@ extension ${swiftType}: NullableAtomic {
     expected: Self?,
     desired: Self?,
     at address: UnsafeMutablePointer<NullableAtomicStorage>,
-    ordering: AtomicUpdateOrdering, // Note: no default
-    failureOrdering: AtomicLoadOrdering // Note: no default
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self?) {
     let old: Builtin.${builtinType}
     let won: Builtin.Int1

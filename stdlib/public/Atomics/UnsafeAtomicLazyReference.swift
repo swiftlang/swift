@@ -18,12 +18,13 @@ import Swift
 @frozen
 public struct UnsafeAtomicLazyReference<Instance: AnyObject> {
   public typealias Value = Instance?
+  public typealias AtomicStorage = Instance?
 
   @usableFromInline
-  internal let _ptr: UnsafeMutablePointer<Value>
+  internal let _ptr: UnsafeMutablePointer<AtomicStorage>
 
   @_transparent // Debug performance
-  public init(@_nonEphemeral at address: UnsafeMutablePointer<Value>) {
+  public init(@_nonEphemeral at address: UnsafeMutablePointer<AtomicStorage>) {
     self._ptr = address
   }
 }
@@ -32,7 +33,7 @@ public struct UnsafeAtomicLazyReference<Instance: AnyObject> {
 extension UnsafeAtomicLazyReference {
   @inlinable
   public static func create() -> Self {
-    let ptr = UnsafeMutablePointer<Value>.allocate(capacity: 1)
+    let ptr = UnsafeMutablePointer<AtomicStorage>.allocate(capacity: 1)
     ptr.initialize(to: nil)
     return Self(at: ptr)
   }

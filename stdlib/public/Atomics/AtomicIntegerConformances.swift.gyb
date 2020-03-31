@@ -222,8 +222,8 @@ extension ${swiftType}: AtomicProtocol {
     expected: ${swiftType},
     desired: ${swiftType},
     at address: UnsafeMutablePointer<${swiftType}>,
-    ordering: AtomicUpdateOrdering, // Note: no default
-    failureOrdering: AtomicLoadOrdering // Note: no default
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: ${swiftType}) {
     switch (ordering, failureOrdering) {
 % for (swiftSuccess, llvmSuccess, _) in rmwOrderings():

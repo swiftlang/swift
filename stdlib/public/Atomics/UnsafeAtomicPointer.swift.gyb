@@ -149,8 +149,8 @@ extension UnsafeAtomicPointer {
   public func compareExchange(
     expected: Value,
     desired: Value,
-    ordering: AtomicUpdateOrdering, // Note: no default
-    failureOrdering: AtomicLoadOrdering // Note: no default
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Value) {
     Value.atomicCompareExchange(
       expected: expected,

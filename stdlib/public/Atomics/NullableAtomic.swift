@@ -13,102 +13,6 @@
 import Swift
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public protocol AtomicProtocol {
-  associatedtype AtomicStorage
-
-  static func atomicStorage(for value: Self) -> AtomicStorage
-
-  static func deinitializeAtomicStorage(
-    at address: UnsafeMutablePointer<AtomicStorage>
-  )
-
-  @_semantics("has_constant_evaluable_arguments")
-  static func atomicLoad(
-    at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicLoadOrdering
-  ) -> Self
-
-  @_semantics("has_constant_evaluable_arguments")
-  static func atomicStore(
-    _ desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicStoreOrdering
-  )
-
-  @_semantics("has_constant_evaluable_arguments")
-  static func atomicExchange(
-    _ desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicUpdateOrdering
-  ) -> Self
-
-  @_semantics("has_constant_evaluable_arguments")
-  static func atomicCompareExchange(
-    expected: Self,
-    desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicUpdateOrdering
-  ) -> (exchanged: Bool, original: Self)
-
-  @_semantics("has_constant_evaluable_arguments")
-  static func atomicCompareExchange(
-    expected: Self,
-    desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicUpdateOrdering, // Note: no default
-    failureOrdering: AtomicLoadOrdering // Note: no default
-  ) -> (exchanged: Bool, original: Self)
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicProtocol where AtomicStorage == Self {
-  @inlinable
-  public static func atomicStorage(for value: Self) -> AtomicStorage {
-    return value
-  }
-
-  @inlinable
-  public static func deinitializeAtomicStorage(
-    at address: UnsafeMutablePointer<AtomicStorage>
-  ) {
-    address.deinitialize(count: 1)
-  }
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
-  static func atomicLoadThenWrappingIncrement(
-    by operand: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicUpdateOrdering
-  ) -> Self
-
-  static func atomicLoadThenWrappingDecrement(
-    by operand: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicUpdateOrdering
-  ) -> Self
-
-  static func atomicLoadThenBitwiseAnd(
-    with operand: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicUpdateOrdering
-  ) -> Self
-
-  static func atomicLoadThenBitwiseOr(
-    with operand: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicUpdateOrdering
-  ) -> Self
-
-  static func atomicLoadThenBitwiseXor(
-    with operand: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicUpdateOrdering
-  ) -> Self
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol NullableAtomic: AtomicProtocol {
   associatedtype NullableAtomicStorage
 
@@ -118,23 +22,27 @@ public protocol NullableAtomic: AtomicProtocol {
     at address: UnsafeMutablePointer<NullableAtomicStorage>
   )
 
+  @_semantics("has_constant_evaluable_arguments")
   static func atomicOptionalLoad(
     at address: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicLoadOrdering
   ) -> Self?
 
+  @_semantics("has_constant_evaluable_arguments")
   static func atomicOptionalStore(
     _ desired: Self?,
     at address: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicStoreOrdering
   )
 
+  @_semantics("has_constant_evaluable_arguments")
   static func atomicOptionalExchange(
     _ desired: Self?,
     at address: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self?
 
+  @_semantics("has_constant_evaluable_arguments")
   static func atomicOptionalCompareExchange(
     expected: Self?,
     desired: Self?,
@@ -142,12 +50,13 @@ public protocol NullableAtomic: AtomicProtocol {
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self?)
 
+  @_semantics("has_constant_evaluable_arguments")
   static func atomicOptionalCompareExchange(
     expected: Self?,
     desired: Self?,
     at address: UnsafeMutablePointer<NullableAtomicStorage>,
-    ordering: AtomicUpdateOrdering, // Note: no default
-    failureOrdering: AtomicLoadOrdering // Note: no default
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self?)
 }
 
@@ -234,8 +143,8 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
     expected: Self,
     desired: Self,
     at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicUpdateOrdering, // Note: no default
-    failureOrdering: AtomicLoadOrdering // Note: no default
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self) {
     Wrapped.atomicOptionalCompareExchange(
       expected: expected,

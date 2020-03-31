@@ -91,8 +91,8 @@ extension AtomicRepresentable {
     expected: Self,
     desired: Self,
     at address: UnsafeMutablePointer<AtomicStorage>,
-    ordering: AtomicUpdateOrdering, // Note: no default
-    failureOrdering: AtomicLoadOrdering // Note: no default
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self) {
     let (exchanged, raw) = RawValue.atomicCompareExchange(
       expected: expected.rawValue,
