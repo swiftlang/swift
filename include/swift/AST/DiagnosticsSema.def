@@ -2716,8 +2716,8 @@ NOTE(codable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)' and 'encode(to:)'?", ())
 
 WARNING(decodable_property_will_not_be_decoded, none,
-        "immutable property %0 will not be decoded because it is declared with "
-        "an initial value which cannot be overwritten", (DeclName))
+        "immutable property will not be decoded because it is declared with "
+        "an initial value which cannot be overwritten", ())
 NOTE(decodable_property_init_or_codingkeys_implicit, none,
      "set the initial value via the initializer or explicitly define a "
      "CodingKeys enum %select{including|without}0 a %1 case to silence "

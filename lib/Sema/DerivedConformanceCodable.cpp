@@ -876,8 +876,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
           }
         }
 
-        varDecl->diagnose(diag::decodable_property_will_not_be_decoded,
-                          varDecl->getName());
+        varDecl->diagnose(diag::decodable_property_will_not_be_decoded);
         if (codingKeysEnum->isImplicit()) {
           varDecl->diagnose(
               diag::decodable_property_init_or_codingkeys_implicit,
