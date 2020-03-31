@@ -205,16 +205,11 @@ static void recordModuleDependencies(
       fileDeps.push_back(fileDep.getKey());
     }
 
-    // Create a module filename.
-    // FIXME: Query Clang to determine an appropriate hashed name for the
-    // module file.
-    llvm::SmallString<32> modulePath(clangModuleDep.ModuleName);
-    llvm::sys::path::replace_extension(modulePath, "pcm");
-
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencies::forClangModule(
-        modulePath.str(), clangModuleDep.ClangModuleMapFile, fileDeps);
+        clangModuleDep.ImplicitModulePCMPath,
+        clangModuleDep.ClangModuleMapFile, fileDeps);
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
       dependencies.addModuleDependency(moduleName.ModuleName, alreadyAddedModules);
     }
@@ -333,7 +328,7 @@ bool ClangImporter::addBridgingHeaderDependencies(
     targetModule.addBridgingModuleDependency(
         moduleDep.ModuleName, alreadyAddedModules);
   }
-  
+
   // Update the cache with the new information for the module.
   cache.updateDependencies(
      {moduleName, ModuleDependenciesKind::Swift},
