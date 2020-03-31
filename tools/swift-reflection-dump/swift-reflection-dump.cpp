@@ -487,6 +487,7 @@ public:
         *result = (uint64_t)~0ull;
         return true;
       }
+      return false;
     }
     case DLQ_GetObjCReservedLowBits: {
       auto result = static_cast<uint8_t *>(outBuffer);
