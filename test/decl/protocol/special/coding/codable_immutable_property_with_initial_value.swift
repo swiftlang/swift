@@ -6,7 +6,7 @@
 
 struct Foo1: Codable {
   let bar: Int = 1
-  // expected-warning@-1 {{immutable property 'bar' will not be decoded because it is declared with an initial value which cannot be overwritten}}
+  // expected-warning@-1 {{immutable property will not be decoded because it is declared with an initial value which cannot be overwritten}}
   // expected-note@-2 {{set the initial value via the initializer or explicitly define a CodingKeys enum including a 'bar' case to silence this warning}}
   // expected-note@-3 {{make the property mutable instead}}{{3-6=var}}
   let baz1: String
@@ -15,7 +15,7 @@ struct Foo1: Codable {
 
 struct Foo2: Decodable {
   let bar: Int = 1
-  // expected-warning@-1 {{immutable property 'bar' will not be decoded because it is declared with an initial value which cannot be overwritten}}
+  // expected-warning@-1 {{immutable property will not be decoded because it is declared with an initial value which cannot be overwritten}}
   // expected-note@-2 {{set the initial value via the initializer or explicitly define a CodingKeys enum without a 'bar' case to silence this warning}}
   // expected-note@-3 {{make the property mutable instead}}{{3-6=var}}
   let baz1: String
@@ -44,7 +44,7 @@ struct Foo4: Codable {
 
 struct Foo5: Decodable {
   let bar: Int = 1
-  // expected-warning@-1 {{immutable property 'bar' will not be decoded because it is declared with an initial value which cannot be overwritten}}
+  // expected-warning@-1 {{immutable property will not be decoded because it is declared with an initial value which cannot be overwritten}}
   // expected-note@-2 {{set the initial value via the initializer or remove the 'bar' case from the CodingKeys enum to silence this warning}}
   // expected-note@-3 {{make the property mutable instead}}{{3-6=var}}
   let baz1: String
