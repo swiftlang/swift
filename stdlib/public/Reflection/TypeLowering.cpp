@@ -1791,9 +1791,10 @@ public:
           /* Size */ 2, /* Alignment */ 2, /* Stride */ 2,
           /* NumExtraInhabitants */ 65536 - NoPayloadCases, Cases);
       } else {
-        auto extraInhabitants = std::min(
-          ValueWitnessFlags::MaxNumExtraInhabitants,
-          std::numeric_limits<uint32_t>::max() - NoPayloadCases + 1);
+        auto extraInhabitants = std::numeric_limits<uint32_t>::max() - NoPayloadCases + 1;
+        if (extraInhabitants > ValueWitnessFlags::MaxNumExtraInhabitants) {
+          extraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
+        }
         return TC.makeTypeInfo<NoPayloadEnumTypeInfo>(
           /* Size */ 4, /* Alignment */ 4, /* Stride */ 4,
           /* NumExtraInhabitants */ extraInhabitants, Cases);
@@ -1883,8 +1884,9 @@ public:
         } else {
           NumExtraInhabitants =
             (1 << (tagCounts.numTagBytes * 8)) - tagCounts.numTags;
-          NumExtraInhabitants = std::min(NumExtraInhabitants,
-                           unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
+          if (NumExtraInhabitants > ValueWitnessFlags::MaxNumExtraInhabitants) {
+            NumExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
+          }
         }
         unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
         if (Stride == 0)
