@@ -876,20 +876,18 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
           }
         }
 
-        C.Diags.diagnose(varDecl->getLoc(),
-                         diag::decodable_property_will_not_be_decoded,
-                         varDecl->getName());
+        varDecl->diagnose(diag::decodable_property_will_not_be_decoded,
+                          varDecl->getName());
         if (codingKeysEnum->isImplicit()) {
-          C.Diags.diagnose(varDecl->getLoc(),
-                           diag::decodable_property_init_or_codingkeys_implicit,
-                           conformsToEncodable ? 0 : 1, varDecl->getName());
+          varDecl->diagnose(
+              diag::decodable_property_init_or_codingkeys_implicit,
+              conformsToEncodable ? 0 : 1, varDecl->getName());
         } else {
-          C.Diags.diagnose(varDecl->getLoc(),
-                           diag::decodable_property_init_or_codingkeys_explicit,
-                           varDecl->getName());
+          varDecl->diagnose(
+              diag::decodable_property_init_or_codingkeys_explicit,
+              varDecl->getName());
         }
-        C.Diags
-            .diagnose(varDecl->getLoc(), diag::decodable_make_property_mutable)
+        varDecl->diagnose(diag::decodable_make_property_mutable)
             .fixItReplace(varDecl->getAttributeInsertionLoc(true), "var");
 
         continue;
