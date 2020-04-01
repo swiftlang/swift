@@ -50,6 +50,14 @@ brew install cmake ninja
 brew cask install java # required for Bazel
 ```
 
+You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle) to install all of these dependencies:
+
+    brew bundle
+
+**[MacPorts](https://macports.org)**
+
+    sudo port install cmake ninja
+
 Additionally, [Bazel](https://www.bazel.build) is required to build with TensorFlow support. Instructions to download Bazel directly can be found [below](#bazel). You can find instructions for installing CMake, and Ninja directly [below](#build-dependencies) as well.
 
 #### Linux

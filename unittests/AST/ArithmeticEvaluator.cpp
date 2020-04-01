@@ -88,7 +88,7 @@ static double evalOrNaN(Evaluator &evaluator, const Request &request) {
 }
 
 /// Rule to evaluate the value of the expression.
-template<typename Derived, CacheKind Caching>
+template<typename Derived, RequestFlags Caching>
 struct EvaluationRule
   : public SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
 {
@@ -131,11 +131,11 @@ struct EvaluationRule
   SourceLoc getNearestLoc() const { return SourceLoc(); }
 };
 
-template<typename Derived, CacheKind Caching>
+template<typename Derived, RequestFlags Caching>
 bool EvaluationRule<Derived, Caching>::brokeCycle = false;
 
 struct InternallyCachedEvaluationRule :
-EvaluationRule<InternallyCachedEvaluationRule, CacheKind::Cached>
+EvaluationRule<InternallyCachedEvaluationRule, RequestFlags::Cached>
 {
   using EvaluationRule::EvaluationRule;
 
@@ -152,13 +152,13 @@ EvaluationRule<InternallyCachedEvaluationRule, CacheKind::Cached>
 };
 
 struct UncachedEvaluationRule
-    : EvaluationRule<UncachedEvaluationRule, CacheKind::Uncached> {
+    : EvaluationRule<UncachedEvaluationRule, RequestFlags::Uncached> {
   using EvaluationRule::EvaluationRule;
 };
 
 struct ExternallyCachedEvaluationRule
     : EvaluationRule<ExternallyCachedEvaluationRule,
-                     CacheKind::SeparatelyCached> {
+                     RequestFlags::SeparatelyCached> {
   using EvaluationRule::EvaluationRule;
 
   bool isCached() const {

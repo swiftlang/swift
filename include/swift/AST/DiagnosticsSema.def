@@ -184,6 +184,9 @@ ERROR(value_type_comparison_with_nil_illegal,none,
 ERROR(cannot_match_expr_pattern_with_value,none,
       "expression pattern of type %0 cannot match values of type %1",
       (Type, Type))
+ERROR(cannot_match_expr_tuple_pattern_with_nontuple_value,none,
+      "tuple pattern cannot match values of non-tuple type %0",
+      (Type))
 ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
       "pattern cannot match values of type %0",
       (Type))
@@ -2771,6 +2774,19 @@ NOTE(decodable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)'?", ())
 NOTE(codable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)' and 'encode(to:)'?", ())
+
+WARNING(decodable_property_will_not_be_decoded, none,
+        "immutable property will not be decoded because it is declared with "
+        "an initial value which cannot be overwritten", ())
+NOTE(decodable_property_init_or_codingkeys_implicit, none,
+     "set the initial value via the initializer or explicitly define a "
+     "CodingKeys enum %select{including|without}0 a %1 case to silence "
+     "this warning", (unsigned, DeclName))
+NOTE(decodable_property_init_or_codingkeys_explicit, none,
+     "set the initial value via the initializer or remove the %0 case from "
+     "the CodingKeys enum to silence this warning", (DeclName))
+NOTE(decodable_make_property_mutable, none,
+     "make the property mutable instead", ())
 
 NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "%select{associated value|stored property}0 type %1 does not conform to "

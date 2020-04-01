@@ -60,7 +60,7 @@ void simple_display(llvm::raw_ostream &out, const CursorInfoOwner &owner);
 class CursorInfoRequest:
     public SimpleRequest<CursorInfoRequest,
                          ide::ResolvedCursorInfo(CursorInfoOwner),
-                         CacheKind::Cached>
+                         RequestFlags::Cached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -121,7 +121,7 @@ void simple_display(llvm::raw_ostream &out, const RangeInfoOwner &owner);
 class RangeInfoRequest:
     public SimpleRequest<RangeInfoRequest,
                          ide::ResolvedRangeInfo(RangeInfoOwner),
-                         CacheKind::Cached>
+                         RequestFlags::Cached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -149,7 +149,7 @@ public:
 class ProvideDefaultImplForRequest:
     public SimpleRequest<ProvideDefaultImplForRequest,
                          ArrayRef<ValueDecl*>(ValueDecl*),
-                         CacheKind::Cached>
+                         RequestFlags::Cached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -211,7 +211,7 @@ struct OverridenDeclsOwner {
 class CollectOverriddenDeclsRequest:
     public SimpleRequest<CollectOverriddenDeclsRequest,
                          ArrayRef<ValueDecl*>(OverridenDeclsOwner),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -262,7 +262,7 @@ struct ProtocolNameOwner {
 class ResolveProtocolNameRequest:
     public SimpleRequest<ResolveProtocolNameRequest,
                          ProtocolDecl*(ProtocolNameOwner),
-                         CacheKind::Cached>
+                         RequestFlags::Cached>
 {
 public:
   using SimpleRequest::SimpleRequest;

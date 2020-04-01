@@ -1741,7 +1741,12 @@ namespace {
         auto underlyingConformance = conformance
           .subst(O->getUnderlyingInterfaceType(),
                  *O->getUnderlyingTypeSubstitutions());
-        
+
+        // Skip protocols without Witness tables, e.g. @objc protocols.
+        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(
+                underlyingConformance.getRequirement()))
+          continue;
+
         auto witnessTableRef = IGM.emitWitnessTableRefString(
                                           underlyingType, underlyingConformance,
                                           contextSig,

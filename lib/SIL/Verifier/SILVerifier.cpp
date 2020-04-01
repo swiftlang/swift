@@ -5620,10 +5620,3 @@ void SILModule::verify() const {
     prop.verify(*this);
   }
 }
-
-/// Determine whether an instruction may not have a SILDebugScope.
-bool swift::maybeScopeless(SILInstruction &I) {
-  if (I.getFunction()->isBare())
-    return true;
-  return !isa<DebugValueInst>(I) && !isa<DebugValueAddrInst>(I);
-}

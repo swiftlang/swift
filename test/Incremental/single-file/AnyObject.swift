@@ -1,4 +1,10 @@
-// REQUIRES: rdar60050653
+// UNSUPPORTED: CPU=i386 && OS=ios
+// UNSUPPORTED: CPU=armv7 && OS=ios
+// UNSUPPORTED: CPU=armv7s && OS=ios
+// UNSUPPORTED: CPU=armv7k && OS=ios
+// Exclude iOS-based 32-bit platforms because the Foundation overlays introduce
+// an extra dependency on _KeyValueCodingAndObservingPublishing only for 64-bit
+// platforms.
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t)
@@ -11,11 +17,13 @@ import Foundation
 // expected-provides {{NSObject}}
 // expected-private-superclass {{__C.NSObject}}
 // expected-private-conformance {{Foundation._KeyValueCodingAndObserving}}
+// expected-private-conformance {{Foundation._KeyValueCodingAndObservingPublishing}}
 // expected-private-conformance {{Swift.Hashable}}
 // expected-private-conformance {{Swift.Equatable}}
 // expected-private-conformance {{Swift.CustomDebugStringConvertible}}
 // expected-private-conformance {{Swift.CVarArg}}
 // expected-private-conformance {{Swift.CustomStringConvertible}}
+// expected-cascading-member {{Swift._ExpressibleByBuiltinIntegerLiteral.init}}
 // expected-cascading-superclass {{main.LookupFactory}}
 @objc private class LookupFactory: NSObject {
   // expected-provides {{AssignmentPrecedence}}

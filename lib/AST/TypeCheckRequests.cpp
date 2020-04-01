@@ -157,6 +157,29 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
     protocolDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 }
 
+evaluator::DependencySource
+SuperclassTypeRequest::readDependencySource(Evaluator &e) const {
+  const auto access = std::get<0>(getStorage())->getFormalAccess();
+  return {
+    e.getActiveDependencySourceOrNull(),
+    evaluator::getScopeForAccessLevel(access)
+  };
+}
+
+void SuperclassTypeRequest::writeDependencySink(Evaluator &eval,
+                                                ReferencedNameTracker &tracker,
+                                                Type value) const {
+  if (!value)
+    return;
+
+  // FIXME: This is compatible with the existing name tracking scheme, but
+  // ignoring this name when we fail to look up a class is bogus.
+  ClassDecl *Super = value->getClassOrBoundGenericClass();
+  if (!Super)
+    return;
+  tracker.addUsedMember({Super, Identifier()}, eval.isActiveSourceCascading());
+}
+
 //----------------------------------------------------------------------------//
 // Enum raw type computation.
 //----------------------------------------------------------------------------//
@@ -1284,9 +1307,83 @@ void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
   std::get<0>(getStorage())->setCheckedRedeclaration();
 }
 
+evaluator::DependencySource
+CheckRedeclarationRequest::readDependencySource(Evaluator &eval) const {
+  auto *current = std::get<0>(getStorage());
+  auto *currentDC = current->getDeclContext();
+  return {
+    currentDC->getParentSourceFile(),
+    evaluator::getScopeForAccessLevel(current->getFormalAccess())
+  };
+}
+
+void CheckRedeclarationRequest::writeDependencySink(
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    evaluator::SideEffect) const {
+  auto *current = std::get<0>(getStorage());
+  if (!current->hasName())
+    return;
+
+  DeclContext *currentDC = current->getDeclContext();
+  SourceFile *currentFile = currentDC->getParentSourceFile();
+  if (!currentFile || currentDC->isLocalContext())
+    return;
+
+  if (currentDC->isTypeContext()) {
+    if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
+      tracker.addUsedMember({nominal, current->getBaseName()},
+                            eval.isActiveSourceCascading());
+    }
+  } else {
+    tracker.addTopLevelName(current->getBaseName(),
+                            eval.isActiveSourceCascading());
+  }
+}
+
+//----------------------------------------------------------------------------//
+// LookupAllConformancesInContextRequest computation.
+//----------------------------------------------------------------------------//
+
+evaluator::DependencySource
+LookupAllConformancesInContextRequest::readDependencySource(
+    Evaluator &eval) const {
+  auto *dc = std::get<0>(getStorage());
+  AccessLevel defaultAccess;
+  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+    const NominalTypeDecl *nominal = ext->getExtendedNominal();
+    if (!nominal) {
+      return {
+        eval.getActiveDependencySourceOrNull(),
+        evaluator::DependencyScope::Cascading
+      };
+    }
+    defaultAccess = nominal->getFormalAccess();
+  } else {
+    defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
+  }
+  return {
+    eval.getActiveDependencySourceOrNull(),
+    evaluator::getScopeForAccessLevel(defaultAccess)
+  };
+}
+
+void LookupAllConformancesInContextRequest::writeDependencySink(
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    ProtocolConformanceLookupResult conformances) const {
+  for (auto conformance : conformances) {
+    tracker.addUsedMember({conformance->getProtocol(), Identifier()},
+                          eval.isActiveSourceCascading());
+  }
+}
+
 //----------------------------------------------------------------------------//
 // TypeCheckSourceFileRequest computation.
 //----------------------------------------------------------------------------//
+
+evaluator::DependencySource
+TypeCheckSourceFileRequest::readDependencySource(Evaluator &e) const {
+  return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
+}
 
 Optional<evaluator::SideEffect>
 TypeCheckSourceFileRequest::getCachedResult() const {
@@ -1328,4 +1425,18 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
     }
 #endif
   }
+}
+
+//----------------------------------------------------------------------------//
+// TypeCheckFunctionBodyUntilRequest computation.
+//----------------------------------------------------------------------------//
+
+evaluator::DependencySource
+TypeCheckFunctionBodyUntilRequest::readDependencySource(Evaluator &e) const {
+  // We're going under a function body scope, unconditionally flip the scope
+  // to private.
+  return {
+    std::get<0>(getStorage())->getParentSourceFile(),
+    evaluator::DependencyScope::Private
+  };
 }

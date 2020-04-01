@@ -19,6 +19,7 @@
 #define SWIFT_AST_EVALUATOR_H
 
 #include "swift/AST/AnyRequest.h"
+#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/Basic/AnyValue.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
@@ -46,6 +47,12 @@ using llvm::None;
 class DiagnosticEngine;
 class Evaluator;
 class UnifiedStatsReporter;
+
+namespace detail {
+// Remove this when the compiler bumps to C++17.
+template <typename...>
+using void_t = void;
+}
 
 /// An "abstract" request function pointer, which is the storage type
 /// used for each of the
@@ -224,6 +231,38 @@ class Evaluator {
   /// so all clients must cope with cycles.
   llvm::DenseMap<AnyRequest, std::vector<AnyRequest>> dependencies;
 
+  /// A stack of dependency sources in the order they were evaluated.
+  llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
+
+  /// An RAII type that manages manipulating the evaluator's
+  /// dependency source stack. It is specialized to be zero-cost for
+  /// requests that are not dependency sources.
+  template <typename Request, typename = detail::void_t<>>
+  struct IncrementalDependencyStackRAII {
+    IncrementalDependencyStackRAII(Evaluator &E, const Request &Req) {}
+  };
+
+  template <typename Request>
+  struct IncrementalDependencyStackRAII<
+      Request, typename std::enable_if<Request::isDependencySource>::type> {
+    NullablePtr<Evaluator> Eval;
+    IncrementalDependencyStackRAII(Evaluator &E, const Request &Req) {
+      auto Source = Req.readDependencySource(E);
+      // If there is no source to introduce, bail. This can occur if
+      // a request originates in the context of a module.
+      if (!Source.getPointer()) {
+        return;
+      }
+      E.dependencySources.emplace_back(Source);
+      Eval = &E;
+    }
+
+    ~IncrementalDependencyStackRAII() {
+      if (Eval.isNonNull())
+        Eval.get()->dependencySources.pop_back();
+    }
+  };
+
   /// Retrieve the request function for the given zone and request IDs.
   AbstractRequestFunction *getAbstractRequestFunction(uint8_t zoneID,
                                                       uint8_t requestID) const;
@@ -264,6 +303,7 @@ public:
            typename std::enable_if<Request::isEverCached>::type * = nullptr>
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
+    IncrementalDependencyStackRAII<Request> incDeps{*this, request};
     // The request can be cached, but check a predicate to determine
     // whether this particular instance is cached. This allows more
     // fine-grained control over which instances get cache.
@@ -279,6 +319,7 @@ public:
            typename std::enable_if<!Request::isEverCached>::type * = nullptr>
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
+    IncrementalDependencyStackRAII<Request> incDeps{*this, request};
     return getResultUncached(request);
   }
 
@@ -366,7 +407,9 @@ private:
     FrontendStatsTracer statsTracer = make_tracer(stats, request);
     if (stats) reportEvaluatedRequest(*stats, request);
 
-    return getRequestFunction<Request>()(request, *this);
+    auto &&r = getRequestFunction<Request>()(request, *this);
+    reportEvaluatedResult<Request>(request, r);
+    return std::move(r);
   }
 
   /// Get the result of a request, consulting an external cache
@@ -377,8 +420,10 @@ private:
   llvm::Expected<typename Request::OutputType>
   getResultCached(const Request &request) {
     // If there is a cached result, return it.
-    if (auto cached = request.getCachedResult())
+    if (auto cached = request.getCachedResult()) {
+      reportEvaluatedResult<Request>(request, *cached);
       return *cached;
+    }
 
     // Compute the result.
     auto result = getResultUncached(request);
@@ -403,7 +448,9 @@ private:
     // If we already have an entry for this request in the cache, return it.
     auto known = cache.find_as(request);
     if (known != cache.end()) {
-      return known->second.template castTo<typename Request::OutputType>();
+      auto r = known->second.template castTo<typename Request::OutputType>();
+      reportEvaluatedResult<Request>(request, r);
+      return r;
     }
 
     // Compute the result.
@@ -414,6 +461,62 @@ private:
     // Cache the result.
     cache.insert({AnyRequest(request), *result});
     return result;
+  }
+
+private:
+  // Report the result of evaluating a request that is not a dependency sink -
+  // which is to say do nothing.
+  template <typename Request,
+            typename std::enable_if<!Request::isDependencySink>::type * = nullptr>
+  void reportEvaluatedResult(const Request &r,
+                             const typename Request::OutputType &o) {}
+
+  // Report the result of evaluating a request that is a dependency sink.
+  template <typename Request,
+            typename std::enable_if<Request::isDependencySink>::type * = nullptr>
+  void reportEvaluatedResult(const Request &r,
+                             const typename Request::OutputType &o) {
+    if (auto *tracker = getActiveDependencyTracker())
+      r.writeDependencySink(*this, *tracker, o);
+  }
+
+  /// If there is an active dependency source, returns its
+  /// \c ReferencedNameTracker. Else, returns \c nullptr.
+  ReferencedNameTracker *getActiveDependencyTracker() const {
+    if (auto *source = getActiveDependencySourceOrNull())
+      return source->getRequestBasedReferencedNameTracker();
+    return nullptr;
+  }
+
+public:
+  /// Returns \c true if the scope of the current active source cascades.
+  ///
+  /// If there is no active scope, the result always cascades.
+  bool isActiveSourceCascading() const {
+    return getActiveSourceScope() == evaluator::DependencyScope::Cascading;
+  }
+
+  /// Returns the scope of the current active scope.
+  ///
+  /// If there is no active scope, the result always cascades.
+  evaluator::DependencyScope getActiveSourceScope() const {
+    if (dependencySources.empty()) {
+      return evaluator::DependencyScope::Cascading;
+    }
+    return dependencySources.back().getInt();
+  }
+
+  /// Returns the active dependency's source file, or \c nullptr if no
+  /// dependency source is active.
+  ///
+  /// The use of this accessor is strongly discouraged, as it implies that a
+  /// dependency sink is seeking to filter out names based on the files they
+  /// come from. Existing callers are being migrated to more reasonable ways
+  /// of judging the relevancy of a dependency.
+  SourceFile *getActiveDependencySourceOrNull() const {
+    if (dependencySources.empty())
+      return nullptr;
+    return dependencySources.back().getPointer();
   }
 
 public:
