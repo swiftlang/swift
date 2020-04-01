@@ -1272,6 +1272,32 @@ OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
   return result.hasValue() ? result.getValue() : nullptr;
 }
 
+template <typename OperatorType>
+void LookupOperatorRequest<OperatorType>::writeDependencySink(
+    Evaluator &evaluator, ReferencedNameTracker &reqTracker,
+    OperatorType *o) const {
+  auto &desc = std::get<0>(this->getStorage());
+  auto *FU = desc.fileOrModule.template get<FileUnit *>();
+  auto shouldRegisterDependencyEdge = [&FU](OperatorType *o) -> bool {
+    if (!o)
+      return true;
+
+    auto *topLevelContext = o->getDeclContext()->getModuleScopeContext();
+    return topLevelContext != FU;
+  };
+
+  // FIXME(Evaluator Incremental Dependencies): This is all needlessly complex.
+  // For one, it does not take into account the fact that precedence groups can
+  // be shadowed, and so should be registered regardless of their defining
+  // module. Second, lookups for operators within the file define a valid named
+  // dependency just as much as lookups outside of the current source file.
+  if (!shouldRegisterDependencyEdge(o)) {
+    return;
+  }
+
+  reqTracker.addTopLevelName(desc.name, desc.isCascading);
+}
+
 #define LOOKUP_OPERATOR(Kind)                                                  \
   Kind##Decl *ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) {       \
     auto result =                                                              \
@@ -1281,7 +1307,10 @@ OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
   }                                                                            \
   template Kind##Decl *                                                        \
   LookupOperatorRequest<Kind##Decl>::evaluate(Evaluator &e,                    \
-                                              OperatorLookupDescriptor d) const;
+                                              OperatorLookupDescriptor) const; \
+  template                                                                     \
+  void LookupOperatorRequest<Kind##Decl>::writeDependencySink(                 \
+           Evaluator &, ReferencedNameTracker &, Kind##Decl *) const;          \
 
 LOOKUP_OPERATOR(PrefixOperator)
 LOOKUP_OPERATOR(InfixOperator)
@@ -2565,7 +2594,18 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
 
 void SourceFile::createReferencedNameTracker() {
   assert(!ReferencedNames && "This file already has a name tracker.");
+  assert(!RequestReferencedNames && "This file already has a name tracker.");
   ReferencedNames.emplace(ReferencedNameTracker());
+  RequestReferencedNames.emplace(ReferencedNameTracker());
+}
+
+const ReferencedNameTracker *
+SourceFile::getConfiguredReferencedNameTracker() const {
+  if (getASTContext().LangOpts.EnableRequestBasedIncrementalDependencies) {
+    return getRequestBasedReferencedNameTracker();
+  } else {
+    return getLegacyReferencedNameTracker();
+  }
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {

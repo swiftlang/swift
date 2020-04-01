@@ -29,6 +29,7 @@ class SourceManager;
 class SourceFile;
 
 // MARK: - DependencyVerifier
+
 bool verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
                         ArrayRef<FileUnit *> SFs);
 bool verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
@@ -100,6 +101,7 @@ private:
 
   void printRemainingDiagnostics() const;
 };
-}
+
+} // end namespace swift
 
 #endif

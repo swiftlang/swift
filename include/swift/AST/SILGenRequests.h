@@ -18,6 +18,7 @@
 #define SWIFT_SILGEN_REQUESTS_H
 
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
 
 namespace swift {
@@ -81,7 +82,7 @@ SourceLoc extractNearestSourceLoc(const SILGenDescriptor &desc);
 class SILGenSourceFileRequest :
     public SimpleRequest<SILGenSourceFileRequest,
                          std::unique_ptr<SILModule>(SILGenDescriptor),
-                         CacheKind::Uncached> {
+                         RequestFlags::Uncached|RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -94,12 +95,16 @@ private:
 
 public:
   bool isCached() const { return true; }
+
+public:
+  // Incremental dependencies.
+  evaluator::DependencySource readDependencySource(Evaluator &) const;
 };
 
 class SILGenWholeModuleRequest :
     public SimpleRequest<SILGenWholeModuleRequest,
                          std::unique_ptr<SILModule>(SILGenDescriptor),
-                         CacheKind::Uncached> {
+                         RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 

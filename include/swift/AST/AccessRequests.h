@@ -33,7 +33,7 @@ class ValueDecl;
 class AccessLevelRequest :
     public SimpleRequest<AccessLevelRequest,
                          AccessLevel(ValueDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -56,7 +56,7 @@ public:
 class SetterAccessLevelRequest :
     public SimpleRequest<SetterAccessLevelRequest,
                          AccessLevel(AbstractStorageDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -79,7 +79,7 @@ using DefaultAndMax = std::pair<AccessLevel, AccessLevel>;
 class DefaultAndMaxAccessLevelRequest :
     public SimpleRequest<DefaultAndMaxAccessLevelRequest,
                          DefaultAndMax(ExtensionDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 private:
