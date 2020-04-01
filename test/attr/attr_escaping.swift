@@ -72,8 +72,7 @@ struct GenericStruct<T> {}
 
 func misuseEscaping(_ a: @escaping Int) {} // expected-error{{@escaping attribute only applies to function types}} {{26-36=}}
 func misuseEscaping(_ a: (@escaping Int)?) {} // expected-error{{@escaping attribute only applies to function types}} {{27-36=}}
-func misuseEscaping(opt a: @escaping ((Int) -> Int)?) {} // expected-error{{@escaping attribute only applies to function types}} {{28-38=}}
-  // expected-note@-1{{closure is already escaping in optional type argument}}
+func misuseEscaping(opt a: @escaping ((Int) -> Int)?) {} // expected-error{{Optional closures are already @escaping}} {{28-38=}}
 
 func misuseEscaping(_ a: (@escaping (Int) -> Int)?) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{27-36=}}
   // expected-note@-1{{closure is already escaping in optional type argument}}
