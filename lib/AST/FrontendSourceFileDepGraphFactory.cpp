@@ -282,7 +282,8 @@ DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
 
 bool fine_grained_dependencies::emitReferenceDependencies(
     DiagnosticEngine &diags, SourceFile *const SF,
-    const DependencyTracker &depTracker, StringRef outputPath,
+    const DependencyTracker &depTracker,
+    StringRef outputPath,
     const bool alsoEmitDotFile) {
 
   // Before writing to the dependencies file path, preserve any previous file
@@ -292,7 +293,7 @@ bool fine_grained_dependencies::emitReferenceDependencies(
 
   SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
                              SF, outputPath, depTracker, alsoEmitDotFile)
-                             .construct();
+                              .construct();
 
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
@@ -563,7 +564,7 @@ void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
       DependencyKey::createKeyForWholeSourceFile(DeclAspect::implementation,
                                                  swiftDeps);
 
-  SF->getReferencedNameTracker()->enumerateAllUses(
+  SF->getConfiguredReferencedNameTracker()->enumerateAllUses(
       includePrivateDeps, depTracker,
       [&](const fine_grained_dependencies::NodeKind kind, StringRef context,
           StringRef name, const bool isCascadingUse) {
