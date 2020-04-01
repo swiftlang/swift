@@ -6,6 +6,7 @@ add_swift_host_tool(swift-ide-test
 )
 target_link_libraries(swift-ide-test
                       PRIVATE
+                        swiftAST
                         swiftDriver
                         swiftFrontend
                         swiftIDE)

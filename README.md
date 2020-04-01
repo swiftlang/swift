@@ -103,7 +103,9 @@ which can be installed via a package manager:
 
     brew install cmake ninja
     
-You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle) to install all of these dependencies:
+You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle)
+from the root of this repository's working directory to install all of these
+dependencies:
 
     brew bundle
 
