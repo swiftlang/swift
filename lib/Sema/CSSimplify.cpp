@@ -5821,6 +5821,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
   }
 
+  // Exclude some of the dynamic member choices from results
+  // because using such choices would result in a self-recursive reference.
+  //
+  // This is required because if there are no viable/unviable choices
+  // `performMemberLookup` is going to attempt to lookup inaccessible
+  // members and results would include dynamic member subscripts which
+  // have already been excluded.
+  llvm::SmallPtrSet<ValueDecl *, 2> excludedDynamicMembers;
+
   // Local function that adds the given declaration if it is a
   // reasonable choice.
   auto addChoice = [&](OverloadChoice candidate) {
@@ -5997,8 +6006,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       if (auto kpElt = memberLocator->getLastElementAs<KPDynamicMemberElt>()) {
         auto *keyPath = kpElt->getKeyPathDecl();
         if (isSelfRecursiveKeyPathDynamicMemberLookup(*this, baseTy,
-                                                      memberLocator))
+                                                      memberLocator)) {
+          excludedDynamicMembers.insert(candidate.getDecl());
           return;
+        }
 
         if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
           // If this is an attempt to access read-only member via
@@ -6233,6 +6244,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         result.markErrorAlreadyDiagnosed();
         return result;
       }
+
+      if (excludedDynamicMembers.count(cand))
+        continue;
 
       result.addUnviable(getOverloadChoice(cand, /*isBridged=*/false,
                                            /*isUnwrappedOptional=*/false),
