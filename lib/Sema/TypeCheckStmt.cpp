@@ -1911,6 +1911,8 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
 
         body = *optBody;
         alreadyTypeChecked = true;
+
+        body->walk(ContextualizeClosures(AFD));
       }
     } else if (func->hasSingleExpressionBody() &&
                func->getResultInterfaceType()->isVoid()) {
