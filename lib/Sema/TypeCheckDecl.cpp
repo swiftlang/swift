@@ -578,6 +578,14 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           VD->getOriginalWrappedProperty(PropertyWrapperSynthesizedPropertyKind::Backing))
         return true;
 
+      // Property wrapper storage wrappers are final if the original property
+      // is final.
+      if (auto *original = VD->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+        if (original->isFinal())
+          return true;
+      }
+
       if (VD->getDeclContext()->getSelfClassDecl()) {
         // If this variable is a class member, mark it final if the
         // class is final, or if it was declared with 'let'.
