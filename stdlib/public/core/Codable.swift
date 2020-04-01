@@ -4601,7 +4601,16 @@ extension Float16: Codable {
   ///
   /// - Parameter decoder: The decoder to read data from.
   public init(from decoder: Decoder) throws {
-    self = try Self(Float(from: decoder))
+    let floatValue = try Float(from: decoder)
+    self = Float16(floatValue)
+    if isInfinite && floatValue.isFinite {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: decoder.codingPath,
+          debugDescription: "Parsed JSON number \(floatValue) does not fit in Float16."
+        )
+      )
+    }
   }
 
   /// Encodes this value into the given encoder.

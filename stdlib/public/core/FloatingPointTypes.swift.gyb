@@ -758,7 +758,6 @@ extension ${Self}: BinaryFloatingPoint {
   @inline(__always)
   public mutating func formRemainder(dividingBy other: ${Self}) {
 % if bits == 16:
-    // TODO: teach importer to map _Float16 <-> Float16, implement new shim
     self = Float16(_stdlib_remainderf(Float(self), Float(other)))
 % else:
     self = _stdlib_remainder${cFuncSuffix}(self, other)
@@ -774,7 +773,6 @@ extension ${Self}: BinaryFloatingPoint {
   @_transparent
   public mutating func formSquareRoot( ) {
 % if bits == 16:
-    // TODO: teach importer to map _Float16 <-> Float16, implement new shim
     self = Float16(_stdlib_squareRootf(Float(self)))
 % else:
     self = _stdlib_squareRoot${cFuncSuffix}(self)
@@ -1099,10 +1097,8 @@ extension ${Self} {
   ///
   /// - Parameter other: The value to use for the new instance.
   ${Availability(srcBits)}
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
-  public init(_ other: ${That}) {
 %   if srcBits == 80 and bits == 16:
+  public init(_ other: ${That}) {
     // If we use the Builtin for this operation, LLVM emits a call to
     // __truncxfhf, which would be a compiler-rt intrinsic but doesn't exist.
     // Workaround this by doing conversion in two stages, with the first stage
@@ -1112,19 +1108,25 @@ extension ${Self} {
       if Float80(flt).magnitude > other.magnitude {
         flt = Float(bitPattern: flt.bitPattern &- (~flt.bitPattern & 1))
       }
-      if Float80(flt).magnitude < other.magnitude {
+      else if Float80(flt).magnitude < other.magnitude {
         flt = Float(bitPattern: flt.bitPattern | 1)
       }
     }
     self = Float16(flt)
-%   elif srcBits > bits:
-    _value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
-%   elif srcBits < bits:
-    _value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
-%   else:
-    _value = other._value
-%   end
   }
+%   else:
+  @inlinable // FIXME(inline-always)
+  @inline(__always)
+  public init(_ other: ${That}) {
+%    if srcBits > bits:
+    _value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
+%    elif srcBits < bits:
+    _value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
+%    else:
+    _value = other._value
+%    end
+  }
+%   end
 
   /// Creates a new instance initialized to the given value, if it can be
   /// represented without rounding.
