@@ -2613,7 +2613,7 @@ public:
   }
   void visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
     printCommon(E, "enum_is_case_expr") << ' ' <<
-      E->getEnumElement()->getName() << "\n";
+      E->getEnumElement()->getBaseIdentifier() << "\n";
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

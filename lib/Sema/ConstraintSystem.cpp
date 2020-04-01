@@ -3870,7 +3870,7 @@ Optional<Identifier> constraints::getOperatorName(Expr *expr) {
   }
 
   if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(choice))
-    return FD->getBaseName().getIdentifier();
+    return FD->getBaseIdentifier();
 
   return None;
 }
