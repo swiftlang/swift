@@ -6917,7 +6917,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
       auto bitPattern = strategy->getBitPatternForNoPayloadElement(elt.decl);
       assert(bitPattern.size() == fixedTI->getFixedSize().getValueInBits());
       LLVM_DEBUG(llvm::dbgs() << "  no-payload case "
-                              << elt.decl->getName().str()
+                              << elt.decl->getBaseIdentifier().str()
                               << ":\t";
             displayBitMask(bitPattern));
 

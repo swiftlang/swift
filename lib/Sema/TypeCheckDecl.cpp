@@ -578,6 +578,14 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           VD->getOriginalWrappedProperty(PropertyWrapperSynthesizedPropertyKind::Backing))
         return true;
 
+      // Property wrapper storage wrappers are final if the original property
+      // is final.
+      if (auto *original = VD->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+        if (original->isFinal())
+          return true;
+      }
+
       if (VD->getDeclContext()->getSelfClassDecl()) {
         // If this variable is a class member, mark it final if the
         // class is final, or if it was declared with 'let'.
@@ -666,7 +674,7 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
   if (!result &&
       decl->isOperator() &&
       dc->isTypeContext()) {
-    auto operatorName = decl->getFullName().getBaseIdentifier();
+    const auto operatorName = decl->getBaseIdentifier();
     if (auto ED = dyn_cast<ExtensionDecl>(dc->getAsDecl())) {
       decl->diagnose(diag::nonstatic_operator_in_extension,
                      operatorName, ED->getExtendedTypeRepr())
@@ -1706,7 +1714,7 @@ OperatorDecl *
 FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {  
   auto &C = FD->getASTContext();
   auto &diags = C.Diags;
-  auto operatorName = FD->getFullName().getBaseIdentifier();
+  const auto operatorName = FD->getBaseIdentifier();
 
   // Check for static/final/class when we're in a type.
   auto dc = FD->getDeclContext();

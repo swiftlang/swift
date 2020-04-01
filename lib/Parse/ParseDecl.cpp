@@ -3519,7 +3519,7 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
     if (!getScopeInfo().isInactiveConfigBlock())
       SF.LocalTypeDecls.insert(TD);
 
-  Identifier name = D->getBaseName().getIdentifier();
+  const Identifier name = D->getBaseIdentifier();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
   D->setLocalDiscriminator(discriminator);
 }

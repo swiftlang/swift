@@ -386,7 +386,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     for (auto *D: TopDecls) {
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
         InsertedFunctions.insert(
-            std::string(FD->getBaseName().getIdentifier()));
+            std::string(FD->getBaseIdentifier()));
       }
     }
 

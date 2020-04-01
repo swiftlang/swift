@@ -541,7 +541,7 @@ public:
   }
   
   /// Returns true if the address falls within a registered image.
-  bool ownsAddress(RemoteAddress Address) {
+  bool ownsAddressRaw(RemoteAddress Address) {
     for (auto Range : imageRanges) {
       auto Start = std::get<0>(Range);
       auto End = std::get<1>(Range);
@@ -549,7 +549,27 @@ public:
           && Address.getAddressData() < End.getAddressData())
         return true;
     }
-  
+
+    return false;
+  }
+
+  /// Returns true if the address is known to the reflection context.
+  /// Currently, that means that either the address falls within a registered
+  /// image, or the address points to a Metadata whose type context descriptor
+  /// is within a registered image.
+  bool ownsAddress(RemoteAddress Address) {
+    if (ownsAddressRaw(Address))
+      return true;
+
+    // This is usually called on a Metadata address which might have been
+    // on the heap. Try reading it and looking up its type context descriptor
+    // instead.
+    if (auto Metadata = readMetadata(Address.getAddressData()))
+      if (auto DescriptorAddress =
+          super::readAddressOfNominalTypeDescriptor(Metadata, true))
+        if (ownsAddressRaw(RemoteAddress(DescriptorAddress)))
+          return true;
+
     return false;
   }
   

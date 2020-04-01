@@ -27,6 +27,8 @@ add_subdirectory(Verifier)
 
 add_swift_host_library(swiftSIL STATIC
   ${SIL_SOURCES})
+target_link_libraries(swiftSIL PUBLIC
+  swiftDemangling)
 target_link_libraries(swiftSIL PRIVATE
   swiftSema
   swiftSerialization)

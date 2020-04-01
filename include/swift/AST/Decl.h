@@ -2496,6 +2496,10 @@ public:
   /// names.
   DeclBaseName getBaseName() const { return Name.getBaseName(); }
 
+  Identifier getBaseIdentifier() const {
+    return Name.getBaseIdentifier();
+  }
+
   /// Generates a DeclNameRef referring to this declaration with as much
   /// specificity as possible.
   DeclNameRef createNameRef() const {
@@ -2824,12 +2828,12 @@ protected:
     ValueDecl(K, context, name, NameLoc), Inherited(inherited) {}
 
 public:
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+  Identifier getName() const { return getBaseIdentifier(); }
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
-    return hasName() ? getBaseName().getIdentifier().str() : "_";
+    return hasName() ? getBaseIdentifier().str() : "_";
   }
 
   /// The type of this declaration's values. For the type of the
@@ -4929,12 +4933,12 @@ public:
 
   SourceRange getSourceRange() const;
 
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+  Identifier getName() const { return getBaseIdentifier(); }
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
-    return hasName() ? getBaseName().getIdentifier().str() : "_";
+    return hasName() ? getBaseIdentifier().str() : "_";
   }
 
   /// Get the type of the variable within its context. If the context is generic,
@@ -5909,7 +5913,7 @@ public:
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
-    return hasName() ? getBaseName().getIdentifier().str() : "_";
+    return hasName() ? getBaseIdentifier().str() : "_";
   }
 
   /// Should this declaration be treated as if annotated with transparent
@@ -6257,8 +6261,6 @@ public:
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
 
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
-
   bool isStatic() const;
 
   /// \returns the way 'static'/'class' was spelled in the source.
@@ -6601,12 +6603,10 @@ public:
                   LiteralExpr *RawValueExpr,
                   DeclContext *DC);
 
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
-
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
-    return hasName() ? getBaseName().getIdentifier().str() : "_";
+    return hasName() ? getBaseIdentifier().str() : "_";
   }
 
   Type getArgumentInterfaceType() const;

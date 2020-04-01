@@ -103,7 +103,9 @@ which can be installed via a package manager:
 
     brew install cmake ninja
     
-You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle) to install all of these dependencies:
+You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle)
+from the root of this repository's working directory to install all of these
+dependencies:
 
     brew bundle
 
@@ -363,7 +365,7 @@ expressed today.
 
 ### CMake
 [CMake](https://cmake.org) is the core infrastructure used to configure builds of
-Swift and its companion projects; at least version 3.4.3 is required.
+Swift and its companion projects; at least version 3.16.5 is required.
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded
