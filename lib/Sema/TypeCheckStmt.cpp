@@ -84,10 +84,6 @@ namespace {
                           unsigned nextDiscriminator = 0)
       : ParentDC(parent), NextDiscriminator(nextDiscriminator) {}
 
-    bool hasAutoClosures() const {
-      return NextDiscriminator != 0;
-    }
-
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // Autoclosures need to be numbered and potentially reparented.
       // Reparenting is required with:
@@ -228,14 +224,9 @@ namespace {
   };
 } // end anonymous namespace
 
-static void setAutoClosureDiscriminators(DeclContext *DC, Stmt *S) {
-  S->walk(ContextualizeClosures(DC));
-}
-
-bool TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
+void TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
   ContextualizeClosures CC(DC);
   E->walk(CC);
-  return CC.hasAutoClosures();
 }
 
 void TypeChecker::contextualizeTopLevelCode(TopLevelCodeDecl *TLCD) {
@@ -422,7 +413,7 @@ public:
   /// Type-check an entire function body.
   bool typeCheckBody(BraceStmt *&S) {
     bool HadError = typeCheckStmt(S);
-    setAutoClosureDiscriminators(DC, S);
+    S->walk(ContextualizeClosures(DC));
     return HadError;
   }
   

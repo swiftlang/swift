@@ -812,7 +812,7 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
 
   // Walk the checked initializer and contextualize any closures
   // we saw there.
-  (void)TypeChecker::contextualizeInitializer(dc, initExpr);
+  TypeChecker::contextualizeInitializer(dc, initExpr);
   return initExpr;
 }
 
@@ -1582,7 +1582,7 @@ public:
           if (initContext) {
             // Check safety of error-handling in the declaration, too.
             TypeChecker::checkInitializerErrorHandling(initContext, init);
-            (void)TypeChecker::contextualizeInitializer(initContext, init);
+            TypeChecker::contextualizeInitializer(initContext, init);
           }
         }
       }
