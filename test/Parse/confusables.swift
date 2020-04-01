@@ -19,5 +19,6 @@ if (true ꝸꝸꝸ false) {} // expected-note {{identifier 'ꝸꝸꝸ' contains 
 // expected-error @+2 {{expected ',' separator}}
 // expected-error @+1 {{type '(Int, Int)' cannot conform to 'BinaryInteger'; only struct/enum/class types can conform to protocols}}
 if (5 ‒ 5) == 0 {} // expected-note {{unicode character '‒' looks similar to '-'; did you mean to use '-'?}} {{7-10=-}}
-// expected-note @-1 {{required by referencing operator function '==' on 'BinaryInteger' where 'Self' = '(Int, Int)'}}
+// expected-note @-1 {{operator function '=='}}
 
+// FIXME(rdar://61028087): The above note should read "required by referencing operator function '==' on 'BinaryInteger' where 'Self' = '(Int, Int)'".

@@ -25,14 +25,20 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SILOptimizer/Utils/SILInliner.h"
 
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 
-static llvm::cl::opt<bool> ShouldRotate("sil-looprotate",
-                                        llvm::cl::init(true));
+/// The size limit for the loop block to duplicate.
+///
+/// Larger blocks will not be duplicated to avoid too much code size increase.
+/// It's very seldom that the default value of 20 is exceeded (< 0.3% of all
+/// loops in the swift benchmarks).
+static llvm::cl::opt<int> LoopRotateSizeLimit("looprotate-size-limit",
+                                              llvm::cl::init(20));
 
 /// Check whether all operands are loop invariant.
 static bool
@@ -59,6 +65,7 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
                               SILBasicBlock *bb,
                               SmallVectorImpl<SILInstruction *> &moves) {
   llvm::DenseSet<SILInstruction *> invariants;
+  int cost = 0;
   for (auto &instRef : *bb) {
     auto *inst = &instRef;
     if (auto *MI = dyn_cast<MethodInst>(inst)) {
@@ -92,10 +99,12 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
                hasLoopInvariantOperands(inst, loop, invariants)) {
       moves.push_back(inst);
       invariants.insert(inst);
+    } else {
+      cost += (int)instructionInlineCost(instRef);
     }
   }
 
-  return true;
+  return cost < LoopRotateSizeLimit;
 }
 
 static void mapOperands(SILInstruction *inst,
@@ -438,11 +447,6 @@ class LoopRotation : public SILFunctionTransform {
 
     if (loopInfo->empty()) {
       LLVM_DEBUG(llvm::dbgs() << "No loops in " << f->getName() << "\n");
-      return;
-    }
-    if (!ShouldRotate) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Skipping loop rotation in " << f->getName() << "\n");
       return;
     }
     LLVM_DEBUG(llvm::dbgs() << "Rotating loops in " << f->getName() << "\n");

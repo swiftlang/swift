@@ -1563,8 +1563,7 @@ bool RLEContext::run() {
     return false;
 
   // Do we run a multi-iteration data flow ?
-  bool Optimistic = Kind == ProcessKind::ProcessMultipleIterations ?
-                        true : false;
+  const bool Optimistic = (Kind == ProcessKind::ProcessMultipleIterations);
 
   // These are a list of basic blocks that we actually processed.
   // We do not process unreachable block, instead we set their liveouts to nil.

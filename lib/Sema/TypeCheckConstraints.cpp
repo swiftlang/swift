@@ -2058,13 +2058,8 @@ TypeChecker::typeCheckExpression(
 
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
-  // FIXME: Look through LoadExpr. This is an egregious hack due to the
-  // way typeCheckExprIndependently works.
-  Expr *contextualTypeExpr = expr;
-  if (auto loadExpr = dyn_cast_or_null<LoadExpr>(contextualTypeExpr))
-    contextualTypeExpr = loadExpr->getSubExpr();
   cs.setContextualType(
-      contextualTypeExpr,
+      expr,
       target.getExprContextualTypeLoc(),
       target.getExprContextualTypePurpose());
 
@@ -2352,11 +2347,16 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   }
 }
 
-bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
-                                   DeclContext *DC,
-                                   Type patternType) {
-  auto target = SolutionApplicationTarget::forInitialization(
-      initializer, DC, patternType, pattern, /*bindPatternVarsOneWay=*/false);
+bool TypeChecker::typeCheckBinding(
+    Pattern *&pattern, Expr *&initializer, DeclContext *DC,
+    Type patternType, PatternBindingDecl *PBD, unsigned patternNumber) {
+  SolutionApplicationTarget target =
+    PBD ? SolutionApplicationTarget::forInitialization(
+            initializer, DC, patternType, PBD, patternNumber,
+            /*bindPatternVarsOneWay=*/false)
+        : SolutionApplicationTarget::forInitialization(
+            initializer, DC, patternType, pattern,
+            /*bindPatternVarsOneWay=*/false);
 
   // Type-check the initializer.
   bool unresolvedTypeExprs = false;
@@ -2425,7 +2425,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
     }
   }
 
-  bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC, patternType);
+  bool hadError = TypeChecker::typeCheckBinding(
+      pattern, init, DC, patternType, PBD, patternNumber);
   if (!init) {
     PBD->setInvalid();
     return true;
@@ -2550,7 +2551,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
       InitType = cs.generateConstraints(
-          pattern, elementLocator, /*bindPatternVarsOneWay=*/false);
+          pattern, elementLocator, /*bindPatternVarsOneWay=*/false,
+          /*patternBinding=*/nullptr, /*patternBindingIndex=*/0);
       if (!InitType)
         return true;
 
@@ -3168,10 +3170,6 @@ void Solution::dump(raw_ostream &out) const {
           << ovl.second.openedType->getString(PO) << "\n";
       break;
 
-    case OverloadChoiceKind::BaseType:
-      out << "base type " << choice.getBaseType()->getString(PO) << "\n";
-      break;
-
     case OverloadChoiceKind::KeyPathApplication:
       out << "key path application root "
           << choice.getBaseType()->getString(PO) << "\n";
@@ -3372,10 +3370,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
         out << choice.getDecl()->getBaseName() << ": "
             << resolved.boundType->getString(PO) << " == "
             << resolved.openedType->getString(PO) << "\n";
-        break;
-
-      case OverloadChoiceKind::BaseType:
-        out << "base type " << choice.getBaseType()->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::KeyPathApplication:
@@ -3835,7 +3829,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
           if (!FD->getResultInterfaceType()->isVoid()) {
             diags.diagnose(diagLoc, diag::downcast_to_unrelated_fixit,
-                           FD->getName())
+                           FD->getBaseIdentifier())
                 .fixItInsertAfter(fromExpr->getEndLoc(), "()");
           }
         }
@@ -4198,7 +4192,7 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   return nullptr;
 }
 
-llvm::Expected<bool>
+bool
 IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
                                        DeclContext *dc) const {
   auto options = defaultMemberLookupOptions;
@@ -4270,7 +4264,7 @@ static bool checkForDynamicAttribute(CanType ty,
   return false;
 }
 
-llvm::Expected<bool>
+bool
 HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
                                                  CanType ty) const {
   return checkForDynamicAttribute<DynamicMemberLookupAttr>(ty, [](Type type) {
@@ -4278,7 +4272,7 @@ HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
   });
 }
 
-llvm::Expected<bool>
+bool
 HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
                                              CanType ty) const {
   return checkForDynamicAttribute<DynamicCallableAttr>(ty, [](Type type) {

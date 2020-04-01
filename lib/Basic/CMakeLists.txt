@@ -86,8 +86,9 @@ add_swift_host_library(swiftBasic STATIC
 target_include_directories(swiftBasic PRIVATE
   ${UUID_INCLUDE})
 
+target_link_libraries(swiftBasic PUBLIC
+  swiftDemangling)
 target_link_libraries(swiftBasic PRIVATE
-  swiftDemangling
   ${UUID_LIBRARIES})
 
 message(STATUS "Swift version: ${SWIFT_VERSION}")

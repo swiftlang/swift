@@ -167,6 +167,11 @@ ArrayRef<Decl *> ParseSourceFileRequest::evaluate(Evaluator &evaluator,
   return ctx.AllocateCopy(decls);
 }
 
+evaluator::DependencySource
+ParseSourceFileRequest::readDependencySource(Evaluator &e) const {
+  return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
+}
+
 Optional<ArrayRef<Decl *>> ParseSourceFileRequest::getCachedResult() const {
   auto *SF = std::get<0>(getStorage());
   return SF->getCachedTopLevelDecls();
@@ -179,6 +184,19 @@ void ParseSourceFileRequest::cacheResult(ArrayRef<Decl *> decls) const {
 
   // Verify the parsed source file.
   verify(*SF);
+}
+
+//----------------------------------------------------------------------------//
+// CodeCompletionSecondPassRequest computation.
+//----------------------------------------------------------------------------//
+
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const CodeCompletionCallbacksFactory *factory) { }
+
+evaluator::DependencySource
+CodeCompletionSecondPassRequest::readDependencySource(Evaluator &e) const {
+  return {std::get<0>(getStorage()), e.getActiveSourceScope()};
 }
 
 // Define request evaluation functions for each of the type checker requests.

@@ -160,6 +160,12 @@ func foo(n: Float) -> Int {
 
 // CHECK: <kw>protocol</kw> Prot
 protocol Prot {
+  // CHECK: <kw>associatedtype</kw> Assoc1 = <type>Array</type><<type>Never</type>>
+  associatedtype Assoc1 = Array<Never>
+  // CHECK: <kw>associatedtype</kw> Assoc2 = <type>Void</type> <kw>where</kw> <type>Assoc2</type>: <type>Equatable</type>
+  associatedtype Assoc2 = Void where Assoc2: Equatable
+  // CHECK: <kw>associatedtype</kw> Assoc3: <type>Prot</type>, <type>Prot</type> = <type>Void</type> <kw>where</kw> <type>Assoc3</type>: <type>Prot</type>
+  associatedtype Assoc3: Prot, Prot = Void where Assoc3: Prot
   // CHECK: <kw>typealias</kw> Blarg
   typealias Blarg
   // CHECK: <kw>func</kw> protMeth(x: <type>Int</type>)

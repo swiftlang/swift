@@ -169,23 +169,23 @@ open class User {
 // above.
 // CHECK-VTABLE-LABEL: sil_vtable [serialized] User {
 // (10 words of normal class metadata on 64-bit platforms, 13 on 32-bit)
-// 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter.1:
-// 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter.1:
-// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!modify.1:
-// 13 CHECK-VTABLE-NEXT: #User.wrappedProp!getter.1:
-// 14 CHECK-VTABLE-NEXT: #User.wrappedProp!setter.1:
-// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!modify.1:
-// 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod!1:
-// 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod!1:
-// 18 CHECK-VTABLE-NEXT: #User.constrainedUnwrapped!1:
-// 19 CHECK-VTABLE-NEXT: #User.constrainedWrapped!1:
-// 20 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
-// 21 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
-// 22 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 23 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 24 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 25 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 26 CHECK-VTABLE-NEXT: #User.lastMethod!1:
+// 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter:
+// 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter:
+// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!modify:
+// 13 CHECK-VTABLE-NEXT: #User.wrappedProp!getter:
+// 14 CHECK-VTABLE-NEXT: #User.wrappedProp!setter:
+// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!modify:
+// 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod:
+// 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod:
+// 18 CHECK-VTABLE-NEXT: #User.constrainedUnwrapped:
+// 19 CHECK-VTABLE-NEXT: #User.constrainedWrapped:
+// 20 CHECK-VTABLE-NEXT: #User.subscript!getter:
+// 21 CHECK-VTABLE-NEXT: #User.subscript!getter:
+// 22 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 23 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 24 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 25 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 26 CHECK-VTABLE-NEXT: #User.lastMethod:
 // CHECK-VTABLE: }
 
 

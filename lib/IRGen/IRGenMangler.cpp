@@ -308,15 +308,7 @@ std::string IRGenMangler::mangleSymbolNameForMangledConformanceAccessorString(
   if (genericSig)
     appendGenericSignature(genericSig);
 
-  if (type)
-    appendType(type);
-
-  if (conformance.isConcrete())
-    appendConcreteProtocolConformance(conformance.getConcrete());
-  else if (conformance.isAbstract())
-    appendProtocolName(conformance.getAbstract());
-  else
-    assert(conformance.isInvalid() && "Unknown protocol conformance");
+  appendAnyProtocolConformance(genericSig, type, conformance);
   return finalize();
 }
 

@@ -1675,12 +1675,11 @@ struct DeclNameRefWithLoc {
   DeclNameLoc Loc;
 };
 
-/// Attribute that marks a function as differentiable and optionally specifies
-/// custom associated derivative functions: 'jvp' and 'vjp'.
+/// Attribute that marks a function as differentiable.
 ///
 /// Examples:
-///   @differentiable(jvp: jvpFoo where T : FloatingPoint)
-///   @differentiable(wrt: (self, x, y), jvp: jvpFoo)
+///   @differentiable(where T : FloatingPoint)
+///   @differentiable(wrt: (self, x, y))
 class DifferentiableAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<DifferentiableAttr,
@@ -1696,16 +1695,6 @@ class DifferentiableAttr final
   bool Linear;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The JVP function.
-  Optional<DeclNameRefWithLoc> JVP;
-  /// The VJP function.
-  Optional<DeclNameRefWithLoc> VJP;
-  /// The JVP function (optional), resolved by the type checker if JVP name is
-  /// specified.
-  FuncDecl *JVPFunction = nullptr;
-  /// The VJP function (optional), resolved by the type checker if VJP name is
-  /// specified.
-  FuncDecl *VJPFunction = nullptr;
   /// The differentiability parameter indices, resolved by the type checker.
   /// The bit stores whether the parameter indices have been computed.
   ///
@@ -1720,19 +1709,22 @@ class DifferentiableAttr final
   /// attribute's where clause requirements. This is set only if the attribute
   /// has a where clause.
   GenericSignature DerivativeGenericSignature;
+  /// The source location of the implicitly inherited protocol requirement
+  /// `@differentiable` attribute. Used for diagnostics, not serialized.
+  ///
+  /// This is set during conformance type-checking, only for implicit
+  /// `@differentiable` attributes created for non-public protocol witnesses of
+  /// protocol requirements with `@differentiable` attributes.
+  SourceLoc ImplicitlyInheritedDifferentiableAttrLocation;
 
   explicit DifferentiableAttr(bool implicit, SourceLoc atLoc,
                               SourceRange baseRange, bool linear,
                               ArrayRef<ParsedAutoDiffParameter> parameters,
-                              Optional<DeclNameRefWithLoc> jvp,
-                              Optional<DeclNameRefWithLoc> vjp,
                               TrailingWhereClause *clause);
 
   explicit DifferentiableAttr(Decl *original, bool implicit, SourceLoc atLoc,
                               SourceRange baseRange, bool linear,
                               IndexSubset *parameterIndices,
-                              Optional<DeclNameRefWithLoc> jvp,
-                              Optional<DeclNameRefWithLoc> vjp,
                               GenericSignature derivativeGenericSignature);
 
 public:
@@ -1740,16 +1732,12 @@ public:
                                     SourceLoc atLoc, SourceRange baseRange,
                                     bool linear,
                                     ArrayRef<ParsedAutoDiffParameter> params,
-                                    Optional<DeclNameRefWithLoc> jvp,
-                                    Optional<DeclNameRefWithLoc> vjp,
                                     TrailingWhereClause *clause);
 
   static DifferentiableAttr *create(AbstractFunctionDecl *original,
                                     bool implicit, SourceLoc atLoc,
                                     SourceRange baseRange, bool linear,
                                     IndexSubset *parameterIndices,
-                                    Optional<DeclNameRefWithLoc> jvp,
-                                    Optional<DeclNameRefWithLoc> vjp,
                                     GenericSignature derivativeGenSig);
 
   Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
@@ -1757,16 +1745,6 @@ public:
   /// Sets the original declaration on which this attribute is declared.
   /// Should only be used by parsing and deserialization.
   void setOriginalDeclaration(Decl *originalDeclaration);
-
-  /// Get the optional 'jvp:' function name and location.
-  /// Use this instead of `getJVPFunction` to check whether the attribute has a
-  /// registered JVP.
-  Optional<DeclNameRefWithLoc> getJVP() const { return JVP; }
-
-  /// Get the optional 'vjp:' function name and location.
-  /// Use this instead of `getVJPFunction` to check whether the attribute has a
-  /// registered VJP.
-  Optional<DeclNameRefWithLoc> getVJP() const { return VJP; }
 
 private:
   /// Returns true if the given `@differentiable` attribute has been
@@ -1800,10 +1778,13 @@ public:
     DerivativeGenericSignature = derivativeGenSig;
   }
 
-  FuncDecl *getJVPFunction() const { return JVPFunction; }
-  void setJVPFunction(FuncDecl *decl);
-  FuncDecl *getVJPFunction() const { return VJPFunction; }
-  void setVJPFunction(FuncDecl *decl);
+  SourceLoc getImplicitlyInheritedDifferentiableAttrLocation() const {
+    return ImplicitlyInheritedDifferentiableAttrLocation;
+  }
+  void getImplicitlyInheritedDifferentiableAttrLocation(SourceLoc loc) {
+    assert(isImplicit());
+    ImplicitlyInheritedDifferentiableAttrLocation = loc;
+  }
 
   /// Get the derivative generic environment for the given `@differentiable`
   /// attribute and original function.
@@ -1812,9 +1793,7 @@ public:
 
   // Print the attribute to the given stream.
   // If `omitWrtClause` is true, omit printing the `wrt:` clause.
-  // If `omitDerivativeFunctions` is true, omit printing derivative functions.
-  void print(llvm::raw_ostream &OS, const Decl *D, bool omitWrtClause = false,
-             bool omitDerivativeFunctions = false) const;
+  void print(llvm::raw_ostream &OS, const Decl *D, bool omitWrtClause = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;

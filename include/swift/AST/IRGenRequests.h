@@ -18,6 +18,7 @@
 #define SWIFT_IRGen_REQUESTS_H
 
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "llvm/ADT/StringSet.h"
@@ -116,7 +117,7 @@ void reportEvaluatedRequest(UnifiedStatsReporter &stats,
 class IRGenSourceFileRequest
     : public SimpleRequest<IRGenSourceFileRequest,
                            std::unique_ptr<llvm::Module>(IRGenDescriptor),
-                           CacheKind::Uncached> {
+                           RequestFlags::Uncached|RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -124,17 +125,21 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<std::unique_ptr<llvm::Module>>
+  std::unique_ptr<llvm::Module>
   evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
 
 public:
   bool isCached() const { return true; }
+
+public:
+  // Incremental dependencies.
+  evaluator::DependencySource readDependencySource(Evaluator &) const;
 };
 
 class IRGenWholeModuleRequest
     : public SimpleRequest<IRGenWholeModuleRequest,
                            std::unique_ptr<llvm::Module>(IRGenDescriptor),
-                           CacheKind::Uncached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -142,7 +147,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<std::unique_ptr<llvm::Module>>
+  std::unique_ptr<llvm::Module>
   evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
 
 public:

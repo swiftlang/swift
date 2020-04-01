@@ -276,7 +276,10 @@ struct PrintOptions {
   /// Prints type variables and unresolved types in an expanded notation suitable
   /// for debugging.
   bool PrintTypesForDebugging = false;
-  
+
+  /// Whether this print option is for printing .swiftinterface file
+  bool IsForSwiftInterface = false;
+
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
     /// 'some P1 & P2'.
@@ -428,6 +431,13 @@ struct PrintOptions {
 
   /// The information for converting archetypes to specialized types.
   llvm::Optional<TypeTransformContext> TransformContext;
+
+  /// Before printing the name of a ModuleDecl, this callback will be called and
+  /// the name of the ModuleDecl it returns will be printed instead. This is
+  /// currently used to present cross import overlays as if they were their
+  /// underlying module.
+  std::function<const ModuleDecl*(const ModuleDecl *)> mapModuleToUnderlying =
+    [] (const ModuleDecl *D) { return D; };
 
   bool PrintAsMember = false;
   

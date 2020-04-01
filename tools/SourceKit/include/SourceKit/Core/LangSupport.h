@@ -485,6 +485,7 @@ struct DocEntityInfo {
   llvm::SmallString<64> LocalizationKey;
   std::vector<DocGenericParam> GenericParams;
   std::vector<std::string> GenericRequirements;
+  std::vector<std::string> RequiredBystanders;
   unsigned Offset = 0;
   unsigned Length = 0;
   bool IsUnavailable = false;

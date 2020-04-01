@@ -993,6 +993,17 @@ void SerializedModuleLoaderBase::loadObjCMethods(
   }
 }
 
+void SerializedModuleLoaderBase::loadDerivativeFunctionConfigurations(
+    AbstractFunctionDecl *originalAFD, unsigned int previousGeneration,
+    llvm::SetVector<AutoDiffConfig> &results) {
+  for (auto &modulePair : LoadedModuleFiles) {
+    if (modulePair.second <= previousGeneration)
+      continue;
+    modulePair.first->loadDerivativeFunctionConfigurations(originalAFD,
+                                                           results);
+  }
+}
+
 std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID,
     const SerializedModuleBaseName &BaseName,
@@ -1084,14 +1095,17 @@ SerializedASTFile::lookupNestedType(Identifier name,
   return File.lookupNestedType(name, parent);
 }
 
-OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,
-                                                DeclKind fixity) const {
-  return File.lookupOperator(name, fixity);
+void SerializedASTFile::lookupOperatorDirect(
+    Identifier name, OperatorFixity fixity,
+    TinyPtrVector<OperatorDecl *> &results) const {
+  if (auto *op = File.lookupOperator(name, fixity))
+    results.push_back(op);
 }
 
-PrecedenceGroupDecl *
-SerializedASTFile::lookupPrecedenceGroup(Identifier name) const {
-  return File.lookupPrecedenceGroup(name);
+void SerializedASTFile::lookupPrecedenceGroupDirect(
+    Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) const {
+  if (auto *group = File.lookupPrecedenceGroup(name))
+    results.push_back(group);
 }
 
 void SerializedASTFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
@@ -1168,6 +1182,11 @@ void SerializedASTFile::getTopLevelDeclsWhereAttributesMatch(
               SmallVectorImpl<Decl*> &results,
               llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
   File.getTopLevelDecls(results, matchAttributes);
+}
+
+void SerializedASTFile::getOperatorDecls(
+    SmallVectorImpl<OperatorDecl *> &results) const {
+  File.getOperatorDecls(results);
 }
 
 void SerializedASTFile::getPrecedenceGroups(

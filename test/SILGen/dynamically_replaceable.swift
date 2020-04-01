@@ -120,13 +120,13 @@ extension Klass {
   // CHECK-LABEL: sil hidden [dynamic_replacement_for "$s23dynamically_replaceable5KlassC08dynamic_B0yyF"] [ossa] @$s23dynamically_replaceable5KlassC11replacementyyF : $@convention(method) (@guaranteed Klass) -> () {
   // CHECK: [[FN:%.*]] = prev_dynamic_function_ref @$s23dynamically_replaceable5KlassC11replacementyyF
   // CHECK: apply [[FN]](%0) : $@convention(method) (@guaranteed Klass) -> ()
-  // CHECK: [[METHOD:%.*]] = class_method %0 : $Klass, #Klass.dynamic_replaceable2!1
+  // CHECK: [[METHOD:%.*]] = class_method %0 : $Klass, #Klass.dynamic_replaceable2 :
   // CHECK: = apply [[METHOD]](%0) : $@convention(method) (@guaranteed Klass) -> ()
   // CHECK: return
   // NOPREVIOUS-LABEL: sil hidden [dynamic_replacement_for "$s23dynamically_replaceable5KlassC08dynamic_B0yyF"] [ossa] @$s23dynamically_replaceable5KlassC11replacementyyF : $@convention(method) (@guaranteed Klass) -> () {
   // NOPREVIOUS: [[FN:%.*]] = class_method %0 : $Klass, #Klass.dynamic_replaceable
   // NOPREVIOUS: apply [[FN]](%0) : $@convention(method) (@guaranteed Klass) -> ()
-  // NOPREVIOUS: [[METHOD:%.*]] = class_method %0 : $Klass, #Klass.dynamic_replaceable2!1
+  // NOPREVIOUS: [[METHOD:%.*]] = class_method %0 : $Klass, #Klass.dynamic_replaceable2 :
   // NOPREVIOUS: = apply [[METHOD]](%0) : $@convention(method) (@guaranteed Klass) -> ()
   // NOPREVIOUS: return
   @_dynamicReplacement(for: dynamic_replaceable())
@@ -169,7 +169,7 @@ extension Klass {
 // CHECK:   apply [[ORIG]]([[ARG]]) : $@convention(method) (@guaranteed Klass) -> Int
 // NOPREVIOUS-LABEL: sil hidden [dynamic_replacement_for "$s23dynamically_replaceable5KlassC08dynamic_B4_varSivg"] [ossa] @$s23dynamically_replaceable5KlassC1rSivg : $@convention(method) (@guaranteed Klass) -> Int {
 // NOPREVIOUS: bb0([[ARG:%.*]] : @guaranteed $Klass):
-// NOPREVIOUS:   [[ORIG:%.*]] = class_method [[ARG]] : $Klass, #Klass.dynamic_replaceable_var!getter.1
+// NOPREVIOUS:   [[ORIG:%.*]] = class_method [[ARG]] : $Klass, #Klass.dynamic_replaceable_var!getter
 // NOPREVIOUS:   apply [[ORIG]]([[ARG]]) : $@convention(method) (@guaranteed Klass) -> Int
 
 // CHECK-LABEL: sil hidden [dynamic_replacement_for "$s23dynamically_replaceable5KlassC08dynamic_B4_varSivs"] [ossa] @$s23dynamically_replaceable5KlassC1rSivs : $@convention(method) (Int, @guaranteed Klass) -> () {
@@ -414,7 +414,7 @@ struct WrapperWithInitialValue<T> {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s23dynamically_replaceable10SomeStructV1tSbvpfP
+// CHECK-NOT: sil hidden [ossa] @$s23dynamically_replaceable10SomeStructV1tSbvpfP
 public struct SomeStruct {
   @WrapperWithInitialValue var t = false
 }

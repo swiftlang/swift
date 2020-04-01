@@ -1797,6 +1797,11 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl) {
   if (decl.isForeign)
     return false;
 
+  if (decl.isEnumElement()) {
+    return calleesAreStaticallyKnowable(module,
+                                        cast<EnumElementDecl>(decl.getDecl()));
+  }
+
   auto *afd = decl.getAbstractFunctionDecl();
   assert(afd && "Expected abstract function decl!");
   return calleesAreStaticallyKnowable(module, afd);
@@ -1835,6 +1840,41 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module,
         return false;
     }
     LLVM_FALLTHROUGH;
+  case AccessLevel::Internal:
+    return module.isWholeModule();
+  case AccessLevel::FilePrivate:
+  case AccessLevel::Private:
+    return true;
+  }
+
+  llvm_unreachable("Unhandled access level in switch.");
+}
+
+/// Are the callees that could be called through Decl statically
+/// knowable based on the Decl and the compilation mode?
+// FIXME: Merge this with calleesAreStaticallyKnowable above
+bool swift::calleesAreStaticallyKnowable(SILModule &module,
+                                         EnumElementDecl *eed) {
+  const DeclContext *assocDC = module.getAssociatedContext();
+  if (!assocDC)
+    return false;
+
+  // Only handle members defined within the SILModule's associated context.
+  if (!eed->isChildContextOf(assocDC))
+    return false;
+
+  if (eed->isDynamic()) {
+    return false;
+  }
+
+  if (!eed->hasAccess())
+    return false;
+
+  // Only consider 'private' members, unless we are in whole-module compilation.
+  switch (eed->getEffectiveAccess()) {
+  case AccessLevel::Open:
+    return false;
+  case AccessLevel::Public:
   case AccessLevel::Internal:
     return module.isWholeModule();
   case AccessLevel::FilePrivate:

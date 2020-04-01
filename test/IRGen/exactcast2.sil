@@ -26,7 +26,7 @@ sil @_TFC4main4HashCfMS0_FT_S0_ : $@convention(thin) (@thick Hash.Type) -> @owne
 
 sil @_TFC4main4Hash6updatefS0_FT_T_ : $@convention(method) (@guaranteed Hash) -> () {
 bb0(%0 : $Hash):
-  %1 = class_method %0 : $Hash, #Hash.hash!1 : (Hash) -> () -> (), $@convention(method) (@guaranteed Hash) -> () // user: %9
+  %1 = class_method %0 : $Hash, #Hash.hash : (Hash) -> () -> (), $@convention(method) (@guaranteed Hash) -> () // user: %9
   checked_cast_br [exact] %0 : $Hash to MD5, bb2, bb3 // id: %2
 
 bb1:                                              // Preds: bb2 bb3
@@ -46,15 +46,15 @@ sil @_TFC4main3MD5cfMS0_FT_S0_ : $@convention(method) (@owned MD5) -> @owned MD5
 sil @_TFC4main3MD5CfMS0_FT_S0_ : $@convention(thin) (@thick MD5.Type) -> @owned MD5
 
 sil_vtable Hash {
-  #Hash.init!initializer.1: @_TFC4main4HashcfMS0_FT_S0_	// main.Hash.init (main.Hash.Type)() -> main.Hash
-  #Hash.update!1: @_TFC4main4Hash6updatefS0_FT_T_	// main.Hash.update (main.Hash)() -> ()
-  #Hash.hash!1: @_TFC4main4Hash4hashfS0_FT_T_	// main.Hash.hash (main.Hash)() -> ()
+  #Hash.init!initializer: @_TFC4main4HashcfMS0_FT_S0_	// main.Hash.init (main.Hash.Type)() -> main.Hash
+  #Hash.update: @_TFC4main4Hash6updatefS0_FT_T_	// main.Hash.update (main.Hash)() -> ()
+  #Hash.hash: @_TFC4main4Hash4hashfS0_FT_T_	// main.Hash.hash (main.Hash)() -> ()
 }
 
 sil_vtable MD5 {
-  #Hash.init!initializer.1: @_TFC4main3MD5cfMS0_FT_S0_ [override]	// main.MD5.init (main.MD5.Type)() -> main.MD5
-  #Hash.update!1: @_TFC4main4Hash6updatefS0_FT_T_ [inherited]	// main.Hash.update (main.Hash)() -> ()
-  #Hash.hash!1: @_TFC4main4Hash4hashfS0_FT_T_ [inherited]	// main.Hash.hash (main.Hash)() -> ()
+  #Hash.init!initializer: @_TFC4main3MD5cfMS0_FT_S0_ [override]	// main.MD5.init (main.MD5.Type)() -> main.MD5
+  #Hash.update: @_TFC4main4Hash6updatefS0_FT_T_ [inherited]	// main.Hash.update (main.Hash)() -> ()
+  #Hash.hash: @_TFC4main4Hash4hashfS0_FT_T_ [inherited]	// main.Hash.hash (main.Hash)() -> ()
 }
 
 

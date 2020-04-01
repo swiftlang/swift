@@ -177,9 +177,9 @@ Here is an example of a ``.sil`` file::
   // Define a SIL vtable. This matches dynamically-dispatched method
   // identifiers to their implementations for a known static class type.
   sil_vtable Button {
-    #Button.onClick!1: @_TC5norms6Button7onClickfS0_FT_T_
-    #Button.onMouseDown!1: @_TC5norms6Button11onMouseDownfS0_FT_T_
-    #Button.onMouseUp!1: @_TC5norms6Button9onMouseUpfS0_FT_T_
+    #Button.onClick: @_TC5norms6Button7onClickfS0_FT_T_
+    #Button.onMouseDown: @_TC5norms6Button11onMouseDownfS0_FT_T_
+    #Button.onMouseUp: @_TC5norms6Button9onMouseUpfS0_FT_T_
   }
 
 SIL Stage
@@ -238,8 +238,6 @@ need not be the lowered type of the formal type of that declaration.
 For example, the lowered type of a declaration reference:
 
 - will usually be thin,
-
-- will frequently be uncurried,
 
 - may have a non-Swift calling convention,
 
@@ -1090,9 +1088,9 @@ Declaration References
 ::
 
   sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
-  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)? ('.' sil-decl-lang)?
-  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
+  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)? ('.' sil-decl-autodiff)?
   sil-decl-subref ::= '!' sil-decl-lang
+  sil-decl-subref ::= '!' sil-decl-autodiff
   sil-decl-subref-part ::= 'getter'
   sil-decl-subref-part ::= 'setter'
   sil-decl-subref-part ::= 'allocator'
@@ -1104,8 +1102,11 @@ Declaration References
   sil-decl-subref-part ::= 'ivardestroyer'
   sil-decl-subref-part ::= 'ivarinitializer'
   sil-decl-subref-part ::= 'defaultarg' '.' [0-9]+
-  sil-decl-uncurry-level ::= [0-9]+
   sil-decl-lang ::= 'foreign'
+  sil-decl-autodiff ::= sil-decl-autodiff-kind '.' sil-decl-autodiff-indices
+  sil-decl-autodiff-kind ::= 'jvp'
+  sil-decl-autodiff-kind ::= 'vjp'
+  sil-decl-autodiff-indices ::= [SU]+
 
 Some SIL instructions need to reference Swift declarations directly. These
 references are introduced with the ``#`` sigil followed by the fully qualified
@@ -1127,35 +1128,6 @@ entity discriminators:
 - ``defaultarg.``\ *n*: the default argument-generating function for
   the *n*\ -th argument of a Swift ``func``
 - ``foreign``: a specific entry point for C/Objective-C interoperability
-
-Methods and curried function definitions in Swift also have multiple
-"uncurry levels" in SIL, representing the function at each possible
-partial application level. For a curried function declaration::
-
-  // Module example
-  func foo(_ x:A)(y:B)(z:C) -> D
-
-The declaration references and types for the different uncurry levels are as
-follows::
-
-  #example.foo!0 : $@convention(thin) (x:A) -> (y:B) -> (z:C) -> D
-  #example.foo!1 : $@convention(thin) ((y:B), (x:A)) -> (z:C) -> D
-  #example.foo!2 : $@convention(thin) ((z:C), (y:B), (x:A)) -> D
-
-The deepest uncurry level is referred to as the **natural uncurry level**. In
-this specific example, the reference at the natural uncurry level is
-``#example.foo!2``.  Note that the uncurried argument clauses are composed
-right-to-left, as specified in the `calling convention`_. For uncurry levels
-less than the uncurry level, the entry point itself is ``@convention(thin)`` but
-returns a thick function value carrying the partially applied arguments for its
-context.
-
-`Dynamic dispatch`_ instructions such as ``class method`` require their method
-declaration reference to be uncurried to at least uncurry level 1 (which applies
-both the "self" argument and the method arguments), because uncurry level zero
-represents the application of the method to its "self" argument, as in
-``foo.method``, which is where the dynamic dispatch semantically occurs
-in Swift.
 
 Linkage
 ~~~~~~~
@@ -1309,9 +1281,9 @@ class::
   sil @A_bas : $@convention(thin) (@owned A) -> ()
 
   sil_vtable A {
-    #A.foo!1: @A_foo
-    #A.bar!1: @A_bar
-    #A.bas!1: @A_bas
+    #A.foo: @A_foo
+    #A.bar: @A_bar
+    #A.bas: @A_bas
   }
 
   class B : A {
@@ -1321,9 +1293,9 @@ class::
   sil @B_bar : $@convention(thin) (@owned B) -> ()
 
   sil_vtable B {
-    #A.foo!1: @A_foo
-    #A.bar!1: @B_bar
-    #A.bas!1: @A_bas
+    #A.foo: @A_foo
+    #A.bar: @B_bar
+    #A.bas: @A_bas
   }
 
   class C : B {
@@ -1333,9 +1305,9 @@ class::
   sil @C_bas : $@convention(thin) (@owned C) -> ()
 
   sil_vtable C {
-    #A.foo!1: @A_foo
-    #A.bar!1: @B_bar
-    #A.bas!1: @C_bas
+    #A.foo: @A_foo
+    #A.bar: @B_bar
+    #A.bas: @C_bas
   }
 
 Note that the declaration reference in the vtable is to the least-derived method
@@ -1781,23 +1753,6 @@ gets called in SIL as::
   %ws = <<make array from %w0, %w1, %w2>>
   apply %zang(%x, %y, %zs, %v, %ws)  : $(x:Int, (y:Int, z:Int...), v:Int, w:Int...) -> ()
 
-Function Currying
-`````````````````
-
-Curried function definitions in Swift emit multiple SIL entry points, one for
-each "uncurry level" of the function. When a function is uncurried, its
-outermost argument clauses are combined into a tuple in right-to-left order.
-For the following declaration::
-
-  func curried(_ x:A)(y:B)(z:C)(w:D) -> Int {}
-
-The types of the SIL entry points are as follows::
-
-  sil @curried_0 : $(x:A) -> (y:B) -> (z:C) -> (w:D) -> Int { ... }
-  sil @curried_1 : $((y:B), (x:A)) -> (z:C) -> (w:D) -> Int { ... }
-  sil @curried_2 : $((z:C), (y:B), (x:A)) -> (w:D) -> Int { ... }
-  sil @curried_3 : $((w:D), (z:C), (y:B), (x:A)) -> Int { ... }
-
 @inout Arguments
 ````````````````
 
@@ -1831,8 +1786,7 @@ Swift Method Calling Convention @convention(method)
 The method calling convention is currently identical to the freestanding
 function convention. Methods are considered to be curried functions, taking
 the "self" argument as their outer argument clause, and the method arguments
-as the inner argument clause(s). When uncurried, the "self" argument is thus
-passed last::
+as the inner argument clause(s). The "self" argument is thus passed last::
 
   struct Foo {
     func method(_ x:Int) -> Int {}
@@ -2035,7 +1989,7 @@ independently assured of validity.  For example, a class method may
 return a class reference::
 
   bb0(%0 : $MyClass):
-    %1 = class_method %0 : $MyClass, #MyClass.foo!1
+    %1 = class_method %0 : $MyClass, #MyClass.foo
     %2 = apply %1(%0) : $@convention(method) (@guaranteed MyClass) -> @owned MyOtherClass
     // use of %2 goes here; no use of %1
     strong_release %2 : $MyOtherClass
@@ -3469,7 +3423,7 @@ Swift native methods and always use vtable dispatch.
 
 The ``objc_method`` and ``objc_super_method`` instructions must reference
 Objective-C methods (indicated by the ``foreign`` marker on a method
-reference, as in ``#NSObject.description!1.foreign``).
+reference, as in ``#NSObject.description!foreign``).
 
 Note that ``objc_msgSend`` invocations can only be used as the callee
 of an ``apply`` instruction or ``partial_apply`` instruction. They cannot
@@ -3482,10 +3436,10 @@ class_method
   sil-instruction ::= 'class_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = class_method %0 : $T, #T.method!1 : $@convention(class_method) U -> V
+  %1 = class_method %0 : $T, #T.method : $@convention(class_method) U -> V
   // %0 must be of a class type or class metatype $T
-  // #T.method!1 must be a reference to a Swift native method of T or
-  // of one of its superclasses, at uncurry level == 1
+  // #T.method must be a reference to a Swift native method of T or
+  // of one of its superclasses
   // %1 will be of type $U -> V
 
 Looks up a method based on the dynamic type of a class or class metatype
@@ -3504,10 +3458,10 @@ objc_method
   sil-instruction ::= 'objc_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = objc_method %0 : $T, #T.method!1.foreign : $@convention(objc_method) U -> V
+  %1 = objc_method %0 : $T, #T.method!foreign : $@convention(objc_method) U -> V
   // %0 must be of a class type or class metatype $T
-  // #T.method!1 must be a reference to an Objective-C method of T or
-  // of one of its superclasses, at uncurry level == 1
+  // #T.method must be a reference to an Objective-C method of T or
+  // of one of its superclasses
   // %1 will be of type $U -> V
 
 Performs Objective-C method dispatch using ``objc_msgSend()``.
@@ -3521,10 +3475,10 @@ super_method
   sil-instruction ::= 'super_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = super_method %0 : $T, #Super.method!1 : $@convention(thin) U -> V
+  %1 = super_method %0 : $T, #Super.method : $@convention(thin) U -> V
   // %0 must be of a non-root class type or class metatype $T
-  // #Super.method!1 must be a reference to a native Swift method of T's
-  // superclass or of one of its ancestor classes, at uncurry level >= 1
+  // #Super.method must be a reference to a native Swift method of T's
+  // superclass or of one of its ancestor classes
   // %1 will be of type $@convention(thin) U -> V
 
 Looks up a method in the superclass of a class or class metatype instance.
@@ -3536,10 +3490,10 @@ objc_super_method
   sil-instruction ::= 'super_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = super_method %0 : $T, #Super.method!1.foreign : $@convention(thin) U -> V
+  %1 = super_method %0 : $T, #Super.method!foreign : $@convention(thin) U -> V
   // %0 must be of a non-root class type or class metatype $T
-  // #Super.method!1.foreign must be a reference to an ObjC method of T's
-  // superclass or of one of its ancestor classes, at uncurry level >= 1
+  // #Super.method!foreign must be a reference to an ObjC method of T's
+  // superclass or of one of its ancestor classes
   // %1 will be of type $@convention(thin) U -> V
 
 This instruction performs an Objective-C message send using
@@ -3552,10 +3506,10 @@ witness_method
   sil-instruction ::= 'witness_method' sil-method-attributes?
                         sil-type ',' sil-decl-ref ':' sil-type
 
-  %1 = witness_method $T, #Proto.method!1 \
+  %1 = witness_method $T, #Proto.method \
     : $@convention(witness_method) <Self: Proto> U -> V
   // $T must be an archetype
-  // #Proto.method!1 must be a reference to a method of one of the protocol
+  // #Proto.method must be a reference to a method of one of the protocol
   //   constraints on T
   // <Self: Proto> U -> V must be the type of the referenced method,
   //   generic on Self
@@ -3741,41 +3695,7 @@ partial_apply
   // %r will be of the substituted thick function type $(Z'...) -> R'
 
 Creates a closure by partially applying the function ``%0`` to a partial
-sequence of its arguments. This instruction is used to implement both curry
-thunks and closures. A curried function in Swift::
-
-  func foo(_ a:A)(b:B)(c:C)(d:D) -> E { /* body of foo */ }
-
-emits curry thunks in SIL as follows (retains and releases omitted for
-clarity)::
-
-  func @foo : $@convention(thin) A -> B -> C -> D -> E {
-  entry(%a : $A):
-    %foo_1 = function_ref @foo_1 : $@convention(thin) (B, A) -> C -> D -> E
-    %thunk = partial_apply %foo_1(%a) : $@convention(thin) (B, A) -> C -> D -> E
-    return %thunk : $B -> C -> D -> E
-  }
-
-  func @foo_1 : $@convention(thin) (B, A) -> C -> D -> E {
-  entry(%b : $B, %a : $A):
-    %foo_2 = function_ref @foo_2 : $@convention(thin) (C, B, A) -> D -> E
-    %thunk = partial_apply %foo_2(%b, %a) \
-      : $@convention(thin) (C, B, A) -> D -> E
-    return %thunk : $(B, A) -> C -> D -> E
-  }
-
-  func @foo_2 : $@convention(thin) (C, B, A) -> D -> E {
-  entry(%c : $C, %b : $B, %a : $A):
-    %foo_3 = function_ref @foo_3 : $@convention(thin) (D, C, B, A) -> E
-    %thunk = partial_apply %foo_3(%c, %b, %a) \
-      : $@convention(thin) (D, C, B, A) -> E
-    return %thunk : $(C, B, A) -> D -> E
-  }
-
-  func @foo_3 : $@convention(thin) (D, C, B, A) -> E {
-  entry(%d : $D, %c : $C, %b : $B, %a : $A):
-    // ... body of foo ...
-  }
+sequence of its arguments. This instruction is used to implement closures.
 
 A local function in Swift that captures context, such as ``bar`` in the
 following example::
@@ -4298,10 +4218,10 @@ an `inject_enum_addr`_ instruction::
   sil @init_with_data : $(AddressOnlyType) -> AddressOnlyEnum {
   entry(%0 : $*AddressOnlyEnum, %1 : $*AddressOnlyType):
     // Store the data argument for the case.
-    %2 = init_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt.1
+    %2 = init_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt
     copy_addr [take] %2 to [initialization] %1 : $*AddressOnlyType
     // Inject the tag.
-    inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt.1
+    inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt
     return
   }
 
@@ -4318,7 +4238,7 @@ discriminator and is done with the `switch_enum`_ terminator::
 
   sil @switch_foo : $(Foo) -> () {
   entry(%foo : $Foo):
-    switch_enum %foo : $Foo, case #Foo.A!enumelt.1: a_dest, case #Foo.B!enumelt.1: b_dest
+    switch_enum %foo : $Foo, case #Foo.A!enumelt: a_dest, case #Foo.B!enumelt: b_dest
 
   a_dest(%a : $Int):
     /* use %a */
@@ -4335,15 +4255,15 @@ projecting the enum value with `unchecked_take_enum_data_addr`_::
 
   sil @switch_foo : $<T> (Foo<T>) -> () {
   entry(%foo : $*Foo<T>):
-    switch_enum_addr %foo : $*Foo<T>, case #Foo.A!enumelt.1: a_dest, \
-      case #Foo.B!enumelt.1: b_dest
+    switch_enum_addr %foo : $*Foo<T>, case #Foo.A!enumelt: a_dest, \
+      case #Foo.B!enumelt: b_dest
 
   a_dest:
-    %a = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.A!enumelt.1
+    %a = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.A!enumelt
     /* use %a */
 
   b_dest:
-    %b = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.B!enumelt.1
+    %b = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.B!enumelt
     /* use %b */
   }
 
@@ -4369,7 +4289,7 @@ enum
   sil-instruction ::= 'enum' sil-type ',' sil-decl-ref (',' sil-operand)?
 
   %1 = enum $U, #U.EmptyCase!enumelt
-  %1 = enum $U, #U.DataCase!enumelt.1, %0 : $T
+  %1 = enum $U, #U.DataCase!enumelt, %0 : $T
   // $U must be an enum type
   // #U.DataCase or #U.EmptyCase must be a case of enum $U
   // If #U.Case has a data type $T, %0 must be a value of type $T
@@ -4385,7 +4305,7 @@ unchecked_enum_data
 
   sil-instruction ::= 'unchecked_enum_data' sil-operand ',' sil-decl-ref
 
-  %1 = unchecked_enum_data %0 : $U, #U.DataCase!enumelt.1
+  %1 = unchecked_enum_data %0 : $U, #U.DataCase!enumelt
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of object type $T for the data type of case U.DataCase
@@ -4400,7 +4320,7 @@ init_enum_data_addr
 
   sil-instruction ::= 'init_enum_data_addr' sil-operand ',' sil-decl-ref
 
-  %1 = init_enum_data_addr %0 : $*U, #U.DataCase!enumelt.1
+  %1 = init_enum_data_addr %0 : $*U, #U.DataCase!enumelt
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
@@ -4442,7 +4362,7 @@ unchecked_take_enum_data_addr
 
   sil-instruction ::= 'unchecked_take_enum_data_addr' sil-operand ',' sil-decl-ref
 
-  %1 = unchecked_take_enum_data_addr %0 : $*U, #U.DataCase!enumelt.1
+  %1 = unchecked_take_enum_data_addr %0 : $*U, #U.DataCase!enumelt
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
@@ -4810,7 +4730,6 @@ alloc_existential_box
   //   representation
   // $T must be an AST type that conforms to P
   // %1 will be of type $P
-  // %1#1 will be of type $*T', where T' is the most abstracted lowering of T
 
 Allocates a boxed existential container of type ``$P`` with space to hold a
 value of type ``$T'``. The box is not fully initialized until a valid value
@@ -5671,8 +5590,8 @@ the original enum value. For example::
   entry(%x : $Foo):
     switch_enum %x : $Foo,       \
       case #Foo.Nothing!enumelt: nothing, \
-      case #Foo.OneInt!enumelt.1:  one_int, \
-      case #Foo.TwoInts!enumelt.1: two_ints
+      case #Foo.OneInt!enumelt:  one_int, \
+      case #Foo.TwoInts!enumelt: two_ints
 
   nothing:
     %zero = integer_literal $Int, 0
@@ -5740,9 +5659,9 @@ dynamic_method_br
   sil-terminator ::= 'dynamic_method_br' sil-operand ',' sil-decl-ref
                        ',' sil-identifier ',' sil-identifier
 
-  dynamic_method_br %0 : $P, #X.method!1, bb1, bb2
+  dynamic_method_br %0 : $P, #X.method, bb1, bb2
   // %0 must be of protocol type
-  // #X.method!1 must be a reference to an @objc method of any class
+  // #X.method must be a reference to an @objc method of any class
   // or protocol type
 
 Looks up the implementation of an Objective-C method with the same
@@ -5854,6 +5773,117 @@ The rules on generic substitutions are identical to those of ``apply``.
 
 Differentiable Programming
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+differentiable_function
+```````````````````````
+::
+
+  sil-instruction ::= 'differentiable_function'
+                      sil-differentiable-function-parameter-indices
+                      sil-value ':' sil-type
+                      sil-differentiable-function-derivative-functions-clause?
+
+  sil-differentiable-function-parameter-indices ::=
+      '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
+  sil-differentiable-derivative-functions-clause ::=
+      'with_derivative'
+      '{' sil-value ':' sil-type ',' sil-value ':' sil-type '}'
+
+  differentiable_function [parameters 0] %0 : $(T) -> T \
+    with_derivative {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
+
+Creates a ``@differentiable`` function from an original function operand and
+derivative function operands (optional). There are two derivative function
+kinds: a Jacobian-vector products (JVP) function and a vector-Jacobian products
+(VJP) function.
+
+``[parameters ...]`` specifies parameter indices that the original function is
+differentiable with respect to.
+
+The ``with_derivative`` clause specifies the derivative function operands
+associated with the original function.
+
+The differentiation transformation canonicalizes all `differentiable_function`
+instructions, generating derivative functions if necessary to fill in derivative
+function operands.
+
+In raw SIL, the ``with_derivative`` clause is optional. In canonical SIL, the
+``with_derivative`` clause is mandatory.
+
+
+linear_function
+```````````````
+::
+
+  sil-instruction ::= 'linear_function'
+                      sil-linear-function-parameter-indices
+                      sil-value ':' sil-type
+                      sil-linear-function-transpose-function-clause?
+
+  sil-linear-function-parameter-indices ::=
+      '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
+  sil-linear-transpose-function-clause ::=
+      with_transpose sil-value ':' sil-type
+
+  linear_function [parameters 0] %0 : $(T) -> T with_transpose %1 : $(T) -> T
+
+Bundles a function with its transpose function into a
+``@differentiable(linear)`` function.
+
+``[parameters ...]`` specifies parameter indices that the original function is
+linear with respect to.
+
+A ``with_transpose`` clause specifies the transpose function associated
+with the original function. When a ``with_transpose`` clause is not specified,
+the mandatory differentiation transform  will add a ``with_transpose`` clause to
+the instruction.
+
+In raw SIL, the ``with_transpose`` clause is optional. In canonical SIL,
+the ``with_transpose`` clause is mandatory.
+
+
+differentiable_function_extract
+```````````````````````````````
+::
+
+  sil-instruction ::= 'differentiable_function_extract'
+                      '[' sil-differentiable-function-extractee ']'
+                      sil-value ':' sil-type
+                      ('as' sil-type)?
+
+  sil-differentiable-function-extractee ::= 'original' | 'jvp' | 'vjp'
+
+  differentiable_function_extract [original] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [vjp] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T \
+    as $(@in_constant T) -> (T, (T.TangentVector) -> T.TangentVector)
+
+Extracts the original function or a derivative function from the given
+``@differentiable`` function. The extractee is one of the following:
+``[original]``, ``[jvp]``, or ``[vjp]``.
+
+In lowered SIL, an explicit extractee type may be provided. This is currently
+used by the LoadableByAddress transformation, which rewrites function types.
+
+
+linear_function_extract
+```````````````````````
+::
+
+  sil-instruction ::= 'linear_function_extract'
+                      '[' sil-linear-function-extractee ']'
+                      sil-value ':' sil-type
+
+  sil-linear-function-extractee ::= 'original' | 'transpose'
+
+  linear_function_extract [original] %0 : $@differentiable(linear) (T) -> T
+  linear_function_extract [transpose] %0 : $@differentiable(linear) (T) -> T
+
+Extracts the original function or a transpose function from the given
+``@differentiable(linear)`` function. The extractee is one of the following:
+``[original]`` or ``[transpose]``.
+
 
 differentiability_witness_function
 ``````````````````````````````````

@@ -7,7 +7,7 @@
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
   typealias JumpBuffer = Int32
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
   import Glibc
   typealias JumpBuffer = jmp_buf
 #else

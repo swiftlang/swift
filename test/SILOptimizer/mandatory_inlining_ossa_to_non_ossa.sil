@@ -278,7 +278,7 @@ bb6:
 // CHECK:   br [[CONT]]
 //
 // CHECK: [[CONT]]:
-// CHECK:   switch_enum [[ARG1]] : $FakeOptional<Klass>, case #FakeOptional.some!enumelt.1: [[SOME:bb[0-9]+]], default [[DEFAULT:bb[0-9]+]]
+// CHECK:   switch_enum [[ARG1]] : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: [[SOME:bb[0-9]+]], default [[DEFAULT:bb[0-9]+]]
 //
 // CHECK: [[SOME]]([[PAYLOAD:%.*]] :
 // CHECK:   release_value [[PAYLOAD]]

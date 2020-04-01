@@ -17,3 +17,17 @@ func exerciseInits(which: Bool) -> C<Int> {
     return C(forInt: ())
   }
 }
+
+protocol P {
+  associatedtype T
+}
+
+struct S : P {
+  typealias T = Int
+}
+
+struct G<T : P> {}
+
+extension G where T == S {
+  func foo(_: T.T) {}
+}

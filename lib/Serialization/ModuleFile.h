@@ -417,6 +417,12 @@ private:
       llvm::OnDiskIterableChainedHashTable<DeclUSRTableInfo>;
   std::unique_ptr<SerializedDeclUSRTable> DeclUSRsTable;
 
+  class DerivativeFunctionConfigTableInfo;
+  using SerializedDerivativeFunctionConfigTable =
+      llvm::OnDiskIterableChainedHashTable<DerivativeFunctionConfigTableInfo>;
+  std::unique_ptr<SerializedDerivativeFunctionConfigTable>
+      DerivativeFunctionConfigurations;
+
   /// A blob of 0 terminated string segments referenced in \c SourceLocsTextData
   StringRef SourceLocsTextData;
 
@@ -549,6 +555,12 @@ private:
   /// index_block::DeclMembersLayout format.
   std::unique_ptr<SerializedDeclMembersTable>
   readDeclMembersTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Read an on-disk derivative function configuration table stored in
+  /// index_block::DerivativeFunctionConfigTableLayout format.
+  std::unique_ptr<ModuleFile::SerializedDerivativeFunctionConfigTable>
+  readDerivativeFunctionConfigTable(ArrayRef<uint64_t> fields,
+                                    StringRef blobData);
 
   /// Reads the index block, which contains global tables.
   ///
@@ -731,7 +743,7 @@ public:
   /// Searches the module's operators for one with the given name and fixity.
   ///
   /// If none is found, returns null.
-  OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
+  OperatorDecl *lookupOperator(Identifier name, OperatorFixity fixity);
 
   /// Searches the module's precedence groups for one with the given
   /// name and fixity.
@@ -774,6 +786,12 @@ public:
                        bool isInstanceMethod,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
 
+  /// Loads all derivative function configurations for the given
+  /// AbstractFunctionDecl.
+  void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD,
+      llvm::SetVector<AutoDiffConfig> &results);
+
   /// Reports all class members in the module to the given consumer.
   ///
   /// This is intended for use with id-style lookup and code completion.
@@ -810,6 +828,9 @@ public:
   void getTopLevelDecls(
          SmallVectorImpl<Decl*> &Results,
          llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
+
+  /// Adds all operators to the given vector.
+  void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &Results);
 
   /// Adds all precedence groups to the given vector.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results);
@@ -978,13 +999,14 @@ public:
   llvm::Expected<ProtocolConformanceRef>
   readConformanceChecked(llvm::BitstreamCursor &Cursor,
                          GenericEnvironment *genericEnv = nullptr);
-  
+
   /// Read a SILLayout from the given cursor.
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
 
-  /// Read the given normal conformance from the current module file.
-  NormalProtocolConformance *
-  readNormalConformance(serialization::NormalConformanceID id);
+  /// Read the given normal conformance from the current module file,
+  /// returns the conformance or the first error.
+  llvm::Expected<NormalProtocolConformance *>
+  readNormalConformanceChecked(serialization::NormalConformanceID id);
 
   /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();

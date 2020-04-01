@@ -41,6 +41,10 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
       log.indent(solverState->depth * 2);
     log << "(increasing score due to ";
     switch (kind) {
+    case SK_Hole:
+      log << "hole in the constraint system";
+      break;
+
     case SK_Unavailable:
       log << "use of an unavailable declaration";
       break;
@@ -143,7 +147,6 @@ static bool sameOverloadChoice(const OverloadChoice &x,
     return false;
 
   switch (x.getKind()) {
-  case OverloadChoiceKind::BaseType:
   case OverloadChoiceKind::KeyPathApplication:
     // FIXME: Compare base types after substitution?
     return true;
@@ -382,7 +385,7 @@ static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
                            false);
 }
 
-llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
+bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison) const {
   auto &C = decl1->getASTContext();
@@ -895,7 +898,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::TupleIndex:
       continue;
 
-    case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::KeyPathApplication:
       llvm_unreachable("Never considered different");
 

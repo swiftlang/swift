@@ -28,103 +28,8 @@ class SILInstruction;
 class SILModule;
 class SILValue;
 class DeadEndBlocks;
-
-namespace ownership {
-
-struct ErrorBehaviorKind {
-  enum inner_t {
-    Invalid = 0,
-    ReturnFalse = 1,
-    PrintMessage = 2,
-    Assert = 4,
-    ReturnFalseOnLeak = 8,
-    PrintMessageAndReturnFalse = PrintMessage | ReturnFalse,
-    PrintMessageAndAssert = PrintMessage | Assert,
-    ReturnFalseOnLeakAssertOtherwise = ReturnFalseOnLeak | Assert,
-  } Value;
-
-  ErrorBehaviorKind() : Value(Invalid) {}
-  ErrorBehaviorKind(inner_t Inner) : Value(Inner) { assert(Value != Invalid); }
-
-  bool shouldAssert() const {
-    assert(Value != Invalid);
-    return Value & Assert;
-  }
-
-  bool shouldReturnFalseOnLeak() const {
-    assert(Value != Invalid);
-    return Value & ReturnFalseOnLeak;
-  }
-
-  bool shouldPrintMessage() const {
-    assert(Value != Invalid);
-    return Value & PrintMessage;
-  }
-
-  bool shouldReturnFalse() const {
-    assert(Value != Invalid);
-    return Value & ReturnFalse;
-  }
-};
-
-} // end namespace ownership
-
-class LinearLifetimeError {
-  ownership::ErrorBehaviorKind errorBehavior;
-  bool foundUseAfterFree = false;
-  bool foundLeak = false;
-  bool foundOverConsume = false;
-
-public:
-  LinearLifetimeError(ownership::ErrorBehaviorKind errorBehavior)
-      : errorBehavior(errorBehavior) {}
-
-  bool getFoundError() const {
-    return foundUseAfterFree || foundLeak || foundOverConsume;
-  }
-
-  bool getFoundLeak() const { return foundLeak; }
-
-  bool getFoundUseAfterFree() const { return foundUseAfterFree; }
-
-  bool getFoundOverConsume() const { return foundOverConsume; }
-
-  void handleLeak(llvm::function_ref<void()> &&messagePrinterFunc) {
-    foundLeak = true;
-
-    if (errorBehavior.shouldPrintMessage())
-      messagePrinterFunc();
-
-    if (errorBehavior.shouldReturnFalseOnLeak())
-      return;
-
-    // We already printed out our error if we needed to, so don't pass it along.
-    handleError([]() {});
-  }
-
-  void handleOverConsume(llvm::function_ref<void()> &&messagePrinterFunc) {
-    foundOverConsume = true;
-    handleError(std::move(messagePrinterFunc));
-  }
-
-  void handleUseAfterFree(llvm::function_ref<void()> &&messagePrinterFunc) {
-    foundUseAfterFree = true;
-    handleError(std::move(messagePrinterFunc));
-  }
-
-private:
-  void handleError(llvm::function_ref<void()> &&messagePrinterFunc) {
-    if (errorBehavior.shouldPrintMessage())
-      messagePrinterFunc();
-
-    if (errorBehavior.shouldReturnFalse()) {
-      return;
-    }
-
-    assert(errorBehavior.shouldAssert() && "At this point, we should assert");
-    llvm_unreachable("triggering standard assertion failure routine");
-  }
-};
+class SILOwnershipVerifier;
+class SILValueOwnershipChecker;
 
 /// A class used to validate linear lifetime with respect to an SSA-like
 /// definition.
@@ -140,6 +45,14 @@ private:
 /// uses must not be reachable from each other and jointly post-dominate all
 /// consuming uses as well as the defining block/instruction.
 class LinearLifetimeChecker {
+public:
+  class Error;
+  struct ErrorBehaviorKind;
+
+private:
+  friend class SILOwnershipVerifier;
+  friend class SILValueOwnershipChecker;
+
   SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
   DeadEndBlocks &deadEndBlocks;
 
@@ -148,6 +61,24 @@ public:
                         DeadEndBlocks &deadEndBlocks)
       : visitedBlocks(visitedBlocks), deadEndBlocks(deadEndBlocks) {}
 
+  /// Returns true that \p value forms a linear lifetime with consuming uses \p
+  /// consumingUses, non consuming uses \p nonConsumingUses. Returns false
+  /// otherwise.
+  bool validateLifetime(SILValue value, ArrayRef<Operand *> consumingUses,
+                        ArrayRef<Operand *> nonConsumingUses);
+
+  /// Given a value and a consuming use of that value, compute a non-unique
+  /// minimal set of insertion points that together with \p consumingUse
+  /// post-dominate and end the lifetime of \p value.
+  ///
+  /// Returns true if we completed the consuming use set and discovered that \p
+  /// consumingUse is not strongly control equivalent to value (meaning
+  /// consumingUse is not in the same loop in the loop nest as value).
+  bool completeConsumingUseSet(
+      SILValue value, Operand *consumingUse,
+      function_ref<void(SILBasicBlock::iterator insertPt)> visitor);
+
+private:
   /// Returns true if:
   ///
   /// 1. No consuming uses are reachable from any other consuming use, from any
@@ -164,22 +95,19 @@ public:
   /// error.
   /// \p leakingBlocks If non-null a list of blocks where the value was detected
   /// to leak. Can be used to insert missing destroys.
-  LinearLifetimeError
-  checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
-             ArrayRef<Operand *> nonConsumingUses,
-             ownership::ErrorBehaviorKind errorBehavior,
-             SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
+  Error checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
+                   ArrayRef<Operand *> nonConsumingUses,
+                   ErrorBehaviorKind errorBehavior);
 
-  /// Returns true that \p value forms a linear lifetime with consuming uses \p
-  /// consumingUses, non consuming uses \p nonConsumingUses. Returns false
-  /// otherwise.
-  bool validateLifetime(SILValue value, ArrayRef<Operand *> consumingUses,
-                        ArrayRef<Operand *> nonConsumingUses) {
-    return !checkValue(value, consumingUses, nonConsumingUses,
-                       ownership::ErrorBehaviorKind::ReturnFalse,
-                       nullptr /*leakingBlocks*/)
-                .getFoundError();
-  }
+  Error checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
+                   ArrayRef<Operand *> nonConsumingUses,
+                   ErrorBehaviorKind errorBehavior,
+                   function_ref<void(SILBasicBlock *)> leakingBlockCallback);
+
+  Error checkValueImpl(
+      SILValue value, ArrayRef<Operand *> consumingUses,
+      ArrayRef<Operand *> nonConsumingUses, ErrorBehaviorKind errorBehavior,
+      Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback);
 };
 
 } // namespace swift

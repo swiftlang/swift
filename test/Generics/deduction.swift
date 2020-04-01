@@ -319,8 +319,9 @@ func foo() {
     let j = min(Int(3), Float(2.5)) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. 'Float')}}
     let k = min(A(), A()) // expected-error{{global function 'min' requires that 'A' conform to 'Comparable'}}
     let oi : Int? = 5
-    let l = min(3, oi) // expected-error{{global function 'min' requires that 'Int?' conform to 'Comparable'}}
-  // expected-note@-1{{wrapped type 'Int' satisfies this requirement}}
+    let l = min(3, oi) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+    // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }
 
 infix operator +&

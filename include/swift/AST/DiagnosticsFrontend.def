@@ -383,12 +383,12 @@ REMARK(interface_file_lock_timed_out,none,
 
 // Dependency Verifier Diagnostics
 ERROR(dependency_cascading_mismatch,none,
-      "expected %select{cascading|non-cascading}0 dependency; found "
-      "%select{cascading|non-cascading}1 dependency instead",
+      "expected %select{non-cascading|cascading}0 dependency; found "
+      "%select{non-cascading|cascading}1 dependency instead",
       (bool, bool))
 ERROR(potential_dependency_cascading_mismatch,none,
-      "expected %select{cascading|non-cascading}0 potential member dependency; "
-      "found %select{cascading|non-cascading}1 potential member dependency "
+      "expected %select{non-cascading|cascading}0 potential member dependency; "
+      "found %select{non-cascading|cascading}1 potential member dependency "
       "instead", (bool, bool))
 ERROR(missing_member_dependency,none,
       "expected "
@@ -396,7 +396,7 @@ ERROR(missing_member_dependency,none,
       "dependency does not exist: %1",
       (/*Expectation::Kind*/uint8_t, StringRef))
 ERROR(unexpected_dependency,none,
-      "unexpected %0 %select{%error|%error||potential member|dynamic member}1 "
+      "unexpected %0 %select{%error|%error|member|potential member|dynamic member}1 "
       "dependency: %2", (StringRef, /*Expectation::Kind*/uint8_t, StringRef))
 ERROR(unexpected_provided_entity,none,
       "unexpected provided entity: %0", (StringRef))

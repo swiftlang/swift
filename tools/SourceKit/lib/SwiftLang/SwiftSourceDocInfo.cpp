@@ -716,7 +716,7 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
 /// Returns true on success, false on error (and sets `Diagnostic` accordingly).
 static bool passCursorInfoForDecl(SourceFile* SF,
                                   const ValueDecl *VD,
-                                  const ModuleDecl *MainModule,
+                                  ModuleDecl *MainModule,
                                   const Type ContainerTy,
                                   bool IsRef,
                                   bool RetrieveRefactoring,
@@ -906,7 +906,23 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     if (ClangMod)
       ModuleName = ClangMod->getFullModuleName();
   } else if (VD->getModuleContext() != MainModule) {
-    ModuleName = VD->getModuleContext()->getName().str().str();
+    ModuleDecl *MD = VD->getModuleContext();
+    // If the decl is from a cross-import overlay module, report the overlay's
+    // underlying module as the owning module.
+    if (SF) {
+      // In a source file we map the imported overlays to the underlying
+      // modules they shadow.
+      auto *Underlying = SF->getModuleShadowedBySeparatelyImportedOverlay(MD);
+      if (Underlying)
+        MD = Underlying;
+    } else if (MainModule) {
+      // In a module interface we need to map the declared overlays of the main
+      // module (which are included in its generated interface) back to the main
+      // module itself.
+      if (MainModule->isUnderlyingModuleOfCrossImportOverlay(MD))
+        MD = MainModule;
+    }
+    ModuleName = MD->getName().str().str();
   }
   StringRef ModuleInterfaceName;
   if (auto IFaceGenRef = Lang.getIFaceGenContexts().find(ModuleName, Invok))
@@ -1642,10 +1658,9 @@ void SwiftLangSupport::getCursorInfo(
                                   Receiver);
         } else {
           std::string Diagnostic;  // Unused.
-          // FIXME: Should pass the main module for the interface but currently
-          // it's not necessary.
+          ModuleDecl *MainModule = IFaceGenRef->getModuleDecl();
           passCursorInfoForDecl(
-              /*SourceFile*/nullptr, Entity.Dcl, /*MainModule*/ nullptr,
+              /*SourceFile*/nullptr, Entity.Dcl, MainModule,
               Type(), Entity.IsRef, Actionables, ResolvedCursorInfo(),
               /*OrigBufferID=*/None, SourceLoc(),
               {}, *this, Invok, Diagnostic, {}, Receiver);

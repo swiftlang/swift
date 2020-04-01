@@ -14,6 +14,6 @@ import gizmo
 
 // CHECK-LABEL: sil hidden [ossa] @$s19objc_block_consumed24passBlockWithConsumedArgyySo5GizmoC_ADtF : $@convention(thin) (@guaranteed Gizmo, @guaranteed Gizmo) -> () {
 func passBlockWithConsumedArg(_ g: Gizmo, _ other: Gizmo) {
-  // CHECK: objc_method %0 : $Gizmo, #Gizmo.perform!1.foreign : (Gizmo) -> (((Gizmo?) -> ())?) -> (), $@convention(objc_method) (Optional<@convention(block) (@owned Optional<Gizmo>) -> ()>, Gizmo) -> ()
+  // CHECK: objc_method %0 : $Gizmo, #Gizmo.perform!foreign : (Gizmo) -> (((Gizmo?) -> ())?) -> (), $@convention(objc_method) (Optional<@convention(block) (@owned Optional<Gizmo>) -> ()>, Gizmo) -> ()
   g.perform { other in }
 }

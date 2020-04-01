@@ -67,8 +67,8 @@ public class CircleManager : ShapeManager {
 // CHECK: }
 
 // CHECK-LABEL: sil_witness_table [serialized] Rectangle: Shape module test {
-// CHECK-LABEL:   method #Shape.draw!1: <Self where Self : Shape> (Self) -> () -> () : @$s4test9RectangleVAA5ShapeA2aDP4drawyyFTW
-// CHECK-LABEL:   method #Shape.area!getter.1: <Self where Self : Shape> (Self) -> () -> Float : @$s4test9RectangleVAA5ShapeA2aDP4areaSfvgTW
+// CHECK-LABEL:   method #Shape.draw: <Self where Self : Shape> (Self) -> () -> () : @$s4test9RectangleVAA5ShapeA2aDP4drawyyFTW
+// CHECK-LABEL:   method #Shape.area!getter: <Self where Self : Shape> (Self) -> () -> Float : @$s4test9RectangleVAA5ShapeA2aDP4areaSfvgTW
 // CHECK-LABEL: }
 
 // NEGATIVE-NOT: sil {{.*}}internalFunction

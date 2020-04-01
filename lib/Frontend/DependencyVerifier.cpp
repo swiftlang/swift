@@ -224,6 +224,7 @@ public:
            "Cannot form negative obligation!");
   }
 
+  Expectation::Scope getScope() const { return info.second; }
   Expectation::Kind getKind() const { return info.first; }
   StringRef getName() const { return name; }
   bool getCascades() const {
@@ -238,6 +239,22 @@ public:
     case Expectation::Scope::Cascading:
       return "cascading";
     }
+  }
+
+  StringRef renderAsFixit(ASTContext &Ctx) const {
+    llvm::StringRef selector =
+#define MATRIX_ENTRY(SELECTOR, SCOPE, KIND) \
+    if (getKind() == Expectation::Kind::KIND && \
+        getScope() == Expectation::Scope::SCOPE) { \
+      return SELECTOR; \
+    }
+
+    [this]() -> StringRef {
+      EXPECTATION_MATRIX
+      return "";
+    }();
+#undef MATRIX_ENTRY
+    return Ctx.AllocateCopy(("// " + selector + "{{" + getName() + "}}").str());
   }
 
 public:
@@ -410,7 +427,7 @@ bool DependencyVerifier::parseExpectations(
 
 bool DependencyVerifier::constructObligations(const SourceFile *SF,
                                               ObligationMap &Obligations) {
-  auto *tracker = SF->getReferencedNameTracker();
+  auto *tracker = SF->getConfiguredReferencedNameTracker();
   assert(tracker && "Constructed source file without referenced name tracker!");
 
   auto &Ctx = SF->getASTContext();
@@ -429,8 +446,9 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
           return;
         case NodeKind::potentialMember: {
           auto key = copyDemangledTypeName(Ctx, context);
+          auto nameCpy = Ctx.AllocateCopy(name);
           Obligations.insert({Obligation::Key::forPotentialMember(key),
-                              {name, Expectation::Kind::PotentialMember,
+                              {nameCpy, Expectation::Kind::PotentialMember,
                                isCascadingUse ? Expectation::Scope::Cascading
                                               : Expectation::Scope::Private}});
         }
@@ -439,23 +457,28 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
           auto demContext = copyDemangledTypeName(Ctx, context);
           auto key = Ctx.AllocateCopy((demContext + "." + name).str());
           Obligations.insert({Obligation::Key::forMember(key),
-                              {context, Expectation::Kind::Member,
+                              {key, Expectation::Kind::Member,
                                isCascadingUse ? Expectation::Scope::Cascading
                                               : Expectation::Scope::Private}});
         }
           break;
-        case NodeKind::dynamicLookup:
-          Obligations.insert({Obligation::Key::forDynamicMember(name),
-                              {context, Expectation::Kind::DynamicMember,
+        case NodeKind::dynamicLookup: {
+          auto contextCpy = Ctx.AllocateCopy(context);
+          auto key = Ctx.AllocateCopy(name);
+          Obligations.insert({Obligation::Key::forDynamicMember(key),
+                              {contextCpy, Expectation::Kind::DynamicMember,
                                isCascadingUse ? Expectation::Scope::Cascading
                                               : Expectation::Scope::Private}});
           break;
+        }
         case NodeKind::topLevel:
-        case NodeKind::sourceFileProvide:
-          Obligations.insert({Obligation::Key::forProvides(name),
-                              {name, Expectation::Kind::Provides,
+        case NodeKind::sourceFileProvide: {
+          auto key = Ctx.AllocateCopy(name);
+          Obligations.insert({Obligation::Key::forProvides(key),
+                              {key, Expectation::Kind::Provides,
                                Expectation::Scope::None}});
           break;
+        }
         case NodeKind::kindCount:
           llvm_unreachable("Given count node?");
         }
@@ -467,7 +490,7 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
 bool DependencyVerifier::verifyObligations(
     const SourceFile *SF, const std::vector<Expectation> &ExpectedDependencies,
     ObligationMap &OM, llvm::StringMap<Expectation> &NegativeExpectations) {
-  auto *tracker = SF->getReferencedNameTracker();
+  auto *tracker = SF->getConfiguredReferencedNameTracker();
   assert(tracker && "Constructed source file without referenced name tracker!");
   auto &diags = SF->getASTContext().Diags;
   for (auto &expectation : ExpectedDependencies) {
@@ -564,6 +587,7 @@ bool DependencyVerifier::diagnoseUnfulfilledObligations(
   CharSourceRange EntireRange = SM.getRangeForBuffer(*SF->getBufferID());
   StringRef InputFile = SM.extractText(EntireRange);
   auto &diags = SF->getASTContext().Diags;
+  auto &Ctx = SF->getASTContext();
   forEachOwedObligation(Obligations, [&](StringRef key, Obligation &p) {
     // HACK: Diagnosing the end of the buffer will print a carat pointing
     // at the file path, but not print any of the buffer's contents, which
@@ -576,10 +600,12 @@ bool DependencyVerifier::diagnoseUnfulfilledObligations(
     case Expectation::Kind::DynamicMember:
     case Expectation::Kind::PotentialMember:
       diags.diagnose(Loc, diag::unexpected_dependency, p.describeCascade(),
-                     static_cast<uint8_t>(p.getKind()), key);
+                     static_cast<uint8_t>(p.getKind()), key)
+        .fixItInsert(Loc, p.renderAsFixit(Ctx));
       break;
     case Expectation::Kind::Provides:
-      diags.diagnose(Loc, diag::unexpected_provided_entity, p.getName());
+      diags.diagnose(Loc, diag::unexpected_provided_entity, p.getName())
+        .fixItInsert(Loc, p.renderAsFixit(Ctx));
       break;
     }
   });

@@ -298,16 +298,16 @@ func archetype_member_ref<T : Runcible>(_ x: T) {
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $T
   // CHECK-NEXT: copy_addr [[READ]] to [initialization] [[TEMP]]
   // CHECK-NEXT: end_access [[READ]]
-  // CHECK-NEXT: witness_method $T, #Runcible.free_method!1
+  // CHECK-NEXT: witness_method $T, #Runcible.free_method :
   // CHECK-NEXT: apply
   // CHECK-NEXT: destroy_addr [[TEMP]]
   var u = x.associated_method()
   // CHECK:      [[WRITE:%.*]] = begin_access [modify] [unknown]
-  // CHECK-NEXT: witness_method $T, #Runcible.associated_method!1
+  // CHECK-NEXT: witness_method $T, #Runcible.associated_method :
   // CHECK-NEXT: apply
   T.static_method()
   // CHECK:      metatype $@thick T.Type
-  // CHECK-NEXT: witness_method $T, #Runcible.static_method!1
+  // CHECK-NEXT: witness_method $T, #Runcible.static_method :
   // CHECK-NEXT: apply
 }
 
@@ -547,11 +547,11 @@ func dontLoadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTrivia
 // CHECK: bb0(%0 : $*Optional<NonTrivialStruct>):
 // CHECK-NEXT: debug_value_addr %0
 // CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
-// CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2:
-// CHECK-NEXT: unchecked_take_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt.1
+// CHECK-NEXT: unchecked_take_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[METATYPE]]
@@ -563,16 +563,16 @@ func dontLoadIgnoredLValueDoubleForceUnwrap(_ a: inout NonTrivialStruct??) -> No
 // CHECK: bb0(%0 : $*Optional<Optional<NonTrivialStruct>>):
 // CHECK-NEXT: debug_value_addr %0
 // CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
-// CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2:
-// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_take_enum_data_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, #Optional.some!enumelt.1
-// CHECK-NEXT: switch_enum_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb3
+// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_take_enum_data_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, #Optional.some!enumelt
+// CHECK-NEXT: switch_enum_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb3
 // CHECK: bb3:
 // CHECK: unreachable
 // CHECK: bb4:
-// CHECK-NEXT: unchecked_take_enum_data_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt.1
+// CHECK-NEXT: unchecked_take_enum_data_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[METATYPE]]
@@ -590,7 +590,7 @@ func loadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct) -> NonTrivialStru
 // CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
 // CHECK-NEXT: end_borrow [[BORROW]]
 // CHECK-NEXT: end_access [[READ]]
-// CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2([[UNWRAPPED_X:%[0-9]+]] : @owned $NonTrivialStruct):
@@ -605,18 +605,18 @@ func loadIgnoredLValueThroughForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTri
 // CHECK: bb0(%0 : $*Optional<NonTrivialStruct>):
 // CHECK-NEXT: debug_value_addr %0
 // CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
-// CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2:
-// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_take_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt.1
+// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_take_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
 // CHECK-NEXT: [[BORROW:%[0-9]+]] = load_borrow [[UNWRAPPED]]
 // CHECK-NEXT: // function_ref NonTrivialStruct.x.getter
 // CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$s{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>
 // CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
 // CHECK-NEXT: end_borrow [[BORROW]]
 // CHECK-NEXT: end_access [[READ]]
-// CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb3
+// CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb3
 // CHECK: bb3:
 // CHECK: unreachable
 // CHECK: bb4([[UNWRAPPED_X:%[0-9]+]] : @owned $NonTrivialStruct):

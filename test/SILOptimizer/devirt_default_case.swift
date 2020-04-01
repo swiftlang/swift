@@ -71,7 +71,7 @@ class Base3 {
 // CHECK: function_ref @$s19devirt_default_case5Base3C6middleyyF
 // CHECK: function_ref @$s19devirt_default_case8Derived333_{{.*}}6middle
 // CHECK-NORMAL-NOT: class_method
-// CHECK-TESTABLE: class_method %0 : $Base3, #Base3.middle!1
+// CHECK-TESTABLE: class_method %0 : $Base3, #Base3.middle
 // CHECK: } // end sil function '$s19devirt_default_case5Base3C5outeryyF'
   @inline(never) func outer() {
     middle()
@@ -126,7 +126,7 @@ class Base4 {
 // CHECK: function_ref @$s19devirt_default_case5Base4C3fooyyFTf4d_n
 // CHECK: function_ref @$s19devirt_default_case8Derived4C3fooyyFTf4d_n
 // CHECK-NORMAL-NOT: class_method
-// CHECK-TESTABLE: class_method %0 : $Base4, #Base4.foo!1
+// CHECK-TESTABLE: class_method %0 : $Base4, #Base4.foo
 // CHECK: } // end sil function '$s19devirt_default_case5Base4C4testyyF'
     foo() 
   }

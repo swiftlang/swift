@@ -1231,12 +1231,30 @@ namespace {
         break;
       }
 
+      FunctionMetadataDifferentiabilityKind metadataDifferentiabilityKind;
+      switch (type->getDifferentiabilityKind()) {
+      case DifferentiabilityKind::NonDifferentiable:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::NonDifferentiable;
+        break;
+      case DifferentiabilityKind::Normal:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Normal;
+        break;
+      case DifferentiabilityKind::Linear:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Linear;
+        break;
+      }
+
       auto flagsVal = FunctionTypeFlags()
                           .withNumParameters(numParams)
                           .withConvention(metadataConvention)
                           .withThrows(type->throws())
                           .withParameterFlags(hasFlags)
-                          .withEscaping(isEscaping);
+                          .withEscaping(isEscaping)
+                          .withDifferentiabilityKind(
+                              metadataDifferentiabilityKind);
 
       auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                           flagsVal.getIntValue());
@@ -2202,6 +2220,10 @@ irgen::getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
 }
 
 static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
+  // Never access by mangled name if we've been asked not to.
+  if (IGM.getOptions().DisableConcreteTypeMetadataMangledNameAccessors)
+    return false;
+  
   // A nongeneric nominal type with nontrivial metadata has an accessor
   // already we can just call.
   if (auto nom = dyn_cast<NominalType>(type)) {
@@ -2213,17 +2235,19 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
   }
   
   // The Swift 5.1 runtime fails to demangle associated types of opaque types.
-  auto hasNestedOpaqueArchetype = type.findIf([](CanType sub) -> bool {
-    if (auto archetype = dyn_cast<NestedArchetypeType>(sub)) {
-      if (isa<OpaqueTypeArchetypeType>(archetype->getRoot())) {
-        return true;
+  if (!IGM.getAvailabilityContext().isContainedIn(IGM.Context.getSwift52Availability())) {
+    auto hasNestedOpaqueArchetype = type.findIf([](CanType sub) -> bool {
+      if (auto archetype = dyn_cast<NestedArchetypeType>(sub)) {
+        if (isa<OpaqueTypeArchetypeType>(archetype->getRoot())) {
+          return true;
+        }
       }
-    }
-    return false;
-  });
-  
-  if (hasNestedOpaqueArchetype)
-    return false;
+      return false;
+    });
+    
+    if (hasNestedOpaqueArchetype)
+      return false;
+  }
   
   return true;
 

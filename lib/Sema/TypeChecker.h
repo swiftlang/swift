@@ -423,7 +423,7 @@ Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
 
 /// Validate the given type.
 ///
-/// Type validation performs name binding, checking of generic arguments,
+/// Type validation performs name lookup, checking of generic arguments,
 /// and so on to determine whether the given type is well-formed and can
 /// be used as a type.
 ///
@@ -916,7 +916,9 @@ void coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
 
 /// Type-check an initialized variable pattern declaration.
 bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC,
-                      Type patternType);
+                      Type patternType,
+                      PatternBindingDecl *PBD = nullptr,
+                      unsigned patternNumber = 0);
 bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
                              Type patternType = Type());
 
@@ -1484,7 +1486,7 @@ Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
   
 /// Build a call to the init(wrappedValue:) initializers of the property
 /// wrappers, filling in the given \c value as the original value.
-Expr *buildPropertyWrapperInitialValueCall(VarDecl *var,
+Expr *buildPropertyWrapperWrappedValueCall(VarDecl *var,
                                            Type backingStorageType,
                                            Expr *value,
                                            bool ignoreAttributeArgs);

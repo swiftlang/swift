@@ -46,8 +46,8 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
   SyntaxParsingContext ExprParsingContext(SyntaxContext, SyntaxContextKind::Expr);
 
   // If we are parsing a refutable pattern, check to see if this is the start
-  // of a let/var/is pattern.  If so, parse it to an UnresolvedPatternExpr and
-  // name binding will perform final validation.
+  // of a let/var/is pattern.  If so, parse it as an UnresolvedPatternExpr and
+  // let pattern type checking determine its final form.
   //
   // Only do this if we're parsing a pattern, to improve QoI on malformed
   // expressions followed by (e.g.) let/var decls.
@@ -2264,7 +2264,10 @@ Expr *Parser::parseExprIdentifier() {
   }
   
   ValueDecl *D = nullptr;
-  if (!InPoundIfEnvironment) {
+  // When doing incremental re-parsing for SwiftSyntax this check may emit bogus
+  // diagnostic. Also really the syntactic parser should not be doing name
+  // lookups, so disable this check when parsing for SwiftSyntax.
+  if (!InPoundIfEnvironment && !Context.LangOpts.ParseForSyntaxTreeOnly) {
     D = lookupInScope(name);
     // FIXME: We want this to work: "var x = { x() }", but for now it's better
     // to disallow it than to crash.
@@ -2834,6 +2837,15 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SmallVector<ASTNode, 4> bodyElements;
   ParserStatus Status;
   Status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
+
+  if (SourceMgr.rangeContainsCodeCompletionLoc({leftBrace, PreviousLoc})) {
+    // Ignore 'CodeCompletionDelayedDeclState' inside closures.
+    // Completions inside functions body inside closures at top level should
+    // be considered top-level completions.
+    if (State->hasCodeCompletionDelayedDeclState())
+      (void)State->takeCodeCompletionDelayedDeclState();
+    Status.setHasCodeCompletion();
+  }
 
   // Parse the closing '}'.
   SourceLoc rightBrace;

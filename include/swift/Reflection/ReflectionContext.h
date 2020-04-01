@@ -541,7 +541,7 @@ public:
   }
   
   /// Returns true if the address falls within a registered image.
-  bool ownsAddress(RemoteAddress Address) {
+  bool ownsAddressRaw(RemoteAddress Address) {
     for (auto Range : imageRanges) {
       auto Start = std::get<0>(Range);
       auto End = std::get<1>(Range);
@@ -549,7 +549,27 @@ public:
           && Address.getAddressData() < End.getAddressData())
         return true;
     }
-  
+
+    return false;
+  }
+
+  /// Returns true if the address is known to the reflection context.
+  /// Currently, that means that either the address falls within a registered
+  /// image, or the address points to a Metadata whose type context descriptor
+  /// is within a registered image.
+  bool ownsAddress(RemoteAddress Address) {
+    if (ownsAddressRaw(Address))
+      return true;
+
+    // This is usually called on a Metadata address which might have been
+    // on the heap. Try reading it and looking up its type context descriptor
+    // instead.
+    if (auto Metadata = readMetadata(Address.getAddressData()))
+      if (auto DescriptorAddress =
+          super::readAddressOfNominalTypeDescriptor(Metadata, true))
+        if (ownsAddressRaw(RemoteAddress(DescriptorAddress)))
+          return true;
+
     return false;
   }
   
@@ -711,181 +731,41 @@ public:
     }
   }
 
+  /// Projects the value of an enum.
+  ///
+  /// Takes the address and typeref for an enum and determines the
+  /// index of the currently-selected case within the enum.
+  /// You can use this index with `swift_reflection_childOfTypeRef`
+  /// to get detailed information about the specific case.
+  ///
+  /// Returns true if the enum case could be successfully determined.  In
+  /// particular, note that this code may return false for valid in-memory data
+  /// if the compiler used a strategy we do not yet understand.
   bool projectEnumValue(RemoteAddress EnumAddress,
                         const TypeRef *EnumTR,
                         int *CaseIndex) {
-    if (EnumTR == nullptr)
+    // Get the TypeInfo and sanity-check it
+    if (EnumTR == nullptr) {
       return false;
-    auto EnumTI = getTypeInfo(EnumTR);
-    if (EnumTI == nullptr)
+    }
+    auto TI = getTypeInfo(EnumTR);
+    if (TI == nullptr) {
       return false;
-
-    auto EnumRecordTI = dyn_cast<const RecordTypeInfo>(EnumTI);
-    if (EnumRecordTI == nullptr)
+    }
+    auto EnumTI = dyn_cast<const EnumTypeInfo>(TI);
+    if (EnumTI == nullptr){
       return false;
-    auto EnumSize = EnumRecordTI->getSize();
-
-    auto Fields = EnumRecordTI->getFields();
-    auto FieldCount = Fields.size();
-    if (FieldCount == 0) {
-      return false;  // No fields?
     }
-    if (FieldCount == 1) {
-      *CaseIndex = 0; // Only possible field
-      return true;
-    }
-
-    switch (EnumRecordTI->getRecordKind()) {
-
-    case RecordKind::NoPayloadEnum: {
-      if (EnumSize == 0) {
-        *CaseIndex = 0;
-        return true;
-      }
-      return getReader().readInteger(EnumAddress, EnumSize, CaseIndex);
-    }
-
-    case RecordKind::SinglePayloadEnum: {
-      FieldInfo PayloadCase = Fields[0];
-      if (!PayloadCase.TR)
-        return false;
-      unsigned long NonPayloadCaseCount = FieldCount - 1;
-      unsigned long PayloadExtraInhabitants = PayloadCase.TI.getNumExtraInhabitants();
-      unsigned Discriminator = 0;
-      auto PayloadSize = PayloadCase.TI.getSize();
-      if (NonPayloadCaseCount >= PayloadExtraInhabitants) {
-        // There are more cases than inhabitants, we need a separate discriminator.
-        auto TagInfo = getEnumTagCounts(PayloadSize, NonPayloadCaseCount, 1);
-        auto TagSize = TagInfo.numTagBytes;
-        auto TagAddress = RemoteAddress(EnumAddress.getAddressData() + PayloadSize);
-        if (!getReader().readInteger(TagAddress, TagSize, &Discriminator)) {
-          printf(">>>> readXI failed to read discriminator\n\n");
-          return false;
-        }
-      }
-
-      if (PayloadSize == 0) {
-        // Payload carries no information, so discriminator fully determines the case
-        *CaseIndex = Discriminator;
-        return true;
-      } else if (Discriminator == 0) {
-        // The payload area carries all the information...
-        if (PayloadExtraInhabitants == 0) {
-          *CaseIndex = 0;
-          return true;
-        }
-        int XITag = 0;
-        if (!PayloadCase.TI.readExtraInhabitantIndex(getReader(), EnumAddress, &XITag)) {
-          return false;
-        }
-        if (XITag < 0) { // Valid (not extra) inhabitant
-          *CaseIndex = 0; // Payload case is always #0
-          return true;
-        } else if ((unsigned)XITag <= NonPayloadCaseCount) {
-          *CaseIndex = XITag + 1;
-          return true;
-        }
-        return false;
-      } else {
-        // No payload: Payload area is reused for more cases
-        uint32_t PayloadTag = 0;
-        auto PayloadTagSize = std::min(PayloadSize, decltype(PayloadSize)(sizeof(PayloadTag)));
-        if (!getReader().readInteger(EnumAddress, PayloadTagSize, &PayloadTag)) {
-          return false;
-        }
-        auto XICases = 1U + PayloadExtraInhabitants; // Cases coded with XIs when discriminator = 0
-        auto PayloadCases = 1U << (PayloadTagSize * 8U);
-        *CaseIndex = XICases + (Discriminator - 1) * PayloadCases + PayloadTag;
-        return true;
-      }
-    }
-
-    case RecordKind::MultiPayloadEnum: {
-      // Collect basic statistics about the enum
-      unsigned long PayloadCaseCount = 0;
-      unsigned long NonPayloadCaseCount = 0;
-      unsigned long PayloadSize = 0;
-      for (auto Field : Fields) {
-        if (Field.TR != 0) {
-          PayloadCaseCount += 1;
-          if (Field.TI.getSize() > PayloadSize) {
-            PayloadSize = Field.TI.getSize();
-          }
-        } else {
-          NonPayloadCaseCount += 1;
-        }
-      }
-      if (EnumSize > PayloadSize) {
-        // If the compiler laid this out with a separate tag, use that.
-        unsigned tag = 0;
-        auto TagSize = EnumSize - PayloadSize;
-        auto TagAddress = remote::RemoteAddress(EnumAddress.getAddressData() + PayloadSize);
-        if (!getReader().readInteger(TagAddress, TagSize, &tag)
-           || tag >= Fields.size()) {
-          return false;
-        }
-        if (tag < PayloadCaseCount) {
-          *CaseIndex = tag;
-          return true;
-        }
-        auto PayloadTagSize = std::min(PayloadSize, 4UL);
-        // Treat the tag as a page selector; payload carries the offset within the page
-        auto Page = tag - PayloadCaseCount;
-        // Zero for 32-bit because we'll never have more than one page
-        auto PageSize = PayloadTagSize >= 4 ? 0 : 1 << (PayloadSize * 8U);
-        auto PageStart = Page * PageSize;
-        unsigned PayloadTag;
-        if (!getReader().readInteger(EnumAddress, PayloadTagSize, &PayloadTag)) {
-          return false;
-        }
-        *CaseIndex = PageStart + PayloadTag + PayloadCaseCount;
-        return true;
-      } else {
-        // XXX TODO: If the payloads have common spare bits (e.g., all pointers)
-        // then use those to decode the case.
-        return false;
-      }
-      break;
-    }
-
-    default:
-      // Unknown record kind.
-      break;
-    }
-    return false;
-  }
-
-  bool getEnumCaseTypeRef(const TypeRef *EnumTR,
-                          unsigned CaseIndex,
-                          std::string &Name,
-                          const TypeRef **OutPayloadTR) {
-    *OutPayloadTR = nullptr;
-
-    if (EnumTR == nullptr)
-      return false;
-
-    auto EnumTI = getTypeInfo(EnumTR);
-    if (EnumTI == nullptr)
-      return false;
-
-    auto EnumRecordTI = dyn_cast<const RecordTypeInfo>(EnumTI);
-    if (EnumRecordTI == nullptr)
-      return false;
-
-    auto NumCases = EnumRecordTI->getNumFields();
-    if (CaseIndex >= NumCases) {
-      return false;
-    } else {
-      const auto Case = EnumRecordTI->getFields()[CaseIndex];
-      Name = Case.Name;
-      *OutPayloadTR = Case.TR;
-      return true;
-    }
+    return EnumTI->projectEnumValue(getReader(), EnumAddress, CaseIndex);
   }
 
   /// Return a description of the layout of a value with the given type.
   const TypeInfo *getTypeInfo(const TypeRef *TR) {
-    return getBuilder().getTypeConverter().getTypeInfo(TR);
+    if (TR == nullptr) {
+      return nullptr;
+    } else {
+      return getBuilder().getTypeConverter().getTypeInfo(TR);
+    }
   }
 
 private:

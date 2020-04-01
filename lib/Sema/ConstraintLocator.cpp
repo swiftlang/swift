@@ -67,7 +67,8 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case TypeParameterRequirement:
     case ContextualType:
     case SynthesizedArgument:
-    case TernaryBranch: {
+    case TernaryBranch:
+    case ClosureBody: {
       auto numValues = numNumericValuesInPathElement(elt.getKind());
       for (unsigned i = 0; i < numValues; ++i)
         id.AddInteger(elt.getValue(i));
@@ -87,6 +88,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ApplyFunction:
   case ConstraintLocator::SequenceElementType:
   case ConstraintLocator::ClosureResult:
+  case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
@@ -325,6 +327,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     }
     case ClosureResult:
       out << "closure result";
+      break;
+
+    case ClosureBody:
+      out << "type of a closure body";
       break;
 
     case ConstructorMember:

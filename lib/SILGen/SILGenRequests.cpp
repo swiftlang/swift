@@ -46,6 +46,16 @@ SourceLoc swift::extractNearestSourceLoc(const SILGenDescriptor &desc) {
   return SourceLoc();
 }
 
+evaluator::DependencySource
+SILGenSourceFileRequest::readDependencySource(Evaluator &e) const {
+  auto &desc = std::get<0>(getStorage());
+  auto *unit = desc.context.get<FileUnit *>();
+  return {
+    dyn_cast_or_null<SourceFile>(unit),
+    evaluator::DependencyScope::Cascading
+  };
+}
+
 // Define request evaluation functions for each of the SILGen requests.
 static AbstractRequestFunction *silGenRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \

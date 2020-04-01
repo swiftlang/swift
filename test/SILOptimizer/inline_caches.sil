@@ -24,15 +24,15 @@ bb0(%0 : $Foo):
 
 //CHECK: class_method
 //CHECK-NEXT: apply
-  %1 = class_method %0 : $Foo, #Foo.ping!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> () // user: %2
+  %1 = class_method %0 : $Foo, #Foo.ping : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> () // user: %2
   %2 = apply %1(%0) : $@convention(method) (@guaranteed Foo) -> ()
   %3 = tuple ()                                   // user: %4
   return %3 : $()                                 // id: %4
 }
 
 sil_vtable Foo {
-  #Foo.ping!1: @_TFC8testcase3Foo4pingfS0_FT_T_	// testcase.Foo.ping (testcase.Foo)() -> ()
-  #Foo.init!initializer.1: @_TFC8testcase3FoocfMS0_FT_S0_	// testcase.Foo.init (testcase.Foo.Type)() -> testcase.Foo
+  #Foo.ping: @_TFC8testcase3Foo4pingfS0_FT_T_	// testcase.Foo.ping (testcase.Foo)() -> ()
+  #Foo.init!initializer: @_TFC8testcase3FoocfMS0_FT_S0_	// testcase.Foo.init (testcase.Foo.Type)() -> testcase.Foo
 }
 
 class C {
@@ -60,15 +60,15 @@ bb0(%0 : $@thick C.Type):
   // CHECK: apply [[REF]]
   // CHECK: br bb1
   // CHECK: bb3
-  // CHECK: [[METHOD:%.*]] = class_method %0 : $@thick C.Type, #C.foo!1 : (C.Type) -> () -> (), $@convention(method) (@thick C.Type) -> ()
+  // CHECK: [[METHOD:%.*]] = class_method %0 : $@thick C.Type, #C.foo : (C.Type) -> () -> (), $@convention(method) (@thick C.Type) -> ()
   // CHECK: apply [[METHOD]]
-  %2 = class_method %0 : $@thick C.Type, #C.foo!1 : (C.Type) -> () -> (), $@convention(method) (@thick C.Type) -> ()
+  %2 = class_method %0 : $@thick C.Type, #C.foo : (C.Type) -> () -> (), $@convention(method) (@thick C.Type) -> ()
   %3 = apply %2(%0) : $@convention(method) (@thick C.Type) -> ()
   %4 = tuple ()
   return %4 : $()
 }
 
 sil_vtable C {
-  #C.foo!1: @_TZFC4spec1C3foofMS0_FT_T_
-  #C.bar!1: @_TZFC4spec1C3barfMS0_FT_T_
+  #C.foo: @_TZFC4spec1C3foofMS0_FT_T_
+  #C.bar: @_TZFC4spec1C3barfMS0_FT_T_
 }

@@ -30,6 +30,9 @@ class FileUnit : public DeclContext {
 #pragma clang diagnostic pop
   virtual void anchor();
 
+  friend class DirectOperatorLookupRequest;
+  friend class DirectPrecedenceGroupLookupRequest;
+
   // FIXME: Stick this in a PointerIntPair.
   const FileUnitKind Kind;
 
@@ -107,6 +110,25 @@ public:
                                const ModuleDecl *importedModule,
                                SmallVectorImpl<Identifier> &spiGroups) const {};
 
+protected:
+  /// Look up an operator declaration. Do not call directly, use
+  /// \c DirectOperatorLookupRequest instead.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  ///
+  /// \param fixity One of Prefix, Infix, or Postfix.
+  virtual void
+  lookupOperatorDirect(Identifier name, OperatorFixity fixity,
+                       TinyPtrVector<OperatorDecl *> &results) const {}
+
+  /// Look up a precedence group. Do not call directly, use
+  /// \c DirectPrecedenceGroupLookupRequest instead.
+  ///
+  /// \param name The precedence group name.
+  virtual void lookupPrecedenceGroupDirect(
+      Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) const {}
+
+public:
   /// Returns the comment attached to the given declaration.
   ///
   /// This function is an implementation detail for comment serialization.
@@ -173,6 +195,13 @@ public:
   getTopLevelDeclsWhereAttributesMatch(
               SmallVectorImpl<Decl*> &Results,
               llvm::function_ref<bool(DeclAttributes)> matchAttributes) const;
+
+  /// Finds all operator decls in this file.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  virtual void
+  getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const {}
 
   /// Finds all precedence group decls in this file.
   ///
@@ -340,22 +369,6 @@ public:
 
   virtual StringRef getFilenameForPrivateDecl(const ValueDecl *decl) const {
     return StringRef();
-  }
-
-  /// Look up an operator declaration.
-  ///
-  /// \param name The operator name ("+", ">>", etc.)
-  ///
-  /// \param fixity One of PrefixOperator, InfixOperator, or PostfixOperator.
-  virtual OperatorDecl *lookupOperator(Identifier name, DeclKind fixity) const {
-    return nullptr;
-  }
-
-  /// Look up a precedence group.
-  ///
-  /// \param name The precedence group name.
-  virtual PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name) const {
-    return nullptr;
   }
 
   /// Returns the Swift module that overlays a Clang module.

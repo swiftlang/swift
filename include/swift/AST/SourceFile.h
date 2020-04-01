@@ -23,9 +23,8 @@ class PersistentParserState;
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
-/// the REPL). Since it contains raw source, it must be parsed and name-bound
-/// before being used for anything; a full type-check is also necessary for
-/// IR generation.
+/// the REPL). Since it contains raw source, it must be type checked for IR
+/// generation.
 class SourceFile final : public FileUnit {
   friend class ParseSourceFileRequest;
 
@@ -128,7 +127,7 @@ private:
 
   /// This is the list of modules that are imported by this module.
   ///
-  /// This is filled in by the Name Binding phase.
+  /// This is filled in by the import resolution phase.
   ArrayRef<ImportedModuleDesc> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
@@ -143,6 +142,7 @@ private:
 
   /// If non-null, used to track name lookups that happen within this file.
   Optional<ReferencedNameTracker> ReferencedNames;
+  Optional<ReferencedNameTracker> RequestReferencedNames;
 
   /// The class in this file marked \@NS/UIApplicationMain.
   ClassDecl *MainClass = nullptr;
@@ -193,6 +193,16 @@ private:
   /// be part of the underlying module. (ClangImporter overlays use a different
   /// mechanism which is not SourceFile-dependent.)
   SeparatelyImportedOverlayMap separatelyImportedOverlays;
+
+  using SeparatelyImportedOverlayReverseMap =
+    llvm::SmallDenseMap<ModuleDecl *, ModuleDecl *>;
+
+  /// A lazily populated mapping from a separately imported overlay to its
+  /// underlying shadowed module.
+  ///
+  /// This is used by tooling to substitute the name of the underlying module
+  /// wherever the overlay's name would otherwise be reported.
+  SeparatelyImportedOverlayReverseMap separatelyImportedOverlaysReversed;
 
   /// A pointer to PersistentParserState with a function reference to its
   /// deleter to handle the fact that it's forward declared.
@@ -301,23 +311,15 @@ public:
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
 
-  template <typename T>
-  using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;
-
-  OperatorMap<InfixOperatorDecl*> InfixOperators;
-  OperatorMap<PostfixOperatorDecl*> PostfixOperators;
-  OperatorMap<PrefixOperatorDecl*> PrefixOperators;
-  OperatorMap<PrecedenceGroupDecl*> PrecedenceGroups;
-
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.
   const SourceFileKind Kind;
 
   enum ASTStage_t {
-    /// The source file is not name bound or type checked.
+    /// The source file has not had its imports resolved or been type checked.
     Unprocessed,
-    /// Name binding has completed.
-    NameBound,
+    /// Import resolution has completed.
+    ImportsResolved,
     /// Type checking has completed.
     TypeChecked
   };
@@ -382,6 +384,7 @@ public:
   /// \returns true if the overlay was added; false if it already existed.
   bool addSeparatelyImportedOverlay(ModuleDecl *overlay,
                                     ModuleDecl *declaring) {
+    separatelyImportedOverlaysReversed.clear();
     return std::get<1>(separatelyImportedOverlays[declaring].insert(overlay));
   }
 
@@ -398,6 +401,12 @@ public:
     auto &value = std::get<1>(*i);
     overlays.append(value.begin(), value.end());
   }
+
+  /// Retrieves a module shadowed by the provided separately imported overlay
+  /// \p shadowed. If such a module is returned, it should be presented to users
+  /// as owning the symbols in \p overlay.
+  ModuleDecl *
+  getModuleShadowedBySeparatelyImportedOverlay(const ModuleDecl *overlay);
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
@@ -419,7 +428,20 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
+protected:
+  virtual void
+  lookupOperatorDirect(Identifier name, OperatorFixity fixity,
+                       TinyPtrVector<OperatorDecl *> &results) const override;
+
+  virtual void lookupPrecedenceGroupDirect(
+      Identifier name,
+      TinyPtrVector<PrecedenceGroupDecl *> &results) const override;
+
+public:
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const override;
 
   virtual void
   getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &results) const override;
@@ -444,33 +466,32 @@ public:
 
   virtual bool walk(ASTWalker &walker) override;
 
-  /// @{
-
-  /// Look up the given operator in this file.
-  ///
-  /// The file must be name-bound already. If the operator is not found, or if
-  /// there is an ambiguity, returns null.
-  ///
-  /// \param isCascading If true, the lookup of this operator may affect
-  /// downstream files.
-  InfixOperatorDecl *lookupInfixOperator(Identifier name, bool isCascading,
-                                         SourceLoc diagLoc = {});
-  PrefixOperatorDecl *lookupPrefixOperator(Identifier name, bool isCascading,
-                                           SourceLoc diagLoc = {});
-  PostfixOperatorDecl *lookupPostfixOperator(Identifier name, bool isCascading,
-                                             SourceLoc diagLoc = {});
-  PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name, bool isCascading,
-                                             SourceLoc diagLoc = {});
-  /// @}
-
-  ReferencedNameTracker *getReferencedNameTracker() {
+  ReferencedNameTracker *getLegacyReferencedNameTracker() {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
-  const ReferencedNameTracker *getReferencedNameTracker() const {
+  const ReferencedNameTracker *getLegacyReferencedNameTracker() const {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
 
+  ReferencedNameTracker *getRequestBasedReferencedNameTracker() {
+    return RequestReferencedNames ? RequestReferencedNames.getPointer() : nullptr;
+  }
+  const ReferencedNameTracker *getRequestBasedReferencedNameTracker() const {
+    return RequestReferencedNames ? RequestReferencedNames.getPointer() : nullptr;
+  }
+
+  /// Creates and installs the referenced name trackers in this source file.
+  ///
+  /// This entrypoint must be called before incremental compilation can proceed,
+  /// else reference dependencies will not be registered.
   void createReferencedNameTracker();
+
+  /// Retrieves the name tracker instance corresponding to
+  /// \c EnableRequestBasedIncrementalDependencies
+  ///
+  /// If incremental dependencies tracking is not enabled or \c createReferencedNameTracker()
+  /// has not been invoked on this source file, the result is \c nullptr.
+  const ReferencedNameTracker *getConfiguredReferencedNameTracker() const;
 
   /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.

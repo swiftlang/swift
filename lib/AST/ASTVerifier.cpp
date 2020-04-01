@@ -419,10 +419,6 @@ public:
       // Always verify the node as a parsed node.
       verifyParsed(node);
 
-      // If we've bound names already, verify as a bound node.
-      if (!SF || SF->ASTStage >= SourceFile::NameBound)
-        verifyBound(node);
-
       // If we've checked types already, do some extra verification.
       if (!SF || SF->ASTStage >= SourceFile::TypeChecked) {
         verifyCheckedAlways(node);
@@ -522,11 +518,6 @@ public:
     void verifyParsedBase(T ASTNode) {
       verifyParsed(cast<typename ASTNodeBase<T>::BaseTy>(ASTNode));
     }
-
-    void verifyBound(Expr *E) {}
-    void verifyBound(Stmt *S) {}
-    void verifyBound(Pattern *P) {}
-    void verifyBound(Decl *D) {}
 
     /// @{
     /// These verification functions are always run on type checked ASTs

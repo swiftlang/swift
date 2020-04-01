@@ -333,7 +333,7 @@ bb1:
   %11 = struct_element_addr %1 : $*UnfoldSequence<Element, State>, #UnfoldSequence._state
   %13 = apply %9(%10, %11) : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @out Optional<τ_0_1> for <State, Element>
   destroy_value %9 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @out Optional<τ_0_1> for <State, Element>
-  switch_enum_addr %10 : $*Optional<Element>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb2
+  switch_enum_addr %10 : $*Optional<Element>, case #Optional.some!enumelt: bb3, case #Optional.none!enumelt: bb2
 
 bb2:
   destroy_addr %10 : $*Optional<Element>
@@ -350,13 +350,13 @@ bb2:
   br bb5
 
 bb3:
-  %27 = unchecked_take_enum_data_addr %10 : $*Optional<Element>, #Optional.some!enumelt.1
-  %28 = init_enum_data_addr %0 : $*Optional<Element>, #Optional.some!enumelt.1
+  %27 = unchecked_take_enum_data_addr %10 : $*Optional<Element>, #Optional.some!enumelt
+  %28 = init_enum_data_addr %0 : $*Optional<Element>, #Optional.some!enumelt
   copy_addr [take] %27 to [initialization] %28 : $*Element
   dealloc_stack %10 : $*Optional<Element>
   destroy_addr %6 : $*UnfoldSequence<Element, State>
   dealloc_stack %6 : $*UnfoldSequence<Element, State>
-  inject_enum_addr %0 : $*Optional<Element>, #Optional.some!enumelt.1
+  inject_enum_addr %0 : $*Optional<Element>, #Optional.some!enumelt
   br bb5
 
 bb4:
@@ -519,11 +519,11 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt.1
+  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [initialization] %10 : $*P
   %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
-  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %2 : $*Optional<P>
   destroy_addr %10 : $*P
@@ -552,12 +552,12 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt.1
+  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [initialization] %10 : $*P
   destroy_addr %2 : $*Optional<P>
   %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
-  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %10 : $*P
   dealloc_stack %10 : $*P
@@ -586,12 +586,12 @@ bb0:
   cond_br undef, bb1, bb3
 
 bb1:
-  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt.1
+  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt
   %10 = alloc_stack $P
   copy_addr %9 to [initialization] %10 : $*P
   %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
   destroy_addr %2 : $*Optional<P>
-  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %10 : $*P
   dealloc_stack %10 : $*P
@@ -1088,12 +1088,12 @@ bb0(%0 : @owned $GS<Builtin.NativeObject>):
 // CHECK: } // end sil function 'unchecked_take_enum_data_addr_rvalue_simple'
 sil [ossa] @unchecked_take_enum_data_addr_rvalue_simple : $@convention(thin) <B> (@in_guaranteed Optional<GS<B>>, @inout Optional<GS<B>>) -> () {
 bb0(%0 : $*Optional<GS<B>>, %1 : $*Optional<GS<B>>):
-  %0a = unchecked_take_enum_data_addr %0 : $*Optional<GS<B>>, #Optional.some!enumelt.1
+  %0a = unchecked_take_enum_data_addr %0 : $*Optional<GS<B>>, #Optional.some!enumelt
   %2 = struct_element_addr %0a : $*GS<B>, #GS._value
   %3 = load [trivial] %2 : $*Builtin.Int64
   %4 = alloc_stack $Optional<GS<B>>
   copy_addr %1 to [initialization] %4 : $*Optional<GS<B>>
-  %4a = unchecked_take_enum_data_addr %4 : $*Optional<GS<B>>, #Optional.some!enumelt.1
+  %4a = unchecked_take_enum_data_addr %4 : $*Optional<GS<B>>, #Optional.some!enumelt
   %6 = struct_element_addr %4a : $*GS<B>, #GS._value
   %7 = load [trivial] %6 : $*Builtin.Int64
   %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
@@ -1110,12 +1110,12 @@ bb0(%0 : $*Optional<GS<B>>, %1 : $*Optional<GS<B>>):
 // CHECK: } // end sil function 'unchecked_take_enum_data_addr_store_rvalue_simple'
 sil [ossa] @unchecked_take_enum_data_addr_store_rvalue_simple : $@convention(thin) (@in_guaranteed Optional<GS<Klass>>, @owned Optional<GS<Klass>>) -> () {
 bb0(%0 : $*Optional<GS<Klass>>, %1 : @owned $Optional<GS<Klass>>):
-  %0a = unchecked_take_enum_data_addr %0 : $*Optional<GS<Klass>>, #Optional.some!enumelt.1
+  %0a = unchecked_take_enum_data_addr %0 : $*Optional<GS<Klass>>, #Optional.some!enumelt
   %2 = struct_element_addr %0a : $*GS<Klass>, #GS._value
   %3 = load [trivial] %2 : $*Builtin.Int64
   %4 = alloc_stack $Optional<GS<Klass>>
   store %1 to [init] %4 : $*Optional<GS<Klass>>
-  %4a = unchecked_take_enum_data_addr %4 : $*Optional<GS<Klass>>, #Optional.some!enumelt.1
+  %4a = unchecked_take_enum_data_addr %4 : $*Optional<GS<Klass>>, #Optional.some!enumelt
   %6 = struct_element_addr %4a : $*GS<Klass>, #GS._value
   %7 = load [trivial] %6 : $*Builtin.Int64
   %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1

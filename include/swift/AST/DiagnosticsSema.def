@@ -184,6 +184,9 @@ ERROR(value_type_comparison_with_nil_illegal,none,
 ERROR(cannot_match_expr_pattern_with_value,none,
       "expression pattern of type %0 cannot match values of type %1",
       (Type, Type))
+ERROR(cannot_match_expr_tuple_pattern_with_nontuple_value,none,
+      "tuple pattern cannot match values of non-tuple type %0",
+      (Type))
 ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
       "pattern cannot match values of type %0",
       (Type))
@@ -661,7 +664,7 @@ NOTE(add_return_type_note,none,
      "did you mean to add a return type?", ())
 
 //------------------------------------------------------------------------------
-// MARK: Name Binding
+// MARK: Import Resolution
 //------------------------------------------------------------------------------
 
 ERROR(sema_no_import,Fatal,
@@ -1200,8 +1203,16 @@ ERROR(c_function_pointer_from_method,none,
 ERROR(c_function_pointer_from_generic_function,none,
       "a C function pointer cannot be formed from a reference to a generic "
       "function", ())
+ERROR(unsupported_linear_to_differentiable_conversion,none,
+      "conversion from '@differentiable(linear)' to '@differentiable' is not "
+      "yet supported", ())
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
+ERROR(invalid_differentiable_function_conversion_expr,none,
+      "a '@differentiable%select{|(linear)}0' function can only be formed from "
+      "a reference to a 'func' or a literal closure", (bool))
+NOTE(invalid_differentiable_function_conversion_parameter,none,
+     "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_pointer_conversion,none,
       "cannot perform pointer conversion of value of type %0 to autoclosure "
       "result type %1",
@@ -1575,7 +1586,7 @@ NOTE(unstable_mangled_name_add_objc,none,
      "for compatibility with existing archives, use '@objc' "
      "to record the Swift 3 runtime name", ())
 
-// Generic types
+// Generic declarations
 ERROR(unsupported_type_nested_in_generic_function,none,
       "type %0 cannot be nested in generic function %1",
       (Identifier, DeclName))
@@ -1591,6 +1602,12 @@ ERROR(unsupported_type_nested_in_protocol_extension,none,
 ERROR(unsupported_nested_protocol,none,
       "protocol %0 cannot be nested inside another declaration",
       (Identifier))
+ERROR(where_nongeneric_ctx,none,
+      "'where' clause on non-generic member declaration requires a "
+      "generic context", ())
+ERROR(where_nongeneric_toplevel,none,
+      "'where' clause cannot be applied to a non-generic top-level "
+      "declaration", ())
 
 // Type aliases
 ERROR(type_alias_underlying_type_access,none,
@@ -1875,8 +1892,9 @@ ERROR(requirement_restricts_self,none,
       "'Self'",
       (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
-      "%select{method|initializer}0 %1 has different argument labels from those "
-      "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
+      "%0 %1 has different argument labels "
+      "from those required by protocol %2 (%3)",
+      (DescriptiveDeclKind, DeclName, Type, DeclName))
 ERROR(witness_initializer_not_required,none,
       "initializer requirement %0 can only be satisfied by a 'required' "
       "initializer in%select{| the definition of}1 non-final class %2",
@@ -2102,6 +2120,9 @@ NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,none,
      "candidate is explicitly '@nonobjc'", ())
+NOTE(protocol_witness_enum_case_payload, none,
+     "candidate is an enum case with associated values, "
+     "but protocol does not allow it", ())
 
 NOTE(protocol_witness_type,none,
      "possibly intended match", ())
@@ -2668,6 +2689,8 @@ ERROR(cannot_synthesize_in_crossfile_extension,none,
       "implementation of %0 cannot be automatically synthesized in an extension "
       "in a different file to the type", (Type))
 
+ERROR(broken_additive_arithmetic_requirement,none,
+      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
 ERROR(broken_case_iterable_requirement,none,
       "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,
@@ -2696,6 +2719,19 @@ ERROR(broken_encodable_requirement,none,
       "Encodable protocol is broken: unexpected requirement", ())
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
+ERROR(broken_differentiable_requirement,none,
+      "Differentiable protocol is broken: unexpected requirement", ())
+WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
+      "stored property %0 has no derivative because %1 does not conform to "
+      "'Differentiable'; add an explicit '@noDerivative' attribute"
+      "%select{|, or conform %2 to 'AdditiveArithmetic'}3",
+      (Identifier, Type, Identifier, bool))
+WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
+      "synthesis of the 'Differentiable.move(along:)' requirement for %1 "
+      "requires all stored properties to be mutable; use 'var' instead, or add "
+      "an explicit '@noDerivative' attribute"
+      "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
+      (Identifier, Identifier, bool))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2721,6 +2757,19 @@ NOTE(decodable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)'?", ())
 NOTE(codable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)' and 'encode(to:)'?", ())
+
+WARNING(decodable_property_will_not_be_decoded, none,
+        "immutable property will not be decoded because it is declared with "
+        "an initial value which cannot be overwritten", ())
+NOTE(decodable_property_init_or_codingkeys_implicit, none,
+     "set the initial value via the initializer or explicitly define a "
+     "CodingKeys enum %select{including|without}0 a %1 case to silence "
+     "this warning", (unsigned, DeclName))
+NOTE(decodable_property_init_or_codingkeys_explicit, none,
+     "set the initial value via the initializer or remove the %0 case from "
+     "the CodingKeys enum to silence this warning", (DeclName))
+NOTE(decodable_make_property_mutable, none,
+     "make the property mutable instead", ())
 
 NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "%select{associated value|stored property}0 type %1 does not conform to "
@@ -2754,10 +2803,6 @@ ERROR(dynamic_self_stored_property_init,none,
       "covariant 'Self' type cannot be referenced from a stored property initializer", ())
 ERROR(dynamic_self_default_arg,none,
       "covariant 'Self' type cannot be referenced from a default argument expression", ())
-
-ERROR(where_nongeneric_ctx,none,
-      "'where' clause on non-generic member declaration requires a "
-      "generic context", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
@@ -2912,6 +2957,8 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
       "attribute for transpose registration instead", ())
+ERROR(differentiable_attr_void_result,none,
+      "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclNameRef, Type))
 // TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
@@ -2936,12 +2983,6 @@ ERROR(differentiable_attr_result_not_differentiable,none,
 ERROR(differentiable_attr_protocol_req_where_clause,none,
       "'@differentiable' attribute on protocol requirement cannot specify "
       "'where' clause", ())
-ERROR(differentiable_attr_protocol_req_assoc_func,none,
-      "'@differentiable' attribute on protocol requirement cannot specify "
-      "'jvp:' or 'vjp:'", ())
-ERROR(differentiable_attr_stored_property_variable_unsupported,none,
-      "'@differentiable' attribute on stored property cannot specify "
-      "'jvp:' or 'vjp:'", ())
 ERROR(differentiable_attr_class_member_dynamic_self_result_unsupported,none,
       "'@differentiable' attribute cannot be declared on class members "
       "returning 'Self'", ())
@@ -2960,6 +3001,12 @@ ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
+NOTE(protocol_witness_missing_differentiable_attr_nonpublic_other_file,none,
+     "non-public %1 %2 must have explicit '%0' attribute to satisfy "
+     "requirement %3 %4 (in protocol %6) because it is declared in a different "
+     "file than the conformance of %5 to %6",
+     (StringRef, DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName,
+      Type, Type))
 
 // @derivative
 ERROR(derivative_attr_expected_result_tuple,none,
@@ -2996,6 +3043,23 @@ ERROR(derivative_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 NOTE(derivative_attr_duplicate_note,none,
      "other attribute declared here", ())
+
+// @transpose
+ERROR(transpose_attr_invalid_linearity_parameter_or_result,none,
+      "cannot transpose with respect to original %select{result|parameter}1 "
+      "'%0' that does not conform to 'Differentiable' and satisfy "
+      "'%0 == %0.TangentVector'", (StringRef, /*isParameter*/ bool))
+ERROR(transpose_attr_overload_not_found,none,
+      "could not find function %0 with expected type %1", (DeclName, Type))
+ERROR(transpose_attr_cannot_use_named_wrt_params,none,
+      "cannot use named 'wrt' parameters in '@transpose(of:)' attribute, found "
+      "%0", (Identifier))
+ERROR(transpose_attr_wrt_self_must_be_static,none,
+     "the transpose of an instance method must be a 'static' method in the "
+     "same type when 'self' is a linearity parameter", ())
+NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
+     "the transpose is declared in %0 but the original function is declared in "
+     "%1", (Type, Type))
 
 // Automatic differentiation attributes
 ERROR(autodiff_attr_original_decl_invalid_kind,none,
@@ -4010,6 +4074,18 @@ ERROR(opaque_type_in_protocol_requirement,none,
 ERROR(attr_only_on_parameters_of_differentiable,none,
       "'%0' may only be used on parameters of '@differentiable' function "
       "types", (StringRef))
+ERROR(differentiable_function_type_invalid_parameter,none,
+      "parameter type '%0' does not conform to 'Differentiable'"
+      "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
+      "function type is '@differentiable%select{|(linear)}1'"
+      "%select{|; did you want to add '@noDerivative' to this parameter?}2",
+      (StringRef, /*tangentVectorEqualsSelf*/ bool,
+       /*hasValidDifferentiabilityParameter*/ bool))
+ERROR(differentiable_function_type_invalid_result,none,
+      "result type '%0' does not conform to 'Differentiable'"
+      "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
+      "function type is '@differentiable%select{|(linear)}1'",
+      (StringRef, bool))
 
 // SIL
 ERROR(opened_non_protocol,none,

@@ -378,106 +378,42 @@ reflect(enumValue: OneIndirectPayload.leafF)
 // CHECK-NEXT: (enum reflect_Enum_value.OneIndirectPayload)
 // CHECK-NEXT: Value: .leafF
 
-enum MultiPayload {
-case stampA
-case envelopeA(Int64)
-case stampB
-case envelopeB(Double)
-case stampC
-case envelopeC((Int32, Int32))
-case stampD
-case stampE
+class SimpleSwiftClass {
+  let value = 7
 }
 
-enum SinglePayloadEnumWithMultiPayloadEnumPayload {
-case payloadA(MultiPayload)
-case alsoA
-case alsoB
-case alsoC
-case alsoD
+struct StructWrappingSimpleSwiftClass {
+  let wrapped = SimpleSwiftClass()
 }
 
-reflect(enumValue: SinglePayloadEnumWithMultiPayloadEnumPayload.payloadA(.stampB))
+enum EnumWrappingStructWrappingSimpleSwiftClass {
+case payload(StructWrappingSimpleSwiftClass)
+case nonpayloadA
+case nonpayloadB
+}
+
+reflect(enumValue: EnumWrappingStructWrappingSimpleSwiftClass.payload(StructWrappingSimpleSwiftClass()))
 
 // CHECK: Reflecting an enum value.
 // CHECK-NEXT: Type reference:
-// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithMultiPayloadEnumPayload)
-// CHECK-NEXT: Value: .payloadA(.stampB)
+// CHECK-NEXT: (enum reflect_Enum_value.EnumWrappingStructWrappingSimpleSwiftClass)
+// CHECK-NEXT: Value: .payload(_)
 
-reflect(enumValue: SinglePayloadEnumWithMultiPayloadEnumPayload.payloadA(.envelopeC((1,2))))
-
-// CHECK: Reflecting an enum value.
-// CHECK-NEXT: Type reference:
-// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithMultiPayloadEnumPayload)
-// CHECK-NEXT: Value: .payloadA(.envelopeC(_))
-
-reflect(enumValue: SinglePayloadEnumWithMultiPayloadEnumPayload.alsoC)
-
-// CHECK: Reflecting an enum value.
-// CHECK-NEXT: Type reference:
-// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithMultiPayloadEnumPayload)
-// CHECK-NEXT: Value: .alsoC
-
-reflect(enumValue: Optional<Optional<SinglePayloadEnumWithMultiPayloadEnumPayload>>.some(.none))
+reflect(enumValue: Optional<EnumWrappingStructWrappingSimpleSwiftClass>.some(.payload(StructWrappingSimpleSwiftClass())))
 
 // CHECK: Reflecting an enum value.
 // CHECK-NEXT: Type reference:
 // CHECK-NEXT: (bound_generic_enum Swift.Optional
-// CHECK-NEXT:  (bound_generic_enum Swift.Optional
-// CHECK-NEXT:   (enum reflect_Enum_value.SinglePayloadEnumWithMultiPayloadEnumPayload)))
-// CHECK-NEXT: Value: .some(.none)
+// CHECK-NEXT:   (enum reflect_Enum_value.EnumWrappingStructWrappingSimpleSwiftClass))
+// CHECK-NEXT: Value: .some(.payload(_))
 
-enum SmallMultiPayload {
-case stampA
-case envelopeA(Int8)
-case stampB
-case envelopeB(Int16)
-case stampC
-case envelopeC((UInt8, Int8))
-case stampD
-case stampE
-}
-
-enum SinglePayloadEnumWithSmallMultiPayloadEnumPayload {
-case payloadA(SmallMultiPayload)
-case alsoA
-case alsoB
-case alsoC
-case alsoD
-}
-
-reflect(enumValue: SinglePayloadEnumWithSmallMultiPayloadEnumPayload.payloadA(.stampB))
-
-// CHECK: Reflecting an enum value.
-// CHECK-NEXT: Type reference:
-// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithSmallMultiPayloadEnumPayload)
-// CHECK-NEXT: Value: .payloadA(.stampB)
-
-reflect(enumValue: SinglePayloadEnumWithSmallMultiPayloadEnumPayload.payloadA(.envelopeC((1,2))))
-
-// CHECK: Reflecting an enum value.
-// CHECK-NEXT: Type reference:
-// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithSmallMultiPayloadEnumPayload)
-// CHECK-NEXT: Value: .payloadA(.envelopeC(_))
-
-reflect(enumValue: SinglePayloadEnumWithSmallMultiPayloadEnumPayload.alsoC)
-
-// CHECK: Reflecting an enum value.
-// CHECK-NEXT: Type reference:
-// CHECK-NEXT: (enum reflect_Enum_value.SinglePayloadEnumWithSmallMultiPayloadEnumPayload)
-// CHECK-NEXT: Value: .alsoC
-
-reflect(enumValue: Optional<Optional<SinglePayloadEnumWithSmallMultiPayloadEnumPayload>>.some(.none))
+reflect(enumValue: Optional<EnumWrappingStructWrappingSimpleSwiftClass>.none)
 
 // CHECK: Reflecting an enum value.
 // CHECK-NEXT: Type reference:
 // CHECK-NEXT: (bound_generic_enum Swift.Optional
-// CHECK-NEXT:  (bound_generic_enum Swift.Optional
-// CHECK-NEXT:   (enum reflect_Enum_value.SinglePayloadEnumWithSmallMultiPayloadEnumPayload)))
-// CHECK-NEXT: Value: .some(.none)
-
-
-// XXX TODO: Multipayload enums with pointer payloads
+// CHECK-NEXT:   (enum reflect_Enum_value.EnumWrappingStructWrappingSimpleSwiftClass))
+// CHECK-NEXT: Value: .none
 
 
 // XXX TODO: test enum with thin function payload XXX

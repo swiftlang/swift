@@ -89,18 +89,18 @@ sil @_TFC9pic_crash10ParentNodecfMS0_FT5indexSi_S0_ : $@convention(method) (Int,
 sil @_TFC9pic_crash10ParentNodeCfMS0_FT5indexSi_S0_ : $@convention(thin) (Int, @thick ParentNode.Type) -> @owned ParentNode
 
 sil_vtable Node {
-  #Node.init!initializer.1: @_TFC9pic_crash4NodecfMS0_FT5indexSi_S0_	// pic_crash.Node.init (pic_crash.Node.Type)(index : Swift.Int) -> pic_crash.Node
-  #Node.check!1: @_test_exact_checked_cast_branch	// pic_crash.Node.check (pic_crash.Node)() -> Swift.Int
-  #Node.index!getter.1: @_TFC9pic_crash4Nodeg5indexSi	// pic_crash.Node.index.getter : Swift.Int
-  #Node.index!setter.1: @_TFC9pic_crash4Nodes5indexSi	// pic_crash.Node.index.setter : Swift.Int
+  #Node.init!initializer: @_TFC9pic_crash4NodecfMS0_FT5indexSi_S0_	// pic_crash.Node.init (pic_crash.Node.Type)(index : Swift.Int) -> pic_crash.Node
+  #Node.check: @_test_exact_checked_cast_branch	// pic_crash.Node.check (pic_crash.Node)() -> Swift.Int
+  #Node.index!getter: @_TFC9pic_crash4Nodeg5indexSi	// pic_crash.Node.index.getter : Swift.Int
+  #Node.index!setter: @_TFC9pic_crash4Nodes5indexSi	// pic_crash.Node.index.setter : Swift.Int
 }
 
 sil_vtable ParentNode {
-  #Node.init!initializer.1: @_TFC9pic_crash10ParentNodecfMS0_FT5indexSi_S0_ [override]	// pic_crash.ParentNode.init (pic_crash.ParentNode.Type)(index : Swift.Int) -> pic_crash.ParentNode
-  #Node.check!1: @_test_exact_checked_cast_branch [override]	// pic_crash.Node.check (pic_crash.Node)() -> Swift.Int
-  #Node.index!getter.1: @_TFC9pic_crash4Nodeg5indexSi [override]	// pic_crash.Node.index.getter : Swift.Int
-  #Node.index!setter.1: @_TFC9pic_crash4Nodes5indexSi [override]	// pic_crash.Node.index.setter : Swift.Int
-  #ParentNode.init!initializer.1: @_TFC9pic_crash10ParentNodecfMS0_FT4leftCS_4Node5rightS1_5indexSi_S0_ 	// pic_crash.ParentNode.init (pic_crash.ParentNode.Type)(left : pic_crash.Node, right : pic_crash.Node, index : Swift.Int) -> pic_crash.ParentNode
+  #Node.init!initializer: @_TFC9pic_crash10ParentNodecfMS0_FT5indexSi_S0_ [override]	// pic_crash.ParentNode.init (pic_crash.ParentNode.Type)(index : Swift.Int) -> pic_crash.ParentNode
+  #Node.check: @_test_exact_checked_cast_branch [override]	// pic_crash.Node.check (pic_crash.Node)() -> Swift.Int
+  #Node.index!getter: @_TFC9pic_crash4Nodeg5indexSi [override]	// pic_crash.Node.index.getter : Swift.Int
+  #Node.index!setter: @_TFC9pic_crash4Nodes5indexSi [override]	// pic_crash.Node.index.setter : Swift.Int
+  #ParentNode.init!initializer: @_TFC9pic_crash10ParentNodecfMS0_FT4leftCS_4Node5rightS1_5indexSi_S0_ 	// pic_crash.ParentNode.init (pic_crash.ParentNode.Type)(left : pic_crash.Node, right : pic_crash.Node, index : Swift.Int) -> pic_crash.ParentNode
 }
 
 sil @$s5test104BaseB0C3fooyyF : $@convention(method) (@guaranteed BaseBase) -> ()
@@ -110,16 +110,16 @@ sil @$s5test110DerivedIntC3fooyyF : $@convention(method) (@guaranteed DerivedInt
 sil @$s5test110DerivedIntCfD : $@convention(method) (@owned DerivedInt) -> ()
 
 sil_vtable BaseBase {
-  #BaseBase.foo!1: (BaseBase) -> () -> () : @$s5test104BaseB0C3fooyyF
-  #BaseBase.deinit!deallocator.1: @$s5test104BaseB0CfD
+  #BaseBase.foo: (BaseBase) -> () -> () : @$s5test104BaseB0C3fooyyF
+  #BaseBase.deinit!deallocator: @$s5test104BaseB0CfD
 }
 
 sil_vtable Base {
-  #BaseBase.foo!1: (BaseBase) -> () -> () : @$s5test104BaseB0C3fooyyF [inherited]
-  #Base.deinit!deallocator.1: @$s5test14BaseCfD
+  #BaseBase.foo: (BaseBase) -> () -> () : @$s5test104BaseB0C3fooyyF [inherited]
+  #Base.deinit!deallocator: @$s5test14BaseCfD
 }
 
 sil_vtable DerivedInt {
-  #BaseBase.foo!1: (BaseBase) -> () -> () : @$s5test110DerivedIntC3fooyyF [override]
-  #DerivedInt.deinit!deallocator.1: @$s5test110DerivedIntCfD
+  #BaseBase.foo: (BaseBase) -> () -> () : @$s5test110DerivedIntC3fooyyF [override]
+  #DerivedInt.deinit!deallocator: @$s5test110DerivedIntCfD
 }

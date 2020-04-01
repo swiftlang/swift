@@ -16,10 +16,10 @@ func multipleLabelsLet(e: E) {
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
   // CHECK-NEXT: [[E_COPY:%.*]] = alloc_stack $E
   // CHECK-NEXT: copy_addr %0 to [initialization] [[E_COPY]]
-  // CHECK-NEXT: switch_enum_addr [[E_COPY]] : $*E, case #E.a!enumelt.1: bb1, case #E.b!enumelt.1: bb2, default bb4
+  // CHECK-NEXT: switch_enum_addr [[E_COPY]] : $*E, case #E.a!enumelt: bb1, case #E.b!enumelt: bb2, default bb4
 
   // CHECK:      bb1:
-  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.a!enumelt.1
+  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.a!enumelt
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack $Any
   // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ANY_BOX]]
   // CHECK-NEXT: copy_addr [[ANY_BOX]] to [initialization] [[X_PHI]]
@@ -29,7 +29,7 @@ func multipleLabelsLet(e: E) {
   // CHECK-NEXT: br bb3
 
   // CHECK:      bb2:
-  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.b!enumelt.1
+  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.b!enumelt
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack $Any
   // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ANY_BOX]]
   // CHECK-NEXT: copy_addr [[ANY_BOX]] to [initialization] [[X_PHI]]
@@ -68,10 +68,10 @@ func multipleLabelsVar(e: E) {
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
   // CHECK-NEXT: [[E_COPY:%.*]] = alloc_stack $E
   // CHECK-NEXT: copy_addr %0 to [initialization] [[E_COPY]]
-  // CHECK-NEXT: switch_enum_addr [[E_COPY]] : $*E, case #E.a!enumelt.1: bb1, case #E.b!enumelt.1: bb2, default bb4
+  // CHECK-NEXT: switch_enum_addr [[E_COPY]] : $*E, case #E.a!enumelt: bb1, case #E.b!enumelt: bb2, default bb4
 
   // CHECK:      bb1:
-  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.a!enumelt.1
+  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.a!enumelt
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack $Any
   // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ANY_BOX]]
   // CHECK-NEXT: copy_addr [[ANY_BOX]] to [initialization] [[X_PHI]]
@@ -81,7 +81,7 @@ func multipleLabelsVar(e: E) {
   // CHECK-NEXT: br bb3
 
   // CHECK:      bb2:
-  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.b!enumelt.1
+  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.b!enumelt
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack $Any
   // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ANY_BOX]]
   // CHECK-NEXT: copy_addr [[ANY_BOX]] to [initialization] [[X_PHI]]
@@ -129,10 +129,10 @@ func fallthroughWithValue(e: E) {
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
   // CHECK-NEXT: [[E_COPY:%.*]] = alloc_stack $E
   // CHECK-NEXT: copy_addr %0 to [initialization] [[E_COPY]]
-  // CHECK-NEXT: switch_enum_addr [[E_COPY]] : $*E, case #E.a!enumelt.1: bb1, case #E.b!enumelt.1: bb2, default bb4
+  // CHECK-NEXT: switch_enum_addr [[E_COPY]] : $*E, case #E.a!enumelt: bb1, case #E.b!enumelt: bb2, default bb4
   
   // CHECK:      bb1:
-  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.a!enumelt.1
+  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.a!enumelt
   // CHECK-NEXT: [[ORIGINAL_ANY_BOX:%.*]] = alloc_stack $Any
   // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ORIGINAL_ANY_BOX]]
   // CHECK:      [[FN1:%.*]] = function_ref @$s34switch_multiple_entry_address_only8takesAnyyyypF
@@ -144,7 +144,7 @@ func fallthroughWithValue(e: E) {
   // CHECK-NEXT: br bb3
   
   // CHECK:      bb2:
-  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.b!enumelt.1
+  // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.b!enumelt
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack $Any
   // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [initialization] [[ANY_BOX]]
   // CHECK-NEXT: copy_addr [[ANY_BOX]] to [initialization] [[X_PHI]]

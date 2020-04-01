@@ -12,11 +12,13 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Evaluator.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Subsystems.h"
 
 using namespace swift;
 
@@ -68,6 +70,49 @@ void SuperclassDeclRequest::cacheResult(ClassDecl *value) const {
 }
 
 //----------------------------------------------------------------------------//
+// InheritedProtocolsRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<ArrayRef<ProtocolDecl *>>
+InheritedProtocolsRequest::getCachedResult() const {
+  auto proto = std::get<0>(getStorage());
+  if (!proto->areInheritedProtocolsValid())
+    return None;
+
+  return proto->InheritedProtocols;
+}
+
+void InheritedProtocolsRequest::cacheResult(ArrayRef<ProtocolDecl *> PDs) const {
+  auto proto = std::get<0>(getStorage());
+  proto->InheritedProtocols = PDs;
+  proto->setInheritedProtocolsValid();
+}
+
+evaluator::DependencySource
+InheritedProtocolsRequest::readDependencySource(Evaluator &e) const {
+  auto *PD = std::get<0>(getStorage());
+  // Ignore context changes for protocols outside our module. This
+  // prevents transitive cascading edges when e.g. our private
+  // type conforms to Hashable which itself looks up Equatable during
+  // qualified lookup.
+  if (!PD->getParentSourceFile())
+    return { nullptr, e.getActiveSourceScope() };
+  return {
+    e.getActiveDependencySourceOrNull(),
+    evaluator::getScopeForAccessLevel(PD->getFormalAccess())
+  };
+}
+
+void InheritedProtocolsRequest::writeDependencySink(
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    ArrayRef<ProtocolDecl *> PDs) const {
+  for (auto *parentProto : PDs) {
+    tracker.addUsedMember({parentProto, Identifier()},
+                          eval.isActiveSourceCascading());
+  }
+}
+
+//----------------------------------------------------------------------------//
 // Missing designated initializers computation
 //----------------------------------------------------------------------------//
 
@@ -81,7 +126,7 @@ void HasMissingDesignatedInitializersRequest::cacheResult(bool result) const {
   classDecl->setHasMissingDesignatedInitializers(result);
 }
 
-llvm::Expected<bool>
+bool
 HasMissingDesignatedInitializersRequest::evaluate(Evaluator &evaluator,
                                            ClassDecl *subject) const {
   // Short-circuit and check for the attribute here.
@@ -111,6 +156,7 @@ HasMissingDesignatedInitializersRequest::evaluate(Evaluator &evaluator,
 //----------------------------------------------------------------------------//
 // Extended nominal computation.
 //----------------------------------------------------------------------------//
+
 Optional<NominalTypeDecl *> ExtendedNominalRequest::getCachedResult() const {
   // Note: if we fail to compute any nominal declaration, it's considered
   // a cache miss. This allows us to recompute the extended nominal types
@@ -130,6 +176,22 @@ void ExtendedNominalRequest::cacheResult(NominalTypeDecl *value) const {
   ext->setExtendedNominal(value);
 }
 
+void ExtendedNominalRequest::writeDependencySink(
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    NominalTypeDecl *value) const {
+  if (!value)
+    return;
+
+  // Ensure this extension comes from a source file.
+  auto *SF = std::get<0>(getStorage())->getParentSourceFile();
+  if (!SF)
+    return;
+  if (SF != eval.getActiveDependencySourceOrNull())
+    return;
+  tracker.addUsedMember({value, Identifier()},
+                        eval.isActiveSourceCascading());
+}
+
 //----------------------------------------------------------------------------//
 // Destructor computation.
 //----------------------------------------------------------------------------//
@@ -146,6 +208,18 @@ Optional<DestructorDecl *> GetDestructorRequest::getCachedResult() const {
 void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
   auto *classDecl = std::get<0>(getStorage());
   classDecl->addMember(value);
+}
+
+evaluator::DependencySource
+GetDestructorRequest::readDependencySource(Evaluator &eval) const {
+  // Looking up the deinitializer currently always occurs in a private
+  // scope because it is impossible to reference 'deinit' in user code, and a
+  // valid 'deinit' declaration cannot occur outside of the
+  // definition of a type.
+  return {
+    eval.getActiveDependencySourceOrNull(),
+    evaluator::DependencyScope::Private
+  };
 }
 
 //----------------------------------------------------------------------------//
@@ -204,6 +278,181 @@ void swift::simple_display(llvm::raw_ostream &out,
 
 SourceLoc swift::extractNearestSourceLoc(const DirectLookupDescriptor &desc) {
   return extractNearestSourceLoc(desc.DC);
+}
+
+//----------------------------------------------------------------------------//
+// LookupOperatorRequest computation.
+//----------------------------------------------------------------------------//
+
+ArrayRef<FileUnit *> OperatorLookupDescriptor::getFiles() const {
+  if (auto *module = getModule())
+    return module->getFiles();
+
+  // Return an ArrayRef pointing to the FileUnit in the union.
+  return llvm::makeArrayRef(*fileOrModule.getAddrOfPtr1());
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const OperatorLookupDescriptor &desc) {
+  out << "looking up operator ";
+  simple_display(out, desc.name);
+  out << " in ";
+  simple_display(out, desc.fileOrModule);
+}
+
+SourceLoc swift::extractNearestSourceLoc(const OperatorLookupDescriptor &desc) {
+  return desc.diagLoc;
+}
+
+void DirectLookupRequest::writeDependencySink(
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    TinyPtrVector<ValueDecl *> result) const {
+  auto &desc = std::get<0>(getStorage());
+  tracker.addUsedMember({desc.DC, desc.Name.getBaseName()},
+                        eval.isActiveSourceCascading());
+}
+
+//----------------------------------------------------------------------------//
+// LookupConformanceInModuleRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const LookupConformanceDescriptor &desc) {
+  out << "looking up conformance to ";
+  simple_display(out, desc.PD);
+  out << " for ";
+  out << desc.Ty.getString();
+  out << " in ";
+  simple_display(out, desc.Mod);
+}
+
+void AnyObjectLookupRequest::writeDependencySink(
+    Evaluator &eval, ReferencedNameTracker &reqTracker,
+    QualifiedLookupResult l) const {
+  auto member = std::get<1>(getStorage());
+  reqTracker.addDynamicLookupName(member.getBaseName(),
+                                  eval.isActiveSourceCascading());
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const LookupConformanceDescriptor &desc) {
+  return SourceLoc();
+}
+
+//----------------------------------------------------------------------------//
+// LookupInModuleRequest computation.
+//----------------------------------------------------------------------------//
+
+evaluator::DependencySource
+ModuleQualifiedLookupRequest::readDependencySource(Evaluator &eval) const {
+  auto *DC = std::get<0>(getStorage());
+  auto options = std::get<3>(getStorage());
+
+  // FIXME(Evaluator Incremental Dependencies): This is an artifact of the
+  // current scheme and should be removed. There are very few callers that are
+  // accurately passing the right known dependencies mask.
+  const bool knownPrivate =
+      (options & NL_KnownDependencyMask) == NL_KnownNonCascadingDependency;
+  const bool fromPrivateDC =
+      DC->isCascadingContextForLookup(/*functionsAreNonCascading=*/false);
+
+  auto scope = evaluator::DependencyScope::Cascading;
+  if (knownPrivate || fromPrivateDC)
+    scope = evaluator::DependencyScope::Private;
+  return { DC->getParentSourceFile(), scope };
+}
+
+void ModuleQualifiedLookupRequest::writeDependencySink(
+    Evaluator &eval, ReferencedNameTracker &reqTracker,
+    QualifiedLookupResult l) const {
+  auto *DC = std::get<0>(getStorage());
+  auto *module = std::get<1>(getStorage());
+  auto member = std::get<2>(getStorage());
+
+  // Decline to record lookups outside our module.
+  if (!DC->getParentSourceFile() ||
+      module != DC->getModuleScopeContext()->getParentModule()) {
+    return;
+  }
+  reqTracker.addTopLevelName(member.getBaseName(),
+                            eval.isActiveSourceCascading());
+}
+
+//----------------------------------------------------------------------------//
+// LookupConformanceInModuleRequest computation.
+//----------------------------------------------------------------------------//
+
+void LookupConformanceInModuleRequest::writeDependencySink(
+    Evaluator &eval, ReferencedNameTracker &reqTracker,
+    ProtocolConformanceRef lookupResult) const {
+  if (lookupResult.isInvalid() || !lookupResult.isConcrete())
+    return;
+
+  auto &desc = std::get<0>(getStorage());
+  auto *Adoptee = desc.Ty->getAnyNominal();
+  if (!Adoptee)
+    return;
+
+  auto *source = eval.getActiveDependencySourceOrNull();
+  assert(source && "Missing dependency source?");
+
+  // Decline to record conformances defined outside of the active module.
+  auto *conformance = lookupResult.getConcrete();
+  if (source->getParentModule() !=
+      conformance->getDeclContext()->getParentModule())
+    return;
+  reqTracker.addUsedMember({Adoptee, Identifier()},
+                           eval.isActiveSourceCascading());
+}
+
+//----------------------------------------------------------------------------//
+// UnqualifiedLookupRequest computation.
+//----------------------------------------------------------------------------//
+
+evaluator::DependencySource
+UnqualifiedLookupRequest::readDependencySource(Evaluator &) const {
+  auto &desc = std::get<0>(getStorage());
+  // FIXME(Evaluator Incremental Dependencies): This maintains compatibility
+  // with the existing scheme, but the existing scheme is totally ad-hoc. We
+  // should remove this flag and ensure that non-cascading qualified lookups
+  // occur in the right contexts instead.
+  auto scope = evaluator::DependencyScope::Cascading;
+  if (desc.Options.contains(UnqualifiedLookupFlags::KnownPrivate)) {
+    scope = evaluator::DependencyScope::Private;
+  }
+  return {desc.DC->getParentSourceFile(), scope};
+}
+
+void UnqualifiedLookupRequest::writeDependencySink(Evaluator &eval,
+                                                   ReferencedNameTracker &track,
+                                                   LookupResult res) const {
+  auto &desc = std::get<0>(getStorage());
+  track.addTopLevelName(desc.Name.getBaseName(),
+                        eval.isActiveSourceCascading());
+}
+
+//----------------------------------------------------------------------------//
+// QualifiedLookupRequest computation.
+//----------------------------------------------------------------------------//
+
+evaluator::DependencySource
+QualifiedLookupRequest::readDependencySource(Evaluator &) const {
+  auto *dc = std::get<0>(getStorage());
+  auto opts = std::get<3>(getStorage());
+  // FIXME(Evaluator Incremental Dependencies): This is an artifact of the
+  // current scheme and should be removed. There are very few callers that are
+  // accurately passing the right known dependencies mask.
+  const bool cascades =
+      dc->isCascadingContextForLookup(/*functionsAreNonCascading*/ false);
+  const bool knownPrivate =
+      (opts & NL_KnownDependencyMask) == NL_KnownNonCascadingDependency;
+  auto scope = evaluator::DependencyScope::Cascading;
+  if (!cascades || knownPrivate)
+    scope = evaluator::DependencyScope::Private;
+  return {
+    dyn_cast<SourceFile>(dc->getModuleScopeContext()),
+    scope
+  };
 }
 
 // Define request evaluation functions for each of the name lookup requests.

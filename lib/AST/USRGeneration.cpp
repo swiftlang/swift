@@ -166,7 +166,7 @@ static bool shouldUseObjCUSR(const Decl *D) {
   return false;
 }
 
-llvm::Expected<std::string>
+std::string
 swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
                                       const ValueDecl *D) const {
   if (auto *VD = dyn_cast<VarDecl>(D))
@@ -225,7 +225,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
 
     auto ClangMacroInfo = ClangN.getAsMacro();
     bool Ignore = clang::index::generateUSRForMacro(
-        D->getBaseName().getIdentifier().str(),
+        D->getBaseIdentifier().str(),
         ClangMacroInfo->getDefinitionLoc(),
         Importer.getClangASTContext().getSourceManager(), Buffer);
     if (!Ignore)
@@ -254,7 +254,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
   return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
 }
 
-llvm::Expected<std::string>
+std::string
 swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
                                             const TypeDecl *D) const {
   if (isa<ModuleDecl>(D))

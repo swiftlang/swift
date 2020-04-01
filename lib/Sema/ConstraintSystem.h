@@ -634,6 +634,8 @@ enum ScoreKind {
 
   /// A fix needs to be applied to the source.
   SK_Fix,
+  /// A hole in the constraint system.
+  SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
   /// A use of a disfavored overload.
@@ -1206,6 +1208,12 @@ class SolutionApplicationTarget {
       /// Whether to bind the variables encountered within the pattern to
       /// fresh type variables via one-way constraints.
       bool bindPatternVarsOneWay;
+
+      /// The pattern binding declaration for an initialization, if any.
+      PatternBindingDecl *patternBinding;
+
+      /// The index into the pattern binding declaration, if any.
+      unsigned patternBindingIndex;
     } expression;
 
     struct {
@@ -1265,6 +1273,13 @@ public:
   /// Form a target for the initialization of a pattern from an expression.
   static SolutionApplicationTarget forInitialization(
       Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
+      bool bindPatternVarsOneWay);
+
+  /// Form a target for the initialization of a pattern binding entry from
+  /// an expression.
+  static SolutionApplicationTarget forInitialization(
+      Expr *initializer, DeclContext *dc, Type patternType,
+      PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
       bool bindPatternVarsOneWay);
 
   Expr *getAsExpr() const {
@@ -1351,6 +1366,9 @@ public:
     return expression.pattern;
   }
 
+  /// For a pattern initialization target, retrieve the contextual pattern.
+  ContextualPattern getInitializationContextualPattern() const;
+
   /// Whether this is an initialization for an Optional.Some pattern.
   bool isOptionalSomePatternInit() const {
     return kind == Kind::expression &&
@@ -1372,6 +1390,18 @@ public:
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
     return expression.wrappedVar;
+  }
+
+  PatternBindingDecl *getInitializationPatternBindingDecl() const {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_Initialization);
+    return expression.patternBinding;
+  }
+
+  unsigned getInitializationPatternBindingIndex() const {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_Initialization);
+    return expression.patternBindingIndex;
   }
 
   /// Whether this context infers an opaque return type.
@@ -2293,8 +2323,8 @@ public:
   /// system, to avoid.
   ///
   /// FIXME: This caching should almost certainly be performed at the
-  /// module level, since type checking occurs after name binding,
-  /// and no new names are introduced after name binding.
+  /// module level, since type checking occurs after import resolution,
+  /// and no new names are introduced after that point.
   ///
   /// \returns A reference to the member-lookup result.
   LookupResult &lookupMember(Type base, DeclNameRef name);
@@ -2825,8 +2855,14 @@ public:
   }
 
   /// Add an explicit conversion constraint (e.g., \c 'x as T').
+  ///
+  /// \param fromType The type of the expression being converted.
+  /// \param toType The type to convert to.
+  /// \param rememberChoice Whether the conversion disjunction should record its
+  /// choice.
+  /// \param locator The locator.
   void addExplicitConversionConstraint(Type fromType, Type toType,
-                                       bool allowFixes,
+                                       RememberChoice_t rememberChoice,
                                        ConstraintLocatorBuilder locator);
 
   /// Add a disjunction constraint.
@@ -3398,7 +3434,9 @@ public:
   ///
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator,
-                           bool bindPatternVarsOneWay);
+                           bool bindPatternVarsOneWay,
+                           PatternBindingDecl *patternBinding,
+                           unsigned patternIndex);
 
   /// Generate constraints for a statement condition.
   ///
@@ -4613,6 +4651,10 @@ public:
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
 
+  /// If we aren't certain that we've emitted a diagnostic, emit a fallback
+  /// diagnostic.
+  void maybeProduceFallbackDiagnostic(SolutionApplicationTarget target) const;
+
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
 
@@ -5097,6 +5139,11 @@ bool isKnownKeyPathType(Type type);
 /// Determine whether given declaration is one for a key path
 /// `{Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
+
+/// Determine whether givne closure has any explicit `return`
+/// statements that could produce non-void result.
+bool hasExplicitResult(ClosureExpr *closure);
+
 } // end namespace constraints
 
 template<typename ...Args>

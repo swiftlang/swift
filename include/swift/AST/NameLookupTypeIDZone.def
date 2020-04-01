@@ -24,6 +24,13 @@ SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest,
 SWIFT_REQUEST(NameLookup, DirectLookupRequest,
               TinyPtrVector<ValueDecl *>(DirectLookupDescriptor), Uncached,
               NoLocationInfo)
+SWIFT_REQUEST(NameLookup, DirectOperatorLookupRequest,
+              TinyPtrVector<OperatorDecl *>(OperatorLookupDescriptor,
+                                            OperatorFixity),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, DirectPrecedenceGroupLookupRequest,
+              TinyPtrVector<PrecedenceGroupDecl *>(OperatorLookupDescriptor),
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ExpandASTScopeRequest,
               ast_scope::ASTScopeImpl* (ast_scope::ASTScopeImpl*, ast_scope::ScopeCreator*),
               SeparatelyCached,
@@ -40,6 +47,12 @@ SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest,
               DirectlyReferencedTypeDecls(
                   llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned),
               Uncached, HasNearestLocation)
+SWIFT_REQUEST(NameLookup, InheritedProtocolsRequest,
+              ArrayRef<ProtocolDecl *>(ProtocolDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, LookupConformanceInModuleRequest,
+              ProtocolConformanceRef(LookupConformanceDescriptor),
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, LookupInModuleRequest,
               QualifiedLookupResult(const DeclContext *, DeclName, NLKind,
                                     namelookup::ResolutionKind,
@@ -71,3 +84,16 @@ SWIFT_REQUEST(NameLookup, UnderlyingTypeDeclsReferencedRequest,
 SWIFT_REQUEST(NameLookup, UnqualifiedLookupRequest,
               LookupResult(UnqualifiedLookupDescriptor), Uncached,
               NoLocationInfo)
+
+SWIFT_REQUEST(NameLookup, LookupPrefixOperatorRequest,
+              PrefixOperatorDecl *(OperatorLookupDescriptor),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, LookupInfixOperatorRequest,
+              InfixOperatorDecl *(OperatorLookupDescriptor),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, LookupPostfixOperatorRequest,
+              PostfixOperatorDecl *(OperatorLookupDescriptor),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, LookupPrecedenceGroupRequest,
+              PrecedenceGroupDecl *(OperatorLookupDescriptor),
+              Cached, NoLocationInfo)

@@ -296,6 +296,11 @@ namespace swift {
     /// incrementals parsing.
     bool BuildSyntaxTree = false;
 
+    /// Whether parsing is occurring for creation of syntax tree only, and no typechecking will occur after
+    /// parsing e.g. when parsing for SwiftSyntax. This is intended to affect parsing, e.g. disable
+    /// unnecessary name lookups that are not useful for pure syntactic parsing.
+    bool ParseForSyntaxTreeOnly = false;
+
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
@@ -322,8 +327,15 @@ namespace swift {
     /// `@differentiable` declaration attribute, etc.
     bool EnableExperimentalDifferentiableProgramming = false;
 
+    /// Whether to enable experimental `AdditiveArithmetic` derived
+    /// conformances.
+    bool EnableExperimentalAdditiveArithmeticDerivedConformances = false;
+
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
+
+    /// If set to \c false, fall back to the legacy manual reference name tracking code.
+    bool EnableRequestBasedIncrementalDependencies = true;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

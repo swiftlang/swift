@@ -116,25 +116,24 @@ if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
     clangBasic)
 endif()
 
+target_link_libraries(swiftAST
+  PUBLIC swiftBasic
+  PRIVATE swiftSyntax)
 if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
   # Add clangBasic as a single direct dependency to avoid bringing along some
   # llvm libraries that we don't need.
   if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
-    set(clangBasicDep "${LLVM_LIBRARY_OUTPUT_INTDIR}/clangBasic.lib")
+    target_link_libraries(swiftAST PRIVATE
+      "${LLVM_LIBRARY_OUTPUT_INTDIR}/clangBasic.lib")
   else()
-    set(clangBasicDep "${LLVM_LIBRARY_OUTPUT_INTDIR}/libclangBasic.a")
+    target_link_libraries(swiftAST PRIVATE
+      "${LLVM_LIBRARY_OUTPUT_INTDIR}/libclangBasic.a")
   endif()
-  target_link_libraries(swiftAST PRIVATE
-    swiftBasic
-    swiftSyntax
-    ${clangBasicDep})
   target_compile_definitions(swiftAST PRIVATE
     SWIFT_BUILD_ONLY_SYNTAXPARSERLIB=1)
 else()
   target_link_libraries(swiftAST PRIVATE
-    swiftBasic
-    swiftMarkup
-    swiftSyntax)
+    swiftMarkup)
 endif()
 
 # intrinsics_gen is the LLVM tablegen target that generates the include files

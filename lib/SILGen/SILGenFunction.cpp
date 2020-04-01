@@ -253,7 +253,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
                      isDeferBody
                      ? diag::capture_before_declaration_defer
                      : diag::capture_before_declaration,
-                     vd->getBaseName().getIdentifier());
+                     vd->getBaseIdentifier());
       Diags.diagnose(vd->getLoc(), diag::captured_value_declared_here);
       Diags.diagnose(capture.getLoc(), diag::value_captured_here);
 
@@ -750,7 +750,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                      ctx.getIdentifier("$input_value"),
                                      dc);
     param->setSpecifier(ParamSpecifier::Owned);
-    param->setInterfaceType(function.getDecl()->getInterfaceType());
+    auto vd = cast<VarDecl>(function.getDecl());
+    param->setInterfaceType(vd->getPropertyWrapperInitValueInterfaceType());
 
     params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());
   }
@@ -800,7 +801,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   // will be in terms of the original property's type.
   if (auto originalProperty = var->getOriginalWrappedProperty()) {
     if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
-      interfaceType = originalProperty->getValueInterfaceType();
+      interfaceType = originalProperty->getPropertyWrapperInitValueInterfaceType();
     }
   }
 

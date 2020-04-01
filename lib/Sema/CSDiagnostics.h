@@ -1519,24 +1519,26 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose an attempt to reference a method as a key path component
+/// Diagnose an attempt to reference a method or initializer as a key path component
 /// e.g.
 ///
 /// ```swift
 /// struct S {
+///   init() { }
 ///   func foo() -> Int { return 42 }
 ///   static func bar() -> Int { return 0 }
 /// }
 ///
 /// _ = \S.foo
 /// _ = \S.Type.bar
+/// _ = \S.init
 /// ```
 class InvalidMethodRefInKeyPath final : public InvalidMemberRefInKeyPath {
 public:
   InvalidMethodRefInKeyPath(const Solution &solution, ValueDecl *method,
                             ConstraintLocator *locator)
       : InvalidMemberRefInKeyPath(solution, method, locator) {
-    assert(isa<FuncDecl>(method));
+    assert(isa<FuncDecl>(method) || isa<ConstructorDecl>(method));
   }
 
   bool diagnoseAsError() override;

@@ -313,7 +313,7 @@ bb1:
   release_value %2 : $MyArray<MyStruct>
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  %8 = enum $Optional<MyArray<MyStruct>>, #Optional.some!enumelt.1, %2 : $MyArray<MyStruct>
+  %8 = enum $Optional<MyArray<MyStruct>>, #Optional.some!enumelt, %2 : $MyArray<MyStruct>
   mark_dependence %1 : $*Builtin.Int1 on %8 : $Optional<MyArray<MyStruct>>
   cond_br %3, bb1, bb2
 
@@ -438,7 +438,7 @@ bb1:
   strong_release %6 : $Builtin.NativeObject
   %10 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %11 = apply %10(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-  %12 = enum $Optional<MyArray<MyStruct>>, #Optional.some!enumelt.1, %2 : $MyArray<MyStruct>
+  %12 = enum $Optional<MyArray<MyStruct>>, #Optional.some!enumelt, %2 : $MyArray<MyStruct>
   %13 = mark_dependence %1 : $*Builtin.Int1 on %12 : $Optional<MyArray<MyStruct>>
   cond_br %8, bb1, bb2
 
