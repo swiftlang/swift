@@ -228,10 +228,17 @@ var y: X5<X4, Int> // expected-error{{'X5' requires the types 'X4.AssocP' (aka '
 // Recursive generic signature validation.
 class Top {}
 class Bottom<T : Bottom<Top>> {}
-// expected-error@-1 {{generic class 'Bottom' references itself}}
-// expected-note@-2 {{type declared here}}
-// expected-error@-3 {{circular reference}}
-// expected-note@-4 {{through reference here}}
+// expected-error@-1 {{'Bottom' requires that 'Top' inherit from 'Bottom<Top>'}}
+// expected-note@-2 {{requirement specified as 'T' : 'Bottom<Top>' [with T = Top]}}
+
+// FIXME: Superclass validation circularity.
+class Top2: Bottom2<Top2> {}
+// expected-error@-1 {{'Top2' inherits from itself}}
+// expected-error@-2 {{'Bottom2' requires that 'Top2' inherit from 'Bottom2<Top2>'}}
+// expected-note@-3 {{through reference here}}
+class Bottom2<T: Bottom2<Top2>> {}
+// expected-note@-1 2{{requirement specified as 'T' : 'Bottom2<Top2>' [with T = Top2]}}
+// expected-error@-2 {{'Bottom2' requires that 'Top2' inherit from 'Bottom2<Top2>'}}
 
 // Invalid inheritance clause
 

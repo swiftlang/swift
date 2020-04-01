@@ -918,8 +918,7 @@ GenericParamList::clone(DeclContext *dc) const {
   for (auto param : getParams()) {
     auto *newParam = new (ctx) GenericTypeParamDecl(
       dc, param->getName(), param->getNameLoc(),
-      GenericTypeParamDecl::InvalidDepth,
-      param->getIndex());
+      param->getDepth(), param->getIndex());
     params.push_back(newParam);
 
     SmallVector<TypeLoc, 2> inherited;

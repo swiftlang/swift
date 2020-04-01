@@ -792,14 +792,6 @@ static Type applyGenericArguments(Type type,
     }  
   }
 
-  // FIXME: More principled handling of circularity.
-  if (!genericDecl->getGenericSignature()) {
-    diags.diagnose(loc, diag::recursive_decl_reference,
-             genericDecl->getDescriptiveKind(), genericDecl->getName());
-    genericDecl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
-    return ErrorType::get(ctx);
-  }
-
   // Resolve the types of the generic arguments.
   options = adjustOptionsForGenericArgs(options);
 
@@ -844,9 +836,6 @@ Type TypeChecker::applyUnboundGenericArguments(
   assert(genericArgs.size() == decl->getGenericParams()->size() &&
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
-  auto genericSig = decl->getGenericSignature();
-  assert(!genericSig.isNull());
-
   TypeSubstitutionMap subs;
 
   // Get the interface type for the declaration. We will be substituting
@@ -877,7 +866,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     skipRequirementsCheck |= parentType->hasTypeVariable();
   } else if (auto genericEnv =
                  decl->getDeclContext()->getGenericEnvironmentOfContext()) {
-    auto genericSig = genericEnv->getGenericSignature();
+    const auto genericSig = genericEnv->getGenericSignature();
     for (auto gp : genericSig->getGenericParams()) {
       subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
         (resolution.usesArchetypes()
@@ -890,18 +879,25 @@ Type TypeChecker::applyUnboundGenericArguments(
   if (noteLoc.isInvalid())
     noteLoc = loc;
 
-  // Realize the types of the generic arguments and add them to the
-  // substitution map.
-  for (unsigned i = 0, e = genericArgs.size(); i < e; i++) {
-    auto origTy = genericSig->getInnermostGenericParams()[i];
-    auto substTy = genericArgs[i];
+  // Add the generic arguments to the substitution map.
+  {
+    // Ensure we have valid generic parameter depths before we attempt
+    // to compute their canonical types.
+    if (resolution.getStage() > TypeResolutionStage::Structural)
+      (void) decl->getGenericSignature();
 
-    // Enter a substitution.
-    subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
-      substTy;
+    const auto params = decl->getGenericParams()->getParams();
+    for (const unsigned i : indices(genericArgs)) {
+      const auto origTy = params[i]->getDeclaredInterfaceType();
+      const auto substTy = genericArgs[i];
 
-    skipRequirementsCheck |=
-        substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+      // Enter a substitution.
+      subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
+        substTy;
+
+      skipRequirementsCheck |=
+          substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+    }
   }
 
   // Check the generic arguments against the requirements of the declaration's
@@ -909,14 +905,12 @@ Type TypeChecker::applyUnboundGenericArguments(
   auto dc = resolution.getDeclContext();
   if (!skipRequirementsCheck &&
       resolution.getStage() > TypeResolutionStage::Structural) {
-    auto result =
-      checkGenericArguments(dc, loc, noteLoc, unboundType,
-                            genericSig->getGenericParams(),
-                            genericSig->getRequirements(),
-                            QueryTypeSubstitutionMap{subs},
-                            LookUpConformance(dc), None);
-
-    switch (result) {
+    const auto genericSig = decl->getGenericSignature();
+    switch (checkGenericArguments(dc, loc, noteLoc, unboundType,
+                                  genericSig->getGenericParams(),
+                                  genericSig->getRequirements(),
+                                  QueryTypeSubstitutionMap{subs},
+                                  LookUpConformance(dc), None)) {
     case RequirementCheckResult::Failure:
     case RequirementCheckResult::SubstitutionFailure:
       return ErrorType::get(dc->getASTContext());

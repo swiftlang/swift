@@ -40,27 +40,29 @@ struct ConformsToCircularAssocTypeDefault : CircularAssocTypeDefault { }
 
 // rdar://problem/20000145
 public protocol P {
-  associatedtype T
+  associatedtype T // expected-note 2{{through reference here}} // expected-note {{protocol requires nested type 'T'; do you want to add it?}}
 }
 
-public struct S<A: P> where A.T == S<A> { // expected-error {{circular reference}}
-// expected-note@-1 {{type declared here}}
-// expected-error@-2 {{generic struct 'S' references itself}}
+// Used to cause a circularity issue during gen. signature validation
+public struct S<A: P> where A.T == S<A> { // OK
   func f(a: A.T) {
     g(a: id(t: a))
-    // expected-error@-1 {{cannot convert value of type 'A.T' to expected argument type 'S<A>'}}
     _ = A.T.self
   }
 
   func g(a: S<A>) {
     f(a: id(t: a))
-    // expected-error@-1 {{cannot convert value of type 'S<A>' to expected argument type 'A.T'}}
     _ = S<A>.self
   }
 
   func id<T>(t: T) -> T {
     return t
   }
+}
+
+// FIXME: Another circularity issue, this should be legal.
+struct SubstitutionForS: P { // expected-error {{type 'SubstitutionForS' does not conform to protocol 'P'}}
+  typealias T = S<SubstitutionForS> // expected-error 2{{type alias 'T' references itself}} // expected-note {{through reference here}}
 }
 
 protocol I {
@@ -71,9 +73,8 @@ protocol PI {
   associatedtype T : I
 }
 
-struct SI<A: PI> : I where A : I, A.T == SI<A> { // expected-error {{circular reference}}
-// expected-note@-1 {{type declared here}}
-// expected-error@-2 {{generic struct 'SI' references itself}}
+// Used to cause a circularity issue during gen. signature validation
+struct SI<A: PI> : I where A : I, A.T == SI<A> {
   func ggg<T : I>(t: T.Type) -> T {
     return T()
   }
