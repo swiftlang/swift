@@ -1023,6 +1023,10 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
     Attrs.addAttribute("ptrauth-returns");
     Attrs.addAttribute("ptrauth-calls");
   }
+
+  if (IRGen.Opts.StackCheck && TargetInfo.CanUseStackChecking) {
+    Attrs.addAttribute("probe-stack", "__chkstk_darwin");
+  }
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {

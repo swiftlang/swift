@@ -127,6 +127,44 @@ static bool addOutputsOfType(ArgStringList &Arguments,
   return Added;
 }
 
+static bool useStackChecking(const ToolChain &TC, const ArgList &inputArgs) {
+  const llvm::Triple &Triple = TC.getTriple();
+  // Disable if sanitizers are on.
+  if (inputArgs.hasArg(options::OPT_sanitize_EQ))
+    return false;
+
+  unsigned Major, Minor, Micro;
+  auto environment = Triple.getEnvironment();
+  auto os = Triple.getOS();
+  switch (os) {
+  case llvm::Triple::Darwin:
+  case llvm::Triple::MacOSX:
+    Triple.getMacOSXVersion(Major, Minor, Micro);
+    if (Major < 10 || Minor < 15)
+      return false;
+    break;
+
+  case llvm::Triple::IOS:
+    Triple.getiOSVersion(Major, Minor, Micro);
+    if (Major < 13)
+      return false;
+    // Simulator.
+    if (Triple.getArch() == llvm::Triple::x86_64)
+      return false;
+    break;
+
+  case llvm::Triple::WatchOS:
+    // Don't currently support arm64_32.
+    Triple.getOSVersion(Major, Minor, Micro);
+    if (Major < 6 || Triple.getArchName().endswith("_32"))
+      return false;
+    break;
+  default:
+    return false;
+  }
+  return environment != llvm::Triple::Simulator;
+}
+
 /// Handle arguments common to all invocations of the frontend (compilation,
 /// module-merging, LLDB's REPL, etc).
 static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
@@ -169,6 +207,11 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   } else {
     arguments.push_back("-disable-objc-interop");
   }
+
+  // Enable stack checking.
+  if (inputArgs.hasFlag(options::OPT_stack_check, options::OPT_no_stack_check,
+                        useStackChecking(TC, inputArgs)))
+    arguments.push_back("-stack-check");
 
   // Handle the CPU and its preferences.
   inputArgs.AddLastArg(arguments, options::OPT_target_cpu);

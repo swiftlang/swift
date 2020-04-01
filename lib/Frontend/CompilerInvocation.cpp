@@ -1134,6 +1134,7 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   for (auto A : Args.getAllArgValues(OPT_embed_tbd_for_module)) {
     Opts.embedSymbolsFromModules.push_back(StringRef(A).str());
   }
+
   return false;
 }
 
@@ -1432,6 +1433,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
         getRuntimeCompatVersion();
   }
+
+  if (Args.hasArg(OPT_stack_check))
+    Opts.StackCheck = true;
+
   return false;
 }
 

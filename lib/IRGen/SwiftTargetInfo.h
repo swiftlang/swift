@@ -96,6 +96,7 @@ public:
   bool ObjCUseFP2Ret = false;
   bool ObjCUseISAMask = false;
   bool ObjCHasOpaqueISAs = false;
+  bool CanUseStackChecking = false;
   
   /// The value stored in a Builtin.once predicate to indicate that an
   /// initialization has already happened, if known.
