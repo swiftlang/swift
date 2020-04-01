@@ -2844,7 +2844,7 @@ namespace {
           // assigned case comes from Optional<T>
           if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
             isOptional = EED->getParentEnum()->isOptionalDecl();
-            memberName = EED->getBaseName().getIdentifier();
+            memberName = EED->getBaseIdentifier();
           }
           
           // Return if the enum case doesn't come from Optional<T>
@@ -7056,7 +7056,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 static bool isValidDynamicCallableMethod(FuncDecl *method,
                                          AnyFunctionType *methodType) {
   auto &ctx = method->getASTContext();
-  if (method->getName() != ctx.Id_dynamicallyCall)
+  if (method->getBaseIdentifier() != ctx.Id_dynamicallyCall)
     return false;
   if (methodType->getParams().size() != 1)
     return false;

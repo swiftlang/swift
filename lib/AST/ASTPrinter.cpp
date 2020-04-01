@@ -2877,7 +2877,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         if (!decl->hasName()) {
           Printer << "<anonymous>";
         } else {
-          Printer.printName(decl->getName(),
+          Printer.printName(decl->getBaseIdentifier(),
                             getTypeMemberPrintNameContext(decl));
           if (decl->isOperator())
             Printer << " ";
@@ -2950,7 +2950,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 void PrintAST::printEnumElement(EnumElementDecl *elt) {
   recordDeclLoc(elt,
     [&]{
-      Printer.printName(elt->getName(), getTypeMemberPrintNameContext(elt));
+      Printer.printName(elt->getBaseIdentifier(),
+                        getTypeMemberPrintNameContext(elt));
     });
 
   if (auto *PL = elt->getParameterList()) {

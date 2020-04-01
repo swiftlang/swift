@@ -59,10 +59,6 @@ template <typename DeclT> static std::string getBaseName(const DeclT *decl) {
   return decl->getBaseName().userFacingName().str();
 }
 
-template <typename DeclT> static std::string getName(const DeclT *decl) {
-  return DeclBaseName(decl->getName()).userFacingName().str();
-}
-
 static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
   Mangle::ASTMangler Mangler;
   return !NTD ? "" : Mangler.mangleTypeAsContextUSR(NTD);
@@ -188,22 +184,22 @@ std::string
 DependencyKey::computeNameForProvidedEntity<NodeKind::topLevel,
                                             PrecedenceGroupDecl const *>(
     const PrecedenceGroupDecl *D) {
-  return ::getName(D);
+  return D->getName().str().str();
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<
     NodeKind::topLevel, FuncDecl const *>(const FuncDecl *D) {
-  return ::getName(D);
+  return getBaseName(D);
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<
     NodeKind::topLevel, OperatorDecl const *>(const OperatorDecl *D) {
-  return ::getName(D);
+  return D->getName().str().str();
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<
     NodeKind::topLevel, NominalTypeDecl const *>(const NominalTypeDecl *D) {
-  return ::getName(D);
+  return D->getName().str().str();
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<

@@ -2278,7 +2278,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
     }
 
     bool checkName(FuncDecl *FD) {
-      auto Name = FD->getName().str();
+      const auto Name = FD->getBaseIdentifier().str();
       return Name == "~="
       || Name == "=="
       || Name == "__derived_enum_equals"
@@ -2391,7 +2391,8 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
     bool isFunctionNameAllowed(BinaryExpr *E) {
       auto FunctionBody = dyn_cast<DotSyntaxCallExpr>(E->getFn())->getFn();
       auto FunctionDeclaration = dyn_cast<DeclRefExpr>(FunctionBody)->getDecl();
-      auto FunctionName = dyn_cast<FuncDecl>(FunctionDeclaration)->getName().str();
+      const auto FunctionName = dyn_cast<FuncDecl>(FunctionDeclaration)
+          ->getBaseIdentifier().str();
       return FunctionName == "~="
       || FunctionName == "=="
       || FunctionName == "__derived_enum_equals"

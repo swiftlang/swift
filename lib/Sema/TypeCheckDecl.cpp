@@ -666,7 +666,7 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
   if (!result &&
       decl->isOperator() &&
       dc->isTypeContext()) {
-    auto operatorName = decl->getFullName().getBaseIdentifier();
+    const auto operatorName = decl->getBaseIdentifier();
     if (auto ED = dyn_cast<ExtensionDecl>(dc->getAsDecl())) {
       decl->diagnose(diag::nonstatic_operator_in_extension,
                      operatorName, ED->getExtendedTypeRepr())
@@ -1706,7 +1706,7 @@ OperatorDecl *
 FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {  
   auto &C = FD->getASTContext();
   auto &diags = C.Diags;
-  auto operatorName = FD->getFullName().getBaseIdentifier();
+  const auto operatorName = FD->getBaseIdentifier();
 
   // Check for static/final/class when we're in a type.
   auto dc = FD->getDeclContext();
