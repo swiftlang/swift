@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
 // RUN: %target-swift-frontend -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
 
 public struct B<T> {
   var x: T
@@ -10,6 +11,10 @@ public struct A<T> {
   var a : B<T>
   var b:  B<T>
 }
+
+// NOTL-LABEL: define{{.*}} %swift.opaque* @"$s30typelayout_based_value_witness1AVwCP"(
+// NOTL:   @"$s30typelayout_based_value_witness1BVMa"(
+// NOTL: }
 
 // CHECK-LABEL: define{{.*}} %swift.opaque* @"$s30typelayout_based_value_witness1AVwCP"(
 // CHECK-NOT:   @"$s30typelayout_based_value_witness1BVMa"(
