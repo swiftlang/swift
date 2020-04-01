@@ -64,7 +64,7 @@ struct DeclApplicabilityOwner {
 class IsDeclApplicableRequest:
     public SimpleRequest<IsDeclApplicableRequest,
                          bool(DeclApplicabilityOwner),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -161,7 +161,7 @@ struct TypeRelationCheckInput {
 class TypeRelationCheckRequest:
     public SimpleRequest<TypeRelationCheckRequest,
                          bool(TypeRelationCheckInput),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -184,7 +184,7 @@ public:
 class RootAndResultTypeOfKeypathDynamicMemberRequest:
     public SimpleRequest<RootAndResultTypeOfKeypathDynamicMemberRequest,
                          TypePair(SubscriptDecl*),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -204,7 +204,7 @@ public:
 class RootTypeOfKeypathDynamicMemberRequest:
     public SimpleRequest<RootTypeOfKeypathDynamicMemberRequest,
                          Type(SubscriptDecl*),
-                         /*Cached in the request above*/CacheKind::Uncached> {
+                         /*Cached in the request above*/RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 

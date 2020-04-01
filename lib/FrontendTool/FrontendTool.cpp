@@ -686,7 +686,7 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
   }
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
-    if (auto *R = SF->getReferencedNameTracker()) {
+    if (auto *R = SF->getConfiguredReferencedNameTracker()) {
       C.NumReferencedTopLevelNames += R->getTopLevelNames().size();
       C.NumReferencedDynamicNames += R->getDynamicLookupNames().size();
       C.NumReferencedMemberNames += R->getUsedMembers().size();
@@ -941,16 +941,18 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
     if (!referenceDependenciesFilePath.empty()) {
-      if (Invocation.getLangOptions().EnableFineGrainedDependencies)
+      auto LangOpts = Invocation.getLangOptions();
+      if (LangOpts.EnableFineGrainedDependencies) {
         (void)fine_grained_dependencies::emitReferenceDependencies(
             Instance.getASTContext().Diags, SF,
-            *Instance.getDependencyTracker(), referenceDependenciesFilePath,
-            Invocation.getLangOptions()
-                .EmitFineGrainedDependencySourcefileDotFiles);
-      else
+            *Instance.getDependencyTracker(),
+            referenceDependenciesFilePath,
+            LangOpts.EmitFineGrainedDependencySourcefileDotFiles);
+      } else {
         (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
                                         *Instance.getDependencyTracker(),
                                         referenceDependenciesFilePath);
+      }
     }
   }
 }

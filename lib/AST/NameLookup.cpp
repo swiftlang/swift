@@ -707,12 +707,15 @@ void namelookup::filterForDiscriminator(SmallVectorImpl<Result> &results,
 template void namelookup::filterForDiscriminator<LookupResultEntry>(
     SmallVectorImpl<LookupResultEntry> &results, DebuggerClient *debugClient);
 
+// FIXME(Evaluator Incremental Dependencies): Remove this function. It is
+// obviated by ModuleQualifiedLookupRequest and LookupInModuleRequest, which
+// both automatically register edges into the request-based name tracker.
 void namelookup::recordLookupOfTopLevelName(DeclContext *topLevelContext,
                                             DeclName name, bool isCascading) {
   auto SF = dyn_cast<SourceFile>(topLevelContext);
   if (!SF)
     return;
-  auto *nameTracker = SF->getReferencedNameTracker();
+  auto *nameTracker = SF->getLegacyReferencedNameTracker();
   if (!nameTracker)
     return;
   nameTracker->addTopLevelName(name.getBaseName(), isCascading);
@@ -1378,7 +1381,7 @@ static void configureLookup(const DeclContext *dc,
   tracker = nullptr;
   if (auto containingSourceFile =
           dyn_cast<SourceFile>(dc->getModuleScopeContext())) {
-    tracker = containingSourceFile->getReferencedNameTracker();
+    tracker = containingSourceFile->getLegacyReferencedNameTracker();
   }
 
   auto checkLookupCascading = [dc, options]() -> Optional<bool> {
@@ -1614,6 +1617,8 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     auto current = stack.back();
     stack.pop_back();
 
+    // FIXME(Evaluator Incremental Dependencies): Remove this. Each direct
+    // lookup in the stack registers this edge automatically.
     if (tracker)
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 

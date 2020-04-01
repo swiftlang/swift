@@ -84,7 +84,7 @@ using TBDFileAndSymbols =
 class GenerateTBDRequest
     : public SimpleRequest<GenerateTBDRequest,
                            TBDFileAndSymbols(TBDGenDescriptor),
-                           CacheKind::Uncached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 

@@ -77,6 +77,17 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     same; the exception is when generics get involved. In this case you'll need
     a `generic environment`. Contrast with `sugared type`.
 
+  cascading dependency
+    A kind of dependency edge relevant to the incremental name tracking
+    subsystem. A cascading dependency (as opposed to a
+    `private dependency <private dependency>`) requires the Swift driver to
+    transitively consider dependency edges in the file that defines the used
+    name when incremental compilation is enabled. A cascading dependency is much
+    safer to produce than its private counterpart, but it comes at the cost of
+    increased usage of compilation resources - even if those resources are being
+    wasted on rebuilding a file that didn't actually require rebuilding.
+    See :doc:`DependencyAnalysis.rst <DependencyAnalysis>`.
+
   Clang importer
     The part of the compiler that reads C and Objective-C declarations and
     exposes them as Swift. Essentially contains a small instance of Clang
@@ -99,6 +110,24 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     Informal term for a protocol requirement that has a default implementation,
     i.e. one that conforming types don't *have* to implement but have the option
     to "customize".
+
+  dependency sink
+    Any request that uses a matching dependency source to write dependency
+    edges into the referenced name trackers. For example, a request that
+    performs direct lookup will write the name being looked up into the
+    name tracker associated with the file that issued the lookup request.
+    The request evaluator automatically determines the appropriate tracker
+    for a dependency sink to write into based on the current active
+    `dependency source <dependency source>` request.
+
+  dependency source
+    Any request that defines a scope under which reference dependencies may be
+    registered. For example, a request to type check an entire file is a
+    dependency source. Dependency sources are automatically managed by the
+    request evaluator as request evaluation proceeds. Dependency sources provide
+    one half of the necessary information to complete a full dependency edge.
+    The other half is provided by corresponding
+    `dependency sink <dependency sink>` requests.
 
   DI (definite initialization / definitive initialization)
     The feature that no uninitialized variables, constants, or properties will
@@ -326,6 +355,17 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     The file currently being compiled, as opposed to the other files that are
     only needed for context. See also
     `Whole-Module Optimization <WMO (whole-module optimization)>`.
+
+  private dependency
+    A kind of dependency edge relevant to the incremental name tracking
+    subsystem. A private dependency (as opposed to a
+    `cascading dependency <cascading dependency>`) declares a dependency edge
+    from one file to a name referenced in that file that does not
+    require further transitive evaluation of dependency edges by the Swift
+    driver. Private dependencies are therefore cheaper than cascading
+    dependencies, but must be used with the utmost care or dependent files will
+    fail to rebuild and the result will most certainly be a miscompile.
+    See :doc:`DependencyAnalysis.rst <DependencyAnalysis>`.
 
   QoI
     "Quality of implementation." The term is meant to describe not how
