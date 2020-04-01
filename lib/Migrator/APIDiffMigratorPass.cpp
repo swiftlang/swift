@@ -340,7 +340,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     if (auto CI = dyn_cast<CommonDiffItem>(Item)) {
       if (CI->isRename() && (CI->NodeKind == SDKNodeKind::DeclVar ||
                              CI->NodeKind == SDKNodeKind::DeclType)) {
-        Text = CI->getNewName();
+        Text = CI->getNewName().str();
         return true;
       }
     }
@@ -385,7 +385,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     SF->getTopLevelDecls(TopDecls);
     for (auto *D: TopDecls) {
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
-        InsertedFunctions.insert(FD->getBaseName().getIdentifier().str());
+        InsertedFunctions.insert(
+            std::string(FD->getBaseName().getIdentifier()));
       }
     }
 
@@ -393,7 +394,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     for (auto &Cur: HelperFuncInfo) {
       if (Cur.ExpressionToWrap)
         continue;
-      auto FuncName = Cur.getFuncName();
+      auto FuncName = Cur.getFuncName().str();
       // Avoid inserting the helper function if it's already present.
       if (!InsertedFunctions.count(FuncName)) {
         Editor.insert(FileEndLoc, Cur.getFuncDef());
@@ -427,7 +428,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       // from type alias to raw-value representable.
       if (isRecognizedTypeAliasChange(Cur.ExpressionToWrap))
         continue;
-      auto FuncName = Cur.getFuncName();
+      auto FuncName = Cur.getFuncName().str();
 
       // Avoid inserting the helper function if it's already present.
       if (!InsertedFunctions.count(FuncName)) {
@@ -937,8 +938,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
                      " {key, value in (key.rawValue, value)})");
       break;
     case NodeAnnotation::SimpleStringRepresentableUpdate:
-      Segs = {"", "", RawType};
-      Segs.push_back(NewType);
+      Segs = {"", "", RawType.str()};
+      Segs.push_back(NewType.str());
       Segs.push_back((Twine("\treturn ") + NewType + "(rawValue: input)").str());
       Segs.push_back("\treturn input.rawValue");
       break;

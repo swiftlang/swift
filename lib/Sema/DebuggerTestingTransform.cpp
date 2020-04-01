@@ -243,7 +243,6 @@ private:
     // TODO: typeCheckExpression() seems to assign types to everything here,
     // but may not be sufficient in some cases.
     Expr *FinalExpr = ClosureCall;
-    (void)swift::createTypeChecker(Ctx);
     if (!TypeChecker::typeCheckExpression(FinalExpr, getCurrentDeclContext()))
       llvm::report_fatal_error("Could not type-check instrumentation");
 
@@ -261,11 +260,11 @@ void swift::performDebuggerTestingTransform(SourceFile &SF) {
   // Walk over all decls in the file to find the next available closure
   // discriminator.
   DiscriminatorFinder DF;
-  for (Decl *D : SF.Decls)
+  for (Decl *D : SF.getTopLevelDecls())
     D->walk(DF);
 
   // Instrument the decls with checkExpect() sanity-checks.
-  for (Decl *D : SF.Decls) {
+  for (Decl *D : SF.getTopLevelDecls()) {
     DebuggerTestingTransform Transform{D->getASTContext(), DF};
     D->walk(Transform);
     swift::verify(D);

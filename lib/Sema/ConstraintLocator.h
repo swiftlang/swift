@@ -68,8 +68,10 @@ public:
     case GenericParameter:
     case ProtocolRequirement:
     case Witness:
+    case PatternMatch:
       return 0;
 
+    case ClosureBody:
     case ContextualType:
     case OpenedGeneric:
     case GenericArgument:
@@ -78,6 +80,7 @@ public:
     case KeyPathComponent:
     case SynthesizedArgument:
     case KeyPathDynamicMember:
+    case TernaryBranch:
       return 1;
 
     case TypeParameterRequirement:
@@ -118,6 +121,7 @@ public:
       StoredWitness,
       StoredGenericSignature,
       StoredKeyPathDynamicMemberBase,
+      StoredPattern,
       StoredKindAndValue
     };
 
@@ -237,6 +241,9 @@ public:
 
       case StoredKeyPathDynamicMemberBase:
         return PathElementKind::KeyPathDynamicMember;
+
+      case StoredPattern:
+        return PathElementKind::PatternMatch;
 
       case StoredKindAndValue:
         return decodeStorage(storage).first;
@@ -358,6 +365,21 @@ public:
 
   /// Determine whether this locator points to the contextual type.
   bool isForContextualType() const;
+
+  /// Determine whether this locator points to the assignment expression.
+  bool isForAssignment() const;
+
+  /// Determine whether this locator points to the coercion expression.
+  bool isForCoercion() const;
+
+  /// Determine whether this locator points to the `try?` expression.
+  bool isForOptionalTry() const;
+
+  /// Determine whether this locator points directly to a given expression.
+  template <class E> bool directlyAt() const {
+    auto *anchor = getAnchor();
+    return anchor && isa<E>(anchor) && getPath().empty();
+  }
 
   /// Attempts to cast the first path element of the locator to a specific
   /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or
@@ -696,6 +718,20 @@ public:
   }
 };
 
+class LocatorPathElt::ClosureBody final : public LocatorPathElt {
+  public:
+  ClosureBody(bool hasExplicitReturn = false)
+    : LocatorPathElt(ConstraintLocator::ClosureBody,
+                     hasExplicitReturn) {}
+
+  /// Indicates whether body of the closure has any `return` statements.
+  bool hasExplicitReturn() const { return bool(getValue(0)); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ClosureBody;
+  }
+};
+
 class LocatorPathElt::ContextualType final : public LocatorPathElt {
 public:
   ContextualType(bool isForSingleExprFunction = false)
@@ -779,6 +815,32 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::KeyPathDynamicMember;
+  }
+};
+
+class LocatorPathElt::TernaryBranch final : public LocatorPathElt {
+public:
+  TernaryBranch(bool side)
+      : LocatorPathElt(ConstraintLocator::TernaryBranch, side) {}
+
+  bool forThen() const { return bool(getValue(0)); }
+
+  bool forElse() const { return !bool(getValue(0)); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::TernaryBranch;
+  }
+};
+
+class LocatorPathElt::PatternMatch final : public LocatorPathElt {
+public:
+  PatternMatch(Pattern *pattern)
+      : LocatorPathElt(LocatorPathElt::StoredPattern, pattern) {}
+
+  Pattern *getPattern() const { return getStoredPointer<Pattern>(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PatternMatch;
   }
 };
 

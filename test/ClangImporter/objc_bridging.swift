@@ -63,3 +63,10 @@ func objcStructs(_ s: StructOfNSStrings, sb: StructOfBlocks) {
   _ = sb.block as Bool // expected-error {{cannot convert value of type '@convention(block) () -> Void' to type 'Bool' in coercion}}
   sb.block() // okay
 }
+
+func test_repair_does_not_interfere_with_conversions() {
+  func foo(_: Any, _: AnyHashable) {}
+  func bar(_ a: AnyObject, _ b: AnyObject) {
+    foo(a, b as! NSObject) // Ok
+  }
+}

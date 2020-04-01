@@ -174,9 +174,9 @@ func dot_struct_test(_ lens: inout DotLens<DotStruct>) {
 }
 
 func dot_class_test(_ lens: inout DotLens<DotClass>) {
-  // CHECK: keypath $ReferenceWritableKeyPath<DotClass, Int>, (root $DotClass; settable_property $Int,  id #DotClass.x!getter.1 : (DotClass) -> () -> Int, getter @$s29keypath_dynamic_member_lookup8DotClassC1xSivpACTK : {{.*}})
+  // CHECK: keypath $ReferenceWritableKeyPath<DotClass, Int>, (root $DotClass; settable_property $Int,  id #DotClass.x!getter : (DotClass) -> () -> Int, getter @$s29keypath_dynamic_member_lookup8DotClassC1xSivpACTK : {{.*}})
   lens.x = 1
-  // CHECK: keypath $ReferenceWritableKeyPath<DotClass, Int>, (root $DotClass; settable_property $Int,  id #DotClass.y!getter.1 : (DotClass) -> () -> Int, getter @$s29keypath_dynamic_member_lookup8DotClassC1ySivpACTK : {{.*}})
+  // CHECK: keypath $ReferenceWritableKeyPath<DotClass, Int>, (root $DotClass; settable_property $Int,  id #DotClass.y!getter : (DotClass) -> () -> Int, getter @$s29keypath_dynamic_member_lookup8DotClassC1ySivpACTK : {{.*}})
   let _ = lens.y
 }
 
@@ -482,4 +482,29 @@ func testDynamicMemberWithDefault(_ x: SR_11933) {
   // CHECK: [[INNER_KP:%[0-9]+]] = keypath $KeyPath<HasDefaultedSubscript, Int>, (root $HasDefaultedSubscript; gettable_property $Int,  id @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icig : $@convention(method) (Int, HasDefaultedSubscript) -> Int, getter @$s29keypath_dynamic_member_lookup21HasDefaultedSubscriptVyS2icipACTK : $@convention(thin) (@in_guaranteed HasDefaultedSubscript, UnsafeRawPointer) -> @out Int, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSiTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[DEF_ARG]])
   // CHECK: [[OUTER_KP:%[0-9]+]] = keypath $KeyPath<SR_11933, Int>, (root $SR_11933; gettable_property $Int,  id @$s29keypath_dynamic_member_lookup8SR_11933V0B6MemberSis7KeyPathCyAA21HasDefaultedSubscriptVSiG_tcig : $@convention(method) (@guaranteed KeyPath<HasDefaultedSubscript, Int>, SR_11933) -> Int, getter @$s29keypath_dynamic_member_lookup8SR_11933V0B6MemberSis7KeyPathCyAA21HasDefaultedSubscriptVSiG_tcipACTK : $@convention(thin) (@in_guaranteed SR_11933, UnsafeRawPointer) -> @out Int, indices [%$0 : $KeyPath<HasDefaultedSubscript, Int> : $KeyPath<HasDefaultedSubscript, Int>], indices_equals @$ss7KeyPathCy29keypath_dynamic_member_lookup21HasDefaultedSubscriptVSiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$ss7KeyPathCy29keypath_dynamic_member_lookup21HasDefaultedSubscriptVSiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[INNER_KP]])
   _ = \SR_11933.[]
+}
+
+// SR-11743 - KeyPath Dynamic Member Lookup crash
+@dynamicMemberLookup
+protocol SR_11743_P {
+  subscript(dynamicMember member: KeyPath<Self, Any>) -> Any { get }
+}
+
+extension SR_11743_P {
+  subscript(dynamicMember member: KeyPath<Self, Any>) -> Any {
+    self[keyPath: member] // Ok
+    // CHECK: function_ref @swift_getAtKeyPath
+    // CHECK-NEXT: apply %{{.*}}<Self, Any>({{.*}})
+  }
+}
+
+@dynamicMemberLookup
+struct SR_11743_Struct {
+  let value: Int
+
+  subscript<T>(dynamicMember member: KeyPath<Self, T>) -> T {
+    return self[keyPath: member]
+    // CHECK: function_ref @swift_getAtKeyPath
+    // CHECK-NEXT: apply %{{.*}}<SR_11743_Struct, T>({{.*}})
+  }
 }

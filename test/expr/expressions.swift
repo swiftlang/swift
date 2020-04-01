@@ -36,7 +36,7 @@ func basictest() {
 
   var x4 : Bool = true
   var x5 : Bool =
-        4 // expected-error {{cannot convert value of type 'Int' to specified type 'Bool'}}
+        4 // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
   //var x6 : Float = 4+5
 
@@ -193,7 +193,7 @@ func test5() {
 
 
   let c: (a: Int, b: Int) = (1,2)
-  let _: (b: Int, a: Int) = c  // Ok, reshuffle tuple.
+  let _: (b: Int, a: Int) = c  // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
 }
 
 
@@ -277,6 +277,7 @@ func test_floating_point() {
 func test_nonassoc(_ x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
   return x == y == x // expected-error {{adjacent operators are in non-associative precedence group 'ComparisonPrecedence'}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}}
+  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (Bool, Bool), (Int, Int)}}
 }
 
 // More realistic examples.
@@ -295,7 +296,7 @@ func fib(_ n: Int) -> Int {
 
 // FIXME: Should warn about integer constants being too large <rdar://problem/14070127>
 var
-   il_a: Bool = 4  // expected-error {{cannot convert value of type 'Int' to specified type 'Bool'}}
+   il_a: Bool = 4  // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 var il_b: Int8
    = 123123
 var il_c: Int8 = 4  // ok
@@ -709,7 +710,6 @@ func unusedExpressionResults() {
   // Unused l-value
   _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 
-
   // <rdar://problem/20749592> Conditional Optional binding hides compiler error
   let optionalc:C? = nil
   optionalc?.method()  // ok
@@ -748,10 +748,13 @@ func invalidDictionaryLiteral() {
 }
 
 
-[4].joined(separator: [1]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
-// expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'String'}}
-[4].joined(separator: [[[1]]]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
-// expected-error@-1 {{cannot convert value of type '[[[Int]]]' to expected argument type 'String'}}
+[4].joined(separator: [1])
+// expected-error@-1 {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-2 {{cannot convert value of type '[Int]' to expected argument type 'String'}}
+
+[4].joined(separator: [[[1]]])
+// expected-error@-1 {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-2 {{cannot convert value of type '[[[Int]]]' to expected argument type 'String'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
@@ -778,7 +781,8 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
   if (cond || a) ?? 42 > 0 {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
-  // expected-error@-1:12 {{cannot convert value of type 'Bool' to expected argument type 'Int?'}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  // expected-error@-2 {{cannot convert value of type 'Bool' to expected argument type 'Int'}}
   if (cond || a) ?? (42 > 0) {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
 
   if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.
@@ -806,13 +810,13 @@ func testParenExprInTheWay() {
   let x = 42
   
   if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-  // expected-error@-1 {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
   if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-  // expected-error@-1 {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
   if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
-  if x & x {} // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if x & x {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 }
 
 // <rdar://problem/21352576> Mixed method/property overload groups can cause a crash during constraint optimization

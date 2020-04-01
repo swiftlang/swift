@@ -21,9 +21,6 @@ namespace {
 // Helper class performing the apply{partial_apply(x,y)}(z) -> apply(z,x,y)
 // peephole.
 class PartialApplyCombiner {
-  // True if temporaries are not created yet.
-  bool isFirstTime = true;
-
   // partial_apply which is being processed.
   PartialApplyInst *pai;
 
@@ -35,184 +32,105 @@ class PartialApplyCombiner {
   // the temporary containing its copy.
   llvm::DenseMap<SILValue, SILValue> argToTmpCopy;
 
-  // Set of lifetime endpoints for this partial_apply.
-  //
-  // Used to find the last uses of partial_apply, which is need to insert
-  // releases/destroys of temporaries as early as possible.
-  ValueLifetimeAnalysis::Frontier partialApplyFrontier;
-
-  SILBuilder &builder;
+  SILBuilderContext &builderCtxt;
 
   InstModCallbacks &callbacks;
 
-  bool processSingleApply(FullApplySite ai);
-  bool allocateTemporaries();
-  void deallocateTemporaries();
-  void destroyTemporaries();
+  bool copyArgsToTemporaries(ArrayRef<FullApplySite> applies);
+
+  void processSingleApply(FullApplySite ai);
 
 public:
-  PartialApplyCombiner(PartialApplyInst *pai, SILBuilder &builder,
+  PartialApplyCombiner(PartialApplyInst *pai, SILBuilderContext &builderCtxt,
                        InstModCallbacks &callbacks)
-      : isFirstTime(true), pai(pai), builder(builder), callbacks(callbacks) {}
-  SILInstruction *combine();
+      : pai(pai), builderCtxt(builderCtxt), callbacks(callbacks) {}
+
+  bool combine();
 };
 
 } // end anonymous namespace
 
-/// Returns true on success.
-bool PartialApplyCombiner::allocateTemporaries() {
+/// Copy the original arguments of the partial_apply into newly created
+/// temporaries and use these temporaries instead of the original arguments
+/// afterwards.
+///
+/// This is done to "extend" the life-time of original partial_apply arguments,
+/// as they may be destroyed/deallocated before the last use by one of the
+/// apply instructions.
+bool PartialApplyCombiner::copyArgsToTemporaries(
+    ArrayRef<FullApplySite> applies) {
   // A partial_apply [stack]'s argument are not owned by the partial_apply and
   // therefore their lifetime must outlive any uses.
-  if (pai->isOnStack()) {
+  if (pai->isOnStack())
     return true;
+
+  SmallVector<Operand *, 8> argsToHandle;
+  getConsumedPartialApplyArgs(pai, argsToHandle,
+                              /*includeTrivialAddrArgs*/ true);
+  if (argsToHandle.empty())
+    return true;
+
+  // Compute the set of endpoints, which will be used to insert destroys of
+  // temporaries.
+  SmallVector<SILInstruction *, 16> paiUsers;
+
+  // Of course we must inlude all apply instructions which we want to optimize.
+  for (FullApplySite ai : applies) {
+    paiUsers.push_back(ai.getInstruction());
   }
 
-  // Copy the original arguments of the partial_apply into newly created
-  // temporaries and use these temporaries instead of the original arguments
-  // afterwards.
-  //
-  // This is done to "extend" the life-time of original partial_apply arguments,
-  // as they may be destroyed/deallocated before the last use by one of the
-  // apply instructions.
-  //
-  // TODO: Copy arguments of the partial_apply into new temporaries only if the
-  // lifetime of arguments ends before their uses by apply instructions.
-  bool needsDestroys = false;
-  CanSILFunctionType paiTy =
-      pai->getCallee()->getType().getAs<SILFunctionType>();
+  // Also include all destroys in the liferange for the arguments.
+  // This is needed for later processing in tryDeleteDeadClosure: in case the
+  // pai gets dead after this optimization, tryDeleteDeadClosure relies on that
+  // we already copied the pai arguments to extend their lifetimes until the pai
+  // is finally destroyed.
+  collectDestroys(pai, paiUsers);
 
-  // Emit a destroy value for each captured closure argument.
-  ArrayRef<SILParameterInfo> paramList = paiTy->getParameters();
-  auto argList = pai->getArguments();
-  paramList = paramList.drop_front(paramList.size() - argList.size());
+  ValueLifetimeAnalysis vla(pai, paiUsers);
+  ValueLifetimeAnalysis::Frontier partialApplyFrontier;
 
-  llvm::SmallVector<std::pair<SILValue, uint16_t>, 8> argsToHandle;
-  for (unsigned i : indices(argList)) {
-    SILValue arg = argList[i];
-    SILParameterInfo param = paramList[i];
-    if (param.isIndirectMutating())
-      continue;
+  // Computing the frontier may fail if the frontier is located on a critical
+  // edge which we may not split.
+  if (!vla.computeFrontier(partialApplyFrontier,
+                           ValueLifetimeAnalysis::DontModifyCFG)) {
+    return false;
+  }
 
-    // Create a temporary and copy the argument into it, if:
-    // - the argument stems from an alloc_stack
-    // - the argument is consumed by the callee and is indirect
-    //   (e.g. it is an @in argument)
-    if (isa<AllocStackInst>(arg) ||
-        (param.isConsumed() &&
-         pai->getSubstCalleeConv().isSILIndirect(param))) {
-      // If the argument has a dependent type, then we can not create a
-      // temporary for it at the beginning of the function, so we must bail.
-      //
-      // TODO: This is because we are inserting alloc_stack at the beginning/end
-      // of functions where the dependent type may not exist yet.
-      if (arg->getType().hasOpenedExistential())
-        return false;
+  for (Operand *argOp : argsToHandle) {
+    SILValue arg = argOp->get();
+    int argIdx = ApplySite(pai).getAppliedArgIndex(*argOp);
+    SILDebugVariable dbgVar(/*Constant*/ true, argIdx);
 
-      // If the temporary is non-trivial, we need to destroy it later.
-      if (!arg->getType().isTrivial(*pai->getFunction()))
-        needsDestroys = true;
-      argsToHandle.push_back(std::make_pair(arg, i));
+    SILValue tmp = arg;
+    SILBuilderWithScope builder(pai, builderCtxt);
+    if (arg->getType().isObject()) {
+      tmp = builder.emitCopyValueOperation(pai->getLoc(), arg);
+    } else {
+      // Copy address-arguments into a stack-allocated temporary.
+      tmp = builder.createAllocStack(pai->getLoc(), arg->getType(), dbgVar);
+      builder.createCopyAddr(pai->getLoc(), arg, tmp, IsTake_t::IsNotTake,
+                             IsInitialization_t::IsInitialization);
     }
-  }
+    argToTmpCopy.insert(std::make_pair(arg, tmp));
 
-  if (needsDestroys) {
-    // Compute the set of endpoints, which will be used to insert destroys of
-    // temporaries. This may fail if the frontier is located on a critical edge
-    // which we may not split (no CFG changes in SILCombine).
-    ValueLifetimeAnalysis vla(pai);
-    if (!vla.computeFrontier(partialApplyFrontier,
-                             ValueLifetimeAnalysis::DontModifyCFG))
-      return false;
-  }
-
-  for (auto argWithIdx : argsToHandle) {
-    SILValue Arg = argWithIdx.first;
-    builder.setInsertionPoint(pai->getFunction()->begin()->begin());
-    // Create a new temporary at the beginning of a function.
-    SILDebugVariable dbgVar(/*Constant*/ true, argWithIdx.second);
-    auto *tmp = builder.createAllocStack(pai->getLoc(), Arg->getType(), dbgVar);
-    builder.setInsertionPoint(pai);
-    // Copy argument into this temporary.
-    builder.createCopyAddr(pai->getLoc(), Arg, tmp, IsTake_t::IsNotTake,
-                           IsInitialization_t::IsInitialization);
-
-    tmpCopies.push_back(tmp);
-    argToTmpCopy.insert(std::make_pair(Arg, tmp));
+    // Destroy the argument value (either as SSA value or in the stack-
+    // allocated temporary) at the end of the partial_apply's lifetime.
+    endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt);
   }
   return true;
-}
-
-/// Emit dealloc_stack for all temporaries.
-void PartialApplyCombiner::deallocateTemporaries() {
-  // Insert dealloc_stack instructions at all function exit points.
-  for (SILBasicBlock &block : *pai->getFunction()) {
-    TermInst *term = block.getTerminator();
-    if (!term->isFunctionExiting())
-      continue;
-
-    for (auto copy : tmpCopies) {
-      builder.setInsertionPoint(term);
-      builder.createDeallocStack(pai->getLoc(), copy);
-    }
-  }
-}
-
-/// Emit code to release/destroy temporaries.
-void PartialApplyCombiner::destroyTemporaries() {
-  // Insert releases and destroy_addrs as early as possible,
-  // because we don't want to keep objects alive longer than
-  // its really needed.
-  for (auto op : tmpCopies) {
-    auto tmpType = op->getType().getObjectType();
-    if (tmpType.isTrivial(*pai->getFunction()))
-      continue;
-    for (auto *endPoint : partialApplyFrontier) {
-      builder.setInsertionPoint(endPoint);
-      if (!tmpType.isAddressOnly(*pai->getFunction())) {
-        SILValue load = builder.emitLoadValueOperation(
-            pai->getLoc(), op, LoadOwnershipQualifier::Take);
-        builder.emitDestroyValueOperation(pai->getLoc(), load);
-      } else {
-        builder.createDestroyAddr(pai->getLoc(), op);
-      }
-    }
-  }
 }
 
 /// Process an apply instruction which uses a partial_apply
 /// as its callee.
 /// Returns true on success.
-bool PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
-  builder.setInsertionPoint(paiAI.getInstruction());
-  builder.setCurrentDebugScope(paiAI.getDebugScope());
-
-  // Prepare the args.
+void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
+  // The arguments of the final apply instruction.
   SmallVector<SILValue, 8> argList;
-  // First the ApplyInst args.
+  // First, add the arguments of ther original ApplyInst args.
   for (auto Op : paiAI.getArguments())
     argList.push_back(Op);
 
-  SILInstruction *insertPoint = &*builder.getInsertionPoint();
-  // Next, the partial apply args.
-
-  // Pre-process partial_apply arguments only once, lazily.
-  if (isFirstTime) {
-    isFirstTime = false;
-    if (!allocateTemporaries())
-      return false;
-  }
-
-  // Now, copy over the partial apply args.
-  for (auto arg : pai->getArguments()) {
-    // If there is new temporary for this argument, use it instead.
-    if (argToTmpCopy.count(arg)) {
-      arg = argToTmpCopy.lookup(arg);
-    }
-    argList.push_back(arg);
-  }
-
-  builder.setInsertionPoint(insertPoint);
-  builder.setCurrentDebugScope(paiAI.getDebugScope());
+  SILBuilderWithScope builder(paiAI.getInstruction(), builderCtxt);
 
   // The thunk that implements the partial apply calls the closure function
   // that expects all arguments to be consumed by the function. However, the
@@ -220,63 +138,64 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   // pre-incremented. When we combine the partial_apply and this apply into
   // a new apply we need to retain all of the closure non-address type
   // arguments.
+  auto destroyloc = RegularLocation::getAutoGeneratedLocation();
   auto paramInfo = pai->getSubstCalleeType()->getParameters();
   auto partialApplyArgs = pai->getArguments();
-  // Set of arguments that need to be destroyed after each invocation.
-  SmallVector<SILValue, 8> toBeDestroyedArgs;
   for (unsigned i : indices(partialApplyArgs)) {
-    auto arg = partialApplyArgs[i];
+    SILValue arg = partialApplyArgs[i];
+    if (argToTmpCopy.count(arg))
+      arg = argToTmpCopy.lookup(arg);
 
-    if (!arg->getType().isAddress()) {
+    if (paramInfo[paramInfo.size() - partialApplyArgs.size() + i]
+            .isConsumed()) {
       // Copy the argument as the callee may consume it.
-      arg = builder.emitCopyValueOperation(pai->getLoc(), arg);
-      // For non consumed parameters (e.g. guaranteed), we also need to
-      // insert destroys after each apply instruction that we create.
-      if (!paramInfo[paramInfo.size() - partialApplyArgs.size() + i]
-               .isConsumed())
-        toBeDestroyedArgs.push_back(arg);
+      if (arg->getType().isAddress()) {
+        auto *ASI = builder.createAllocStack(pai->getLoc(), arg->getType());
+        builder.createCopyAddr(pai->getLoc(), arg, ASI, IsTake_t::IsNotTake,
+                               IsInitialization_t::IsInitialization);
+        paiAI.insertAfterFullEvaluation([&](SILBasicBlock::iterator insertPt) {
+          SILBuilderWithScope builder(insertPt);
+          builder.createDeallocStack(destroyloc, ASI);
+        });
+        arg = ASI;
+      } else {
+        arg = builder.emitCopyValueOperation(pai->getLoc(), arg);
+      }
     }
+    // Add the argument of the partial_apply.
+    argList.push_back(arg);
   }
 
-  auto callee = pai->getCallee();
+  SILValue callee = pai->getCallee();
   SubstitutionMap subs = pai->getSubstitutionMap();
 
   // The partial_apply might be substituting in an open existential type.
   builder.addOpenedArchetypeOperands(pai);
 
-  FullApplySite nai;
-  if (auto *tai = dyn_cast<TryApplyInst>(paiAI))
-    nai = builder.createTryApply(paiAI.getLoc(), callee, subs, argList,
-                                 tai->getNormalBB(), tai->getErrorBB());
-  else
-    nai = builder.createApply(paiAI.getLoc(), callee, subs, argList,
-                              cast<ApplyInst>(paiAI)->isNonThrowing());
-
+  if (auto *tai = dyn_cast<TryApplyInst>(paiAI)) {
+    builder.createTryApply(paiAI.getLoc(), callee, subs, argList,
+                           tai->getNormalBB(), tai->getErrorBB());
+  } else {
+    auto *apply = cast<ApplyInst>(paiAI);
+    auto *newAI = builder.createApply(paiAI.getLoc(), callee, subs, argList,
+                                      apply->isNonThrowing());
+    callbacks.replaceValueUsesWith(apply, newAI);
+  }
   // We also need to destroy the partial_apply instruction itself because it is
   // consumed by the apply_instruction.
-  auto loc = RegularLocation::getAutoGeneratedLocation();
-  paiAI.insertAfterFullEvaluation([&](SILBasicBlock::iterator insertPt) {
-    SILBuilderWithScope builder(insertPt);
-    for (auto arg : toBeDestroyedArgs) {
-      builder.emitDestroyValueOperation(loc, arg);
-    }
-    if (!pai->hasCalleeGuaranteedContext()) {
-      builder.emitDestroyValueOperation(loc, pai);
-    }
-  });
-
-  if (auto *apply = dyn_cast<ApplyInst>(paiAI)) {
-    callbacks.replaceValueUsesWith(SILValue(apply),
-                                   cast<ApplyInst>(nai.getInstruction()));
+  if (!pai->hasCalleeGuaranteedContext()) {
+    paiAI.insertAfterFullEvaluation([&](SILBasicBlock::iterator insertPt) {
+      SILBuilderWithScope builder(insertPt);
+      builder.emitDestroyValueOperation(destroyloc, pai);
+    });
   }
   callbacks.deleteInst(paiAI.getInstruction());
-  return true;
 }
 
 /// Perform the apply{partial_apply(x,y)}(z) -> apply(z,x,y) peephole
 /// by iterating over all uses of the partial_apply and searching
 /// for the pattern to transform.
-SILInstruction *PartialApplyCombiner::combine() {
+bool PartialApplyCombiner::combine() {
   // We need to model @unowned_inner_pointer better before we can do the
   // peephole here.
   if (llvm::any_of(pai->getSubstCalleeType()->getResults(),
@@ -284,7 +203,7 @@ SILInstruction *PartialApplyCombiner::combine() {
                      return resultInfo.getConvention() ==
                             ResultConvention::UnownedInnerPointer;
                    })) {
-    return nullptr;
+    return false;
   }
 
   // Iterate over all uses of the partial_apply
@@ -292,6 +211,7 @@ SILInstruction *PartialApplyCombiner::combine() {
 
   // Worklist of operands.
   SmallVector<Operand *, 8> worklist(pai->getUses());
+  SmallVector<FullApplySite, 4> foundApplySites;
 
   while (!worklist.empty()) {
     auto *use = worklist.pop_back_val();
@@ -338,25 +258,29 @@ SILInstruction *PartialApplyCombiner::combine() {
     if (ai.hasSubstitutions())
       continue;
 
-    if (!processSingleApply(ai))
-      return nullptr;
+    foundApplySites.push_back(ai);
   }
 
-  // release/destroy and deallocate introduced temporaries.
-  if (!tmpCopies.empty()) {
-    destroyTemporaries();
-    deallocateTemporaries();
+  if (foundApplySites.empty())
+    return false;
+
+  if (!copyArgsToTemporaries(foundApplySites))
+    return false;
+
+  for (FullApplySite ai : foundApplySites) {
+    processSingleApply(ai);
   }
 
-  return nullptr;
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-SILInstruction *swift::tryOptimizeApplyOfPartialApply(
-    PartialApplyInst *pai, SILBuilder &builder, InstModCallbacks callbacks) {
-  PartialApplyCombiner combiner(pai, builder, callbacks);
+bool swift::tryOptimizeApplyOfPartialApply(PartialApplyInst *pai,
+                                           SILBuilderContext &builderCtxt,
+                                           InstModCallbacks callbacks) {
+  PartialApplyCombiner combiner(pai, builderCtxt, callbacks);
   return combiner.combine();
 }

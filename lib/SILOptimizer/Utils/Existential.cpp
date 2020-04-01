@@ -69,9 +69,9 @@ findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI, SILInstruction *Insn) {
 
 /// Returns the instruction that initializes the given stack address. This is
 /// currently either a init_existential_addr, unconditional_checked_cast_addr,
-/// or copy_addr (if the instruction initializing the source of the copy cannot
-/// be determined). Returns nullptr if the initializer does not dominate the
-/// alloc_stack user \p ASIUser.  If the value is copied from another stack
+/// store, or copy_addr (if the instruction initializing the source of the copy
+/// cannot be determined). Returns nullptr if the initializer does not dominate
+/// the alloc_stack user \p ASIUser.  If the value is copied from another stack
 /// location, \p isCopied is set to true.
 ///
 /// allocStackAddr may either itself be an AllocStackInst or an
@@ -111,6 +111,19 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
       }
       continue;
     }
+    if (auto *store = dyn_cast<StoreInst>(User)) {
+      if (store->getDest() == allocStackAddr) {
+        if (SingleWrite)
+          return nullptr;
+        SingleWrite = store;
+        // When we support OSSA here, we need to insert a new copy of the value
+        // before `store` (and make sure that the copy is destroyed when
+        // replacing the apply operand).
+        assert(store->getOwnershipQualifier() ==
+               StoreOwnershipQualifier::Unqualified);
+      }
+      continue;
+    }
     if (isa<InitExistentialAddrInst>(User)) {
       if (SingleWrite)
         return nullptr;
@@ -143,6 +156,9 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
   SILBasicBlock *BB = SingleWrite->getParent();
   if (BB != allocStackAddr->getParentBlock() && BB != ASIUser->getParent())
     return nullptr;
+
+  if (auto *store = dyn_cast<StoreInst>(SingleWrite))
+    return store;
 
   if (auto *IE = dyn_cast<InitExistentialAddrInst>(SingleWrite))
     return IE;
@@ -180,24 +196,6 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
   return CAI;
 }
 
-/// Return the address of the value used to initialize the given stack location.
-/// If the value originates from init_existential_addr, then it will be a
-/// different type than \p allocStackAddr.
-static SILValue getAddressOfStackInit(SILValue allocStackAddr,
-                                      SILInstruction *ASIUser, bool &isCopied) {
-  SILInstruction *initI = getStackInitInst(allocStackAddr, ASIUser, isCopied);
-  if (!initI)
-    return SILValue();
-
-  if (auto *IEA = dyn_cast<InitExistentialAddrInst>(initI))
-    return IEA;
-
-  if (auto *CAI = dyn_cast<CopyAddrInst>(initI))
-    return CAI->getSrc();
-
-  return SILValue();
-}
-
 /// Check if the given operand originates from a recognized OpenArchetype
 /// instruction. If so, return the Opened, otherwise return nullptr.
 OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
@@ -207,11 +205,17 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     // Handle:
     //   %opened = open_existential_addr
     //   %instance = alloc $opened
-    //   copy_addr %opened to %stack
+    //   <copy|store> %opened to %stack
     //   <opened_use> %instance
-    if (auto stackInitVal =
-            getAddressOfStackInit(instance, user, isOpenedValueCopied)) {
-      openedVal = stackInitVal;
+    if (auto *initI = getStackInitInst(instance, user, isOpenedValueCopied)) {
+      // init_existential_addr isn't handled here because it isn't considered an
+      // "opened" archtype. init_existential_addr should be handled by
+      // ConcreteExistentialInfo.
+
+      if (auto *CAI = dyn_cast<CopyAddrInst>(initI))
+        openedVal = CAI->getSrc();
+      if (auto *store = dyn_cast<StoreInst>(initI))
+        openedVal = store->getSrc();
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {

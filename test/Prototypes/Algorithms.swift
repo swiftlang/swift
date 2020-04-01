@@ -613,6 +613,11 @@ extension Collection {
   /// The collection must already be partitioned according to the
   /// predicate, as if `self.partition(by: predicate)` had already
   /// been called.
+  ///
+  /// - Efficiency: At most log(N) invocations of `predicate`, where 
+  ///   N is the length of `self`.  At most log(N) index offsetting
+  ///   operations if `self` conforms to `RandomAccessCollection`;
+  ///   at most N such operations otherwise.
   func partitionPoint(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Index {

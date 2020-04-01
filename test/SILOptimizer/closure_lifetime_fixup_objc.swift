@@ -44,7 +44,7 @@ public protocol DangerousEscaper {
 
 // Release of closure copy (1).
 // CHECK:   strong_release %0 : $@callee_guaranteed () -> ()
-// CHECK:   [[METH:%.*]] = objc_method [[OE]] : $@opened("{{.*}}") DangerousEscaper, #DangerousEscaper.malicious!1.foreign : <Self where Self : DangerousEscaper> (Self) -> (() -> ()) -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:   [[METH:%.*]] = objc_method [[OE]] : $@opened("{{.*}}") DangerousEscaper, #DangerousEscaper.malicious!foreign : <Self where Self : DangerousEscaper> (Self) -> (() -> ()) -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
 // CHECK:   apply [[METH]]<@opened("{{.*}}") DangerousEscaper>([[BLOCK_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
 
 // Release sentinel closure copy (5).
@@ -85,7 +85,7 @@ public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villian
 // CHECK:   br [[LOOP_HEADER_BB:bb[0-9]+]]([[NONE]]
 //
 // CHECK: [[LOOP_HEADER_BB]]([[LOOP_IND_VAR:%.*]] : $Optional
-// CHECK:   switch_enum {{.*}} : $Optional<Int>, case #Optional.some!enumelt.1: [[SUCC_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+// CHECK:   switch_enum {{.*}} : $Optional<Int>, case #Optional.some!enumelt: [[SUCC_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCC_BB]](
 // CHECK:   [[THUNK_FUNC:%.*]] = function_ref @$sIg_Ieg_TR :
@@ -97,7 +97,7 @@ public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villian
 // CHECK:   store [[MDI]] to [[BLOCK_PROJ]] :
 // CHECK:   [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_SLOT]]
 // CHECK:   release_value [[LOOP_IND_VAR]]
-// CHECK:   [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt.1, [[MDI]]
+// CHECK:   [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[MDI]]
 // CHECK:   [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
 // CHECK:   destroy_addr [[BLOCK_PROJ]]
 // CHECK:   [[DISPATCH_SYNC_FUNC:%.*]] = function_ref @dispatch_sync :
@@ -127,7 +127,7 @@ func getDispatchQueue() -> DispatchQueue
 // CHECK: bb0([[SELF:%.*]] : $C):
 // CHECK:   [[F:%.*]] = function_ref @$s27closure_lifetime_fixup_objc1CCfdyyXEfU_
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]([[SELF]])
-// CHECK:   [[DEINIT:%.*]] = objc_super_method [[SELF]] : $C, #NSObject.deinit!deallocator.1.foreign
+// CHECK:   [[DEINIT:%.*]] = objc_super_method [[SELF]] : $C, #NSObject.deinit!deallocator.foreign
 // CHECK:   strong_release [[PA]]
 // CHECK:   [[SUPER:%.*]] = upcast [[SELF]] : $C to $NSObject
 // CHECK-NEXT:   apply [[DEINIT]]([[SUPER]]) : $@convention(objc_method) (NSObject) -> ()

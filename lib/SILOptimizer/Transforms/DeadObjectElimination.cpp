@@ -224,15 +224,17 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   if (isa<DestroyAddrInst>(Inst))
     return true;
 
-  // The only store instructions which is guaranteed to store a trivial value
-  // is an inject_enum_addr witout a payload (i.e. without init_enum_data_addr).
-  // There can also be a 'store [trivial]', but we don't handle that yet.
-  if (onlyAcceptTrivialStores)
-    return false;
-
   // If we see a store here, we have already checked that we are storing into
   // the pointer before we added it to the worklist, so we can skip it.
-  if (isa<StoreInst>(Inst))
+  if (auto *store = dyn_cast<StoreInst>(Inst)) {
+    // TODO: when we have OSSA, we can also accept stores of non trivial values:
+    //       just replace the store with a destroy_value.
+    return !onlyAcceptTrivialStores ||
+           store->getSrc()->getType().isTrivial(*store->getFunction());
+  }
+
+  // Conceptually this instruction has no side-effects.
+  if (isa<InitExistentialAddrInst>(Inst))
     return true;
 
   // If Inst does not read or write to memory, have side effects, and is not a
@@ -641,7 +643,8 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
 /// side effect?
 static bool isAllocatingApply(SILInstruction *Inst) {
   ArraySemanticsCall ArrayAlloc(Inst);
-  return ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitialized;
+  return ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitialized ||
+         ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitializedIntrinsic;
 }
 
 namespace {
@@ -832,7 +835,9 @@ static bool getDeadInstsAfterInitializerRemoved(
 bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
                                               DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
-  if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized)
+  if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized &&
+      ArraySemanticsCall(AI).getKind() !=
+          ArrayCallKind::kArrayUninitializedIntrinsic)
     return false;
 
   llvm::SmallVector<SILInstruction *, 8> instsDeadAfterInitializerRemoved;

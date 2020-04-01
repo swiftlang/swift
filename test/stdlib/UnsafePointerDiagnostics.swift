@@ -131,7 +131,7 @@ struct SR9800 {
   func foo(_: UnsafePointer<UInt8>) {}
 
   func ambiguityTest(buf: UnsafeMutablePointer<CChar>) {
-    _ = foo(UnsafePointer(buf)) // this call should be unambiguoius
+    foo(UnsafePointer(buf)) // this call should be unambiguoius
   }
 }
 

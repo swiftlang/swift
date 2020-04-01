@@ -9,4 +9,4 @@ func foo() -> Int {
 // RUN: diff -u %S/extract-func.swift.expected %t.result/extract-func.swift.expected
 
 // FIXME: Fails on linux with assertion: "!GlibcModuleMapPath.empty()"" failed
-// REQUIRES-ANY: OS=macosx
+// REQUIRES: OS=macosx

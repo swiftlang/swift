@@ -66,7 +66,7 @@ public:
     /// "open", "public", "internal", "fileprivate", or "private".
     AccessControlKeyword,
 
-    /// such as @"availability".
+    /// such as @"available".
     DeclAttrKeyword,
 
     /// such as "unavailable" etc. for @available.
@@ -507,7 +507,7 @@ enum class CompletionKind {
   AfterPoundDirective,
   PlatformConditon,
   AfterIfStmtElse,
-  GenericParams,
+  GenericRequirement,
   PrecedenceGroup,
 };
 
@@ -527,6 +527,11 @@ public:
   /// Describes the relationship between the type of the completion results and
   /// the expected type at the code completion position.
   enum ExpectedTypeRelation {
+    /// The result does not have a type (e.g. keyword).
+    NotApplicable,
+
+    /// The type relation have not been calculated.
+    Unknown,
 
     /// The relationship of the result's type to the expected type is not
     /// invalid, not convertible, and not identical.
@@ -580,7 +585,7 @@ public:
   CodeCompletionResult(ResultKind Kind, SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
-                       ExpectedTypeRelation TypeDistance = Unrelated,
+                       ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind =
                            CodeCompletionOperatorKind::None)
       : Kind(Kind), KnownOperatorKind(unsigned(KnownOperatorKind)),
@@ -605,7 +610,7 @@ public:
                        SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
-                       ExpectedTypeRelation TypeDistance = Unrelated)
+                       ExpectedTypeRelation TypeDistance)
       : Kind(Keyword), KnownOperatorKind(0),
         SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
         NotRecReason(NotRecommendedReason::NoReason),
@@ -684,7 +689,7 @@ public:
         AssociatedUSRs(AssociatedUSRs), DocWords(DocWords) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
-    TypeDistance = ExpectedTypeRelation::Unrelated;
+    TypeDistance = ExpectedTypeRelation::Unknown;
     assert(!isOperator() ||
            getOperatorKind() != CodeCompletionOperatorKind::None);
   }

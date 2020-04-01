@@ -193,7 +193,7 @@ macro(swift_common_standalone_build_config_cmark product)
   include_directories("${CMARK_MAIN_INCLUDE_DIR}"
                       "${CMARK_BUILD_INCLUDE_DIR}")
 
-  include(${PATH_TO_CMARK_BUILD}/src/CMarkExports.cmake)
+  include(${PATH_TO_CMARK_BUILD}/src/cmarkTargets.cmake)
   add_definitions(-DCMARK_STATIC_DEFINE)
 endmacro()
 

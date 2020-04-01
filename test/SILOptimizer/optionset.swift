@@ -22,6 +22,16 @@ public func returnTestOptions() -> TestOptions {
     return [.first, .second, .third, .fourth]
 }
 
+// CHECK:      sil @{{.*}}returnEmptyTestOptions{{.*}}
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   integer_literal {{.*}}, 0
+// CHECK-NEXT:   struct $Int
+// CHECK-NEXT:   struct $TestOptions
+// CHECK-NEXT:   return
+public func returnEmptyTestOptions() -> TestOptions {
+    return []
+}
+
 // CHECK:        alloc_global @{{.*}}globalTestOptions{{.*}}
 // CHECK-NEXT:   global_addr
 // CHECK-NEXT:   integer_literal {{.*}}, 15

@@ -33,14 +33,11 @@ class ConstructorDecl;
 class FuncDecl;
 class GenericParamList;
 class NominalTypeDecl;
+class ObjCReason;
 class ParamDecl;
 class Type;
 class ValueDecl;
 class VarDecl;
-
-class TypeChecker;
-
-class ObjCReason;
 
 enum class SelfAccessorKind {
   /// We're building a derived accessor on top of whatever this
@@ -62,6 +59,16 @@ Expr *buildSelfReference(VarDecl *selfDecl,
 /// or paren expr, suitable for use in an apply expr.
 Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                   ASTContext &ctx);
+
+/// Returns the protocol requirement with the specified name.
+ValueDecl *getProtocolRequirement(ProtocolDecl *protocol, Identifier name);
+
+// Returns true if given nominal type declaration has a `let` stored property
+// with an initial value.
+bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal);
+
+/// Add `@_fixed_layout` attribute to the nominal type, if possible.
+void addFixedLayoutAttr(NominalTypeDecl *nominal);
 
 } // end namespace swift
 

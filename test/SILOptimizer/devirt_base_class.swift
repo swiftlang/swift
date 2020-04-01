@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-spec-devirt -O -emit-sil %s | %FileCheck %s
 
 public class Base1 { @inline(never) func f() -> Int { return 0 } }
 

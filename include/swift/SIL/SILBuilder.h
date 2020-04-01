@@ -197,6 +197,8 @@ public:
     assert(F && "cannot create this instruction without a function context");
     return *F;
   }
+  
+  bool isInsertingIntoGlobal() const { return F == nullptr; }
 
   TypeExpansionContext getTypeExpansionContext() const {
     return TypeExpansionContext(getFunction());
@@ -726,6 +728,7 @@ public:
   }
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV) {
+    assert(!LV->getType().isAddress());
     return insert(new (getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV));
   }
@@ -802,14 +805,14 @@ public:
   }
 
   EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue) {
+    if (auto *arg = dyn_cast<SILPhiArgument>(borrowedValue)) {
+      if (auto *ti = arg->getSingleTerminator()) {
+        assert(!ti->isTransformationTerminator() &&
+               "Transforming terminators do not have end_borrow");
+      }
+    }
     return insert(new (getModule())
                       EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
-  }
-
-  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue BorrowedValue,
-                                 SILValue OriginalValue) {
-    return insert(new (getModule())
-                      EndBorrowInst(getSILDebugLocation(Loc), BorrowedValue));
   }
 
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
@@ -1783,12 +1786,6 @@ public:
   // Unchecked cast helpers
   //===--------------------------------------------------------------------===//
 
-  // Create an UncheckedRefCast if the source and dest types are legal,
-  // otherwise return null.
-  // Unwrap or wrap optional types as needed.
-  SingleValueInstruction *tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
-                                                    SILType ResultTy);
-
   // Create the appropriate cast instruction based on result type.
   SingleValueInstruction *createUncheckedBitCast(SILLocation Loc, SILValue Op,
                                                  SILType Ty);
@@ -2162,6 +2159,60 @@ public:
 
   SILValue emitThickToObjCMetatype(SILLocation Loc, SILValue Op, SILType Ty);
   SILValue emitObjCToThickMetatype(SILLocation Loc, SILValue Op, SILType Ty);
+
+  //===--------------------------------------------------------------------===//
+  // Differentiable programming instructions
+  //===--------------------------------------------------------------------===//
+
+  DifferentiableFunctionInst *createDifferentiableFunction(
+      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
+    return insert(DifferentiableFunctionInst::create(
+        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
+  }
+
+  LinearFunctionInst *createLinearFunction(
+      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      Optional<SILValue> TransposeFunction = None) {
+    return insert(LinearFunctionInst::create(
+        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        OriginalFunction, TransposeFunction, hasOwnership()));
+  }
+
+  /// Note: explicit extractee type may be specified only in lowered SIL.
+  DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
+      SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
+      SILValue Function, Optional<SILType> ExtracteeType = None) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc), Extractee, Function,
+        ExtracteeType));
+  }
+
+  DifferentiableFunctionExtractInst *
+  createDifferentiableFunctionExtractOriginal(SILLocation Loc,
+                                              SILValue TheFunction) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc),
+        NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
+  }
+
+  LinearFunctionExtractInst *createLinearFunctionExtract(
+      SILLocation Loc, LinearDifferentiableFunctionTypeComponent Extractee,
+      SILValue TheFunction) {
+    return insert(new (getModule()) LinearFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
+  }
+
+  /// Note: explicit function type may be specified only in lowered SIL.
+  DifferentiabilityWitnessFunctionInst *createDifferentiabilityWitnessFunction(
+      SILLocation Loc, DifferentiabilityWitnessFunctionKind WitnessKind,
+      SILDifferentiabilityWitness *Witness,
+      Optional<SILType> FunctionType = None) {
+    return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
+        getModule(), getSILDebugLocation(Loc), WitnessKind, Witness,
+        FunctionType));
+  }
 
   //===--------------------------------------------------------------------===//
   // Private Helper Methods

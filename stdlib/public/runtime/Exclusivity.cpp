@@ -341,8 +341,14 @@ void swift::swift_endAccess(ValueBuffer *buffer) {
 
 char *swift::swift_getFunctionReplacement(char **ReplFnPtr, char *CurrFn) {
   char *ReplFn = *ReplFnPtr;
-  if (ReplFn == CurrFn)
+  char *RawReplFn = ReplFn;
+
+#if SWIFT_PTRAUTH
+  RawReplFn = ptrauth_strip(RawReplFn, ptrauth_key_function_pointer);
+#endif
+  if (RawReplFn == CurrFn)
     return nullptr;
+
   SwiftTLSContext &ctx = getTLSContext();
   if (ctx.CallOriginalOfReplacedFunction) {
     ctx.CallOriginalOfReplacedFunction = false;

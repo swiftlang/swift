@@ -681,6 +681,10 @@ namespace {
                                                 IsNotBitwiseTakable, \
                                                 IsFixedSize), \
         IsOptional(isOptional) {} \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
+                                          SILType T) const override { \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T); \
+    } \
     void emitValueAssignWithCopy(IRGenFunction &IGF, \
                                  Address dest, Address src) const { \
       IGF.emit##Name##CopyAssign(dest, src, Refcounting); \
@@ -725,6 +729,10 @@ namespace {
       assert(refcounting == ReferenceCounting::Native || \
              refcounting == ReferenceCounting::Unknown); \
     } \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
+                                          SILType T) const override { \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T); \
+    } \
     llvm::Type *getValueType() const { \
       return ValueType; \
     } \
@@ -768,6 +776,10 @@ namespace {
         bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
                                       spareBits, align, IsPOD, IsFixedSize) {} \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
+                                          SILType T) const override { \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T); \
+    } \
     const LoadableTypeInfo & \
     getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const { \
       if (!IGM.ObjCInterop) \
@@ -831,6 +843,11 @@ class OpaqueExistentialTypeInfo final :
 public:
   OpaqueExistentialLayout getLayout() const {
     return OpaqueExistentialLayout(getNumStoredProtocols());
+  }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
   }
 
   Address projectWitnessTable(IRGenFunction &IGF, Address obj,
@@ -976,6 +993,11 @@ class ClassExistentialTypeInfo final
            refcounting == ReferenceCounting::ObjC);
   }
 
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+  }
+
   /// Given an explosion with multiple pointer elements in them, pack them
   /// into an enum payload explosion.
   /// FIXME: Assumes the explosion is broken into word-sized integer chunks.
@@ -1026,6 +1048,11 @@ public:
                                  ReferenceCounting *refcounting) const override{
     if (refcounting) *refcounting = Refcounting;
     return getNumStoredProtocols() == 0;
+  }
+  
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override {
+    return index == 0;
   }
 
   const LoadableTypeInfo &
@@ -1294,6 +1321,11 @@ public:
     return MetatypeTI;
   }
 
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+  }
+
   void emitValueRetain(IRGenFunction &IGF, llvm::Value *value,
                        Atomicity atomicity) const {
     // do nothing
@@ -1324,6 +1356,11 @@ public:
                            ReferenceCounting refcounting)
     : HeapTypeInfo(storage, size, spareBits, align), ErrorProto(errorProto),
       Refcounting(refcounting) {}
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+  }
 
   ReferenceCounting getReferenceCounting() const {
     // Error uses its own RC entry points.

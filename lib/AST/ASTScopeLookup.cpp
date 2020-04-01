@@ -194,8 +194,8 @@ bool ASTScopeImpl::doesContextMatchStartingContext(
 // For a SubscriptDecl with generic parameters, the call tries to do lookups
 // with startingContext equal to either the get or set subscript
 // AbstractFunctionDecls. Since the generic parameters are in the
-// SubScriptDeclScope, and not the AbstractFunctionDecl scopes (after all how
-// could one parameter be in two scopes?), GenericParamScoped intercepts the
+// SubscriptDeclScope, and not the AbstractFunctionDecl scopes (after all how
+// could one parameter be in two scopes?), GenericParamScope intercepts the
 // match query here and tests against the accessor DeclContexts.
 bool GenericParamScope::doesContextMatchStartingContext(
     const DeclContext *context) const {
@@ -205,6 +205,19 @@ bool GenericParamScope::doesContextMatchStartingContext(
         return true;
     }
   }
+  return false;
+}
+
+bool DifferentiableAttributeScope::doesContextMatchStartingContext(
+    const DeclContext *context) const {
+  // Need special logic to handle case where `attributedDeclaration` is an
+  // `AbstractStorageDecl` (`SubscriptDecl` or `VarDecl`). The initial starting
+  // context in `ASTScopeImpl::findStartingScopeForLookup` will be an accessor
+  // of the `attributedDeclaration`.
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(attributedDeclaration))
+    for (auto accessor : asd->getAllAccessors())
+      if (up_cast<DeclContext>(accessor) == context)
+        return true;
   return false;
 }
 
@@ -435,6 +448,25 @@ bool SpecializeAttributeScope::lookupLocalsOrMembers(
     for (auto *param : params->getParams())
       if (consumer.consume({param}, DeclVisibilityKind::GenericParameter))
         return true;
+  return false;
+}
+
+bool DifferentiableAttributeScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+  auto visitAbstractFunctionDecl = [&](AbstractFunctionDecl *afd) {
+    if (auto *params = afd->getGenericParams())
+      for (auto *param : params->getParams())
+        if (consumer.consume({param}, DeclVisibilityKind::GenericParameter))
+          return true;
+    return false;
+  };
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(attributedDeclaration)) {
+    return visitAbstractFunctionDecl(afd);
+  } else if (auto *asd = dyn_cast<AbstractStorageDecl>(attributedDeclaration)) {
+    for (auto *accessor : asd->getAllAccessors())
+      if (visitAbstractFunctionDecl(accessor))
+        return true;
+  }
   return false;
 }
 

@@ -270,3 +270,32 @@ class Foo {
     Self.value * 2
   }()
 }
+
+// https://bugs.swift.org/browse/SR-11681 - duplicate diagnostics
+struct Box<T> {
+  let boxed: T
+}
+
+class Boxer {
+  lazy var s = Box<Self>(boxed: self as! Self)
+  // expected-error@-1 {{stored property cannot have covariant 'Self' type}}
+  // expected-error@-2 {{mutable property cannot have covariant 'Self' type}}
+
+  var t = Box<Self>(boxed: Self())
+  // expected-error@-1 {{stored property cannot have covariant 'Self' type}}
+  // expected-error@-2 {{covariant 'Self' type cannot be referenced from a stored property initializer}}
+
+  required init() {}
+}
+
+// https://bugs.swift.org/browse/SR-12133 - a type named 'Self' should be found first
+struct OuterType {
+  struct `Self` {
+    let string: String
+  }
+
+  var foo: `Self`? {
+    let optional: String? = "foo"
+    return optional.map { `Self`(string: $0) }
+  }
+}

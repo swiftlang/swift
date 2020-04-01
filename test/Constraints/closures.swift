@@ -186,7 +186,7 @@ func testMap() {
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
-[].reduce { $0 + $1 }  // expected-error {{cannot invoke 'reduce' with an argument list of type '(@escaping (_, _) -> _)'}}
+[].reduce { $0 + $1 }  // expected-error {{missing argument for parameter #1 in call}}
 
 
 
@@ -273,7 +273,6 @@ func verify_NotAC_to_AC_failure(_ arg: () -> ()) {
 // SR-1069 - Error diagnostic refers to wrong argument
 class SR1069_W<T> {
   func append<Key: AnyObject>(value: T, forKey key: Key) where Key: Hashable {}
-  // expected-note@-1 {{where 'Key' = 'Object?'}}
 }
 class SR1069_C<T> { let w: SR1069_W<(AnyObject, T) -> ()> = SR1069_W() }
 struct S<T> {
@@ -281,9 +280,10 @@ struct S<T> {
 
   func subscribe<Object: AnyObject>(object: Object?, method: (Object, T) -> ()) where Object: Hashable {
     let wrappedMethod = { (object: AnyObject, value: T) in }
-    // expected-error @+2 {{instance method 'append(value:forKey:)' requires that 'Object?' be a class type}}
-    // expected-note @+1 {{wrapped type 'Object' satisfies this requirement}}
     cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }
+    // expected-error@-1 {{value of optional type 'Object?' must be unwrapped to a value of type 'Object'}}
+    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
 }
 
@@ -371,7 +371,7 @@ func someGeneric19997471<T>(_ x: T) {
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> U' expects 1 argument, but 2 were used in closure body}}
+  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
 }
 
 
@@ -456,7 +456,13 @@ extension Collection {
   }
 }
 func fn_r28909024(n: Int) {
-  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}}
+  // FIXME(diagnostics): Unfortunately there is no easy way to fix this diagnostic issue at the moment
+  // because the problem is related to ordering of the bindings - we'd attempt to bind result of the expression
+  // to contextual type of `Void` which prevents solver from discovering correct types for range - 0..<10
+  // (since both arguments are literal they are ranked lower than contextual type).
+  //
+  // Good diagnostic for this is - `unexpected non-void return value in void function`
+  return (0..<10).r28909024 { // expected-error {{type of expression is ambiguous without more context}}
     _ in true
   }
 }
@@ -916,3 +922,97 @@ func test_trailing_closure_with_defaulted_last() {
   foo { 42 } // Ok
   foo(fn: { 42 }) // Ok
 }
+
+// Test that even in multi-statement closure case we still pick up `(Action) -> Void` over `Optional<(Action) -> Void>`.
+// Such behavior used to rely on ranking of partial solutions but with delayed constraint generation of closure bodies
+// it's no longer the case, so we need to make sure that even in case of complete solutions we still pick the right type.
+
+protocol Action { }
+protocol StateType { }
+
+typealias Fn = (Action) -> Void
+typealias Middleware<State> = (@escaping Fn, @escaping () -> State?) -> (@escaping Fn) -> Fn
+
+class Foo<State: StateType> {
+  var state: State!
+  var fn: Fn!
+
+  init(middleware: [Middleware<State>]) {
+    self.fn = middleware
+               .reversed()
+               .reduce({ action in },
+                       { (fun, middleware) in // Ok, to type-check result type has to be `(Action) -> Void`
+                         let dispatch: (Action) -> Void = { _ in }
+                         let getState = { [weak self] in self?.state }
+                         return middleware(dispatch, getState)(fun)
+                       })
+  }
+}
+
+// Make sure that `String...` is translated into `[String]` in the body
+func test_explicit_variadic_is_interpreted_correctly() {
+  _ = { (T: String...) -> String in T[0] + "" } // Ok
+}
+
+// rdar://problem/59208419 - closure result type is incorrectly inferred to be a supertype
+func test_correct_inference_of_closure_result_in_presence_of_optionals() {
+  class A {}
+  class B : A {}
+
+  func foo(_: B) -> Int? { return 42 }
+
+  func bar<T: A>(_: (A) -> T?) -> T? {
+    return .none
+  }
+
+  guard let v = bar({ $0 as? B }),
+        let _ = foo(v) // Ok, v is inferred as `B`
+  else {
+    return;
+  }
+}
+
+// rdar://problem/59741308 - inference fails with tuple element has to joined to supertype
+func rdar_59741308() {
+  class Base {
+    func foo(_: Int) {}
+  }
+
+  class A : Base {}
+  class B : Base {}
+
+  func test() {
+    // Note that `0`, and `1` here are going to be type variables
+    // which makes join impossible until it's already to late for
+    // it to be useful.
+    [(A(), 0), (B(), 1)].forEach { base, value in
+      base.foo(value) // Ok
+    }
+  }
+}
+
+func r60074136() {
+  func takesClosure(_ closure: ((Int) -> Void) -> Void) {}
+
+  takesClosure { ((Int) -> Void) -> Void in // expected-warning {{unnamed parameters must be written with the empty name '_'}}
+  }
+}
+
+func rdar52204414() {
+  let _: () -> Void = { return 42 }
+  // expected-error@-1 {{cannot convert value of type 'Int' to closure result type 'Void'}}
+  let _ = { () -> Void in return 42 }
+  // expected-error@-1 {{declared closure result 'Int' is incompatible with contextual type 'Void'}}
+}
+
+// SR-12291 - trailing closure is used as an argument to the last (positionally) parameter
+func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {}
+func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {}
+
+overloaded_with_default { 0 } // Ok (could be ambiguous if trailing was allowed to match `a:` in first overload)
+
+func overloaded_with_default_and_autoclosure<T>(_ a: @autoclosure () -> T, b: Int = 0) {}
+func overloaded_with_default_and_autoclosure<T>(b: Int = 0, c: @escaping () -> T?) {}
+
+overloaded_with_default_and_autoclosure { 42 } // Ok
+overloaded_with_default_and_autoclosure(42) // Ok

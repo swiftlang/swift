@@ -1,0 +1,123 @@
+// RUN: %target-sil-opt -O -wmo -enable-sil-verify-all %s | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class A {
+  @objc deinit
+  init()
+}
+
+public protocol P {
+  func foo() -> Int64
+}
+
+public class B : A, P {
+  public func foo() -> Int64
+  @objc deinit
+  override init()
+}
+
+public class C : A, P {
+  public func foo() -> Int64
+  @objc deinit
+  override init()
+}
+
+func imp(x: A & P, y: A & P) -> Int64
+
+public func test(x: B, y: C) -> Int64
+
+// protocol witness for P.foo() in conformance B
+sil shared [transparent] [serialized] [thunk] @Pfoo : $@convention(witness_method: P) (@in_guaranteed B) -> Int64 {
+// %0                                             // user: %1
+bb0(%0 : $*B):
+  %1 = load %0 : $*B                              // users: %2, %3
+  %2 = class_method %1 : $B, #B.foo : (B) -> () -> Int64, $@convention(method) (@guaranteed B) -> Int64 // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed B) -> Int64 // user: %4
+  return %3 : $Int64                                // id: %4
+} // end sil function 'Pfoo'
+
+// B.foo()
+sil [noinline] @foo : $@convention(method) (@guaranteed B) -> Int64 {
+// %0                                             // user: %1
+bb0(%0 : $B):
+  debug_value %0 : $B, let, name "self", argno 1  // id: %1
+  %2 = integer_literal $Builtin.Int64, 1          // user: %3
+  %3 = struct $Int64 (%2 : $Builtin.Int64)          // user: %4
+  return %3 : $Int64                                // id: %4
+} // end sil function 'foo'
+
+
+// This function calls @impl. The optimizer generates a specialization of impl
+// based on the arguments passed to it here. Even though this function isn't
+// directly checked, it is essentail for the optimization.
+// test(x:y:)
+sil @test :$@convention(thin) (@guaranteed B, @guaranteed C) -> Int64 {
+// %0                                             // users: %5, %4, %2
+// %1                                             // users: %7, %6, %3
+bb0(%0 : $B, %1 : $C):
+  debug_value %0 : $B, let, name "x", argno 1     // id: %2
+  debug_value %1 : $C, let, name "y", argno 2     // id: %3
+  strong_retain %0 : $B                           // id: %4
+  %5 = init_existential_ref %0 : $B : $B, $A & P  // users: %11, %9
+  strong_retain %1 : $C                           // id: %6
+  %7 = init_existential_ref %1 : $C : $C, $A & P  // users: %10, %9
+  // function_ref imp(x:y:)
+  %8 = function_ref @impl : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int64 // user: %9
+  %9 = apply %8(%5, %7) : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int64 // user: %12
+  strong_release %7 : $A & P                      // id: %10
+  strong_release %5 : $A & P                      // id: %11
+  return %9 : $Int64                                // id: %12
+} // end sil function 'test'
+
+// We're looking of an optimized spcialization of @impl, not @impl itself.
+// CHECK-NOT: @impl
+// CHECK-LABEL: sil shared [noinline] @{{.*}}impl{{.*}}
+// In the optimization pass we look for uses of alloc_stack (aka %5).
+// This test makes sure that we look at the correct uses with the
+// correct dominance order (store before apply before dealloc).
+// This function will be passed arguments of type B and C for arguments
+// %0 and %1 respectively. We want to make sure that we call B's foo method
+// and not C's foo method.
+sil hidden [noinline] @impl : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int64 {
+bb0(%0 : $A & P, %1 : $A & P):
+  %2 = open_existential_ref %0 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  %3 = unchecked_ref_cast %1 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+
+  %5 = alloc_stack $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  store %2 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  
+  // We want to make sure that we picked up on the FIRST store and not the second one.
+  // class C's foo method is named "bar" whereas class B's foo method is named "foo".
+  // We want to make sure that we call a function named "foo" not "bar".
+  // CHECK: [[FN:%[0-9]+]] = function_ref @${{.*}}foo{{.*}} : $@convention(thin) () -> Int64
+  %7 = witness_method $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P, #P.foo : <Self where Self : P> (Self) -> () -> Int64, %2 : $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  // CHECK: apply [[FN]]
+  %8 = apply %7<@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P>(%5) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  
+  store %3 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  dealloc_stack %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  return %8 : $Int64
+// CHECK-LABEL: end sil function {{.*}}impl{{.*}}
+} // end sil function 'impl'
+
+// C.foo()
+sil @bar : $@convention(method) (@guaranteed C) -> Int64
+
+sil_vtable [serialized] B {
+  #B.foo: (B) -> () -> Int64 : @foo  // B.foo()
+}
+
+sil_vtable [serialized] C {
+  #C.foo: (C) -> () -> Int64 : @bar
+}
+
+sil_witness_table [serialized] B: P module run {
+  method #P.foo: <Self where Self : P> (Self) -> () -> Int64 : @Pfoo  // protocol witness for P.foo() in conformance B
+}

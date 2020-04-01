@@ -384,7 +384,7 @@ class TypeDecoder {
     }
     case NodeKind::BuiltinTypeName: {
       auto mangledName = Demangle::mangleNode(Node);
-      return Builder.createBuiltinType(Node->getText(), mangledName);
+      return Builder.createBuiltinType(Node->getText().str(), mangledName);
     }
     case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
@@ -494,6 +494,10 @@ class TypeDecoder {
     case NodeKind::NoEscapeFunctionType:
     case NodeKind::AutoClosureType:
     case NodeKind::EscapingAutoClosureType:
+    case NodeKind::DifferentiableFunctionType:
+    case NodeKind::EscapingDifferentiableFunctionType:
+    case NodeKind::LinearFunctionType:
+    case NodeKind::EscapingLinearFunctionType:
     case NodeKind::FunctionType: {
       if (Node->getNumChildren() < 2)
         return BuiltType();
@@ -507,6 +511,15 @@ class TypeDecoder {
           flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
       } else if (Node->getKind() == NodeKind::ThinFunctionType) {
         flags = flags.withConvention(FunctionMetadataConvention::Thin);
+      } else if (Node->getKind() == NodeKind::DifferentiableFunctionType ||
+               Node->getKind() ==
+                   NodeKind::EscapingDifferentiableFunctionType) {
+        flags = flags.withDifferentiabilityKind(
+            FunctionMetadataDifferentiabilityKind::Normal);
+      } else if (Node->getKind() == NodeKind::LinearFunctionType ||
+                 Node->getKind() == NodeKind::EscapingLinearFunctionType) {
+        flags = flags.withDifferentiabilityKind(
+            FunctionMetadataDifferentiabilityKind::Linear);
       }
 
       bool isThrow =
@@ -527,7 +540,11 @@ class TypeDecoder {
               .withEscaping(
                           Node->getKind() == NodeKind::FunctionType ||
                           Node->getKind() == NodeKind::EscapingAutoClosureType ||
-                          Node->getKind() == NodeKind::EscapingObjCBlock);
+                          Node->getKind() == NodeKind::EscapingObjCBlock ||
+                          Node->getKind() ==
+                              NodeKind::EscapingDifferentiableFunctionType ||
+                          Node->getKind() ==
+                              NodeKind::EscapingLinearFunctionType);
 
       auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
       if (!result) return BuiltType();
@@ -683,12 +700,12 @@ class TypeDecoder {
       auto assocTypeChild = Node->getChild(1);
       auto member = assocTypeChild->getFirstChild()->getText();
       if (assocTypeChild->getNumChildren() < 2)
-        return Builder.createDependentMemberType(member, base);
+        return Builder.createDependentMemberType(member.str(), base);
 
       auto protocol = decodeMangledProtocolType(assocTypeChild->getChild(1));
       if (!protocol)
         return BuiltType();
-      return Builder.createDependentMemberType(member, base, protocol);
+      return Builder.createDependentMemberType(member.str(), base, protocol);
     }
     case NodeKind::DependentAssociatedTypeRef: {
       if (Node->getNumChildren() < 2)

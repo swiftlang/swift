@@ -19,6 +19,7 @@
 #define SWIFT_AST_EVALUATOR_H
 
 #include "swift/AST/AnyRequest.h"
+#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/Basic/AnyValue.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
@@ -47,6 +48,12 @@ class DiagnosticEngine;
 class Evaluator;
 class UnifiedStatsReporter;
 
+namespace detail {
+// Remove this when the compiler bumps to C++17.
+template <typename...>
+using void_t = void;
+}
+
 /// An "abstract" request function pointer, which is the storage type
 /// used for each of the
 using AbstractRequestFunction = void(void);
@@ -54,7 +61,7 @@ using AbstractRequestFunction = void(void);
 /// Form the specific request function for the given request type.
 template<typename Request>
 using RequestFunction =
-  llvm::Expected<typename Request::OutputType>(const Request &, Evaluator &);
+  typename Request::OutputType(const Request &, Evaluator &);
 
 /// Pretty stack trace handler for an arbitrary request.
 template<typename Request>
@@ -187,6 +194,9 @@ class Evaluator {
   /// Whether to dump detailed debug info for cycles.
   bool debugDumpCycles;
 
+  /// Whether we're building a request dependency graph.
+  bool buildDependencyGraph;
+
   /// Used to report statistics about which requests were evaluated, if
   /// non-null.
   UnifiedStatsReporter *stats = nullptr;
@@ -205,7 +215,7 @@ class Evaluator {
 
   /// A vector containing all of the active evaluation requests, which
   /// is treated as a stack and is used to detect cycles.
-  llvm::SetVector<AnyRequest> activeRequests;
+  llvm::SetVector<ActiveRequest> activeRequests;
 
   /// A cache that stores the results of requests.
   llvm::DenseMap<AnyRequest, AnyValue> cache;
@@ -220,6 +230,38 @@ class Evaluator {
   /// (DAG). However, cyclic dependencies will be recorded within this graph,
   /// so all clients must cope with cycles.
   llvm::DenseMap<AnyRequest, std::vector<AnyRequest>> dependencies;
+
+  /// A stack of dependency sources in the order they were evaluated.
+  llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
+
+  /// An RAII type that manages manipulating the evaluator's
+  /// dependency source stack. It is specialized to be zero-cost for
+  /// requests that are not dependency sources.
+  template <typename Request, typename = detail::void_t<>>
+  struct IncrementalDependencyStackRAII {
+    IncrementalDependencyStackRAII(Evaluator &E, const Request &Req) {}
+  };
+
+  template <typename Request>
+  struct IncrementalDependencyStackRAII<
+      Request, typename std::enable_if<Request::isDependencySource>::type> {
+    NullablePtr<Evaluator> Eval;
+    IncrementalDependencyStackRAII(Evaluator &E, const Request &Req) {
+      auto Source = Req.readDependencySource(E);
+      // If there is no source to introduce, bail. This can occur if
+      // a request originates in the context of a module.
+      if (!Source.getPointer()) {
+        return;
+      }
+      E.dependencySources.emplace_back(Source);
+      Eval = &E;
+    }
+
+    ~IncrementalDependencyStackRAII() {
+      if (Eval.isNonNull())
+        Eval.get()->dependencySources.pop_back();
+    }
+  };
 
   /// Retrieve the request function for the given zone and request IDs.
   AbstractRequestFunction *getAbstractRequestFunction(uint8_t zoneID,
@@ -237,7 +279,9 @@ class Evaluator {
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
-  Evaluator(DiagnosticEngine &diags, bool debugDumpCycles=false);
+  Evaluator(DiagnosticEngine &diags,
+            bool debugDumpCycles,
+            bool buildDependencyGraph);
 
   /// Emit GraphViz output visualizing the request graph.
   void emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath);
@@ -253,26 +297,30 @@ public:
   void registerRequestFunctions(Zone zone,
                                 ArrayRef<AbstractRequestFunction *> functions);
 
-  /// Evaluate the given request and produce its result,
-  /// consulting/populating the cache as required.
-  template<typename Request>
+  /// Retrieve the result produced by evaluating a request that can
+  /// be cached.
+  template<typename Request,
+           typename std::enable_if<Request::isEverCached>::type * = nullptr>
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
-    // Check for a cycle.
-    if (checkDependency(getCanonicalRequest(request))) {
-      return llvm::Error(
-        llvm::make_unique<CyclicalRequestError<Request>>(request, *this));
-    }
+    IncrementalDependencyStackRAII<Request> incDeps{*this, request};
+    // The request can be cached, but check a predicate to determine
+    // whether this particular instance is cached. This allows more
+    // fine-grained control over which instances get cache.
+    if (request.isCached())
+      return getResultCached(request);
 
-    // Make sure we remove this from the set of active requests once we're
-    // done.
-    SWIFT_DEFER {
-      assert(activeRequests.back().castTo<Request>() == request);
-      activeRequests.pop_back();
-    };
+    return getResultUncached(request);
+  }
 
-    // Get the result.
-    return getResult(request);
+  /// Retrieve the result produced by evaluating a request that
+  /// will never be cached.
+  template<typename Request,
+           typename std::enable_if<!Request::isEverCached>::type * = nullptr>
+  llvm::Expected<typename Request::OutputType>
+  operator()(const Request &request) {
+    IncrementalDependencyStackRAII<Request> incDeps{*this, request};
+    return getResultUncached(request);
   }
 
   /// Evaluate a set of requests and return their results as a tuple.
@@ -301,7 +349,7 @@ public:
            typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
   void cacheOutput(const Request &request,
                    typename Request::OutputType &&output) {
-    cache.insert({getCanonicalRequest(request), std::move(output)});
+    cache.insert({AnyRequest(request), std::move(output)});
   }
 
   /// Clear the cache stored within this evaluator.
@@ -313,24 +361,13 @@ public:
   /// Is the given request, or an equivalent, currently being evaluated?
   template <typename Request>
   bool hasActiveRequest(const Request &request) const {
-    return activeRequests.count(AnyRequest(request));
+    return activeRequests.count(ActiveRequest(request));
   }
 
 private:
-  template <typename Request>
-  const AnyRequest &getCanonicalRequest(const Request &request) {
-    // FIXME: DenseMap ought to let us do this with one hash lookup.
-    auto iter = dependencies.find_as(request);
-    if (iter != dependencies.end())
-      return iter->first;
-    auto insertResult = dependencies.insert({AnyRequest(request), {}});
-    assert(insertResult.second && "just checked if the key was already there");
-    return insertResult.first->first;
-  }
-
   /// Diagnose a cycle detected in the evaluation of the given
   /// request.
-  void diagnoseCycle(const AnyRequest &request);
+  void diagnoseCycle(const ActiveRequest &request);
 
   /// Check the dependency from the current top of the stack to
   /// the given request, including cycle detection and diagnostics.
@@ -338,39 +375,31 @@ private:
   /// \returns true if a cycle was detected, in which case this function has
   /// already diagnosed the cycle. Otherwise, returns \c false and adds this
   /// request to the \c activeRequests stack.
-  bool checkDependency(const AnyRequest &request);
-
-  /// Retrieve the result produced by evaluating a request that can
-  /// be cached.
-  template<typename Request,
-           typename std::enable_if<Request::isEverCached>::type * = nullptr>
-  llvm::Expected<typename Request::OutputType>
-  getResult(const Request &request) {
-    // The request can be cached, but check a predicate to determine
-    // whether this particular instance is cached. This allows more
-    // fine-grained control over which instances get cache.
-    if (request.isCached())
-      return getResultCached(request);
-
-    return getResultUncached(request);
-  }
-
-  /// Retrieve the result produced by evaluating a request that
-  /// will never be cached.
-  template<typename Request,
-           typename std::enable_if<!Request::isEverCached>::type * = nullptr>
-  llvm::Expected<typename Request::OutputType>
-  getResult(const Request &request) {
-    return getResultUncached(request);
-  }
+  bool checkDependency(const ActiveRequest &request);
 
   /// Produce the result of the request without caching.
   template<typename Request>
   llvm::Expected<typename Request::OutputType>
   getResultUncached(const Request &request) {
+    auto activeReq = ActiveRequest(request);
+
+    // Check for a cycle.
+    if (checkDependency(activeReq)) {
+      return llvm::Error(
+          std::make_unique<CyclicalRequestError<Request>>(request, *this));
+    }
+
+    // Make sure we remove this from the set of active requests once we're
+    // done.
+    SWIFT_DEFER {
+      assert(activeRequests.back() == activeReq);
+      activeRequests.pop_back();
+    };
+
     // Clear out the dependencies on this request; we're going to recompute
     // them now anyway.
-    dependencies.find_as(request)->second.clear();
+    if (buildDependencyGraph)
+      dependencies.find_as(request)->second.clear();
 
     PrettyStackTraceRequest<Request> prettyStackTrace(request);
 
@@ -378,7 +407,9 @@ private:
     FrontendStatsTracer statsTracer = make_tracer(stats, request);
     if (stats) reportEvaluatedRequest(*stats, request);
 
-    return getRequestFunction<Request>()(request, *this);
+    auto &&r = getRequestFunction<Request>()(request, *this);
+    reportEvaluatedResult<Request>(request, r);
+    return std::move(r);
   }
 
   /// Get the result of a request, consulting an external cache
@@ -389,8 +420,10 @@ private:
   llvm::Expected<typename Request::OutputType>
   getResultCached(const Request &request) {
     // If there is a cached result, return it.
-    if (auto cached = request.getCachedResult())
+    if (auto cached = request.getCachedResult()) {
+      reportEvaluatedResult<Request>(request, *cached);
       return *cached;
+    }
 
     // Compute the result.
     auto result = getResultUncached(request);
@@ -415,7 +448,9 @@ private:
     // If we already have an entry for this request in the cache, return it.
     auto known = cache.find_as(request);
     if (known != cache.end()) {
-      return known->second.template castTo<typename Request::OutputType>();
+      auto r = known->second.template castTo<typename Request::OutputType>();
+      reportEvaluatedResult<Request>(request, r);
+      return r;
     }
 
     // Compute the result.
@@ -424,8 +459,64 @@ private:
       return result;
 
     // Cache the result.
-    cache.insert({getCanonicalRequest(request), *result});
+    cache.insert({AnyRequest(request), *result});
     return result;
+  }
+
+private:
+  // Report the result of evaluating a request that is not a dependency sink -
+  // which is to say do nothing.
+  template <typename Request,
+            typename std::enable_if<!Request::isDependencySink>::type * = nullptr>
+  void reportEvaluatedResult(const Request &r,
+                             const typename Request::OutputType &o) {}
+
+  // Report the result of evaluating a request that is a dependency sink.
+  template <typename Request,
+            typename std::enable_if<Request::isDependencySink>::type * = nullptr>
+  void reportEvaluatedResult(const Request &r,
+                             const typename Request::OutputType &o) {
+    if (auto *tracker = getActiveDependencyTracker())
+      r.writeDependencySink(*this, *tracker, o);
+  }
+
+  /// If there is an active dependency source, returns its
+  /// \c ReferencedNameTracker. Else, returns \c nullptr.
+  ReferencedNameTracker *getActiveDependencyTracker() const {
+    if (auto *source = getActiveDependencySourceOrNull())
+      return source->getRequestBasedReferencedNameTracker();
+    return nullptr;
+  }
+
+public:
+  /// Returns \c true if the scope of the current active source cascades.
+  ///
+  /// If there is no active scope, the result always cascades.
+  bool isActiveSourceCascading() const {
+    return getActiveSourceScope() == evaluator::DependencyScope::Cascading;
+  }
+
+  /// Returns the scope of the current active scope.
+  ///
+  /// If there is no active scope, the result always cascades.
+  evaluator::DependencyScope getActiveSourceScope() const {
+    if (dependencySources.empty()) {
+      return evaluator::DependencyScope::Cascading;
+    }
+    return dependencySources.back().getInt();
+  }
+
+  /// Returns the active dependency's source file, or \c nullptr if no
+  /// dependency source is active.
+  ///
+  /// The use of this accessor is strongly discouraged, as it implies that a
+  /// dependency sink is seeking to filter out names based on the files they
+  /// come from. Existing callers are being migrated to more reasonable ways
+  /// of judging the relevancy of a dependency.
+  SourceFile *getActiveDependencySourceOrNull() const {
+    if (dependencySources.empty())
+      return nullptr;
+    return dependencySources.back().getPointer();
   }
 
 public:

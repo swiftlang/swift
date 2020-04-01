@@ -222,3 +222,15 @@ let _ = Conforms<X>.Decl4<Z2>.Decl2.self // expected-error {{type 'Z2.T' (aka 'Y
 let _ = Conforms<X>.Decl4<Z2>.Decl3.self // expected-error {{type 'Z2.T' (aka 'Y') does not conform to protocol 'P'}}
 let _ = Conforms<X>.Decl4<Z2>.Decl4<X>.self // expected-error {{type 'Z2.T' (aka 'Y') does not conform to protocol 'P'}}
 let _ = Conforms<X>.Decl4<Z2>.Decl5<X>.self // expected-error {{type 'Z2.T' (aka 'Y') does not conform to protocol 'P'}}
+
+// rdar://problem/45271663
+protocol PP { associatedtype V }
+struct SS<PI : PP> {}
+enum EE<A, B> {}
+extension EE : PP where A : PP, B : PP { typealias V = EE<A.V, B.V> }
+
+protocol P2 { associatedtype U }
+func f<PI : PP & P2>(s: SS<PI>) -> SS<EE<PI.U, PI.U>> where PI.U : PP, PI.V : P2 {
+  let t: EE<PI.V.U, PI.V.U>.V
+  // expected-error@-1 {{type 'PI.V.U' does not conform to protocol 'PP'}}
+}

@@ -33,6 +33,7 @@ class ClangTypeConverter :
   using super = TypeVisitor<ClangTypeConverter, clang::QualType>;
 
   llvm::DenseMap<Type, clang::QualType> Cache;
+  llvm::DenseMap<const clang::Decl *, swift::Decl *> ReversedExportMap;
 
   bool StdlibTypesAreCached = false;
 
@@ -73,10 +74,18 @@ public:
     ArrayRef<AnyFunctionType::Param> params, Type resultTy,
     AnyFunctionType::Representation repr);
 
+  /// Check whether the given Clang declaration is an export of a Swift
+  /// declaration introduced by this converter, and if so, return the original
+  /// Swift declaration.
+  Decl *getSwiftDeclForExportedClangDecl(const clang::Decl *decl) const;
+
 private:
   clang::QualType convert(Type type);
   clang::QualType convertMemberType(NominalTypeDecl *DC,
                                     StringRef memberName);
+
+  void registerExportedClangDecl(Decl *swiftDecl,
+                                 const clang::Decl *clangDecl);
 
   clang::QualType reverseBuiltinTypeMapping(StructType *type);
 

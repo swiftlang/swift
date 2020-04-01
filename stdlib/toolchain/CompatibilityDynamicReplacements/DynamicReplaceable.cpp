@@ -32,6 +32,10 @@ extern "C" char *swift_getFunctionReplacement50(char **ReplFnPtr, char *CurrFn) 
   char *ReplFn = *ReplFnPtr;
   char *RawReplFn = ReplFn;
 
+#if SWIFT_PTRAUTH
+  RawReplFn = ptrauth_strip(RawReplFn, ptrauth_key_function_pointer);
+#endif
+
   if (RawReplFn == CurrFn)
     return nullptr;
 

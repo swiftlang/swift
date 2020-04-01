@@ -165,9 +165,11 @@ SILDeserializer::SILDeserializer(
              kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
              kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
              kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
-             kind == sil_index_block::SIL_PROPERTY_OFFSETS)) &&
+             kind == sil_index_block::SIL_PROPERTY_OFFSETS ||
+             kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES)) &&
          "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, SIL_GLOBALVAR_NAMES, \
-          SIL_WITNESS_TABLE_NAMES, or SIL_DEFAULT_WITNESS_TABLE_NAMES.");
+          SIL_WITNESS_TABLE_NAMES, SIL_DEFAULT_WITNESS_TABLE_NAMES, \
+          SIL_PROPERTY_OFFSETS, or SIL_DIFFERENTIABILITY_WITNESS_NAMES.");
     (void)prevKind;
 
     if (kind == sil_index_block::SIL_FUNC_NAMES)
@@ -180,6 +182,8 @@ SILDeserializer::SILDeserializer(
       WitnessTableList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES)
       DefaultWitnessTableList = readFuncTable(scratch, blobData);
+    else if (kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES)
+      DifferentiabilityWitnessList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_PROPERTY_OFFSETS) {
       // No matching 'names' block for property descriptors needed yet.
       MF->allocateBuffer(Properties, scratch);
@@ -217,6 +221,12 @@ SILDeserializer::SILDeserializer(
               offKind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS) &&
              "Expect a SIL_DEFAULT_WITNESS_TABLE_OFFSETS record.");
       MF->allocateBuffer(DefaultWitnessTables, scratch);
+    } else if (kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES) {
+      assert((next.Kind == llvm::BitstreamEntry::Record &&
+              offKind ==
+                  sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_OFFSETS) &&
+             "Expect a SIL_DIFFERENTIABILITY_WITNESS_OFFSETS record.");
+      MF->allocateBuffer(DifferentiabilityWitnesses, scratch);
     }
   }
 }
@@ -337,6 +347,24 @@ SILType SILDeserializer::getSILType(Type Ty, SILValueCategory Category,
   }
   return inContext->getLoweredType(TyLoc.getType()->getCanonicalType())
       .getCategoryType(Category);
+}
+
+/// Helper function to find a SILDifferentiabilityWitness, given its mangled
+/// key.
+SILDifferentiabilityWitness *
+SILDeserializer::getSILDifferentiabilityWitnessForReference(
+    StringRef mangledKey) {
+  // Check to see if we have a witness under this key already.
+  auto *witness = SILMod.lookUpDifferentiabilityWitness(mangledKey);
+  if (witness)
+    return witness;
+  // Otherwise, look for a witness under this key in the module.
+  if (!DifferentiabilityWitnessList)
+    return nullptr;
+  auto iter = DifferentiabilityWitnessList->find(mangledKey);
+  if (iter == DifferentiabilityWitnessList->end())
+    return nullptr;
+  return readDifferentiabilityWitness(*iter);
 }
 
 /// Helper function to find a SILFunction, given its name and type.
@@ -483,14 +511,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   IdentifierID replacedFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass,
@@ -602,7 +630,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setThunk(IsThunk_t(isThunk));
     fn->setWithoutActuallyEscapingThunk(bool(isWithoutactuallyEscapingThunk));
     fn->setInlineStrategy(Inline_t(inlineStrategy));
-    fn->setGlobalInit(isGlobal == 1);
+    fn->setSpecialPurpose(SILFunction::Purpose(specialPurpose));
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setAlwaysWeakImported(isWeakImported);
@@ -760,7 +788,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
   // of this SILFunction.
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
-         kind != SIL_WITNESS_TABLE) {
+         kind != SIL_WITNESS_TABLE && kind != SIL_DIFFERENTIABILITY_WITNESS) {
     if (kind == SIL_BASIC_BLOCK)
       // Handle a SILBasicBlock record.
       CurrentBB = readSILBasicBlock(fn, CurrentBB, scratch);
@@ -881,13 +909,12 @@ static CastConsumptionKind getCastConsumptionKind(unsigned attr) {
 static SILDeclRef getSILDeclRef(ModuleFile *MF,
                                 ArrayRef<uint64_t> ListOfValues,
                                 unsigned &NextIdx) {
-  assert(ListOfValues.size() >= NextIdx+4 &&
-         "Expect 4 numbers for SILDeclRef");
+  assert(ListOfValues.size() >= NextIdx+3 &&
+         "Expect 3 numbers for SILDeclRef");
   SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[NextIdx])),
                   (SILDeclRef::Kind)ListOfValues[NextIdx+1],
-                  /*isCurried=*/ListOfValues[NextIdx+2] > 0,
-                  /*isForeign=*/ListOfValues[NextIdx+3] > 0);
-  NextIdx += 4;
+                  /*isForeign=*/ListOfValues[NextIdx+2] > 0);
+  NextIdx += 3;
   return DRef;
 }
 
@@ -1015,7 +1042,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   Builder.setInsertionPoint(BB);
   Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
-           Attr = 0, NumSubs = 0, NumConformances = 0, IsNonThrowingApply = 0;
+           Attr = 0, Attr2 = 0, NumSubs = 0, NumConformances = 0,
+           IsNonThrowingApply = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
@@ -1118,6 +1146,29 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         scratch, TyID, TyCategory, Attr, TyID2, TyCategory2, TyID3,
         TyCategory3, ValID3, ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::WitnessMethodInst;
+    break;
+  case SIL_INST_DIFFERENTIABLE_FUNCTION:
+    SILInstDifferentiableFunctionLayout::readRecord(
+        scratch, /*numParams*/ Attr, /*hasDerivativeFunctions*/ Attr2,
+        ListOfValues);
+    RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionInst;
+    break;
+  case SIL_INST_LINEAR_FUNCTION:
+    SILInstLinearFunctionLayout::readRecord(
+        scratch, /*numParams*/ Attr, /*hasTransposeFunction*/ Attr2,
+        ListOfValues);
+    RawOpCode = (unsigned)SILInstructionKind::LinearFunctionInst;
+    break;
+  case SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT:
+    SILInstDifferentiableFunctionExtractLayout::readRecord(
+        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr,
+        /*hasExplicitExtracteeType*/ Attr2);
+    RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionExtractInst;
+    break;
+  case SIL_INST_LINEAR_FUNCTION_EXTRACT:
+    SILInstLinearFunctionExtractLayout::readRecord(
+        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
+    RawOpCode = (unsigned)SILInstructionKind::LinearFunctionExtractInst;
     break;
   }
 
@@ -1429,7 +1480,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // two values in the list are the basic block identifiers.
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
-    SILType FnTy = getSILType(Ty, SILValueCategory::Object, nullptr);
+    SILType FnTy = getSILType(Ty, SILValueCategory::Object, Fn);
     SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object, Fn);
 
     SILBasicBlock *errorBB = getBBForReference(Fn, ListOfValues.back());
@@ -1455,7 +1506,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::PartialApplyInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
-    SILType FnTy = getSILType(Ty, SILValueCategory::Object, nullptr);
+    SILType FnTy = getSILType(Ty, SILValueCategory::Object, Fn);
     SILType closureTy = getSILType(Ty2, SILValueCategory::Object, Fn);
 
     SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
@@ -2521,8 +2572,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     CanGenericSignature sig = CanGenericSignature();
     if (!genericParams.empty() || !requirements.empty())
       sig = GenericSignature::get(genericParams, requirements)
-         ->getCanonicalSignature();
-    
+                .getCanonicalSignature();
+
     auto pattern = KeyPathPattern::get(SILMod, sig,
                                        rootTy->getCanonicalType(),
                                        valueTy->getCanonicalType(),
@@ -2540,6 +2591,89 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     
     ResultVal = Builder.createKeyPath(Loc, pattern, subMap, operands, kpTy);
+    break;
+  }
+  case SILInstructionKind::DifferentiableFunctionInst: {
+    bool hasDerivativeFunctions = (bool)Attr2;
+    unsigned numOperands = hasDerivativeFunctions ? 3 : 1;
+    auto numParamIndices = ListOfValues.size() - numOperands * 3;
+    assert(ListOfValues.size() == numParamIndices + numOperands * 3);
+    auto rawParamIndices =
+        map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
+                                      [](uint64_t i) { return (unsigned)i; });
+    auto numParams = Attr;
+    auto *paramIndices =
+        IndexSubset::get(MF->getContext(), numParams, rawParamIndices);
+    SmallVector<SILValue, 3> operands;
+    for (auto i = numParamIndices; i < numParamIndices + numOperands * 3;
+         i += 3) {
+      auto astTy = MF->getType(ListOfValues[i]);
+      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i + 1], Fn);
+      operands.push_back(getLocalValue(ListOfValues[i + 2], silTy));
+    }
+    Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
+    if (hasDerivativeFunctions)
+      derivativeFunctions = std::make_pair(operands[1], operands[2]);
+    ResultVal = Builder.createDifferentiableFunction(
+        Loc, paramIndices, operands[0], derivativeFunctions);
+    break;
+  }
+  case SILInstructionKind::LinearFunctionInst: {
+    bool hasLinearFunction = (bool)Attr2;
+    unsigned numOperands = hasLinearFunction ? 2 : 1;
+    auto numParamIndices = ListOfValues.size() - numOperands * 3;
+    assert(ListOfValues.size() == numParamIndices + numOperands * 3);
+    auto rawParamIndices =
+       map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
+                                     [](uint64_t i) { return (unsigned)i; });
+    auto numParams = Attr;
+    auto *paramIndices =
+        IndexSubset::get(MF->getContext(), numParams, rawParamIndices);
+    SmallVector<SILValue, 3> operands;
+    for (auto i = numParamIndices;
+         i < numParamIndices + numOperands * 3; i += 3) {
+      auto astTy = MF->getType(ListOfValues[i]);
+      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1], Fn);
+      operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
+    }
+    Optional<SILValue> transposeFunction = None;
+    if (hasLinearFunction)
+      transposeFunction = operands[1];
+    ResultVal = Builder.createLinearFunction(
+        Loc, paramIndices, operands[0], transposeFunction);
+    break;
+  }
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto astTy = MF->getType(TyID);
+    auto silTy = getSILType(astTy, SILValueCategory::Object, Fn);
+    auto val = getLocalValue(ValID, silTy);
+    NormalDifferentiableFunctionTypeComponent extractee(Attr);
+    Optional<SILType> explicitExtracteeType = None;
+    if (Attr2)
+      explicitExtracteeType = silTy;
+    ResultVal = Builder.createDifferentiableFunctionExtract(
+        Loc, extractee, val, explicitExtracteeType);
+    break;
+  }
+  case SILInstructionKind::LinearFunctionExtractInst: {
+    auto astTy = MF->getType(TyID);
+    auto silTy = getSILType(astTy, SILValueCategory::Object, Fn);
+    auto val = getLocalValue(ValID, silTy);
+    LinearDifferentiableFunctionTypeComponent extractee(Attr);
+    ResultVal = Builder.createLinearFunctionExtract(Loc, extractee, val);
+    break;
+  }
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    StringRef mangledKey = MF->getIdentifierText(ValID);
+    auto *witness = getSILDifferentiabilityWitnessForReference(mangledKey);
+    assert(witness && "SILDifferentiabilityWitness not found");
+    DifferentiabilityWitnessFunctionKind witnessKind(Attr);
+    Optional<SILType> explicitFnTy = None;
+    auto astTy = MF->getType(TyID);
+    if (TyID)
+      explicitFnTy = getSILType(astTy, SILValueCategory::Object, Fn);
+    ResultVal = Builder.createDifferentiabilityWitnessFunction(
+        Loc, witnessKind, witness, explicitFnTy);
     break;
   }
   }
@@ -2988,6 +3122,7 @@ void SILDeserializer::readWitnessTableEntries(
   // Another record means the end of this WitnessTable.
   while (kind != SIL_WITNESS_TABLE &&
          kind != SIL_DEFAULT_WITNESS_TABLE &&
+         kind != SIL_DIFFERENTIABILITY_WITNESS &&
          kind != SIL_FUNCTION) {
     if (kind == SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY) {
       witnessEntries.push_back(SILDefaultWitnessTable::Entry());
@@ -3062,6 +3197,16 @@ void SILDeserializer::readWitnessTableEntries(
 
 SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
                                                    SILWitnessTable *existingWt) {
+  auto deserialized = readWitnessTableChecked(WId, existingWt);
+  if (!deserialized) {
+    MF->fatal(deserialized.takeError());
+  }
+  return deserialized.get();
+}
+
+llvm::Expected<SILWitnessTable *>
+  SILDeserializer::readWitnessTableChecked(DeclID WId,
+                                           SILWitnessTable *existingWt) {
   if (WId == 0)
     return nullptr;
   assert(WId <= WitnessTables.size() && "invalid WitnessTable ID");
@@ -3108,8 +3253,12 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   }
 
   // Deserialize Conformance.
+  auto maybeConformance = MF->readConformanceChecked(SILCursor);
+  if (!maybeConformance)
+    return maybeConformance.takeError();
+
   auto theConformance = cast<RootProtocolConformance>(
-                          MF->readConformance(SILCursor).getConcrete());
+                          maybeConformance.get().getConcrete());
 
   PrettyStackTraceConformance trace(SILMod.getASTContext(),
                                     "deserializing SIL witness table for",
@@ -3186,8 +3335,18 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
 void SILDeserializer::getAllWitnessTables() {
   if (!WitnessTableList)
     return;
-  for (unsigned I = 0, E = WitnessTables.size(); I < E; I++)
-    readWitnessTable(I + 1, nullptr);
+  for (unsigned I = 0, E = WitnessTables.size(); I < E; I++) {
+    auto maybeTable = readWitnessTableChecked(I + 1, nullptr);
+    if (!maybeTable) {
+      if (maybeTable.errorIsA<XRefNonLoadedModuleError>()) {
+        // This is most likely caused by decls hidden by an implementation-only
+        // import, it is safe to ignore for this function's purpose.
+        consumeError(maybeTable.takeError());
+      } else {
+        MF->fatal(maybeTable.takeError());
+      }
+    }
+  }
 }
 
 SILWitnessTable *
@@ -3341,6 +3500,141 @@ SILDeserializer::lookupDefaultWitnessTable(SILDefaultWitnessTable *existingWt) {
     LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n"; Wt->dump());
 
   return Wt;
+}
+
+SILDifferentiabilityWitness *
+SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
+  if (DId == 0)
+    return nullptr;
+  assert(DId <= DifferentiabilityWitnesses.size() &&
+         "Invalid SILDifferentiabilityWitness ID");
+
+  auto &diffWitnessOrOffset = DifferentiabilityWitnesses[DId - 1];
+  if (diffWitnessOrOffset.isFullyDeserialized())
+    return diffWitnessOrOffset.get();
+
+  BCOffsetRAII restoreOffset(SILCursor);
+  if (auto err = SILCursor.JumpToBit(diffWitnessOrOffset.getOffset()))
+    MF->fatal(std::move(err));
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  auto entry = maybeEntry.get();
+  if (entry.Kind == llvm::BitstreamEntry::Error) {
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in "
+                               "readDefaultWitnessTable.\n");
+    return nullptr;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
+  assert(kind == SIL_DIFFERENTIABILITY_WITNESS &&
+         "Expected sil_differentiability_witness");
+  (void)kind;
+
+  DeclID originalNameId, jvpNameId, vjpNameId;
+  unsigned rawLinkage, isDeclaration, isSerialized, numParameterIndices,
+      numResultIndices;
+  GenericSignatureID derivativeGenSigID;
+  ArrayRef<uint64_t> rawParameterAndResultIndices;
+
+  DifferentiabilityWitnessLayout::readRecord(
+      scratch, originalNameId, rawLinkage, isDeclaration, isSerialized,
+      derivativeGenSigID, jvpNameId, vjpNameId, numParameterIndices,
+      numResultIndices, rawParameterAndResultIndices);
+
+  if (isDeclaration) {
+    assert(!isSerialized && "declaration must not be serialized");
+  }
+
+  auto linkageOpt = fromStableSILLinkage(rawLinkage);
+  assert(linkageOpt &&
+         "Expected value linkage for sil_differentiability_witness");
+  auto originalName = MF->getIdentifierText(originalNameId);
+  auto jvpName = MF->getIdentifierText(jvpNameId);
+  auto vjpName = MF->getIdentifierText(vjpNameId);
+  auto *original = getFuncForReference(originalName);
+  assert(original && "Original function must be found");
+  auto *jvp = getFuncForReference(jvpName);
+  if (!jvpName.empty()) {
+    assert(!isDeclaration && "JVP must not be defined in declaration");
+    assert(jvp && "JVP function must be found if JVP name is not empty");
+  }
+  auto *vjp = getFuncForReference(vjpName);
+  if (!vjpName.empty()) {
+    assert(!isDeclaration && "VJP must not be defined in declaration");
+    assert(vjp && "VJP function must be found if VJP name is not empty");
+  }
+  auto derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
+
+  auto originalFnType = original->getLoweredFunctionType();
+  SmallVector<unsigned, 8> parameterAndResultIndices(
+      rawParameterAndResultIndices.begin(), rawParameterAndResultIndices.end());
+  assert(parameterAndResultIndices.size() ==
+             numParameterIndices + numResultIndices &&
+         "Parameter/result indices count mismatch");
+  auto *parameterIndices =
+      IndexSubset::get(MF->getContext(), originalFnType->getNumParameters(),
+                       ArrayRef<unsigned>(parameterAndResultIndices)
+                           .take_front(numParameterIndices));
+  auto numResults = originalFnType->getNumResults() +
+                    originalFnType->getNumIndirectMutatingParameters();
+  auto *resultIndices =
+      IndexSubset::get(MF->getContext(), numResults,
+                       ArrayRef<unsigned>(parameterAndResultIndices)
+                           .take_back(numResultIndices));
+
+  AutoDiffConfig config(parameterIndices, resultIndices, derivativeGenSig);
+  auto *diffWitness =
+      SILMod.lookUpDifferentiabilityWitness({originalName, config});
+
+  // Witnesses that we deserialize are always available externally; we never
+  // want to emit them ourselves.
+  auto linkage = swift::addExternalToLinkage(*linkageOpt);
+
+  // If there is no existing differentiability witness, create one.
+  if (!diffWitness)
+    diffWitness = SILDifferentiabilityWitness::createDeclaration(
+        SILMod, linkage, original, parameterIndices, resultIndices,
+        derivativeGenSig);
+
+  // If the current differentiability witness is merely a declaration, and the
+  // deserialized witness is a definition, upgrade the current differentiability
+  // witness to a definition. This can happen in the following situations:
+  // 1. The witness was just created above.
+  // 2. The witness started out as a declaration (e.g. the differentiation
+  //    pass emitted a witness for an external function) and now we're loading
+  //    the definition (e.g. an optimization pass asked for the definition and
+  //    we found the definition serialized in this module).
+  if (diffWitness->isDeclaration() && !isDeclaration)
+    diffWitness->convertToDefinition(jvp, vjp, isSerialized);
+
+  diffWitnessOrOffset.set(diffWitness,
+                          /*isFullyDeserialized*/ diffWitness->isDefinition());
+  return diffWitness;
+}
+
+SILDifferentiabilityWitness *SILDeserializer::lookupDifferentiabilityWitness(
+    StringRef mangledDiffWitnessKey) {
+  if (!DifferentiabilityWitnessList)
+    return nullptr;
+  auto iter = DifferentiabilityWitnessList->find(mangledDiffWitnessKey);
+  if (iter == DifferentiabilityWitnessList->end())
+    return nullptr;
+  return readDifferentiabilityWitness(*iter);
+}
+
+void SILDeserializer::getAllDifferentiabilityWitnesses() {
+  if (!DifferentiabilityWitnessList)
+    return;
+  for (unsigned I = 0, E = DifferentiabilityWitnesses.size(); I < E; ++I)
+    readDifferentiabilityWitness(I + 1);
 }
 
 SILDeserializer::~SILDeserializer() {

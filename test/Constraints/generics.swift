@@ -835,3 +835,14 @@ func sr_11491(_ value: [String]) {
   arr.insert(value)
   // expected-error@-1 {{cannot convert value of type '[String]' to expected argument type 'String'}}
 }
+
+func test_dictionary_with_generic_mismatch_in_key_or_value() {
+  struct S<T> : Hashable {}
+  // expected-note@-1 2 {{arguments to generic parameter 'T' ('Int' and 'Bool') are expected to be equal}}
+
+  let _: [Int: S<Bool>] = [0: S<Bool>(), 1: S<Int>()]
+  // expected-error@-1 {{cannot convert value of type 'S<Int>' to expected dictionary value type 'S<Bool>'}}
+
+  let _: [S<Bool>: Int] = [S<Int>(): 42]
+  // expected-error@-1 {{cannot convert value of type 'S<Int>' to expected dictionary key type 'S<Bool>'}}
+}

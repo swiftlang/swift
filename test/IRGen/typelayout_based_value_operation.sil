@@ -1,0 +1,74 @@
+// RUN: %target-swift-frontend -enable-type-layout %s -emit-ir -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -disable-type-layout %s -emit-ir -sil-verify-all | %FileCheck %s --check-prefix=NOTYPELAYOUT
+
+sil_stage canonical
+import Builtin
+
+public struct B<T> {
+  var x: T
+  var y: T
+}
+
+public struct A<T> {
+  var a : B<T>
+  var b:  B<T>
+}
+
+public class C {}
+
+// CHECK-LABEL: define{{.*}} void @testDestroyValueTrival(
+// CHECK-NEXT: entry:
+// CHECK-NEXT:  ret void
+// CHECK-NEXT: }
+
+sil @testDestroyValueTrival : $@convention(thin) (@in A<Builtin.Int32>) -> ()  {
+entry(%arg : $*A<Builtin.Int32>):
+  destroy_addr %arg : $*A<Builtin.Int32>
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: define{{.*}} void @testValue(
+// CHECK:   call %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOc"(
+// CHECK:   call %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
+// CHECK:   call %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
+// CHECK: }
+
+// CHECK-LABEL: define{{.*}} %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOc"(
+// CHECK:  call %swift.type* @__swift_instantiateConcreteTypeFromMangledName
+// CHECK:  load
+// CHECK:  call %swift.opaque* %{{.*}}(%swift.opaque* noalias {{.*}}, %swift.type* {{.*}})
+// CHECK: }
+
+// CHECK-LABEL: define{{.*}} %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
+// CHECK:  call %swift.type* @__swift_instantiateConcreteTypeFromMangledName
+// CHECK:  load
+// CHECK:  call void %{{.*}}(%swift.opaque* noalias {{.*}}, %swift.type* {{.*}})
+// CHECK: }
+
+// NOTYPELAYOUT-LABEL: define{{.*}} %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOc"(
+// NOTYPELAYOUT: swift_retain
+// NOTYPELAYOUT: swift_retain
+// NOTYPELAYOUT: swift_retain
+// NOTYPELAYOUT: swift_retain
+// CHECK: }
+
+// NOTYPELAYOUT-LABEL: define{{.*}} %T32typelayout_based_value_operation1AVyAA1CCG* @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
+// NOTYPELAYOUT: swift_release
+// NOTYPELAYOUT: swift_release
+// NOTYPELAYOUT: swift_release
+// NOTYPELAYOUT: swift_release
+// CHECK: }
+
+sil @testValue : $@convention(thin) (@in A<C>) -> ()  {
+entry(%arg : $*A<C>):
+  %loc = alloc_stack $A<C>
+  copy_addr %arg to [initialization] %loc : $*A<C>
+  destroy_addr %arg : $*A<C>
+  destroy_addr %loc : $*A<C>
+  dealloc_stack %loc: $*A<C>
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil_vtable C {}

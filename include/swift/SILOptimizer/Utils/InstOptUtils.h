@@ -79,6 +79,13 @@ public:
   /// up.
   void trackIfDead(SILInstruction *inst);
 
+  /// If the instruction \p inst is dead, delete it immediately and record
+  /// its operands so that they can be cleaned up later.
+  void deleteIfDead(
+      SILInstruction *inst,
+      llvm::function_ref<void(SILInstruction *)> callback =
+          [](SILInstruction *) {});
+
   /// Delete the instruction \p inst and record instructions that may become
   /// dead because of the removal of \c inst. This function will add necessary
   /// ownership instructions to fix the lifetimes of the operands of \c inst to
@@ -130,6 +137,23 @@ public:
   void
   cleanUpDeadInstructions(llvm::function_ref<void(SILInstruction *)> callback =
                               [](SILInstruction *) {});
+
+  /// Recursively visit users of \c inst  (including \c inst)and delete
+  /// instructions that are dead (including \c inst). Invoke the \c callback on
+  /// instructions that are deleted.
+  void recursivelyDeleteUsersIfDead(
+      SILInstruction *inst,
+      llvm::function_ref<void(SILInstruction *)> callback =
+                                    [](SILInstruction *) {});
+
+  /// Recursively visit users of \c inst  (including \c inst)and force delete
+  /// them. Also, destroy the consumed operands of the deleted instructions
+  /// whenever necessary. Invoke the \c callback on instructions that are
+  /// deleted.
+  void recursivelyForceDeleteUsersAndFixLifetimes(
+      SILInstruction *inst,
+      llvm::function_ref<void(SILInstruction *)> callback =
+          [](SILInstruction *) {});
 };
 
 /// If \c inst is dead, delete it and recursively eliminate all code that
@@ -146,6 +170,9 @@ public:
 void eliminateDeadInstruction(
     SILInstruction *inst, llvm::function_ref<void(SILInstruction *)> callback =
                               [](SILInstruction *) {});
+
+/// Return the number of @inout arguments passed to the given apply site.
+unsigned getNumInOutArguments(FullApplySite applySite);
 
 /// For each of the given instructions, if they are dead delete them
 /// along with their dead operands. Note this utility must be phased out and
@@ -265,28 +292,69 @@ struct InstModCallbacks {
       [](SILValue oldValue, SILValue newValue) {
         oldValue->replaceAllUsesWith(newValue);
       };
+  std::function<void(SingleValueInstruction *, SILValue)>
+      eraseAndRAUWSingleValueInst =
+          [](SingleValueInstruction *i, SILValue newValue) {
+            i->replaceAllUsesWith(newValue);
+            i->eraseFromParent();
+          };
 
   InstModCallbacks(decltype(deleteInst) deleteInst,
                    decltype(createdNewInst) createdNewInst,
                    decltype(replaceValueUsesWith) replaceValueUsesWith)
       : deleteInst(deleteInst), createdNewInst(createdNewInst),
-        replaceValueUsesWith(replaceValueUsesWith) {}
+        replaceValueUsesWith(replaceValueUsesWith),
+        eraseAndRAUWSingleValueInst(
+            [](SingleValueInstruction *i, SILValue newValue) {
+              i->replaceAllUsesWith(newValue);
+              i->eraseFromParent();
+            }) {}
+
+  InstModCallbacks(
+      decltype(deleteInst) deleteInst, decltype(createdNewInst) createdNewInst,
+      decltype(replaceValueUsesWith) replaceValueUsesWith,
+      decltype(eraseAndRAUWSingleValueInst) eraseAndRAUWSingleValueInst)
+      : deleteInst(deleteInst), createdNewInst(createdNewInst),
+        replaceValueUsesWith(replaceValueUsesWith),
+        eraseAndRAUWSingleValueInst(eraseAndRAUWSingleValueInst) {}
+
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
   InstModCallbacks(const InstModCallbacks &) = default;
   InstModCallbacks(InstModCallbacks &&) = default;
 };
 
+/// Get all consumed arguments of a partial_apply.
+///
+/// These are basically all arguments, except inout arguments and arguments
+/// of trivial type.
+/// If \p includeTrivialAddrArgs is true, also trivial address-type arguments
+/// are included.
+void getConsumedPartialApplyArgs(PartialApplyInst *pai,
+                                 SmallVectorImpl<Operand *> &argOperands,
+                                 bool includeTrivialAddrArgs);
+
+/// Collect all (transitive) users of \p inst which just copy or destroy \p
+/// inst.
+///
+/// In other words: all users which do not prevent \p inst from being considered
+/// as "dead".
+/// Returns true, if there are no other users beside those collected in \p
+/// destroys, i.e. if \p inst can be considered as "dead".
+bool collectDestroys(SingleValueInstruction *inst,
+                     SmallVectorImpl<SILInstruction *> &destroys);
 /// If Closure is a partial_apply or thin_to_thick_function with only local
 /// ref count users and a set of post-dominating releases:
 ///
 /// 1. Remove all ref count operations and the closure.
-/// 2. Add each one of the last release locations insert releases for the
-///    captured args if we have a partial_apply.
+/// 2. At each one of the last release locations insert releases for the
+///    captured args if we have a partial_apply (except \p needKeepArgsAlive is
+///    false).
 ///
 /// In the future this should be extended to be less conservative with users.
 bool tryDeleteDeadClosure(SingleValueInstruction *closure,
-                          InstModCallbacks callbacks = InstModCallbacks());
+                          InstModCallbacks callbacks = InstModCallbacks(),
+                          bool needKeepArgsAlive = true);
 
 /// Given a SILValue argument to a partial apply \p Arg and the associated
 /// parameter info for that argument, perform the necessary cleanups to Arg when
@@ -296,11 +364,18 @@ void releasePartialApplyCapturedArg(
     SILParameterInfo paramInfo,
     InstModCallbacks callbacks = InstModCallbacks());
 
+void deallocPartialApplyCapturedArg(
+    SILBuilder &builder, SILLocation loc, SILValue arg,
+    SILParameterInfo paramInfo);
+
 /// Insert destroys of captured arguments of partial_apply [stack].
 void insertDestroyOfCapturedArguments(
     PartialApplyInst *pai, SILBuilder &builder,
     llvm::function_ref<bool(SILValue)> shouldInsertDestroy =
         [](SILValue arg) -> bool { return true; });
+
+void insertDeallocOfCapturedArguments(
+    PartialApplyInst *pai, SILBuilder &builder);
 
 /// This iterator 'looks through' one level of builtin expect users exposing all
 /// users of the looked through builtin expect instruction i.e it presents a
@@ -424,6 +499,10 @@ bool calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl);
 /// be reached by calling the function represented by Decl?
 bool calleesAreStaticallyKnowable(SILModule &module, AbstractFunctionDecl *afd);
 
+/// Do we have enough information to determine all callees that could
+/// be reached by calling the function represented by Decl?
+bool calleesAreStaticallyKnowable(SILModule &module, EnumElementDecl *eed);
+
 // Attempt to get the instance for , whose static type is the same as
 // its exact dynamic type, returning a null SILValue() if we cannot find it.
 // The information that a static type is the same as the exact dynamic,
@@ -495,9 +574,9 @@ findLocalApplySites(FunctionRefBaseInst *fri);
 /// Gets the base implementation of a method.
 AbstractFunctionDecl *getBaseMethod(AbstractFunctionDecl *FD);
 
-SILInstruction *
-tryOptimizeApplyOfPartialApply(PartialApplyInst *pai, SILBuilder &builder,
-                               InstModCallbacks callbacks = InstModCallbacks());
+bool tryOptimizeApplyOfPartialApply(
+    PartialApplyInst *pai, SILBuilderContext &builderCtxt,
+    InstModCallbacks callbacks = InstModCallbacks());
 
 } // end namespace swift
 

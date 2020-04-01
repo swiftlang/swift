@@ -42,6 +42,8 @@ static llvm::cl::opt<bool>
 
 SILInstruction*
 SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
+  if (AEBI->getFunction()->hasOwnership())
+    return nullptr;
 
   // Optimize away the pattern below that happens when exceptions are created
   // and in some cases, due to inlining, are not needed.
@@ -171,6 +173,9 @@ static EnumElementDecl *getInjectEnumCaseTo(SILValue Addr) {
 }
 
 SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
+  if (SEAI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Convert switch_enum_addr -> br
   // if the only thing which writes to the address is an inject_enum_addr.
   SILValue Addr = SEAI->getOperand();
@@ -206,6 +211,9 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
 }
 
 SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
+  if (SEAI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Canonicalize a select_enum_addr: if the default refers to exactly one case,
   // then replace the default with that case.
   Builder.setCurrentDebugScope(SEAI->getDebugScope());
@@ -249,11 +257,10 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
   return I;
 }
 
-SILInstruction *SILCombiner::visitSelectValueInst(SelectValueInst *SVI) {
-  return nullptr;
-}
-
 SILInstruction *SILCombiner::visitSwitchValueInst(SwitchValueInst *SVI) {
+  if (SVI->getFunction()->hasOwnership())
+    return nullptr;
+
   SILValue Cond = SVI->getOperand();
   BuiltinIntegerType *CondTy = Cond->getType().getAs<BuiltinIntegerType>();
   if (!CondTy || !CondTy->isFixedWidth(1))
@@ -417,7 +424,40 @@ public:
 
 } // end anonymous namespace
 
+/// Returns true if there is a retain instruction between \p from and the
+/// destroy or deallocation of \p alloc.
+static bool somethingIsRetained(SILInstruction *from, AllocStackInst *alloc) {
+  llvm::SmallVector<SILInstruction *, 8> workList;
+  llvm::SmallPtrSet<SILBasicBlock *, 8> handled;
+  workList.push_back(from);
+  while (!workList.empty()) {
+    SILInstruction *start = workList.pop_back_val();
+    for (auto iter = start->getIterator(), end = start->getParent()->end();
+         iter != end;
+         ++iter) {
+      SILInstruction *inst = &*iter;
+      if (isa<RetainValueInst>(inst) || isa<StrongRetainInst>(inst)) {
+        return true;
+      }
+      if ((isa<DeallocStackInst>(inst) || isa<DestroyAddrInst>(inst)) &&
+          inst->getOperand(0) == alloc) {
+        break;
+      }
+      if (isa<TermInst>(inst)) {
+        for (SILBasicBlock *succ : start->getParent()->getSuccessors()) {
+          if (handled.insert(succ).second)
+            workList.push_back(&*succ->begin());
+        }
+      }
+    }
+  }
+  return false;
+}
+
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
+  if (AS->getFunction()->hasOwnership())
+    return nullptr;
+
   // If we are testing SILCombine and we are asked not to eliminate
   // alloc_stacks, just return.
   if (DisableAllocStackOpts)
@@ -477,6 +517,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   //
   // TODO: Do we not remove purely dead live ranges here? Seems like we should.
   SmallPtrSet<SILInstruction *, 16> ToDelete;
+  SmallVector<CopyAddrInst *, 4> takingCopies;
 
   for (auto *Op : AS->getUses()) {
     // Replace a copy_addr [take] %src ... by a destroy_addr %src if %src is
@@ -484,8 +525,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     // Otherwise, just delete the copy_addr.
     if (auto *CopyAddr = dyn_cast<CopyAddrInst>(Op->getUser())) {
       if (CopyAddr->isTakeOfSrc() && CopyAddr->getSrc() != AS) {
-        Builder.setInsertionPoint(CopyAddr);
-        Builder.createDestroyAddr(CopyAddr->getLoc(), CopyAddr->getSrc());
+        takingCopies.push_back(CopyAddr);
       }
     }
 
@@ -506,6 +546,20 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     ToDelete.insert(Op->getUser());
   }
 
+  // Check if a retain is moved after the copy_addr. If the retained object
+  // happens to be the source of the copy_addr it might be only kept alive by
+  // the stack location. This cannot happen with OSSA.
+  // TODO: remove this check once we have OSSA.
+  for (CopyAddrInst *copy : takingCopies) {
+    if (somethingIsRetained(copy, AS))
+      return nullptr;
+  }
+
+  for (CopyAddrInst *copy : takingCopies) {
+    SILBuilderWithScope destroyBuilder(copy, Builder.getBuilderContext());
+    destroyBuilder.createDestroyAddr(copy->getLoc(), copy->getSrc());
+  }
+
   // Erase the 'live-range'
   for (auto *Inst : ToDelete) {
     Inst->replaceAllUsesOfAllResultsWithUndef();
@@ -515,6 +569,9 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 }
 
 SILInstruction *SILCombiner::visitAllocRefInst(AllocRefInst *AR) {
+  if (AR->getFunction()->hasOwnership())
+    return nullptr;
+
   if (!AR)
     return nullptr;
   // Check if the only uses are deallocating stack or deallocating.
@@ -594,7 +651,66 @@ SILInstruction *SILCombiner::optimizeLoadFromStringLiteral(LoadInst *LI) {
   return Builder.createIntegerLiteral(LI->getLoc(), LI->getType(), str[index]);
 }
 
+/// Returns true if \p LI loads a zero integer from the empty Array, Dictionary
+/// or Set singleton.
+static bool isZeroLoadFromEmptyCollection(LoadInst *LI) {
+  auto intTy = LI->getType().getAs<BuiltinIntegerType>();
+  if (!intTy)
+    return false;
+  
+  SILValue addr = LI->getOperand();
+
+  // Find the root object of the load-address.
+  for (;;) {
+    switch (addr->getKind()) {
+      case ValueKind::GlobalAddrInst: {
+        StringRef gName =
+          cast<GlobalAddrInst>(addr)->getReferencedGlobal()->getName();
+        return gName == "_swiftEmptyArrayStorage" ||
+               gName == "_swiftEmptyDictionarySingleton" ||
+               gName == "_swiftEmptySetSingleton";
+      }
+      case ValueKind::StructElementAddrInst: {
+        auto *SEA = cast<StructElementAddrInst>(addr);
+        // For Array, we only support "count". The value of "capacityAndFlags"
+        // is not defined in the ABI and could change in another version of the
+        // runtime (the capacity must be 0, but the flags may be not 0).
+        if (SEA->getStructDecl()->getName().is("_SwiftArrayBodyStorage") &&
+            !SEA->getField()->getName().is("count")) {
+          return false;
+        }
+        addr = SEA->getOperand();
+        break;
+      }
+      case ValueKind::RefElementAddrInst: {
+        auto *REA = cast<RefElementAddrInst>(addr);
+        Identifier className = REA->getClassDecl()->getName();
+        // For Dictionary and Set we support "count" and "capacity".
+        if (className.is("__RawDictionaryStorage") ||
+            className.is("__RawSetStorage")) {
+          Identifier fieldName = REA->getField()->getName();
+          if (!fieldName.is("_count") && !fieldName.is("_capacity"))
+            return false;
+        }
+        addr = REA->getOperand();
+        break;
+      }
+      case ValueKind::UncheckedRefCastInst:
+      case ValueKind::UpcastInst:
+      case ValueKind::RawPointerToRefInst:
+      case ValueKind::AddressToPointerInst:
+        addr = cast<SingleValueInstruction>(addr)->getOperand(0);
+        break;
+      default:
+        return false;
+    }
+  }
+}
+
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
+  if (LI->getFunction()->hasOwnership())
+    return nullptr;
+
   // (load (upcast-ptr %x)) -> (upcast-ref (load %x))
   Builder.setCurrentDebugScope(LI->getDebugScope());
   if (auto *UI = dyn_cast<UpcastInst>(LI->getOperand())) {
@@ -606,6 +722,17 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   if (SILInstruction *I = optimizeLoadFromStringLiteral(LI))
     return I;
 
+  // Constant-propagate the 0 value when loading "count" or "capacity" from the
+  // empty Array, Set or Dictionary storage.
+  // On high-level SIL this optimization is also done by the
+  // ArrayCountPropagation pass, but only for Array. And even for Array it's
+  // sometimes needed to propagate the empty-array count when high-level
+  // semantics function are already inlined.
+  // Note that for non-empty arrays/sets/dictionaries, the count can be
+  // propagated by redundant load elimination.
+  if (isZeroLoadFromEmptyCollection(LI))
+    return Builder.createIntegerLiteral(LI->getLoc(), LI->getType(), 0);
+
   return nullptr;
 }
 
@@ -616,6 +743,9 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
 /// ->
 ///    %2 = index_addr %ptr, x+y
 SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
+  if (IA->getFunction()->hasOwnership())
+    return nullptr;
+
   unsigned index = 0;
   SILValue base = isConstIndexAddr(IA, index);
   if (!base)
@@ -632,6 +762,8 @@ SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
 }
 
 SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
+  assert(!RVI->getFunction()->hasOwnership());
+
   SILValue Operand = RVI->getOperand();
   SILType OperandTy = Operand->getType();
 
@@ -668,6 +800,8 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
 }
 
 SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
+  assert(!RVI->getFunction()->hasOwnership());
+
   SILValue Operand = RVI->getOperand();
   SILType OperandTy = Operand->getType();
 
@@ -734,17 +868,10 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   return nullptr;
 }
 
-SILInstruction *
-SILCombiner::visitReleaseValueAddrInst(ReleaseValueAddrInst *RVI) {
-  return nullptr;
-}
-
-SILInstruction *
-SILCombiner::visitRetainValueAddrInst(RetainValueAddrInst *RVI) {
-  return nullptr;
-}
-
 SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
+  if (CFI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Remove runtime asserts such as overflow checks and bounds checks.
   if (RemoveCondFails)
     return eraseInstFromFunction(*CFI);
@@ -783,6 +910,8 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
 }
 
 SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
+  assert(!SRI->getFunction()->hasOwnership());
+
   // Retain of ThinToThickFunction is a no-op.
   SILValue funcOper = SRI->getOperand();
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(funcOper))
@@ -834,13 +963,73 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
   return nullptr;
 }
 
+/// Create a value from stores to an address.
+///
+/// If there are only stores to \p addr, return the stored value. Also, if there
+/// are address projections, create aggregate instructions for it.
+/// If builder is null, it's just a dry-run to check if it's possible.
+static SILValue createValueFromAddr(SILValue addr, SILBuilder *builder,
+                                    SILLocation loc) {
+  SmallVector<SILValue, 4> elems;
+  enum Kind {
+    none, store, tuple
+  } kind = none;
+
+  for (Operand *use : addr->getUses()) {
+    SILInstruction *user = use->getUser();
+    if (user->isDebugInstruction())
+      continue;
+
+    auto *st = dyn_cast<StoreInst>(user);
+    if (st && kind == none && st->getDest() == addr) {
+      elems.push_back(st->getSrc());
+      kind = store;
+      // We cannot just return st->getSrc() here because we also have to check
+      // if the store destination is the only use of addr.
+      continue;
+    }
+
+    if (auto *telem = dyn_cast<TupleElementAddrInst>(user)) {
+      if (kind == none) {
+        elems.resize(addr->getType().castTo<TupleType>()->getNumElements());
+        kind = tuple;
+      }
+      if (kind == tuple) {
+        if (elems[telem->getFieldNo()])
+          return SILValue();
+        elems[telem->getFieldNo()] = createValueFromAddr(telem, builder, loc);
+        continue;
+      }
+    }
+    // TODO: handle StructElementAddrInst to create structs.
+
+    return SILValue();
+  }
+  switch (kind) {
+  case none:
+    return SILValue();
+  case store:
+    assert(elems.size() == 1);
+    return elems[0];
+  case tuple:
+    if (std::any_of(elems.begin(), elems.end(),
+                    [](SILValue v){ return !(bool)v; }))
+      return SILValue();
+    if (builder) {
+      return builder->createTuple(loc, addr->getType().getObjectType(), elems);
+    }
+    // Just return anything not null for the dry-run.
+    return elems[0];
+  }
+}
+
 /// Simplify the following two frontend patterns:
 ///
 ///   %payload_addr = init_enum_data_addr %payload_allocation
 ///   store %payload to %payload_addr
 ///   inject_enum_addr %payload_allocation, $EnumType.case
 ///
-///   inject_enum_add %nopayload_allocation, $EnumType.case
+///   inject_enum_addr %nopayload_allocation, $EnumType.case
 ///
 /// for a concrete enum type $EnumType.case to:
 ///
@@ -853,6 +1042,9 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
 /// We leave the cleaning up to mem2reg.
 SILInstruction *
 SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
+  if (IEAI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Given an inject_enum_addr of a concrete type without payload, promote it to
   // a store of an enum. Mem2reg/load forwarding will clean things up for us. We
   // can't handle the payload case here due to the flow problems caused by the
@@ -1033,16 +1225,6 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   }
   assert((EnumAddrIns == IEAI) &&
          "Found InitEnumDataAddrInst differs from IEAI");
-  // Found the DataAddrInst to this enum payload. Check if it has only use.
-  if (!hasOneNonDebugUse(DataAddrInst))
-    return nullptr;
-
-  auto *SI = dyn_cast<StoreInst>(getSingleNonDebugUser(DataAddrInst));
-  auto *AI = dyn_cast<ApplyInst>(getSingleNonDebugUser(DataAddrInst));
-  if (!SI && !AI) {
-    return nullptr;
-  }
-
   // Make sure the enum pattern instructions are the only ones which write to
   // this location
   if (!WriteSet.empty()) {
@@ -1090,18 +1272,30 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     }
   }
 
-  if (SI) {
-    assert((SI->getDest() == DataAddrInst) &&
-           "Can't find StoreInst with DataAddrInst as its destination");
+  // Check if we can replace all stores to the enum data with an enum of the
+  // stored value. We can also handle tuples as payloads, e.g.
+  //
+  //   %payload_addr = init_enum_data_addr %enum_addr
+  //   %elem0_addr = tuple_element_addr %payload_addr, 0
+  //   %elem1_addr = tuple_element_addr %payload_addr, 1
+  //   store %payload0 to %elem0_addr
+  //   store %payload1 to %elem1_addr
+  //   inject_enum_addr %enum_addr, $EnumType.case
+  //
+  if (createValueFromAddr(DataAddrInst, nullptr, DataAddrInst->getLoc())) {
+    SILValue en =
+      createValueFromAddr(DataAddrInst, &Builder, DataAddrInst->getLoc());
+    assert(en);
+
     // In that case, create the payload enum/store.
     EnumInst *E = Builder.createEnum(
-        DataAddrInst->getLoc(), SI->getSrc(), DataAddrInst->getElement(),
+        DataAddrInst->getLoc(), en, DataAddrInst->getElement(),
         DataAddrInst->getOperand()->getType().getObjectType());
     Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand(),
                         StoreOwnershipQualifier::Unqualified);
     // Cleanup.
-    eraseInstFromFunction(*SI);
-    eraseInstFromFunction(*DataAddrInst);
+    eraseUsesOfInstruction(DataAddrInst);
+    recursivelyDeleteTriviallyDeadInstructions(DataAddrInst, true);
     return eraseInstFromFunction(*IEAI);
   }
 
@@ -1119,7 +1313,9 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   //  %1 = enum $EnumType, $EnumType.case, %load
   //  store %1 to %nopayload_addr
   //
-  assert(AI && "Must have an apply");
+  auto *AI = dyn_cast_or_null<ApplyInst>(getSingleNonDebugUser(DataAddrInst));
+  if (!AI)
+    return nullptr;
   unsigned ArgIdx = 0;
   Operand *EnumInitOperand = nullptr;
   for (auto &Opd : AI->getArgumentOperands()) {
@@ -1159,6 +1355,9 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 SILInstruction *
 SILCombiner::
 visitUnreachableInst(UnreachableInst *UI) {
+  if (UI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Make sure that this unreachable instruction
   // is the last instruction in the basic block.
   if (UI->getParent()->getTerminator() == UI)
@@ -1185,11 +1384,46 @@ visitUnreachableInst(UnreachableInst *UI) {
 /// (load (unchecked_take_enum_data_addr x)) -> (unchecked_enum_data (load x))
 ///
 /// FIXME: Implement this for address projections.
+///
+/// Also remove dead unchecked_take_enum_data_addr:
+///   (destroy_addr (unchecked_take_enum_data_addr x)) -> (destroy_addr x)
 SILInstruction *
 SILCombiner::
 visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
+  if (TEDAI->getFunction()->hasOwnership())
+    return nullptr;
+
   // If our TEDAI has no users, there is nothing to do.
   if (TEDAI->use_empty())
+    return nullptr;
+
+  bool onlyLoads = true;
+  bool onlyDestroys = true;
+  for (auto U : getNonDebugUses(TEDAI)) {
+    // Check if it is load. If it is not a load, bail...
+    if (!isa<LoadInst>(U->getUser()))
+      onlyLoads = false;
+    if (!isa<DestroyAddrInst>(U->getUser()))
+      onlyDestroys = false;
+  }
+  
+  if (onlyDestroys) {
+    // The unchecked_take_enum_data_addr is dead: remove it and replace all
+    // destroys with a destroy of its operand.
+    while (!TEDAI->use_empty()) {
+      Operand *use = *TEDAI->use_begin();
+      SILInstruction *user = use->getUser();
+      if (auto *dai = dyn_cast<DestroyAddrInst>(user)) {
+        dai->setOperand(TEDAI->getOperand());
+      } else {
+        assert(user->isDebugInstruction());
+        eraseInstFromFunction(*user);
+      }
+    }
+    return eraseInstFromFunction(*TEDAI);
+  }
+
+  if (!onlyLoads)
     return nullptr;
 
   // If our enum type is address only, we cannot do anything here. The key
@@ -1198,12 +1432,6 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
   // TEDAI without the TEDAI being loadable itself.
   if (TEDAI->getOperand()->getType().isAddressOnly(*TEDAI->getFunction()))
     return nullptr;
-
-  // For each user U of the take_enum_data_addr...
-  for (auto U : getNonDebugUses(TEDAI))
-    // Check if it is load. If it is not a load, bail...
-    if (!isa<LoadInst>(U->getUser()))
-      return nullptr;
 
   // Grab the EnumAddr.
   SILLocation Loc = TEDAI->getLoc();
@@ -1237,6 +1465,8 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
 }
 
 SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
+  assert(!SRI->getFunction()->hasOwnership());
+
   // Release of ThinToThickFunction is a no-op.
   if (isa<ThinToThickFunctionInst>(SRI->getOperand()))
     return eraseInstFromFunction(*SRI);
@@ -1266,6 +1496,9 @@ SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
 }
 
 SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
+  if (CBI->getFunction()->hasOwnership())
+    return nullptr;
+
   // cond_br(xor(x, 1)), t_label, f_label -> cond_br x, f_label, t_label
   // cond_br(x == 0), t_label, f_label -> cond_br x, f_label, t_label
   // cond_br(x != 1), t_label, f_label -> cond_br x, f_label, t_label
@@ -1284,9 +1517,9 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
       X->getType() ==
           SILType::getBuiltinIntegerType(1, CBI->getModule().getASTContext())) {
     SmallVector<SILValue, 4> OrigTrueArgs, OrigFalseArgs;
-    for (const auto &Op : CBI->getTrueArgs())
+    for (const auto Op : CBI->getTrueArgs())
       OrigTrueArgs.push_back(Op);
-    for (const auto &Op : CBI->getFalseArgs())
+    for (const auto Op : CBI->getFalseArgs())
       OrigFalseArgs.push_back(Op);
     return Builder.createCondBranch(CBI->getLoc(), X,
                                     CBI->getFalseBB(), OrigFalseArgs,
@@ -1398,6 +1631,9 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
 }
 
 SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
+  if (SEI->getFunction()->hasOwnership())
+    return nullptr;
+
   // Canonicalize a select_enum: if the default refers to exactly one case, then
   // replace the default with that case.
   if (SEI->hasDefault()) {
@@ -1444,6 +1680,9 @@ SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
 }
 
 SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
+  if (TEI->getFunction()->hasOwnership())
+    return nullptr;
+
   // tuple_extract(apply([add|sub|...]overflow(x, 0)), 1) -> 0
   // if it can be proven that no overflow can happen.
   if (TEI->getFieldNo() != 1)
@@ -1458,6 +1697,9 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
 }
 
 SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
+  if (FLI->getFunction()->hasOwnership())
+    return nullptr;
+
   // fix_lifetime(alloc_stack) -> fix_lifetime(load(alloc_stack))
   Builder.setCurrentDebugScope(FLI->getDebugScope());
   if (auto *AI = dyn_cast<AllocStackInst>(FLI->getOperand())) {
@@ -1473,6 +1715,9 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
 SILInstruction *
 SILCombiner::
 visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
+  if (ARDI->getFunction()->hasOwnership())
+    return nullptr;
+
   SmallVector<SILValue, 4> Counts;
   auto getCounts = [&] (AllocRefDynamicInst *AI) -> ArrayRef<SILValue> {
     for (Operand &Op : AI->getTailAllocatedCounts()) {
@@ -1540,40 +1785,51 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   return NewInst;
 }
 
-SILInstruction *SILCombiner::visitEnumInst(EnumInst *EI) {
-  return nullptr;
-}
+SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
+  if (mdi->getFunction()->hasOwnership())
+    return nullptr;
 
-SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *MDI) {
   // Simplify the base operand of a MarkDependenceInst to eliminate unnecessary
   // instructions that aren't adding value.
   //
   // Conversions to Optional.Some(x) often happen here, this isn't important
   // for us, we can just depend on 'x' directly.
-  if (auto eiBase = dyn_cast<EnumInst>(MDI->getBase())) {
+  if (auto *eiBase = dyn_cast<EnumInst>(mdi->getBase())) {
     if (eiBase->hasOperand() && eiBase->hasOneUse()) {
-      MDI->setBase(eiBase->getOperand());
+      mdi->setBase(eiBase->getOperand());
       eraseInstFromFunction(*eiBase);
-      return MDI;
+      return mdi;
     }
   }
   
   // Conversions from a class to AnyObject also happen a lot, we can just depend
   // on the class reference.
-  if (auto ier = dyn_cast<InitExistentialRefInst>(MDI->getBase())) {
-    MDI->setBase(ier->getOperand());
+  if (auto *ier = dyn_cast<InitExistentialRefInst>(mdi->getBase())) {
+    mdi->setBase(ier->getOperand());
     if (ier->use_empty())
       eraseInstFromFunction(*ier);
-    return MDI;
+    return mdi;
   }
 
   // Conversions from a class to AnyObject also happen a lot, we can just depend
   // on the class reference.
-  if (auto oeri = dyn_cast<OpenExistentialRefInst>(MDI->getBase())) {
-    MDI->setBase(oeri->getOperand());
+  if (auto *oeri = dyn_cast<OpenExistentialRefInst>(mdi->getBase())) {
+    mdi->setBase(oeri->getOperand());
     if (oeri->use_empty())
       eraseInstFromFunction(*oeri);
-    return MDI;
+    return mdi;
+  }
+
+  // Sometimes due to specialization/builtins, we can get a mark_dependence
+  // whose base is a trivial typed object. In such a case, the mark_dependence
+  // does not have a meaning, so just eliminate it.
+  {
+    SILType baseType = mdi->getBase()->getType();
+    if (baseType.isObject() && baseType.isTrivial(*mdi->getFunction())) {
+      SILValue value = mdi->getValue();
+      mdi->replaceAllUsesWith(value);
+      return eraseInstFromFunction(*mdi);
+    }
   }
 
   return nullptr;
@@ -1582,6 +1838,9 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *MDI) {
 
 SILInstruction *SILCombiner::
 visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI) {
+  if (CBOI->getFunction()->hasOwnership())
+    return nullptr;
+
   auto *URC = dyn_cast<UncheckedRefCastInst>(CBOI->getOperand());
   if (!URC)
     return nullptr;

@@ -560,7 +560,7 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
       // the type metadata for Int by chasing through N layers of metadata
       // just because that path happens to be in the cache.
       if (!type->hasArchetype() &&
-          isTypeMetadataAccessTrivial(IGF.IGM, type)) {
+          !shouldCacheTypeMetadataAccess(IGF.IGM, type)) {
         continue;
       }
 
@@ -708,6 +708,11 @@ void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
     out << "ValueWitnessTable";
   } else {
     assert(isSingletonKind());
+    if (Value >= ValueWitnessDiscriminatorBase) {
+      auto witness = ValueWitness(Value - ValueWitnessDiscriminatorBase);
+      out << "Discriminator(" << getValueWitnessName(witness) << ")";
+      return;
+    }
     ValueWitness witness = ValueWitness(Value - ValueWitnessBase);
     out << getValueWitnessName(witness);
   }

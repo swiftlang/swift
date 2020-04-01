@@ -13,6 +13,7 @@
 #ifndef SWIFT_SERIALIZATION_SILLOADER_H
 #define SWIFT_SERIALIZATION_SILLOADER_H
 
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/SIL/Notifications.h"
@@ -32,6 +33,7 @@ class SILModule;
 class SILVTable;
 class SILWitnessTable;
 class SILDefaultWitnessTable;
+class SILDifferentiabilityWitness;
 
 /// Maintains a list of SILDeserializer, one for each serialized modules
 /// in ASTContext. It provides lookupSILFunction that will perform lookup
@@ -64,6 +66,8 @@ public:
   SILVTable *lookupVTable(const ClassDecl *C);
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
   SILDefaultWitnessTable *lookupDefaultWitnessTable(SILDefaultWitnessTable *C);
+  SILDifferentiabilityWitness *
+  lookupDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
 
   /// Invalidate the cached entries for deserialized SILFunctions.
   void invalidateCaches();
@@ -98,6 +102,9 @@ public:
 
   /// Deserialize all Properties in all SILModules.
   void getAllProperties();
+
+  /// Deserialize all DifferentiabilityWitnesses in all SILModules.
+  void getAllDifferentiabilityWitnesses();
 
   SerializedSILLoader(const SerializedSILLoader &) = delete;
   SerializedSILLoader(SerializedSILLoader &&) = delete;

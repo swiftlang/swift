@@ -194,7 +194,7 @@ pr = "foo"
 pr.foo()
 
 var _ : ([Int]).Type = type(of: [4])
-// CHECK: : ([Int]).Type
+// CHECK: : [Int].Type
 var _ : ((Int) -> Int)? = .none
 // CHECK: : ((Int) -> Int)?
 func chained(f f: @escaping (Int) -> ()) -> Int { return 0 }

@@ -95,7 +95,7 @@ void SplitterStep::computeFollowupSteps(
   auto components = CG.computeConnectedComponents(CS.getTypeVariables());
   unsigned numComponents = components.size();
   if (numComponents < 2) {
-    steps.push_back(llvm::make_unique<ComponentStep>(
+    steps.push_back(std::make_unique<ComponentStep>(
         CS, 0, &CS.InactiveConstraints, Solutions));
     return;
   }
@@ -126,7 +126,7 @@ void SplitterStep::computeFollowupSteps(
 
     // If there are no dependencies, build a normal component step.
     if (components[i].dependsOn.empty()) {
-      steps.push_back(llvm::make_unique<ComponentStep>(
+      steps.push_back(std::make_unique<ComponentStep>(
           CS, solutionIndex, &Components[i], std::move(components[i]),
           PartialSolutions[solutionIndex]));
       continue;
@@ -141,7 +141,7 @@ void SplitterStep::computeFollowupSteps(
 
     // Otherwise, build a dependent component "splitter" step, which
     // handles all combinations of incoming partial solutions.
-    steps.push_back(llvm::make_unique<DependentComponentSplitterStep>(
+    steps.push_back(std::make_unique<DependentComponentSplitterStep>(
         CS, &Components[i], solutionIndex, std::move(components[i]),
         llvm::makeMutableArrayRef(PartialSolutions.get(), numComponents)));
   }
@@ -220,6 +220,7 @@ bool SplitterStep::mergePartialSolutions() const {
   ArrayRef<unsigned> counts = countsVec;
   SmallVector<unsigned, 2> indices(numComponents, 0);
   bool anySolutions = false;
+  size_t solutionMemory = 0;
   do {
     // Create a new solver scope in which we apply all of the relevant partial
     // solutions.
@@ -236,6 +237,7 @@ bool SplitterStep::mergePartialSolutions() const {
     if (!CS.worseThanBestSolution()) {
       // Finalize this solution.
       auto solution = CS.finalize();
+      solutionMemory += solution.getTotalMemory();
       if (isDebugMode())
         getDebugLogger() << "(composed solution " << CS.CurrentScore << ")\n";
 
@@ -243,6 +245,12 @@ bool SplitterStep::mergePartialSolutions() const {
       Solutions.push_back(std::move(solution));
       anySolutions = true;
     }
+
+    // Since merging partial solutions can go exponential, make sure we didn't
+    // pass the "too complex" thresholds including allocated memory and time.
+    if (CS.getExpressionTooComplex(solutionMemory))
+      return false;
+
   } while (nextCombination(counts, indices));
 
   return anySolutions;
@@ -273,7 +281,7 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
     }
 
     followup.push_back(
-        llvm::make_unique<ComponentStep>(CS, Index, Constraints, Component,
+        std::make_unique<ComponentStep>(CS, Index, Constraints, Component,
                                          std::move(dependsOnSolutions),
                                          Solutions));
   } while (nextCombination(dependsOnSetsRef, indices));
@@ -329,16 +337,15 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto *disjunction = CS.selectDisjunction();
   auto bestBindings = CS.determineBestBindings();
 
-  if (bestBindings && (!disjunction || (!bestBindings->IsHole &&
-                                        !bestBindings->InvolvesTypeVariables &&
-                                        !bestBindings->FullyBound))) {
+  if (bestBindings &&
+      (!disjunction || bestBindings->favoredOverDisjunction(disjunction))) {
     // Produce a type variable step.
     return suspend(
-        llvm::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
+        std::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
   } else if (disjunction) {
     // Produce a disjunction step.
     return suspend(
-        llvm::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+        std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
   } else if (!CS.solverState->allowsFreeTypeVariables() &&
              CS.hasFreeTypeVariables()) {
     // If there are no disjunctions or type variables to bind

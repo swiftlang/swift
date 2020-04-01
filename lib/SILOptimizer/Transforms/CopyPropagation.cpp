@@ -615,7 +615,7 @@ static bool computeLiveness(CopyPropagationState &pass) {
       // point of the end_borrow.
       if (auto *BBI = dyn_cast<BeginBorrowInst>(user)) {
         for (Operand *use : BBI->getUses()) {
-          if (auto *EBI = dyn_cast<EndBorrowInst>(use->getUser()))
+          if (isa<EndBorrowInst>(use->getUser()))
             computeUseLiveness(use, pass);
         }
         continue;

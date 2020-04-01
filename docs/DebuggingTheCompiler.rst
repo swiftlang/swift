@@ -164,22 +164,66 @@ Debugging on SIL Level
 Options for Dumping the SIL
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Often it is not sufficient to dump the SIL at the beginning or end of the
-optimization pipeline.
-The SILPassManager supports useful options to dump the SIL also between
-pass runs.
+Often it is not sufficient to dump the SIL at the beginning or end of
+the optimization pipeline. The SILPassManager supports useful options
+to dump the SIL also between pass runs.
 
-The option ``-Xllvm -sil-print-all`` dumps the whole SIL module after all
-passes. Although it prints only functions which were changed by a pass, the
-output can get *very* large.
+The SILPassManager's SIL dumping options vary along two orthogonal
+functional axes:
 
-It is useful if you identified a problem in the final SIL and you want to
-check which pass did introduce the wrong SIL.
+1. Options that control if functions/modules are printed.
+2. Options that filter what is printed at those points.
 
-There are several other options available, e.g. to filter the output by
-function names (``-Xllvm -sil-print-only-function``/``s``) or by pass names
-(``-Xllvm -sil-print-before``/``after``/``around``).
-For details see ``PassManager.cpp``.
+One generally always specifies an option of type 1 and optionally adds
+an option of type 2 to filter the output.
+
+A short (non-exhaustive) list of type 1 options:
+
+* ``-Xllvm -sil-print-all``: Print functions/modules when ever a
+  function pass modifies a function and Print the entire module
+  (modulo filtering) if a module pass modifies a SILModule.
+
+A short (non-exhaustive) list of type 2 options:
+
+* ``-Xllvm -sil-print-around=$PASS_NAME``: Print a function/module
+  before and after a function pass with name ``$PASS_NAME`` runs on a
+  function/module or dump a module before a module pass with name
+  ``$PASS_NAME`` runs on a module.
+
+* ``-Xllvm -sil-print-before=$PASS_NAME``: Print a function/module
+  before a function pass with name ``$PASS_NAME`` runs on a
+  function/module or dump a module before a module pass with name
+  ``$PASS_NAME`` runs on a module. NOTE: This happens even without
+  sil-print-all set!
+
+* ``-Xllvm -sil-print-after=$PASS_NAME``: Print a function/module
+  after a function pass with name ``$PASS_NAME`` runs on a
+  function/module or dump a module before a module pass with name
+  ``$PASS_NAME`` runs on a module.
+
+* ``-Xllvm '-sil-print-only-function=SWIFT_MANGLED_NAME'``: When ever
+  one would print a function/module, only print the given function.
+
+These options together allow one to visualize how a
+SILFunction/SILModule is optimized by the optimizer as each
+optimization pass runs easily via formulations like::
+
+    swiftc -Xllvm '-sil-print-only-function=$myMainFunction' -Xllvm -sil-print-all
+
+NOTE: This may emit a lot of text to stderr, so be sure to pipe the
+output to a file.
+
+Getting CommandLine for swift stdlib from Ninja
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If one builds swift using ninja and wants to dump the SIL of the
+stdlib using some of the SIL dumping options from the previous
+section, one can use the following one-liner::
+
+  ninja -t commands | grep swiftc | grep Swift.o | grep " -c "
+
+This should give one a single command line that one can use for
+Swift.o, perfect for applying the previous sections options to.
 
 Dumping the SIL and other Data in LLDB
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -358,6 +402,17 @@ this case, we know that ``GlobalARCOpts::run`` was hit 85 times. So, now
 we know to ignore swift_getGenericMetadata 84 times, i.e.::
 
     (lldb) br set -i 84 -n GlobalARCOpts::run
+
+A final trick is that one can use the -R option to stop at a relative assembly
+address in lldb. Specifically, lldb resolves the breakpoint normally and then
+just adds the argument -R to the address. So for instance, if I want to stop at
+the address at +38 in the function with the name 'foo', I would write::
+
+    (lldb) br set -R 38 -n foo
+
+Then lldb would add 38 to the offset of foo and break there. This is really
+useful in contexts where one wants to set a breakpoint at an assembly address
+that is stable across multiple different invocations of lldb.
 
 LLDB Scripts
 ~~~~~~~~~~~~

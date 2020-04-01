@@ -70,7 +70,7 @@ SourceComparator::buildEquivalenceClasses() {
   std::unordered_map<std::string, std::vector<size_t>> rhsMap;
   for (auto index = regionsToCompare.start.rhs();
        index < regionsToCompare.end.rhs(); ++index)
-    rhsMap[linesToCompare.rhs()[index]].push_back(index);
+    rhsMap[linesToCompare.rhs()[index].str()].push_back(index);
   return rhsMap;
 }
 
@@ -86,7 +86,7 @@ SourceComparator::buildDAGOfSubsequences(
   for (auto i = regionsToCompare.start.lhs(); i < regionsToCompare.end.lhs();
        ++i) {
     // What lines in rhs does the ith line in lhs match?
-    auto iter = rhsMap.find(linesToCompare.lhs()[i]);
+    auto iter = rhsMap.find(linesToCompare.lhs()[i].str());
     if (iter == rhsMap.end())
       continue; // no match in rhs
     auto &res = iter->second;

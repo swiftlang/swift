@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-testing -profile-generate -profile-coverage-mapping -emit-sil -module-name coverage_subscript_autoclosure %s | %FileCheck %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 struct S {
   subscript(i: Int, autoclosure: @autoclosure () ->  Int) -> Int {

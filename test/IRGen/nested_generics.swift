@@ -16,13 +16,13 @@ public func makeAMetadata() {
 }
 
 // Type constructor for OuterGenericStruct<T>
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructVMa"(i64, %swift.type*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructVMa"(i64 %0, %swift.type* %1)
 
 // Type constructor for OuterGenericStruct<T>.InnerGenericStruct<U>
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV05InnerdE0VMa"(i64, %swift.type*, %swift.type*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV05InnerdE0VMa"(i64 %0, %swift.type* %1, %swift.type* %2)
 
 // Type constructor for OuterGenericStruct<T>.InnerConcreteStruct
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV013InnerConcreteE0VMa"(i64, %swift.type*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics18OuterGenericStructV013InnerConcreteE0VMa"(i64 %0, %swift.type* %1)
 
 public struct OuterGenericStruct<T> {
   public struct InnerGenericStruct<U> {
@@ -40,13 +40,13 @@ public struct OuterGenericStruct<T> {
 }
 
 // Type constructor for OuterGenericClass<T>
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassCMa"(i64, %swift.type*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassCMa"(i64 %0, %swift.type* %1)
 
 // Type constructor for OuterGenericClass<T>.InnerGenericClass<U>
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC05InnerdE0CMa"(i64, %swift.type*, %swift.type*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC05InnerdE0CMa"(i64 %0, %swift.type* %1, %swift.type* %2)
 
 // Type constructor for OuterGenericClass<T>.InnerConcreteClass
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC013InnerConcreteE0CMa"(i64, %swift.type*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s15nested_generics17OuterGenericClassC013InnerConcreteE0CMa"(i64 %0, %swift.type* %1)
 
 public class OuterGenericClass<T> {
   public class InnerGenericClass<U> {

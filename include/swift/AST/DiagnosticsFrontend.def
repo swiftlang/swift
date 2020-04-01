@@ -94,6 +94,8 @@ ERROR(error_unknown_arg,none,
       "unknown argument: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,none,
       "invalid value '%1' in '%0'", (StringRef, StringRef))
+WARNING(warning_type_fingerprints_require_fine_grained_dependencies,none,
+      "Type fingerprints require fine-grained dependencies", ())
 WARNING(warning_cannot_multithread_batch_mode,none,
       "ignoring -num-threads argument; cannot multithread batch mode", ())
 ERROR(error_unsupported_option_argument,none,
@@ -260,6 +262,34 @@ WARNING(tbd_only_supported_in_whole_module,none,
         "TBD generation is only supported when the whole module can be seen",
         ())
 
+WARNING(linker_directives_choice_confusion,none,
+        "only one of -emit-ldadd-cfile-path and -module-installname-map-file can be specified;"
+        "the c file won't be generated",
+        ())
+
+ERROR(previous_installname_map_missing,none,
+      "cannot open previous install name map from %0",
+      (StringRef))
+
+ERROR(previous_installname_map_corrupted,none,
+      "previous install name map from %0 is malformed",
+      (StringRef))
+
+REMARK(default_previous_install_name, none,
+      "default previous install name for %0 is %1", (StringRef, StringRef))
+
+REMARK(platform_previous_install_name, none,
+       "previous install name for %0 in %1 is %2", (StringRef, StringRef, StringRef))
+
+ERROR(unknown_platform_name, none,
+      "unkown platform name %0", (StringRef))
+
+ERROR(unknown_swift_module_name, none,
+      "cannot find Swift module with name %0", (StringRef))
+
+ERROR(cannot_find_install_name, none,
+      "cannot find previous install name for module %0 in %1", (StringRef, StringRef))
+
 ERROR(symbol_in_tbd_not_in_ir,none,
       "symbol '%0' (%1) is in TBD file, but not in generated IR",
       (StringRef, StringRef))
@@ -342,6 +372,40 @@ NOTE(compiled_module_invalid_reason,none,
 ERROR(unknown_forced_module_loading_mode,none,
       "unknown value for SWIFT_FORCE_MODULE_LOADING variable: '%0'",
       (StringRef))
+ERROR(error_creating_remark_serializer,none,
+      "error while creating remark serializer: '%0'", (StringRef))
+
+REMARK(interface_file_lock_failure,none,
+      "could not acquire lock file for module interface '%0'", (StringRef))
+
+REMARK(interface_file_lock_timed_out,none,
+      "timed out waiting to acquire lock file for module interface '%0'", (StringRef))
+
+// Dependency Verifier Diagnostics
+ERROR(dependency_cascading_mismatch,none,
+      "expected %select{non-cascading|cascading}0 dependency; found "
+      "%select{non-cascading|cascading}1 dependency instead",
+      (bool, bool))
+ERROR(potential_dependency_cascading_mismatch,none,
+      "expected %select{non-cascading|cascading}0 potential member dependency; "
+      "found %select{non-cascading|cascading}1 potential member dependency "
+      "instead", (bool, bool))
+ERROR(missing_member_dependency,none,
+      "expected "
+      "%select{%error|provided|member|potential member|dynamic member}0 "
+      "dependency does not exist: %1",
+      (/*Expectation::Kind*/uint8_t, StringRef))
+ERROR(unexpected_dependency,none,
+      "unexpected %0 %select{%error|%error|member|potential member|dynamic member}1 "
+      "dependency: %2", (StringRef, /*Expectation::Kind*/uint8_t, StringRef))
+ERROR(unexpected_provided_entity,none,
+      "unexpected provided entity: %0", (StringRef))
+ERROR(negative_expectation_violated,none,
+      "unexpected dependency exists: %0", (StringRef))
+ERROR(expectation_missing_opening_braces,none,
+      "expected {{ in expectation", ())
+ERROR(expectation_missing_closing_braces,none,
+      "didn't find '}}' to match '{{' in expectation", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

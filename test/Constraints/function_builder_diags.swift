@@ -1,7 +1,12 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking
 
+enum Either<T,U> {
+  case first(T)
+  case second(U)
+}
+
 @_functionBuilder
-struct TupleBuilder { // expected-note 2{{struct 'TupleBuilder' declared here}}
+struct TupleBuilder { // expected-note 3{{struct 'TupleBuilder' declared here}}
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -30,6 +35,13 @@ struct TupleBuilder { // expected-note 2{{struct 'TupleBuilder' declared here}}
 
   static func buildDo<T>(_ value: T) -> T { return value }
   static func buildIf<T>(_ value: T?) -> T? { return value }
+
+  static func buildEither<T,U>(first value: T) -> Either<T,U> {
+    return .first(value)
+  }
+  static func buildEither<T,U>(second value: U) -> Either<T,U> {
+    return .second(value)
+  }
 }
 
 @_functionBuilder
@@ -83,7 +95,8 @@ func testDiags() {
   // Declarations
   tuplify(true) { _ in
     17
-    let x = 17 // expected-error{{closure containing a declaration cannot be used with function builder 'TupleBuilder'}}
+    let x = 17
+    let y: Int // expected-error{{closure containing a declaration cannot be used with function builder 'TupleBuilder'}}
     x + 25
   }
 
@@ -160,9 +173,9 @@ struct Text : P {
   init(_: T) {}
 }
 
-struct Label<L> : P where L : P { // expected-note {{'L' declared as parameter to type 'Label'}}
+struct Label<L> : P where L : P { // expected-note 2 {{'L' declared as parameter to type 'Label'}}
   typealias T = L
-  init(@Builder _: () -> L) {}
+  init(@Builder _: () -> L) {} // expected-note {{'init(_:)' declared here}}
 }
 
 func test_51167632() -> some P {
@@ -170,6 +183,15 @@ func test_51167632() -> some P {
     Text("hello")
     Label  // expected-error {{generic parameter 'L' could not be inferred}}
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
+  })
+}
+
+func test_56221372() -> some P {
+  AnyP(G {
+    Text("hello")
+    Label() // expected-error {{generic parameter 'L' could not be inferred}}
+    // expected-error@-1 {{missing argument for parameter #1 in call}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
   })
 }
 
@@ -211,7 +233,7 @@ func erroneousSR11350(x: Int) {
       if b {
         acceptInt(0) { }
       }
-    }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
+    }).domap(0) // expected-error{{value of type '()?' has no member 'domap'}}
   }
 }
 
@@ -233,4 +255,288 @@ tuplify(true) { x in
   "hello"
   #warning("oops")  // expected-warning{{oops}}
   3.14159
+}
+
+struct MyTuplifiedStruct {
+  var condition: Bool
+
+  @TupleBuilder var computed: some Any { // expected-note{{remove the attribute to explicitly disable the function builder}}{{3-17=}}
+    if condition {
+      return 17 // expected-warning{{application of function builder 'TupleBuilder' disabled by explicit 'return' statement}}
+      // expected-note@-1{{remove 'return' statements to apply the function builder}}{{7-14=}}{{12-19=}}
+    } else {
+           return 42
+    }
+  }
+}
+
+// Check that we're performing syntactic use diagnostics.
+func acceptMetatype<T>(_: T.Type) -> Bool { true }
+
+func syntacticUses<T>(_: T) {
+  tuplify(true) { x in
+    if x && acceptMetatype(T) { // expected-error{{expected member name or constructor call after type name}}
+      // expected-note@-1{{use '.self' to reference the type object}}
+      acceptMetatype(T) // expected-error{{expected member name or constructor call after type name}}
+      // expected-note@-1{{use '.self' to reference the type object}}
+    }
+  }
+}
+
+// Check custom diagnostics within "if" conditions.
+struct HasProperty {
+  var property: Bool = false
+}
+
+func checkConditions(cond: Bool) {
+  var x = HasProperty()
+
+  tuplify(cond) { value in
+    if x.property = value { // expected-error{{use of '=' in a boolean context, did you mean '=='?}}
+      "matched it"
+    }
+  }
+}
+
+// Check that a closure with a single "return" works with function builders.
+func checkSingleReturn(cond: Bool) {
+  tuplify(cond) { value in
+    return (value, 17)
+  }
+
+  tuplify(cond) { value in
+    (value, 17)
+  }
+
+  tuplify(cond) {
+    ($0, 17)
+  }
+}
+
+// rdar://problem/59116520
+func checkImplicitSelfInClosure() {
+  @_functionBuilder
+  struct Builder {
+    static func buildBlock(_ children: String...) -> Element { Element() }
+  }
+
+  struct Element {
+    static func nonEscapingClosure(@Builder closure: (() -> Element)) {}
+    static func escapingClosure(@Builder closure: @escaping (() -> Element)) {}
+  }
+
+  class C {
+    let identifier: String = ""
+
+    func testImplicitSelf() {
+      Element.nonEscapingClosure {
+        identifier // okay
+      }
+
+      Element.escapingClosure { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+        identifier // expected-error {{reference to property 'identifier' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        // expected-note@-1 {{reference 'self.' explicitly}}
+      }
+    }
+  }
+}
+
+// rdar://problem/59239224 - crash because some nodes don't have type
+// information during solution application.
+struct X<T> {
+  init(_: T) { }
+}
+
+@TupleBuilder func foo(cond: Bool) -> some Any {
+  if cond {
+    tuplify(cond) { x in
+      X(x)
+    }
+  }
+}
+
+// switch statements don't allow fallthrough
+enum E {
+  case a
+  case b(Int, String?)
+}
+
+func testSwitch(e: E) {
+  tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    case .a:
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+      fallthrough // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilder'}}
+    case .b(let i, nil):
+      "just \(i)"
+    }
+  }
+}
+
+// Ensure that we don't back-propagate constraints to the subject
+// expression. This is a potential avenue for future exploration, but
+// is currently not supported by switch statements outside of function
+// builders. It's better to be consistent for now.
+enum E2 {
+  case b(Int, String?) // expected-note{{'b' declared here}}
+}
+
+func getSomeEnumOverloaded(_: Double) -> E { return .a }
+func getSomeEnumOverloaded(_: Int) -> E2 { return .b(0, nil) }
+
+func testOverloadedSwitch() {
+  tuplify(true) { c in
+    // FIXME: Bad source location.
+    switch getSomeEnumOverloaded(17) { // expected-error{{type 'E2' has no member 'a'; did you mean 'b'?}}
+    case .a:
+      "a"
+    default:
+      "default"
+    }
+  }
+}
+
+// Check exhaustivity.
+func testNonExhaustiveSwitch(e: E) {
+    tuplify(true) { c in
+    "testSwitch"
+    switch e { // expected-error{{switch must be exhaustive}}
+      // expected-note @-1{{add missing case: '.b(_, .none)'}}
+    case .a:
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+    }
+  }
+}
+
+// rdar://problem/59856491
+struct TestConstraintGenerationErrors {
+  @TupleBuilder var buildTupleFnBody: String {
+    String(nothing) // expected-error {{use of unresolved identifier 'nothing'}}
+  }
+
+  func buildTupleClosure() {
+    tuplify(true) { _ in
+      String(nothing) // expected-error {{use of unresolved identifier 'nothing'}}
+    }
+  }
+}
+
+// Check @unknown
+func testUnknownInSwitchSwitch(e: E) {
+    tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    @unknown case .a: // expected-error{{'@unknown' is only supported for catch-all cases ("case _")}}
+      "a"
+    case .b(let i, let s?):
+      i * 2
+      s + "!"
+    default:
+      "nothing"
+    }
+  }
+}
+
+// Check for mutability mismatches when there are multiple case items
+// referring to same-named variables.
+enum E3 {
+  case a(Int, String)
+  case b(String, Int)
+  case c(String, Int)
+}
+
+func testCaseMutabilityMismatches(e: E3) {
+    tuplify(true) { c in
+    "testSwitch"
+    switch e {
+    case .a(let x, var y),
+         .b(let y, // expected-error{{'let' pattern binding must match previous 'var' pattern binding}}
+            var x), // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
+         .c(let y, // expected-error{{'let' pattern binding must match previous 'var' pattern binding}}
+            var x): // expected-error{{'var' pattern binding must match previous 'let' pattern binding}}
+      x
+      y += "a"
+    }
+  }
+}
+
+// Check for type equivalence among different case variables with the same name.
+func testCaseVarTypes(e: E3) {
+    // FIXME: Terrible diagnostic
+    tuplify(true) { c in  // expected-error{{type of expression is ambiguous without more context}}
+    "testSwitch"
+    switch e {
+    case .a(let x, let y),
+         .c(let x, let y):
+      x
+      y + "a"
+    }
+  }
+}
+
+// Test for buildFinalResult.
+@_functionBuilder
+struct WrapperBuilder {
+  static func buildBlock() -> () { }
+  
+  static func buildBlock<T1>(_ t1: T1) -> T1 {
+    return t1
+  }
+  
+  static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
+    return (t1, t2)
+  }
+  
+  static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
+      -> (T1, T2, T3) {
+    return (t1, t2, t3)
+  }
+
+  static func buildBlock<T1, T2, T3, T4>(_ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4)
+      -> (T1, T2, T3, T4) {
+    return (t1, t2, t3, t4)
+  }
+
+  static func buildBlock<T1, T2, T3, T4, T5>(
+    _ t1: T1, _ t2: T2, _ t3: T3, _ t4: T4, _ t5: T5
+  ) -> (T1, T2, T3, T4, T5) {
+    return (t1, t2, t3, t4, t5)
+  }
+
+  static func buildDo<T>(_ value: T) -> T { return value }
+  static func buildIf<T>(_ value: T?) -> T? { return value }
+
+  static func buildEither<T,U>(first value: T) -> Either<T,U> {
+    return .first(value)
+  }
+  static func buildEither<T,U>(second value: U) -> Either<T,U> {
+    return .second(value)
+  }
+  static func buildFinalResult<T>(_ value: T) -> Wrapper<T> {
+    return Wrapper(value: value)
+  }
+}
+
+struct Wrapper<T> {
+  var value: T
+}
+
+func wrapperify<T>(_ cond: Bool, @WrapperBuilder body: (Bool) -> T) -> T{
+  return body(cond)
+}
+
+func testWrapperBuilder() {
+  let x = wrapperify(true) { c in
+    3.14159
+    "hello"
+  }
+
+  let _: Int = x // expected-error{{cannot convert value of type 'Wrapper<(Double, String)>' to specified type 'Int'}}
 }

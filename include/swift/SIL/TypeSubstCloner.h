@@ -82,9 +82,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
             // substitutions may be different from the original ones, e.g.
             // there can be less substitutions.
             RecursiveSubs = SubstitutionMap::get(
-              AI.getFunction()
-                ->getLoweredFunctionType()
-                ->getInvocationGenericSignature(),
+              LoweredFnTy->getSubstGenericSignature(),
               Subs);
 
             // Use the new set of substitutions to compute the new

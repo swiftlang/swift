@@ -208,6 +208,23 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
 
+  friend bool operator==(AnyFunctionRef lhs, AnyFunctionRef rhs) {
+     return lhs.TheFunction == rhs.TheFunction;
+   }
+
+   friend bool operator!=(AnyFunctionRef lhs, AnyFunctionRef rhs) {
+     return lhs.TheFunction != rhs.TheFunction;
+   }
+
+  friend llvm::hash_code hash_value(AnyFunctionRef fn) {
+    using llvm::hash_value;
+    return hash_value(fn.TheFunction.getOpaqueValue());
+  }
+
+  friend SourceLoc extractNearestSourceLoc(AnyFunctionRef fn) {
+    return fn.getLoc();
+  }
+
 private:
   ArrayRef<AnyFunctionType::Yield>
   getYieldResultsImpl(SmallVectorImpl<AnyFunctionType::Yield> &buffer,
@@ -234,6 +251,8 @@ private:
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(pop)
 #endif
+
+void simple_display(llvm::raw_ostream &out, AnyFunctionRef fn);
 
 } // namespace swift
 

@@ -25,6 +25,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/Located.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
@@ -69,16 +70,13 @@ public:
   struct Convention {
     StringRef Name = {};
     DeclNameRef WitnessMethodProtocol = {};
-    StringRef ClangType = {};
-    // Carry the source location for diagnostics.
-    SourceLoc ClangTypeLoc = {};
-
+    Located<StringRef> ClangType = Located<StringRef>(StringRef(), {});
     /// Convenience factory function to create a Swift convention.
     ///
     /// Don't use this function if you are creating a C convention as you
     /// probably need a ClangType field as well.
     static Convention makeSwiftConvention(StringRef name) {
-      return {name, DeclNameRef(), "", {}};
+      return {name, DeclNameRef(), Located<StringRef>("", {})};
     }
   };
 
@@ -687,23 +685,6 @@ public:
   }
 };
 
-/// Defines the @_implicitly_synthesizes_nested_requirement attribute.
-class ImplicitlySynthesizesNestedRequirementAttr : public DeclAttribute {
-public:
-  ImplicitlySynthesizesNestedRequirementAttr(StringRef Value, SourceLoc AtLoc,
-                                             SourceRange Range)
-    : DeclAttribute(DAK_ImplicitlySynthesizesNestedRequirement,
-                    AtLoc, Range, /*Implicit*/false),
-      Value(Value) {}
-
-  /// The name of the phantom requirement.
-  const StringRef Value;
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ImplicitlySynthesizesNestedRequirement;
-  }
-};
-
 /// Determine the result of comparing an availability attribute to a specific
 /// platform or language version.
 enum class AvailableVersionComparison {
@@ -1127,6 +1108,24 @@ public:
   }
 };
 
+/// The \c @_typeEraser(TypeEraserType) attribute.
+class TypeEraserAttr final : public DeclAttribute {
+  TypeLoc TypeEraserLoc;
+public:
+  TypeEraserAttr(SourceLoc atLoc, SourceRange range, TypeLoc typeEraserLoc)
+      : DeclAttribute(DAK_TypeEraser, atLoc, range, /*Implicit=*/false),
+        TypeEraserLoc(typeEraserLoc) {}
+
+  const TypeLoc &getTypeEraserLoc() const { return TypeEraserLoc; }
+  TypeLoc &getTypeEraserLoc() { return TypeEraserLoc; }
+
+  bool hasViableTypeEraserInit(ProtocolDecl *protocol) const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_TypeEraser;
+  }
+};
+
 /// Represents any sort of access control modifier.
 class AbstractAccessControlAttr : public DeclAttribute {
 protected:
@@ -1172,6 +1171,36 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SetterAccess;
+  }
+};
+
+/// SPI attribute applied to both decls and imports.
+class SPIAccessControlAttr final : public DeclAttribute,
+                                   private llvm::TrailingObjects<SPIAccessControlAttr, Identifier> {
+  friend TrailingObjects;
+
+  SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
+                       ArrayRef<Identifier> spiGroups);
+
+  // Number of trailing SPI group identifiers.
+  size_t numSPIGroups;
+
+public:
+  static SPIAccessControlAttr *create(ASTContext &context, SourceLoc atLoc,
+                                      SourceRange range,
+                                      ArrayRef<Identifier> spiGroups);
+
+  /// Name of SPIs declared by the attribute.
+  ///
+  /// Note: A single SPI name per attribute is currently supported but this
+  /// may change with the syntax change.
+  ArrayRef<Identifier> getSPIGroups() const {
+    return { this->template getTrailingObjects<Identifier>(),
+             numSPIGroups };
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_SPIAccessControl;
   }
 };
 
@@ -1625,8 +1654,16 @@ public:
   /// Indicates when the symbol was moved here.
   const llvm::VersionTuple MovedVersion;
 
-  /// Returns true if this attribute is active given the current platform.
-  bool isActivePlatform(const ASTContext &ctx) const;
+  struct ActiveVersion {
+    StringRef ModuleName;
+    PlatformKind Platform;
+    bool IsSimulator;
+    llvm::VersionTuple Version;
+  };
+
+  /// Returns non-optional if this attribute is active given the current platform.
+  /// The value provides more details about the active platform.
+  Optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_OriginallyDefinedIn;
   }
@@ -1638,34 +1675,33 @@ struct DeclNameRefWithLoc {
   DeclNameLoc Loc;
 };
 
-/// Attribute that marks a function as differentiable and optionally specifies
-/// custom associated derivative functions: 'jvp' and 'vjp'.
+/// Attribute that marks a function as differentiable.
 ///
 /// Examples:
-///   @differentiable(jvp: jvpFoo where T : FloatingPoint)
-///   @differentiable(wrt: (self, x, y), jvp: jvpFoo)
+///   @differentiable(where T : FloatingPoint)
+///   @differentiable(wrt: (self, x, y))
 class DifferentiableAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<DifferentiableAttr,
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
+  friend class DifferentiableAttributeTypeCheckRequest;
 
+  /// The declaration on which the `@differentiable` attribute is declared.
+  /// May not be a valid declaration for `@differentiable` attributes.
+  /// Resolved during parsing and deserialization.
+  Decl *OriginalDeclaration = nullptr;
   /// Whether this function is linear (optional).
   bool Linear;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The JVP function.
-  Optional<DeclNameRefWithLoc> JVP;
-  /// The VJP function.
-  Optional<DeclNameRefWithLoc> VJP;
-  /// The JVP function (optional), resolved by the type checker if JVP name is
-  /// specified.
-  FuncDecl *JVPFunction = nullptr;
-  /// The VJP function (optional), resolved by the type checker if VJP name is
-  /// specified.
-  FuncDecl *VJPFunction = nullptr;
-  /// The differentiation parameters' indices, resolved by the type checker.
-  IndexSubset *ParameterIndices = nullptr;
+  /// The differentiability parameter indices, resolved by the type checker.
+  /// The bit stores whether the parameter indices have been computed.
+  ///
+  /// Note: it is necessary to use a bit instead of `nullptr` parameter indices
+  /// to represent "parameter indices not yet type-checked" because invalid
+  /// attributes have `nullptr` parameter indices but have been type-checked.
+  llvm::PointerIntPair<IndexSubset *, 1, bool> ParameterIndicesAndBit;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
   /// The generic signature for autodiff associated functions. Resolved by the
@@ -1673,19 +1709,22 @@ class DifferentiableAttr final
   /// attribute's where clause requirements. This is set only if the attribute
   /// has a where clause.
   GenericSignature DerivativeGenericSignature;
+  /// The source location of the implicitly inherited protocol requirement
+  /// `@differentiable` attribute. Used for diagnostics, not serialized.
+  ///
+  /// This is set during conformance type-checking, only for implicit
+  /// `@differentiable` attributes created for non-public protocol witnesses of
+  /// protocol requirements with `@differentiable` attributes.
+  SourceLoc ImplicitlyInheritedDifferentiableAttrLocation;
 
   explicit DifferentiableAttr(bool implicit, SourceLoc atLoc,
                               SourceRange baseRange, bool linear,
                               ArrayRef<ParsedAutoDiffParameter> parameters,
-                              Optional<DeclNameRefWithLoc> jvp,
-                              Optional<DeclNameRefWithLoc> vjp,
                               TrailingWhereClause *clause);
 
   explicit DifferentiableAttr(Decl *original, bool implicit, SourceLoc atLoc,
                               SourceRange baseRange, bool linear,
                               IndexSubset *parameterIndices,
-                              Optional<DeclNameRefWithLoc> jvp,
-                              Optional<DeclNameRefWithLoc> vjp,
                               GenericSignature derivativeGenericSignature);
 
 public:
@@ -1693,36 +1732,30 @@ public:
                                     SourceLoc atLoc, SourceRange baseRange,
                                     bool linear,
                                     ArrayRef<ParsedAutoDiffParameter> params,
-                                    Optional<DeclNameRefWithLoc> jvp,
-                                    Optional<DeclNameRefWithLoc> vjp,
                                     TrailingWhereClause *clause);
 
   static DifferentiableAttr *create(AbstractFunctionDecl *original,
                                     bool implicit, SourceLoc atLoc,
                                     SourceRange baseRange, bool linear,
                                     IndexSubset *parameterIndices,
-                                    Optional<DeclNameRefWithLoc> jvp,
-                                    Optional<DeclNameRefWithLoc> vjp,
                                     GenericSignature derivativeGenSig);
 
-  /// Get the optional 'jvp:' function name and location.
-  /// Use this instead of `getJVPFunction` to check whether the attribute has a
-  /// registered JVP.
-  Optional<DeclNameRefWithLoc> getJVP() const { return JVP; }
+  Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
 
-  /// Get the optional 'vjp:' function name and location.
-  /// Use this instead of `getVJPFunction` to check whether the attribute has a
-  /// registered VJP.
-  Optional<DeclNameRefWithLoc> getVJP() const { return VJP; }
+  /// Sets the original declaration on which this attribute is declared.
+  /// Should only be used by parsing and deserialization.
+  void setOriginalDeclaration(Decl *originalDeclaration);
 
-  IndexSubset *getParameterIndices() const {
-    return ParameterIndices;
-  }
-  void setParameterIndices(IndexSubset *parameterIndices) {
-    ParameterIndices = parameterIndices;
-  }
+private:
+  /// Returns true if the given `@differentiable` attribute has been
+  /// type-checked.
+  bool hasBeenTypeChecked() const;
 
-  /// The parsed differentiation parameters, i.e. the list of parameters
+public:
+  IndexSubset *getParameterIndices() const;
+  void setParameterIndices(IndexSubset *parameterIndices);
+
+  /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
@@ -1745,10 +1778,13 @@ public:
     DerivativeGenericSignature = derivativeGenSig;
   }
 
-  FuncDecl *getJVPFunction() const { return JVPFunction; }
-  void setJVPFunction(FuncDecl *decl);
-  FuncDecl *getVJPFunction() const { return VJPFunction; }
-  void setVJPFunction(FuncDecl *decl);
+  SourceLoc getImplicitlyInheritedDifferentiableAttrLocation() const {
+    return ImplicitlyInheritedDifferentiableAttrLocation;
+  }
+  void getImplicitlyInheritedDifferentiableAttrLocation(SourceLoc loc) {
+    assert(isImplicit());
+    ImplicitlyInheritedDifferentiableAttrLocation = loc;
+  }
 
   /// Get the derivative generic environment for the given `@differentiable`
   /// attribute and original function.
@@ -1757,10 +1793,7 @@ public:
 
   // Print the attribute to the given stream.
   // If `omitWrtClause` is true, omit printing the `wrt:` clause.
-  // If `omitAssociatedFunctions` is true, omit printing associated functions.
-  void print(llvm::raw_ostream &OS, const Decl *D,
-             bool omitWrtClause = false,
-             bool omitAssociatedFunctions = false) const;
+  void print(llvm::raw_ostream &OS, const Decl *D, bool omitWrtClause = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
@@ -1773,15 +1806,15 @@ public:
 ///
 /// The `@derivative(of:)` attribute also has an optional `wrt:` clause
 /// specifying the parameters that are differentiated "with respect to", i.e.
-/// the differentiation parameters. The differentiation parameters must conform
-/// to the `Differentiable` protocol.
+/// the differentiability parameters. The differentiability parameters must
+/// conform to the `Differentiable` protocol.
 ///
-/// If the `wrt:` clause is unspecified, the differentiation parameters are
+/// If the `wrt:` clause is unspecified, the differentiability parameters are
 /// inferred to be all parameters that conform to `Differentiable`.
 ///
 /// `@derivative(of:)` attribute type-checking verifies that the type of the
 /// derivative function declaration is consistent with the type of the
-/// referenced original declaration and the differentiation parameters.
+/// referenced original declaration and the differentiability parameters.
 ///
 /// Examples:
 ///   @derivative(of: sin(_:))
@@ -1791,7 +1824,7 @@ class DerivativeAttr final
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type repr for the referenced original function. This field is
+  /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.
@@ -1800,9 +1833,9 @@ class DerivativeAttr final
   DeclNameRefWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
   AbstractFunctionDecl *OriginalFunction = nullptr;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The differentiation parameters' indices, resolved by the type checker.
+  /// The differentiability parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
   /// The derivative function kind (JVP or VJP), resolved by the type checker.
   Optional<AutoDiffDerivativeFunctionKind> Kind = None;
@@ -1845,7 +1878,7 @@ public:
   }
   void setDerivativeKind(AutoDiffDerivativeFunctionKind kind) { Kind = kind; }
 
-  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
@@ -1874,7 +1907,7 @@ public:
 /// computed property declaration.
 ///
 /// The `@transpose(of:)` attribute also has a `wrt:` clause specifying the
-/// parameters that are transposed "with respect to", i.e. the transposed
+/// parameters that are transposed "with respect to", i.e. the linearity
 /// parameters.
 ///
 /// Examples:
@@ -1885,7 +1918,7 @@ class TransposeAttr final
       private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type repr for the referenced original function. This field is
+  /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.
@@ -1894,9 +1927,9 @@ class TransposeAttr final
   DeclNameRefWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
   AbstractFunctionDecl *OriginalFunction = nullptr;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed linearity parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The transposed parameters' indices, resolved by the type checker.
+  /// The linearity parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
 
   explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
@@ -1929,7 +1962,7 @@ public:
     OriginalFunction = decl;
   }
 
-  /// The parsed transposed parameters, i.e. the list of parameters specified in
+  /// The parsed linearity parameters, i.e. the list of parameters specified in
   /// 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
@@ -1990,6 +2023,11 @@ public:
   /// unavailable relative to the provided language version.
   bool
   isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
+
+  /// Finds the most-specific platform-specific attribute that is
+  /// active for the current platform.
+  const AvailableAttr *
+  findMostSpecificActivePlatform(const ASTContext &ctx) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or the first one that indicates it's
@@ -2071,6 +2109,15 @@ public:
   /// Retrieve the first attribute with the given kind.
   const DeclAttribute *getAttribute(DeclAttrKind DK,
                                     bool AllowInvalid = false) const {
+    for (auto Attr : *this)
+      if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
+        return Attr;
+    return nullptr;
+  }
+
+  /// Retrieve the first attribute with the given kind.
+  DeclAttribute *getAttribute(DeclAttrKind DK,
+                              bool AllowInvalid = false) {
     for (auto Attr : *this)
       if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
         return Attr;

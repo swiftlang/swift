@@ -330,3 +330,5 @@ thirdCall("""
 fourthCall(a: @escaping () -> Int)
 // CHECK: <call><name>fourthCall</name>(<arg><name>a</name>: @escaping () -> Int</arg>)</call>
 
+// CHECK: <call><name>foo</name> <closure>{ [unowned <lvar><name>self</name></lvar>, <lvar><name>x</name></lvar>] in _ }</closure></call>
+foo { [unowned self, x] in _ }

@@ -1,5 +1,9 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
+// REQUIRES: rdar60068448
+// FIXME Reenable the !invariant.load metadata after debugging miscompiles...
+// <rdar://60068448> Teach IRGen to emit !invariant metadata for 'let' variables
+
 sil_stage lowered
 
 import Builtin
@@ -7,6 +11,10 @@ import Builtin
 struct X {
   var y: Builtin.Int32
   var z: Builtin.Int32
+}
+
+class C {
+  @_hasStorage @_hasInitialValue final let prop: Builtin.Int32 { get }
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @invariant_load
@@ -24,3 +32,13 @@ entry(%p : $Builtin.RawPointer):
   %z = load [trivial] %zp : $*Builtin.Int32
   return undef : $()
 }
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @testLetProp
+sil @testLetProp : $@convention(thin) (@guaranteed C) -> Builtin.Int32 {
+bb0(%0 : $C):
+  %propAdr = ref_element_addr %0 : $C, #C.prop
+  // CHECK: load i32, {{.*}} !invariant.load
+  %val = load %propAdr : $*Builtin.Int32
+  return %val : $Builtin.Int32
+}
+

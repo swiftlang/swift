@@ -289,7 +289,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
 // CHECK: <func=,param0=r>
 sil @projections : $@convention(thin) (EP) -> Builtin.Int32 {
 bb0(%0 : $EP):
-  %ee = unchecked_enum_data %0 : $EP, #EP.data!enumelt.1
+  %ee = unchecked_enum_data %0 : $EP, #EP.data!enumelt
   %te = tuple_extract %ee : $(SP, Builtin.Int1), 0
   %se = struct_extract %te : $SP, #SP.value
   %urc = unchecked_ref_cast %se : $X to $Builtin.BridgeObject

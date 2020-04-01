@@ -55,9 +55,9 @@
 // EXEC: -frontend
 // EXEC-DAG: -num-threads 4
 // EXEC-DAG: {{[^ ]*[/\\]}}Inputs{{/|\\\\}}main.swift{{"?}} {{[^ ]*[/\\]}}multi-threaded.swift 
-// EXEC-DAG:  -o {{.*te?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} -o {{.*te?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
+// EXEC-DAG:  -o {{.*[tT]e?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} -o {{.*[tT]e?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
 // EXEC: {{ld|clang}}
-// EXEC:  {{.*te?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} {{.*te?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
+// EXEC:  {{.*[tT]e?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} {{.*[tT]e?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
 
 // DEPENDENCIES-DAG: {{.*}}multi-threaded.o : {{.*[/\\]}}multi-threaded.swift {{.*[/\\]}}Inputs{{[/\\]}}main.swift
 // DEPENDENCIES-DAG: {{.*}}main.o : {{.*[/\\]}}multi-threaded.swift {{.*[/\\]}}Inputs{{[/\\]}}main.swift

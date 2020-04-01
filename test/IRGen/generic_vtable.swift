@@ -40,15 +40,15 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$s14generic_vtable4BaseCMf" = internal global
 // -- destructor
-// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseCfD"
+// CHECK-SAME: @"$s14generic_vtable4BaseCfD{{(.ptrauth)?}}"
 // -- value witness table
 // CHECK-SAME: i8** {{@"\$sBoWV"|null}}
 // -- vtable entry for 'm1()'
-// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m1yyF"
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* {{@"\$s14generic_vtable4BaseC2m1yyF"|.* @"\$s14generic_vtable4BaseC2m1yyF.ptrauth"}}
 // -- vtable entry for 'm2()'
-// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m2yyF"
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* {{@"\$s14generic_vtable4BaseC2m2yyF"|.* @"\$s14generic_vtable4BaseC2m2yyF.ptrauth"}}
 // -- vtable entry for 'init()'
-// CHECK-SAME: %T14generic_vtable4BaseC* (%swift.type*)* @"$s14generic_vtable4BaseCACycfC"
+// CHECK-SAME: %T14generic_vtable4BaseC* (%swift.type*)* {{@"\$s14generic_vtable4BaseCACycfC"|.* @"\$s14generic_vtable4BaseCACycfC.ptrauth"}}
 // --
 // CHECK-SAME: , align
 
@@ -119,21 +119,21 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$s14generic_vtable8ConcreteCMf" = internal global <{{.*}}> <{
 // -- destructor
-// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$s14generic_vtable8ConcreteCfD",
+// CHECK-SAME: @"$s14generic_vtable8ConcreteCfD{{(.ptrauth)?}}"
 // -- value witness table is filled in at runtime
 // CHECK-SAME: i8** null,
 // -- nominal type descriptor
-// CHECK-SAME: @"$s14generic_vtable8ConcreteCMn",
+// CHECK-SAME: @"$s14generic_vtable8ConcreteCMn{{(.ptrauth)?}}"
 // -- vtable entry for 'm1()'
-// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m1yyF"
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* {{@"\$s14generic_vtable4BaseC2m1yyF"|.* @"\$s14generic_vtable4BaseC2m1yyF.ptrauth.1"}}
 // -- vtable entry for 'm2()'
-// CHECK-SAME: void (%T14generic_vtable7DerivedC*)* @"$s14generic_vtable7DerivedC2m2yyF"
+// CHECK-SAME: void (%T14generic_vtable7DerivedC*)* {{@"\$s14generic_vtable7DerivedC2m2yyF"|.* @"\$s14generic_vtable7DerivedC2m2yyF.ptrauth"}}
 // -- vtable entry for 'init()'
-// CHECK-SAME: %T14generic_vtable8ConcreteC* (%swift.type*)* @"$s14generic_vtable8ConcreteCACycfC"
+// CHECK-SAME: %T14generic_vtable8ConcreteC* (%swift.type*)* {{@"\$s14generic_vtable8ConcreteCACycfC"|.* @"\$s14generic_vtable8ConcreteCACycfC.ptrauth"}}
 // -- vtable entry for 'm3()'
-// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$s14generic_vtable8ConcreteC2m3yyF"
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* {{@"\$s14generic_vtable8ConcreteC2m3yyF"|.* @"\$s14generic_vtable8ConcreteC2m3yyF.ptrauth"}}
 // -- vtable entry for 'm4()'
-// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$s14generic_vtable8ConcreteC2m4yyF"
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* {{@"\$s14generic_vtable8ConcreteC2m4yyF"|.* @"\$s14generic_vtable8ConcreteC2m4yyF.ptrauth"}}
 // --
 // CHECK-SAME: }>, align
 
@@ -152,16 +152,16 @@ public class Concrete : Derived<Int> {
 //// Metadata initialization function for 'Derived' copies superclass vtable
 //// and installs overrides for 'm2()' and 'init()'.
 
-// CHECK-LABEL: define internal %swift.type* @"$s14generic_vtable7DerivedCMi"(%swift.type_descriptor*, i8**, i8*)
+// CHECK-LABEL: define internal %swift.type* @"$s14generic_vtable7DerivedCMi"(%swift.type_descriptor* %0, i8** %1, i8* %2)
 
 // - 2 immediate members:
 //   - type metadata for generic parameter T,
 //   - and vtable entry for 'm3()'
-// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
+// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* {{.*}}, i8** %1, i8* %2)
 // CHECK: ret %swift.type* [[METADATA]]
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable7DerivedCMr"
-// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8* %0, i8** %1) {{.*}} {
 // CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
 
 // CHECK: ret %swift.metadata_response
@@ -173,7 +173,7 @@ public class Concrete : Derived<Int> {
 
 //// Metadata response function for 'Concrete' is fairly simple.
 
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable8ConcreteCMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable8ConcreteCMr"(%swift.type* %0, i8* %1, i8** %2)
 // -- ClassLayoutFlags is 256 / 0x100, HasStaticVTable
 // CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, {{.*}})
 // CHECK: ret %swift.metadata_response

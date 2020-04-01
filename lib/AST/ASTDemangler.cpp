@@ -365,7 +365,8 @@ Type ASTBuilder::createFunctionType(
     auto parameterFlags = ParameterTypeFlags()
                               .withValueOwnership(ownership)
                               .withVariadic(flags.isVariadic())
-                              .withAutoClosure(flags.isAutoClosure());
+                              .withAutoClosure(flags.isAutoClosure())
+                              .withNoDerivative(flags.isNoDerivative());
 
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
   }
@@ -386,6 +387,19 @@ Type ASTBuilder::createFunctionType(
     break;
   }
 
+  DifferentiabilityKind diffKind;
+  switch (flags.getDifferentiabilityKind()) {
+  case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
+    diffKind = DifferentiabilityKind::NonDifferentiable;
+    break;
+  case FunctionMetadataDifferentiabilityKind::Normal:
+    diffKind = DifferentiabilityKind::Normal;
+    break;
+  case FunctionMetadataDifferentiabilityKind::Linear:
+    diffKind = DifferentiabilityKind::Linear;
+    break;
+  }
+
   auto noescape =
     (representation == FunctionTypeRepresentation::Swift
      || representation == FunctionTypeRepresentation::Block)
@@ -393,9 +407,7 @@ Type ASTBuilder::createFunctionType(
 
   FunctionType::ExtInfo incompleteExtInfo(
     FunctionTypeRepresentation::Swift,
-    noescape, flags.throws(),
-    DifferentiabilityKind::NonDifferentiable,
-    /*clangFunctionType*/nullptr);
+    noescape, flags.throws(), diffKind, /*clangFunctionType*/nullptr);
 
   const clang::Type *clangFunctionType = nullptr;
   if (representation == FunctionTypeRepresentation::CFunctionPointer)
@@ -454,7 +466,7 @@ Type ASTBuilder::createImplFunctionType(
     ArrayRef<Demangle::ImplFunctionResult<Type>> results,
     Optional<Demangle::ImplFunctionResult<Type>> errorResult,
     ImplFunctionTypeFlags flags) {
-  GenericSignature genericSig = GenericSignature();
+  GenericSignature genericSig;
 
   SILCoroutineKind funcCoroutineKind = SILCoroutineKind::None;
   ParameterConvention funcCalleeConvention =
@@ -519,7 +531,7 @@ Type ASTBuilder::createImplFunctionType(
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
                               funcResults, funcErrorResult,
-                              SubstitutionMap(), false, Ctx);
+                              SubstitutionMap(), SubstitutionMap(), Ctx);
 }
 
 Type ASTBuilder::createProtocolCompositionType(
@@ -865,12 +877,13 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
     }
   }
 
-  return evaluateOrDefault(
-      Ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        nominalDecl->getGenericSignature().getPointer(), { },
-        std::move(requirements)},
-      GenericSignature())->getCanonicalSignature();
+  return evaluateOrDefault(Ctx.evaluator,
+                           AbstractGenericSignatureRequest{
+                               nominalDecl->getGenericSignature().getPointer(),
+                               {},
+                               std::move(requirements)},
+                           GenericSignature())
+      .getCanonicalSignature();
 }
 
 DeclContext *
@@ -980,8 +993,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
         continue;
       }
 
-      if (ext->getGenericSignature()->getCanonicalSignature()
-          == genericSig) {
+      if (ext->getGenericSignature().getCanonicalSignature() == genericSig) {
         return ext;
       }
     }

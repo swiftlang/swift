@@ -24,19 +24,20 @@
 #include "swift/Runtime/Config.h"
 
 #if SWIFT_OBJC_INTEROP
+#include "ErrorObject.h"
+#include "Private.h"
+#include "SwiftObject.h"
+#include "swift/Basic/Lazy.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/ObjCBridge.h"
-#include "swift/Basic/Lazy.h"
-#include "swift/Demangling/ManglingMacros.h"
-#include "ErrorObject.h"
-#include "Private.h"
+#include <Foundation/Foundation.h>
 #include <dlfcn.h>
 #include <objc/NSObject.h>
-#include <objc/runtime.h>
 #include <objc/message.h>
 #include <objc/objc.h>
-#include <Foundation/Foundation.h>
+#include <objc/runtime.h>
 
 using namespace swift;
 using namespace swift::hashable_support;
@@ -97,6 +98,18 @@ using namespace swift::hashable_support;
          && "Error box used as NSError before initialization");
   // Don't need to .retain.autorelease since it's immutable.
   return cf_const_cast<id>(domain);
+}
+
+- (id /* NSString */)description {
+  auto error = (const SwiftError *)self;
+  auto value = error->getValue();
+
+  // Copy the value, since it will be consumed by getDescription.
+  ValueBuffer copyBuf;
+  auto copy = error->type->allocateBufferIn(&copyBuf);
+  error->type->vw_initializeWithCopy(copy, const_cast<OpaqueValue *>(value));
+
+  return getDescription(copy, error->type);
 }
 
 - (NSInteger)code {

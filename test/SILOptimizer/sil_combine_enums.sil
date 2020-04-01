@@ -26,22 +26,22 @@ sil @eliminate_sw_enum_addr : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_stack $Optional<SomeClass>, var, name "x" // users: %2, %4, %5, %17, %19
   %1 = alloc_ref $SomeClass                       // user: %3
-  %2 = init_enum_data_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt.1 // user: %3
+  %2 = init_enum_data_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt // user: %3
   store %1 to %2 : $*SomeClass                    // id: %3
-  inject_enum_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt.1 // id: %4
+  inject_enum_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt // id: %4
   %5 = load %0 : $*Optional<SomeClass>          // users: %6, %8, %9, %14
   retain_value %5 : $Optional<SomeClass>
   %7 = alloc_stack $Optional<SomeClass>           // users: %9, %10, %11, %13
   retain_value %5 : $Optional<SomeClass>
   store %5 to %7 : $*Optional<SomeClass>        // id: %9
-  switch_enum_addr %7 : $*Optional<SomeClass>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2 // id: %10
+  switch_enum_addr %7 : $*Optional<SomeClass>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2 // id: %10
 
 bb1:                                              // Preds: bb0
-  %11 = unchecked_take_enum_data_addr %7 : $*Optional<SomeClass>, #Optional.some!enumelt.1 // user: %12
+  %11 = unchecked_take_enum_data_addr %7 : $*Optional<SomeClass>, #Optional.some!enumelt // user: %12
   %12 = load %11 : $*SomeClass                    // users: %15, %16
   dealloc_stack %7 : $*Optional<SomeClass> // id: %13
   release_value %5 : $Optional<SomeClass>         // id: %14
-  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int // user: %16
+  %15 = class_method %12 : $SomeClass, #SomeClass.hash : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int // user: %16
   %16 = apply %15(%12) : $@convention(method) (@guaranteed SomeClass) -> Int // user: %20
   %17 = load %0 : $*Optional<SomeClass>         // user: %18
   release_value %17 : $Optional<SomeClass>        // id: %18
@@ -61,9 +61,9 @@ sil @eliminate_select_enum_addr : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_stack $Optional<SomeClass>
   %1 = alloc_ref $SomeClass
-  %2 = init_enum_data_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt.1
+  %2 = init_enum_data_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt
   store %1 to %2 : $*SomeClass
-  inject_enum_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt.1
+  inject_enum_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt
   %5 = load %0 : $*Optional<SomeClass>
   retain_value %5 : $Optional<SomeClass>
   %7 = alloc_stack $Optional<SomeClass>
@@ -71,15 +71,15 @@ bb0:
   store %5 to %7 : $*Optional<SomeClass>
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0
-  %b = select_enum_addr %7 : $*Optional<SomeClass>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
+  %b = select_enum_addr %7 : $*Optional<SomeClass>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
   cond_br %b, bb1, bb2
 
 bb1:
-  %11 = unchecked_take_enum_data_addr %7 : $*Optional<SomeClass>, #Optional.some!enumelt.1
+  %11 = unchecked_take_enum_data_addr %7 : $*Optional<SomeClass>, #Optional.some!enumelt
   %12 = load %11 : $*SomeClass                    // users: %15, %16
   dealloc_stack %7 : $*Optional<SomeClass>
   release_value %5 : $Optional<SomeClass>
-  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
+  %15 = class_method %12 : $SomeClass, #SomeClass.hash : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
   %16 = apply %15(%12) : $@convention(method) (@guaranteed SomeClass) -> Int
   %17 = load %0 : $*Optional<SomeClass>
   release_value %17 : $Optional<SomeClass>
@@ -137,13 +137,13 @@ bb0(%0 : $*G<T>):
 // CHECK-LABEL: sil @canonicalize_init_enum_data_addr
 // CHECK-NOT: init_enum_data_addr
 // CHECK-NOT: inject_enum_addr
-// CHECK: enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK: enum $Optional<Int32>, #Optional.some!enumelt
 // CHECK-NOT: inject_enum_addr
 // CHECK: return
 sil @canonicalize_init_enum_data_addr : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
 bb0(%0 : $*Int32, %1 : $Builtin.Int32):
   %s1 = alloc_stack $Optional<Int32>
-  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
   %v = load %0 : $*Int32
   store %v to %e1 : $*Int32
   %i1 = integer_literal $Builtin.Int32, 1
@@ -152,7 +152,7 @@ bb0(%0 : $*Int32, %1 : $Builtin.Int32):
   %w = tuple_extract %a : $(Builtin.Int32, Builtin.Int1), 0
   %i = struct $Int32 (%w : $Builtin.Int32)
   store %i to %0 : $*Int32
-  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
   dealloc_stack %s1 : $*Optional<Int32>
   return %i : $Int32
 }
@@ -160,13 +160,13 @@ bb0(%0 : $*Int32, %1 : $Builtin.Int32):
 // CHECK-LABEL: sil @canonicalize_init_enum_data_addr_diff_basic_blocks
 // CHECK-NOT: init_enum_data_addr
 // CHECK-NOT: inject_enum_addr
-// CHECK: enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK: enum $Optional<Int32>, #Optional.some!enumelt
 // CHECK-NOT: inject_enum_addr
 // CHECK: return
 sil @canonicalize_init_enum_data_addr_diff_basic_blocks : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
 bb0(%0 : $*Int32, %1 : $Builtin.Int32):
   %s1 = alloc_stack $Optional<Int32>
-  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
   %v = load %0 : $*Int32
   store %v to %e1 : $*Int32
   %i1 = integer_literal $Builtin.Int32, 1
@@ -178,7 +178,7 @@ bb0(%0 : $*Int32, %1 : $Builtin.Int32):
 
 bb1:                                              // Preds: bb0
   store %i to %0 : $*Int32
-  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
   dealloc_stack %s1 : $*Optional<Int32>
   return %i : $Int32
 }
@@ -186,7 +186,7 @@ bb1:                                              // Preds: bb0
 // CHECK-LABEL: sil @fail_to_canonicalize_init_enum_data_addr_reach_entry
 // CHECK: init_enum_data_addr
 // CHECK: inject_enum_addr
-// CHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt
 // CHECK: return
 sil @fail_to_canonicalize_init_enum_data_addr_reach_entry : $@convention(thin) (@inout Int32, Builtin.Int32, Builtin.Int1) -> Int32 {
 bb0(%0 : $*Int32, %1 : $Builtin.Int32, %2 : $Builtin.Int1):
@@ -197,7 +197,7 @@ bb0(%0 : $*Int32, %1 : $Builtin.Int32, %2 : $Builtin.Int1):
   cond_br %2, bb1, bb2
 
 bb1:
-  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
   %v = load %0 : $*Int32
   store %v to %e1 : $*Int32
   %i1 = integer_literal $Builtin.Int32, 1
@@ -209,7 +209,7 @@ bb1:
   br bb2
 
 bb2:                                              // Preds: bb0 bb1
-  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
   dealloc_stack %s1 : $*Optional<Int32>
   return %i2 : $Int32
 }
@@ -217,12 +217,12 @@ bb2:                                              // Preds: bb0 bb1
 // CHECK-LABEL: sil @fail_to_canonicalize_init_enum_data_addr
 // CHECK: init_enum_data_addr
 // CHECK: inject_enum_addr
-// CHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt
 // CHECK: return
 sil @fail_to_canonicalize_init_enum_data_addr : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
 bb0(%0 : $*Int32, %1 : $Builtin.Int32):
   %s1 = alloc_stack $Optional<Int32>
-  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
   %v = load %0 : $*Int32
   store %v to %e1 : $*Int32
   %i1 = integer_literal $Builtin.Int32, 1
@@ -239,7 +239,7 @@ bb1:
 
 bb2:
   store %i to %0 : $*Int32
-  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
   dealloc_stack %s1 : $*Optional<Int32>
   return %i : $Int32
 }
@@ -255,12 +255,12 @@ sil @convert_select_enum_cond_br_to_switch_enum : $@convention(thin) (@owned Opt
 bb0(%0 : $Optional<SomeClass>):
   %1 = integer_literal $Builtin.Int1, 0
   %2 = integer_literal $Builtin.Int1, -1
-  %3 = select_enum %0 : $Optional<SomeClass>, case #Optional.none!enumelt: %2, case #Optional.some!enumelt.1: %1 : $Builtin.Int1
+  %3 = select_enum %0 : $Optional<SomeClass>, case #Optional.none!enumelt: %2, case #Optional.some!enumelt: %1 : $Builtin.Int1
   cond_br %3, bb2, bb1
 
 bb1:
-  %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.some!enumelt.1
-  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
+  %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.some!enumelt
+  %6 = class_method %5 : $SomeClass, #SomeClass.hash : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
   %7 = apply %6(%5) : $@convention(method) (@guaranteed SomeClass) -> Int
   fix_lifetime %5 : $SomeClass
   strong_release %5 : $SomeClass
@@ -345,12 +345,12 @@ sil @dont_convert_select_enum_cond_br_to_switch_enum : $@convention(thin) (@owne
 bb0(%0 : $Optional<SomeClass>):
   %2 = integer_literal $Builtin.Int1, 0
   %3 = integer_literal $Builtin.Int1, -1
-  %4 = select_enum %0 : $Optional<SomeClass>, case #Optional.none!enumelt: %3, case #Optional.some!enumelt.1: %2 : $Builtin.Int1
+  %4 = select_enum %0 : $Optional<SomeClass>, case #Optional.none!enumelt: %3, case #Optional.some!enumelt: %2 : $Builtin.Int1
   cond_br %4, bb2, bb1
 
 bb1:
-  %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.some!enumelt.1
-  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
+  %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.some!enumelt
+  %6 = class_method %5 : $SomeClass, #SomeClass.hash : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
   %7 = apply %6(%5) : $@convention(method) (@guaranteed SomeClass) -> Int
   fix_lifetime %5 : $SomeClass
   strong_release %5 : $SomeClass
@@ -449,7 +449,7 @@ sil @keep_unchecked_enum_data : $@convention(thin) (@owned X, @owned T) -> @owne
 bb0(%0 : $X, %1 : $T):
 // CHECK: [[CAST:%.*]] = unchecked_bitwise_cast %0 : $X to $Y
   %4 = unchecked_bitwise_cast %0 : $X to $Y
-  switch_enum %4 : $Y, case #Y.none!enumelt: bb1, case #Y.some!enumelt.1: bb2
+  switch_enum %4 : $Y, case #Y.none!enumelt: bb1, case #Y.some!enumelt: bb2
 
 // CHECK: bb1
 bb1:
@@ -459,8 +459,8 @@ bb1:
 
 // CHECK: bb2
 bb2(%10 : $T):
-// CHECK: unchecked_enum_data [[CAST]] : $Y, #Y.some!enumelt.1
-  %11 = unchecked_enum_data %4 : $Y, #Y.some!enumelt.1
+// CHECK: unchecked_enum_data [[CAST]] : $Y, #Y.some!enumelt
+  %11 = unchecked_enum_data %4 : $Y, #Y.some!enumelt
   %12 = struct_extract %11 : $T, #T.c
   br bb3(%12 : $C)
 
@@ -473,3 +473,26 @@ bb3(%14 : $C):
 // CHECK: return
   return %16 : $T
 }
+
+// CHECK-LABEL: sil @test_inject_tuple
+// CHECK:   [[A:%[0-9]+]] = alloc_stack $Optional<(Int, Int)>
+// CHECK:   [[T:%[0-9]+]] = tuple (%0 : $Int, %1 : $Int)
+// CHECK:   [[E:%[0-9]+]] = enum $Optional<(Int, Int)>, #Optional.some!enumelt, [[T]] : $(Int, Int)
+// CHECK:   store [[E]] to [[A]]
+// CHECK:   [[L:%[0-9]+]] = load [[A]]
+// CHECK:   return [[L]]
+// CHECK: } // end sil function 'test_inject_tuple'
+sil @test_inject_tuple : $@convention(thin) (Int, Int) -> Optional<(Int, Int)> {
+bb0(%0 : $Int, %1 : $Int):
+  %17 = alloc_stack $Optional<(Int, Int)>
+  %45 = init_enum_data_addr %17 : $*Optional<(Int, Int)>, #Optional.some!enumelt
+  %46 = tuple_element_addr %45 : $*(Int, Int), 0
+  %47 = tuple_element_addr %45 : $*(Int, Int), 1
+  store %0 to %46 : $*Int
+  store %1 to %47 : $*Int
+  inject_enum_addr %17 : $*Optional<(Int, Int)>, #Optional.some!enumelt
+  %r = load %17 : $*Optional<(Int, Int)>
+  dealloc_stack %17 : $*Optional<(Int, Int)>
+  return %r : $Optional<(Int, Int)>
+}
+

@@ -40,6 +40,7 @@ namespace clang {
   class NamedDecl;
   class Sema;
   class TargetInfo;
+  class Type;
   class VisibleDeclConsumer;
   class DeclarationName;
 }
@@ -173,7 +174,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
+  virtual bool canImportModule(Located<Identifier> named) override;
 
   /// Import a module with the given module path.
   ///
@@ -189,7 +190,7 @@ public:
   /// emits a diagnostic and returns NULL.
   virtual ModuleDecl *loadModule(
                         SourceLoc importLoc,
-                        ArrayRef<std::pair<Identifier, SourceLoc>> path)
+                        ArrayRef<Located<Identifier>> path)
                       override;
 
   /// Determine whether \c overlayDC is within an overlay module for the
@@ -327,6 +328,10 @@ public:
   /// \sa importHeader
   ModuleDecl *getImportedHeaderModule() const override;
 
+  /// Retrieves the Swift wrapper for the given Clang module, creating
+  /// it if necessary.
+  ModuleDecl *getWrapperForModule(const clang::Module *mod) const override;
+
   std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
                                         time_t &fileModTime);
 
@@ -399,7 +404,7 @@ public:
   /// Given the path of a Clang module, collect the names of all its submodules.
   /// Calling this function does not load the module.
   void collectSubModuleNames(
-      ArrayRef<std::pair<Identifier, SourceLoc>> path,
+      ArrayRef<Located<Identifier>> path,
       std::vector<std::string> &names) const;
 
   /// Given a Clang module, decide whether this module is imported already.
@@ -416,6 +421,21 @@ public:
   /// with -import-objc-header option.
   getPCHFilename(const ClangImporterOptions &ImporterOptions,
                  StringRef SwiftPCHHash, bool &isExplicit);
+
+  const clang::Type *parseClangFunctionType(StringRef type,
+                                            SourceLoc loc) const override;
+  void printClangType(const clang::Type *type,
+                      llvm::raw_ostream &os) const override;
+
+  StableSerializationPath
+  findStableSerializationPath(const clang::Decl *decl) const override;
+
+  const clang::Decl *
+  resolveStableSerializationPath(
+                            const StableSerializationPath &path) const override;
+
+  bool isSerializable(const clang::Type *type,
+                      bool checkCanonical) const override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

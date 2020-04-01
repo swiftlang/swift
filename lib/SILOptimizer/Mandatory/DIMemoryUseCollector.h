@@ -52,22 +52,18 @@ struct DIElementUseInfo;
 /// Derived classes have an additional field at the end that models whether or
 /// not super.init() has been called or not.
 class DIMemoryObjectInfo {
-public:
   /// The uninitialized memory that we are analyzing.
   MarkUninitializedInst *MemoryInst;
 
-private:
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
 
-public:
   /// This is the count of elements being analyzed.  For memory objects that are
   /// tuples, this is the flattened element count.  For 'self' members in init
   /// methods, this is the local field count (+1 for super/self classes were
   /// initialized).
   unsigned NumElements;
 
-private:
   /// True if the memory object being analyzed represents a 'let', which is
   /// initialize-only (reassignments are not allowed).
   bool IsLet = false;
@@ -81,6 +77,8 @@ public:
 
   SILLocation getLoc() const { return MemoryInst->getLoc(); }
   SILFunction &getFunction() const { return *MemoryInst->getFunction(); }
+  SILModule &getModule() const { return MemoryInst->getModule(); }
+  SILBasicBlock *getParentBlock() const { return MemoryInst->getParent(); }
 
   /// Return the first instruction of the function containing the memory object.
   SILInstruction *getFunctionEntryPoint() const;
@@ -95,13 +93,31 @@ public:
   /// be non-empty.
   bool hasDummyElement() const { return HasDummyElement; }
 
-  SingleValueInstruction *getAddress() const { return MemoryInst; }
+  /// Return the actual 'uninitialized' memory. In the case of alloc_ref,
+  /// alloc_stack, this always just returns the actual mark_uninitialized
+  /// instruction. For alloc_box though it returns the project_box associated
+  /// with the memory info.
+  SingleValueInstruction *getUninitializedValue() const {
+    if (auto *mui = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
+      if (auto *pbi = mui->getSingleUserOfType<ProjectBoxInst>()) {
+        return pbi;
+      }
+    }
+    return MemoryInst;
+  }
 
   /// Return the number of elements, without the extra "super.init" tracker in
   /// initializers of derived classes.
   unsigned getNumMemoryElements() const {
     return NumElements - (unsigned)isDerivedClassSelf();
   }
+
+  /// Return the number of elements, including the extra "super.init" tracker in
+  /// initializers of derived classes.
+  ///
+  /// \see getNumMemoryElements() for the number of elements, excluding the
+  /// extra "super.init" tracker in the initializers of derived classes.
+  unsigned getNumElements() const { return NumElements; }
 
   /// Return true if this is 'self' in any kind of initializer.
   bool isAnyInitSelf() const { return !MemoryInst->isVar(); }
@@ -188,12 +204,21 @@ public:
     return false;
   }
 
+  bool isRootSelf() const {
+    return MemoryInst->getKind() == MarkUninitializedInst::RootSelf;
+  }
+
+  bool isDelegatingSelfAllocated() const {
+    return MemoryInst->isDelegatingSelfAllocated();
+  }
+
+  enum class EndScopeKind { Borrow, Access };
+
   /// Given an element number (in the flattened sense) return a pointer to a
   /// leaf element of the specified number.
-  SILValue
-  emitElementAddress(unsigned TupleEltNo, SILLocation Loc, SILBuilder &B,
-                     llvm::SmallVectorImpl<std::pair<SILValue, SILValue>>
-                         &EndBorrowList) const;
+  SILValue emitElementAddressForDestroy(
+      unsigned TupleEltNo, SILLocation Loc, SILBuilder &B,
+      SmallVectorImpl<std::pair<SILValue, EndScopeKind>> &EndScopeList) const;
 
   /// Return the swift type of the specified element.
   SILType getElementType(unsigned EltNo) const;
@@ -306,9 +331,7 @@ struct DIElementUseInfo {
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
 /// and storing the information found into the Uses and Releases lists.
 void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
-                              DIElementUseInfo &UseInfo,
-                              bool isDefiniteInitFinished,
-                              bool TreatAddressToPointerAsInout);
+                              DIElementUseInfo &UseInfo);
 
 } // end namespace ownership
 } // end namespace swift

@@ -32,9 +32,9 @@ func <#some name#>() {} // expected-error {{editor placeholder in source file}}
 class switch {} // expected-error {{keyword 'switch' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{7-13=`switch`}}
 struct Self {} // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}}
 protocol enum {} // expected-error {{keyword 'enum' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{10-14=`enum`}}
-protocol test { // expected-note{{in declaration of 'test'}}
-  associatedtype public // expected-error {{keyword 'public' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{18-24=`public`}} expected-error {{consecutive declarations on a line must be separated by ';'}}
-} // expected-error{{expected declaration}}
+protocol test {
+  associatedtype public // expected-error {{keyword 'public' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{18-24=`public`}}
+}
 func _(_ x: Int) {} // expected-error {{keyword '_' cannot be used as an identifier here}} // expected-note {{if this name is unavoidable, use backticks to escape it}} {{6-7=`_`}}
 
 // SIL keywords are tokenized as normal identifiers in non-SIL mode.

@@ -182,11 +182,11 @@ bb0(%0 : @owned $RefWithInt):
 // CHECK-LABEL: Function: 'unchecked_enum_data_propagates_ownership'
 // CHECK: Found over consume?!
 // CHECK: Value: %0 = argument of bb0 : $Optional<Builtin.NativeObject>
-// CHECK: User: destroy_value %0 : $Optional<Builtin.NativeObject>
+// CHECK: User:   %1 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt
 // CHECK: Block: bb0
 sil [ossa] @unchecked_enum_data_propagates_ownership : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $Optional<Builtin.NativeObject>):
-  %1 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
+  %1 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt
   destroy_value %0 : $Optional<Builtin.NativeObject>
   %9999 = tuple()
   return %9999 : $()
@@ -205,7 +205,7 @@ bb0(%0 : @owned $Optional<Builtin.NativeObject>):
 // CHECK: any: Yes. Liveness: MustBeLive
 sil [ossa] @switch_enum_mismatching_argument_guaranteed_to_owned : $@convention(thin) (@guaranteed Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @guaranteed $Optional<Builtin.NativeObject>):
-  switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+  switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%1 : @owned $Builtin.NativeObject):
   destroy_value %1 : $Builtin.NativeObject
@@ -232,10 +232,9 @@ bb3:
 // CHECK: any: Yes. Liveness: MustBeLive
 sil [ossa] @switch_enum_mismatching_argument_owned_to_guaranteed : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $Optional<Builtin.NativeObject>):
-  switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+  switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%1 : @guaranteed $Builtin.NativeObject):
-  end_borrow %1 : $Builtin.NativeObject
   br bb3
 
 bb2:
@@ -251,16 +250,16 @@ bb3:
 // CHECK: Found use after free?!
 // CHECK: Value:   %1 = begin_borrow %0 : $Optional<Builtin.NativeObject>
 // CHECK: Consuming User:   end_borrow %1 : $Optional<Builtin.NativeObject>
-// CHECK: Non Consuming User:   end_borrow %3 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   %5 = unchecked_ref_cast %3 : $Builtin.NativeObject to $Builtin.NativeObject
 // CHECK: Block: bb1
 sil [ossa] @switch_enum_guaranteed_arg_outlives_original_value : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $Optional<Builtin.NativeObject>):
   %1 = begin_borrow %0 : $Optional<Builtin.NativeObject>
-  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%2 : @guaranteed $Builtin.NativeObject):
   end_borrow %1 : $Optional<Builtin.NativeObject>
-  end_borrow %2 : $Builtin.NativeObject
+  %2a = unchecked_ref_cast %2 : $Builtin.NativeObject to $Builtin.NativeObject
   br bb3
 
 bb2:
@@ -312,7 +311,6 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%1 : @guaranteed $SuperKlass):
-  end_borrow %1 : $SuperKlass
   br bb3
 
 bb2(%2 : @owned $Builtin.NativeObject):
@@ -339,7 +337,6 @@ bb1(%1 : @owned $SuperKlass):
   br bb3
 
 bb2(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow %2 : $Builtin.NativeObject
   br bb3
 
 bb3:
@@ -363,11 +360,9 @@ bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%1 : @guaranteed $SuperKlass):
-  end_borrow %1 : $SuperKlass
   br bb3
 
 bb2(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow %2 : $Builtin.NativeObject
   br bb3
 
 bb3:
@@ -387,7 +382,6 @@ bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%1 : @guaranteed $SuperKlass):
-  end_borrow %1 : $SuperKlass
   br bb3
 
 bb2(%2 : @owned $Builtin.NativeObject):
@@ -414,7 +408,6 @@ bb1(%1 : @owned $SuperKlass):
   br bb3
 
 bb2(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow %2 : $Builtin.NativeObject
   br bb3
 
 bb3:
@@ -426,7 +419,7 @@ bb3:
 // CHECK: Found use after free?!
 // CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
-// CHECK: Non Consuming User:   end_borrow %7 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   %9 = unchecked_ref_cast %7 : $Builtin.NativeObject to $Builtin.NativeObject
 // CHECK: Block: bb2
 sil [ossa] @checked_cast_br_guaranteed_arg_outlives_original_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -434,13 +427,13 @@ bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %1 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%2 : @guaranteed $SuperKlass):
-  end_borrow %2 : $SuperKlass
   end_borrow %1 : $Builtin.NativeObject
+  %2a = unchecked_ref_cast %2 : $SuperKlass to $SuperKlass
   br bb3
 
 bb2(%3 : @guaranteed $Builtin.NativeObject):
   end_borrow %1 : $Builtin.NativeObject
-  end_borrow %3 : $Builtin.NativeObject
+  %3a = unchecked_ref_cast %3 : $Builtin.NativeObject to $Builtin.NativeObject
   br bb3
 
 bb3:
@@ -453,44 +446,18 @@ bb3:
 // CHECK: Found use after free?!
 // CHECK: Value:   %2 = upcast %0 : $Klass to $SuperKlass
 // CHECK: Consuming User:   store %2 to [init] %1 : $*SuperKlass
-// CHECK: Non Consuming User:   %4 = class_method %2 : $SuperKlass, #SuperKlass.doSomething!1 : (SuperKlass) -> () -> (), $@convention(method) (@guaranteed SuperKlass) -> ()
+// CHECK: Non Consuming User:   %4 = class_method %2 : $SuperKlass, #SuperKlass.doSomething : (SuperKlass) -> () -> (), $@convention(method) (@guaranteed SuperKlass) -> ()
 // CHECK: Block: bb0
 sil [ossa] @consume_with_classmethod : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   %1 = alloc_stack $SuperKlass
   %2 = upcast %0 : $Klass to $SuperKlass
   store %2 to [init] %1 : $*SuperKlass
-  %3 = class_method %2 : $SuperKlass, #SuperKlass.doSomething!1 : (SuperKlass) -> () -> (), $@convention(method) (@guaranteed SuperKlass) -> ()
+  %3 = class_method %2 : $SuperKlass, #SuperKlass.doSomething : (SuperKlass) -> () -> (), $@convention(method) (@guaranteed SuperKlass) -> ()
   destroy_addr %1 : $*SuperKlass
   dealloc_stack %1 : $*SuperKlass
   %9999 = tuple()
   return %9999 : $()
-}
-
-// CHECK-LABEL: Function: 'init_existential_ref_not_forwarding'
-// CHECK: Have operand with incompatible ownership?!
-// CHECK: Value: %0 = argument of bb0 : $ClassProtConformingRef
-// CHECK: User:   %2 = init_existential_ref %0 : $ClassProtConformingRef : $ClassProtConformingRef, $ClassProt
-// CHECK: Operand Number: 0
-// CHECK: Conv: guaranteed
-// CHECK: OwnershipMap:
-// CHECK: -- OperandOwnershipKindMap --
-// CHECK: unowned:  No.
-// CHECK: owned: Yes. Liveness: MustBeInvalidated
-// CHECK: guaranteed:  No.
-// CHECK: any: Yes. Liveness: MustBeLive
-// CHECK-NOT: init_existential_ref %1
-// CHECK: Function: 'init_existential_ref_not_forwarding'
-// CHECK: Error! Found a leaked owned value that was never consumed.
-// CHECK: Value:   %2 = init_existential_ref %0 : $ClassProtConformingRef : $ClassProtConformingRef, $ClassProt
-// CHECK-NOT: init_existential_ref %1
-sil [ossa] @init_existential_ref_not_forwarding : $@convention(thin) (@guaranteed ClassProtConformingRef, @owned ClassProtConformingRef) -> @owned (ClassProt, ClassProt) {
-bb0(%0 : @guaranteed $ClassProtConformingRef, %1 : @owned $ClassProtConformingRef):
-  %2 = init_existential_ref %0 : $ClassProtConformingRef : $ClassProtConformingRef, $ClassProt
-  %3 = copy_value %2 : $ClassProt
-  %4 = init_existential_ref %1 : $ClassProtConformingRef : $ClassProtConformingRef, $ClassProt
-  %5 = tuple(%3 : $ClassProt, %4 : $ClassProt)
-  return %5 : $(ClassProt, ClassProt)
 }
 
 sil [ossa] @eliminate_copy_try_apple_callee : $@convention(thin) (@owned Builtin.NativeObject) -> @error Error {
@@ -498,7 +465,6 @@ entry(%0 : @owned $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
-
 
 // CHECK-LABEL: Function: 'use_after_free_consume_in_same_block'
 // CHECK: Found use after free due to unvisited non lifetime ending uses?!

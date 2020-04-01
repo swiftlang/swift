@@ -10,9 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
+import sys
 from argparse import ArgumentError
-
-import diagnostics
 
 from .targets import StdlibDeploymentTarget
 
@@ -64,8 +63,10 @@ class HostSpecificConfiguration(object):
             deployment_target = StdlibDeploymentTarget.get_target_for_name(
                 deployment_target_name)
             if deployment_target is None:
-                diagnostics.fatal("unknown target: %r" % (
-                    deployment_target_name,))
+                sys.stderr.write('ERROR: unknown target: {}\n'.format(
+                    deployment_target_name))
+                sys.stderr.flush()
+                sys.exit(1)
 
             # Add the SDK to use.
             deployment_platform = deployment_target.platform
@@ -135,6 +136,8 @@ class HostSpecificConfiguration(object):
                     suffix = "-only_non_executable"
                 elif args.only_executable_test:
                     suffix = "-only_executable"
+                elif args.only_non_executable_test:
+                    suffix = "-only_non_executable"
                 else:
                     suffix = ""
                 subset_suffix = ""
@@ -149,8 +152,18 @@ class HostSpecificConfiguration(object):
                     subset_suffix = "-only_stress"
                 else:
                     subset_suffix = ""
-                self.swift_test_run_targets.append("check-swift{}{}-{}".format(
-                    subset_suffix, suffix, name))
+
+                # Support for running the macCatalyst tests with
+                # the iOS-like target triple.
+                if name == "macosx-x86_64" and args.maccatalyst \
+                   and args.maccatalyst_ios_tests:
+                    (self.swift_test_run_targets
+                     .append("check-swift{}{}-{}".format(
+                         subset_suffix, suffix, "macosx-maccatalyst-x86_64")))
+                else:
+                    (self.swift_test_run_targets
+                     .append("check-swift{}{}-{}".format(
+                         subset_suffix, suffix, name)))
                 if args.test_optimized and not test_host_only:
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize-{}".format(
@@ -203,25 +216,25 @@ class HostSpecificConfiguration(object):
             platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
         if not args.test_osx:
             platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
-        if not args.test_ios_host:
+        if not args.test_ios_host and not args.only_non_executable_test:
             platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
-        else:
+        elif not args.only_non_executable_test:
             raise ArgumentError(None,
                                 "error: iOS device tests are not " +
                                 "supported in open-source Swift.")
         if not args.test_ios_simulator:
             platforms_to_skip_test.add(StdlibDeploymentTarget.iOSSimulator)
-        if not args.test_tvos_host:
+        if not args.test_tvos_host and not args.only_non_executable_test:
             platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
-        else:
+        elif not args.only_non_executable_test:
             raise ArgumentError(None,
                                 "error: tvOS device tests are not " +
                                 "supported in open-source Swift.")
         if not args.test_tvos_simulator:
             platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTVSimulator)
-        if not args.test_watchos_host:
+        if not args.test_watchos_host and not args.only_non_executable_test:
             platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
-        else:
+        elif not args.only_non_executable_test:
             raise ArgumentError(None,
                                 "error: watchOS device tests are not " +
                                 "supported in open-source Swift.")
@@ -244,10 +257,10 @@ class HostSpecificConfiguration(object):
         platforms_to_skip_test_host = set()
         if not args.test_android_host:
             platforms_to_skip_test_host.add(StdlibDeploymentTarget.Android)
-        if not args.test_ios_host:
+        if not args.test_ios_host and not args.only_non_executable_test:
             platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
-        if not args.test_tvos_host:
+        if not args.test_tvos_host and not args.only_non_executable_test:
             platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleTV)
-        if not args.test_watchos_host:
+        if not args.test_watchos_host and not args.only_non_executable_test:
             platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleWatch)
         return platforms_to_skip_test_host

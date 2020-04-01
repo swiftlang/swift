@@ -30,6 +30,7 @@ add_swift_host_library(swiftParse STATIC
     ParsedSyntaxRecorder.cpp.gyb)
 target_link_libraries(swiftParse PRIVATE
   swiftAST
-  swiftSyntax)
+  swiftSyntax
+  swiftSyntaxParse)
 
 add_dependencies(swiftParse swift-parse-syntax-generated-headers)

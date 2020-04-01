@@ -150,7 +150,7 @@ protected:
   LoadResult loadFromString(const void *node, StringRef data);
   LoadResult loadFromPath(const void *node, StringRef path);
 
-  void addIndependentNode(const void *node) {
+  void registerJob(const void *node) {
     bool newlyInserted = Provides.insert({node, {}}).second;
     assert(newlyInserted && "node is already in graph");
     (void)newlyInserted;
@@ -260,8 +260,8 @@ public:
   /// Adds \p node to the dependency graph without any connections.
   ///
   /// This can be used for new nodes that may be updated later.
-  void addIndependentNode(T node) {
-    return CoarseGrainedDependencyGraphImpl::addIndependentNode(
+  void registerJob(T node) {
+    return CoarseGrainedDependencyGraphImpl::registerJob(
         Traits::getAsVoidPointer(node));
   }
 

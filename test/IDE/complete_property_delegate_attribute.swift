@@ -35,11 +35,11 @@ struct TestStruct {
   @MyStruct(arg1: .#^ARG_MyEnum_DOT^#
   var test3
 // ARG_MyEnum_DOT: Begin completions, 2 items
-// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/ExprSpecific:     east[#MyEnum#]; name=east
-// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/ExprSpecific:     west[#MyEnum#]; name=west
+// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     east[#MyEnum#]; name=east
+// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     west[#MyEnum#]; name=west
 // ARG_MyEnum_DOT: End completions
 
- @MyStruct(arg1: MyEnum.#^ARG_MyEnum_NOBINDING^#)
+  @MyStruct(arg1: MyEnum.#^ARG_MyEnum_NOBINDING^#)
 // ARG_MyEnum_NOBINDING: Begin completions
 // ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal: east[#MyEnum#];
 // ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal: west[#MyEnum#];

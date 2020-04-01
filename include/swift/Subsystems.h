@@ -55,22 +55,20 @@ namespace swift {
   class ModuleDecl;
   typedef void *OpaqueSyntaxNode;
   class Parser;
-  class PersistentParserState;
   class SerializationOptions;
   class SILOptions;
   class SILModule;
   class SILParserTUState;
   class SourceFile;
+  enum class SourceFileKind;
   class SourceManager;
   class SyntaxParseActions;
   class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
-  class TypeChecker;
   class TypeCheckerOptions;
   struct TypeLoc;
   class UnifiedStatsReporter;
-  enum class SourceFileKind;
 
   namespace Lowering {
     class TypeConverter;
@@ -104,34 +102,11 @@ namespace swift {
 
   /// @}
 
-  /// Parse a single buffer into the given source file.
-  ///
-  /// If the source file is the main file, stop parsing after the next
-  /// stmt-brace-item with side-effects.
-  ///
-  /// \param SF the file within the module being parsed.
-  ///
-  /// \param BufferID the buffer to parse from.
-  ///
-  /// \param[out] Done set to \c true if end of the buffer was reached.
-  ///
-  /// \param SIL if non-null, we're parsing a SIL file.
-  ///
-  /// \param PersistentState if non-null the same PersistentState object can
-  /// be used to resume parsing or parse delayed function bodies.
-  void parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
-                           SILParserState *SIL = nullptr,
-                           PersistentParserState *PersistentState = nullptr,
-                           bool DelayBodyParsing = true);
-
-  /// Parse a single buffer into the given source file, until the full source
-  /// contents are parsed.
-  void parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
-                               PersistentParserState *PersistentState = nullptr,
-                               bool DelayBodyParsing = true);
+  /// Parse a source file's SIL declarations into a given SIL module.
+  void parseSourceFileSIL(SourceFile &SF, SILParserState *sil);
 
   /// Finish the code completion.
-  void performCodeCompletionSecondPass(PersistentParserState &PersistentState,
+  void performCodeCompletionSecondPass(SourceFile &SF,
                                        CodeCompletionCallbacksFactory &Factory);
 
   /// Lex and return a vector of tokens for the given buffer.
@@ -143,46 +118,33 @@ namespace swift {
                               bool TokenizeInterpolatedString = true,
                               ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
-  /// Once parsing is complete, this walks the AST to resolve imports, record
-  /// operators, and do other top-level validation.
-  ///
-  /// \param StartElem Where to start for incremental name binding in the main
-  ///                  source file.
-  void performNameBinding(SourceFile &SF, unsigned StartElem = 0);
+  /// This walks the AST to resolve imports.
+  void performImportResolution(SourceFile &SF);
 
   /// Once type-checking is complete, this instruments code with calls to an
   /// intrinsic that record the expected values of local variables so they can
   /// be compared against the results from the debugger.
   void performDebuggerTestingTransform(SourceFile &SF);
 
-  /// Once parsing and name-binding are complete, this optionally transforms the
-  /// ASTs to add calls to external logging functions.
+  /// Once type checking is complete, this optionally transforms the ASTs to add
+  /// calls to external logging functions.
   ///
   /// \param HighPerformance True if the playground transform should omit
   /// instrumentation that has a high runtime performance impact.
   void performPlaygroundTransform(SourceFile &SF, bool HighPerformance);
   
-  /// Once parsing and name-binding are complete this optionally walks the ASTs
-  /// to add calls to externally provided functions that simulate
-  /// "program counter"-like debugging events. See the comment at the top of
-  /// lib/Sema/PCMacro.cpp for a description of the calls inserted.
+  /// Once type checking is complete this optionally walks the ASTs to add calls
+  /// to externally provided functions that simulate "program counter"-like
+  /// debugging events. See the comment at the top of lib/Sema/PCMacro.cpp for a
+  /// description of the calls inserted.
   void performPCMacro(SourceFile &SF);
-
-  /// Creates a type checker instance on the given AST context, if it
-  /// doesn't already have one.
-  ///
-  /// \returns a reference to the type checker instance.
-  TypeChecker &createTypeChecker(ASTContext &Ctx);
 
   /// Bind all 'extension' visible from \p SF to the extended nominal.
   void bindExtensions(SourceFile &SF);
 
-  /// Once parsing and name-binding are complete, this walks the AST to resolve
-  /// types and diagnose problems therein.
-  ///
-  /// \param StartElem Where to start for incremental type-checking in the main
-  /// source file.
-  void performTypeChecking(SourceFile &SF, unsigned StartElem = 0);
+  /// Once import resolution is complete, this walks the AST to resolve types
+  /// and diagnose problems therein.
+  void performTypeChecking(SourceFile &SF);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method
@@ -234,12 +196,12 @@ namespace swift {
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
   performSILGeneration(ModuleDecl *M, Lowering::TypeConverter &TC,
-                       SILOptions &options);
+                       const SILOptions &options);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
   performSILGeneration(FileUnit &SF, Lowering::TypeConverter &TC,
-                       SILOptions &options);
+                       const SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
@@ -263,13 +225,13 @@ namespace swift {
   /// Get the CPU, subtarget feature options, and triple to use when emitting code.
   std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
              std::string>
-  getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx);
+  getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   /// If you set an outModuleHash, then you need to call performLLVM.
   std::unique_ptr<llvm::Module>
-  performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
+  performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       llvm::LLVMContext &LLVMContext,
@@ -281,9 +243,10 @@ namespace swift {
   /// and return the generated LLVM IR module.
   /// If you set an outModuleHash, then you need to call performLLVM.
   std::unique_ptr<llvm::Module>
-  performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
+  performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
+                      StringRef PrivateDiscriminator,
                       llvm::LLVMContext &LLVMContext,
                       llvm::GlobalVariable **outModuleHash = nullptr,
                       llvm::StringSet<> *LinkerDirectives = nullptr);
@@ -291,7 +254,7 @@ namespace swift {
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This does not cause the module to be
   /// printed, only to be optimized.
-  void performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
+  void performLLVMOptimizations(const IRGenOptions &Opts, llvm::Module *Module,
                                 llvm::TargetMachine *TargetMachine);
 
   /// Wrap a serialized module inside a swift AST section in an object file.
@@ -299,38 +262,40 @@ namespace swift {
                                    StringRef OutputPath);
 
   /// Turn the given LLVM module into native code and return true on error.
-  bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx, llvm::Module *Module,
-                   StringRef OutputFilename,
-                   UnifiedStatsReporter *Stats=nullptr);
+  bool performLLVM(const IRGenOptions &Opts,
+                   ASTContext &Ctx,
+                   llvm::Module *Module,
+                   StringRef OutputFilename);
 
   /// Run the LLVM passes. In multi-threaded compilation this will be done for
   /// multiple LLVM modules in parallel.
-  /// \param Diags may be null if LLVM code gen diagnostics are not required.
-  /// \param DiagMutex may also be null if a mutex around \p Diags is not
-  ///                  required.
+  /// \param Diags The Diagnostic Engine.
+  /// \param DiagMutex in contexts that require parallel codegen, a mutex that the
+  ///                  diagnostic engine uses to synchronize emission.
   /// \param HashGlobal used with incremental LLVMCodeGen to know if a module
   ///                   was already compiled, may be null if not desired.
   /// \param Module LLVM module to code gen, required.
   /// \param TargetMachine target of code gen, required.
   /// \param effectiveLanguageVersion version of the language, effectively.
   /// \param OutputFilename Filename for output.
-  bool performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
+  bool performLLVM(const IRGenOptions &Opts,
+                   DiagnosticEngine &Diags,
                    llvm::sys::Mutex *DiagMutex,
                    llvm::GlobalVariable *HashGlobal,
                    llvm::Module *Module,
                    llvm::TargetMachine *TargetMachine,
                    const version::Version &effectiveLanguageVersion,
                    StringRef OutputFilename,
-                   UnifiedStatsReporter *Stats=nullptr);
+                   UnifiedStatsReporter *Stats);
 
   /// Dump YAML describing all fixed-size types imported from the given module.
-  bool performDumpTypeInfo(IRGenOptions &Opts,
+  bool performDumpTypeInfo(const IRGenOptions &Opts,
                            SILModule &SILMod,
                            llvm::LLVMContext &LLVMContext);
 
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>
-  createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx);
+  createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx);
 
   /// A convenience wrapper for Parser functionality.
   class ParserUnit {
@@ -382,6 +347,30 @@ namespace swift {
   /// ASTContext.
   void registerTypeCheckerRequestFunctions(Evaluator &evaluator);
 
+  /// Register SILGen-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any SIL generation
+  /// should call this functions after forming the ASTContext.
+  void registerSILGenRequestFunctions(Evaluator &evaluator);
+
+  /// Register SILOptimizer-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any SIL optimization
+  /// should call this functions after forming the ASTContext.
+  void registerSILOptimizerRequestFunctions(Evaluator &evaluator);
+
+  /// Register TBDGen-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any TBD generation
+  /// should call this functions after forming the ASTContext.
+  void registerTBDGenRequestFunctions(Evaluator &evaluator);
+
+  /// Register IRGen-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any IR generation
+  /// should call this functions after forming the ASTContext.
+  void registerIRGenRequestFunctions(Evaluator &evaluator);
+
   /// Register IDE-level request functions with the evaluator.
   ///
   /// The ASTContext will automatically call these upon construction.
@@ -392,6 +381,9 @@ namespace swift {
   /// The ASTContext will automatically call these upon construction.
   /// Calling registerIDERequestFunctions will invoke this function as well.
   void registerIDETypeCheckRequestFunctions(Evaluator &evaluator);
+
+  /// Register SILOptimizer passes necessary for IRGen.
+  void registerIRGenSILTransforms(ASTContext &ctx);
 
 } // end namespace swift
 

@@ -55,6 +55,7 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* RawRepresentable Changes */";
   case LocalDiagID::generic_sig_change:
     return "/* Generic Signature Changes */";
+  case LocalDiagID::enum_case_added:
   case LocalDiagID::decl_added:
   case LocalDiagID::decl_reorder:
   case LocalDiagID::var_has_fixed_order_change:
@@ -73,6 +74,8 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::super_class_changed:
   case LocalDiagID::no_longer_open:
   case LocalDiagID::desig_init_added:
+  case LocalDiagID::added_invisible_designated_init:
+  case LocalDiagID::not_inheriting_convenience_inits:
     return "/* Class Inheritance Change */";
   default:
     return StringRef();

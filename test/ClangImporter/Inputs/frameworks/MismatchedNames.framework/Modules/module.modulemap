@@ -1,0 +1,6 @@
+framework module MismatchedNames {
+}
+
+module MismatchedNames.Swift {
+  header "MismatchedNames-Swift.h"
+}

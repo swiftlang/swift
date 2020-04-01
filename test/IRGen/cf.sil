@@ -50,7 +50,7 @@ bb0(%0 : $CCRefrigerator, %1: $CCMutableRefrigerator):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @call_generic
-// CHECK-SAME:    ([[REFRIGERATOR]]*, [[MUTABLE_REFRIGERATOR]]*) {{.*}} {
+// CHECK-SAME:    ([[REFRIGERATOR]]* %0, [[MUTABLE_REFRIGERATOR]]* %1) {{.*}} {
 // CHECK:      [[T0:%.*]] = bitcast [[REFRIGERATOR]]* %0 to [[OBJC]]*
 // CHECK-NEXT: [[T1:%.*]] = call swiftcc %swift.metadata_response @"$sSo17CCRefrigeratorRefaMa"([[INT]] 0)
 // CHECK-NEXT: [[T2:%.*]] = extractvalue %swift.metadata_response [[T1]], 0
@@ -65,7 +65,7 @@ bb0(%0 : $CCRefrigerator, %1: $CCMutableRefrigerator):
 // CHECK:      call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0,
 // CHECK-SAME: @"$sSo17CCRefrigeratorRefaMf"
 
-// CHECK-LABEL:    define internal swiftcc %swift.metadata_response @"$sSo24CCMutableRefrigeratorRefaMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL:    define internal swiftcc %swift.metadata_response @"$sSo24CCMutableRefrigeratorRefaMr"(%swift.type* %0, i8* %1, i8** %2)
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$sSo17CCRefrigeratorRefaMa"([[INT]] 255)
 // CHECK-NEXT: [[T1:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: extractvalue %swift.metadata_response [[T0]], 1

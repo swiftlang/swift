@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,19 +14,6 @@
 // the new OS log APIs. These are prototype implementations and should not be
 // used outside of tests.
 
-/// Formatting options supported by the logging APIs for logging integers.
-/// These can be specified in the string interpolation passed to the log APIs.
-/// For Example,
-///     log.info("Writing to file with permissions: \(perm, format: .octal)")
-///
-/// See `OSLogInterpolation.appendInterpolation` definitions for default options
-/// for integer types.
-public enum IntFormat {
-  case decimal
-  case hex
-  case octal
-}
-
 /// Privacy qualifiers for indicating the privacy level of the logged data
 /// to the logging system. These can be specified in the string interpolation
 /// passed to the log APIs.
@@ -35,9 +22,10 @@ public enum IntFormat {
 ///
 /// See `OSLogInterpolation.appendInterpolation` definitions for default options
 /// for each supported type.
-public enum Privacy {
+public enum OSLogPrivacy {
   case `private`
   case `public`
+  case auto
 }
 
 /// Maximum number of arguments i.e., interpolated expressions that can
@@ -48,9 +36,10 @@ public enum Privacy {
 @_optimize(none)
 public var maxOSLogArgumentCount: UInt8 { return 48 }
 
-@_semantics("constant_evaluable")
-@inlinable
-@_optimize(none)
+/// Note that this is marked transparent instead of @inline(__always) as it is
+/// used in optimize(none) functions.
+@_transparent
+@usableFromInline
 internal var logBitsPerByte: Int { return 3 }
 
 /// Represents a string interpolation passed to the log APIs.
@@ -100,12 +89,15 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   @usableFromInline
   @frozen
   internal enum ArgumentFlag {
+    case autoFlag
     case privateFlag
     case publicFlag
 
     @inlinable
     internal var rawValue: UInt8 {
       switch self {
+      case .autoFlag:
+        return 0
       case .privateFlag:
         return 0x1
       case .publicFlag:
@@ -212,13 +204,15 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
-  internal func isPrivate(_ privacy: Privacy) -> Bool {
-    // Do not use equality comparisons on enums as it is not supported by
-    // the constant evaluator.
-    if case .private = privacy {
-      return true
+  internal func getArugmentFlag(_ privacy: OSLogPrivacy) -> ArgumentFlag {
+    switch privacy {
+    case .public:
+      return .publicFlag
+    case .private:
+      return .privateFlag
+    default:
+      return .autoFlag
     }
-    return false
   }
 
   /// Compute a byte-sized argument header consisting of flag and type.
@@ -230,10 +224,10 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   @_effects(readonly)
   @_optimize(none)
   internal func getArgumentHeader(
-    isPrivate: Bool,
+    privacy: OSLogPrivacy,
     type: ArgumentType
   ) -> UInt8 {
-    let flag: ArgumentFlag = isPrivate ? .privateFlag : .publicFlag
+    let flag = getArugmentFlag(privacy)
     let flagAndType: UInt8 = (type.rawValue &<< 4) | flag.rawValue
     return flagAndType
   }
@@ -245,11 +239,13 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   @_effects(readonly)
   @_optimize(none)
   internal func getUpdatedPreamble(
-    isPrivate: Bool,
+    privacy: OSLogPrivacy,
     isScalar: Bool
   ) -> UInt8 {
     var preamble = self.preamble
-    if isPrivate {
+    // Equality comparisions on enums is not yet supported by the constant
+    // evaluator.
+    if case .private = privacy {
       preamble |= PreambleBitMask.privateBitMask.rawValue
     }
     if !isScalar {

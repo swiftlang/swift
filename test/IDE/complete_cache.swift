@@ -63,7 +63,7 @@ import ctypes
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/recommendedover[Foo3, Foo2]: FooStruct4[#FooStruct4#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]:    FooStruct5[#FooStruct5#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/recommendedover[ro1, ro2, ro3, ro4]/recommended[r1, r2, r3]/keyword[k1, k2, k3, k4]:    FooStruct6[#FooStruct6#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[TypeAlias]/OtherModule[ctypes]: FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[TypeAlias]/OtherModule[ctypes]/keyword[Foo2]: FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
 // CLANG_CTYPES: End completions
 
 // CLANG_MACROS: Begin completions

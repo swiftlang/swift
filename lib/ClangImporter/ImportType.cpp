@@ -15,9 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "CFTypeInfo.h"
-#include "ImporterImpl.h"
 #include "ClangDiagnosticConsumer.h"
-#include "swift/Strings.h"
+#include "ImporterImpl.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -31,11 +30,13 @@
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
-#include "clang/Sema/Lookup.h"
-#include "clang/Sema/Sema.h"
-#include "clang/Lex/Preprocessor.h"
+#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/TypeVisitor.h"
+#include "clang/Basic/Builtins.h"
+#include "clang/Lex/Preprocessor.h"
+#include "clang/Sema/Lookup.h"
+#include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Compiler.h"
@@ -608,7 +609,7 @@ namespace {
     importObjCTypeParamDecl(const clang::ObjCTypeParamDecl *objcTypeParamDecl) {
       // Pull the corresponding generic type parameter from the imported class.
       const auto *typeParamContext = objcTypeParamDecl->getDeclContext();
-      GenericSignature genericSig = GenericSignature();
+      GenericSignature genericSig;
       if (auto *category =
             dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
         auto ext = cast_or_null<ExtensionDecl>(

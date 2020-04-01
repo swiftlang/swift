@@ -157,6 +157,29 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
     protocolDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 }
 
+evaluator::DependencySource
+SuperclassTypeRequest::readDependencySource(Evaluator &e) const {
+  const auto access = std::get<0>(getStorage())->getFormalAccess();
+  return {
+    e.getActiveDependencySourceOrNull(),
+    evaluator::getScopeForAccessLevel(access)
+  };
+}
+
+void SuperclassTypeRequest::writeDependencySink(Evaluator &eval,
+                                                ReferencedNameTracker &tracker,
+                                                Type value) const {
+  if (!value)
+    return;
+
+  // FIXME: This is compatible with the existing name tracking scheme, but
+  // ignoring this name when we fail to look up a class is bogus.
+  ClassDecl *Super = value->getClassOrBoundGenericClass();
+  if (!Super)
+    return;
+  tracker.addUsedMember({Super, Identifier()}, eval.isActiveSourceCascading());
+}
+
 //----------------------------------------------------------------------------//
 // Enum raw type computation.
 //----------------------------------------------------------------------------//
@@ -363,7 +386,7 @@ SourceLoc WhereClauseOwner::getLoc() const {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const WhereClauseOwner &owner) {
-  if (auto where = owner.source.dyn_cast<TrailingWhereClause *>()) {
+  if (owner.source.is<TrailingWhereClause *>()) {
     simple_display(out, owner.dc->getAsDecl());
   } else if (owner.source.is<SpecializeAttr *>()) {
     out << "@_specialize";
@@ -390,6 +413,9 @@ MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
     return genericParams->getRequirements();
   } else if (const auto attr = source.dyn_cast<SpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
+      return whereClause->getRequirements();
+  } else if (const auto attr = source.dyn_cast<DifferentiableAttr *>()) {
+    if (auto whereClause = attr->getWhereClause())
       return whereClause->getRequirements();
   } else if (const auto whereClause = source.get<TrailingWhereClause *>()) {
     return whereClause->getRequirements();
@@ -860,14 +886,14 @@ bool EnumRawValuesRequest::isCached() const {
   return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
 }
 
-Optional<bool> EnumRawValuesRequest::getCachedResult() const {
+Optional<evaluator::SideEffect> EnumRawValuesRequest::getCachedResult() const {
   auto *ED = std::get<0>(getStorage());
   if (ED->LazySemanticInfo.hasCheckedRawValues())
-    return true;
+    return std::make_tuple<>();
   return None;
 }
 
-void EnumRawValuesRequest::cacheResult(bool) const {
+void EnumRawValuesRequest::cacheResult(evaluator::SideEffect) const {
   auto *ED = std::get<0>(getStorage());
   auto flags = ED->LazySemanticInfo.RawTypeAndFlags.getInt() |
       EnumDecl::HasFixedRawValues |
@@ -1014,15 +1040,16 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
 }
 
 //----------------------------------------------------------------------------//
-// LookupPrecedenceGroupRequest computation.
+// ValidatePrecedenceGroupRequest computation.
 //----------------------------------------------------------------------------//
 
-SourceLoc LookupPrecedenceGroupRequest::getNearestLoc() const {
+SourceLoc ValidatePrecedenceGroupRequest::getNearestLoc() const {
   auto &desc = std::get<0>(getStorage());
   return desc.getLoc();
 }
 
-void LookupPrecedenceGroupRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+void ValidatePrecedenceGroupRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
   auto &desc = std::get<0>(getStorage());
   if (auto pathDir = desc.pathDirection) {
     diags.diagnose(desc.nameLoc, diag::precedence_group_cycle, (bool)*pathDir);
@@ -1031,7 +1058,8 @@ void LookupPrecedenceGroupRequest::diagnoseCycle(DiagnosticEngine &diags) const 
   }
 }
 
-void LookupPrecedenceGroupRequest::noteCycleStep(DiagnosticEngine &diag) const {
+void ValidatePrecedenceGroupRequest::noteCycleStep(
+    DiagnosticEngine &diag) const {
   auto &desc = std::get<0>(getStorage());
   diag.diagnose(desc.nameLoc,
                  diag::circular_reference_through_precedence_group, desc.ident);
@@ -1073,6 +1101,12 @@ void swift::simple_display(llvm::raw_ostream &out,
     break;
   case ImplicitMemberAction::ResolveCodingKeys:
     out << "resolve CodingKeys";
+    break;
+  case ImplicitMemberAction::ResolveEncodable:
+    out << "resolve Encodable.encode(to:)";
+    break;
+  case ImplicitMemberAction::ResolveDecodable:
+    out << "resolve Decodable.init(from:)";
     break;
   }
 }
@@ -1116,15 +1150,15 @@ void ValueWitnessRequest::cacheResult(Witness type) const {
 //----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           FunctionBuilderClosurePreCheck value) {
+                           FunctionBuilderBodyPreCheck value) {
   switch (value) {
-  case FunctionBuilderClosurePreCheck::Okay:
+  case FunctionBuilderBodyPreCheck::Okay:
     out << "okay";
     break;
-  case FunctionBuilderClosurePreCheck::HasReturnStmt:
+  case FunctionBuilderBodyPreCheck::HasReturnStmt:
     out << "has return statement";
     break;
-  case FunctionBuilderClosurePreCheck::Error:
+  case FunctionBuilderBodyPreCheck::Error:
     out << "error";
     break;
   }
@@ -1236,18 +1270,126 @@ void CallerSideDefaultArgExprRequest::cacheResult(Expr *expr) const {
 }
 
 //----------------------------------------------------------------------------//
+// DifferentiableAttributeTypeCheckRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<IndexSubset *>
+DifferentiableAttributeTypeCheckRequest::getCachedResult() const {
+  auto *attr = std::get<0>(getStorage());
+  if (attr->hasBeenTypeChecked())
+    return attr->ParameterIndicesAndBit.getPointer();
+  return None;
+}
+
+void DifferentiableAttributeTypeCheckRequest::cacheResult(
+    IndexSubset *parameterIndices) const {
+  auto *attr = std::get<0>(getStorage());
+  attr->ParameterIndicesAndBit.setPointerAndInt(parameterIndices, true);
+}
+
+//----------------------------------------------------------------------------//
+// CheckRedeclarationRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<evaluator::SideEffect>
+CheckRedeclarationRequest::getCachedResult() const {
+  if (!std::get<0>(getStorage())->alreadyCheckedRedeclaration())
+    return None;
+  return std::make_tuple<>();
+}
+
+void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
+  std::get<0>(getStorage())->setCheckedRedeclaration();
+}
+
+evaluator::DependencySource
+CheckRedeclarationRequest::readDependencySource(Evaluator &eval) const {
+  auto *current = std::get<0>(getStorage());
+  auto *currentDC = current->getDeclContext();
+  return {
+    currentDC->getParentSourceFile(),
+    evaluator::getScopeForAccessLevel(current->getFormalAccess())
+  };
+}
+
+void CheckRedeclarationRequest::writeDependencySink(
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    evaluator::SideEffect) const {
+  auto *current = std::get<0>(getStorage());
+  if (!current->hasName())
+    return;
+
+  DeclContext *currentDC = current->getDeclContext();
+  SourceFile *currentFile = currentDC->getParentSourceFile();
+  if (!currentFile || currentDC->isLocalContext())
+    return;
+
+  if (currentDC->isTypeContext()) {
+    if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
+      tracker.addUsedMember({nominal, current->getBaseName()},
+                            eval.isActiveSourceCascading());
+    }
+  } else {
+    tracker.addTopLevelName(current->getBaseName(),
+                            eval.isActiveSourceCascading());
+  }
+}
+
+//----------------------------------------------------------------------------//
+// LookupAllConformancesInContextRequest computation.
+//----------------------------------------------------------------------------//
+
+evaluator::DependencySource
+LookupAllConformancesInContextRequest::readDependencySource(
+    Evaluator &eval) const {
+  auto *dc = std::get<0>(getStorage());
+  AccessLevel defaultAccess;
+  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+    const NominalTypeDecl *nominal = ext->getExtendedNominal();
+    if (!nominal) {
+      return {
+        eval.getActiveDependencySourceOrNull(),
+        evaluator::DependencyScope::Cascading
+      };
+    }
+    defaultAccess = nominal->getFormalAccess();
+  } else {
+    defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
+  }
+  return {
+    eval.getActiveDependencySourceOrNull(),
+    evaluator::getScopeForAccessLevel(defaultAccess)
+  };
+}
+
+void LookupAllConformancesInContextRequest::writeDependencySink(
+    Evaluator &eval, ReferencedNameTracker &tracker,
+    ProtocolConformanceLookupResult conformances) const {
+  for (auto conformance : conformances) {
+    tracker.addUsedMember({conformance->getProtocol(), Identifier()},
+                          eval.isActiveSourceCascading());
+  }
+}
+
+//----------------------------------------------------------------------------//
 // TypeCheckSourceFileRequest computation.
 //----------------------------------------------------------------------------//
 
-Optional<bool> TypeCheckSourceFileRequest::getCachedResult() const {
+evaluator::DependencySource
+TypeCheckSourceFileRequest::readDependencySource(Evaluator &e) const {
+  return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
+}
+
+Optional<evaluator::SideEffect>
+TypeCheckSourceFileRequest::getCachedResult() const {
   auto *SF = std::get<0>(getStorage());
   if (SF->ASTStage == SourceFile::TypeChecked)
-    return true;
+    return std::make_tuple<>();
 
   return None;
 }
 
-void TypeCheckSourceFileRequest::cacheResult(bool result) const {
+void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
   auto *SF = std::get<0>(getStorage());
 
   // Verify that we've checked types correctly.
@@ -1278,4 +1420,18 @@ void TypeCheckSourceFileRequest::cacheResult(bool result) const {
     }
 #endif
   }
+}
+
+//----------------------------------------------------------------------------//
+// TypeCheckFunctionBodyUntilRequest computation.
+//----------------------------------------------------------------------------//
+
+evaluator::DependencySource
+TypeCheckFunctionBodyUntilRequest::readDependencySource(Evaluator &e) const {
+  // We're going under a function body scope, unconditionally flip the scope
+  // to private.
+  return {
+    std::get<0>(getStorage())->getParentSourceFile(),
+    evaluator::DependencyScope::Private
+  };
 }

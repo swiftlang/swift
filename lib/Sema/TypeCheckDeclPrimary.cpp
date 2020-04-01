@@ -37,6 +37,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -336,7 +337,7 @@ static void checkInheritanceClause(
 static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
   auto req =
     ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveCodingKeys};
-  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, false);
+  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
 }
 
 // Check for static properties that produce empty option sets
@@ -418,27 +419,80 @@ static void checkGenericParams(GenericContext *ownerCtx) {
                          [](Requirement, RequirementRepr *) { return false; });
 }
 
-/// Check whether \c current is a redeclaration.
-static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
-  // If we've already checked this declaration, don't do it again.
-  if (current->alreadyCheckedRedeclaration())
+template <typename T>
+static void checkOperatorOrPrecedenceGroupRedeclaration(
+    T *decl, Diag<> diagID, Diag<> noteID,
+    llvm::function_ref<TinyPtrVector<T *>(OperatorLookupDescriptor)>
+        lookupOthers) {
+  if (decl->isInvalid())
     return;
 
-  // Make sure we don't do this checking again.
-  current->setCheckedRedeclaration(true);
+  auto *currentFile = decl->getDeclContext()->getParentSourceFile();
+  assert(currentFile);
 
+  auto *module = currentFile->getParentModule();
+  auto &ctx = module->getASTContext();
+  auto desc = OperatorLookupDescriptor::forModule(module, decl->getName(),
+                                                  /*cascades*/ true,
+                                                  /*diagLoc*/ SourceLoc());
+  auto otherDecls = lookupOthers(desc);
+  for (auto *other : otherDecls) {
+    if (other == decl || other->isInvalid())
+      continue;
+
+    // Emit a redeclaration error if the two declarations occur in the same
+    // source file. We currently allow redeclarations across source files to
+    // allow the user to shadow operator decls from imports, as we currently
+    // favor those decls over ones from other files.
+    // FIXME: Once we prefer operator decls from the same module, start
+    // diagnosing redeclarations across files.
+    if (currentFile == other->getDeclContext()->getParentSourceFile()) {
+      // Make sure we get the diagnostic ordering to be sensible.
+      if (decl->getLoc().isValid() && other->getLoc().isValid() &&
+          ctx.SourceMgr.isBeforeInBuffer(decl->getLoc(), other->getLoc())) {
+        std::swap(decl, other);
+      }
+      ctx.Diags.diagnose(decl, diagID);
+      ctx.Diags.diagnose(other, noteID);
+      decl->setInvalid();
+      return;
+    }
+  }
+}
+
+static void checkRedeclaration(OperatorDecl *op) {
+  checkOperatorOrPrecedenceGroupRedeclaration<OperatorDecl>(
+      op, diag::operator_redeclared, diag::previous_operator_decl,
+      [&](OperatorLookupDescriptor desc) {
+        DirectOperatorLookupRequest req{desc, op->getFixity()};
+        return evaluateOrDefault(op->getASTContext().evaluator, req, {});
+      });
+}
+
+static void checkRedeclaration(PrecedenceGroupDecl *group) {
+  checkOperatorOrPrecedenceGroupRedeclaration<PrecedenceGroupDecl>(
+      group, diag::precedence_group_redeclared,
+      diag::previous_precedence_group_decl, [&](OperatorLookupDescriptor desc) {
+        DirectPrecedenceGroupLookupRequest req{desc};
+        return evaluateOrDefault(group->getASTContext().evaluator, req, {});
+      });
+}
+
+/// Check whether \c current is a redeclaration.
+evaluator::SideEffect
+CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   // Ignore invalid and anonymous declarations.
   if (current->isInvalid() || !current->hasName())
-    return;
+    return std::make_tuple<>();
 
   // If this declaration isn't from a source file, don't check it.
   // FIXME: Should restrict this to the source file we care about.
   DeclContext *currentDC = current->getDeclContext();
   SourceFile *currentFile = currentDC->getParentSourceFile();
   if (!currentFile || currentDC->isLocalContext())
-    return;
+    return std::make_tuple<>();
 
-  ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
+  ReferencedNameTracker *tracker = currentFile->getLegacyReferencedNameTracker();
   bool isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
 
   // Find other potential definitions.
@@ -448,6 +502,8 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
     if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
       auto found = nominal->lookupDirect(current->getBaseName());
       otherDefinitions.append(found.begin(), found.end());
+      // FIXME(Evaluator Incremental Dependencies): Remove this. The direct
+      // lookup registers this edge, and so does the redeclaration request.
       if (tracker)
         tracker->addUsedMember({nominal, current->getBaseName()}, isCascading);
     }
@@ -456,6 +512,8 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
     currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
                                                 otherDefinitions);
+    // FIXME(Evaluator Incremental Dependencies): Remove this. The redeclaration
+    // request itself registers this edge.
     if (tracker)
       tracker->addTopLevelName(current->getBaseName(), isCascading);
   }
@@ -465,6 +523,7 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
   OverloadSignature currentSig = current->getOverloadSignature();
   CanType currentSigType = current->getOverloadSignatureType();
   ModuleDecl *currentModule = current->getModuleContext();
+  auto &ctx = current->getASTContext();
   for (auto other : otherDefinitions) {
     // Skip invalid declarations and ourselves.
     //
@@ -666,10 +725,11 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
       // set this at the beginning of the function, but we might have swapped
       // the decls for diagnostics; so ensure we also set this for the actual
       // decl we diagnosed on.
-      current->setCheckedRedeclaration(true);
+      current->setCheckedRedeclaration();
       break;
     }
   }
+  return std::make_tuple<>();
 }
 
 static Optional<unsigned>
@@ -723,9 +783,8 @@ static void checkDefaultArguments(ParameterList *params) {
     (void)param->getTypeCheckedDefaultExpr();
 }
 
-llvm::Expected<Expr *>
-DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
-                                     ParamDecl *param) const {
+Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
+                                           ParamDecl *param) const {
   if (param->getDefaultArgumentKind() == DefaultArgumentKind::Inherited) {
     // Inherited default arguments don't have expressions, but we need to
     // perform a couple of semantic checks to make sure they're valid.
@@ -757,7 +816,7 @@ DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   return initExpr;
 }
 
-llvm::Expected<Initializer *>
+Initializer *
 DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
                                             ParamDecl *param) const {
   auto &ctx = param->getASTContext();
@@ -932,6 +991,45 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
   llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
+/// Create a fix-it string for the 'decodable_suggest_overriding_init_here' and
+/// optionally, the 'codable_suggest_overriding_init_here' diagnostics.
+static std::string getFixItStringForDecodable(ClassDecl *CD,
+                                              bool includeEncodeTo) {
+  auto &ctx = CD->getASTContext();
+  SourceLoc indentationLoc = CD->getBraces().End;
+  StringRef extraIndentation;
+  StringRef indentation = Lexer::getIndentationForLine(
+      ctx.SourceMgr, indentationLoc, &extraIndentation);
+  std::string fixItStringToReturn;
+  {
+    llvm::raw_string_ostream out(fixItStringToReturn);
+    ExtraIndentStreamPrinter printer(out, indentation);
+
+    printer.printNewline();
+    printer << "override init(from decoder: Decoder) throws";
+
+    // Add a dummy body.
+    auto printDummyBody = [&]() {
+      printer << " {";
+      printer.printNewline();
+      printer << extraIndentation << getCodePlaceholder();
+      printer.printNewline();
+      printer << "}";
+    };
+
+    printDummyBody();
+
+    if (includeEncodeTo) {
+      printer.printNewline();
+      printer.printNewline();
+      printer << "override func encode(to encoder: Encoder) throws";
+      printDummyBody();
+    }
+  }
+
+  return fixItStringToReturn;
+}
+
 /// Diagnose a class that does not have any initializers.
 static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   ASTContext &C = classDecl->getASTContext();
@@ -950,7 +1048,6 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   // It is helpful to suggest here that the user may have forgotten to override
   // init(from:) (and encode(to:), if applicable) in a note, before we start
   // listing the members that prevented initializer synthesis.
-  // TODO: Add a fixit along with this suggestion.
   if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
@@ -975,6 +1072,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
         diagDest = result.front().getValueDecl();
 
       auto diagName = diag::decodable_suggest_overriding_init_here;
+      auto shouldEmitFixItForEncodeTo = false;
 
       // This is also a bit of a hack, but the best place we've got at the
       // moment to suggest this.
@@ -992,11 +1090,18 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
         // The direct lookup here won't see an encode(to:) if it is inherited
         // from the superclass.
         auto encodeTo = DeclName(C, C.Id_encode, C.Id_to);
-        if (classDecl->lookupDirect(encodeTo).empty())
+        if (classDecl->lookupDirect(encodeTo).empty()) {
           diagName = diag::codable_suggest_overriding_init_here;
+          shouldEmitFixItForEncodeTo = true;
+        }
       }
 
-      C.Diags.diagnose(diagDest, diagName);
+      auto insertionLoc =
+          Lexer::getLocForEndOfLine(C.SourceMgr, classDecl->getBraces().Start);
+      auto fixItString =
+          getFixItStringForDecodable(classDecl, shouldEmitFixItForEncodeTo);
+      C.Diags.diagnose(diagDest, diagName)
+          .fixItInsert(insertionLoc, fixItString);
     }
   }
 
@@ -1103,6 +1208,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
 
   auto *superclassDecl = classDecl->getSuperclassDecl();
   if (superclassDecl &&
+      superclassDecl->getModuleContext() != classDecl->getModuleContext() &&
       superclassDecl->hasMissingDesignatedInitializers())
     return;
 
@@ -1119,17 +1225,22 @@ namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
   ASTContext &Ctx;
+  SourceFile *SF;
 
-  explicit DeclChecker(ASTContext &ctx) : Ctx(ctx) {}
+  explicit DeclChecker(ASTContext &ctx, SourceFile *SF) : Ctx(ctx), SF(SF) {}
 
   ASTContext &getASTContext() const { return Ctx; }
+  void addDelayedFunction(AbstractFunctionDecl *AFD) {
+    if (!SF) return;
+    SF->DelayedFunctions.push_back(AFD);
+  }
 
   void visit(Decl *decl) {
-    if (getASTContext().Stats)
-      getASTContext().Stats->getFrontendCounters().NumDeclsTypechecked++;
+    if (auto *Stats = getASTContext().Stats)
+      Stats->getFrontendCounters().NumDeclsTypechecked++;
 
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "typecheck-decl",
-                                    decl);
+    FrontendStatsTracer StatsTracer(getASTContext().Stats,
+                                    "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
     
     DeclVisitor<DeclChecker>::visit(decl);
@@ -1139,10 +1250,12 @@ public:
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       auto &Context = getASTContext();
       TypeChecker::checkForForbiddenPrefix(Context, VD->getBaseName());
-      
-      checkRedeclaration(Context, VD);
 
       // Force some requests, which can produce diagnostics.
+
+      // Check redeclaration.
+      (void) evaluateOrDefault(decl->getASTContext().evaluator,
+                               CheckRedeclarationRequest{VD}, {});
 
       // Compute access level.
       (void) VD->getFormalAccess();
@@ -1184,10 +1297,15 @@ public:
   
   void visitImportDecl(ImportDecl *ID) {
     TypeChecker::checkDeclAttributes(ID);
+
+    // Force the lookup of decls referenced by a scoped import in case it emits
+    // diagnostics.
+    (void)ID->getDecls();
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
     TypeChecker::checkDeclAttributes(OD);
+    checkRedeclaration(OD);
     auto &Ctx = OD->getASTContext();
     if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD)) {
       (void)IOD->getPrecedenceGroup();
@@ -1209,6 +1327,7 @@ public:
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
     TypeChecker::checkDeclAttributes(PGD);
     validatePrecedenceGroup(PGD);
+    checkRedeclaration(PGD);
     checkAccessControl(PGD);
   }
 
@@ -1289,13 +1408,13 @@ public:
     }
 
     if (VD->getDeclContext()->getSelfClassDecl()) {
-      checkDynamicSelfType(VD, VD->getValueInterfaceType());
-
       if (VD->getValueInterfaceType()->hasDynamicSelfType()) {
         if (VD->hasStorage())
           VD->diagnose(diag::dynamic_self_in_stored_property);
         else if (VD->isSettable(nullptr))
           VD->diagnose(diag::dynamic_self_in_mutable_property);
+        else
+          checkDynamicSelfType(VD, VD->getValueInterfaceType());
       }
     }
     
@@ -1334,7 +1453,7 @@ public:
     TypeChecker::checkDeclAttributes(PBD);
 
     bool isInSILMode = false;
-    if (auto sourceFile = DC->getParentSourceFile())
+    if (auto sourceFile = SF)
       isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
     bool isTypeContext = DC->isTypeContext();
 
@@ -1392,7 +1511,7 @@ public:
         // protocol.
         if (var->isStatic() && !isa<ProtocolDecl>(DC)) {
           // ...but don't enforce this for SIL or module interface files.
-          switch (DC->getParentSourceFile()->Kind) {
+          switch (SF->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
             return;
@@ -1410,7 +1529,7 @@ public:
 
         // Global variables require an initializer in normal source files.
         if (DC->isModuleScopeContext()) {
-          switch (DC->getParentSourceFile()->Kind) {
+          switch (SF->Kind) {
           case SourceFileKind::Main:
           case SourceFileKind::REPL:
           case SourceFileKind::Interface:
@@ -1839,7 +1958,11 @@ public:
       ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
 
       if (auto *SF = CD->getParentSourceFile()) {
-        if (auto *tracker = SF->getReferencedNameTracker()) {
+        // FIXME(Evaluator Incremental Dependencies): Remove this. Type lookup
+        // for the superclass will run (un)qualified lookup which will register
+        // the appropriate edge, then SuperclassTypeRequest registers the
+        // potential member edge.
+        if (auto *tracker = SF->getLegacyReferencedNameTracker()) {
           bool isPrivate =
               CD->getFormalAccess() <= AccessLevel::FilePrivate;
           tracker->addUsedMember({Super, Identifier()}, !isPrivate);
@@ -1943,10 +2066,12 @@ public:
     // Check for circular inheritance within the protocol.
     (void)PD->hasCircularInheritedProtocols();
 
-    auto *SF = PD->getParentSourceFile();
     if (SF) {
-      if (auto *tracker = SF->getReferencedNameTracker()) {
+      if (auto *tracker = SF->getLegacyReferencedNameTracker()) {
         bool isNonPrivate = (PD->getFormalAccess() > AccessLevel::FilePrivate);
+        // FIXME(Evaluator Incremental Dependencies): Remove this. Type lookup
+        // for the ancestor protocols will run (un)qualified lookup which will
+        // register the appropriate edge.
         for (auto *parentProto : PD->getInheritedProtocols())
           tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
       }
@@ -2099,15 +2224,16 @@ public:
     } else if (shouldSkipBodyTypechecking(FD)) {
       FD->setBodySkipped(FD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(FD);
+      addDelayedFunction(FD);
     }
 
     checkExplicitAvailability(FD);
 
-    if (FD->getDeclContext()->getSelfClassDecl())
-      checkDynamicSelfType(FD, FD->getResultInterfaceType());
+    // Skip this for accessors, since we should have diagnosed the
+    // storage itself.
+    if (!isa<AccessorDecl>(FD))
+      if (FD->getDeclContext()->getSelfClassDecl())
+        checkDynamicSelfType(FD, FD->getResultInterfaceType());
 
     checkDefaultArguments(FD->getParameters());
 
@@ -2430,9 +2556,7 @@ public:
     } else if (shouldSkipBodyTypechecking(CD)) {
       CD->setBodySkipped(CD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(CD);
+      addDelayedFunction(CD);
     }
 
     checkDefaultArguments(CD->getParameters());
@@ -2447,14 +2571,13 @@ public:
     } else if (shouldSkipBodyTypechecking(DD)) {
       DD->setBodySkipped(DD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(DD);
+      addDelayedFunction(DD);
     }
   }
 };
 } // end anonymous namespace
 
 void TypeChecker::typeCheckDecl(Decl *D) {
-  DeclChecker(D->getASTContext()).visit(D);
+  auto *SF = D->getDeclContext()->getParentSourceFile();
+  DeclChecker(D->getASTContext(), SF).visit(D);
 }

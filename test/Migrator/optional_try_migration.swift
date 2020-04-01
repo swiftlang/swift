@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -c -swift-version 4 -primary-file %s -emit-migrated-file-path %t/optional_try_migration.result.swift
-// RUN: diff -u %S/optional_try_migration.swift.expected %t/optional_try_migration.result.swift
+// RUN: diff --strip-trailing-cr -u %S/optional_try_migration.swift.expected %t/optional_try_migration.result.swift
 
 func fetchOptInt() throws -> Int? {
     return 3

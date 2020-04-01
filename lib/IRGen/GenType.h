@@ -145,6 +145,8 @@ private:
   const TypeInfo *convertEnumType(TypeBase *key, CanType type, EnumDecl *D);
   const TypeInfo *convertStructType(TypeBase *key, CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(SILFunctionType *T);
+  const TypeInfo *convertNormalDifferentiableFunctionType(SILFunctionType *T);
+  const TypeInfo *convertLinearDifferentiableFunctionType(SILFunctionType *T);
   const TypeInfo *convertBlockStorageType(SILBlockStorageType *T);
   const TypeInfo *convertBoxType(SILBoxType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
@@ -172,6 +174,8 @@ public:
 
   const TypeInfo *getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
+
+  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
@@ -229,9 +233,16 @@ private:
     llvm::DenseMap<TypeBase *, const TypeInfo *> IndependentCache[NumLoweringModes];
     llvm::DenseMap<TypeBase *, const TypeInfo *> DependentCache[NumLoweringModes];
 
+    llvm::DenseMap<TypeBase *, const TypeLayoutEntry *>
+        IndependentTypeLayoutCache[NumLoweringModes];
+    llvm::DenseMap<TypeBase *, const TypeLayoutEntry *>
+        DependentTypeLayoutCache[NumLoweringModes];
+
   public:
     llvm::DenseMap<TypeBase *, const TypeInfo *> &getCacheFor(bool isDependent,
                                                               Mode mode);
+    llvm::DenseMap<TypeBase *, const TypeLayoutEntry *> &
+    getTypeLayoutCacheFor(bool isDependent, Mode mode);
   };
   Types_t Types;
 };
@@ -316,7 +327,37 @@ public:
                      Size size,
                      const llvm::Twine &description);
 };
-  
+
+template <class FixedTypeInfoType>
+TypeLayoutEntry *buildTypeLayoutEntryForFields(IRGenModule &IGM, SILType T,
+                                               const FixedTypeInfoType &TI) {
+  std::vector<TypeLayoutEntry *> fields;
+
+  auto minimumAlignment = TI.getFixedAlignment().getValue();
+  Alignment::int_type minFieldAlignment = 1;
+  for (auto &field : TI.getFields()) {
+    auto fieldTy = field.getType(IGM, T);
+    auto fieldAlignment = cast<FixedTypeInfo>(field.getTypeInfo())
+                              .getFixedAlignment()
+                              .getValue();
+    if (minFieldAlignment < fieldAlignment)
+      minFieldAlignment = fieldAlignment;
+    fields.push_back(field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+  }
+
+  if (fields.empty() && minFieldAlignment >= minimumAlignment) {
+    return IGM.typeLayoutCache.getEmptyEntry();
+  }
+
+  if (fields.size() == 1 && minFieldAlignment >= minimumAlignment) {
+    return fields[0];
+  }
+  if (minimumAlignment < minFieldAlignment)
+    minimumAlignment = minFieldAlignment;
+  return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+      fields, minimumAlignment, true);
+}
+
 } // end namespace irgen
 } // end namespace swift
 

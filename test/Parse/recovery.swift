@@ -619,9 +619,11 @@ class WrongInheritanceClause6(Int {}
 class WrongInheritanceClause7<T>(Int where T:AnyObject {}
 
 // <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
-Base=1 as Base=1  // expected-error {{cannot convert value of type 'Int' to type 'Base' in coercion}}
-
-
+Base=1 as Base=1 // expected-error{{cannot convert value of type 'Int' to type 'Base' in coercion}}
+// expected-error@-1 {{cannot assign to immutable expression of type 'Base.Type'}}
+// expected-error@-2 {{cannot assign to immutable expression of type 'Base'}}
+// expected-error@-3 {{cannot assign value of type '()' to type 'Base.Type'}}
+// expected-error@-4 {{cannot assign value of type 'Int' to type 'Base'}}
 
 // <rdar://problem/18634543> Parser hangs at swift::Parser::parseType
 public enum TestA {
@@ -816,9 +818,12 @@ func test23719432() {
 }
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator
-infix operator · {  // expected-error {{'·' is considered to be an identifier, not an operator}}
+infix operator · {  // expected-error {{'·' is considered an identifier and must not appear within an operator name}}
   associativity none precedence 150
 }
+
+infix operator -@-class Recover1 {} // expected-error {{'@' is not allowed in operator names}}
+prefix operator -фф--class Recover2 {} // expected-error {{'фф' is considered an identifier and must not appear within an operator name}}
 
 // <rdar://problem/21712891> Swift Compiler bug: String subscripts with range should require closing bracket.
 func r21712891(s : String) -> String {

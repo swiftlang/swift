@@ -552,31 +552,38 @@ public:
   ///
   /// \param lookupKind The kind of lookup to perform.
   ///
-  /// \param diagnostics If non-null, will be populated with the set of
-  /// diagnostics that should be emitted for this declaration context.
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolDecl *, 2>
   getLocalProtocols(ConformanceLookupKind lookupKind
-                      = ConformanceLookupKind::All,
-                    SmallVectorImpl<ConformanceDiagnostic> *diagnostics
-                      = nullptr) const;
+                      = ConformanceLookupKind::All) const;
 
   /// Retrieve the set of protocol conformances associated with this
   /// declaration context.
   ///
   /// \param lookupKind The kind of lookup to perform.
   ///
-  /// \param diagnostics If non-null, will be populated with the set of
-  /// diagnostics that should be emitted for this declaration context.
-  ///
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolConformance *, 2>
   getLocalConformances(ConformanceLookupKind lookupKind
-                         = ConformanceLookupKind::All,
-                       SmallVectorImpl<ConformanceDiagnostic> *diagnostics
-                         = nullptr) const;
+                         = ConformanceLookupKind::All) const;
+
+  /// Retrieve diagnostics discovered while expanding conformances for this
+  /// declaration context. This operation then removes those diagnostics from
+  /// consideration, so subsequent calls to this function with the same
+  /// declaration context that have not had any new extensions bound
+  /// will see an empty array.
+  SmallVector<ConformanceDiagnostic, 4>
+  takeConformanceDiagnostics() const;
+
+  /// Retrieves a list of separately imported overlays which are shadowing
+  /// \p declaring. If any \p overlays are returned, qualified lookups into
+  /// \p declaring should be performed into \p overlays instead; since they
+  /// are overlays, they will re-export \p declaring, but will also augment it
+  /// with additional symbols.
+  void getSeparatelyImportedOverlays(
+      ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) const;
 
   /// Retrieve the syntactic depth of this declaration context, i.e.,
   /// the number of non-module-scoped contexts.
@@ -681,18 +688,9 @@ enum class IterableDeclContextKind : uint8_t {
 /// Note that an iterable declaration context must inherit from both
 /// \c IterableDeclContext and \c DeclContext.
 class IterableDeclContext {
-  enum LazyMembers : unsigned {
-    Present = 1 << 0,
-
-    /// Lazy member loading has a variety of feedback loops that need to
-    /// switch to pseudo-empty-member behaviour to avoid infinite recursion;
-    /// we use this flag to control them.
-    InProgress = 1 << 1,
-  };
-
   /// The first declaration in this context along with a bit indicating whether
   /// the members of this context will be lazily produced.
-  mutable llvm::PointerIntPair<Decl *, 2, LazyMembers> FirstDeclAndLazyMembers;
+  mutable llvm::PointerIntPair<Decl *, 1, bool> FirstDeclAndLazyMembers;
 
   /// The last declaration in this context, used for efficient insertion,
   /// along with the kind of iterable declaration context.
@@ -780,20 +778,7 @@ public:
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
-    return FirstDeclAndLazyMembers.getInt() & LazyMembers::Present;
-  }
-
-  bool isLoadingLazyMembers() {
-    return FirstDeclAndLazyMembers.getInt() & LazyMembers::InProgress;
-  }
-
-  void setLoadingLazyMembers(bool inProgress) {
-    LazyMembers status = FirstDeclAndLazyMembers.getInt();
-    if (inProgress)
-      status = LazyMembers(status | LazyMembers::InProgress);
-    else
-      status = LazyMembers(status & ~LazyMembers::InProgress);
-    FirstDeclAndLazyMembers.setInt(status);
+    return FirstDeclAndLazyMembers.getInt();
   }
 
   /// Setup the loader for lazily-loaded members.
@@ -823,6 +808,12 @@ public:
 
   // Some Decls are IterableDeclContexts, but not all.
   static bool classof(const Decl *D);
+
+  /// Return a hash of all tokens in the body for dependency analysis, if
+  /// available.
+  Optional<std::string> getBodyFingerprint() const;
+
+  bool areTokensHashedForThisBodyInsteadOfInterfaceHash() const;
 
 private:
   /// Add a member to the list for iteration purposes, but do not notify the

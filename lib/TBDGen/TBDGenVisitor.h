@@ -44,6 +44,21 @@ struct TBDGenOptions;
 
 namespace tbdgen {
 
+enum class LinkerPlatformId: uint8_t {
+#define LD_PLATFORM(Name, Id) Name = Id,
+#include "ldPlatformKinds.def"
+};
+
+struct InstallNameStore {
+  // The default install name to use when no specific install name is specified.
+  std::string InstallName;
+  // The install name specific to the platform id. This takes precedence over
+  // the default install name.
+  std::map<uint8_t, std::string> PlatformInstallName;
+  StringRef getInstallName(LinkerPlatformId Id) const;
+  void remark(ASTContext &Ctx, StringRef ModuleName) const;
+};
+
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
   llvm::MachO::InterfaceFile &Symbols;
@@ -54,12 +69,17 @@ public:
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   const TBDGenOptions &Opts;
-  Decl* TopLevelDecl = nullptr;
 
 private:
+  std::vector<Decl*> DeclStack;
+  std::unique_ptr<std::map<std::string, InstallNameStore>>
+    previousInstallNameMap;
+  std::unique_ptr<std::map<std::string, InstallNameStore>>
+    parsePreviousModuleInstallNameMap();
   void addSymbolInternal(StringRef name, llvm::MachO::SymbolKind kind,
                          bool isLinkerDirective = false);
-  void addLinkerDirectiveSymbols(StringRef name, llvm::MachO::SymbolKind kind);
+  void addLinkerDirectiveSymbolsLdHide(StringRef name, llvm::MachO::SymbolKind kind);
+  void addLinkerDirectiveSymbolsLdPrevious(StringRef name, llvm::MachO::SymbolKind kind);
   void addSymbol(StringRef name, llvm::MachO::SymbolKind kind =
                                      llvm::MachO::SymbolKind::GlobalSymbol);
 
@@ -86,13 +106,17 @@ public:
                 ModuleDecl *swiftModule, const TBDGenOptions &opts)
       : Symbols(symbols), Targets(targets), StringSymbols(stringSymbols),
         DataLayout(dataLayout), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule), Opts(opts) {}
-
+        SwiftModule(swiftModule), Opts(opts),
+        previousInstallNameMap(parsePreviousModuleInstallNameMap())  {}
+  ~TBDGenVisitor() { assert(DeclStack.empty()); }
   void addMainIfNecessary(FileUnit *file) {
     // HACK: 'main' is a special symbol that's always emitted in SILGen if
     //       the file has an entry point. Since it doesn't show up in the
     //       module until SILGen, we need to explicitly add it here.
-    if (file->hasEntryPoint())
+    //
+    // Make sure to only add the main symbol for the module that we're emitting
+    // TBD for, and not for any statically linked libraries.
+    if (file->hasEntryPoint() && file->getParentModule() == SwiftModule)
       addSymbol("main");
   }
 
@@ -128,6 +152,8 @@ public:
   void visitEnumElementDecl(EnumElementDecl *EED);
 
   void visitDecl(Decl *D) {}
+
+  void visit(Decl *D);
 };
 } // end namespace tbdgen
 } // end namespace swift

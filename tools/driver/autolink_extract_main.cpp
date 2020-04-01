@@ -80,7 +80,8 @@ public:
     }
 
     if (ParsedArgs.getLastArg(OPT_help)) {
-      std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
+      std::string ExecutableName =
+          llvm::sys::path::stem(MainExecutablePath).str();
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Autolink Extract", options::AutolinkExtractOption,
                        0, /*ShowAllAliases*/false);
@@ -113,8 +114,12 @@ extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
                                  CompilerInstance &Instance) {
   // Search for the section we hold autolink entries in
   for (auto &Section : ObjectFile->sections()) {
-    llvm::StringRef SectionName;
-    Section.getName(SectionName);
+    llvm::Expected<llvm::StringRef> SectionNameOrErr = Section.getName();
+    if (!SectionNameOrErr) {
+      llvm::consumeError(SectionNameOrErr.takeError());
+      continue;
+    }
+    llvm::StringRef SectionName = *SectionNameOrErr;
     if (SectionName == ".swift1_autolink_entries") {
       llvm::Expected<llvm::StringRef> SectionData = Section.getContents();
       if (!SectionData) {
@@ -134,7 +139,7 @@ extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
       SectionData->split(SplitFlags, llvm::StringRef("\0", 1), -1,
                          /*KeepEmpty=*/false);
       for (const auto &Flag : SplitFlags)
-        LinkerFlags.push_back(Flag);
+        LinkerFlags.push_back(Flag.str());
     }
   }
   return false;

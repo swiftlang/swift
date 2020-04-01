@@ -137,8 +137,9 @@ static bool swiftCodeCompleteImpl(
 
         SwiftConsumer.setContext(&CI.getASTContext(), &CI.getInvocation(),
                                  &CompletionContext);
-        performCodeCompletionSecondPass(CI.getPersistentParserState(),
-                                        *callbacksFactory);
+
+        auto SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
         SwiftConsumer.clearContext();
       });
 }
@@ -181,7 +182,8 @@ void SwiftLangSupport::codeComplete(
       SKConsumer.setCompletionKind(kind);
 
     bool hasRequiredType = info.completionContext->typeContextKind == TypeContextKind::Required;
-    CodeCompletionContext::sortCompletionResults(Results);
+    if (CCOpts.sortByName)
+      CodeCompletionContext::sortCompletionResults(Results);
     // FIXME: this adhoc filtering should be configurable like it is in the
     // codeCompleteOpen path.
     for (auto *Result : Results) {
@@ -500,6 +502,28 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
     Info.SemanticContext = CCCtxCurrentModule; break;
   case SemanticContextKind::OtherModule:
     Info.SemanticContext = CCCtxOtherModule; break;
+  }
+
+  static UIdent CCTypeRelNotApplicable("source.codecompletion.typerelation.notapplicable");
+  static UIdent CCTypeRelUnknown("source.codecompletion.typerelation.unknown");
+  static UIdent CCTypeRelUnrelated("source.codecompletion.typerelation.unrelated");
+  static UIdent CCTypeRelInvalid("source.codecompletion.typerelation.invalid");
+  static UIdent CCTypeRelConvertible("source.codecompletion.typerelation.convertible");
+  static UIdent CCTypeRelIdentical("source.codecompletion.typerelation.identical");
+
+  switch (Result->getExpectedTypeRelation()) {
+  case CodeCompletionResult::NotApplicable:
+    Info.TypeRelation = CCTypeRelNotApplicable; break;
+  case CodeCompletionResult::Unknown:
+    Info.TypeRelation = CCTypeRelUnknown; break;
+  case CodeCompletionResult::Unrelated:
+    Info.TypeRelation = CCTypeRelUnrelated; break;
+  case CodeCompletionResult::Invalid:
+    Info.TypeRelation = CCTypeRelInvalid; break;
+  case CodeCompletionResult::Convertible:
+    Info.TypeRelation = CCTypeRelConvertible; break;
+  case  CodeCompletionResult::Identical:
+    Info.TypeRelation = CCTypeRelIdentical; break;
   }
 
   Info.ModuleName = Result->getModuleName();
@@ -970,7 +994,8 @@ static void transformAndForwardResults(
     CodeCompletion::SwiftResult paren(
         CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
         SemanticContextKind::ExpressionSpecific,
-        exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString);
+        exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString,
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
 
     SwiftCompletionInfo info;
     std::vector<Completion *> extended =
@@ -1064,7 +1089,7 @@ static void transformAndForwardResults(
     });
 
     auto *inputBuf = session->getBuffer();
-    std::string str = inputBuf->getBuffer().slice(0, offset);
+    std::string str = inputBuf->getBuffer().slice(0, offset).str();
     {
       llvm::raw_string_ostream OSS(str);
       SwiftToSourceKitCompletionAdapter::getResultSourceText(
@@ -1268,9 +1293,9 @@ SwiftCompletionCache::~SwiftCompletionCache() {}
 
 void SwiftLangSupport::codeCompleteCacheOnDisk(StringRef path) {
   ThreadSafeRefCntPtr<SwiftCompletionCache> newCache(new SwiftCompletionCache);
-  newCache->onDisk = llvm::make_unique<ide::OnDiskCodeCompletionCache>(path);
+  newCache->onDisk = std::make_unique<ide::OnDiskCodeCompletionCache>(path);
   newCache->inMemory =
-      llvm::make_unique<ide::CodeCompletionCache>(newCache->onDisk.get());
+      std::make_unique<ide::CodeCompletionCache>(newCache->onDisk.get());
 
   CCCache = newCache; // replace the old cache.
 }

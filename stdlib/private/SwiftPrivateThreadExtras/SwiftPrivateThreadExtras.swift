@@ -17,7 +17,7 @@
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -162,10 +162,7 @@ public class _stdlib_Barrier {
   }
 
   deinit {
-    let ret = _stdlib_thread_barrier_destroy(_threadBarrierPtr)
-    if ret != 0 {
-      fatalError("_stdlib_thread_barrier_destroy() failed")
-    }
+    _stdlib_thread_barrier_destroy(_threadBarrierPtr)
   }
 
   public func wait() {

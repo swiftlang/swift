@@ -19,6 +19,11 @@ class TestSuper { }
 struct SInt: Codable, Equatable, Hashable {
     var x: Int
 }
+extension SInt: Comparable {
+  static func < (_ lhs: Self, _ rhs: Self) -> Bool {
+    return lhs.x < rhs.x
+  }
+}
 struct SFloat {
     var y: Float
 }
@@ -39,6 +44,7 @@ enum EGeneric<T> {
 }
 extension EGeneric: Equatable where T: Equatable {}
 extension EGeneric: Hashable where T: Hashable {}
+extension EGeneric: Comparable where T: Comparable {}
 
 enum NoValues {
     case a, b, c
@@ -82,6 +88,19 @@ func testEquatableHashable<T: Equatable & Hashable>(cases: [Int: (T, T, Bool, Bo
     for (testLine, (lhs, rhs, equal, hashEqual)) in cases {
         expectEqual(lhs == rhs, equal,
                     "\(#file):\(testLine) LHS <\(debugDescription(lhs))> == RHS <\(debugDescription(rhs))> doesn't match <\(equal)>")
+
+        let lhsHash = lhs.hashValue
+        let rhsHash = rhs.hashValue
+        expectEqual(lhsHash == rhsHash, hashEqual,
+                    "\(#file):\(testLine) LHS <\(debugDescription(lhs)).hashValue> (\(lhsHash)) == RHS <\(debugDescription(rhs)).hashValue> (\(rhsHash)) doesn't match <\(hashEqual)>")
+    }
+}
+func testEquatableHashableComparable<T: Hashable & Comparable>(cases: [Int: (T, T, Bool, Bool, Bool)]) {
+    for (testLine, (lhs, rhs, equal, hashEqual, less)) in cases {
+        expectEqual(lhs == rhs, equal,
+                    "\(#file):\(testLine) LHS <\(debugDescription(lhs))> == RHS <\(debugDescription(rhs))> doesn't match <\(equal)>")
+        expectEqual(lhs < rhs, less,
+                    "\(#file):\(testLine) LHS <\(debugDescription(lhs))> < RHS <\(debugDescription(rhs))> doesn't match <\(less)>")
 
         let lhsHash = lhs.hashValue
         let rhsHash = rhs.hashValue
@@ -147,28 +166,28 @@ class TestEquatableHashable : TestSuper {
         testEquatableHashable(cases: generic)
     }
 
-    lazy var egeneric: [Int: (EGeneric<SInt>, EGeneric<SInt>, Bool, Bool)] = [
-      #line : (EGaOne, EGaOne, true, true),
-      #line : (EGaOne, EGaTwo, false, false),
-      #line : (EGaOne, EGbOne, false, false),
-      #line : (EGaOne, EGbTwo, false, false),
-      #line : (EGaOne, EGc___, false, false),
+    lazy var egeneric: [Int: (EGeneric<SInt>, EGeneric<SInt>, Bool, Bool, Bool)] = [
+      #line : (EGaOne, EGaOne, true, true, false),
+      #line : (EGaOne, EGaTwo, false, false, true),
+      #line : (EGaOne, EGbOne, false, false, true),
+      #line : (EGaOne, EGbTwo, false, false, true),
+      #line : (EGaOne, EGc___, false, false, true),
 
-      #line : (EGbOne, EGaOne, false, false),
-      #line : (EGbOne, EGaTwo, false, false),
-      #line : (EGbOne, EGbOne, true, true),
-      #line : (EGbOne, EGbTwo, false, false),
-      #line : (EGbOne, EGc___, false, false),
+      #line : (EGbOne, EGaOne, false, false, false),
+      #line : (EGbOne, EGaTwo, false, false, false),
+      #line : (EGbOne, EGbOne, true, true, false),
+      #line : (EGbOne, EGbTwo, false, false, true),
+      #line : (EGbOne, EGc___, false, false, true),
 
-      #line : (EGc___, EGaOne, false, false),
-      #line : (EGc___, EGaTwo, false, false),
-      #line : (EGc___, EGbOne, false, false),
-      #line : (EGc___, EGbTwo, false, false),
-      #line : (EGc___, EGc___, true, true),
+      #line : (EGc___, EGaOne, false, false, false),
+      #line : (EGc___, EGaTwo, false, false, false),
+      #line : (EGc___, EGbOne, false, false, false),
+      #line : (EGc___, EGbTwo, false, false, false),
+      #line : (EGc___, EGc___, true, true, false),
     ]
 
     func test_EGeneric() {
-        testEquatableHashable(cases: egeneric)
+        testEquatableHashableComparable(cases: egeneric)
     }
 }
 

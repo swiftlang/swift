@@ -30,6 +30,7 @@
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -229,6 +230,10 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
     Iteration++;
   }
 
+  if (invalidatedStackNesting) {
+    StackNesting().correctStackNesting(&F);
+  }
+
   // Cleanup the builder and return whether or not we made any changes.
   return Changed;
 }
@@ -245,10 +250,6 @@ class SILCombine : public SILFunctionTransform {
   
   /// The entry point to the transformation.
   void run() override {
-    // FIXME: We should be able to handle ownership.
-    if (getFunction()->hasOwnership())
-      return;
-
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
     auto *PCA = PM->getAnalysis<ProtocolConformanceAnalysis>();

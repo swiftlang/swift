@@ -10,6 +10,9 @@ struct NonCodable : Hashable {
 
 struct CodableGeneric<T> : Codable {
     let value: Int = 5
+    // expected-warning@-1 {{immutable property will not be decoded because it is declared with an initial value which cannot be overwritten}}
+    // expected-note@-2 {{set the initial value via the initializer or explicitly define a CodingKeys enum including a 'value' case to silence this warning}}
+    // expected-note@-3 {{make the property mutable instead}}{{5-8=var}}
 }
 
 // Classes whose properties are not all Codable should fail to synthesize
@@ -162,13 +165,17 @@ class NonConformingClass : Codable { // expected-error {{type 'NonConformingClas
   // These lines have to be within the NonConformingClass type because
   // CodingKeys should be private.
   func foo() {
-    let _ = NonConformingClass.CodingKeys.self
-    let _ = NonConformingClass.CodingKeys.x
-    let _ = NonConformingClass.CodingKeys.y
-    let _ = NonConformingClass.CodingKeys.z // expected-error {{type 'NonConformingClass.CodingKeys' has no member 'z'}}
+    // They should not get a CodingKeys type.
+    let _ = NonConformingClass.CodingKeys.self // expected-error {{type 'NonConformingClass' has no member 'CodingKeys'}}
+    let _ = NonConformingClass.CodingKeys.x // expected-error {{type 'NonConformingClass' has no member 'CodingKeys'}}
+    let _ = NonConformingClass.CodingKeys.y // expected-error {{type 'NonConformingClass' has no member 'CodingKeys'}}
+    let _ = NonConformingClass.CodingKeys.z // expected-error {{type 'NonConformingClass' has no member 'CodingKeys'}}
   }
 }
 
 // They should not receive Codable methods.
 let _ = NonConformingClass.init(from:) // expected-error {{type 'NonConformingClass' has no member 'init(from:)'}}
 let _ = NonConformingClass.encode(to:) // expected-error {{type 'NonConformingClass' has no member 'encode(to:)'}}
+
+// They should not get a CodingKeys type.
+let _ = NonConformingClass.CodingKeys.self // expected-error {{type 'NonConformingClass' has no member 'CodingKeys'}}

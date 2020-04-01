@@ -37,14 +37,16 @@ static ManagedValue emitUnabstractedCast(SILGenFunction &SGF, SILLocation loc,
                                          ManagedValue value,
                                          CanType sourceFormalType,
                                          CanType targetFormalType) {
-  if (value.getType() == SGF.getLoweredType(targetFormalType))
+  SILType loweredResultTy = SGF.getLoweredType(targetFormalType);
+  if (value.getType() == loweredResultTy)
     return value;
 
   return SGF.emitTransformedValue(loc, value,
                                   AbstractionPattern(sourceFormalType),
                                   sourceFormalType,
                                   AbstractionPattern(targetFormalType),
-                                  targetFormalType);
+                                  targetFormalType,
+                                  loweredResultTy);
 }
 
 static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
@@ -520,17 +522,24 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
     // Since we are going to be storing this into memory, we need fn at +1.
     fn = fn.ensurePlusOne(*this, loc);
   }
+  
+  // All different substitutions of a function type can share a thunk.
+  auto loweredFuncUnsubstTy = loweredFuncTy->getUnsubstitutedType(SGM.M);
+  if (loweredFuncUnsubstTy != loweredFuncTy) {
+    fn = B.createConvertFunction(loc, fn,
+                         SILType::getPrimitiveObjectType(loweredFuncUnsubstTy));
+  }
 
   // Build the invoke function signature. The block will capture the original
   // function value.
   auto fnInterfaceTy = cast<SILFunctionType>(
-    loweredFuncTy->mapTypeOutOfContext()->getCanonicalType());
+    loweredFuncUnsubstTy->mapTypeOutOfContext()->getCanonicalType());
   auto blockInterfaceTy = cast<SILFunctionType>(
     loweredBlockTy->mapTypeOutOfContext()->getCanonicalType());
 
   assert(!blockInterfaceTy->isCoroutine());
 
-  auto storageTy = SILBlockStorageType::get(loweredFuncTy);
+  auto storageTy = SILBlockStorageType::get(loweredFuncUnsubstTy);
   auto storageInterfaceTy = SILBlockStorageType::get(fnInterfaceTy);
 
   // Build the invoke function type.
@@ -570,13 +579,14 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
       genericSig, extInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, params, 
       /*yields*/ {}, blockInterfaceTy->getResults(),
-      blockInterfaceTy->getOptionalErrorResult(), SubstitutionMap(), false,
+      blockInterfaceTy->getOptionalErrorResult(),
+      SubstitutionMap(), SubstitutionMap(),
       getASTContext());
 
   // Create the invoke function. Borrow the mangling scheme from reabstraction
   // thunks, which is what we are in spirit.
   auto thunk = SGM.getOrCreateReabstractionThunk(invokeTy,
-                                                 loweredFuncTy,
+                                                 loweredFuncUnsubstTy,
                                                  loweredBlockTy,
                                                  /*dynamicSelfType=*/CanType());
 
@@ -588,7 +598,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
     // Not retaining the closure in the reabstraction thunk is safe if we hold
     // another reference for the is_escaping sentinel.
     buildFuncToBlockInvokeBody(thunkSGF, loc, funcType, blockType,
-                               loweredFuncTy, loweredBlockTy, storageTy,
+                               loweredFuncUnsubstTy, loweredBlockTy, storageTy,
                                useWithoutEscapingVerification);
     SGM.emitLazyConformancesForFunction(thunk);
   }
@@ -730,7 +740,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
                                  nativeType);
 
     // Put the value into memory if necessary.
-    assert(v.getType().isTrivial(SGF.F) || v.hasCleanup());
+    assert(v.getOwnershipKind() == ValueOwnershipKind::None || v.hasCleanup());
     SILModuleConventions silConv(SGF.SGM.M);
     // bridgeAnything always takes an indirect argument as @in.
     // Since we don't have the SIL type here, check the current SIL stage/mode
@@ -930,16 +940,19 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   auto loweredFuncTyWithoutNoEscape = adjustFunctionType(
       loweredFuncTy, loweredFuncTy->getExtInfo().withNoEscape(false),
       loweredFuncTy->getWitnessMethodConformanceOrInvalid());
+  
+  auto loweredFuncUnsubstTy =
+    loweredFuncTyWithoutNoEscape->getUnsubstitutedType(SGM.M);
 
   CanType dynamicSelfType;
-  auto thunkTy = buildThunkType(loweredBlockTy, loweredFuncTyWithoutNoEscape,
+  auto thunkTy = buildThunkType(loweredBlockTy, loweredFuncUnsubstTy,
                                 inputSubstType, outputSubstType,
                                 genericEnv, interfaceSubs, dynamicSelfType);
   assert(!dynamicSelfType && "Not implemented");
 
   auto thunk = SGM.getOrCreateReabstractionThunk(thunkTy,
                                                  loweredBlockTy,
-                                                 loweredFuncTyWithoutNoEscape,
+                                                 loweredFuncUnsubstTy,
                                                  /*dynamicSelfType=*/CanType());
 
   // Build it if necessary.
@@ -948,7 +961,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
     thunk->setGenericEnvironment(genericEnv);
     auto loc = RegularLocation::getAutoGeneratedLocation();
     buildBlockToFuncThunkBody(thunkSGF, loc, blockType, funcType,
-                              loweredBlockTy, loweredFuncTyWithoutNoEscape);
+                              loweredBlockTy, loweredFuncUnsubstTy);
     SGM.emitLazyConformancesForFunction(thunk);
   }
 
@@ -966,6 +979,11 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
       loc, thunkValue, interfaceSubs, block,
       loweredFuncTy->getCalleeConvention());
 
+  if (loweredFuncUnsubstTy != loweredFuncTyWithoutNoEscape) {
+    thunkedFn = B.createConvertFunction(loc, thunkedFn,
+                SILType::getPrimitiveObjectType(loweredFuncTyWithoutNoEscape));
+  }
+  
   if (!loweredFuncTy->isNoEscape()) {
     return thunkedFn;
   }
@@ -1588,8 +1606,6 @@ getThunkedForeignFunctionRef(SILGenFunction &SGF,
                              SILDeclRef foreign,
                              ArrayRef<ManagedValue> args,
                              const SILConstantInfo &foreignCI) {
-  assert(!foreign.isCurried
-         && "should not thunk calling convention when curried");
   assert(foreign.isForeign);
 
   // Produce an objc_method when thunking ObjC methods.

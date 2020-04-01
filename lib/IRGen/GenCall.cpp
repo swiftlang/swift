@@ -29,11 +29,13 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
 #include "llvm/IR/CallSite.h"
+#include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/Support/Compiler.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
 #include "GenObjC.h"
+#include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -205,8 +207,8 @@ void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
                                        unsigned argIndex, Alignment align) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::ByVal);
-  b.addAttribute(llvm::Attribute::getWithAlignment(IGM.LLVMContext,
-                                                   align.getValue()));
+  b.addAttribute(llvm::Attribute::getWithAlignment(
+      IGM.LLVMContext, llvm::Align(align.getValue())));
   attrs = attrs.addAttributes(IGM.LLVMContext,
                               argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
@@ -1617,10 +1619,9 @@ llvm::CallSite CallEmission::emitCallSite() {
     auto origCallee = call->getCalledValue();
     llvm::Value *opaqueCallee = origCallee;
     opaqueCallee =
-      IGF.Builder.CreateBitCast(opaqueCallee, IGF.IGM.Int8PtrTy);    
-    opaqueCallee =
-      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_prepare_retcon,
-                                      { opaqueCallee });
+      IGF.Builder.CreateBitCast(opaqueCallee, IGF.IGM.Int8PtrTy);
+    opaqueCallee = IGF.Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::coro_prepare_retcon, {opaqueCallee});
     opaqueCallee =
       IGF.Builder.CreateBitCast(opaqueCallee, origCallee->getType());
     call->setCalledFunction(fn.getFunctionType(), opaqueCallee);
@@ -1648,8 +1649,19 @@ llvm::CallSite CallEmission::emitCallSite() {
 
 llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
                                       ArrayRef<llvm::Value*> args) {
+  SmallVector<llvm::OperandBundleDef, 1> bundles;
+
+  // Add a pointer-auth bundle if necessary.
+  if (const auto &authInfo = fn.getAuthInfo()) {
+    auto key = getInt32(authInfo.getKey());
+    auto discriminator = authInfo.getDiscriminator();
+    llvm::Value *bundleArgs[] = { key, discriminator };
+    bundles.emplace_back("ptrauth", bundleArgs);
+  }
+
   assert(!isTrapIntrinsic(fn.getPointer()) && "Use CreateNonMergeableTrap");
-  llvm::CallInst *call = IRBuilderBase::CreateCall(fn.getPointer(), args);
+  llvm::CallInst *call =
+    IRBuilderBase::CreateCall(fn.getPointer(), args, bundles);
   call->setAttributes(fn.getAttributes());
   call->setCallingConv(fn.getCallingConv());
   return call;
@@ -1743,7 +1755,8 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
     auto indirectStructTy = cast<llvm::StructType>(
       indirectPointer->getType()->getPointerElementType());
     auto layout = IGF.IGM.DataLayout.getStructLayout(indirectStructTy);
-    Address indirectBuffer(indirectPointer, Alignment(layout->getAlignment()));
+    Address indirectBuffer(indirectPointer,
+                           Alignment(layout->getAlignment().value()));
 
     for (auto i : indices(indirectStructTy->elements())) {
       // Skip padding.
@@ -2075,10 +2088,11 @@ static void emitCoerceAndExpand(IRGenFunction &IGF, Explosion &in,
 
   // Make the alloca at least as aligned as the coercion struct, just
   // so that the element accesses we make don't end up under-aligned.
-  Alignment coercionTyAlignment = Alignment(coercionTyLayout->getAlignment());
+  Alignment coercionTyAlignment =
+      Alignment(coercionTyLayout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(temporary.getAddress());
   if (alloca->getAlignment() < coercionTyAlignment.getValue()) {
-    alloca->setAlignment(coercionTyAlignment.getValue());
+    alloca->setAlignment(llvm::MaybeAlign(coercionTyAlignment.getValue()));
     temporary = Address(temporary.getAddress(), coercionTyAlignment);
   }
 
@@ -2355,7 +2369,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
         auto ABIAlign = AI.getIndirectAlign();
         if (ABIAlign > addr.getAlignment()) {
           auto *AS = cast<llvm::AllocaInst>(addr.getAddress());
-          AS->setAlignment(ABIAlign.getQuantity());
+          AS->setAlignment(llvm::MaybeAlign(ABIAlign.getQuantity()));
           addr = Address(addr.getAddress(), Alignment(ABIAlign.getQuantity()));
         }
       }
@@ -2558,6 +2572,22 @@ void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
   }
 }
 
+std::pair<PointerAuthSchema, PointerAuthEntity>
+irgen::getCoroutineResumeFunctionPointerAuth(IRGenModule &IGM,
+                                             CanSILFunctionType fnType) {
+  switch (fnType->getCoroutineKind()) {
+  case SILCoroutineKind::None:
+    llvm_unreachable("not a coroutine");
+  case SILCoroutineKind::YieldMany:
+    return { IGM.getOptions().PointerAuth.YieldManyResumeFunctions,
+             PointerAuthEntity::forYieldTypes(fnType) };
+  case SILCoroutineKind::YieldOnce:
+    return { IGM.getOptions().PointerAuth.YieldOnceResumeFunctions,
+             PointerAuthEntity::forYieldTypes(fnType) };
+  }
+  llvm_unreachable("bad coroutine kind");
+}
+
 static void emitRetconCoroutineEntry(IRGenFunction &IGF,
                                      CanSILFunctionType fnType,
                                      Explosion &allParamValues,
@@ -2584,10 +2614,9 @@ static void emitRetconCoroutineEntry(IRGenFunction &IGF,
 
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
   // This serves as a handle that we can pass around to other intrinsics.
-  auto hdl = IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_begin, {
-    id,
-    llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy)
-  });
+  auto hdl = IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_begin,
+      {id, llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy)});
 
   // Set the coroutine handle; this also flags that is a coroutine so that
   // e.g. dynamic allocas use the right code generation.
@@ -2598,7 +2627,7 @@ void irgen::emitYieldOnceCoroutineEntry(IRGenFunction &IGF,
                                         CanSILFunctionType fnType,
                                         Explosion &allParamValues) {
   emitRetconCoroutineEntry(IGF, fnType, allParamValues,
-                           llvm::Intrinsic::ID::coro_id_retcon_once,
+                           llvm::Intrinsic::coro_id_retcon_once,
                            getYieldOnceCoroutineBufferSize(IGF.IGM),
                            getYieldOnceCoroutineBufferAlignment(IGF.IGM));
 }
@@ -2607,7 +2636,7 @@ void irgen::emitYieldManyCoroutineEntry(IRGenFunction &IGF,
                                         CanSILFunctionType fnType,
                                         Explosion &allParamValues) {
   emitRetconCoroutineEntry(IGF, fnType, allParamValues,
-                           llvm::Intrinsic::ID::coro_id_retcon,
+                           llvm::Intrinsic::coro_id_retcon,
                            getYieldManyCoroutineBufferSize(IGF.IGM),
                            getYieldManyCoroutineBufferAlignment(IGF.IGM));
 }
@@ -2684,8 +2713,8 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
       resultStructTy->getElementType(resultStructTy->getNumElements() - 1)
                     ->getPointerElementType());
     auto layout = IGF.IGM.DataLayout.getStructLayout(bufferStructTy);
-    indirectBuffer = IGF.createAlloca(bufferStructTy,
-                                      Alignment(layout->getAlignment()));
+    indirectBuffer = IGF.createAlloca(
+        bufferStructTy, Alignment(layout->getAlignment().value()));
     indirectBufferSize = Size(layout->getSizeInBytes());
     IGF.Builder.CreateLifetimeStart(*indirectBuffer, indirectBufferSize);
 
@@ -2709,10 +2738,8 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
   }
 
   // Perform the yield.
-  auto isUnwind =
-    IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_suspend_retcon,
-                                    { IGF.IGM.Int1Ty },
-                                    yieldArgs);
+  auto isUnwind = IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_suspend_retcon, {IGF.IGM.Int1Ty}, yieldArgs);
 
   // We're done with the indirect buffer.
   if (indirectBuffer) {
@@ -3030,10 +3057,10 @@ void IRGenFunction::emitScalarReturn(llvm::Type *resultType,
 static void adjustAllocaAlignment(const llvm::DataLayout &DL,
                                   Address allocaAddr, llvm::StructType *type) {
   auto layout = DL.getStructLayout(type);
-  Alignment layoutAlignment = Alignment(layout->getAlignment());
+  Alignment layoutAlignment = Alignment(layout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(allocaAddr.getAddress());
   if (alloca->getAlignment() < layoutAlignment.getValue()) {
-    alloca->setAlignment(layoutAlignment.getValue());
+    alloca->setAlignment(llvm::MaybeAlign(layoutAlignment.getValue()));
     allocaAddr = Address(allocaAddr.getAddress(), layoutAlignment);
   }
 }
@@ -3475,7 +3502,12 @@ Callee irgen::getBlockPointerCallee(IRGenFunction &IGF,
 
   auto sig = emitCastOfFunctionPointer(IGF, invokeFnPtr, info.OrigFnType);
 
-  FunctionPointer fn(invokeFnPtr, sig);
+  auto &schema = IGF.getOptions().PointerAuth.BlockInvocationFunctionPointers;
+  auto authInfo = PointerAuthInfo::emit(IGF, schema,
+                                        invokeFnPtrAddr.getAddress(),
+                                        info.OrigFnType);
+
+  FunctionPointer fn(invokeFnPtr, authInfo, sig);
 
   return Callee(std::move(info), fn, blockPtr);
 }
@@ -3484,8 +3516,10 @@ Callee irgen::getSwiftFunctionPointerCallee(
     IRGenFunction &IGF, llvm::Value *fnPtr, llvm::Value *dataPtr,
     CalleeInfo &&calleeInfo, bool castOpaqueToRefcountedContext) {
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, calleeInfo.OrigFnType);
+  auto authInfo =
+    PointerAuthInfo::forFunctionPointer(IGF.IGM, calleeInfo.OrigFnType);
 
-  FunctionPointer fn(fnPtr, sig);
+  FunctionPointer fn(fnPtr, authInfo, sig);
   if (castOpaqueToRefcountedContext) {
     assert(dataPtr && dataPtr->getType() == IGF.IGM.OpaquePtrTy &&
            "Expecting trivial closure context");
@@ -3498,8 +3532,10 @@ Callee irgen::getCFunctionPointerCallee(IRGenFunction &IGF,
                                         llvm::Value *fnPtr,
                                         CalleeInfo &&calleeInfo) {
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, calleeInfo.OrigFnType);
+  auto authInfo =
+    PointerAuthInfo::forFunctionPointer(IGF.IGM, calleeInfo.OrigFnType);
 
-  FunctionPointer fn(fnPtr, sig);
+  FunctionPointer fn(fnPtr, authInfo, sig);
 
   return Callee(std::move(calleeInfo), fn);
 }
@@ -3516,16 +3552,24 @@ FunctionPointer::forExplosionValue(IRGenFunction &IGF, llvm::Value *fnPtr,
   // Bitcast out of an opaque pointer type.
   assert(fnPtr->getType() == IGF.IGM.Int8PtrTy);
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, fnType);
+  auto authInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, fnType);
 
-  return FunctionPointer(fnPtr, sig);
+  return FunctionPointer(fnPtr, authInfo, sig);
 }
 
 llvm::Value *
 FunctionPointer::getExplosionValue(IRGenFunction &IGF,
                                    CanSILFunctionType fnType) const {
+  llvm::Value *fnPtr = getPointer();
+
+  // Re-sign to the appropriate schema for this function pointer type.
+  auto resultAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, fnType);
+  if (getAuthInfo() != resultAuthInfo) {
+    fnPtr = emitPointerAuthResign(IGF, fnPtr, getAuthInfo(), resultAuthInfo);
+  }
+
   // Bitcast to an opaque pointer type.
-  llvm::Value *fnPtr =
-    IGF.Builder.CreateBitCast(getPointer(), IGF.IGM.Int8PtrTy);
+  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
 
   return fnPtr;
 }

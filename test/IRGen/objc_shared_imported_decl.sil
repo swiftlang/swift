@@ -6,7 +6,7 @@
 import Swift
 
 sil public @use_witness : $@convention(thin) () -> () {
-  %0 = witness_method $SomeOptions, #Equatable."=="!1 : <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+  %0 = witness_method $SomeOptions, #Equatable."==" : <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
   %1 = tuple ()
   return %1: $()
 }

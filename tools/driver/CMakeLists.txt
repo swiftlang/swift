@@ -3,15 +3,15 @@ add_swift_host_tool(swift
   autolink_extract_main.cpp
   modulewrap_main.cpp
   swift_indent_main.cpp
+  swift_symbolgraph_extract_main.cpp
   SWIFT_COMPONENT compiler
 )
 target_link_libraries(swift
                       PRIVATE
                         swiftDriver
-                        swiftFrontendTool)
-if(HAVE_UNICODE_LIBEDIT)
-  target_link_libraries(swift PRIVATE edit)
-endif()
+                        swiftFrontendTool
+                        swiftSymbolGraphGen
+                        LLVMBitstreamReader)
 
 swift_create_post_build_symlink(swift
   SOURCE "swift${CMAKE_EXECUTABLE_SUFFIX}"
@@ -25,10 +25,16 @@ swift_create_post_build_symlink(swift
 
 swift_create_post_build_symlink(swift
   SOURCE "swift${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "swift-symbolgraph-extract${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+swift_create_post_build_symlink(swift
+  SOURCE "swift${CMAKE_EXECUTABLE_SUFFIX}"
   DESTINATION "swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
   WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
 add_swift_tool_symlink(swiftc swift compiler)
+add_swift_tool_symlink(swift-symbolgraph-extract swift compiler)
 add_swift_tool_symlink(swift-autolink-extract swift autolink-driver)
 add_swift_tool_symlink(swift-indent swift editor-integration)
 
@@ -41,6 +47,9 @@ add_dependencies(compiler swift)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT compiler)
+swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-symbolgraph-extract${CMAKE_EXECUTABLE_SUFFIX}"
+                           DESTINATION "bin"
+                           COMPONENT compiler)
 add_dependencies(autolink-driver swift)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
@@ -49,3 +58,4 @@ add_dependencies(editor-integration swift)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-indent${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT editor-integration)
+

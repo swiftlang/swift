@@ -5,4 +5,5 @@ silopt_register_sources(
   LoopRotate.cpp
   LoopUnroll.cpp
   LICM.cpp
+  ForEachLoopUnroll.cpp
 )

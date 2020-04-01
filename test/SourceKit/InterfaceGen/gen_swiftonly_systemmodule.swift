@@ -9,7 +9,7 @@
 // RUN:     %s
 
 // RUN: %sourcekitd-test -req=interface-gen -module SomeModule -- -sdk %t/SDK -Fsystem %t/SDK/Frameworks -target %target-triple > %t.response
-// RUN: diff -u %s.response %t.response
+// RUN: diff --strip-trailing-cr -u %s.response %t.response
 
 public struct SomeValue {
   internal var internalValue: Int { return 1 }

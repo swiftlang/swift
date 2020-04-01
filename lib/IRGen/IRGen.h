@@ -263,6 +263,8 @@ public:
 
   explicit operator bool() const { return Value != 0; }
 
+  explicit operator llvm::MaybeAlign() const { return llvm::MaybeAlign(Value); }
+
   friend bool operator< (Alignment L, Alignment R){ return L.Value <  R.Value; }
   friend bool operator<=(Alignment L, Alignment R){ return L.Value <= R.Value; }
   friend bool operator> (Alignment L, Alignment R){ return L.Value >  R.Value; }

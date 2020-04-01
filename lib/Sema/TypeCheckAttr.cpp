@@ -96,7 +96,6 @@ public:
   IGNORED_ATTR(HasMissingDesignatedInitializers)
   IGNORED_ATTR(InheritsConvenienceInitializers)
   IGNORED_ATTR(Inline)
-  IGNORED_ATTR(ImplicitlySynthesizesNestedRequirement)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(ObjCRuntimeName)
@@ -115,13 +114,7 @@ public:
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
   IGNORED_ATTR(OriginallyDefinedIn)
-
-  // TODO(TF-828): Upstream `@differentiable` attribute type-checking from
-  // tensorflow branch.
-  IGNORED_ATTR(Differentiable)
-  // TODO(TF-830): Upstream `@transpose` attribute type-checking from tensorflow
-  // branch.
-  IGNORED_ATTR(Transpose)
+  IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -196,6 +189,7 @@ public:
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitAccessControlAttr(AccessControlAttr *attr);
   void visitSetterAccessAttr(SetterAccessAttr *attr);
+  void visitSPIAccessControlAttr(SPIAccessControlAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
 
   void visitObjCAttr(ObjCAttr *attr);
@@ -243,6 +237,7 @@ public:
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
+  void visitTypeEraserAttr(TypeEraserAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
 
   void visitFrozenAttr(FrozenAttr *attr);
@@ -254,7 +249,10 @@ public:
   void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
   void visitNonEphemeralAttr(NonEphemeralAttr *attr);
   void checkOriginalDefinedInAttrs(Decl *D, ArrayRef<OriginallyDefinedInAttr*> Attrs);
+
+  void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDerivativeAttr(DerivativeAttr *attr);
+  void visitTransposeAttr(TransposeAttr *attr);
 };
 } // end anonymous namespace
 
@@ -272,7 +270,7 @@ void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
     if (!(isa<AccessorDecl>(D) && D->isImplicit()))
       diagnoseAndRemoveAttr(attr, diag::transparent_in_classes_not_supported);
   }
-  
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Stored properties and variables can't be transparent.
     if (VD->hasStorage())
@@ -339,7 +337,7 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
       }
     }
   }
-  
+
   // Verify that we don't have a static function.
   if (FD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
@@ -560,7 +558,7 @@ isAcceptableOutletType(Type type, bool &isArray, ASTContext &ctx) {
 
   if (type->isExistentialType())
     return diag::iboutlet_nonobjc_protocol;
-  
+
   // No other types are permitted.
   return diag::iboutlet_nonobject_type;
 }
@@ -864,6 +862,18 @@ void AttributeChecker::visitSetterAccessAttr(
   }
 }
 
+void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
+  if (auto VD = dyn_cast<ValueDecl>(D)) {
+    auto declAccess = VD->getFormalAccess();
+    if (declAccess < AccessLevel::Public) {
+      diagnoseAndRemoveAttr(attr,
+                            diag::spi_attribute_on_non_public,
+                            declAccess,
+                            D->getDescriptiveKind());
+    }
+  }
+}
+
 static bool checkObjCDeclContext(Decl *D) {
   DeclContext *DC = D->getDeclContext();
   if (DC->getSelfClassDecl())
@@ -941,9 +951,16 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
                  : diag::objc_name_deinit);
       const_cast<ObjCAttr *>(attr)->clearName();
     } else {
+      auto func = cast<AbstractFunctionDecl>(D);
+
+      // Trigger lazy loading of any imported members with the same selector.
+      // This ensures we correctly diagnose selector conflicts.
+      if (auto *CD = D->getDeclContext()->getSelfClassDecl()) {
+        (void) CD->lookupDirect(*objcName, !func->isStatic());
+      }
+
       // We have a function. Make sure that the number of parameters
       // matches the "number of colons" in the name.
-      auto func = cast<AbstractFunctionDecl>(D);
       auto params = func->getParameters();
       unsigned numParameters = params->size();
       if (auto CD = dyn_cast<ConstructorDecl>(func))
@@ -1354,6 +1371,16 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     return;
   }
 
+  // Make sure there isn't a more specific attribute we should be using instead.
+  // findMostSpecificActivePlatform() is O(N), so only do this if we're checking
+  // an iOS attribute while building for macCatalyst.
+  if (attr->Platform == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
+    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
+      return;
+    }
+  }
+
   SourceLoc attrLoc = attr->getLocation();
 
   Optional<Diag<>> MaybeNotAllowed =
@@ -1430,7 +1457,7 @@ void AttributeChecker::visitSwiftNativeObjCRuntimeBaseAttr(
     attr->setInvalid();
     return;
   }
-  
+
   if (theClass->hasSuperclass()) {
     diagnose(attr->getLocation(),
              diag::swift_native_objc_runtime_base_not_on_root_class);
@@ -1489,10 +1516,16 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 static bool isBuiltinOperator(StringRef name, DeclAttribute *attr) {
   return ((isa<PrefixAttr>(attr)  && name == "&") ||   // lvalue to inout
           (isa<PostfixAttr>(attr) && name == "!") ||   // optional unwrapping
+          // FIXME: Not actually a builtin operator, but should probably
+          // be allowed and accounted for in Sema?
+          (isa<PrefixAttr>(attr)  && name == "?") ||
           (isa<PostfixAttr>(attr) && name == "?") ||   // optional chaining
-          (isa<InfixAttr>(attr) && name == "?") ||     // ternary operator
+          (isa<InfixAttr>(attr)   && name == "?") ||   // ternary operator
           (isa<PostfixAttr>(attr) && name == ">") ||   // generic argument list
-          (isa<PrefixAttr>(attr)  && name == "<"));    // generic argument list
+          (isa<PrefixAttr>(attr)  && name == "<") ||   // generic argument list
+                                     name == "="  ||   // Assignment
+          // FIXME: Should probably be allowed in expression position?
+                                     name == "->");
 }
 
 void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
@@ -1582,7 +1615,7 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   // Check the type.  It must be an [unchecked]optional, weak, a normal
   // class, AnyObject, or classbound protocol.
   // It must conform to the NSCopying protocol.
-  
+
 }
 
 void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
@@ -1594,7 +1627,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     UIApplicationMainClass,
     NSApplicationMainClass,
   };
-  
+
   unsigned applicationMainKind;
   if (isa<UIApplicationMainAttr>(attr))
     applicationMainKind = UIApplicationMainClass;
@@ -1602,9 +1635,9 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     applicationMainKind = NSApplicationMainClass;
   else
     llvm_unreachable("not an ApplicationMain attr");
-  
+
   auto *CD = dyn_cast<ClassDecl>(D);
-  
+
   // The applicant not being a class should have been diagnosed by the early
   // checker.
   if (!CD) return;
@@ -1617,7 +1650,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     attr->setInvalid();
     return;
   }
-  
+
   // @XXApplicationMain classes must conform to the XXApplicationDelegate
   // protocol.
   auto *SF = cast<SourceFile>(CD->getModuleScopeContext());
@@ -1646,7 +1679,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
 
   if (attr->isInvalid())
     return;
-  
+
   // Register the class as the main class in the module. If there are multiples
   // they will be diagnosed.
   if (SF->registerMainClass(CD, attr->getLocation()))
@@ -1969,7 +2002,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   if (isa<StructDecl>(D)) {
     diagnose(attr->getLocation(), diag::fixed_layout_struct)
       .fixItReplace(attr->getRange(), "@frozen");
-  }  
+  }
 
   auto *VD = cast<ValueDecl>(D);
 
@@ -2361,6 +2394,179 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
   }
 }
 
+bool
+TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
+                                         TypeEraserAttr *attr,
+                                         ProtocolDecl *protocol) const {
+  auto &ctx = protocol->getASTContext();
+  auto &diags = ctx.Diags;
+  TypeLoc &typeEraserLoc = attr->getTypeEraserLoc();
+  TypeRepr *typeEraserRepr = typeEraserLoc.getTypeRepr();
+  DeclContext *dc = protocol->getDeclContext();
+  Type protocolType = protocol->getDeclaredType();
+
+  // Get the NominalTypeDecl for the type eraser.
+  Type typeEraser = typeEraserLoc.getType();
+  if (!typeEraser && typeEraserRepr) {
+    auto resolution = TypeResolution::forContextual(protocol);
+    typeEraser = resolution.resolveType(typeEraserRepr, /*options=*/None);
+    typeEraserLoc.setType(typeEraser);
+  }
+
+  if (typeEraser->hasError())
+    return false;
+
+  // The type eraser must be a concrete nominal type
+  auto nominalTypeDecl = typeEraser->getAnyNominal();
+  if (auto typeAliasDecl = dyn_cast_or_null<TypeAliasDecl>(nominalTypeDecl))
+    nominalTypeDecl = typeAliasDecl->getUnderlyingType()->getAnyNominal();
+
+  if (!nominalTypeDecl || isa<ProtocolDecl>(nominalTypeDecl)) {
+    diags.diagnose(typeEraserLoc.getLoc(), diag::non_nominal_type_eraser);
+    return false;
+  }
+
+  // The nominal type must be accessible wherever the protocol is accessible
+  if (nominalTypeDecl->getFormalAccess() < protocol->getFormalAccess()) {
+    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_not_accessible,
+                   nominalTypeDecl->getFormalAccess(), nominalTypeDecl->getName(),
+                   protocolType, protocol->getFormalAccess());
+    diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
+    return false;
+  }
+
+  // The type eraser must conform to the annotated protocol
+  if (!TypeChecker::conformsToProtocol(typeEraser, protocol, dc, None)) {
+    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_does_not_conform,
+                   typeEraser, protocolType);
+    diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
+    return false;
+  }
+
+  // The type eraser must have an init of the form init<T: Protocol>(erasing: T)
+  auto lookupResult = TypeChecker::lookupMember(dc, typeEraser,
+                                                DeclNameRef::createConstructor());
+
+  // Keep track of unviable init candidates for diagnostics
+  enum class UnviableReason {
+    Failable,
+    UnsatisfiedRequirements,
+    Inaccessible,
+  };
+  SmallVector<std::tuple<ConstructorDecl *, UnviableReason, Type>, 2> unviable;
+
+  bool foundMatch = llvm::any_of(lookupResult, [&](const LookupResultEntry &entry) {
+    auto *init = cast<ConstructorDecl>(entry.getValueDecl());
+    if (!init->isGeneric() || init->getGenericParams()->size() != 1)
+      return false;
+
+    auto genericSignature = init->getGenericSignature();
+    auto genericParamType = genericSignature->getInnermostGenericParams().front();
+
+    // Fow now, only allow one parameter.
+    auto params = init->getParameters();
+    if (params->size() != 1)
+      return false;
+
+    // The parameter must have the form `erasing: T` where T conforms to the protocol.
+    ParamDecl *param = *init->getParameters()->begin();
+    if (param->getArgumentName() != ctx.Id_erasing ||
+        !param->getInterfaceType()->isEqual(genericParamType) ||
+        !genericSignature->conformsToProtocol(genericParamType, protocol))
+      return false;
+
+    // Allow other constraints as long as the init can be called with any
+    // type conforming to the annotated protocol. We will check this by
+    // substituting the protocol's Self type for the generic arg and check that
+    // the requirements in the generic signature are satisfied.
+    auto baseMap =
+        typeEraser->getContextSubstitutionMap(nominalTypeDecl->getParentModule(),
+                                              nominalTypeDecl);
+    QuerySubstitutionMap getSubstitution{baseMap};
+    auto subMap = SubstitutionMap::get(
+        genericSignature,
+        [&](SubstitutableType *type) -> Type {
+          if (type->isEqual(genericParamType))
+            return protocol->getSelfTypeInContext();
+
+          return getSubstitution(type);
+        },
+        TypeChecker::LookUpConformance(dc));
+
+    // Use invalid 'SourceLoc's to suppress diagnostics.
+    auto result = TypeChecker::checkGenericArguments(
+          protocol, SourceLoc(), SourceLoc(), typeEraser,
+          genericSignature->getGenericParams(),
+          genericSignature->getRequirements(),
+          QuerySubstitutionMap{subMap},
+          TypeChecker::LookUpConformance(dc),
+          None);
+
+    if (result != RequirementCheckResult::Success) {
+      unviable.push_back(
+          std::make_tuple(init, UnviableReason::UnsatisfiedRequirements,
+                          genericParamType));
+      return false;
+    }
+
+    if (init->isFailable()) {
+      unviable.push_back(
+          std::make_tuple(init, UnviableReason::Failable, genericParamType));
+      return false;
+    }
+
+    if (init->getFormalAccess() < protocol->getFormalAccess()) {
+      unviable.push_back(
+          std::make_tuple(init, UnviableReason::Inaccessible, genericParamType));
+      return false;
+    }
+
+    return true;
+  });
+
+  if (!foundMatch) {
+    if (unviable.empty()) {
+      diags.diagnose(attr->getLocation(), diag::type_eraser_missing_init,
+                     typeEraser, protocol->getName().str());
+      diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
+      return false;
+    }
+
+    diags.diagnose(attr->getLocation(), diag::type_eraser_unviable_init,
+                   typeEraser, protocol->getName().str());
+    for (auto &candidate: unviable) {
+      auto init = std::get<0>(candidate);
+      auto reason = std::get<1>(candidate);
+      auto genericParamType = std::get<2>(candidate);
+
+      switch (reason) {
+      case UnviableReason::Failable:
+        diags.diagnose(init->getLoc(), diag::type_eraser_failable_init);
+        break;
+      case UnviableReason::UnsatisfiedRequirements:
+        diags.diagnose(init->getLoc(),
+                       diag::type_eraser_init_unsatisfied_requirements,
+                       genericParamType, protocol->getName().str());
+        break;
+      case UnviableReason::Inaccessible:
+        diags.diagnose(init->getLoc(), diag::type_eraser_init_not_accessible,
+                       init->getFormalAccess(), protocolType,
+                       protocol->getFormalAccess());
+        break;
+      }
+    }
+    return false;
+  }
+
+  return true;
+}
+
+void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
+  assert(isa<ProtocolDecl>(D));
+  // Invoke the request.
+  (void)attr->hasViableTypeEraserInit(cast<ProtocolDecl>(D));
+}
+
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   TypeLoc &ProtoTypeLoc = attr->getProtocolType();
 
@@ -2436,7 +2642,7 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 }
 
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
-  auto dc = D->getInnermostDeclContext();
+  auto dc = D->getDeclContext();
 
   // Figure out which nominal declaration this custom attribute refers to.
   auto nominal = evaluateOrDefault(
@@ -2469,10 +2675,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       attr->setInvalid();
       return;
     }
-    
+
     return;
   }
-  
+
   // If the nominal type is a function builder type, verify that D is a
   // function, storage with an explicit getter, or parameter of function type.
   if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>()) {
@@ -2483,8 +2689,24 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       decl = func;
     } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
       decl = storage;
-      auto getter = storage->getParsedAccessor(AccessorKind::Get);
-      if (!getter || !getter->hasBody()) {
+
+      // Check whether this is a property without an explicit getter.
+      auto shouldDiagnose = [&]() -> bool {
+        auto getter = storage->getParsedAccessor(AccessorKind::Get);
+        if (!getter)
+          return true;
+
+        // Module interfaces don't print bodies for all getters, so allow getters
+        // that don't have a body if we're compiling a module interface.
+        SourceFile *parent = storage->getDeclContext()->getParentSourceFile();
+        bool isInInterface = parent && parent->Kind == SourceFileKind::Interface;
+        if (!isInInterface && !getter->hasBody())
+          return true;
+
+        return false;
+      };
+
+      if (shouldDiagnose()) {
         diagnose(attr->getLocation(),
                  diag::function_builder_attribute_on_storage_without_getter,
                  nominal->getFullName(),
@@ -2639,42 +2861,40 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
   if (Attrs.empty())
     return;
   auto &Ctx = D->getASTContext();
-  OriginallyDefinedInAttr* theAttr = nullptr;
+  std::map<PlatformKind, SourceLoc> seenPlatforms;
+
   // Attrs are in the reverse order of the source order. We need to visit them
   // in source order to diagnose the later attribute.
   for (auto *Attr: Attrs) {
     if (!Attr->isActivePlatform(Ctx))
       continue;
-    if (theAttr) {
-      // Only one version number is allowed for one platform name.
-      diagnose(theAttr->AtLoc, diag::originally_defined_in_dupe_platform,
-               platformString(Attr->Platform));
+    auto AtLoc = Attr->AtLoc;
+    auto Platform = Attr->Platform;
+    if (!seenPlatforms.insert({Platform, AtLoc}).second) {
+      // We've seen the platform before, emit error to the previous one which
+      // comes later in the source order.
+      diagnose(seenPlatforms[Platform],
+               diag::originally_defined_in_dupe_platform,
+               platformString(Platform));
       return;
-    } else {
-      theAttr = Attr;
     }
-  }
-  if (!theAttr)
-    return;
-  assert(theAttr);
-  static StringRef AttrName = "_originallyDefinedIn";
-  auto AtLoc = theAttr->AtLoc;
-  if (!D->getDeclContext()->isModuleScopeContext()) {
-    diagnose(AtLoc, diag::originally_definedin_topleve_decl, AttrName);
-    return;
-  }
-  auto AvailRange = AvailabilityInference::availableRange(D, Ctx);
-  if (!AvailRange.getOSVersion().hasLowerEndpoint()) {
-    diagnose(AtLoc, diag::originally_definedin_need_available,
-             AttrName);
-    return;
-  }
-  auto AvailBegin = AvailRange.getOSVersion().getLowerEndpoint();
-  if (AvailBegin >= theAttr->MovedVersion) {
-    diagnose(AtLoc,
-             diag::originally_definedin_must_after_available_version,
-             AttrName);
-    return;
+    static StringRef AttrName = "_originallyDefinedIn";
+    if (!D->getDeclContext()->isModuleScopeContext()) {
+      diagnose(AtLoc, diag::originally_definedin_topleve_decl, AttrName);
+      return;
+    }
+    auto IntroVer = D->getIntroducedOSVersion(Platform);
+    if (!IntroVer.hasValue()) {
+      diagnose(AtLoc, diag::originally_definedin_need_available,
+               AttrName);
+      return;
+    }
+    if (IntroVer.getValue() >= Attr->MovedVersion) {
+      diagnose(AtLoc,
+               diag::originally_definedin_must_after_available_version,
+               AttrName);
+      return;
+    }
   }
 }
 
@@ -2876,7 +3096,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   }
 }
 
-llvm::Expected<ValueDecl *>
+ValueDecl *
 DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
                                          ValueDecl *VD) const {
   // Dynamic replacements must be explicit.
@@ -2903,7 +3123,7 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
 
   // If we can lazily resolve the function, do so now.
   if (auto *LazyResolver = attr->Resolver) {
-    auto decl = attr->Resolver->loadDynamicallyReplacedFunctionDecl(
+    auto decl = LazyResolver->loadDynamicallyReplacedFunctionDecl(
         attr, attr->ResolverContextData);
     attr->Resolver = nullptr;
     return decl;
@@ -2942,7 +3162,7 @@ static bool conformsToDifferentiable(Type type, DeclContext *DC) {
   return !tanType.isNull() && !tanType->hasError();
 };
 
-IndexSubset *TypeChecker::inferDifferentiationParameters(
+IndexSubset *TypeChecker::inferDifferentiabilityParameters(
     AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
   auto &ctx = AFD->getASTContext();
   auto *functionType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
@@ -2981,7 +3201,7 @@ IndexSubset *TypeChecker::inferDifferentiationParameters(
   for (auto &param : functionType->getParams())
     allParamTypes.push_back(param.getPlainType());
 
-  // Set differentiation parameters.
+  // Set differentiability parameters.
   for (unsigned i : range(parameterBits.size()))
     if (isDifferentiableParam(i))
       parameterBits.set(i);
@@ -2989,14 +3209,15 @@ IndexSubset *TypeChecker::inferDifferentiationParameters(
   return IndexSubset::get(ctx, parameterBits);
 }
 
-// Computes `IndexSubset` from the given parsed differentiation parameters
-// (possibly empty) for the given function and derivative generic environment,
-// then verifies that the parameter indices are valid.
+// Computes the differentiability parameter indices from the given parsed
+// differentiability parameters for the given original or derivative
+// `AbstractFunctionDecl` and derivative generic environment. On error, emits
+// diagnostics and returns `nullptr`.
 // - If parsed parameters are empty, infer parameter indices.
 // - Otherwise, build parameter indices from parsed parameters.
 // The attribute name/location are used in diagnostics.
-static IndexSubset *computeDifferentiationParameters(
-    ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
+static IndexSubset *computeDifferentiabilityParameters(
+    ArrayRef<ParsedAutoDiffParameter> parsedDiffParams,
     AbstractFunctionDecl *function, GenericEnvironment *derivativeGenEnv,
     StringRef attrName, SourceLoc attrLoc) {
   auto &ctx = function->getASTContext();
@@ -3036,13 +3257,14 @@ static IndexSubset *computeDifferentiationParameters(
     }
   }
 
-  // If parsed differentiation parameters are empty, infer parameter indices
+  // If parsed differentiability parameters are empty, infer parameter indices
   // from the function type.
-  if (parsedWrtParams.empty())
-    return TypeChecker::inferDifferentiationParameters(function,
-                                                       derivativeGenEnv);
+  if (parsedDiffParams.empty())
+    return TypeChecker::inferDifferentiabilityParameters(function,
+                                                         derivativeGenEnv);
 
-  // Otherwise, build parameter indices from parsed differentiation parameters.
+  // Otherwise, build parameter indices from parsed differentiability
+  // parameters.
   auto numUncurriedParams = functionType->getNumParams();
   if (auto *resultFnType =
           functionType->getResult()->getAs<AnyFunctionType>()) {
@@ -3050,17 +3272,17 @@ static IndexSubset *computeDifferentiationParameters(
   }
   llvm::SmallBitVector parameterBits(numUncurriedParams);
   int lastIndex = -1;
-  for (unsigned i : indices(parsedWrtParams)) {
-    auto paramLoc = parsedWrtParams[i].getLoc();
-    switch (parsedWrtParams[i].getKind()) {
+  for (unsigned i : indices(parsedDiffParams)) {
+    auto paramLoc = parsedDiffParams[i].getLoc();
+    switch (parsedDiffParams[i].getKind()) {
     case ParsedAutoDiffParameter::Kind::Named: {
       auto nameIter = llvm::find_if(params.getArray(), [&](ParamDecl *param) {
-        return param->getName() == parsedWrtParams[i].getName();
+        return param->getName() == parsedDiffParams[i].getName();
       });
       // Parameter name must exist.
       if (nameIter == params.end()) {
         diags.diagnose(paramLoc, diag::diff_params_clause_param_name_unknown,
-                       parsedWrtParams[i].getName());
+                       parsedDiffParams[i].getName());
         return nullptr;
       }
       // Parameter names must be specified in the original order.
@@ -3090,7 +3312,7 @@ static IndexSubset *computeDifferentiationParameters(
       break;
     }
     case ParsedAutoDiffParameter::Kind::Ordered: {
-      auto index = parsedWrtParams[i].getIndex();
+      auto index = parsedDiffParams[i].getIndex();
       if (index >= numParams) {
         diags.diagnose(paramLoc,
                        diag::diff_params_clause_param_index_out_of_range);
@@ -3111,50 +3333,45 @@ static IndexSubset *computeDifferentiationParameters(
   return IndexSubset::get(ctx, parameterBits);
 }
 
-// Checks if the given `IndexSubset` instance is valid for the given function
+// Checks if the given differentiability parameter indices are valid for the
+// given original or derivative `AbstractFunctionDecl` and original function
 // type in the given derivative generic environment and module context. Returns
 // true on error.
-// The parsed differentiation parameters and attribute location are used in
+//
+// The parsed differentiability parameters and attribute location are used in
 // diagnostics.
-static bool checkDifferentiationParameters(
-    AbstractFunctionDecl *AFD, IndexSubset *indices,
+static bool checkDifferentiabilityParameters(
+    AbstractFunctionDecl *AFD, IndexSubset *diffParamIndices,
     AnyFunctionType *functionType, GenericEnvironment *derivativeGenEnv,
-    ModuleDecl *module, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
+    ModuleDecl *module, ArrayRef<ParsedAutoDiffParameter> parsedDiffParams,
     SourceLoc attrLoc) {
   auto &ctx = AFD->getASTContext();
   auto &diags = ctx.Diags;
 
-  // Diagnose empty parameter indices. This occurs when no `wrt:` clause is
-  // declared and no differentiation parameters can be inferred.
-  if (indices->isEmpty()) {
+  // Diagnose empty differentiability indices. No differentiability parameters
+  // were resolved or inferred.
+  if (diffParamIndices->isEmpty()) {
     diags.diagnose(attrLoc, diag::diff_params_clause_no_inferred_parameters);
     return true;
   }
 
-  // Check that differentiation parameters have allowed types.
-  SmallVector<Type, 4> wrtParamTypes;
-  autodiff::getSubsetParameterTypes(indices, functionType, wrtParamTypes);
-  for (unsigned i : range(wrtParamTypes.size())) {
+  // Check that differentiability parameters have allowed types.
+  SmallVector<AnyFunctionType::Param, 4> diffParams;
+  functionType->getSubsetParameters(diffParamIndices, diffParams);
+  for (unsigned i : range(diffParams.size())) {
     SourceLoc loc =
-        parsedWrtParams.empty() ? attrLoc : parsedWrtParams[i].getLoc();
-    auto wrtParamType = wrtParamTypes[i];
-    // `inout` parameters are not yet supported.
-    if (wrtParamType->is<InOutType>()) {
-      diags.diagnose(loc,
-                     diag::diff_params_clause_cannot_diff_wrt_inout_parameter,
-                     wrtParamType);
-      return true;
-    }
-    if (!wrtParamType->hasTypeParameter())
-      wrtParamType = wrtParamType->mapTypeOutOfContext();
+        parsedDiffParams.empty() ? attrLoc : parsedDiffParams[i].getLoc();
+    auto diffParamType = diffParams[i].getPlainType();
+    if (!diffParamType->hasTypeParameter())
+      diffParamType = diffParamType->mapTypeOutOfContext();
     if (derivativeGenEnv)
-      wrtParamType = derivativeGenEnv->mapTypeIntoContext(wrtParamType);
+      diffParamType = derivativeGenEnv->mapTypeIntoContext(diffParamType);
     else
-      wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
+      diffParamType = AFD->mapTypeIntoContext(diffParamType);
     // Parameter must conform to `Differentiable`.
-    if (!conformsToDifferentiable(wrtParamType, AFD)) {
+    if (!conformsToDifferentiable(diffParamType, AFD)) {
       diags.diagnose(loc, diag::diff_params_clause_param_not_differentiable,
-                     wrtParamType);
+                     diffParamType);
       return true;
     }
   }
@@ -3182,20 +3399,15 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
 
   // Perform lookup.
   LookupResult results;
+  // If `baseType` is not null but `lookupContext` is a type context, set
+  // `baseType` to the `self` type of `lookupContext` to perform member lookup.
+  if (!baseType && lookupContext->isTypeContext())
+    baseType = lookupContext->getSelfTypeInContext();
   if (baseType) {
     results = TypeChecker::lookupMember(lookupContext, baseType, funcName);
   } else {
     results = TypeChecker::lookupUnqualified(lookupContext, funcName,
                                              funcNameLoc, lookupOptions);
-
-    // If looking up an operator within a type context, look specifically within
-    // the type context.
-    // This tries to resolve unqualified operators, like `+`.
-    if (funcName.isOperator() && lookupContext->isTypeContext()) {
-      if (auto tmp = TypeChecker::lookupMember(
-              lookupContext, lookupContext->getSelfTypeInContext(), funcName))
-        results = tmp;
-    }
   }
 
   // Initialize error flags.
@@ -3307,7 +3519,7 @@ static bool checkFunctionSignature(
   if (!std::equal(required->getParams().begin(), required->getParams().end(),
                   candidateFnTy->getParams().begin(),
                   [&](AnyFunctionType::Param x, AnyFunctionType::Param y) {
-                    return x.getPlainType()->isEqual(mapType(y.getPlainType()));
+                    return x.getOldType()->isEqual(mapType(y.getOldType()));
                   }))
     return false;
 
@@ -3335,26 +3547,20 @@ static bool checkFunctionSignature(
   return checkFunctionSignature(requiredResultFnTy, candidateResultTy);
 };
 
-// Returns an `AnyFunctionType` with the same `ExtInfo` as `fnType`, but with
-// the given parameters, result type, and generic signature. If the given
-// generic signature is `null`, use the generic signature of `fnType`.
+// Returns an `AnyFunctionType` from the given parameters, result type, and
+// generic signature.
 static AnyFunctionType *
-makeFunctionType(AnyFunctionType *fnType,
-                 ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
+makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
                  GenericSignature genericSignature) {
-  if (!genericSignature)
-    if (auto *genericFunctionType = fnType->getAs<GenericFunctionType>())
-      genericSignature = genericFunctionType->getGenericSignature();
   if (genericSignature)
-    return GenericFunctionType::get(genericSignature, parameters, resultType,
-                                    fnType->getExtInfo());
-  return FunctionType::get(parameters, resultType, fnType->getExtInfo());
+    return GenericFunctionType::get(genericSignature, parameters, resultType);
+  return FunctionType::get(parameters, resultType);
 }
 
 // Computes the original function type corresponding to the given derivative
-// function type.
-AnyFunctionType *
-getAutoDiffOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
+// function type. Used for `@derivative` attribute type-checking.
+static AnyFunctionType *
+getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   // Unwrap curry levels. At most, two parameter lists are necessary, for
   // curried method types with a `(Self)` parameter list.
   SmallVector<AnyFunctionType *, 2> curryLevels;
@@ -3372,7 +3578,7 @@ getAutoDiffOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
          "Expected derivative result to be a two-element tuple");
   auto originalResult = derivativeResult->getElement(0).getType();
   auto *originalType = makeFunctionType(
-      curryLevels.back(), curryLevels.back()->getParams(), originalResult,
+      curryLevels.back()->getParams(), originalResult,
       curryLevels.size() == 1 ? derivativeFnTy->getOptGenericSignature()
                               : nullptr);
 
@@ -3383,7 +3589,7 @@ getAutoDiffOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
     unsigned i = pair.index();
     AnyFunctionType *curryLevel = pair.value();
     originalType =
-        makeFunctionType(curryLevel, curryLevel->getParams(), originalType,
+        makeFunctionType(curryLevel->getParams(), originalType,
                          i == curryLevelsWithoutLast.size() - 1
                              ? derivativeFnTy->getOptGenericSignature()
                              : nullptr);
@@ -3391,7 +3597,506 @@ getAutoDiffOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   return originalType;
 }
 
-/// Typechecks the given derivative attribute `attr` on decl `D`.
+// Computes the original function type corresponding to the given transpose
+// function type. Used for `@transpose` attribute type-checking.
+static AnyFunctionType *
+getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
+                                 IndexSubset *linearParamIndices,
+                                 bool wrtSelf) {
+  unsigned transposeParamsIndex = 0;
+
+  // Get the transpose function's parameters and result type.
+  auto transposeParams = transposeFnType->getParams();
+  auto transposeResult = transposeFnType->getResult();
+  bool isCurried = transposeResult->is<AnyFunctionType>();
+  if (isCurried) {
+    auto methodType = transposeResult->castTo<AnyFunctionType>();
+    transposeParams = methodType->getParams();
+    transposeResult = methodType->getResult();
+  }
+
+  // Get the original function's result type.
+  // The original result type is always equal to the type of the last
+  // parameter of the transpose function type.
+  auto originalResult = transposeParams.back().getPlainType();
+
+  // Get transposed result types.
+  // The transpose function result type may be a singular type or a tuple type.
+  SmallVector<TupleTypeElt, 4> transposeResultTypes;
+  if (auto transposeResultTupleType = transposeResult->getAs<TupleType>()) {
+    transposeResultTypes.append(transposeResultTupleType->getElements().begin(),
+                                transposeResultTupleType->getElements().end());
+  } else {
+    transposeResultTypes.push_back(transposeResult);
+  }
+
+  // Get the `Self` type, if the transpose function type is curried.
+  // - If `self` is a linearity parameter, use the first transpose result type.
+  // - Otherwise, use the first transpose parameter type.
+  unsigned transposeResultTypesIndex = 0;
+  Type selfType;
+  if (isCurried && wrtSelf) {
+    selfType = transposeResultTypes.front().getType();
+    transposeResultTypesIndex++;
+  } else if (isCurried) {
+    selfType = transposeFnType->getParams().front().getPlainType();
+  }
+
+  // Get the original function's parameters.
+  SmallVector<AnyFunctionType::Param, 8> originalParams;
+  // The number of original parameters is equal to the sum of:
+  // - The number of original non-transposed parameters.
+  //   - This is the number of transpose parameters minus one. All transpose
+  //     parameters come from the original function, except the last parameter
+  //     (the transposed original result).
+  // - The number of original transposed parameters.
+  //   - This is the number of linearity parameters.
+  unsigned originalParameterCount =
+      transposeParams.size() - 1 + linearParamIndices->getNumIndices();
+  // Iterate over all original parameter indices.
+  for (auto i : range(originalParameterCount)) {
+    // Skip `self` parameter if `self` is a linearity parameter.
+    // The `self` is handled specially later to form a curried function type.
+    bool isSelfParameterAndWrtSelf =
+        wrtSelf && i == linearParamIndices->getCapacity() - 1;
+    if (isSelfParameterAndWrtSelf)
+      continue;
+    // If `i` is a linearity parameter index, the next original parameter is
+    // the next transpose result.
+    if (linearParamIndices->contains(i)) {
+      auto resultType =
+          transposeResultTypes[transposeResultTypesIndex++].getType();
+      originalParams.push_back(AnyFunctionType::Param(resultType));
+    }
+    // Otherwise, the next original parameter is the next transpose parameter.
+    else {
+      originalParams.push_back(transposeParams[transposeParamsIndex++]);
+    }
+  }
+
+  // Compute the original function type.
+  AnyFunctionType *originalType;
+  // If the transpose type is curried, the original function type is:
+  // `(Self) -> (<original parameters>) -> <original result>`.
+  if (isCurried) {
+    assert(selfType && "`Self` type should be resolved");
+    originalType = makeFunctionType(originalParams, originalResult, nullptr);
+    originalType =
+        makeFunctionType(AnyFunctionType::Param(selfType), originalType,
+                         transposeFnType->getOptGenericSignature());
+  }
+  // Otherwise, the original function type is simply:
+  // `(<original parameters>) -> <original result>`.
+  else {
+    originalType = makeFunctionType(originalParams, originalResult,
+                                    transposeFnType->getOptGenericSignature());
+  }
+  return originalType;
+}
+
+
+
+/// Given a `@differentiable` attribute, attempts to resolve the original
+/// `AbstractFunctionDecl` for which it is registered, using the declaration
+/// on which it is actually declared. On error, emits diagnostic and returns
+/// `nullptr`.
+AbstractFunctionDecl *
+resolveDifferentiableAttrOriginalFunction(DifferentiableAttr *attr) {
+  auto *D = attr->getOriginalDeclaration();
+  assert(D &&
+         "Original declaration should be resolved by parsing/deserialization");
+  auto &ctx = D->getASTContext();
+  auto &diags = ctx.Diags;
+  auto *original = dyn_cast<AbstractFunctionDecl>(D);
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+    // If `@differentiable` attribute is declared directly on a
+    // `AbstractStorageDecl` (a stored/computed property or subscript),
+    // forward the attribute to the storage's getter.
+    // TODO(TF-129): Forward `@differentiable` attributes to setters after
+    // differentiation supports inout parameters.
+    // TODO(TF-1080): Forward `@differentiable` attributes to `read` and
+    // `modify` accessors after differentiation supports `inout` parameters.
+    if (!asd->getDeclContext()->isModuleScopeContext()) {
+      original = asd->getSynthesizedAccessor(AccessorKind::Get);
+    } else {
+      original = nullptr;
+    }
+  }
+  // Non-`get` accessors are not yet supported: `set`, `read`, and `modify`.
+  // TODO(TF-129): Enable `set` when differentiation supports inout parameters.
+  // TODO(TF-1080): Enable `read` and `modify` when differentiation supports
+  // coroutines.
+  if (auto *accessor = dyn_cast_or_null<AccessorDecl>(original))
+    if (!accessor->isGetter())
+      original = nullptr;
+  // Diagnose if original `AbstractFunctionDecl` could not be resolved.
+  if (!original) {
+    diagnoseAndRemoveAttr(diags, D, attr, diag::invalid_decl_attribute, attr);
+    attr->setInvalid();
+    return nullptr;
+  }
+  // If the original function has an error interface type, return.
+  // A diagnostic should have already been emitted.
+  if (original->getInterfaceType()->hasError())
+    return nullptr;
+  return original;
+}
+
+/// Given a `@differentiable` attribute, attempts to resolve the derivative
+/// generic signature. The derivative generic signature is returned as
+/// `derivativeGenSig`. On error, emits diagnostic, assigns `nullptr` to
+/// `derivativeGenSig`, and returns true.
+bool resolveDifferentiableAttrDerivativeGenericSignature(
+    DifferentiableAttr *attr, AbstractFunctionDecl *original,
+    GenericSignature &derivativeGenSig) {
+  derivativeGenSig = nullptr;
+
+  auto &ctx = original->getASTContext();
+  auto &diags = ctx.Diags;
+
+  bool isOriginalProtocolRequirement =
+      isa<ProtocolDecl>(original->getDeclContext()) &&
+      original->isProtocolRequirement();
+
+  // Compute the derivative generic signature for the `@differentiable`
+  // attribute:
+  // - If the `@differentiable` attribute has a `where` clause, use it to
+  //   compute the derivative generic signature.
+  // - Otherwise, use the original function's generic signature by default.
+  derivativeGenSig = original->getGenericSignature();
+
+  // Handle the `where` clause, if it exists.
+  // - Resolve attribute where clause requirements and store in the attribute
+  //   for serialization.
+  // - Compute generic signature for autodiff derivative functions based on
+  //   the original function's generate signature and the attribute's where
+  //   clause requirements.
+  if (auto *whereClause = attr->getWhereClause()) {
+    // `@differentiable` attributes on protocol requirements do not support
+    // `where` clauses.
+    if (isOriginalProtocolRequirement) {
+      diags.diagnose(attr->getLocation(),
+                     diag::differentiable_attr_protocol_req_where_clause);
+      attr->setInvalid();
+      return true;
+    }
+    if (whereClause->getRequirements().empty()) {
+      // `where` clause must not be empty.
+      diags.diagnose(attr->getLocation(),
+                     diag::differentiable_attr_empty_where_clause);
+      attr->setInvalid();
+      return true;
+    }
+
+    auto originalGenSig = original->getGenericSignature();
+    if (!originalGenSig) {
+      // `where` clauses are valid only when the original function is generic.
+      diags
+          .diagnose(
+              attr->getLocation(),
+              diag::differentiable_attr_where_clause_for_nongeneric_original,
+              original->getFullName())
+          .highlight(whereClause->getSourceRange());
+      attr->setInvalid();
+      return true;
+    }
+
+    // Build a new generic signature for autodiff derivative functions.
+    GenericSignatureBuilder builder(ctx);
+    // Add the original function's generic signature.
+    builder.addGenericSignature(originalGenSig);
+
+    using FloatingRequirementSource =
+        GenericSignatureBuilder::FloatingRequirementSource;
+
+    bool errorOccurred = false;
+    WhereClauseOwner(original, attr)
+        .visitRequirements(
+            TypeResolutionStage::Structural,
+            [&](const Requirement &req, RequirementRepr *reqRepr) {
+              switch (req.getKind()) {
+              case RequirementKind::SameType:
+              case RequirementKind::Superclass:
+              case RequirementKind::Conformance:
+                break;
+
+              // Layout requirements are not supported.
+              case RequirementKind::Layout:
+                diags
+                    .diagnose(attr->getLocation(),
+                              diag::differentiable_attr_layout_req_unsupported)
+                    .highlight(reqRepr->getSourceRange());
+                errorOccurred = true;
+                return false;
+              }
+
+              // Add requirement to generic signature builder.
+              builder.addRequirement(
+                  req, reqRepr, FloatingRequirementSource::forExplicit(reqRepr),
+                  nullptr, original->getModuleContext());
+              return false;
+            });
+
+    if (errorOccurred) {
+      attr->setInvalid();
+      return true;
+    }
+
+    // Compute generic signature for derivative functions.
+    derivativeGenSig = std::move(builder).computeGenericSignature(
+        attr->getLocation(), /*allowConcreteGenericParams=*/true);
+  }
+
+  // Set the resolved derivative generic signature in the attribute.
+  // Do not set the derivative generic signature if the original function's
+  // generic signature is equal to `derivativeGenSig` and all generic parameters
+  // are concrete. In that case, the original function and derivative functions
+  // are all lowered as SIL functions with no generic signature (specialized
+  // with concrete types from same-type requirements), so the derivative generic
+  // signature should not be set.
+  auto skipDerivativeGenericSignature = [&] {
+    auto origCanGenSig =
+        original->getGenericSignature().getCanonicalSignature();
+    auto derivativeCanGenSig = derivativeGenSig.getCanonicalSignature();
+    if (!derivativeCanGenSig)
+      return false;
+    return origCanGenSig == derivativeCanGenSig &&
+           derivativeCanGenSig->areAllParamsConcrete();
+  };
+  if (skipDerivativeGenericSignature())
+    derivativeGenSig = GenericSignature();
+  attr->setDerivativeGenericSignature(derivativeGenSig);
+  return false;
+}
+
+/// Given a `@differentiable` attribute, attempts to resolve and validate the
+/// differentiability parameter indices. The parameter indices are returned as
+/// `diffParamIndices`. On error, emits diagnostic, assigns `nullptr` to
+/// `diffParamIndices`, and returns true.
+bool resolveDifferentiableAttrDifferentiabilityParameters(
+    DifferentiableAttr *attr, AbstractFunctionDecl *original,
+    AnyFunctionType *derivativeFnTy, GenericEnvironment *derivativeGenEnv,
+    IndexSubset *&diffParamIndices) {
+  diffParamIndices = nullptr;
+
+  // Get the parsed differentiability parameter indices, which have not yet been
+  // resolved. Parsed differentiability parameter indices are defined only for
+  // parsed attributes.
+  auto parsedDiffParams = attr->getParsedParameters();
+
+  diffParamIndices = computeDifferentiabilityParameters(
+      parsedDiffParams, original, derivativeGenEnv, attr->getAttrName(),
+      attr->getLocation());
+  if (!diffParamIndices) {
+    attr->setInvalid();
+    return true;
+  }
+
+  // Check if differentiability parameter indices are valid.
+  if (checkDifferentiabilityParameters(original, diffParamIndices,
+                                       derivativeFnTy, derivativeGenEnv,
+                                       original->getModuleContext(),
+                                       parsedDiffParams, attr->getLocation())) {
+    attr->setInvalid();
+    return true;
+  }
+
+  return false;
+}
+
+/// Checks whether differentiable programming is enabled for the given
+/// differentiation-related attribute. Returns true on error.
+bool checkIfDifferentiableProgrammingEnabled(
+    ASTContext &ctx, DeclAttribute *attr) {
+  auto &diags = ctx.Diags;
+  // The experimental differentiable programming flag must be enabled.
+  if (!ctx.LangOpts.EnableExperimentalDifferentiableProgramming) {
+    diags
+        .diagnose(attr->getLocation(),
+                  diag::experimental_differentiable_programming_disabled)
+        .highlight(attr->getRangeWithAt());
+    return true;
+  }
+  // The `Differentiable` protocol must be available.
+  // If unavailable, the `_Differentiation` module should be imported.
+  if (!ctx.getProtocol(KnownProtocolKind::Differentiable)) {
+    diags
+        .diagnose(attr->getLocation(), diag::attr_used_without_required_module,
+                  attr, ctx.Id_Differentiation)
+        .highlight(attr->getRangeWithAt());
+    return true;
+  }
+  return false;
+}
+
+IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
+    Evaluator &evaluator, DifferentiableAttr *attr) const {
+  // Skip type-checking for implicit `@differentiable` attributes. We currently
+  // assume that all implicit `@differentiable` attributes are valid.
+  //
+  // Motivation: some implicit attributes do not have a `where` clause, and this
+  // function assumes that the `where` clauses exist. Propagating `where`
+  // clauses and requirements consistently is a larger problem, to be revisited.
+  if (attr->isImplicit())
+    return nullptr;
+
+  auto *D = attr->getOriginalDeclaration();
+  auto &ctx = D->getASTContext();
+  auto &diags = ctx.Diags;
+  // `@differentiable` attribute requires experimental differentiable
+  // programming to be enabled.
+  if (checkIfDifferentiableProgrammingEnabled(ctx, attr))
+    return nullptr;
+
+  // Resolve the original `AbstractFunctionDecl`.
+  auto *original = resolveDifferentiableAttrOriginalFunction(attr);
+  if (!original)
+    return nullptr;
+
+  auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
+
+  // Diagnose if original function is an invalid class member.
+  bool isOriginalClassMember = original->getDeclContext() &&
+                               original->getDeclContext()->getSelfClassDecl();
+  if (isOriginalClassMember) {
+    auto *classDecl = original->getDeclContext()->getSelfClassDecl();
+    assert(classDecl);
+    // Class members returning dynamic `Self` are not supported.
+    // Dynamic `Self` is supported only as a single top-level result for class
+    // members. JVP/VJP functions returning `(Self, ...)` tuples would not
+    // type-check.
+    bool diagnoseDynamicSelfResult = original->hasDynamicSelfResult();
+    if (diagnoseDynamicSelfResult) {
+      // Diagnose class initializers in non-final classes.
+      if (isa<ConstructorDecl>(original)) {
+        if (!classDecl->isFinal()) {
+          diags.diagnose(
+              attr->getLocation(),
+              diag::differentiable_attr_nonfinal_class_init_unsupported,
+              classDecl->getDeclaredInterfaceType());
+          attr->setInvalid();
+          return nullptr;
+        }
+      }
+      // Diagnose all other declarations returning dynamic `Self`.
+      else {
+        diags.diagnose(
+            attr->getLocation(),
+            diag::
+                differentiable_attr_class_member_dynamic_self_result_unsupported);
+        attr->setInvalid();
+        return nullptr;
+      }
+    }
+  }
+
+  // Resolve the derivative generic signature.
+  GenericSignature derivativeGenSig = nullptr;
+  if (resolveDifferentiableAttrDerivativeGenericSignature(attr, original,
+                                                          derivativeGenSig))
+    return nullptr;
+  GenericEnvironment *derivativeGenEnv = nullptr;
+  if (derivativeGenSig)
+    derivativeGenEnv = derivativeGenSig->getGenericEnvironment();
+
+  // Compute the derivative function type.
+  auto derivativeFnTy = originalFnTy;
+  if (derivativeGenEnv)
+    derivativeFnTy = derivativeGenEnv->mapTypeIntoContext(derivativeFnTy)
+                         ->castTo<AnyFunctionType>();
+
+  // Resolve and validate the differentiability parameters.
+  IndexSubset *resolvedDiffParamIndices = nullptr;
+  if (resolveDifferentiableAttrDifferentiabilityParameters(
+          attr, original, derivativeFnTy, derivativeGenEnv,
+          resolvedDiffParamIndices))
+    return nullptr;
+
+  // Get the original semantic result type.
+  llvm::SmallVector<AutoDiffSemanticFunctionResultType, 1> originalResults;
+  autodiff::getFunctionSemanticResultTypes(originalFnTy, originalResults,
+                                           derivativeGenEnv);
+  // Check that original function has at least one semantic result, i.e.
+  // that the original semantic result type is not `Void`.
+  if (originalResults.empty()) {
+    diags
+        .diagnose(attr->getLocation(), diag::autodiff_attr_original_void_result,
+                  original->getFullName())
+        .highlight(original->getSourceRange());
+    attr->setInvalid();
+    return nullptr;
+  }
+  // Check that original function does not have multiple semantic results.
+  if (originalResults.size() > 1) {
+    diags
+        .diagnose(attr->getLocation(),
+                  diag::autodiff_attr_original_multiple_semantic_results)
+        .highlight(original->getSourceRange());
+    attr->setInvalid();
+    return nullptr;
+  }
+  auto originalResult = originalResults.front();
+  auto originalResultTy = originalResult.type;
+  // Check that the original semantic result conforms to `Differentiable`.
+  if (!conformsToDifferentiable(originalResultTy, original)) {
+    diags.diagnose(attr->getLocation(),
+                   diag::differentiable_attr_result_not_differentiable,
+                   originalResultTy);
+    attr->setInvalid();
+    return nullptr;
+  }
+
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+    // Remove `@differentiable` attribute from storage declaration to prevent
+    // duplicate attribute registration during SILGen.
+    D->getAttrs().removeAttribute(attr);
+    // Transfer `@differentiable` attribute from storage declaration to
+    // getter accessor.
+    auto *getterDecl = asd->getAccessor(AccessorKind::Get);
+    auto *newAttr = DifferentiableAttr::create(
+        getterDecl, /*implicit*/ true, attr->AtLoc, attr->getRange(),
+        attr->isLinear(), resolvedDiffParamIndices,
+        attr->getDerivativeGenericSignature());
+    auto insertion = ctx.DifferentiableAttrs.try_emplace(
+        {getterDecl, resolvedDiffParamIndices}, newAttr);
+    // Reject duplicate `@differentiable` attributes.
+    if (!insertion.second) {
+      diagnoseAndRemoveAttr(diags, D, attr,
+                            diag::differentiable_attr_duplicate);
+      diags.diagnose(insertion.first->getSecond()->getLocation(),
+                     diag::differentiable_attr_duplicate_note);
+      return nullptr;
+    }
+    getterDecl->getAttrs().add(newAttr);
+    // Register derivative function configuration.
+    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+    getterDecl->addDerivativeFunctionConfiguration(
+        {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
+    return resolvedDiffParamIndices;
+  }
+  // Reject duplicate `@differentiable` attributes.
+  auto insertion =
+      ctx.DifferentiableAttrs.try_emplace({D, resolvedDiffParamIndices}, attr);
+  if (!insertion.second && insertion.first->getSecond() != attr) {
+    diagnoseAndRemoveAttr(diags, D, attr, diag::differentiable_attr_duplicate);
+    diags.diagnose(insertion.first->getSecond()->getLocation(),
+                   diag::differentiable_attr_duplicate_note);
+    return nullptr;
+  }
+  // Register derivative function configuration.
+  auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+  original->addDerivativeFunctionConfiguration(
+      {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
+  return resolvedDiffParamIndices;
+}
+
+void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
+  // Call `getParameterIndices` to trigger
+  // `DifferentiableAttributeTypeCheckRequest`.
+  (void)attr->getParameterIndices();
+}
+
+/// Type-checks the given `@derivative` attribute `attr` on declaration `D`.
 ///
 /// Effects are:
 /// - Sets the original function and parameter indices on `attr`.
@@ -3401,19 +4106,13 @@ getAutoDiffOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
 /// \returns true on error, false on success.
 static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
                                     DerivativeAttr *attr) {
-  // Note: Implementation must be idempotent because it can get called multiple
+  // Note: Implementation must be idempotent because it may be called multiple
   // times for the same attribute.
-
   auto &diags = Ctx.Diags;
-
   // `@derivative` attribute requires experimental differentiable programming
   // to be enabled.
-  auto &ctx = D->getASTContext();
-  if (!ctx.LangOpts.EnableExperimentalDifferentiableProgramming) {
-    diags.diagnose(attr->getLocation(),
-                   diag::experimental_differentiable_programming_disabled);
+  if (checkIfDifferentiableProgrammingEnabled(Ctx, attr))
     return true;
-  }
   auto *derivative = cast<FuncDecl>(D);
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
@@ -3455,23 +4154,10 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     return true;
   }
   attr->setDerivativeKind(kind);
-  // `value: R` result tuple element must conform to `Differentiable`.
-  auto diffableProto = Ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto valueResultType = valueResultElt.getType();
-  if (valueResultType->hasTypeParameter())
-    valueResultType = derivative->mapTypeIntoContext(valueResultType);
-  auto valueResultConf = TypeChecker::conformsToProtocol(
-      valueResultType, diffableProto, derivative->getDeclContext(), None);
-  if (!valueResultConf) {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_result_value_not_differentiable,
-                   valueResultElt.getType());
-    return true;
-  }
 
   // Compute expected original function type and look up original function.
   auto *originalFnType =
-      getAutoDiffOriginalFunctionType(derivativeInterfaceType);
+      getDerivativeOriginalFunctionType(derivativeInterfaceType);
 
   // Returns true if the generic parameters in `source` satisfy the generic
   // requirements in `target`.
@@ -3503,6 +4189,9 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
       };
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
+    // TODO(TF-982): Allow derivatives on protocol requirements.
+    if (isa<ProtocolDecl>(originalCandidate->getDeclContext()))
+      return false;
     return checkFunctionSignature(
         cast<AnyFunctionType>(originalFnType->getCanonicalType()),
         originalCandidate->getInterfaceType()->getCanonicalType(),
@@ -3585,55 +4274,102 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
       return true;
     }
   }
+  // Diagnose if original function is an invalid class member.
+  bool isOriginalClassMember =
+      originalAFD->getDeclContext() &&
+      originalAFD->getDeclContext()->getSelfClassDecl();
+  if (isOriginalClassMember) {
+    auto *classDecl = originalAFD->getDeclContext()->getSelfClassDecl();
+    assert(classDecl);
+    // Class members returning dynamic `Self` are not supported.
+    // Dynamic `Self` is supported only as a single top-level result for class
+    // members. JVP/VJP functions returning `(Self, ...)` tuples would not
+    // type-check.
+    bool diagnoseDynamicSelfResult = originalAFD->hasDynamicSelfResult();
+    if (diagnoseDynamicSelfResult) {
+      // Diagnose class initializers in non-final classes.
+      if (isa<ConstructorDecl>(originalAFD)) {
+        if (!classDecl->isFinal()) {
+          diags.diagnose(attr->getLocation(),
+                         diag::derivative_attr_nonfinal_class_init_unsupported,
+                         classDecl->getDeclaredInterfaceType());
+          return true;
+        }
+      }
+      // Diagnose all other declarations returning dynamic `Self`.
+      else {
+        diags.diagnose(
+            attr->getLocation(),
+            diag::derivative_attr_class_member_dynamic_self_result_unsupported,
+            DeclNameRef(originalAFD->getFullName()));
+        return true;
+      }
+    }
+  }
   attr->setOriginalFunction(originalAFD);
 
-  // Get the resolved `wrt:` parameter indices.
-  auto *resolvedWrtParamIndices = attr->getParameterIndices();
+  // Get the resolved differentiability parameter indices.
+  auto *resolvedDiffParamIndices = attr->getParameterIndices();
 
-  // Get the parsed `wrt:` parameter indices, which have not yet been resolved.
-  // Parsed `wrt:` paraeter indices are defined only for parsed attributes.
-  auto parsedWrtParams = attr->getParsedParameters();
+  // Get the parsed differentiability parameter indices, which have not yet been
+  // resolved. Parsed differentiability parameter indices are defined only for
+  // parsed attributes.
+  auto parsedDiffParams = attr->getParsedParameters();
 
-  // If parameter indices are not resolved, compute them.
-  if (!resolvedWrtParamIndices)
-    resolvedWrtParamIndices = computeDifferentiationParameters(
-        parsedWrtParams, derivative, derivative->getGenericEnvironment(),
+  // If differentiability parameter indices are not resolved, compute them.
+  if (!resolvedDiffParamIndices)
+    resolvedDiffParamIndices = computeDifferentiabilityParameters(
+        parsedDiffParams, derivative, derivative->getGenericEnvironment(),
         attr->getAttrName(), attr->getLocation());
-  if (!resolvedWrtParamIndices)
+  if (!resolvedDiffParamIndices)
     return true;
 
-  // Check if the `wrt:` parameter indices are valid.
-  if (checkDifferentiationParameters(
-          originalAFD, resolvedWrtParamIndices, originalFnType,
+  // Check if the differentiability parameter indices are valid.
+  if (checkDifferentiabilityParameters(
+          originalAFD, resolvedDiffParamIndices, originalFnType,
           derivative->getGenericEnvironment(), derivative->getModuleContext(),
-          parsedWrtParams, attr->getLocation()))
+          parsedDiffParams, attr->getLocation()))
     return true;
 
-  // Set the resolved `wrt:` parameter indices in the attribute.
-  attr->setParameterIndices(resolvedWrtParamIndices);
+  // Set the resolved differentiability parameter indices in the attribute.
+  attr->setParameterIndices(resolvedDiffParamIndices);
 
-  // Gather `wrt:` parameters.
-  SmallVector<Type, 4> wrtParamTypes;
-  autodiff::getSubsetParameterTypes(resolvedWrtParamIndices, originalFnType,
-                                    wrtParamTypes);
-
-  // Get the `TangentVector` associated types of the `wrt:` parameters.
-  auto wrtParamTanTypes =
-      map<SmallVector<TupleTypeElt, 4>>(wrtParamTypes, [&](Type paramType) {
-        if (paramType->hasTypeParameter())
-          paramType = derivative->mapTypeIntoContext(paramType);
-        auto conf = TypeChecker::conformsToProtocol(paramType, diffableProto,
-                                                    derivative, None);
-        assert(conf &&
-               "Expected resolved parameter to conform to `Differentiable`");
-        auto paramAssocType =
-            conf.getTypeWitnessByName(paramType, Ctx.Id_TangentVector);
-        return TupleTypeElt(paramAssocType);
-      });
-
-  // Get the `TangentVector` associated type of the `value:` result type.
-  auto resultTanType = valueResultConf.getTypeWitnessByName(
-      valueResultType, Ctx.Id_TangentVector);
+  // Get the original semantic result.
+  llvm::SmallVector<AutoDiffSemanticFunctionResultType, 1> originalResults;
+  autodiff::getFunctionSemanticResultTypes(
+      originalFnType, originalResults,
+      derivative->getGenericEnvironmentOfContext());
+  // Check that original function has at least one semantic result, i.e.
+  // that the original semantic result type is not `Void`.
+  if (originalResults.empty()) {
+    diags
+        .diagnose(attr->getLocation(), diag::autodiff_attr_original_void_result,
+                  derivative->getFullName())
+        .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
+    attr->setInvalid();
+    return true;
+  }
+  // Check that original function does not have multiple semantic results.
+  if (originalResults.size() > 1) {
+    diags
+        .diagnose(attr->getLocation(),
+                  diag::autodiff_attr_original_multiple_semantic_results)
+        .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
+    attr->setInvalid();
+    return true;
+  }
+  auto originalResult = originalResults.front();
+  auto originalResultType = originalResult.type;
+  // Check that the original semantic result conforms to `Differentiable`.
+  auto *diffableProto = Ctx.getProtocol(KnownProtocolKind::Differentiable);
+  auto valueResultConf = TypeChecker::conformsToProtocol(
+      originalResultType, diffableProto, derivative->getDeclContext(), None);
+  if (!valueResultConf) {
+    diags.diagnose(attr->getLocation(),
+                   diag::derivative_attr_result_value_not_differentiable,
+                   valueResultElt.getType());
+    return true;
+  }
 
   // Compute the actual differential/pullback type that we use for comparison
   // with the expected type. We must canonicalize the derivative interface type
@@ -3649,19 +4385,14 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
       cast<TupleType>(canActualResultType).getElementType(1);
 
   // Compute expected differential/pullback type.
-  Type expectedFuncEltType;
-  if (kind == AutoDiffDerivativeFunctionKind::JVP) {
-    auto diffParams = map<SmallVector<AnyFunctionType::Param, 4>>(
-        wrtParamTanTypes, [&](TupleTypeElt elt) {
-          return AnyFunctionType::Param(elt.getType());
-        });
-    expectedFuncEltType = FunctionType::get(diffParams, resultTanType);
-  } else {
-    expectedFuncEltType =
-        FunctionType::get({AnyFunctionType::Param(resultTanType)},
-                          TupleType::get(wrtParamTanTypes, Ctx));
-  }
-  expectedFuncEltType = expectedFuncEltType->mapTypeOutOfContext();
+  Type expectedFuncEltType =
+      originalFnType->getAutoDiffDerivativeFunctionLinearMapType(
+          resolvedDiffParamIndices, kind.getLinearMapKind(), lookupConformance,
+          /*makeSelfParamFirst*/ true);
+  if (expectedFuncEltType->hasTypeParameter())
+    expectedFuncEltType = derivative->mapTypeIntoContext(expectedFuncEltType);
+  if (expectedFuncEltType->hasArchetype())
+    expectedFuncEltType = expectedFuncEltType->mapTypeOutOfContext();
 
   // Check if differential/pullback type matches expected type.
   if (!actualFuncEltType->isEqual(expectedFuncEltType)) {
@@ -3697,7 +4428,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   // Reject duplicate `@derivative` attributes.
   auto &derivativeAttrs = Ctx.DerivativeAttrs[std::make_tuple(
-      originalAFD, resolvedWrtParamIndices, kind)];
+      originalAFD, resolvedDiffParamIndices, kind)];
   derivativeAttrs.insert(attr);
   if (derivativeAttrs.size() > 1) {
     diags.diagnose(attr->getLocation(),
@@ -3712,10 +4443,378 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     return true;
   }
 
+  // Register derivative function configuration.
+  auto *resultIndices = IndexSubset::get(Ctx, 1, {0});
+  originalAFD->addDerivativeFunctionConfiguration(
+      {resolvedDiffParamIndices, resultIndices,
+       derivative->getGenericSignature()});
+
   return false;
 }
 
 void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   if (typeCheckDerivativeAttr(Ctx, D, attr))
     attr->setInvalid();
+}
+
+/// Returns true if the given type's `TangentVector` is equal to itself in the
+/// given module.
+static bool tangentVectorEqualsSelf(Type type, DeclContext *DC) {
+  assert(conformsToDifferentiable(type, DC));
+  auto &ctx = type->getASTContext();
+  auto *differentiableProto =
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  auto conf = TypeChecker::conformsToProtocol(
+                  type, differentiableProto, DC,
+                  ConformanceCheckFlags::InExpression);
+  auto tanType = conf.getTypeWitnessByName(type, ctx.Id_TangentVector);
+  return type->getCanonicalType() == tanType->getCanonicalType();
+};
+
+
+// Computes the linearity parameter indices from the given parsed linearity
+// parameters for the given transpose function. On error, emits diagnostics and
+// returns `nullptr`.
+//
+// The attribute location is used in diagnostics.
+static IndexSubset *
+computeLinearityParameters(ArrayRef<ParsedAutoDiffParameter> parsedLinearParams,
+                           AbstractFunctionDecl *transposeFunction,
+                           SourceLoc attrLoc) {
+  auto &ctx = transposeFunction->getASTContext();
+  auto &diags = ctx.Diags;
+
+  // Get the transpose function type.
+  auto *transposeFunctionType =
+      transposeFunction->getInterfaceType()->castTo<AnyFunctionType>();
+  bool isCurried = transposeFunctionType->getResult()->is<AnyFunctionType>();
+
+  // Get transposed result types.
+  // The transpose function result type may be a singular type or a tuple type.
+  ArrayRef<TupleTypeElt> transposeResultTypes;
+  auto transposeResultType = transposeFunctionType->getResult();
+  if (isCurried)
+    transposeResultType =
+        transposeResultType->castTo<AnyFunctionType>()->getResult();
+  if (auto resultTupleType = transposeResultType->getAs<TupleType>()) {
+    transposeResultTypes = resultTupleType->getElements();
+  } else {
+    transposeResultTypes = ArrayRef<TupleTypeElt>(transposeResultType);
+  }
+
+  // If `self` is a linearity parameter, the transpose function must be static.
+  auto isStaticMethod = transposeFunction->isStatic();
+  bool wrtSelf = false;
+  if (!parsedLinearParams.empty())
+    wrtSelf = parsedLinearParams.front().getKind() ==
+              ParsedAutoDiffParameter::Kind::Self;
+  if (wrtSelf && !isStaticMethod) {
+    diags.diagnose(attrLoc, diag::transpose_attr_wrt_self_must_be_static);
+    return nullptr;
+  }
+
+  // Build linearity parameter indices from parsed linearity parameters.
+  auto numUncurriedParams = transposeFunctionType->getNumParams();
+  if (isCurried) {
+    auto *resultFnType =
+        transposeFunctionType->getResult()->castTo<AnyFunctionType>();
+    numUncurriedParams += resultFnType->getNumParams();
+  }
+  auto numParams =
+      numUncurriedParams + parsedLinearParams.size() - 1 - (unsigned)wrtSelf;
+  SmallBitVector parameterBits(numParams);
+  int lastIndex = -1;
+  for (unsigned i : indices(parsedLinearParams)) {
+    auto paramLoc = parsedLinearParams[i].getLoc();
+    switch (parsedLinearParams[i].getKind()) {
+    case ParsedAutoDiffParameter::Kind::Named: {
+      diags.diagnose(paramLoc, diag::transpose_attr_cannot_use_named_wrt_params,
+                     parsedLinearParams[i].getName());
+      return nullptr;
+    }
+    case ParsedAutoDiffParameter::Kind::Self: {
+      // 'self' can only be the first in the list.
+      if (i > 0) {
+        diags.diagnose(paramLoc, diag::diff_params_clause_self_must_be_first);
+        return nullptr;
+      }
+      parameterBits.set(parameterBits.size() - 1);
+      break;
+    }
+    case ParsedAutoDiffParameter::Kind::Ordered: {
+      auto index = parsedLinearParams[i].getIndex();
+      if (index >= numParams) {
+        diags.diagnose(paramLoc,
+                       diag::diff_params_clause_param_index_out_of_range);
+        return nullptr;
+      }
+      // Parameter names must be specified in the original order.
+      if ((int)index <= lastIndex) {
+        diags.diagnose(paramLoc,
+                       diag::diff_params_clause_params_not_original_order);
+        return nullptr;
+      }
+      parameterBits.set(index);
+      lastIndex = index;
+      break;
+    }
+    }
+  }
+  return IndexSubset::get(ctx, parameterBits);
+}
+
+// Checks if the given linearity parameter types are valid for the given
+// original function in the given derivative generic environment and module
+// context. Returns true on error.
+//
+// The parsed differentiability parameters and attribute location are used in
+// diagnostics.
+static bool checkLinearityParameters(
+    AbstractFunctionDecl *originalAFD,
+    SmallVector<AnyFunctionType::Param, 4> linearParams,
+    GenericEnvironment *derivativeGenEnv, ModuleDecl *module,
+    ArrayRef<ParsedAutoDiffParameter> parsedLinearParams, SourceLoc attrLoc) {
+  auto &ctx = originalAFD->getASTContext();
+  auto &diags = ctx.Diags;
+
+  // Check that linearity parameters have allowed types.
+  for (unsigned i : range(linearParams.size())) {
+    auto linearParamType = linearParams[i].getPlainType();
+    if (!linearParamType->hasTypeParameter())
+      linearParamType = linearParamType->mapTypeOutOfContext();
+    if (derivativeGenEnv)
+      linearParamType = derivativeGenEnv->mapTypeIntoContext(linearParamType);
+    else
+      linearParamType = originalAFD->mapTypeIntoContext(linearParamType);
+    SourceLoc loc =
+        parsedLinearParams.empty() ? attrLoc : parsedLinearParams[i].getLoc();
+    // Parameter must conform to `Differentiable` and satisfy
+    // `Self == Self.TangentVector`.
+    if (!conformsToDifferentiable(linearParamType, originalAFD) ||
+        !tangentVectorEqualsSelf(linearParamType, originalAFD)) {
+      diags.diagnose(loc,
+                     diag::transpose_attr_invalid_linearity_parameter_or_result,
+                     linearParamType.getString(), /*isParameter*/ true);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Given a transpose function type where `self` is a linearity parameter,
+// sets `staticSelfType` and `instanceSelfType` and returns true if they are
+// equals. Otherwise, returns false.
+static bool
+doTransposeStaticAndInstanceSelfTypesMatch(AnyFunctionType *transposeType,
+                                           Type &staticSelfType,
+                                           Type &instanceSelfType) {
+  // Transpose type should have the form:
+  // `(StaticSelf) -> (...) -> (InstanceSelf, ...)`.
+  auto methodType = transposeType->getResult()->castTo<AnyFunctionType>();
+  auto transposeResult = methodType->getResult();
+
+  // Get transposed result types.
+  // The transpose function result type may be a singular type or a tuple type.
+  SmallVector<TupleTypeElt, 4> transposeResultTypes;
+  if (auto transposeResultTupleType = transposeResult->getAs<TupleType>()) {
+    transposeResultTypes.append(transposeResultTupleType->getElements().begin(),
+                                transposeResultTupleType->getElements().end());
+  } else {
+    transposeResultTypes.push_back(transposeResult);
+  }
+  assert(!transposeResultTypes.empty());
+
+  // Get the static and instance `Self` types.
+  staticSelfType = transposeType->getParams()
+                       .front()
+                       .getPlainType()
+                       ->getMetatypeInstanceType();
+  instanceSelfType = transposeResultTypes.front().getType();
+
+  // Return true if static and instance `Self` types are equal.
+  return staticSelfType->isEqual(instanceSelfType);
+}
+
+void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
+  auto *transpose = cast<FuncDecl>(D);
+  auto lookupConformance =
+      LookUpConformanceInModule(D->getDeclContext()->getParentModule());
+  auto originalName = attr->getOriginalFunctionName();
+  auto *transposeInterfaceType =
+      transpose->getInterfaceType()->castTo<AnyFunctionType>();
+  bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
+
+  // Get the linearity parameter indices.
+  auto *linearParamIndices = attr->getParameterIndices();
+
+  // Get the parsed linearity parameter indices, which have not yet been
+  // resolved. Parsed linearity parameter indices are defined only for parsed
+  // attributes.
+  auto parsedLinearParams = attr->getParsedParameters();
+
+  // If linearity parameter indices are not resolved, compute them.
+  if (!linearParamIndices)
+    linearParamIndices = computeLinearityParameters(
+        parsedLinearParams, transpose, attr->getLocation());
+  if (!linearParamIndices) {
+    attr->setInvalid();
+    return;
+  }
+
+  // Diagnose empty linearity parameter indices. This occurs when no `wrt:`
+  // clause is declared and no linearity parameters can be inferred.
+  if (linearParamIndices->isEmpty()) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::diff_params_clause_no_inferred_parameters);
+    return;
+  }
+
+  bool wrtSelf = false;
+  if (!parsedLinearParams.empty())
+    wrtSelf = parsedLinearParams.front().getKind() ==
+              ParsedAutoDiffParameter::Kind::Self;
+
+  // If the transpose function is curried and `self` is a linearity parameter,
+  // check that the instance and static `Self` types are equal.
+  Type staticSelfType, instanceSelfType;
+  if (isCurried && wrtSelf) {
+    bool doSelfTypesMatch = doTransposeStaticAndInstanceSelfTypesMatch(
+        transposeInterfaceType, staticSelfType, instanceSelfType);
+    if (!doSelfTypesMatch) {
+      diagnose(attr->getLocation(),
+               diag::transpose_attr_wrt_self_must_be_static);
+      diagnose(attr->getLocation(),
+               diag::transpose_attr_wrt_self_self_type_mismatch_note,
+               staticSelfType, instanceSelfType);
+      attr->setInvalid();
+      return;
+    }
+  }
+
+  auto *expectedOriginalFnType = getTransposeOriginalFunctionType(
+      transposeInterfaceType, linearParamIndices, wrtSelf);
+
+  // `R` result type must conform to `Differentiable` and satisfy
+  // `Self == Self.TangentVector`.
+  auto expectedOriginalResultType = expectedOriginalFnType->getResult();
+  if (isCurried)
+    expectedOriginalResultType =
+        expectedOriginalResultType->castTo<AnyFunctionType>()->getResult();
+  if (expectedOriginalResultType->hasTypeParameter())
+    expectedOriginalResultType = transpose->mapTypeIntoContext(
+        expectedOriginalResultType);
+  if (!conformsToDifferentiable(expectedOriginalResultType, transpose) ||
+      !tangentVectorEqualsSelf(expectedOriginalResultType, transpose)) {
+    diagnoseAndRemoveAttr(
+        attr, diag::transpose_attr_invalid_linearity_parameter_or_result,
+        expectedOriginalResultType.getString(), /*isParameter*/ false);
+    return;
+  }
+
+  // Returns true if the generic parameters in `source` satisfy the generic
+  // requirements in `target`.
+  std::function<bool(GenericSignature, GenericSignature)>
+      checkGenericSignatureSatisfied = [&](GenericSignature source,
+                                           GenericSignature target) {
+        // If target is null, then its requirements are satisfied.
+        if (!target)
+          return true;
+        // If source is null but target is not null, then target's
+        // requirements are not satisfied.
+        if (!source)
+          return false;
+        // Check if target's requirements are satisfied by source.
+        // Cancel diagnostics using `DiagnosticTransaction`.
+        // Diagnostics should not be emitted because this function is used to
+        // check candidates; if no candidates match, a separate diagnostic will
+        // be produced.
+        DiagnosticTransaction transaction(Ctx.Diags);
+        SWIFT_DEFER { transaction.abort(); };
+        return TypeChecker::checkGenericArguments(
+            transpose, originalName.Loc.getBaseNameLoc(),
+            originalName.Loc.getBaseNameLoc(), Type(),
+            source->getGenericParams(), target->getRequirements(),
+            [](SubstitutableType *dependentType) {
+              return Type(dependentType);
+            },
+            lookupConformance, None) == RequirementCheckResult::Success;
+      };
+
+  auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
+    return checkFunctionSignature(
+        cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
+        originalCandidate->getInterfaceType()->getCanonicalType(),
+        checkGenericSignatureSatisfied);
+  };
+
+  auto noneValidDiagnostic = [&]() {
+    diagnose(originalName.Loc,
+             diag::autodiff_attr_original_decl_none_valid_found,
+             originalName.Name, expectedOriginalFnType);
+  };
+  auto ambiguousDiagnostic = [&]() {
+    diagnose(originalName.Loc, diag::attr_ambiguous_reference_to_decl,
+             originalName.Name, attr->getAttrName());
+  };
+  auto notFunctionDiagnostic = [&]() {
+    diagnose(originalName.Loc,
+             diag::autodiff_attr_original_decl_invalid_kind,
+             originalName.Name);
+  };
+  std::function<void()> invalidTypeContextDiagnostic = [&]() {
+    diagnose(originalName.Loc,
+             diag::autodiff_attr_original_decl_not_same_type_context,
+             originalName.Name);
+  };
+
+  // Returns true if the transpose function and original function candidate are
+  // defined in compatible type contexts. If the transpose function and the
+  // original function candidate have different parents, return false.
+  std::function<bool(AbstractFunctionDecl *)> hasValidTypeContext =
+      [&](AbstractFunctionDecl *decl) { return true; };
+
+  auto resolution = TypeResolution::forContextual(transpose->getDeclContext());
+  Type baseType;
+  if (attr->getBaseTypeRepr())
+    baseType = resolution.resolveType(attr->getBaseTypeRepr(), None);
+  auto lookupOptions =
+      (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
+                               : defaultUnqualifiedLookupOptions) |
+      NameLookupFlags::IgnoreAccessControl;
+  auto transposeTypeCtx = transpose->getInnermostTypeContext();
+  if (!transposeTypeCtx) transposeTypeCtx = transpose->getParent();
+  assert(transposeTypeCtx);
+
+  // Look up original function.
+  auto funcLoc = originalName.Loc.getBaseNameLoc();
+  if (attr->getBaseTypeRepr())
+    funcLoc = attr->getBaseTypeRepr()->getLoc();
+  auto *originalAFD = findAbstractFunctionDecl(
+      originalName.Name, funcLoc, baseType, transposeTypeCtx, isValidOriginal,
+      noneValidDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
+      lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
+  if (!originalAFD) {
+    attr->setInvalid();
+    return;
+  }
+
+  attr->setOriginalFunction(originalAFD);
+
+  // Get the linearity parameter types.
+  SmallVector<AnyFunctionType::Param, 4> linearParams;
+  expectedOriginalFnType->getSubsetParameters(linearParamIndices, linearParams,
+                                              /*reverseCurryLevels*/ true);
+
+  // Check if linearity parameter indices are valid.
+  if (checkLinearityParameters(originalAFD, linearParams,
+                               transpose->getGenericEnvironment(),
+                               transpose->getModuleContext(),
+                               parsedLinearParams, attr->getLocation())) {
+    D->getAttrs().removeAttribute(attr);
+    attr->setInvalid();
+    return;
+  }
+
+  // Set the resolved linearity parameter indices in the attribute.
+  attr->setParameterIndices(linearParamIndices);
 }

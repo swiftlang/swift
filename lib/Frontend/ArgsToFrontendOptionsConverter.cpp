@@ -63,8 +63,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_prebuilt_module_cache_path)) {
     Opts.PrebuiltModuleCachePath = A->getValue();
   }
-
+  if (const Arg *A = Args.getLastArg(OPT_bridging_header_directory_for_print)) {
+    Opts.BridgingHeaderDirForPrint = A->getValue();
+  }
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
+  Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
 
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
@@ -85,6 +88,8 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.RemarkOnRebuildFromModuleInterface |=
     Args.hasArg(OPT_Rmodule_interface_rebuild);
+
+  Opts.DisableInterfaceFileLock |= Args.hasArg(OPT_disable_interface_lockfile);
 
   computePrintStatsOptions();
   computeDebugTimeOptions();
@@ -174,8 +179,7 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
-  Opts.EnableSerializationNestedTypeLookupTable &=
-      !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
+  Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames();
@@ -457,7 +461,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
   }
   // In order to pass some tests, must leave ModuleName empty.
   if (!Opts.InputsAndOutputs.hasInputs()) {
-    Opts.ModuleName = StringRef();
+    Opts.ModuleName = std::string();
     // FIXME: This is a bug that should not happen, but does in tests.
     // The compiler should bail out earlier, where "no frontend action was
     // selected".
@@ -474,7 +478,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
           ? outputFilenames->front()
           : Opts.InputsAndOutputs.getFilenameOfFirstInput();
 
-  Opts.ModuleName = llvm::sys::path::stem(nameToStem);
+  Opts.ModuleName = llvm::sys::path::stem(nameToStem).str();
   return false;
 }
 

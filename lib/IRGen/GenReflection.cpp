@@ -322,8 +322,7 @@ std::pair<llvm::Constant *, unsigned>
 IRGenModule::getTypeRef(Type type, GenericSignature genericSig,
                         MangledTypeRefRole role) {
   return getTypeRef(type->getCanonicalType(genericSig),
-      genericSig ? genericSig->getCanonicalSignature() : CanGenericSignature(),
-      role);
+                    genericSig.getCanonicalSignature(), role);
 }
 
 std::pair<llvm::Constant *, unsigned>
@@ -359,7 +358,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
   GenericEnvironment *genericEnv = nullptr;
 
   if (origGenericSig) {
-    genericSig = origGenericSig->getCanonicalSignature();
+    genericSig = origGenericSig.getCanonicalSignature();
     enumerateGenericSignatureRequirements(genericSig,
                 [&](GenericRequirement reqt) { requirements.push_back(reqt); });
     genericEnv = genericSig->getGenericEnvironment();
@@ -470,7 +469,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
                                       nullptr,
                                       symbolName);
   ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
-  var->setAlignment(2);
+  var->setAlignment(llvm::MaybeAlign(2));
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
 
@@ -523,9 +522,7 @@ protected:
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
     addTypeRef(type->getCanonicalType(genericSig),
-               genericSig ? genericSig->getCanonicalSignature()
-                          : CanGenericSignature(),
-               role);
+               genericSig.getCanonicalSignature(), role);
   }
 
   /// Add a 32-bit relative offset to a mangled typeref string
@@ -647,9 +644,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
       auto NameGlobal = IGM.getAddrOfFieldName(AssocTy.first);
       B.addRelativeAddress(NameGlobal);
       addTypeRef(AssocTy.second,
-                 Nominal->getGenericSignature()
-                   ? Nominal->getGenericSignature()->getCanonicalSignature()
-                   : CanGenericSignature());
+                 Nominal->getGenericSignature().getCanonicalSignature());
     }
   }
 
@@ -671,11 +666,14 @@ public:
 };
 
 class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
-  const uint32_t fieldRecordSize = 12;
+public:
+  static const uint32_t FieldRecordSize = 12;
+  
+private:
   const NominalTypeDecl *NTD;
 
   void addFieldDecl(const ValueDecl *value, Type type,
-                    GenericSignature genericSig, bool indirect=false) {
+                    bool indirect=false) {
     reflection::FieldRecordFlags flags;
     flags.setIsIndirectCase(indirect);
     if (auto var = dyn_cast<VarDecl>(value))
@@ -686,6 +684,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     if (!type) {
       B.addInt32(0);
     } else {
+      auto genericSig = NTD->getGenericSignature();
+
       // The standard library's Mirror demangles metadata from field
       // descriptors, so use MangledTypeRefRole::Metadata to ensure
       // runtime metadata is available.
@@ -714,13 +714,12 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     }
 
     B.addInt16(uint16_t(kind));
-    B.addInt16(fieldRecordSize);
+    B.addInt16(FieldRecordSize);
 
     auto properties = NTD->getStoredProperties();
     B.addInt32(properties.size());
     for (auto property : properties)
-      addFieldDecl(property, property->getInterfaceType(),
-                   NTD->getGenericSignature());
+      addFieldDecl(property, property->getInterfaceType());
   }
 
   void layoutEnum() {
@@ -737,7 +736,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     }
 
     B.addInt16(uint16_t(kind));
-    B.addInt16(fieldRecordSize);
+    B.addInt16(FieldRecordSize);
     B.addInt32(strategy.getElementsWithPayload().size()
                + strategy.getElementsWithNoPayload().size());
 
@@ -745,12 +744,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       bool indirect = (enumCase.decl->isIndirect() ||
                        enumDecl->isIndirect());
       addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType(),
-                   enumDecl->getGenericSignature(),
                    indirect);
     }
 
     for (auto enumCase : strategy.getElementsWithNoPayload()) {
-      addFieldDecl(enumCase.decl, CanType(), nullptr);
+      addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType());
     }
   }
 
@@ -764,7 +762,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     else
       Kind = FieldDescriptorKind::Protocol;
     B.addInt16(uint16_t(Kind));
-    B.addInt16(fieldRecordSize);
+    B.addInt16(FieldRecordSize);
     B.addInt32(0);
   }
 
@@ -813,6 +811,57 @@ public:
   FieldTypeMetadataBuilder(IRGenModule &IGM,
                            const NominalTypeDecl * NTD)
     : ReflectionMetadataBuilder(IGM), NTD(NTD) {}
+
+  llvm::GlobalVariable *emit() {
+    auto section = IGM.getFieldTypeMetadataSectionName();
+    return ReflectionMetadataBuilder::emit(
+      [&](IRGenModule &IGM, ConstantInit definition) -> llvm::Constant* {
+        return IGM.getAddrOfReflectionFieldDescriptor(
+          NTD->getDeclaredType()->getCanonicalType(), definition);
+      },
+      section);
+  }
+};
+
+static bool
+deploymentTargetHasRemoteMirrorZeroSizedTypeDescriptorBug(IRGenModule &IGM) {
+  auto target = IGM.Context.LangOpts.Target;
+  
+  if (target.isMacOSX() && target.isMacOSXVersionLT(10, 15, 4)) {
+    return true;
+  }
+  if (target.isiOS() && target.isOSVersionLT(13, 4)) { // includes tvOS
+    return true;
+  }
+  if (target.isWatchOS() && target.isOSVersionLT(6, 2)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/// Metadata builder that emits a fixed-layout empty type as an empty struct, as
+/// a workaround for a RemoteMirror crash in older OSes.
+class EmptyStructMetadataBuilder : public ReflectionMetadataBuilder {
+  const NominalTypeDecl *NTD;
+  
+  void layout() override {
+    addNominalRef(NTD);
+    B.addInt32(0);
+    B.addInt16(uint16_t(FieldDescriptorKind::Struct));
+    B.addInt16(FieldTypeMetadataBuilder::FieldRecordSize);
+    B.addInt32(0);
+  }
+  
+public:
+  EmptyStructMetadataBuilder(IRGenModule &IGM,
+                             const NominalTypeDecl *NTD)
+    : ReflectionMetadataBuilder(IGM), NTD(NTD) {
+      assert(IGM.getTypeInfoForUnlowered(
+                           NTD->getDeclaredTypeInContext()->getCanonicalType())
+                .isKnownEmpty(ResilienceExpansion::Maximal)
+             && "should only be used for known empty types");
+  }
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getFieldTypeMetadataSectionName();
@@ -933,8 +982,11 @@ public:
                            SubstitutionMap Subs,
                            const HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM),
-      OrigCalleeType(OrigCalleeType),
-      SubstCalleeType(SubstCalleeType), Subs(Subs),
+      // TODO: Preserve substitutions, since they may affect representation in
+      // the box
+      OrigCalleeType(OrigCalleeType->getUnsubstitutedType(IGM.getSILModule())),
+      SubstCalleeType(SubstCalleeType->getUnsubstitutedType(IGM.getSILModule())),
+      Subs(Subs),
       Layout(Layout) {}
 
   using MetadataSourceMap
@@ -1079,9 +1131,17 @@ public:
           return t;
         })->getCanonicalType();
       }
+      
+      // TODO: We should preserve substitutions in SILFunctionType captures
+      // once the runtime MetadataReader can understand them, since they can
+      // affect representation.
+      //
+      // For now, eliminate substitutions from the capture representation.
+      SwiftType =
+        SwiftType->replaceSubstitutedSILFunctionTypesWithUnsubstituted(IGM.getSILModule())
+                 ->getCanonicalType();
 
-      CaptureTypes.push_back(
-          SILType::getPrimitiveObjectType(SwiftType->getCanonicalType()));
+      CaptureTypes.push_back(SILType::getPrimitiveObjectType(SwiftType));
     }
 
     return CaptureTypes;
@@ -1094,12 +1154,10 @@ public:
     B.addInt32(CaptureTypes.size());
     B.addInt32(MetadataSources.size());
     B.addInt32(Layout.getBindings().size());
-    
-    auto sig = OrigCalleeType->getSubstGenericSignature()
-              ? OrigCalleeType->getSubstGenericSignature()
-                              ->getCanonicalSignature()
-              : CanGenericSignature();
-    
+
+    auto sig =
+      OrigCalleeType->getInvocationGenericSignature().getCanonicalSignature();
+
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
       addLoweredTypeRef(CaptureType, sig);
@@ -1146,7 +1204,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     OS << "__TEXT,__swift5_" << LongName << ", regular, no_dead_strip";
     break;
   }
-  return OS.str();
+  return std::string(OS.str());
 }
 
 const char *IRGenModule::getFieldTypeMetadataSectionName() {
@@ -1338,6 +1396,19 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   }
 
   if (needsOpaqueDescriptor) {
+    // Work around an issue in the RemoteMirror library that ships in
+    // macOS 10.15/iOS 13 and earlier that causes it to crash on a
+    // BuiltinTypeDescriptor with zero size. If the type has zero size, emit it
+    // as an empty struct instead, which will have the same impact on the
+    // encoded type layout.
+    auto &TI = getTypeInfoForUnlowered(T);
+    if (deploymentTargetHasRemoteMirrorZeroSizedTypeDescriptorBug(*this)
+        && TI.isKnownEmpty(ResilienceExpansion::Maximal)) {
+      EmptyStructMetadataBuilder builder(*this, D);
+      builder.emit();
+      return;
+    }
+    
     FixedTypeMetadataBuilder builder(*this, D);
     builder.emit();
   }

@@ -19,7 +19,7 @@
 using namespace swift;
 
 // For manual debugging, dump graphs in DOT format.
-llvm::cl::opt<bool> EnableGraphWriter(
+static llvm::cl::opt<bool> EnableGraphWriter(
     "escapes-enable-graphwriter", llvm::cl::init(false),
     llvm::cl::desc("With -escapes-dump, also write .dot files."));
 

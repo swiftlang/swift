@@ -7,7 +7,7 @@ struct S: _ExpressibleByColorLiteral {
 
 let y: S = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)
 let y2 = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1) // expected-error{{could not infer type of color literal}} expected-note{{import AppKit to use 'NSColor' as the default color literal type}}
-let y3 = #colorLiteral(red: 1, bleen: 0, grue: 0, alpha: 1) // expected-error{{cannot convert value of type '(red: Int, bleen: Int, grue: Int, alpha: Int)' to expected argument type '(red: Float, green: Float, blue: Float, alpha: Float)'}}
+let y3 = #colorLiteral(red: 1, bleen: 0, grue: 0, alpha: 1) // expected-error{{incorrect argument labels in call (have 'red:bleen:grue:alpha:', expected 'red:green:blue:alpha:')}} expected-error{{could not infer type of color literal}} expected-note{{import AppKit to use 'NSColor' as the default color literal type}}
 
 struct I: _ExpressibleByImageLiteral {
   init(imageLiteralResourceName: String) {}
@@ -23,7 +23,7 @@ struct Path: _ExpressibleByFileReferenceLiteral {
 let p1: Path = #fileLiteral(resourceName: "what.txt")
 let p2 = #fileLiteral(resourceName: "what.txt") // expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'URL' as the default file reference literal type}}
 
-let text = #fileLiteral(resourceName: "TextFile.txt").relativeString! // expected-error{{type of expression is ambiguous without more context}}
+let text = #fileLiteral(resourceName: "TextFile.txt").relativeString! // expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'URL' as the default file reference literal type}}
 
 // rdar://problem/49861813
-#fileLiteral() // expected-error {{cannot convert value of type '()' to expected argument type '(resourceName: String)'}}
+#fileLiteral() // expected-error{{missing argument for parameter 'resourceName' in call}} expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'URL' as the default file reference literal type}}

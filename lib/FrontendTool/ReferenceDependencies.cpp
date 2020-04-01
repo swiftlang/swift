@@ -61,7 +61,8 @@ public:
   ///
   /// \return true on error
   static bool emit(DiagnosticEngine &diags, SourceFile *SF,
-                   const DependencyTracker &depTracker, StringRef outputPath);
+                   const DependencyTracker &depTracker,
+                   StringRef outputPath);
 
   /// Emit the dependencies.
   static void emit(SourceFile *SF, const DependencyTracker &depTracker,
@@ -124,7 +125,6 @@ private:
   void emitValueDecl(const ValueDecl *VD) const;
 
   static bool extendedTypeIsPrivate(TypeLoc inheritedType);
-  static bool declIsPrivate(const Decl *member);
 };
 
 /// Emit the depended-upon declartions.
@@ -252,7 +252,7 @@ ProvidesEmitter::emitTopLevelNames() const {
   out << providesTopLevel << ":\n";
 
   CollectedDeclarations cpd;
-  for (const Decl *D : SF->Decls)
+  for (const Decl *D : SF->getTopLevelDecls())
     emitTopLevelDecl(D, cpd);
   for (auto *operatorFunction : cpd.memberOperatorDecls)
     out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
@@ -334,8 +334,9 @@ void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,
       std::all_of(ED->getInherited().begin(), ED->getInherited().end(),
                   extendedTypeIsPrivate);
   if (justMembers) {
-    if (std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
-                    declIsPrivate)) {
+    if (std::all_of(
+            ED->getMembers().begin(), ED->getMembers().end(),
+            [](const Decl *D) { return D->isPrivateToEnclosingFile(); })) {
       return;
     }
     cpd.extensionsWithJustMembers.push_back(ED);
@@ -474,37 +475,11 @@ bool ProvidesEmitter::extendedTypeIsPrivate(TypeLoc inheritedType) {
   assert(!layout.explicitSuperclass && "Should not have a subclass existential "
                                        "in the inheritance clause of an extension");
   for (auto protoTy : layout.getProtocols()) {
-    if (!declIsPrivate(protoTy->getDecl()))
+    if (!protoTy->getDecl()->isPrivateToEnclosingFile())
       return false;
   }
 
   return true;
-}
-
-bool ProvidesEmitter::declIsPrivate(const Decl *member) {
-  auto *VD = dyn_cast<ValueDecl>(member);
-  if (!VD) {
-    switch (member->getKind()) {
-    case DeclKind::Import:
-    case DeclKind::PatternBinding:
-    case DeclKind::EnumCase:
-    case DeclKind::TopLevelCode:
-    case DeclKind::IfConfig:
-    case DeclKind::PoundDiagnostic:
-      return true;
-
-    case DeclKind::Extension:
-    case DeclKind::InfixOperator:
-    case DeclKind::PrefixOperator:
-    case DeclKind::PostfixOperator:
-      return false;
-
-    default:
-      llvm_unreachable("everything else is a ValueDecl");
-    }
-  }
-
-  return VD->getFormalAccess() <= AccessLevel::FilePrivate;
 }
 
 void DependsEmitter::emit(const SourceFile *SF,
@@ -514,12 +489,12 @@ void DependsEmitter::emit(const SourceFile *SF,
 }
 
 void DependsEmitter::emit() const {
-  const ReferencedNameTracker *const tracker = SF->getReferencedNameTracker();
-  assert(tracker && "Cannot emit reference dependencies without a tracker");
+  const auto *nameTracker = SF->getConfiguredReferencedNameTracker();
+  assert(nameTracker && "Cannot emit reference dependencies without a tracker");
 
-  emitTopLevelNames(tracker);
+  emitTopLevelNames(nameTracker);
 
-  auto &memberLookupTable = tracker->getUsedMembers();
+  auto &memberLookupTable = nameTracker->getUsedMembers();
   std::vector<MemberTableEntryTy> sortedMembers{
     memberLookupTable.begin(), memberLookupTable.end()
   };
@@ -545,7 +520,7 @@ void DependsEmitter::emit() const {
 
   emitMembers(sortedMembers);
   emitNominalTypes(sortedMembers);
-  emitDynamicLookup(tracker);
+  emitDynamicLookup(nameTracker);
   emitExternal(depTracker);
 }
 

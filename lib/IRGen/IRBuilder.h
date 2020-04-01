@@ -125,7 +125,7 @@ public:
   llvm::LoadInst *CreateLoad(llvm::Value *addr, Alignment align,
                              const llvm::Twine &name = "") {
     llvm::LoadInst *load = IRBuilderBase::CreateLoad(addr, name);
-    load->setAlignment(align.getValue());
+    load->setAlignment(llvm::MaybeAlign(align.getValue()));
     return load;
   }
   llvm::LoadInst *CreateLoad(Address addr, const llvm::Twine &name = "") {
@@ -135,7 +135,7 @@ public:
   llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr,
                                Alignment align) {
     llvm::StoreInst *store = IRBuilderBase::CreateStore(value, addr);
-    store->setAlignment(align.getValue());
+    store->setAlignment(llvm::MaybeAlign(align.getValue()));
     return store;
   }
   llvm::StoreInst *CreateStore(llvm::Value *value, Address addr) {
@@ -208,20 +208,21 @@ public:
 
   using IRBuilderBase::CreateMemCpy;
   llvm::CallInst *CreateMemCpy(Address dest, Address src, Size size) {
-    return CreateMemCpy(dest.getAddress(), dest.getAlignment().getValue(),
-                        src.getAddress(), src.getAlignment().getValue(),
-                        size.getValue());
+    return CreateMemCpy(
+        dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+        src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+        size.getValue());
   }
 
   using IRBuilderBase::CreateMemSet;
   llvm::CallInst *CreateMemSet(Address dest, llvm::Value *value, Size size) {
     return CreateMemSet(dest.getAddress(), value, size.getValue(),
-                        dest.getAlignment().getValue());
+                        llvm::MaybeAlign(dest.getAlignment().getValue()));
   }
   llvm::CallInst *CreateMemSet(Address dest, llvm::Value *value,
                                llvm::Value *size) {
     return CreateMemSet(dest.getAddress(), value, size,
-                        dest.getAlignment().getValue());
+                        llvm::MaybeAlign(dest.getAlignment().getValue()));
   }
   
   using IRBuilderBase::CreateLifetimeStart;
@@ -241,11 +242,11 @@ public:
   // FunctionPointer.
 
   bool isTrapIntrinsic(llvm::Value *Callee) {
-    return Callee == llvm::Intrinsic::getDeclaration(getModule(),
-                                                     llvm::Intrinsic::ID::trap);
+    return Callee ==
+           llvm::Intrinsic::getDeclaration(getModule(), llvm::Intrinsic::trap);
   }
   bool isTrapIntrinsic(llvm::Intrinsic::ID intrinsicID) {
-    return intrinsicID == llvm::Intrinsic::ID::trap;
+    return intrinsicID == llvm::Intrinsic::trap;
   }
 
   llvm::CallInst *CreateCall(llvm::Value *Callee, ArrayRef<llvm::Value *> Args,

@@ -22,7 +22,10 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
       ${swift_platform_gyb_sources}
       Darwin.swift.gyb
 
-    SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+    SWIFT_COMPILE_FLAGS
+      ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
+      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+      -Xfrontend -disable-objc-attr-requires-foundation-module
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ALL_APPLE_PLATFORMS
     INSTALL_IN_COMPONENT sdk-overlay
@@ -37,7 +40,9 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
       ${swift_platform_gyb_sources}
       Glibc.swift.gyb
 
-    SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+    SWIFT_COMPILE_FLAGS
+      ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
+      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ANDROID CYGWIN FREEBSD LINUX HAIKU
     INSTALL_IN_COMPONENT sdk-overlay
@@ -51,7 +56,10 @@ add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
     GYB_SOURCES
       ${swift_platform_gyb_sources}
 
-    SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+    SWIFT_COMPILE_FLAGS
+      ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
+      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+      -Xcc -D_USE_MATH_DEFINES
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS WINDOWS
     INSTALL_IN_COMPONENT sdk-overlay)
@@ -72,6 +80,8 @@ foreach(sdk ${SWIFT_SDKS})
 
     if(${sdk} STREQUAL ANDROID)
       set(glibc_modulemap_source "bionic.modulemap.gyb")
+    elseif(${sdk} STREQUAL OPENBSD)
+      set(glibc_modulemap_source "libc-openbsd.modulemap.gyb")
     else()
       set(glibc_modulemap_source "glibc.modulemap.gyb")
     endif()
@@ -91,9 +101,11 @@ foreach(sdk ${SWIFT_SDKS})
 
     list(APPEND glibc_modulemap_target_list ${glibc_modulemap_target})
 
-    # If this SDK is a target for a non-native host, create a native modulemap
-    # without a sysroot prefix. This is the one we'll install instead.
-    if(NOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}" STREQUAL "/")
+    # If this SDK is a target for a non-native host, except if it's for Android
+    # with its own native sysroot, create a native modulemap without a sysroot
+    # prefix. This is the one we'll install instead.
+    if(NOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}" STREQUAL "/" AND
+       NOT (${sdk} STREQUAL ANDROID AND NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL ""))
       set(glibc_sysroot_relative_modulemap_out "${module_dir}/sysroot-relative-modulemaps/glibc.modulemap")
 
       string(REPLACE "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}"

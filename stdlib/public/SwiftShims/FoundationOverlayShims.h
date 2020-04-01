@@ -33,3 +33,7 @@
 #import "NSLocaleShims.h"
 #import "NSTimeZoneShims.h"
 #import "NSUndoManagerShims.h"
+
+@protocol _NSKVOCompatibilityShim <NSObject>
++ (void)_noteProcessHasUsedKVOSwiftOverlay;
+@end

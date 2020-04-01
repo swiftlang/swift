@@ -71,7 +71,7 @@ FileSpecificDiagnosticConsumer::consolidateSubconsumers(
   if (subconsumers.size() == 1)
     return std::move(subconsumers.front()).consumer;
   // Cannot use return
-  // llvm::make_unique<FileSpecificDiagnosticConsumer>(subconsumers); because
+  // std::make_unique<FileSpecificDiagnosticConsumer>(subconsumers); because
   // the constructor is private.
   return std::unique_ptr<DiagnosticConsumer>(
       new FileSpecificDiagnosticConsumer(subconsumers));

@@ -44,11 +44,12 @@ func valueToValue(x: C) -> some Q {
 
 // CHECK-LABEL: sil hidden {{.*}}13reabstraction1xQr
 func reabstraction(x: @escaping () -> ()) -> some Any {
-  // CHECK: bb0([[ARG0:%.*]] : $*@callee_guaranteed () -> @out (), [[ARG1:%.*]] : @guaranteed $@callee_guaranteed () -> ()):
+  // CHECK: bb0([[ARG0:%[0-9]+]] : 
   // CHECK: [[VALUE_COPY:%.*]] = copy_value [[ARG1]]
   // CHECK: [[REABSTRACT:%.*]] = function_ref @$sIeg_ytIegr_TR
   // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT]]([[VALUE_COPY]])
-  // CHECK: store [[THUNK]] to [init] [[ARG0]]
+  // CHECK: [[THUNK_CONV:%.*]] = convert_function [[THUNK]]
+  // CHECK: store [[THUNK_CONV]] to [init] [[ARG0]]
   return x
 }
 
@@ -148,4 +149,28 @@ struct S2 : X {
   func returnFunctionType() -> () -> A {
     return foo
   }
+}
+
+class Base {}
+class Sub1 : Base {}
+class Sub2 : Base {}
+
+public class D {
+   var cond = true
+   // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s18opaque_result_type1DC1c33_C2C55A4BAF30C3244D4A165D48A91142LLQrvg
+   // CHECK: bb3([[RET:%[0-9]+]] : @owned $Base):
+   // CHECH:  return [[RET]]
+   // CHECK: } // end sil function '$s18opaque_result_type1DC1c33_C2C55A4BAF30C3244D4A165D48A91142LLQrvg'
+   private lazy var c: some Base = {
+        let d = cond ? Sub1() : Sub2()
+        return d
+    }()
+}
+
+// CHECK-LABEL: sil [ossa] @$s18opaque_result_type10tupleAsAnyQryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s18opaque_result_type10tupleAsAnyQryF", 0) 🦸 {
+public func tupleAsAny() -> some Any {
+// CHECK-NEXT: bb0(%0 : $*()):
+// CHECK-NEXT:   %1 = tuple ()
+// CHECK-NEXT:   return %1 : $()
+  return ()
 }

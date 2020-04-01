@@ -231,7 +231,7 @@ static bool canSkipCircularityCheck(NominalTypeDecl *decl) {
   return decl->hasClangNode() || decl->wasDeserialized();
 }
 
-llvm::Expected<bool>
+bool
 HasCircularInheritanceRequest::evaluate(Evaluator &evaluator,
                                         ClassDecl *decl) const {
   if (canSkipCircularityCheck(decl) || !decl->hasSuperclass())
@@ -246,10 +246,10 @@ HasCircularInheritanceRequest::evaluate(Evaluator &evaluator,
     llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
     return true;
   }
-  return result;
+  return result.get();
 }
 
-llvm::Expected<bool>
+bool
 HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
                                                ProtocolDecl *decl) const {
   if (canSkipCircularityCheck(decl))
@@ -258,7 +258,7 @@ HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   bool anyObject = false;
   auto inherited = getDirectlyInheritedNominalTypeDecls(decl, anyObject);
   for (auto &found : inherited) {
-    auto *protoDecl = dyn_cast<ProtocolDecl>(found.second);
+    auto *protoDecl = dyn_cast<ProtocolDecl>(found.Item);
     if (!protoDecl)
       continue;
 
@@ -277,7 +277,7 @@ HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-llvm::Expected<bool>
+bool
 HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
                                      EnumDecl *decl) const {
   if (canSkipCircularityCheck(decl) || !decl->hasRawType())
@@ -294,7 +294,7 @@ HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
     llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
     return true;
   }
-  return result;
+  return result.get();
 }
 
 namespace {
@@ -399,7 +399,7 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   llvm_unreachable("covered switch");
 }
 
-llvm::Expected<CtorInitializerKind>
+CtorInitializerKind
 InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
   auto &diags = decl->getASTContext().Diags;
 
@@ -470,7 +470,7 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
   return CtorInitializerKind::Designated;
 }
 
-llvm::Expected<bool>
+bool
 ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *decl) const {
   // Quick check: @objc protocols require a class.
@@ -490,11 +490,11 @@ ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
   // class-bound protocol.
   for (const auto found : allInheritedNominals) {
     // Superclass bound.
-    if (isa<ClassDecl>(found.second))
+    if (isa<ClassDecl>(found.Item))
       return true;
 
     // A protocol that might be class-constrained.
-    if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
       if (proto->requiresClass())
         return true;
     }
@@ -503,7 +503,7 @@ ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-llvm::Expected<bool>
+bool
 ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
                                            ProtocolDecl *decl) const {
   // If it's not @objc, it conforms to itself only if it has a self-conformance
@@ -531,7 +531,7 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-llvm::Expected<bool>
+bool
 ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
                                           ProtocolDecl *decl) const {
   // ObjC protocols can always be existential.
@@ -559,7 +559,7 @@ ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-llvm::Expected<bool>
+bool
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (isa<ClassDecl>(decl))
     return decl->getAttrs().hasAttribute<FinalAttr>();
@@ -578,7 +578,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           VD->getOriginalWrappedProperty(PropertyWrapperSynthesizedPropertyKind::Backing))
         return true;
 
-      if (auto *nominalDecl = VD->getDeclContext()->getSelfClassDecl()) {
+      if (VD->getDeclContext()->getSelfClassDecl()) {
         // If this variable is a class member, mark it final if the
         // class is final, or if it was declared with 'let'.
         auto *PBD = VD->getParentPatternBinding();
@@ -655,7 +655,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return false;
 }
 
-llvm::Expected<bool>
+bool
 IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(decl))
     return accessor->getStorage()->isStatic();
@@ -685,7 +685,7 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
   return result;
 }
 
-llvm::Expected<bool>
+bool
 IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))
@@ -745,7 +745,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return false;
 }
 
-llvm::Expected<ArrayRef<Requirement>>
+ArrayRef<Requirement>
 RequirementSignatureRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *proto) const {
   ASTContext &ctx = proto->getASTContext();
@@ -794,7 +794,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   return reqSignature->getRequirements();
 }
 
-llvm::Expected<Type>
+Type
 DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
                                        AssociatedTypeDecl *assocType) const {
   if (assocType->Resolver) {
@@ -813,7 +813,7 @@ DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
   return Type();
 }
 
-llvm::Expected<bool>
+bool
 NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
                                      AbstractFunctionDecl *decl) const {
   auto *dc = decl->getDeclContext();
@@ -973,18 +973,22 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   }
 }
 
-llvm::Expected<bool>
+evaluator::SideEffect
 EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
                                TypeResolutionStage stage) const {
   Type rawTy = ED->getRawType();
   if (!rawTy) {
-    return true;
+    return std::make_tuple<>();
+  }
+
+  if (!computeAutomaticEnumValueKind(ED)) {
+    return std::make_tuple<>();
   }
 
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ED->mapTypeIntoContext(rawTy);
   if (rawTy->hasError())
-    return true;
+    return std::make_tuple<>();
 
   // Check the raw values of the cases.
   LiteralExpr *prevValue = nullptr;
@@ -1013,7 +1017,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
         valueKind = computeAutomaticEnumValueKind(ED);
         if (!valueKind) {
           elt->setInvalid();
-          return true;
+          return std::make_tuple<>();
         }
       }
       
@@ -1103,7 +1107,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
                        diag::enum_raw_value_incrementing_from_zero);
     }
   }
-  return true;
+  return std::make_tuple<>();
 }
 
 const ConstructorDecl *
@@ -1249,9 +1253,11 @@ static PrecedenceGroupDecl *
 lookupPrecedenceGroup(const PrecedenceGroupDescriptor &descriptor) {
   auto *dc = descriptor.dc;
   if (auto sf = dc->getParentSourceFile()) {
-    bool cascading = dc->isCascadingContextForLookup(false);
-    return sf->lookupPrecedenceGroup(descriptor.ident, cascading,
-                                     descriptor.nameLoc);
+    auto desc = OperatorLookupDescriptor::forFile(
+        sf, descriptor.ident, dc->isCascadingContextForLookup(false),
+        descriptor.nameLoc);
+    return evaluateOrDefault(sf->getASTContext().evaluator,
+                             LookupPrecedenceGroupRequest{desc}, nullptr);
   } else {
     return dc->getParentModule()->lookupPrecedenceGroup(descriptor.ident,
                                                         descriptor.nameLoc);
@@ -1273,8 +1279,9 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
 
     PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
                                    PrecedenceGroupDescriptor::HigherThan};
-    auto group = evaluateOrDefault(PGD->getASTContext().evaluator,
-                                   LookupPrecedenceGroupRequest{desc}, nullptr);
+    auto group =
+        evaluateOrDefault(PGD->getASTContext().evaluator,
+                          ValidatePrecedenceGroupRequest{desc}, nullptr);
     if (group) {
       rel.Group = group;
       addedHigherThan = true;
@@ -1293,8 +1300,9 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     auto dc = PGD->getDeclContext();
     PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
                                    PrecedenceGroupDescriptor::LowerThan};
-    auto group = evaluateOrDefault(PGD->getASTContext().evaluator,
-                                   LookupPrecedenceGroupRequest{desc}, nullptr);
+    auto group =
+        evaluateOrDefault(PGD->getASTContext().evaluator,
+                          ValidatePrecedenceGroupRequest{desc}, nullptr);
     bool hadError = false;
     if (group) {
       rel.Group = group;
@@ -1328,7 +1336,7 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     checkPrecedenceCircularity(Diags, PGD);
 }
 
-llvm::Expected<PrecedenceGroupDecl *> LookupPrecedenceGroupRequest::evaluate(
+PrecedenceGroupDecl * ValidatePrecedenceGroupRequest::evaluate(
     Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
   if (auto *group = lookupPrecedenceGroup(descriptor)) {
     validatePrecedenceGroup(group);
@@ -1343,7 +1351,7 @@ PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
                                                         SourceLoc nameLoc) {
   return evaluateOrDefault(
       dc->getASTContext().evaluator,
-      LookupPrecedenceGroupRequest({dc, name, nameLoc, None}), nullptr);
+      ValidatePrecedenceGroupRequest({dc, name, nameLoc, None}), nullptr);
 }
 
 static NominalTypeDecl *resolveSingleNominalTypeDecl(
@@ -1390,7 +1398,7 @@ bool swift::checkDesignatedTypes(OperatorDecl *OD,
 /// This establishes key invariants, such as an InfixOperatorDecl's
 /// reference to its precedence group and the transitive validity of that
 /// group.
-llvm::Expected<PrecedenceGroupDecl *>
+PrecedenceGroupDecl *
 OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
                                          InfixOperatorDecl *IOD) const {
   auto enableOperatorDesignatedTypes =
@@ -1456,7 +1464,7 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
   return group;
 }
 
-llvm::Expected<SelfAccessKind>
+SelfAccessKind
 SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   if (FD->getAttrs().getAttribute<MutatingAttr>(true)) {
     if (!FD->isInstanceMember() || !FD->getDeclContext()->hasValueSemantics()) {
@@ -1589,7 +1597,7 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   return subscriptParams->get(index - startIndex);
 }
 
-llvm::Expected<bool>
+bool
 IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
                                                ValueDecl *decl) const {
   TypeRepr *TyR = nullptr;
@@ -1662,7 +1670,7 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
 }
 
 /// Validate the underlying type of the given typealias.
-llvm::Expected<Type>
+Type
 UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
                                 TypeAliasDecl *typeAlias) const {
   TypeResolutionOptions options((typeAlias->getGenericParams()
@@ -1694,7 +1702,7 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
 
 /// Bind the given function declaration, which declares an operator, to the
 /// corresponding operator declaration.
-llvm::Expected<OperatorDecl *>
+OperatorDecl *
 FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {  
   auto &C = FD->getASTContext();
   auto &diags = C.Diags;
@@ -1719,26 +1727,24 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     FD->diagnose(diag::operator_in_local_scope);
   }
 
+  auto desc = OperatorLookupDescriptor::forFile(
+      FD->getDeclContext()->getParentSourceFile(), operatorName,
+      FD->isCascadingContextForLookup(false), FD->getLoc());
   OperatorDecl *op = nullptr;
-  SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
   if (FD->isUnaryOperator()) {
     if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
-      op = SF.lookupPrefixOperator(operatorName,
-                                   FD->isCascadingContextForLookup(false),
-                                   FD->getLoc());
+      op = evaluateOrDefault(evaluator,
+                             LookupPrefixOperatorRequest{desc}, nullptr);
     } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
-      op = SF.lookupPostfixOperator(operatorName,
-                                    FD->isCascadingContextForLookup(false),
-                                    FD->getLoc());
+      op = evaluateOrDefault(evaluator,
+                             LookupPostfixOperatorRequest{desc}, nullptr);
     } else {
-      auto prefixOp =
-          SF.lookupPrefixOperator(operatorName,
-                                  FD->isCascadingContextForLookup(false),
-                                  FD->getLoc());
-      auto postfixOp =
-          SF.lookupPostfixOperator(operatorName,
-                                   FD->isCascadingContextForLookup(false),
-                                   FD->getLoc());
+      auto prefixOp = evaluateOrDefault(evaluator,
+                                        LookupPrefixOperatorRequest{desc},
+                                        nullptr);
+      auto postfixOp = evaluateOrDefault(evaluator,
+                                         LookupPostfixOperatorRequest{desc},
+                                         nullptr);
 
       // If we found both prefix and postfix, or neither prefix nor postfix,
       // complain. We can't fix this situation.
@@ -1784,9 +1790,9 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
                   static_cast<bool>(postfixOp));
     }
   } else if (FD->isBinaryOperator()) {
-    op = SF.lookupInfixOperator(operatorName,
-                                FD->isCascadingContextForLookup(false),
-                                FD->getLoc());
+    op = evaluateOrDefault(evaluator,
+                           LookupInfixOperatorRequest{desc},
+                           nullptr);
   } else {
     diags.diagnose(FD, diag::invalid_arg_count_for_operator);
     return nullptr;
@@ -1887,7 +1893,7 @@ static Type buildAddressorResultType(AccessorDecl *addressor,
   return valueType->wrapInPointer(pointerKind);
 }
 
-llvm::Expected<Type>
+Type
 ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
@@ -1940,7 +1946,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       resultTyRepr, TypeResolverContext::FunctionResult);
 }
 
-llvm::Expected<ParamSpecifier>
+ParamSpecifier
 ParamSpecifierRequest::evaluate(Evaluator &evaluator,
                                 ParamDecl *param) const {
   auto *dc = param->getDeclContext();
@@ -2065,7 +2071,7 @@ static Type validateParameterType(ParamDecl *decl) {
   return TL.getType();
 }
 
-llvm::Expected<Type>
+Type
 InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   auto &Context = D->getASTContext();
 
@@ -2272,7 +2278,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   }
 }
 
-llvm::Expected<NamedPattern *>
+NamedPattern *
 NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   auto &Context = VD->getASTContext();
   auto *PBD = VD->getParentPatternBinding();
@@ -2330,7 +2336,7 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   return namingPattern;
 }
 
-llvm::Expected<DeclRange>
+DeclRange
 EmittedMembersRequest::evaluate(Evaluator &evaluator,
                                 ClassDecl *CD) const {
   if (!CD->getParentSourceFile())
@@ -2431,7 +2437,7 @@ static bool isNonGenericTypeAliasType(Type type) {
   return false;
 }
 
-llvm::Expected<Type>
+Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   auto error = [&ext]() {
     ext->setInvalid();

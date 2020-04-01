@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -27,7 +27,6 @@ class AccessorDecl;
 class NominalTypeDecl;
 class PatternBindingDecl;
 class Type;
-class TypeChecker;
 class ValueDecl;
 class VarDecl;
 
@@ -97,6 +96,32 @@ public:
   static ValueDecl *getDerivableRequirement(NominalTypeDecl *nominal,
                                             ValueDecl *requirement);
 
+  /// Determine if an AdditiveArithmetic requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveAdditiveArithmetic(NominalTypeDecl *type,
+                                          DeclContext *DC);
+
+  /// Derive an AdditiveArithmetic requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveAdditiveArithmetic(ValueDecl *requirement);
+
+  /// Determine if a Differentiable requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveDifferentiable(NominalTypeDecl *type, DeclContext *DC);
+
+  /// Derive a Differentiable requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveDifferentiable(ValueDecl *requirement);
+
+  /// Derive a Differentiable type witness for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveDifferentiable(AssociatedTypeDecl *assocType);
+
   /// Derive a CaseIterable requirement for an enum if it has no associated
   /// values for any of its cases.
   ///
@@ -109,6 +134,12 @@ public:
   /// \returns the derived member, which will also be added to the type.
   Type deriveCaseIterable(AssociatedTypeDecl *assocType);
 
+  /// Determine if a RawRepresentable requirement can be derived for a type.
+  ///
+  /// This is implemented for non-empty enums without associated values,
+  /// that declare a raw type in the inheritance clause.
+  static bool canDeriveRawRepresentable(DeclContext *DC, NominalTypeDecl *type);
+
   /// Derive a RawRepresentable requirement for an enum, if it has a valid
   /// raw type and raw values for all of its cases.
   ///
@@ -120,6 +151,20 @@ public:
   ///
   /// \returns the derived member, which will also be added to the type.
   Type deriveRawRepresentable(AssociatedTypeDecl *assocType);
+
+  /// Determine if a Comparable requirement can be derived for a type.
+  ///
+  /// This is implemented for enums without associated or raw values.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveComparable(DeclContext *DC, EnumDecl *enumeration);
+
+  /// Derive an Equatable requirement for a type.
+  ///
+  /// This is implemented for enums without associated or raw values.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveComparable(ValueDecl *requirement);
 
   /// Determine if an Equatable requirement can be derived for a type.
   ///
@@ -189,9 +234,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);
 
-  /// Derive the CodingKeys requirement for a value type.
-  TypeDecl *derivePhantomCodingKeysRequirement();
-
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
   declareDerivedProperty(Identifier name, Type propertyInterfaceType,
@@ -215,7 +257,63 @@ public:
   ///
   /// \param synthesizing The decl that is being synthesized.
   bool checkAndDiagnoseDisallowedContext(ValueDecl *synthesizing) const;
+
+  /// Returns a generated guard statement that checks whether the given lhs and
+  /// rhs expressions are equal. If not equal, the else block for the guard
+  /// returns `guardReturnValue`.
+  /// \p C The AST context.
+  /// \p lhsExpr The first expression to compare for equality.
+  /// \p rhsExpr The second expression to compare for equality.
+  /// \p guardReturnValue The expression to return if the two sides are not
+  /// equal
+  static GuardStmt *returnIfNotEqualGuard(ASTContext &C, Expr *lhsExpr,
+                                          Expr *rhsExpr,
+                                          Expr *guardReturnValue);
+  // return false
+  static GuardStmt *returnFalseIfNotEqualGuard(ASTContext &C, Expr *lhsExpr,
+                                               Expr *rhsExpr);
+  // return lhs < rhs
+  static GuardStmt *
+  returnComparisonIfNotEqualGuard(ASTContext &C, Expr *lhsExpr, Expr *rhsExpr);
+
+  /// Returns the ParamDecl for each associated value of the given enum whose
+  /// type does not conform to a protocol \p theEnum The enum whose elements and
+  /// associated values should be checked. \p protocol The protocol being
+  /// requested. \return The ParamDecl of each associated value whose type does
+  /// not conform.
+  static SmallVector<ParamDecl *, 4>
+  associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
+                                          ProtocolDecl *protocol);
+
+  /// Returns true if, for every element of the given enum, it either has no
+  /// associated values or all of them conform to a protocol.
+  /// \p theEnum The enum whose elements and associated values should be
+  /// checked. \p protocol The protocol being requested. \return True if all
+  /// associated values of all elements of the enum conform.
+  static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
+                                                   EnumDecl *theEnum,
+                                                   ProtocolDecl *protocol);
+  /// Create AST statements which convert from an enum to an Int with a switch.
+  /// \p stmts The generated statements are appended to this vector.
+  /// \p parentDC Either an extension or the enum itself.
+  /// \p enumDecl The enum declaration.
+  /// \p enumVarDecl The enum input variable.
+  /// \p funcDecl The parent function.
+  /// \p indexName The name of the output variable.
+  /// \return A DeclRefExpr of the output variable (of type Int).
+  static DeclRefExpr *
+  convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts, DeclContext *parentDC,
+                     EnumDecl *enumDecl, VarDecl *enumVarDecl,
+                     AbstractFunctionDecl *funcDecl, const char *indexName);
+
+  static Pattern *
+  enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl, char varPrefix,
+                               DeclContext *varContext,
+                               SmallVectorImpl<VarDecl *> &boundVars);
+
+  static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
+                                 DeclContext *varContext);
 };
-}
+} // namespace swift
 
 #endif

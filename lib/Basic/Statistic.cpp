@@ -25,6 +25,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <chrono>
 #include <limits>
 
@@ -220,7 +221,7 @@ class StatsProfiler {
       if (I != Children.end()) {
         return I->getSecond().get();
       } else {
-        auto N = llvm::make_unique<Node>(this);
+        auto N = std::make_unique<Node>(this);
         auto P = N.get();
         Children.insert(std::make_pair(K, std::move(N)));
         return P;
@@ -343,12 +344,13 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     ProfileDirname(Directory),
     StartedTime(llvm::TimeRecord::getCurrentTime()),
     MainThreadID(std::this_thread::get_id()),
-    Timer(make_unique<NamedRegionTimer>(AuxName,
+    Timer(std::make_unique<NamedRegionTimer>(AuxName,
                                         "Building Target",
                                         ProgramName, "Running Program")),
     SourceMgr(SM),
     ClangSourceMgr(CSM),
-    RecursiveTimers(llvm::make_unique<RecursionSafeTimers>())
+    RecursiveTimers(std::make_unique<RecursionSafeTimers>()),
+    IsFlushingTracesAndProfiles(false)
 {
   path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
@@ -360,9 +362,9 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
   if (TraceEvents)
     FrontendStatsEvents.emplace();
   if (ProfileEvents)
-    EventProfilers = make_unique<StatsProfilers>();
+    EventProfilers =std::make_unique<StatsProfilers>();
   if (ProfileEntities)
-    EntityProfilers = make_unique<StatsProfilers>();
+    EntityProfilers =std::make_unique<StatsProfilers>();
 }
 
 void UnifiedStatsReporter::recordJobMaxRSS(long rss) {
@@ -418,7 +420,7 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
     auto &C = getFrontendCounters();
 #define FRONTEND_STATISTIC(TY, NAME)                            \
     do {                                                        \
-      static Statistic Stat = {#TY, #NAME, #NAME, {0}, {false}};  \
+      static Statistic Stat = {#TY, #NAME, #NAME};              \
       Stat += (C).NAME;                                         \
     } while (0);
 #include "swift/Basic/Statistics.def"
@@ -428,7 +430,7 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
     auto &C = getDriverCounters();
 #define DRIVER_STATISTIC(NAME)                                       \
     do {                                                             \
-      static Statistic Stat = {"Driver", #NAME, #NAME, {0}, {false}};  \
+      static Statistic Stat = {"Driver", #NAME, #NAME};              \
       Stat += (C).NAME;                                              \
     } while (0);
 #include "swift/Basic/Statistics.def"
@@ -557,6 +559,13 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
     bool IsEntry)
 {
   assert(MainThreadID == std::this_thread::get_id());
+
+  // Don't record any new stats if we're currently flushing the ones we've
+  // already recorded. This can happen when requests get kicked off when
+  // computing source ranges.
+  if (IsFlushingTracesAndProfiles)
+    return;
+
   // First make a note in the recursion-safe timers; these
   // are active anytime UnifiedStatsReporter is active.
   if (IsEntry) {
@@ -711,6 +720,10 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 
 void
 UnifiedStatsReporter::flushTracesAndProfiles() {
+  // Note that we're currently flushing statistics and shouldn't record any
+  // more until we've finished.
+  llvm::SaveAndRestore<bool> flushing(IsFlushingTracesAndProfiles, true);
+
   if (FrontendStatsEvents && SourceMgr) {
     std::error_code EC;
     raw_fd_ostream tstream(TraceFilename, EC, fs::F_Append | fs::F_Text);

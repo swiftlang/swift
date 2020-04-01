@@ -185,7 +185,7 @@ namespace {
           // argument.
           ManagedValue argument;
           if (!shouldTakeOnSuccess(consumption)) {
-            argument = SGF.B.createGuaranteedPhiArgument(
+            argument = SGF.B.createGuaranteedTransformingTerminatorArgument(
                 origTargetTL.getLoweredType());
           } else {
             argument =
@@ -236,7 +236,8 @@ namespace {
         switch (consumption) {
         case CastConsumptionKind::BorrowAlways:
         case CastConsumptionKind::CopyOnSuccess:
-          SGF.B.createGuaranteedPhiArgument(operandValue.getType());
+          SGF.B.createGuaranteedTransformingTerminatorArgument(
+              operandValue.getType());
           handleFalse(None);
           break;
         case CastConsumptionKind::TakeAlways:

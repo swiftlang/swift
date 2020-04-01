@@ -59,7 +59,7 @@ namespace {
 
 /// A "minimal" class for querying IRGen.
 struct IRGenContext {
-  IRGenOptions IROpts;
+  const IRGenOptions IROpts;
   SILOptions SILOpts;
   Lowering::TypeConverter TC;
   std::unique_ptr<SILModule> SILMod;
@@ -133,7 +133,7 @@ public:
       return getOffsetOfTupleElement(tupleType, optMetadata, memberName);
     } else {
       return Result<uint64_t>::emplaceFailure(Failure::TypeHasNoSuchMember,
-                                              memberName);
+                                              memberName.str());
     }
   }
 
@@ -207,7 +207,7 @@ private:
 
     // Use a specialized diagnostic if we couldn't find any such member.
     if (!member) {
-      return fail<uint64_t>(Failure::TypeHasNoSuchMember, memberName);
+      return fail<uint64_t>(Failure::TypeHasNoSuchMember, memberName.str());
     }
 
     return fail<uint64_t>(Failure::Unknown);
@@ -329,7 +329,7 @@ private:
     unsigned targetIndex;
     if (memberName.getAsInteger(10, targetIndex) ||
         targetIndex >= type->getNumElements())
-      return fail<uint64_t>(Failure::TypeHasNoSuchMember, memberName);
+      return fail<uint64_t>(Failure::TypeHasNoSuchMember, memberName.str());
 
     // Fast path: element 0 is always at offset 0.
     if (targetIndex == 0)

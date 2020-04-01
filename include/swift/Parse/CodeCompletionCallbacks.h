@@ -190,7 +190,7 @@ public:
 
   /// Complete the import decl with importable modules.
   virtual void
-  completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) {};
+  completeImportDecl(std::vector<Located<Identifier>> &Path) {};
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
@@ -217,7 +217,7 @@ public:
 
   virtual void completeAfterIfStmt(bool hasElse) {};
 
-  virtual void completeGenericParams(TypeLoc TL) {};
+  virtual void completeGenericRequirement() {};
 
   /// Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

@@ -46,6 +46,7 @@ cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake: Func S1.foo3() is now static
 cake: Var C1.CIIns1 changes from weak to strong
 cake: Var C1.CIIns2 changes from strong to weak
+cake: EnumElement FrozenKind.AddedCase has been added as a new enum case
 
 /* Conformance changes */
 cake: Func ObjCProtocol.removeOptional() is no longer an optional requirement
@@ -64,7 +65,9 @@ cake: Accessor ClassWithOpenMember.property.Get() is no longer open for subclass
 cake: Class C4 has changed its super class from APINotesTest.OldType to APINotesTest.NewType
 cake: Class SubGenericClass has changed its super class from cake.GenericClass<cake.P1> to cake.GenericClass<cake.P2>
 cake: Class SuperClassRemoval has removed its super class cake.C3
+cake: Class SuperClassRemoval no longer inherits convenience inits from its superclass
 cake: Constructor AddingNewDesignatedInit.init(_:) has been added as a designated initializer to an open class
+cake: Constructor ClassWithMissingDesignatedInits.init() has been added as a designated initializer to an open class
 cake: Func ClassWithOpenMember.bar() is no longer open for subclassing
 cake: Func ClassWithOpenMember.foo() is no longer open for subclassing
 cake: Var ClassWithOpenMember.property is no longer open for subclassing

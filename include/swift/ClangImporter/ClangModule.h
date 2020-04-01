@@ -118,6 +118,8 @@ public:
   Optional<clang::ExternalASTSource::ASTSourceDescriptor>
   getASTSourceDescriptor() const;
 
+  virtual StringRef getModuleDefiningPath() const override;
+
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::ClangModule;
   }

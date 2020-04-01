@@ -16,13 +16,13 @@
 // RUN: cd %t && %swiftc_driver -enable-batch-mode -incremental -output-file-map %S/Inputs/abcd_filemap.yaml -module-name main -j 1 d.swift c.swift b.swift a.swift main.swift -driver-show-incremental -driver-show-job-lifecycle >%t/out.txt 2>&1
 // RUN: %FileCheck %s <%t/out.txt
 //
-// Check that we saw invalidation happen in alphabetic order
-// CHECK: Queuing because of dependencies discovered later: {compile: b.o <= b.swift}
-// CHECK: Queuing because of dependencies discovered later: {compile: c.o <= c.swift}
+// Check that we saw invalidation happen in command-line argument order
 // CHECK: Queuing because of dependencies discovered later: {compile: d.o <= d.swift}
-// CHECK: Batchable: {compile: b.o <= b.swift}
-// CHECK: Batchable: {compile: c.o <= c.swift}
+// CHECK: Queuing because of dependencies discovered later: {compile: c.o <= c.swift}
+// CHECK: Queuing because of dependencies discovered later: {compile: b.o <= b.swift}
 // CHECK: Batchable: {compile: d.o <= d.swift}
+// CHECK: Batchable: {compile: c.o <= c.swift}
+// CHECK: Batchable: {compile: b.o <= b.swift}
 //
-// But check that we still issued the job in reverse-alphabetic order
+// Check that we still issued the job in reverse-alphabetic order
 // CHECK: Adding batch job to task queue: {compile: d.o c.o b.o <= d.swift c.swift b.swift}

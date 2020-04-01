@@ -217,13 +217,48 @@ AvailabilityContext AvailabilityInference::inferForType(Type t) {
   return walker.AvailabilityInfo;
 }
 
+AvailabilityContext ASTContext::getObjCMetadataUpdateCallbackAvailability() {
+  return getSwift50Availability();
+}
+
+AvailabilityContext ASTContext::getObjCGetClassHookAvailability() {
+  return getSwift50Availability();
+}
+
+AvailabilityContext ASTContext::getSwift50Availability() {
+  auto target = LangOpts.Target;
+
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
+
+  if (target.isMacOSX()) {
+    return AvailabilityContext(
+                            VersionRange::allGTE(llvm::VersionTuple(10,14,4)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+                            VersionRange::allGTE(llvm::VersionTuple(12,2)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+                            VersionRange::allGTE(llvm::VersionTuple(5,2)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
+}
+
 AvailabilityContext ASTContext::getOpaqueTypeAvailability() {
+  return getSwift51Availability();
+}
+
+AvailabilityContext ASTContext::getObjCClassStubsAvailability() {
   return getSwift51Availability();
 }
 
 AvailabilityContext ASTContext::getSwift51Availability() {
   auto target = LangOpts.Target;
   
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
+
   if (target.isMacOSX()) {
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(10,15,0)));
@@ -239,14 +274,65 @@ AvailabilityContext ASTContext::getSwift51Availability() {
 }
 
 AvailabilityContext ASTContext::getTypesInAbstractMetadataStateAvailability() {
+  return getSwift52Availability();
+}
+
+AvailabilityContext ASTContext::getPrespecializedGenericMetadataAvailability() {
+  return getSwift53Availability();
+}
+
+AvailabilityContext ASTContext::getSwift52Availability() {
+  auto target = LangOpts.Target;
+
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
+
+  if (target.isMacOSX() ) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(9, 99, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
+}
+
+AvailabilityContext ASTContext::getSwift53Availability() {
+  auto target = LangOpts.Target;
+
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
+
+  if (target.isMacOSX() ) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(9, 99, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
+}
+
+AvailabilityContext ASTContext::getSwiftFutureAvailability() {
   auto target = LangOpts.Target;
 
   if (target.isMacOSX() ) {
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
-  } else if (target.isiOS() || target.isWatchOS()) {
+  } else if (target.isiOS()) {
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(9999, 0, 0)));
+        VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(9, 99, 0)));
   } else {
     return AvailabilityContext::alwaysAvailable();
   }

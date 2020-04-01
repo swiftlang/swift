@@ -26,7 +26,7 @@
 #define NOMINMAX
 #include <windows.h>
 #else
-#if !defined(__HAIKU__)
+#if !defined(__HAIKU__) && !defined(__wasi__)
 #include <sys/errno.h>
 #else
 #include <errno.h>
@@ -41,7 +41,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
+#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__) || defined(__OpenBSD__)
 #include <sstream>
 #include <cmath>
 #elif defined(__ANDROID__)
@@ -67,7 +67,7 @@ static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
 #define strtod_l swift_strtod_l
 #define strtof_l swift_strtof_l
 #endif
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__wasi__)
 #include <locale.h>
 #else
 #include <xlocale.h>
@@ -357,7 +357,7 @@ static bool swift_stringIsSignalingNaN(const char *nptr) {
   return strcasecmp(nptr, "snan") == 0;
 }
 
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
+#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__) || defined(__OpenBSD__)
 // Cygwin does not support uselocale(), but we can use the locale feature 
 // in stringstream object.
 template <typename T>
@@ -503,6 +503,8 @@ const char *swift::_swift_stdlib_strtof_clocale(
 void swift::_swift_stdlib_flockfile_stdout() {
 #if defined(_WIN32)
   _lock_file(stdout);
+#elif defined(__wasi__)
+  // WebAssembly/WASI doesn't support file locking yet https://bugs.swift.org/browse/SR-12097
 #else
   flockfile(stdout);
 #endif
@@ -511,6 +513,8 @@ void swift::_swift_stdlib_flockfile_stdout() {
 void swift::_swift_stdlib_funlockfile_stdout() {
 #if defined(_WIN32)
   _unlock_file(stdout);
+#elif defined(__wasi__)
+  // WebAssembly/WASI doesn't support file locking yet https://bugs.swift.org/browse/SR-12097
 #else
   funlockfile(stdout);
 #endif

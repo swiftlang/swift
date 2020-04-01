@@ -49,7 +49,7 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
   for (const ModuleDecl::ImportedModule &importPair : imports) {
     if (importPair.first.empty())
       continue;
-    diags.diagnose(importPair.first.front().second,
+    diags.diagnose(importPair.first.front().Loc,
                    diag::module_interface_scoped_import_unsupported);
   }
 }
@@ -61,14 +61,20 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
                                             ModuleInterfaceOptions const &Opts,
                                             ModuleDecl *M) {
   auto &Ctx = M->getASTContext();
-  auto ToolsVersion = swift::version::getSwiftFullVersion(
-      Ctx.LangOpts.EffectiveLanguageVersion);
+  auto ToolsVersion =
+      getSwiftInterfaceCompilerVersionForCurrentCompiler(Ctx);
   out << "// " SWIFT_INTERFACE_FORMAT_VERSION_KEY ": "
       << InterfaceFormatVersion << "\n";
   out << "// " SWIFT_COMPILER_VERSION_KEY ": "
       << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
       << Opts.Flags << "\n";
+}
+
+std::string
+swift::getSwiftInterfaceCompilerVersionForCurrentCompiler(ASTContext &ctx) {
+  return swift::version::getSwiftFullVersion(
+             ctx.LangOpts.EffectiveLanguageVersion);
 }
 
 llvm::Regex swift::getSwiftInterfaceFormatVersionRegex() {
@@ -81,14 +87,22 @@ llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
                      llvm::Regex::Newline);
 }
 
+llvm::Regex swift::getSwiftInterfaceCompilerVersionRegex() {
+  return llvm::Regex("^// " SWIFT_COMPILER_VERSION_KEY
+                     ": (.+)$", llvm::Regex::Newline);
+}
+
 /// Prints the imported modules in \p M to \p out in the form of \c import
 /// source declarations.
-static void printImports(raw_ostream &out, ModuleDecl *M) {
+static void printImports(raw_ostream &out,
+                         ModuleInterfaceOptions const &Opts,
+                         ModuleDecl *M) {
   // FIXME: This is very similar to what's in Serializer::writeInputBlock, but
   // it's not obvious what higher-level optimization would be factored out here.
   ModuleDecl::ImportFilter allImportFilter;
   allImportFilter |= ModuleDecl::ImportFilterKind::Public;
   allImportFilter |= ModuleDecl::ImportFilterKind::Private;
+  allImportFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
 
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
   M->getImportedModules(allImports, allImportFilter);
@@ -104,22 +118,32 @@ static void printImports(raw_ostream &out, ModuleDecl *M) {
   publicImportSet.insert(publicImports.begin(), publicImports.end());
 
   for (auto import : allImports) {
-    if (import.second->isOnoneSupportModule() ||
-        import.second->isBuiltinModule()) {
+    auto importedModule = import.second;
+    if (importedModule->isOnoneSupportModule() ||
+        importedModule->isBuiltinModule()) {
       continue;
     }
 
     if (publicImportSet.count(import))
       out << "@_exported ";
+
+    // SPI attribute on imports
+    if (Opts.PrintSPIs) {
+      SmallVector<Identifier, 4> spis;
+      M->lookupImportedSPIGroups(importedModule, spis);
+      for (auto spiName : spis)
+        out << "@_spi(" << spiName << ") ";
+    }
+
     out << "import ";
-    import.second->getReverseFullModuleName().printForward(out);
+    importedModule->getReverseFullModuleName().printForward(out);
 
     // Write the access path we should be honoring but aren't.
     // (See diagnoseScopedImports above.)
     if (!import.first.empty()) {
       out << "/*";
       for (const auto &accessPathElem : import.first)
-        out << "." << accessPathElem.first;
+        out << "." << accessPathElem.Item;
       out << "*/";
     }
 
@@ -270,21 +294,26 @@ public:
     const NominalTypeDecl *nominal;
     const IterableDeclContext *memberContext;
 
+    auto shouldInclude = [](const ExtensionDecl *extension) {
+      if (extension->isConstrainedExtension()) {
+        // Conditional conformances never apply to inherited protocols, nor
+        // can they provide unconditional conformances that might be used in
+        // other extensions.
+        return false;
+      }
+      return true;
+    };
     if ((nominal = dyn_cast<NominalTypeDecl>(D))) {
       directlyInherited = nominal->getInherited();
       memberContext = nominal;
 
     } else if (auto *extension = dyn_cast<ExtensionDecl>(D)) {
-      if (extension->isConstrainedExtension()) {
-        // Conditional conformances never apply to inherited protocols, nor
-        // can they provide unconditional conformances that might be used in
-        // other extensions.
+      if (!shouldInclude(extension)) {
         return;
       }
       nominal = extension->getExtendedNominal();
       directlyInherited = extension->getInherited();
       memberContext = extension;
-
     } else {
       return;
     }
@@ -293,6 +322,18 @@ public:
       return;
 
     map[nominal].recordProtocols(directlyInherited, D);
+    // Collect protocols inherited from super classes
+    if (auto *CD = dyn_cast<ClassDecl>(D)) {
+      for (auto *SD = CD->getSuperclassDecl(); SD;
+           SD = SD->getSuperclassDecl()) {
+        map[nominal].recordProtocols(SD->getInherited(), SD);
+        for (auto *Ext: SD->getExtensions()) {
+          if (shouldInclude(Ext)) {
+            map[nominal].recordProtocols(Ext->getInherited(), Ext);
+          }
+        }
+      }
+    }
 
     // Recurse to find any nested types.
     for (const Decl *member : memberContext->getMembers())
@@ -339,6 +380,9 @@ public:
                                     ModuleDecl *M,
                                     const NominalTypeDecl *nominal) const {
     if (ExtraProtocols.empty())
+      return;
+
+    if (!printOptions.shouldPrint(nominal))
       return;
 
     SmallPtrSet<ProtocolDecl *, 16> handledProtocols;
@@ -437,10 +481,10 @@ bool swift::emitSwiftInterface(raw_ostream &out,
   assert(M);
 
   printToolVersionAndFlagsComment(out, Opts, M);
-  printImports(out, M);
+  printImports(out, Opts, M);
 
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
-      Opts.PreserveTypesAsWritten);
+      Opts.PreserveTypesAsWritten, Opts.PrintFullConvention, Opts.PrintSPIs);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;

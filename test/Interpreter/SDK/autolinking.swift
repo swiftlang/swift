@@ -7,7 +7,7 @@
 // RUN: not %target-jit-run -lLinkMe %s 2>&1
 
 // RUN: %target-jit-run -lLinkMe -DUSE_DIRECTLY %s -L %t 2>&1
-// RUN: not --crash %target-jit-run -DUSE_DIRECTLY -lLinkMe %s 2>&1
+// RUN: not %target-jit-run -DUSE_DIRECTLY -lLinkMe %s 2>&1
 // REQUIRES: executable_test
 
 

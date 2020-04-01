@@ -36,8 +36,7 @@ func test1a() -> unionSearchFlags {
 
 func test1b(_ b : Bool) {
   _ = 123
-  _ = .description == 1 // expected-error {{instance member 'description' cannot be used on type 'Int'}}
-  // expected-error@-1 {{member 'description' in 'Int' produces result of type 'String', but context expects 'Int'}}
+  _ = .description == 1 // expected-error {{cannot infer contextual base in reference to member 'description'}}
 }
 
 enum MaybeInt {
@@ -277,7 +276,8 @@ func testDirection() {
     i = x
     break
 
-  case .NorthEast(let x): // expected-warning {{cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+  case .NorthEast(let x): // expected-warning {{enum case 'NorthEast' has 2 associated values; matching them as a tuple is deprecated}}
+                          // expected-note@-14 {{'NorthEast(distanceNorth:distanceEast:)' declared here}}
     i = x.distanceEast
     break
   }
@@ -554,3 +554,65 @@ let _: EnumWithStructNone? = .none // Okay
 let _: EnumWithTypealiasNone? = .none // Okay
 let _: EnumWithBothStructAndComputedNone? = .none // Okay
 let _: EnumWithBothTypealiasAndComputedNone? = .none // Okay
+
+// SR-12063
+
+let foo1: Foo? = Foo.none
+let foo2: Foo?? = Foo.none
+
+switch foo1 {
+  case .none: break 
+  // expected-warning@-1 {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+  // expected-note@-2 {{use 'nil' to silence this warning}}{{8-13=nil}}
+  // expected-note@-3 {{use 'none?' instead}}{{9-13=none?}}
+  case .bar: break
+  default: break
+}
+
+switch foo2 {
+  case .none: break 
+  // expected-warning@-1 {{assuming you mean 'Optional<Optional<Foo>>.none'; did you mean 'Foo.none' instead?}}
+  // expected-note@-2 {{use 'nil' to silence this warning}}{{8-13=nil}}
+  // expected-note@-3 {{use 'none??' instead}}{{9-13=none??}}
+  case .bar: break
+  default: break
+}
+
+if case .none = foo1 {}
+// expected-warning@-1 {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+// expected-note@-2 {{use 'nil' to silence this warning}}{{9-14=nil}}
+// expected-note@-3 {{use 'none?' instead}}{{10-14=none?}}
+
+if case .none = foo2 {}
+// expected-warning@-1 {{assuming you mean 'Optional<Optional<Foo>>.none'; did you mean 'Foo.none' instead?}}
+// expected-note@-2 {{use 'nil' to silence this warning}}{{9-14=nil}}
+// expected-note@-3 {{use 'none??' instead}}{{10-14=none??}}
+
+switch foo1 {
+  case nil: break // Okay
+  case .bar: break
+  default: break
+}
+
+switch foo1 {
+  case .none?: break // Okay
+  case .bar: break
+  default: break
+}
+
+switch foo2 {
+  case nil: break // Okay
+  case .bar: break
+  default: break
+}
+
+switch foo2 {
+  case .none??: break // Okay
+  case .bar: break
+  default: break
+}
+
+if case nil = foo1 {} // Okay
+if case .none? = foo1 {} // Okay
+if case nil = foo2 {} // Okay
+if case .none?? = foo2 {} // Okay

@@ -100,3 +100,16 @@ func withoutActuallyEscapingConflict() {
     modifyAndPerform(&localVar, closure: $0)
   }
 }
+
+// CHECK-LABEL: sil [ossa] @$s25without_actually_escaping0A25ActuallyEscapingCFunction8functionyyyXC_tF
+// CHECK: bb0([[ARG:%.*]] : $@convention(c) @noescape () -> ()):
+// CHECK:   [[E:%.*]] = convert_function [[ARG]] : $@convention(c) @noescape () -> () to [without_actually_escaping] $@convention(c) () -> ()
+// CHECK:   [[F:%.*]] = function_ref @$s25without_actually_escaping0A25ActuallyEscapingCFunction8functionyyyXC_tFyyyXCXEfU_ : $@convention(thin) (@convention(c) () -> ()) -> ()
+// CHECK:   apply [[F]]([[E]]) : $@convention(thin) (@convention(c) () -> ()) -> ()
+public func withoutActuallyEscapingCFunction(function: (@convention(c) () -> Void)) {
+  withoutActuallyEscaping(function) { f in
+    var pointer: UnsafeRawPointer? = nil
+    pointer = unsafeBitCast(f, to: UnsafeRawPointer.self)
+    print(pointer)
+  }
+}

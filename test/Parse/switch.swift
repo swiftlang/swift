@@ -64,7 +64,7 @@ case _ where x % 2 == 0,
   x = 1
 case var y where y % 2 == 0:
   x = y + 1
-case _ where 0: // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+case _ where 0: // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
   x = 0
 default:
   x = 1

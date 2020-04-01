@@ -17,7 +17,7 @@ protocol Test {
   var subminor : Int  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{21-21= { get <#set#> \}}}
   static var staticProperty: Int // expected-error{{property in protocol must have explicit { get } or { get set } specifier}} {{33-33= { get <#set#> \}}}
 
-  let bugfix // expected-error {{type annotation missing in pattern}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  let bugfix // expected-error {{type annotation missing in pattern}} expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}}
   var comment // expected-error {{type annotation missing in pattern}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
 }
 
@@ -101,9 +101,10 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 3 {{protocol 'CircleMiddle' refines itself}}
-protocol CircleStart : CircleEnd { func circle_start() }
-// expected-note@-1 3 {{protocol 'CircleStart' declared here}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{protocol 'CircleMiddle' refines itself}}
+// expected-note@-1 {{protocol 'CircleMiddle' declared here}}
+protocol CircleStart : CircleEnd { func circle_start() } // expected-error {{protocol 'CircleStart' refines itself}}
+// expected-note@-1 2 {{protocol 'CircleStart' declared here}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 3 {{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
@@ -118,7 +119,7 @@ struct Circle {
 func testCircular(_ circle: Circle) {
   // FIXME: It would be nice if this failure were suppressed because the protocols
   // have circular definitions.
-  _ = circle as CircleStart // expected-error{{'Circle' is not convertible to 'CircleStart'; did you mean to use 'as!' to force downcast?}} {{14-16=as!}}
+  _ = circle as CircleStart // expected-error{{value of type 'Circle' does not conform to 'CircleStart' in coercion}}
 }
 
 // <rdar://problem/14750346>
@@ -457,7 +458,7 @@ protocol ShouldntCrash {
   let fullName: String { get }  // expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
   
   // <rdar://problem/17200672> Let in protocol causes unclear errors and crashes
-  let fullName2: String  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}} {{3-6=var}} {{24-24= { get \}}}
+  let fullName2: String  // expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}} {{3-6=var}} {{24-24= { get \}}}
 
   // <rdar://problem/16789886> Assert on protocol property requirement without a type
   var propertyWithoutType { get } // expected-error {{type annotation missing in pattern}}
@@ -482,7 +483,7 @@ func f<T : C1>(_ x : T) {
 
 class C2 {}
 func g<T : C2>(_ x : T) {
-  x as P2 // expected-error{{'T' is not convertible to 'P2'; did you mean to use 'as!' to force downcast?}} {{5-7=as!}}
+  x as P2 // expected-error{{value of type 'T' does not conform to 'P2' in coercion}}
 }
 
 class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}}
@@ -513,7 +514,7 @@ class C4 : P4 { // expected-error {{type 'C4' does not conform to protocol 'P4'}
 // <rdar://problem/25185722> Crash with invalid 'let' property in protocol
 protocol LetThereBeCrash {
   let x: Int
-  // expected-error@-1 {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}} {{13-13= { get \}}}
+  // expected-error@-1 {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}} {{13-13= { get \}}}
   // expected-note@-2 {{declared here}}
 }
 

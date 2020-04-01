@@ -27,6 +27,10 @@
 #include <queue>
 #include <tuple>
 
+namespace clang {
+  class Type;
+}
+
 namespace swift {
   class SILModule;
 
@@ -63,6 +67,8 @@ protected:
 
 public:
   SerializerBase(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC);
+
+  ASTContext &getASTContext();
 };
 
 class Serializer : public SerializerBase {
@@ -193,6 +199,10 @@ class Serializer : public SerializerBase {
                        index_block::TYPE_OFFSETS>
   TypesToSerialize;
 
+  ASTBlockRecordKeeper<const clang::Type *, ClangTypeID,
+                       index_block::CLANG_TYPE_OFFSETS>
+  ClangTypesToSerialize;
+
   ASTBlockRecordKeeper<const DeclContext *, LocalDeclContextID,
                        index_block::LOCAL_DECL_CONTEXT_OFFSETS>
   LocalDeclContextsToSerialize;
@@ -245,6 +255,23 @@ public:
   using ExtensionTableData =
       SmallVector<std::pair<const NominalTypeDecl *, DeclID>, 4>;
   using ExtensionTable = llvm::MapVector<Identifier, ExtensionTableData>;
+
+  using DerivativeFunctionConfigTableData =
+      llvm::SmallVector<std::pair<std::string, GenericSignatureID>, 4>;
+  // In-memory representation of what will eventually be an on-disk hash table
+  // mapping original declaration USRs to derivative function configurations.
+  using DerivativeFunctionConfigTable =
+      llvm::MapVector<Identifier, DerivativeFunctionConfigTableData>;
+  // Uniqued mapping from original declarations USRs to derivative function
+  // configurations.
+  // Note: this exists because `GenericSignature` can be used as a `DenseMap`
+  // key, while `GenericSignatureID` cannot
+  // (`DenseMapInfo<GenericSignatureID>::getEmptyKey()` crashes). To work
+  // around this, a `UniquedDerivativeFunctionConfigTable` is first
+  // constructed, and then converted to a `DerivativeFunctionConfigTableData`.
+  using UniquedDerivativeFunctionConfigTable = llvm::MapVector<
+      Identifier,
+      llvm::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
 
 private:
   /// A map from identifiers to methods and properties with the given name.
@@ -313,6 +340,9 @@ private:
   /// Writes the given type.
   void writeASTBlockEntity(Type ty);
 
+  /// Writes the given Clang type.
+  void writeASTBlockEntity(const clang::Type *ty);
+
   /// Writes a generic signature.
   void writeASTBlockEntity(GenericSignature sig);
 
@@ -357,8 +387,7 @@ private:
   void writeSIL(const SILModule *M, bool serializeAllSIL);
 
   /// Top-level entry point for serializing a module.
-  void writeAST(ModuleOrSourceFile DC,
-                bool enableNestedTypeLookupTable);
+  void writeAST(ModuleOrSourceFile DC);
 
   using SerializerBase::SerializerBase;
   using SerializerBase::writeToStream;
@@ -375,6 +404,13 @@ public:
   ///
   /// \returns The ID for the given Type in this module.
   TypeID addTypeRef(Type ty);
+
+  /// Records the use of the given C type.
+  ///
+  /// The type will be scheduled for serialization if necessary.,
+  ///
+  /// \returns The ID for the given type in this module.
+  ClangTypeID addClangTypeRef(const clang::Type *ty);
 
   /// Records the use of the given DeclBaseName.
   ///

@@ -167,12 +167,12 @@ GenericSignatureBuilder *GenericSignatureImpl::getGenericSignatureBuilder() {
 }
 
 bool GenericSignatureImpl::isEqual(GenericSignature Other) {
-  return getCanonicalSignature() == Other.getPointer()->getCanonicalSignature();
+  return getCanonicalSignature() == Other.getCanonicalSignature();
 }
 
 bool GenericSignatureImpl::isCanonical() const {
-  if (CanonicalSignatureOrASTContext.is<ASTContext*>()) return true;
-
+  if (CanonicalSignatureOrASTContext.is<ASTContext *>())
+    return true;
   return getCanonicalSignature().getPointer() == this;
 }
 
@@ -308,6 +308,14 @@ CanGenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
 #endif
 
   return CanGenericSignature(canSig);
+}
+
+CanGenericSignature GenericSignature::getCanonicalSignature() const {
+  // If the underlying pointer is null, return `CanGenericSignature()`.
+  if (isNull())
+    return CanGenericSignature();
+  // Otherwise, return the canonical signature of the underlying pointer.
+  return getPointer()->getCanonicalSignature();
 }
 
 CanGenericSignature GenericSignatureImpl::getCanonicalSignature() const {

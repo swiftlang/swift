@@ -67,7 +67,7 @@ public:
     return LoggingLevel >= LogLevel;
   }
   static void enableLogging(StringRef Name, Level LogLevel) {
-    LoggerName = Name;
+    LoggerName = Name.str();
     LoggingLevel = LogLevel;
   }
 

@@ -28,17 +28,11 @@ import tempfile
 from collections import namedtuple
 from operator import attrgetter
 
+from build_swift.build_swift import shell
+
 import gyb
 
 from jobstats import load_stats_dir, merge_all_jobstats
-
-
-def find_which(p):
-    for d in os.environ["PATH"].split(os.pathsep):
-        full = os.path.join(d, p)
-        if os.path.isfile(full) and os.access(full, os.X_OK):
-            return full
-    return p
 
 
 # Evidently the debug-symbol reader in dtrace is sufficiently slow and/or buggy
@@ -47,7 +41,7 @@ def find_which(p):
 # entries, see rdar://problem/7037927 or rdar://problem/11490861 respectively),
 # so we sniff the presence of debug symbols here.
 def has_debuginfo(swiftc):
-    swiftc = find_which(swiftc)
+    swiftc = shell.which(swiftc)
     for line in subprocess.check_output(
             ["dwarfdump", "--file-stats", swiftc]).splitlines():
         if '%' not in line:

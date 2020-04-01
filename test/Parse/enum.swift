@@ -473,7 +473,7 @@ enum SE0036 {
 
   func staticReferenceInInstanceMethod() {
     _ = A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-9=SE0036.}}
-    _ = self.A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-9=SE0036.}}
+    _ = self.A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-13=SE0036}}
     _ = SE0036.A
   }
 
@@ -488,7 +488,7 @@ enum SE0036 {
   func staticReferenceInSwitchInInstanceMethod() {
     switch self {
     case A: break // expected-error {{enum case 'A' cannot be used as an instance member}} {{10-10=.}}
-    case B(_): break // expected-error {{enum case 'B' cannot be used as an instance member}} {{10-10=.}}
+    case B(_): break // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
     case C(let x): _ = x; break // expected-error {{enum case 'C' cannot be used as an instance member}} {{10-10=.}}
     }
   }
@@ -532,7 +532,7 @@ enum SE0036_Generic<T> {
 
   func foo() {
     switch self {
-    case A(_): break // expected-error {{enum case 'A' cannot be used as an instance member}} {{10-10=.}} expected-error {{missing argument label 'x:' in call}}
+    case A(_): break // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
     }
 
     switch self {
@@ -549,8 +549,8 @@ enum switch {} // expected-error {{keyword 'switch' cannot be used as an identif
 
 enum SE0155 {
   case emptyArgs() // expected-warning {{enum element with associated values must have at least one associated value}}
-  // expected-note@-1 {{did you mean to remove the empty associated value list?}} {{17-18=}}
-  // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{17-17=Void}}
+  // expected-note@-1 {{did you mean to remove the empty associated value list?}} {{17-19=}}
+  // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{18-18=Void}}
 }
 
 // SR-11261

@@ -23,7 +23,7 @@ SILLoopAnalysis::newFunctionAnalysis(SILFunction *F) {
   assert(DA != nullptr && "Expect a valid dominance analysis");
   DominanceInfo *DT = DA->get(F);
   assert(DT != nullptr && "Expect a valid dominance information");
-  return llvm::make_unique<SILLoopInfo>(F, DT);
+  return std::make_unique<SILLoopInfo>(F, DT);
 }
 
 void SILLoopAnalysis::initialize(SILPassManager *PM) {

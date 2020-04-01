@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -suppress-warnings -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_label %s | %FileCheck %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_label.foo
 func foo() { // CHECK-DAG: [[@LINE]]:12 -> [[@LINE+19]]:2 : 0

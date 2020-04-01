@@ -705,7 +705,7 @@ void swift::performPCMacro(SourceFile &SF) {
   };
 
   ExpressionFinder EF;
-  for (Decl *D : SF.Decls) {
+  for (Decl *D : SF.getTopLevelDecls()) {
     D->walk(EF);
   }
 }

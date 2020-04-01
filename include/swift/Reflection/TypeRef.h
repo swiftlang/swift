@@ -150,6 +150,9 @@ public:
   void dump() const;
   void dump(FILE *file, unsigned Indent = 0) const;
 
+  /// Build a demangle tree from this TypeRef.
+  Demangle::NodePointer getDemangling(Demangle::Demangler &Dem) const;
+
   bool isConcrete() const;
   bool isConcreteAfterSubstitutions(const GenericArgumentMap &Subs) const;
 

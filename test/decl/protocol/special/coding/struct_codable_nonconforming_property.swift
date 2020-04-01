@@ -10,6 +10,9 @@ struct NonCodable : Hashable {
 
 struct CodableGeneric<T> : Codable {
     let value: Int = 5
+    // expected-warning@-1 {{immutable property will not be decoded because it is declared with an initial value which cannot be overwritten}}
+    // expected-note@-2 {{set the initial value via the initializer or explicitly define a CodingKeys enum including a 'value' case to silence this warning}}
+    // expected-note@-3 {{make the property mutable instead}}{{5-8=var}}
 }
 
 // Structs whose properties are not all Codable should fail to synthesize
@@ -162,13 +165,17 @@ struct NonConformingStruct : Codable { // expected-error {{type 'NonConformingSt
   // These lines have to be within the NonConformingStruct type because
   // CodingKeys should be private.
   func foo() {
-    let _ = NonConformingStruct.CodingKeys.self
-    let _ = NonConformingStruct.CodingKeys.x
-    let _ = NonConformingStruct.CodingKeys.y
-    let _ = NonConformingStruct.CodingKeys.z // expected-error {{type 'NonConformingStruct.CodingKeys' has no member 'z'}}
+    // They should not get a CodingKeys type.
+    let _ = NonConformingStruct.CodingKeys.self // expected-error {{type 'NonConformingStruct' has no member 'CodingKeys'}}
+    let _ = NonConformingStruct.CodingKeys.x // expected-error {{type 'NonConformingStruct' has no member 'CodingKeys'}}
+    let _ = NonConformingStruct.CodingKeys.y // expected-error {{type 'NonConformingStruct' has no member 'CodingKeys'}}
+    let _ = NonConformingStruct.CodingKeys.z // expected-error {{type 'NonConformingStruct' has no member 'CodingKeys'}}
   }
 }
 
 // They should not receive Codable methods.
 let _ = NonConformingStruct.init(from:) // expected-error {{type 'NonConformingStruct' has no member 'init(from:)'}}
 let _ = NonConformingStruct.encode(to:) // expected-error {{type 'NonConformingStruct' has no member 'encode(to:)'}}
+
+// They should not get a CodingKeys type.
+let _ = NonConformingStruct.CodingKeys.self // expected-error {{type 'NonConformingStruct' has no member 'CodingKeys'}}

@@ -1860,7 +1860,7 @@ const InheritedNameSet *NameImporter::getAllPropertyNames(
   llvm::BumpPtrAllocator &alloc = scratch.getAllocator();
   known = allProperties.insert({
       std::pair<const clang::ObjCInterfaceDecl *, char>(classDecl, forInstance),
-      llvm::make_unique<InheritedNameSet>(parentSet, alloc) }).first;
+      std::make_unique<InheritedNameSet>(parentSet, alloc) }).first;
 
   // Local function to add properties from the given set.
   auto addProperties = [&](clang::DeclContext::decl_range members) {

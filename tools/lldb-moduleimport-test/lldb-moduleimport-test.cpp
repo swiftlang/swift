@@ -167,8 +167,12 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
     }
 
     for (auto &Section : Obj->sections()) {
-      llvm::StringRef Name;
-      Section.getName(Name);
+      llvm::Expected<llvm::StringRef> NameOrErr = Section.getName();
+      if (!NameOrErr) {
+        llvm::consumeError(NameOrErr.takeError());
+        continue;
+      }
+      llvm::StringRef Name = *NameOrErr;
       if ((MachO && Name == swift::MachOASTSectionName) ||
           (ELF && Name == swift::ELFASTSectionName) ||
           (COFF && Name == swift::COFFASTSectionName)) {
@@ -289,7 +293,7 @@ int main(int argc, char **argv) {
 
   // Infer SDK and Target triple from the module.
   if (!extendedInfo.getSDKPath().empty())
-    Invocation.setSDKPath(extendedInfo.getSDKPath());
+    Invocation.setSDKPath(extendedInfo.getSDKPath().str());
   Invocation.setTargetTriple(info.targetTriple);
 
   Invocation.setModuleName("lldbtest");
@@ -325,14 +329,14 @@ int main(int argc, char **argv) {
       llvm::outs() << "Importing " << path << "... ";
 
 #ifdef SWIFT_SUPPORTS_SUBMODULES
-    std::vector<std::pair<swift::Identifier, swift::SourceLoc> > AccessPath;
+    std::vector<swift::Located<swift::Identifier>> AccessPath;
     for (auto i = llvm::sys::path::begin(path);
          i != llvm::sys::path::end(path); ++i)
       if (!llvm::sys::path::is_separator((*i)[0]))
           AccessPath.push_back({ CI.getASTContext().getIdentifier(*i),
                                  swift::SourceLoc() });
 #else
-    std::vector<std::pair<swift::Identifier, swift::SourceLoc> > AccessPath;
+    std::vector<swift::Located<swift::Identifier>> AccessPath;
     AccessPath.push_back({ CI.getASTContext().getIdentifier(path),
                            swift::SourceLoc() });
 #endif

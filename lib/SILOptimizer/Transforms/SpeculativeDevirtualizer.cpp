@@ -81,14 +81,20 @@ static SILBasicBlock *cloneEdge(TermInst *TI, unsigned SuccIndex) {
 }
 
 // A utility function for cloning the apply instruction.
-static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
+static FullApplySite CloneApply(FullApplySite AI, SILValue SelfArg,
+                                SILBuilder &Builder) {
   // Clone the Apply.
   Builder.setCurrentDebugScope(AI.getDebugScope());
   Builder.addOpenedArchetypeOperands(AI.getInstruction());
   auto Args = AI.getArguments();
   SmallVector<SILValue, 8> Ret(Args.size());
-  for (unsigned i = 0, e = Args.size(); i != e; ++i)
-    Ret[i] = Args[i];
+  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+    if (i == e - 1 && SelfArg) {
+      Ret[i] = SelfArg;
+    } else {
+      Ret[i] = Args[i];
+    }
+  }
 
   FullApplySite NAI;
 
@@ -169,8 +175,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILValue DownCastedClassInstance = Iden->getArgument(0);
 
   // Copy the two apply instructions into the two blocks.
-  FullApplySite IdenAI = CloneApply(AI, IdenBuilder);
-  FullApplySite VirtAI = CloneApply(AI, VirtBuilder);
+  FullApplySite IdenAI = CloneApply(AI, DownCastedClassInstance, IdenBuilder);
+  FullApplySite VirtAI = CloneApply(AI, SILValue(), VirtBuilder);
 
   // See if Continue has a release on self as the instruction right after the
   // apply. If it exists, move it into position in the diamond.
@@ -223,7 +229,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
 
   // Devirtualize the apply instruction on the identical path.
   auto NewInst =
-    devirtualizeClassMethod(IdenAI, DownCastedClassInstance, CD, nullptr);
+      devirtualizeClassMethod(IdenAI, DownCastedClassInstance, CD, nullptr)
+          .first;
   assert(NewInst && "Expected to be able to devirtualize apply!");
   (void)NewInst;
 
@@ -408,7 +415,8 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     // try to devirtualize it completely.
     ClassHierarchyAnalysis::ClassList Subs;
     if (isDefaultCaseKnown(CHA, AI, CD, Subs)) {
-      auto NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue, CD, &ORE);
+      auto NewInst =
+          tryDevirtualizeClassMethod(AI, SubTypeValue, CD, &ORE).first;
       if (NewInst)
         deleteDevirtualizedApply(AI);
       return bool(NewInst);
@@ -568,7 +576,8 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     ORE.emit(RB);
     return true;
   }
-  auto NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue, CD, nullptr);
+  auto NewInst =
+      tryDevirtualizeClassMethod(AI, SubTypeValue, CD, nullptr).first;
   if (NewInst) {
     ORE.emit(RB);
     deleteDevirtualizedApply(AI);
@@ -590,6 +599,7 @@ namespace {
     void run() override {
 
       auto &CurFn = *getFunction();
+
       // Don't perform speculative devirtualization at -Os.
       if (CurFn.optimizeForSize())
         return;

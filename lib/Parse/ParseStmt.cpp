@@ -93,6 +93,12 @@ bool Parser::isStartOfStmt() {
     Parser::BacktrackingScope backtrack(*this);
     consumeToken(tok::identifier);
     consumeToken(tok::colon);
+
+    // We treating IDENTIIFIER: { as start of statement to provide missed 'do'
+    // diagnostics. This case will be handled in parseStmt().
+    if (Tok.is(tok::l_brace)) {
+      return true;
+    }
     // For better recovery, we just accept a label on any statement.  We reject
     // putting a label on something inappropriate in parseStmt().
     return isStartOfStmt();
@@ -300,14 +306,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          Tok.isNot(tok::pound_elseif) &&
          Tok.isNot(tok::pound_else) &&
          Tok.isNot(tok::eof) &&
-         Tok.isNot(tok::kw_sil) &&
-         Tok.isNot(tok::kw_sil_scope) &&
-         Tok.isNot(tok::kw_sil_stage) &&
-         Tok.isNot(tok::kw_sil_vtable) &&
-         Tok.isNot(tok::kw_sil_global) &&
-         Tok.isNot(tok::kw_sil_witness_table) &&
-         Tok.isNot(tok::kw_sil_default_witness_table) &&
-         Tok.isNot(tok::kw_sil_property) &&
+         !isStartOfSILDecl() &&
          (isConditionalBlock ||
           !isTerminatorForBraceItemListKind(Kind, Entries))) {
 
@@ -394,7 +393,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserStatus Status = parseLineDirective(false);
       BraceItemsStatus |= Status;
       NeedParseErrorRecovery = Status.isError();
-    } else if (isStartOfDecl()) {
+    } else if (isStartOfSwiftDecl()) {
       SmallVector<Decl*, 8> TmpDecls;
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
@@ -455,9 +454,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       if (!Result.isNull()) {
         // NOTE: this is a 'virtual' brace statement which does not have
         //       explicit '{' or '}', so the start and end locations should be
-        //       the same as those of the result node
+        //       the same as those of the result node, plus any junk consumed
+        //       afterwards
         auto Brace = BraceStmt::create(Context, Result.getStartLoc(),
-                                       Result, Result.getEndLoc());
+                                       Result, PreviousLoc, /*Implicit=*/true);
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
 
@@ -637,6 +637,12 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtPoundAssert();
+  case tok::l_brace:
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    SourceLoc colonLoc = Tok.getLoc();
+    diagnose(colonLoc, diag::labeled_block_needs_do)
+      .fixItInsert(colonLoc, "do ");
+    return parseStmtDo(LabelInfo, /*shouldSkipDoTokenConsume*/ true);
   }
 }
 
@@ -690,7 +696,7 @@ ParserResult<Stmt> Parser::parseStmtBreak() {
   // since the expression after the break is dead, we don't feel bad eagerly
   // parsing this.
   if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
-      !isStartOfStmt() && !isStartOfDecl())
+      !isStartOfStmt() && !isStartOfSwiftDecl())
     TargetLoc = consumeIdentifier(&Target);
 
   return makeParserResult(new (Context) BreakStmt(Loc, Target, TargetLoc));
@@ -713,7 +719,7 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
   // since the expression after the continue is dead, we don't feel bad eagerly
   // parsing this.
   if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
-      !isStartOfStmt() && !isStartOfDecl())
+      !isStartOfStmt() && !isStartOfSwiftDecl())
     TargetLoc = consumeIdentifier(&Target);
 
   return makeParserResult(new (Context) ContinueStmt(Loc, Target, TargetLoc));
@@ -746,7 +752,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
   if (Tok.isNot(tok::r_brace, tok::semi, tok::eof, tok::pound_if, 
                 tok::pound_error, tok::pound_warning, tok::pound_endif,
                 tok::pound_else, tok::pound_elseif) &&
-      !isStartOfStmt() && !isStartOfDecl()) {
+      !isStartOfStmt() && !isStartOfSwiftDecl()) {
     SourceLoc ExprLoc = Tok.getLoc();
 
     // Issue a warning when the returned expression is on a different line than
@@ -1264,7 +1270,8 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
                          diag::avail_query_expected_rparen, LParenLoc))
     Status.setIsParseError();
 
-  auto *result = PoundAvailableInfo::create(Context, PoundLoc, Specs,RParenLoc);
+  auto *result = PoundAvailableInfo::create(Context, PoundLoc, LParenLoc, Specs,
+                                            RParenLoc);
   return makeParserResult(Status, result);
 }
 
@@ -1875,9 +1882,16 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
 ///   stmt-do:
 ///     (identifier ':')? 'do' stmt-brace
 ///     (identifier ':')? 'do' stmt-brace stmt-catch+
-ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
+ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo,
+                                       bool shouldSkipDoTokenConsume) {
   SyntaxContext->setCreateSyntax(SyntaxKind::DoStmt);
-  SourceLoc doLoc = consumeToken(tok::kw_do);
+  SourceLoc doLoc;
+
+  if (shouldSkipDoTokenConsume) {
+    doLoc = Tok.getLoc();
+  } else {
+    doLoc = consumeToken(tok::kw_do);
+  }
 
   ParserStatus status;
 
@@ -1917,18 +1931,21 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
       DoCatchStmt::create(Context, labelInfo, doLoc, body.get(), allClauses));
   }
 
-  SourceLoc whileLoc;
-
-  // If we don't see a 'while', this is just the bare 'do' scoping
-  // statement.
-  if (!consumeIf(tok::kw_while, whileLoc)) {
+  // If we dont see a 'while' or see a 'while' that starts
+  // from new line. This is just the bare `do` scoping statement.
+  if (Tok.getKind() != tok::kw_while || Tok.isAtStartOfLine()) {
     return makeParserResult(status,
-                         new (Context) DoStmt(labelInfo, doLoc, body.get()));
+                            new (Context) DoStmt(labelInfo, doLoc, body.get()));
   }
-
+  SourceLoc whileLoc = Tok.getLoc();
   // But if we do, advise the programmer that it's 'repeat' now.
-  diagnose(doLoc, diag::do_while_now_repeat_while)
+  diagnose(doLoc, diag::do_while_now_repeat_while);
+  diagnose(doLoc, diag::do_while_expected_repeat_while)
     .fixItReplace(doLoc, "repeat");
+  diagnose(doLoc, diag::do_while_expected_separate_stmt)
+    .fixItInsert(whileLoc, "\n");
+
+  consumeToken(tok::kw_while);
   status.setIsParseError();
   ParserResult<Expr> condition;
   if (Tok.is(tok::l_brace)) {
@@ -2117,10 +2134,11 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
 
   // Parse the 'where' expression if present.
   ParserResult<Expr> Where;
+  SourceLoc WhereLoc;
   if (Tok.is(tok::kw_where)) {
     SyntaxParsingContext WhereClauseCtxt(SyntaxContext,
                                          SyntaxKind::WhereClause);
-    consumeToken();
+    WhereLoc = consumeToken();
     Where = parseExprBasic(diag::expected_foreach_where_expr);
     if (Where.isNull())
       Where = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
@@ -2138,7 +2156,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   return makeParserResult(
       Status,
       new (Context) ForEachStmt(LabelInfo, ForLoc, pattern.get(), InLoc,
-                                Container.get(), Where.getPtrOrNull(),
+                                Container.get(), WhereLoc, Where.getPtrOrNull(),
                                 Body.get()));
 }
 

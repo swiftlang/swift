@@ -140,7 +140,7 @@ void ConformanceLookupTable::destroy() {
 }
 
 namespace {
-  using ConformanceConstructionInfo = std::pair<SourceLoc, ProtocolDecl *>;
+  using ConformanceConstructionInfo = Located<ProtocolDecl *>;
 }
 
 template<typename NominalFunc, typename ExtensionFunc>
@@ -194,14 +194,14 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       loader.first->loadAllConformances(next, loader.second, conformances);
       loadAllConformances(next, conformances);
       for (auto conf : conformances) {
-        protocols.push_back({SourceLoc(), conf->getProtocol()});
+        protocols.push_back({conf->getProtocol(), SourceLoc()});
       }
     } else if (next->getParentSourceFile()) {
       bool anyObject = false;
       for (const auto &found :
                getDirectlyInheritedNominalTypeDecls(next, anyObject)) {
-        if (auto proto = dyn_cast<ProtocolDecl>(found.second))
-          protocols.push_back({found.first, proto});
+        if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
+          protocols.push_back({proto, found.Loc});
       }
     }
 
@@ -281,7 +281,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           // its inherited protocols directly.
           auto source = ConformanceSource::forExplicit(ext);
           for (auto locAndProto : protos)
-            addProtocol(locAndProto.second, locAndProto.first, source);
+            addProtocol(locAndProto.Item, locAndProto.Loc, source);
         });
     break;
 
@@ -470,8 +470,8 @@ void ConformanceLookupTable::addInheritedProtocols(
   bool anyObject = false;
   for (const auto &found :
           getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.second))
-      addProtocol(proto, found.first, source);
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
+      addProtocol(proto, found.Loc, source);
   }
 }
 

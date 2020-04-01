@@ -506,3 +506,8 @@ const long long $ss21_ObjectiveCBridgeableMp[1] = {0};
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const long long $ss7KeyPathCMo[1] = {0};
+
+// Boxing
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $ss12__SwiftValueCMn[1] = {0};

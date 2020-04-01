@@ -31,15 +31,12 @@ class CanTypeVisitor {
 public:
   RetTy visit(CanType T, Args... args) {
     switch (T->getKind()) {
-#define UNCHECKED_TYPE(CLASS, PARENT) \
-    case TypeKind::CLASS:
 #define SUGARED_TYPE(CLASS, PARENT) \
     case TypeKind::CLASS:
 #define TYPE(CLASS, PARENT)
 #include "swift/AST/TypeNodes.def"
-      llvm_unreachable("non-canonical or unchecked type");
+      llvm_unreachable("non-canonical type");
 
-#define UNCHECKED_TYPE(CLASS, PARENT)
 #define SUGARED_TYPE(CLASS, PARENT)
 #define TYPE(CLASS, PARENT)                                  \
     case TypeKind::CLASS:                                    \
@@ -64,7 +61,12 @@ public:
 #define TYPE(CLASS, PARENT) ABSTRACT_TYPE(CLASS, PARENT)
 #define ABSTRACT_SUGARED_TYPE(CLASS, PARENT)
 #define SUGARED_TYPE(CLASS, PARENT)
-#define UNCHECKED_TYPE(CLASS, PARENT)
+  // Don't allow unchecked types by default, but allow visitors to opt-in to
+  // handling them.
+#define UNCHECKED_TYPE(CLASS, PARENT)                          \
+  RetTy visit##CLASS##Type(Can##CLASS##Type T, Args... args) { \
+     llvm_unreachable("unchecked type");                       \
+  }
 #include "swift/AST/TypeNodes.def"
 };
 

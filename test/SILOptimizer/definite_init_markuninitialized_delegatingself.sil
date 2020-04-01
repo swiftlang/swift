@@ -89,10 +89,10 @@ bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
 sil [ossa] @test_delegating_box_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
-  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
-  %4 = mark_uninitialized [delegatingselfallocated] %2a : $*RootClassWithNontrivialStoredProperties
+  %2a = mark_uninitialized [delegatingselfallocated] %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
+  %4 = project_box %2a : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
   store %0 to [init] %4 : $*RootClassWithNontrivialStoredProperties
-  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
+  destroy_value %2a : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
 
   %13 = tuple ()
   return %13 : $()
@@ -114,12 +114,12 @@ bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
 sil [ossa] @test_delegating_rvalue_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
-  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
-  %4 = mark_uninitialized [delegatingselfallocated] %2a : $*RootClassWithNontrivialStoredProperties
+  %2a = mark_uninitialized [delegatingselfallocated] %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
+  %4 = project_box %2a : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
   store %0 to [init] %4 : $*RootClassWithNontrivialStoredProperties
   %6 = load [take] %4 : $*RootClassWithNontrivialStoredProperties
   destroy_value %6 : $RootClassWithNontrivialStoredProperties
-  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
+  destroy_value %2a : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
 
   %13 = tuple ()
   return %13 : $()

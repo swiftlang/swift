@@ -19,7 +19,13 @@ import Foundation
 // CHECK: [[@LINE-1]]:20 | class/Swift | MyCls1 | [[MyCls1_USR:.*]] | Def
   @objc public func someMeth() {}
   // CHECK: [[@LINE-1]]:21 | instance-method/Swift | someMeth() | [[MyCls1_someMeth_USR:.*]] | Def
-  // CHECK: [[@LINE-4]]:38 | constructor/Swift | init() | [[MyCls1_init_USR:.*]] | Def,Impl,RelChild,RelOver | rel: 2
+
+  @objc public var prop = 0
+  // CHECK: [[@LINE-1]]:20 | instance-property/Swift | prop | [[MyCls1_prop_USR:.*]] | Def
+  // CHECK: [[@LINE-2]]:20 | instance-method/acc-get/Swift | getter:prop | [[MyCls1_prop_get_USR:.*]] | Def
+  // CHECK: [[@LINE-3]]:20 | instance-method/acc-set/Swift | setter:prop | [[MyCls1_prop_set_USR:.*]] | Def
+
+  // CHECK: [[@LINE-10]]:38 | constructor/Swift | init() | [[MyCls1_init_USR:.*]] | Def,Impl,RelChild,RelOver | rel: 2
   // CHECK-NEXT: RelOver | constructor/Swift | init() | c:objc(cs)NSObject(im)init
   // CHECK-NEXT: RelChild | class/Swift | MyCls1 | [[MyCls1_USR]]
 }
@@ -40,6 +46,10 @@ public extension MyCls1 {
 // CHECK: [[@LINE-2]]:18 | class/Swift | MyCls1 | [[MyCls1_USR]] |
   @objc public func someExtMeth() {}
   // CHECK: [[@LINE-1]]:21 | instance-method/Swift | someExtMeth() | [[MyCls1_someExtMeth_USR:.*]] | Def
+
+  @objc public var ext_prop: Int { 0 }
+  // CHECK: [[@LINE-1]]:20 | instance-property/Swift | ext_prop | [[MyCls1_ext_prop_USR:.*]] | Def
+  // CHECK: [[@LINE-2]]:34 | instance-method/acc-get/Swift | getter:ext_prop | [[MyCls1_ext_prop_get_USR:.*]] | Def
 }
 
 public extension SomeObjCClass {

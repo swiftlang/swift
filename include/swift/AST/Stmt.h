@@ -321,6 +321,7 @@ class alignas(8) PoundAvailableInfo final :
   friend TrailingObjects;
 
   SourceLoc PoundLoc;
+  SourceLoc LParenLoc;
   SourceLoc RParenLoc;
 
   // The number of queries tail allocated after this object.
@@ -329,17 +330,27 @@ class alignas(8) PoundAvailableInfo final :
   /// The version range when this query will return true. This value is
   /// filled in by Sema.
   VersionRange AvailableRange;
-  
-  PoundAvailableInfo(SourceLoc PoundLoc, ArrayRef<AvailabilitySpec *> queries,
-                     SourceLoc RParenLoc)
-   : PoundLoc(PoundLoc), RParenLoc(RParenLoc), NumQueries(queries.size()),
-     AvailableRange(VersionRange::empty()) {
+
+  /// For zippered builds, this is the version range for the target variant
+  /// that must hold for the query to return true. For example, when
+  /// compiling with target x86_64-macosx10.15 and target-variant
+  /// x86_64-ios13.0 a query of #available(macOS 10.22, iOS 20.0, *) will
+  /// have a variant range of [20.0, +inf).
+  /// This is filled in by Sema.
+  VersionRange VariantAvailableRange;
+
+  PoundAvailableInfo(SourceLoc PoundLoc, SourceLoc LParenLoc,
+                     ArrayRef<AvailabilitySpec *> queries, SourceLoc RParenLoc)
+   : PoundLoc(PoundLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+     NumQueries(queries.size()), AvailableRange(VersionRange::empty()),
+     VariantAvailableRange(VersionRange::empty()) {
     std::uninitialized_copy(queries.begin(), queries.end(),
                             getTrailingObjects<AvailabilitySpec *>());
   }
   
 public:
   static PoundAvailableInfo *create(ASTContext &ctx, SourceLoc PoundLoc,
+                                    SourceLoc LParenLoc,
                                     ArrayRef<AvailabilitySpec *> queries,
                                     SourceLoc RParenLoc);
   
@@ -348,6 +359,9 @@ public:
                               NumQueries);
   }
   
+  SourceLoc getLParenLoc() const { return LParenLoc; }
+  SourceLoc getRParenLoc() const { return RParenLoc; }
+
   SourceLoc getStartLoc() const { return PoundLoc; }
   SourceLoc getEndLoc() const;
   SourceLoc getLoc() const { return PoundLoc; }
@@ -356,6 +370,13 @@ public:
   
   const VersionRange &getAvailableRange() const { return AvailableRange; }
   void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
+
+  const VersionRange &getVariantAvailableRange() const {
+    return VariantAvailableRange;
+  }
+  void setVariantAvailableRange(const VersionRange &Range) {
+    VariantAvailableRange = Range;
+  }
 };
 
 
@@ -755,6 +776,7 @@ public:
 
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(WhileLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
+  SourceLoc getWhileLoc() const { return WhileLoc; }
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
@@ -776,9 +798,10 @@ public:
                   getDefaultImplicitFlag(implicit, RepeatLoc),
                   LabelInfo),
       RepeatLoc(RepeatLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
-  
+
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(RepeatLoc); }
   SourceLoc getEndLoc() const;
+  SourceLoc getRepeatLoc() const { return RepeatLoc; }
   
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
@@ -803,13 +826,12 @@ class ForEachStmt : public LabeledStmt {
   Pattern *Pat;
   SourceLoc InLoc;
   Expr *Sequence;
+  SourceLoc WhereLoc;
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
 
   // Set by Sema:
   ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
-  ConcreteDeclRef makeIterator;
-  ConcreteDeclRef iteratorNext;
   VarDecl *iteratorVar = nullptr;
   Expr *iteratorVarRef = nullptr;
   OpaqueValueExpr *elementExpr = nullptr;
@@ -817,12 +839,12 @@ class ForEachStmt : public LabeledStmt {
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, Pattern *Pat,
-              SourceLoc InLoc, Expr *Sequence, Expr *WhereExpr, BraceStmt *Body,
-              Optional<bool> implicit = None)
+              SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
+              Expr *WhereExpr, BraceStmt *Body, Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                   LabelInfo),
       ForLoc(ForLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
-      WhereExpr(WhereExpr), Body(Body) {
+      WhereLoc(WhereLoc), WhereExpr(WhereExpr), Body(Body) {
     setPattern(Pat);
   }
 
@@ -838,12 +860,6 @@ public:
   void setConvertElementExpr(Expr *expr) { convertElementExpr = expr; }
   Expr *getConvertElementExpr() const { return convertElementExpr; }
 
-  void setMakeIterator(ConcreteDeclRef declRef) { makeIterator = declRef; }
-  ConcreteDeclRef getMakeIterator() const { return makeIterator; }
-
-  void setIteratorNext(ConcreteDeclRef declRef) { iteratorNext = declRef; }
-  ConcreteDeclRef getIteratorNext() const { return iteratorNext; }
-
   void setSequenceConformance(ProtocolConformanceRef conformance) {
     sequenceConformance = conformance;
   }
@@ -856,6 +872,9 @@ public:
 
   /// getInLoc - Retrieve the location of the 'in' keyword.
   SourceLoc getInLoc() const { return InLoc; }
+
+  /// getWhereLoc - Retrieve the location of the 'where' keyword.
+  SourceLoc getWhereLoc() const { return WhereLoc; }
   
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.

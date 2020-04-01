@@ -910,6 +910,66 @@ ModuleFile::readObjCMethodTable(ArrayRef<uint64_t> fields, StringRef blobData) {
                                              base + sizeof(uint32_t), base));
 }
 
+/// Used to deserialize entries in the on-disk derivative function configuration
+/// table.
+class ModuleFile::DerivativeFunctionConfigTableInfo {
+public:
+  using internal_key_type = StringRef;
+  using external_key_type = internal_key_type;
+  using data_type = SmallVector<std::pair<std::string, GenericSignatureID>, 8>;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  external_key_type GetExternalKey(internal_key_type ID) { return ID; }
+
+  internal_key_type GetInternalKey(external_key_type ID) { return ID; }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    return {keyLength, dataLength};
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return StringRef(reinterpret_cast<const char *>(data), length);
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    data_type result;
+    const uint8_t *limit = data + length;
+    while (data < limit) {
+      DeclID genSigId = endian::readNext<uint32_t, little, unaligned>(data);
+      int32_t nameLength = endian::readNext<int32_t, little, unaligned>(data);
+      StringRef mangledName(reinterpret_cast<const char *>(data), nameLength);
+      data += nameLength;
+      result.push_back({mangledName, genSigId});
+    }
+    return result;
+  }
+};
+
+std::unique_ptr<ModuleFile::SerializedDerivativeFunctionConfigTable>
+ModuleFile::readDerivativeFunctionConfigTable(ArrayRef<uint64_t> fields,
+                                              StringRef blobData) {
+  uint32_t tableOffset;
+  index_block::DerivativeFunctionConfigTableLayout::readRecord(fields,
+                                                               tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  using OwnedTable = std::unique_ptr<SerializedDerivativeFunctionConfigTable>;
+  return OwnedTable(SerializedDerivativeFunctionConfigTable::Create(
+      base + tableOffset, base + sizeof(uint32_t), base));
+}
+
 bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
   if (llvm::Error Err = cursor.EnterSubBlock(INDEX_BLOCK_ID)) {
     // FIXME this drops the error on the floor.
@@ -986,6 +1046,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(Types, scratch);
         break;
+      case index_block::CLANG_TYPE_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(ClangTypes, scratch);
+        break;
       case index_block::IDENTIFIER_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(Identifiers, scratch);
@@ -1010,6 +1074,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::OBJC_METHODS:
         ObjCMethods = readObjCMethodTable(scratch, blobData);
+        break;
+      case index_block::DERIVATIVE_FUNCTION_CONFIGURATIONS:
+        DerivativeFunctionConfigurations =
+            readDerivativeFunctionConfigTable(scratch, blobData);
         break;
       case index_block::ENTRY_POINT:
         assert(blobData.empty());
@@ -1456,6 +1524,9 @@ bool ModuleFile::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
       case decl_locs_block::DECL_USRS:
         DeclUSRsTable = readDeclUSRsTable(scratch, blobData);
         break;
+      case decl_locs_block::DOC_RANGES:
+        DocRangesData = blobData;
+        break;
       default:
         // Unknown index kind, which this version of the compiler won't use.
         break;
@@ -1640,16 +1711,33 @@ ModuleFile::ModuleFile(
         case input_block::IMPORTED_MODULE: {
           unsigned rawImportControl;
           bool scoped;
+          bool hasSPI;
           input_block::ImportedModuleLayout::readRecord(scratch,
                                                         rawImportControl,
-                                                        scoped);
+                                                        scoped, hasSPI);
           auto importKind = getActualImportControl(rawImportControl);
           if (!importKind) {
             // We don't know how to import this dependency.
             info.status = error(Status::Malformed);
             return;
           }
-          Dependencies.push_back({blobData, importKind.getValue(), scoped});
+
+          StringRef spiBlob;
+          if (hasSPI) {
+            scratch.clear();
+
+            llvm::BitstreamEntry entry =
+                fatalIfUnexpected(cursor.advance(AF_DontPopBlockAtEnd));
+            unsigned recordID =
+                fatalIfUnexpected(cursor.readRecord(entry.ID, scratch, &spiBlob));
+            assert(recordID == input_block::IMPORTED_MODULE_SPIS);
+            input_block::ImportedModuleLayoutSPI::readRecord(scratch);
+            (void) recordID;
+          } else {
+            spiBlob = StringRef();
+          }
+
+          Dependencies.push_back({blobData, spiBlob, importKind.getValue(), scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {
@@ -1983,9 +2071,17 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       auto scopeID = ctx.getIdentifier(scopePath);
       assert(!scopeID.empty() &&
              "invalid decl name (non-top-level decls not supported)");
-      std::pair<Identifier, SourceLoc> accessPathElem(scopeID, SourceLoc());
+      Located<Identifier> accessPathElem = { scopeID, SourceLoc() };
       dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
                            module};
+    }
+
+    // SPI
+    StringRef spisStr = dependency.RawSPIs;
+    while (!spisStr.empty()) {
+      StringRef nextComponent;
+      std::tie(nextComponent, spisStr) = spisStr.split('\0');
+      dependency.spiGroups.push_back(ctx.getIdentifier(nextComponent));
     }
 
     if (!module->hasResolvedImports()) {
@@ -2124,7 +2220,8 @@ TypeDecl *ModuleFile::lookupNestedType(Identifier name,
   return nullptr;
 }
 
-OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
+OperatorDecl *ModuleFile::lookupOperator(Identifier name,
+                                         OperatorFixity fixity) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
   if (!OperatorDecls)
@@ -2202,14 +2299,14 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isScoped())
         std::tie(ModulePathStr, ScopePath) = ModulePathStr.rsplit('\0');
 
-      SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1> AccessPath;
+      SmallVector<Located<swift::Identifier>, 1> AccessPath;
       while (!ModulePathStr.empty()) {
         StringRef NextComponent;
         std::tie(NextComponent, ModulePathStr) = ModulePathStr.split('\0');
         AccessPath.push_back({Ctx.getIdentifier(NextComponent), SourceLoc()});
       }
 
-      if (AccessPath.size() == 1 && AccessPath[0].first == Ctx.StdlibModuleName)
+      if (AccessPath.size() == 1 && AccessPath[0].Item == Ctx.StdlibModuleName)
         continue;
 
       ModuleDecl *M = Ctx.getLoadedModule(AccessPath);
@@ -2228,7 +2325,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           // Lookup the decl in the top-level module.
           ModuleDecl *TopLevelModule = M;
           if (AccessPath.size() > 1)
-            TopLevelModule = Ctx.getLoadedModule(AccessPath.front().first);
+            TopLevelModule = Ctx.getLoadedModule(AccessPath.front().Item);
 
           SmallVector<ValueDecl *, 8> Decls;
           TopLevelModule->lookupQualified(
@@ -2278,7 +2375,7 @@ void ModuleFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
   };
 
   if (!accessPath.empty()) {
-    auto iter = TopLevelDecls->find(accessPath.front().first);
+    auto iter = TopLevelDecls->find(accessPath.front().Item);
     if (iter == TopLevelDecls->end())
       return;
 
@@ -2372,7 +2469,35 @@ void ModuleFile::loadObjCMethods(
   }
 }
 
-Optional<TinyPtrVector<ValueDecl *>>
+void ModuleFile::loadDerivativeFunctionConfigurations(
+    AbstractFunctionDecl *originalAFD,
+    llvm::SetVector<AutoDiffConfig> &results) {
+  if (!DerivativeFunctionConfigurations)
+    return;
+  auto &ctx = originalAFD->getASTContext();
+  Mangle::ASTMangler Mangler;
+  auto mangledName = Mangler.mangleDeclAsUSR(originalAFD, "");
+  auto configs = DerivativeFunctionConfigurations->find(mangledName);
+  if (configs == DerivativeFunctionConfigurations->end())
+    return;
+  for (auto entry : *configs) {
+    auto *parameterIndices = IndexSubset::getFromString(ctx, entry.first);
+    auto derivativeGenSigOrError = getGenericSignatureChecked(entry.second);
+    if (!derivativeGenSigOrError) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(derivativeGenSigOrError.takeError());
+      llvm::consumeError(derivativeGenSigOrError.takeError());
+    }
+    auto derivativeGenSig = derivativeGenSigOrError.get();
+    // NOTE(TF-1038): Result indices are currently unsupported in derivative
+    // registration attributes. In the meantime, always use `{0}` (wrt the
+    // first and only result).
+    auto resultIndices = IndexSubset::get(ctx, 1, {0});
+    results.insert({parameterIndices, resultIndices, derivativeGenSig});
+  }
+}
+
+TinyPtrVector<ValueDecl *>
 ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                              uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", IDC->getDecl());
@@ -2395,7 +2520,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
         fatalIfUnexpected(DeclMemberTablesCursor.advance());
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       fatal();
-      return None;
+      return results;
     }
     SmallVector<uint64_t, 64> scratch;
     StringRef blobData;
@@ -2420,10 +2545,6 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(mem.takeError());
         consumeError(mem.takeError());
-
-        // Treat this as a cache-miss to the caller and let them attempt
-        // to refill through the normal loadAllMembers() path.
-        return None;
       }
     }
   }
@@ -2454,7 +2575,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
         if (auto nominal = dc->getSelfNominalTypeDecl())
-          if (nominal->getName() == accessPath.front().first)
+          if (nominal->getName() == accessPath.front().Item)
             results.push_back(vd);
       }
     } else {
@@ -2467,7 +2588,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
         if (auto nominal = dc->getSelfNominalTypeDecl())
-          if (nominal->getName() == accessPath.front().first)
+          if (nominal->getName() == accessPath.front().Item)
             results.push_back(vd);
       }
     }
@@ -2496,7 +2617,7 @@ void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
         if (auto nominal = dc->getSelfNominalTypeDecl())
-          if (nominal->getName() == accessPath.front().first)
+          if (nominal->getName() == accessPath.front().Item)
             consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
                                DynamicLookupInfo::AnyObject);
       }
@@ -2531,6 +2652,17 @@ void ModuleFile::lookupObjCMethods(
   }
 }
 
+void ModuleFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                                    SmallVectorImpl<Identifier> &spiGroups) const {
+  for (auto &dep : Dependencies) {
+    auto depSpis = dep.spiGroups;
+    if (dep.Import.second == importedModule &&
+        !depSpis.empty()) {
+      spiGroups.append(depSpis.begin(), depSpis.end());
+    }
+  }
+}
+
 void
 ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
   for (auto &lib : LinkLibraries)
@@ -2559,6 +2691,17 @@ void ModuleFile::getTopLevelDecls(
       continue;
     }
     results.push_back(declOrError.get());
+  }
+}
+
+void ModuleFile::getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) {
+  PrettyStackTraceModuleFile stackEntry(*this);
+  if (!OperatorDecls)
+    return;
+
+  for (auto entry : OperatorDecls->data()) {
+    for (auto item : entry)
+      results.push_back(cast<OperatorDecl>(getDecl(item.second)));
   }
 }
 
@@ -2661,7 +2804,10 @@ ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
   // Size of BasicDeclLocs in the buffer.
   // FilePathOffset + LocNum * LineColumn
   uint32_t LineColumnCount = 3;
-  uint32_t RecordSize = NumSize + NumSize * 2 * LineColumnCount;
+  uint32_t RecordSize =
+    NumSize + // Offset into source filename blob
+    NumSize + // Offset into doc ranges blob
+    NumSize * 2 * LineColumnCount; // Line/column of: Loc, StartLoc, EndLoc
   uint32_t RecordOffset = RecordSize * UsrId;
   assert(RecordOffset < BasicDeclLocsData.size());
   assert(BasicDeclLocsData.size() % RecordSize == 0);
@@ -2675,6 +2821,23 @@ ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
   size_t TerminatorOffset = FilePath.find('\0');
   assert(TerminatorOffset != StringRef::npos && "unterminated string data");
   Result.SourceFilePath = FilePath.slice(0, TerminatorOffset);
+
+  const auto DocRangesOffset = ReadNext();
+  if (DocRangesOffset) {
+    assert(!DocRangesData.empty());
+    const auto *Data = DocRangesData.data() + DocRangesOffset;
+    const auto NumLocs = endian::readNext<uint32_t, little, unaligned>(Data);
+    assert(NumLocs);
+
+    for (uint32_t i = 0; i < NumLocs; ++i) {
+      LineColumn LC;
+      LC.Line = endian::readNext<uint32_t, little, unaligned>(Data);
+      LC.Column = endian::readNext<uint32_t, little, unaligned>(Data);
+      auto Length = endian::readNext<uint32_t, little, unaligned>(Data);
+      Result.DocRanges.push_back(std::make_pair(LC, Length));
+    }
+  }
+
 #define READ_FIELD(X)                                                         \
 Result.X.Line = ReadNext();                                                   \
 Result.X.Column = ReadNext();
@@ -2812,4 +2975,14 @@ ClassDecl *SerializedASTFile::getMainClass() const {
 
 const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {
   return File.CompatibilityVersion;
+}
+
+StringRef SerializedASTFile::getModuleDefiningPath() const {
+  StringRef moduleFilename = getFilename();
+  StringRef parentDir = llvm::sys::path::parent_path(moduleFilename);
+
+  if (llvm::sys::path::extension(parentDir) == ".swiftmodule")
+    return parentDir;
+
+  return moduleFilename;
 }

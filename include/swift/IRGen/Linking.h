@@ -53,19 +53,17 @@ public:
   /// be promoted to public external. Used by the LLDB expression evaluator.
   bool ForcePublicDecls;
 
-  bool IsWholeModule;
-
   explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
-                       bool forcePublicDecls, bool isWholeModule);
+                       bool forcePublicDecls);
 
   /// In case of multiple llvm modules (in multi-threaded compilation) all
   /// private decls must be visible from other files.
   bool shouldAllPrivateDeclsBeVisibleFromOtherFiles() const {
     return HasMultipleIGMs;
   }
-  /// In case of multipe llvm modules, private lazy protocol
+  /// In case of multiple llvm modules, private lazy protocol
   /// witness table accessors could be emitted by two different IGMs during
   /// IRGen into different object files and the linker would complain about
   /// duplicate symbols.
@@ -346,6 +344,9 @@ class LinkEntity {
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
 
+    /// A SIL differentiability witness.
+    DifferentiabilityWitness,
+
     // Everything following this is a type kind.
 
     /// A value witness for a type.
@@ -535,6 +536,14 @@ class LinkEntity {
     return getAssociatedConformanceByIndex(conformance->getProtocol(), index);
   }
 
+  void
+  setForDifferentiabilityWitness(Kind kind,
+                                 const SILDifferentiabilityWitness *witness) {
+    Pointer = const_cast<void *>(static_cast<const void *>(witness));
+    SecondaryPointer = nullptr;
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
+  }
+
   void setForType(Kind kind, CanType type) {
     assert(isTypeKind(kind));
     Pointer = type.getPointer();
@@ -545,9 +554,7 @@ class LinkEntity {
   LinkEntity() = default;
 
   static bool isValidResilientMethodRef(SILDeclRef declRef) {
-    if (declRef.isForeign ||
-        declRef.isDirectReference ||
-        declRef.isCurried)
+    if (declRef.isForeign)
       return false;
 
     auto *decl = declRef.getDecl();
@@ -835,6 +842,14 @@ public:
     return entity;
   }
 
+  static LinkEntity
+  forDifferentiabilityWitness(const SILDifferentiabilityWitness *witness) {
+    LinkEntity entity;
+    entity.setForDifferentiabilityWitness(Kind::DifferentiabilityWitness,
+                                          witness);
+    return entity;
+  }
+
   static LinkEntity forProtocolWitnessTable(const RootProtocolConformance *C) {
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::ProtocolWitnessTable, C);
@@ -1010,11 +1025,6 @@ public:
   std::string mangleAsString() const;
   SILLinkage getLinkage(ForDefinition_t isDefinition) const;
 
-  /// Returns true if this function or global variable is potentially defined
-  /// in a different module.
-  ///
-  bool isAvailableExternally(IRGenModule &IGM) const;
-
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
@@ -1031,16 +1041,25 @@ public:
       ::getFromOpaqueValue(reinterpret_cast<void*>(Pointer));
   }
 
-  SILFunction *getSILFunction() const {
-    assert(getKind() == Kind::SILFunction ||
+  bool hasSILFunction() const {
+    return getKind() == Kind::SILFunction ||
            getKind() == Kind::DynamicallyReplaceableFunctionVariable ||
-           getKind() == Kind::DynamicallyReplaceableFunctionKey);
+           getKind() == Kind::DynamicallyReplaceableFunctionKey;
+  }
+
+  SILFunction *getSILFunction() const {
+    assert(hasSILFunction());
     return reinterpret_cast<SILFunction*>(Pointer);
   }
 
   SILGlobalVariable *getSILGlobalVariable() const {
     assert(getKind() == Kind::SILGlobalVariable);
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
+  }
+
+  SILDifferentiabilityWitness *getSILDifferentiabilityWitness() const {
+    assert(getKind() == Kind::DifferentiabilityWitness);
+    return reinterpret_cast<SILDifferentiabilityWitness *>(Pointer);
   }
 
   const RootProtocolConformance *getRootProtocolConformance() const {
@@ -1080,6 +1099,16 @@ public:
     assert(getKind() == Kind::SILFunction);
     return LINKENTITY_GET_FIELD(Data, IsDynamicallyReplaceableImpl);
   }
+  bool isDynamicallyReplaceableKey() const {
+    return getKind() == Kind::DynamicallyReplaceableFunctionKey ||
+      getKind() == Kind::OpaqueTypeDescriptorAccessorKey;
+  }
+  bool isOpaqueTypeDescriptorAccessor() const {
+    return getKind() == Kind::OpaqueTypeDescriptorAccessor ||
+           getKind() == Kind::OpaqueTypeDescriptorAccessorImpl ||
+           getKind() == Kind::OpaqueTypeDescriptorAccessorKey ||
+           getKind() == Kind::OpaqueTypeDescriptorAccessorVar;
+  }
   bool isAllocator() const {
     assert(getKind() == Kind::DynamicallyReplaceableFunctionImpl ||
            getKind() == Kind::DynamicallyReplaceableFunctionKeyAST ||
@@ -1087,6 +1116,7 @@ public:
     return SecondaryPointer != nullptr;
   }
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }
+  bool isContextDescriptor() const;
   CanType getType() const {
     assert(isTypeKind(getKind()));
     return CanType(reinterpret_cast<TypeBase*>(Pointer));
@@ -1106,16 +1136,16 @@ public:
   bool isSILFunction() const {
     return getKind() == Kind::SILFunction;
   }
-  bool isNominalTypeDescriptor() const {
-    return getKind() == Kind::NominalTypeDescriptor;
+  bool isDynamicallyReplaceableFunctionKey() const {
+    return getKind() == Kind::DynamicallyReplaceableFunctionKey;
   }
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const;
   
-  /// Return the source file whose codegen should trigger emission of this
-  /// link entity, if one can be identified.
-  const SourceFile *getSourceFileForEmission() const;
+  /// Return the module scope context whose codegen should trigger emission
+  /// of this link entity, if one can be identified.
+  DeclContext *getDeclContextForEmission() const;
   
   /// Get the preferred alignment for the definition of this entity.
   Alignment getAlignment(IRGenModule &IGM) const;
@@ -1123,6 +1153,8 @@ public:
   /// Get the default LLVM type to use for forward declarations of this
   /// entity.
   llvm::Type *getDefaultDeclarationType(IRGenModule &IGM) const;
+
+  bool isAlwaysSharedLinkage() const;
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 };

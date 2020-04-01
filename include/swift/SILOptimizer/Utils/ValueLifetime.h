@@ -33,13 +33,16 @@ public:
   /// The lifetime frontier for the value. It is the list of instructions
   /// following the last uses of the value. All the frontier instructions
   /// end the value's lifetime.
-  typedef llvm::SmallVector<SILInstruction *, 4> Frontier;
+  using Frontier = SmallVector<SILInstruction *, 4>;
 
-  /// Constructor for the value \p Def with a specific set of users of Def's
-  /// users.
-  ValueLifetimeAnalysis(SILInstruction *def,
-                        ArrayRef<SILInstruction *> userList)
-      : defValue(def), userSet(userList.begin(), userList.end()) {
+  /// Constructor for the value \p Def with a specific range of users.
+  ///
+  /// We templatize over the RangeTy so that we can initialize
+  /// ValueLifetimeAnalysis with misc iterators including transform
+  /// iterators.
+  template <typename RangeTy>
+  ValueLifetimeAnalysis(SILInstruction *def, const RangeTy &userRange)
+      : defValue(def), userSet(userRange.begin(), userRange.end()) {
     propagateLiveness();
   }
 
@@ -78,6 +81,9 @@ public:
   /// split, otherwise the returned \p frontier consists of only those
   /// instructions of the frontier that are not in the critical edges. Note that
   /// the method getCriticalEdges can be used to retrieve the critical edges.
+  ///
+  /// An edge is also considered as "critical" if it has a single precedessor
+  /// but the predecessor's terminal instruction is a user of the value.
   ///
   /// If \p deBlocks is provided, all dead-end blocks are ignored. This
   /// prevents unreachable-blocks to be included in the frontier.
@@ -132,6 +138,15 @@ private:
   SILInstruction *findLastUserInBlock(SILBasicBlock *bb);
 };
 
+/// Destroys \p valueOrStackLoc at \p frontier.
+///
+/// If  \p valueOrStackLoc is an alloc_stack, inserts destroy_addr and
+/// dealloc_stack at each instruction of the \p frontier.
+/// Otherwise \p valueOrStackLoc must be a value type and in this case, inserts
+/// destroy_value at each instruction of the \p frontier.
+void endLifetimeAtFrontier(SILValue valueOrStackLoc,
+                           const ValueLifetimeAnalysis::Frontier &frontier,
+                           SILBuilderContext &builderCtxt);
 
 } // end namespace swift
 

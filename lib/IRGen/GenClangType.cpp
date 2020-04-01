@@ -366,7 +366,7 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
   APInt size(32, e);
   auto &ctx = getClangASTContext();
   return ctx.getCanonicalType(
-      ctx.getConstantArrayType(clangEltTy, size,
+      ctx.getConstantArrayType(clangEltTy, size, nullptr,
           clang::ArrayType::Normal, 0));
 }
 

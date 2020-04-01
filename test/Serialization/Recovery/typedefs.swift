@@ -1,4 +1,7 @@
 // RUN: %empty-directory(%t)
+
+// Cannot use -parse-as-library here because that would compile also the
+// #if VERIFY path, which contains top-level code.
 // RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck -check-prefix CHECK-VTABLE %s
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
@@ -23,9 +26,9 @@ import Lib
 // CHECK-SIL-LABEL: sil hidden [ossa] @$s8typedefs11testSymbolsyyF
 func testSymbols() {
   // Check that the symbols are not using 'Bool'.
-  // CHECK-SIL: function_ref @$s3Lib1xs5Int32Vvau
+  // CHECK-SIL: global_addr @$s3Lib9usesAssocs5Int32VSgvp
   _ = Lib.x
-  // CHECK-SIL: function_ref @$s3Lib9usesAssocs5Int32VSgvau
+  // CHECK-SIL: global_addr @$s3Lib1xs5Int32Vvp
   _ = Lib.usesAssoc
 } // CHECK-SIL: end sil function '$s8typedefs11testSymbolsyyF'
 
@@ -36,7 +39,7 @@ public func testVTableBuilding(user: User) {
   // changes, please check that offset is still correct.
   // CHECK-IR-NOT: ret
   // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 28|i32 31}}
-  _ = user.lastMethod()
+  user.lastMethod()
 } // CHECK-IR: ret void
 
 #if VERIFY
@@ -166,23 +169,23 @@ open class User {
 // above.
 // CHECK-VTABLE-LABEL: sil_vtable [serialized] User {
 // (10 words of normal class metadata on 64-bit platforms, 13 on 32-bit)
-// 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter.1:
-// 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter.1:
-// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!modify.1:
-// 13 CHECK-VTABLE-NEXT: #User.wrappedProp!getter.1:
-// 14 CHECK-VTABLE-NEXT: #User.wrappedProp!setter.1:
-// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!modify.1:
-// 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod!1:
-// 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod!1:
-// 18 CHECK-VTABLE-NEXT: #User.constrainedUnwrapped!1:
-// 19 CHECK-VTABLE-NEXT: #User.constrainedWrapped!1:
-// 20 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
-// 21 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
-// 22 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 23 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 24 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 25 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 26 CHECK-VTABLE-NEXT: #User.lastMethod!1:
+// 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter:
+// 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter:
+// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!modify:
+// 13 CHECK-VTABLE-NEXT: #User.wrappedProp!getter:
+// 14 CHECK-VTABLE-NEXT: #User.wrappedProp!setter:
+// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!modify:
+// 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod:
+// 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod:
+// 18 CHECK-VTABLE-NEXT: #User.constrainedUnwrapped:
+// 19 CHECK-VTABLE-NEXT: #User.constrainedWrapped:
+// 20 CHECK-VTABLE-NEXT: #User.subscript!getter:
+// 21 CHECK-VTABLE-NEXT: #User.subscript!getter:
+// 22 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 23 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 24 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 25 CHECK-VTABLE-NEXT: #User.init!allocator:
+// 26 CHECK-VTABLE-NEXT: #User.lastMethod:
 // CHECK-VTABLE: }
 
 

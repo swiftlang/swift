@@ -14,8 +14,9 @@
 import os
 import platform
 
+from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
+
 from . import product
-from .. import multiroot_data_file
 from .. import shell
 
 
@@ -52,7 +53,7 @@ class SKStressTester(product.Product):
             '--toolchain', self.install_toolchain_path(),
             '--config', configuration,
             '--build-dir', self.build_dir,
-            '--multiroot-data-file', multiroot_data_file.path(),
+            '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
             # There might have been a Package.resolved created by other builds
             # or by the package being opened using Xcode. Discard that and
             # reset the dependencies to be local.

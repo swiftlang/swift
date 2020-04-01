@@ -118,8 +118,8 @@ struct Vegetarian: EatsFruit, EatsVegetables { }
 func testVegetarian(chef: Chef<Vegetarian>) {
   chef.cook(.#^CONDITIONAL_OVERLOAD_ARG^#)
 // CONDITIONAL_OVERLOAD_ARG: Begin completions, 2 items
-// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/ExprSpecific:     apple[#Fruit#]; name=apple
-// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/ExprSpecific:     broccoli[#Vegetable#]; name=broccoli
+// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     apple[#Fruit#]; name=apple
+// CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     broccoli[#Vegetable#]; name=broccoli
 // CONDITIONAL_OVERLOAD_ARG: End completions
 
   var chefMeta: Chef<Vegetarian>.Type = Chef<Vegetarian>.self

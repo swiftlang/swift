@@ -172,7 +172,7 @@ public:
 
   void updateCache() {
     if (!Cache)
-      Cache = llvm::make_unique<CalleeCache>(M);
+      Cache = std::make_unique<CalleeCache>(M);
   }
 
   CalleeList getCalleeList(FullApplySite FAS) {

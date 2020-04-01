@@ -8,9 +8,7 @@
 // rdar://problem/57644243 : We shouldn't crash if -use-clang-function-types is not enabled.
 // RUN: %target-swift-frontend %s -typecheck -DNOCRASH3 -I %t
 
-// FIXME: [clang-function-type-serialization] This should stop crashing once we
-// start serializing clang function types.
-// RUN: not --crash %target-swift-frontend %s -typecheck -DCRASH -I %t -use-clang-function-types
+// RUN: %target-swift-frontend %s -typecheck -DCRASH -I %t -use-clang-function-types
 
 #if NOCRASH1
 public func my_signal() -> Optional<@convention(c) (Int32) -> Void> {

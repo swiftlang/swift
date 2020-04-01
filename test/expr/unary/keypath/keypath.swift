@@ -814,7 +814,7 @@ func test_keypath_with_method_refs() {
 // SR-10467 - Argument type 'KeyPath<String, Int>' does not conform to expected type 'Any'
 func test_keypath_in_any_context() {
   func foo(_: Any) {}
-  _ = foo(\String.count) // Ok
+  foo(\String.count) // Ok
 }
 
 protocol PWithTypeAlias {

@@ -17,6 +17,7 @@
 #define SWIFT_PARSE_REQUESTS_H
 
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
 
 namespace swift {
@@ -27,12 +28,22 @@ template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
+struct FingerprintAndMembers {
+  Optional<std::string> fingerprint = None;
+  ArrayRef<Decl *> members = {};
+  bool operator==(const FingerprintAndMembers &x) const {
+    return fingerprint == x.fingerprint && members == x.members;
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const FingerprintAndMembers &value);
+
 /// Parse the members of a nominal type declaration or extension.
-class ParseMembersRequest :
-    public SimpleRequest<ParseMembersRequest,
-                         ArrayRef<Decl *>(IterableDeclContext *),
-                         CacheKind::Cached>
-{
+/// Return a fingerprint and the members.
+class ParseMembersRequest
+    : public SimpleRequest<ParseMembersRequest,
+                           FingerprintAndMembers(IterableDeclContext *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -40,8 +51,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<Decl *> evaluate(Evaluator &evaluator,
-                            IterableDeclContext *idc) const;
+  FingerprintAndMembers evaluate(Evaluator &evaluator,
+                                 IterableDeclContext *idc) const;
 
 public:
   // Caching
@@ -52,7 +63,7 @@ public:
 class ParseAbstractFunctionBodyRequest :
     public SimpleRequest<ParseAbstractFunctionBodyRequest,
                          BraceStmt *(AbstractFunctionDecl *),
-                         CacheKind::SeparatelyCached>
+                         RequestFlags::SeparatelyCached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -68,6 +79,51 @@ public:
   bool isCached() const { return true; }
   Optional<BraceStmt *> getCachedResult() const;
   void cacheResult(BraceStmt *value) const;
+};
+
+/// Parse the top-level decls of a SourceFile.
+class ParseSourceFileRequest
+    : public SimpleRequest<
+          ParseSourceFileRequest, ArrayRef<Decl *>(SourceFile *),
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySource> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Decl *> evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+  Optional<ArrayRef<Decl *>> getCachedResult() const;
+  void cacheResult(ArrayRef<Decl *> decls) const;
+
+public:
+  evaluator::DependencySource readDependencySource(Evaluator &) const;
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const CodeCompletionCallbacksFactory *factory);
+
+class CodeCompletionSecondPassRequest
+    : public SimpleRequest<CodeCompletionSecondPassRequest,
+                           bool(SourceFile *, CodeCompletionCallbacksFactory *),
+                           RequestFlags::Uncached|RequestFlags::DependencySource> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, SourceFile *SF,
+                CodeCompletionCallbacksFactory *Factory) const;
+
+public:
+  evaluator::DependencySource readDependencySource(Evaluator &) const;
 };
 
 /// The zone number for the parser.

@@ -467,3 +467,10 @@ func testNonEphemeralInMemberwiseInits() {
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'const'}}
   // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 }
+
+func ambiguous_fn(@_nonEphemeral _ ptr: UnsafePointer<Int>) {} // expected-note {{found this candidate}}
+func ambiguous_fn(_ ptr: UnsafeRawPointer) {} // expected-note {{found this candidate}}
+
+func test_ambiguity_with_function_instead_of_argument(_ x: inout Int) {
+  ambiguous_fn(&x) // expected-error {{ambiguous use of 'ambiguous_fn'}}
+}

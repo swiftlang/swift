@@ -232,7 +232,7 @@ OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
 
       llvm::SmallString<128> PathStorage;
       OutputMap.insert(std::pair<file_types::ID, std::string>(
-          Kind, resolvePath(Path, PathStorage)));
+          Kind, resolvePath(Path, PathStorage).str()));
 
       // HACK: fake up an SwiftRanges & CompiledSource output filenames
       if (addEntriesForSourceRangeDependencies &&

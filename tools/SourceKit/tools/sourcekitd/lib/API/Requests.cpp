@@ -406,7 +406,7 @@ static Optional<VFSOptions> getVFSOptions(RequestDict &Req) {
 
   std::unique_ptr<OptionsDictionary> options;
   if (auto dict = Req.getDictionary(KeyVFSOptions)) {
-    options = llvm::make_unique<SKOptionsDictionary>(*dict);
+    options = std::make_unique<SKOptionsDictionary>(*dict);
   }
 
   return VFSOptions{name->str(), std::move(options)};
@@ -701,7 +701,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     std::string swiftVer;
     Optional<StringRef> swiftVerValStr = Req.getString(KeySwiftVersion);
     if (swiftVerValStr.hasValue()) {
-      swiftVer = swiftVerValStr.getValue();
+      swiftVer = swiftVerValStr.getValue().str();
     } else {
       Optional<int64_t> swiftVerVal = Req.getOptionalInt64(KeySwiftVersion);
       if (swiftVerVal.hasValue())
@@ -833,7 +833,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
         err = createErrorRequestInvalid("missing 'key.name'");
         return true;
       }
-      CCInfo.Name = *Name;
+      CCInfo.Name = (*Name).str();
 
       sourcekitd_uid_t Kind = dict.getUID(KeyKind);
       if (!Kind) {
@@ -1271,7 +1271,7 @@ static sourcekitd_response_t indexSource(StringRef Filename,
 }
 
 void SKIndexingConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 bool SKIndexingConsumer::startDependency(UIdent Kind,
@@ -1573,15 +1573,19 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
   // while GenericParams is empty.
   if (!Info.GenericRequirements.empty()) {
     auto ReqArray = Elem.setArray(KeyGenericRequirements);
+
     for (auto &Req : Info.GenericRequirements) {
       auto ReqElem = ReqArray.appendDictionary();
       ReqElem.set(KeyDescription, Req);
     }
   }
+
+  if (!Info.RequiredBystanders.empty())
+    Elem.set(KeyRequiredBystanders, Info.RequiredBystanders);
 }
 
 void SKDocConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 bool SKDocConsumer::handleSourceText(StringRef Text) {
@@ -1952,7 +1956,7 @@ codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
 }
 
 void SKCodeCompletionConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 void SKCodeCompletionConsumer::setCompletionKind(UIdent kind) {
@@ -1982,6 +1986,7 @@ bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
                      DocBriefOpt,
                      AssocUSRsOpt,
                      R.SemanticContext,
+                     R.TypeRelation,
                      R.NotRecommended,
                      R.NumBytesToErase);
   return true;
@@ -2029,7 +2034,7 @@ static sourcekitd_response_t codeCompleteOpen(StringRef Name,
   std::unique_ptr<SKOptionsDictionary> options;
   std::vector<FilterRule> filterRules;
   if (optionsDict) {
-    options = llvm::make_unique<SKOptionsDictionary>(*optionsDict);
+    options = std::make_unique<SKOptionsDictionary>(*optionsDict);
     bool failed = false;
     optionsDict->dictionaryArrayApply(KeyFilterRules, [&](RequestDict dict) {
       FilterRule rule;
@@ -2124,14 +2129,14 @@ codeCompleteUpdate(StringRef name, int64_t offset,
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
   if (optionsDict)
-    options = llvm::make_unique<SKOptionsDictionary>(*optionsDict);
+    options = std::make_unique<SKOptionsDictionary>(*optionsDict);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.codeCompleteUpdate(name, offset, options.get(), CCC);
   return CCC.createResponse();
 }
 
 void SKGroupedCodeCompletionConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 bool SKGroupedCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
@@ -2247,7 +2252,7 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
     }
 
     void failed(StringRef ErrDescription) override {
-      ErrorDescription = ErrDescription;
+      ErrorDescription = ErrDescription.str();
     }
 
     bool isError() const { return ErrorDescription.hasValue(); }
@@ -2300,7 +2305,7 @@ conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
     }
 
     void failed(StringRef ErrDescription) override {
-      ErrorDescription = ErrDescription;
+      ErrorDescription = ErrDescription.str();
     }
 
     bool isError() const { return ErrorDescription.hasValue(); }
@@ -2684,6 +2689,9 @@ static void fillDictionaryForDiagnosticInfoBase(
   }
   if (!Info.Filename.empty())
     Elem.set(KeyFilePath, Info.Filename);
+
+  if (!Info.EducationalNotePaths.empty())
+    Elem.set(KeyEducationalNotePaths, Info.EducationalNotePaths);
 
   if (!Info.Ranges.empty()) {
     auto RangesArr = Elem.setArray(KeyRanges);
@@ -3106,6 +3114,13 @@ static bool isSemanticEditorDisabled() {
                                            NSEC_PER_SEC * Seconds);
       dispatch_after(When, dispatch_get_main_queue(), ^{
         Toggle = SemaInfoToggle::Enable;
+
+        static UIdent SemaEnabledNotificationUID(
+            "source.notification.sema_enabled");
+        ResponseBuilder RespBuilder;
+        auto Dict = RespBuilder.getDictionary();
+        Dict.set(KeyNotification, SemaEnabledNotificationUID);
+        sourcekitd::postNotification(RespBuilder.createResponse());
       });
     });
   }

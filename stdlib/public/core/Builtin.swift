@@ -378,8 +378,8 @@ internal var _objectPointerLowSpareBitShift: UInt {
     }
 }
 
-#if arch(i386) || arch(arm) || arch(powerpc64) || arch(powerpc64le) || arch(
-  s390x)
+#if arch(i386) || arch(arm) || arch(wasm32) || arch(powerpc64) || arch(
+  powerpc64le) || arch(s390x)
 @inlinable
 internal var _objectPointerIsObjCBit: UInt {
     @inline(__always) get { return 0x0000_0002 }

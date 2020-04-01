@@ -1,0 +1,11 @@
+---
+Name: NamedLazyMembers
+Classes:
+- Name: PrivateDoer
+  Methods:
+  - Selector: "objectForKey:"
+    MethodKind: Instance
+    SwiftPrivate: true
+  - Selector: "count"
+    MethodKind: Instance
+    SwiftPrivate: true

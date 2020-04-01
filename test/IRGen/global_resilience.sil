@@ -123,7 +123,7 @@ bb0:
   return %tuple : $()
 }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_allocate_value_buffer(%swift.type*, %swift.opaque*)
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_allocate_value_buffer(%swift.type* %0, %swift.opaque* %1)
 // CHECK: entry:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
@@ -154,7 +154,7 @@ bb0:
 // CHECK:   ret %swift.opaque* [[PHI]]
 
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_project_value_buffer(%swift.type*, %swift.opaque*)
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_project_value_buffer(%swift.type* %0, %swift.opaque* %1)
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]

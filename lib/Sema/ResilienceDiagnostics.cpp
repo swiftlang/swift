@@ -127,9 +127,10 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (D->getDeclContext()->isLocalContext())
     return false;
 
-  // Public declarations are OK.
+  // Public non-SPI declarations are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
-                              TreatUsableFromInlineAsPublic).isPublic())
+                              TreatUsableFromInlineAsPublic).isPublic() &&
+      !D->isSPI())
     return false;
 
   auto &Context = DC->getASTContext();
@@ -206,15 +207,19 @@ static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
                                       const SourceFile &userSF,
                                       FragileFunctionKind fragileKind) {
   auto definingModule = D->getModuleContext();
-  if (!userSF.isImportedImplementationOnly(definingModule))
+
+  bool isImplementationOnly =
+    userSF.isImportedImplementationOnly(definingModule);
+  if (!isImplementationOnly && !userSF.isImportedAsSPI(D))
     return false;
 
   // TODO: different diagnostics
   ASTContext &ctx = definingModule->getASTContext();
-  ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_implementation_only,
+  ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module,
                      D->getDescriptiveKind(), D->getFullName(),
                      static_cast<unsigned>(fragileKind),
-                     definingModule->getName());
+                     definingModule->getName(),
+                     static_cast<unsigned>(!isImplementationOnly));
   return true;
 }
 

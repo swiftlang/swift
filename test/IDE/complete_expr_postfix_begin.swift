@@ -64,10 +64,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_5 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_6 | %FileCheck %s -check-prefix=IN_FOR_EACH_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_7 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_8 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_8 | %FileCheck %s -check-prefix=IN_FOR_EACH_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_9 | %FileCheck %s -check-prefix=IN_FOR_EACH_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_10 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_11 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_11 | %FileCheck %s -check-prefix=IN_FOR_EACH_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_12 | %FileCheck %s -check-prefix=IN_FOR_EACH_2
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 | %FileCheck %s -check-prefix=DEPRECATED_1

@@ -94,6 +94,7 @@ struct TestOptions {
   std::string CachePath;
   llvm::SmallVector<std::string, 4> RequestOptions;
   llvm::ArrayRef<const char *> CompilerArgs;
+  std::string ModuleCachePath;
   bool UsingSwiftArgs;
   std::string USR;
   std::string SwiftName;
@@ -123,6 +124,7 @@ struct TestOptions {
   llvm::StringMap<VFSFile> VFSFiles;
   llvm::Optional<std::string> VFSName;
   llvm::Optional<bool> CancelOnSubsequentRequest;
+  bool ShellExecution = false;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;
 };

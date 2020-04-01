@@ -1,6 +1,9 @@
 // <rdar://problem/15358345> Check that we always use PIC relocations on all
 // platforms.
 
+// SR-12194
+// XFAIL: OS=linux-android, CPU=aarch64
+
 // RUN: %target-swift-frontend %s -module-name main -S -o - | %FileCheck -check-prefix=%target-cpu -check-prefix=%target-cpu-%target-sdk-name %s
 
 var global: Int = 0
@@ -58,9 +61,9 @@ public func use_global() -> Int {
 // armv7k:        ldr [[R_ADR]], {{\[}}[[R_ADR]]{{\]}}
 
 // arm64-LABEL: {{_?}}$s4main10use_globalSiyF:
-// arm64:        bl _swift_beginAccess
 // arm64:        adrp [[REG1:x[0-9]+]], _$s4main6globalSivp@PAGE
 // arm64:        add [[REG1]], [[REG1]], _$s4main6globalSivp@PAGEOFF
+// arm64:        bl _swift_beginAccess
 // arm64:        ldr [[REG2:x[0-9]+]], {{\[}}[[REG1]]{{\]}}
 // arm64:        str [[REG2]], [sp]
 // arm64:        bl _swift_endAccess
@@ -76,6 +79,12 @@ public func use_global() -> Int {
 // aarch64:         str [[REG2]], [sp]
 // aarch64:         bl swift_endAccess
 // aarch64:         ldr x0, [sp]
+
+// arm64e-LABEL: _$s4main10use_globalSiyF:
+// arm64e:         adrp [[REG1:x[0-9]+]], _$s4main6globalSivp@PAGE
+// arm64e:         add [[REG1]], [[REG1]], _$s4main6globalSivp@PAGEOFF
+// arm64e:         bl _swift_beginAccess
+// arm64e:         ldr {{x[0-9]+}}, {{\[}}[[REG1]]{{\]}}
 
 // powerpc64le-LABEL: {{_?}}$s4main10use_globalSiyF:
 // powerpc64le:        bl swift_beginAccess

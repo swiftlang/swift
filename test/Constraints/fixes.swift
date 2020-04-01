@@ -129,11 +129,24 @@ var ciuo: C! = nil
 if co {} // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{6-6= != nil)}}
 if ciuo {} // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{8-8= != nil)}}
 co ? true : false // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{1-1=(}} {{3-3= != nil)}}
-!co ? false : true // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{4-4= != nil)}}
+!co ? false : true // expected-error{{optional type 'C?' cannot be used as a boolean; test for '== nil' instead}} {{1-2=}} {{2-2=(}} {{4-4= == nil)}}
 ciuo ? true : false // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{1-1=(}} {{5-5= != nil)}}
-!ciuo ? false : true // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
-!co // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{4-4= != nil)}}
-!ciuo // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
+!ciuo ? false : true // expected-error{{optional type 'C?' cannot be used as a boolean; test for '== nil' instead}} {{1-2=}} {{2-2=(}} {{6-6= == nil)}}
+!co // expected-error{{optional type 'C?' cannot be used as a boolean; test for '== nil' instead}} {{1-2=}} {{2-2=(}} {{4-4= == nil)}}
+!ciuo // expected-error{{optional type 'C?' cannot be used as a boolean; test for '== nil' instead}} {{1-2=}} {{2-2=(}} {{6-6= == nil)}}
+
+// Used an integer in a conditional expression
+var n1: Int = 1
+var n2: UInt8 = 0
+var n3: Int16 = 2
+
+if n1 {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}} {{4-4=(}} {{6-6= != 0)}}
+if !n1 {} // expected-error {{type 'Int' cannot be used as a boolean; test for '== 0' instead}} {{4-5=}} {{5-5=(}} {{7-7= == 0)}}
+n1 ? true : false // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}} {{1-1=(}} {{3-3= != 0)}}
+!n1 ? false : true // expected-error {{type 'Int' cannot be used as a boolean; test for '== 0' instead}} {{1-2=}} {{2-2=(}} {{4-4= == 0)}}
+!n1 // expected-error {{type 'Int' cannot be used as a boolean; test for '== 0' instead}} {{1-2=}} {{2-2=(}} {{4-4= == 0)}}
+if n2 {} // expected-error {{type 'UInt8' cannot be used as a boolean; test for '!= 0' instead}} {{4-4=(}} {{6-6= != 0)}}
+!n3 // expected-error {{type 'Int16' cannot be used as a boolean; test for '== 0' instead}} {{1-2=}} {{2-2=(}} {{4-4= == 0)}}
 
 // Forgotten ! or ?
 var someInt = co.a // expected-error{{value of optional type 'C?' must be unwrapped to refer to member 'a' of wrapped base type 'C'}}
@@ -146,17 +159,15 @@ struct Q {
 }
 let q = Q(s: nil)
 let a: Int? = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
-// expected-error@-1 {{cannot convert value of type 'String.UTF8View' to specified type 'Int?'}}
+// expected-error@-1 {{cannot convert value of type 'String.UTF8View?' to specified type 'Int?'}}
 // expected-note@-2{{chain the optional using '?'}}{{18-18=?}}
-// expected-note@-3{{force-unwrap using '!'}}{{18-18=!}}
 let b: Int = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
 // expected-error@-1 {{cannot convert value of type 'String.UTF8View' to specified type 'Int'}}
 // expected-note@-2{{chain the optional using '?'}}{{17-17=?}}
 // expected-note@-3{{force-unwrap using '!'}}{{17-17=!}}
 let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
-// expected-error@-1 {{cannot convert value of type 'String.UTF8View' to specified type 'Int?'}}
+// expected-error@-1 {{cannot convert value of type 'String.UTF8View?' to specified type 'Int?'}}
 // expected-note@-2{{chain the optional using '?'}}{{18-18=?}}
-// expected-note@-3{{force-unwrap using '!'}}{{18-18=!}}
 let c = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
 // expected-note@-1{{chain the optional using '?' to access member 'utf8' only for non-'nil' base values}}{{12-12=?}}
 // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{12-12=!}}
@@ -170,6 +181,14 @@ let a1116: [S1116] = []
 var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
 // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{49-49=(}} {{53-53= ?? <#default value#>)}}
 // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{53-53=!}}
+
+func makeArray<T>(_ x: T) -> [T] { [x] }
+
+func sr12399(_ x: Int?) {
+  _ = Set(0...10).subtracting(makeArray(x)) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{42-42= ?? <#default value#>}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{42-42=!}}
+}
 
 func moreComplexUnwrapFixes() {
   struct S {
@@ -336,4 +355,11 @@ func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
 
   _ = \S.[nil] // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
   _ = \S.[fn] // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{13-13=()}}
+}
+
+func sr12426(a: Any, _ str: String?) {
+  a == str // expected-error {{cannot convert value of type 'Any' to expected argument type 'String'}}
+  // expected-error@-1 {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
+  // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }

@@ -92,7 +92,7 @@ defaultArgTuplesNotMaterializable(identity(5))
 
 // <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
 defaultArgTuplesNotMaterializable(identity((5, y: 10)))
-// expected-error@-1 {{cannot convert value of type '(Int, y: Int)' to expected argument type 'Int'}}
+// expected-error@-1 {{conflicting arguments to generic parameter 'T' ('(Int, y: Int)' vs. 'Int')}}
 
 
 // rdar://problem/21799331

@@ -263,9 +263,9 @@ enum class DeclVisibilityKind {
   /// \endcode
   MemberOfCurrentNominal,
 
-  /// Declaration that is a requirement of a protocol implemented by the
-  /// immediately enclosing nominal decl, in case the nominal decl does not
-  /// supply a witness for this requirement.
+  /// Declaration is a requirement – in case the nominal decl does not supply
+  /// a corresponding witness – or an extension member of a protocol
+  /// conformed to by the immediately enclosing nominal decl.
   ///
   /// For example, 'foo' is visible at (1) because of this.
   /// \code
@@ -278,7 +278,12 @@ enum class DeclVisibilityKind {
   ///   }
   /// }
   /// \endcode
-  MemberOfProtocolImplementedByCurrentNominal,
+  MemberOfProtocolConformedToByCurrentNominal,
+
+  /// Declaration is a derived requirement of a protocol conformed to by the
+  /// immediately enclosing nominal decl (a witness for a synthesized
+  /// conformance).
+  MemberOfProtocolDerivedByCurrentNominal,
 
   /// Declaration is a member of the superclass of the immediately enclosing
   /// nominal decl.
@@ -467,6 +472,7 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               Type BaseTy,
                               const DeclContext *CurrDC,
                               bool includeInstanceMembers,
+                              bool includeDerivedRequirements,
                               GenericSignatureBuilder *GSB = nullptr);
 
 namespace namelookup {
@@ -495,7 +501,7 @@ void recordLookupOfTopLevelName(DeclContext *topLevelContext, DeclName name,
 void getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
     unsigned i,
-    llvm::SmallVectorImpl<std::pair<SourceLoc, NominalTypeDecl *>> &result,
+    llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
     bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -503,7 +509,7 @@ void getDirectlyInheritedNominalTypeDecls(
 /// and splitting out the components of compositions.
 ///
 /// If we come across the AnyObject type, set \c anyObject true.
-SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4>
+SmallVector<Located<NominalTypeDecl *>, 4>
 getDirectlyInheritedNominalTypeDecls(
                       llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
                       bool &anyObject);

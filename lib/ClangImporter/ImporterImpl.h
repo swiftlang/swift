@@ -447,10 +447,6 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
-  /// Keep track of all member declarations that have been imported into a nominal type.
-  llvm::DenseMap<const NominalTypeDecl *, std::vector<ValueDecl *>>
-      MembersForNominal;
-
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }
@@ -499,6 +495,13 @@ public:
   /// nominal type.
   llvm::DenseMap<const NominalTypeDecl *, TinyPtrVector<ConstructorDecl *>>
       ConstructorsForNominal;
+
+  /// Keep track of all member declarations that have been imported into
+  /// a nominal type.
+  llvm::DenseMap<const NominalTypeDecl *,
+                 llvm::DenseMap<DeclBaseName,
+                                TinyPtrVector<ValueDecl *>>>
+      MembersForNominal;
 
   /// Keep track of the nested 'Code' enum for imported error wrapper
   /// structs.
@@ -621,17 +624,17 @@ private:
 
   /// Load a module using the clang::CompilerInstance.
   ModuleDecl *loadModuleClang(SourceLoc importLoc,
-                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+                              ArrayRef<Located<Identifier>> path);
   
   /// "Load" a module from debug info. Because debug info types are read on
   /// demand, this doesn't really do any work.
   ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
-                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+                              ArrayRef<Located<Identifier>> path);
 
 public:
   /// Load a module using either method.
   ModuleDecl *loadModule(SourceLoc importLoc,
-                         ArrayRef<std::pair<Identifier, SourceLoc>> path);
+                         ArrayRef<Located<Identifier>> path);
 
   void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
     if (!isIUO)
@@ -772,14 +775,16 @@ public:
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
-  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version);
+  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version,
+                         bool UseCanonicalDecl = true);
 
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
                        bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
 
   Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
                                Version version,
-                               bool SuperfluousTypedefsAreTransparent);
+                               bool SuperfluousTypedefsAreTransparent,
+                               bool UseCanonicalDecl);
 
   /// Same as \c importDeclReal, but for use inside importer
   /// implementation.
@@ -787,9 +792,11 @@ public:
   /// Unlike \c importDeclReal, this function for convenience transparently
   /// looks through superfluous typedefs and returns the imported underlying
   /// decl in that case.
-  Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version) {
+  Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version,
+                   bool UseCanonicalDecl = true) {
     return importDeclAndCacheImpl(ClangDecl, version,
-                                  /*SuperfluousTypedefsAreTransparent=*/true);
+                                  /*SuperfluousTypedefsAreTransparent=*/true,
+                                  /*UseCanonicalDecl*/UseCanonicalDecl);
   }
 
   /// Import the given Clang declaration into Swift.  Use this function
@@ -800,7 +807,8 @@ public:
   /// not be represented in Swift.
   Decl *importDeclReal(const clang::NamedDecl *ClangDecl, Version version) {
     return importDeclAndCacheImpl(ClangDecl, version,
-                                  /*SuperfluousTypedefsAreTransparent=*/false);
+                                  /*SuperfluousTypedefsAreTransparent=*/false,
+                                  /*UseCanonicalDecl*/true);
   }
 
   /// Import a cloned version of the given declaration, which is part of
@@ -815,7 +823,10 @@ public:
   void importInheritedConstructors(const clang::ObjCInterfaceDecl *curObjCClass,
                                    const ClassDecl *classDecl,
                                    SmallVectorImpl<Decl *> &newMembers);
-  
+  void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
+                                     DeclContext *dc, Optional<DeclBaseName> name,
+                                     SmallVectorImpl<Decl *> &members);
+
   /// Utility function for building simple generic signatures.
   GenericSignature buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);
@@ -917,12 +928,13 @@ public:
   ClangModuleUnit *getWrapperForModule(const clang::Module *underlying);
 
   /// Constructs a Swift module for the given Clang module.
-  ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
+  ModuleDecl *finishLoadingClangModule(SourceLoc importLoc,
+                                       const clang::Module *clangModule,
                                        bool preferOverlay);
 
   /// Call finishLoadingClangModule on each deferred import collected
   /// while scanning a bridging header or PCH.
-  void handleDeferredImports();
+  void handleDeferredImports(SourceLoc diagLoc);
 
   /// Retrieve the named Swift type, e.g., Int32.
   ///
@@ -956,6 +968,22 @@ public:
   /// is over-aligned.
   bool isOverAligned(const clang::TypeDecl *typeDecl);
   bool isOverAligned(clang::QualType type);
+
+  /// Determines whether the given Clang type is serializable in a
+  /// Swift AST.  This should only be called after successfully importing
+  /// the type, because it will look for a stable serialization path for any
+  /// referenced declarations, which may depend on whether there's a known
+  /// import of it.  (It will not try to import the declaration to avoid
+  /// circularity problems.)
+  ///
+  /// Note that this will only check the requested sugaring of the given
+  /// type (depending on \c checkCanonical); the canonical type may be
+  /// serializable even if the non-canonical type is not, or vice-versa.
+  bool isSerializable(clang::QualType type, bool checkCanonical);
+
+  /// Try to find a stable Swift serialization path for the given Clang
+  /// declaration.
+  StableSerializationPath findStableSerializationPath(const clang::Decl *decl);
 
   /// Look up and attempt to import a Clang declaration with
   /// the given name.
@@ -1180,12 +1208,22 @@ public:
   ///
   /// FIXME: This is all a hack; we should have lazier deserialization
   /// of protocols separate from their conformances.
-  void recordImportedProtocols(const Decl *decl,
+  void recordImportedProtocols(Decl *decl,
                                ArrayRef<ProtocolDecl *> protocols) {
+    // Nothing to do for protocols.
+    if (isa<ProtocolDecl>(decl)) return;
+
     if (protocols.empty())
       return;
 
     ImportedProtocols[decl] = SwiftContext.AllocateCopy(protocols);
+
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      nominal->setConformanceLoader(this, 0);
+    } else {
+      auto ext = cast<ExtensionDecl>(decl);
+      ext->setConformanceLoader(this, 0);
+    }
   }
 
   /// Retrieve the imported protocols for the given declaration.
@@ -1206,7 +1244,7 @@ public:
   virtual void
   loadAllMembers(Decl *D, uint64_t unused) override;
 
-  virtual Optional<TinyPtrVector<ValueDecl *>>
+  virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
@@ -1285,6 +1323,13 @@ public:
   /// \returns \c true if the \c visitor ever returns \c true, \c
   /// false otherwise.
   bool forEachLookupTable(llvm::function_ref<bool(SwiftLookupTable &table)> fn);
+
+  /// Determine whether the given Clang entry is visible.
+  ///
+  /// FIXME: this is an elaborate hack to badly reflect Clang's
+  /// submodule visibility into Swift.
+  bool isVisibleClangEntry(const clang::NamedDecl *clangDecl);
+  bool isVisibleClangEntry(SwiftLookupTable::SingleEntry entry);
 
   /// Look for namespace-scope values with the given name in the given
   /// Swift lookup table.

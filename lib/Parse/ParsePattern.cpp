@@ -208,9 +208,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       diagnose(leftParenLoc, diagnostic)
         .highlight({leftParenLoc, rightParenLoc});
       diagnose(leftParenLoc, diag::enum_element_empty_arglist_delete)
-        .fixItRemoveChars(leftParenLoc, rightParenLoc);
+        .fixItRemoveChars(leftParenLoc,
+                          Lexer::getLocForEndOfToken(SourceMgr, rightParenLoc));
       diagnose(leftParenLoc, diag::enum_element_empty_arglist_add_void)
-        .fixItInsert(leftParenLoc, "Void");
+        .fixItInsertAfter(leftParenLoc, "Void");
     }
     return ParserStatus();
   }

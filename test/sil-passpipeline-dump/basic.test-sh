@@ -1,15 +1,13 @@
 // RUN: %sil-passpipeline-dumper -Onone | %FileCheck %s
-// RUN: %sil-passpipeline-dumper -Onone | %{python} -c 'import json; import sys; json.load(sys.stdin)'
 
-// CHECK: [
-// CHECK:     [
-// CHECK:         "Serialization",
-// CHECK:         ["SerializeSILPass","serialize-sil"]
-// CHECK:     ],
-// CHECK:     [
-// CHECK:         "Rest of Onone",
-// CHECK:         ["UsePrespecialized","use-prespecialized"],
-// CHECK:         ["AssumeSingleThreaded","sil-assume-single-threaded"],
-// CHECK:         ["SILDebugInfoGenerator","sil-debuginfo-gen"]
-// CHECK:     ]
-// CHECK: ]
+// CHECK: ---
+// CHECK: name:            Mandatory Combines
+// CHECK: passes:          [ "for-each-loop-unroll", "mandatory-combine" ]
+// CHECK: ---
+// CHECK: name:            Serialization
+// CHECK: passes:          [ "serialize-sil", "ownership-model-eliminator" ]
+// CHECK: ---
+// CHECK: name:            Rest of Onone
+// CHECK: passes:          [ "use-prespecialized", "sil-assume-single-threaded",
+// CHECK:                    "sil-debuginfo-gen" ]
+// CHECK: ...

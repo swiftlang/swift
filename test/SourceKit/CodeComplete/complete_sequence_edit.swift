@@ -45,9 +45,9 @@ func foo(arg: Foo) {
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=track-compiles == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=8:11 -name file.swift -text-input %t/State1.swift -- file.swift == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=11:13 -name file.swift -text-input %t/State2.swift -- file.swift == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=12:13 -name file.swift -text-input %t/State3.swift -- file.swift > %t.response
+// RUN:   -req=complete -pos=8:11 -name file.swift -text-input %t/State1.swift -- file.swift == \
+// RUN:   -req=complete -pos=11:13 -name file.swift -text-input %t/State2.swift -- file.swift == \
+// RUN:   -req=complete -pos=12:13 -name file.swift -text-input %t/State3.swift -- file.swift > %t.response
 // RUN: %FileCheck --check-prefix=RESULT  %s < %t.response
 // RUN: %FileCheck --check-prefix=TRACE  %s < %t.response
 

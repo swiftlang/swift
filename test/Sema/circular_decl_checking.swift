@@ -23,9 +23,10 @@ class HasGenericFunc {
   }
 }
 
-class HasProp {
+class HasProp { // expected-note {{'HasProp' declared here}}
   var HasProp: HasProp {
-    return HasProp() // expected-error {{cannot call value of non-function type 'HasProp'}}{{19-21=}}
+    return HasProp() // expected-error {{use of 'HasProp' refers to instance method rather than class 'HasProp' in module 'circular_decl_checking'}}
+    // expected-note@-1 {{use 'circular_decl_checking.' to reference the class in module 'circular_decl_checking'}} {{12-12=circular_decl_checking.}}
   }
   var SomethingElse: SomethingElse? { // expected-error {{use of undeclared type 'SomethingElse'}}
     return nil

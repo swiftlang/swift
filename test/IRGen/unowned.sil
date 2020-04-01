@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -disable-objc-interop -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-objc-interop -disable-type-layout -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
-// CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[C:%T7unowned1CC]] = type <{ [[REF:%swift.refcounted]] }>
-// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[A:%T7unowned1AV]] = type <{ %swift.unowned }>
+// CHECK-DAG: [[TYPE:%swift.type]] = type
+// CHECK-DAG: [[C:%T7unowned1CC]] = type <{ [[REF:%swift.refcounted]] }>
+// CHECK-DAG: [[OPAQUE:%swift.opaque]] = type opaque
+// CHECK-DAG: [[A:%T7unowned1AV]] = type <{ %swift.unowned }>
 
 import Builtin
 
@@ -30,7 +30,7 @@ bb0(%0 : $@sil_unowned C):
   %3 = tuple ()
   return %3 : $()
 }
-// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_rr_class([[C]]*) {{.*}} {
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_rr_class([[C]]* %0) {{.*}} {
 // CHECK:      call [[C]]* bitcast ([[REF]]* ([[REF]]*)* @swift_unownedRetain to [[C]]* ([[C]]*)*)([[C]]* returned %0)
 // CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRelease to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: ret void
@@ -42,7 +42,7 @@ bb0(%0 : $@sil_unowned P):
   %3 = tuple ()
   return %3 : $()
 }
-// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_rr_proto(%swift.refcounted*, i8**) {{.*}} {
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_rr_proto(%swift.refcounted* %0, i8** %1) {{.*}} {
 // CHECK:      call %swift.refcounted* @swift_unownedRetain(%swift.refcounted* returned %0)
 // CHECK:      call void @swift_unownedRelease(%swift.refcounted* %0)
 // CHECK-NEXT: ret void

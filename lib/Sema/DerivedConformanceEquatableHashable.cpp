@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,8 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file implements implicit derivation of the Equatable and Hashable
-//  protocols. (Comparable is similar enough in spirit that it would make
-//  sense to live here too when we implement its derivation.)
+//  protocols. 
 //
 //===----------------------------------------------------------------------===//
 
@@ -36,43 +35,6 @@ enum NonconformingMemberKind {
   AssociatedValue,
   StoredProperty
 };
-
-/// Returns the ParamDecl for each associated value of the given enum whose type
-/// does not conform to a protocol
-/// \p theEnum The enum whose elements and associated values should be checked.
-/// \p protocol The protocol being requested.
-/// \return The ParamDecl of each associated value whose type does not conform.
-static SmallVector<ParamDecl *, 3>
-associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
-                                        ProtocolDecl *protocol) {
-  SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
-  for (auto elt : theEnum->getAllElements()) {
-    auto PL = elt->getParameterList();
-    if (!PL)
-      continue;
-
-    for (auto param : *PL) {
-      auto type = param->getInterfaceType();
-      if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                          protocol, DC, None)
-              .isInvalid()) {
-        nonconformingAssociatedValues.push_back(param);
-      }
-    }
-  }
-  return nonconformingAssociatedValues;
-}
-
-/// Returns true if, for every element of the given enum, it either has no
-/// associated values or all of them conform to a protocol.
-/// \p theEnum The enum whose elements and associated values should be checked.
-/// \p protocol The protocol being requested.
-/// \return True if all associated values of all elements of the enum conform.
-static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
-                                                 EnumDecl *theEnum,
-                                                 ProtocolDecl *protocol) {
-  return associatedValuesNotConformingToProtocol(DC, theEnum, protocol).empty();
-}
 
 /// Returns the VarDecl of each stored property in the given struct whose type
 /// does not conform to a protocol.
@@ -120,7 +82,7 @@ static bool canDeriveConformance(DeclContext *DC,
   if (auto enumDecl = dyn_cast<EnumDecl>(target)) {
     // The cases must not have associated values, or all associated values must
     // conform to the protocol.
-    return allAssociatedValuesConformToProtocol(DC, enumDecl, protocol);
+    return DerivedConformance::allAssociatedValuesConformToProtocol(DC, enumDecl, protocol);
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(target)) {
@@ -139,7 +101,7 @@ void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
     auto nonconformingAssociatedTypes =
-        associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
+        DerivedConformance::associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
     for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
       SourceLoc reprLoc;
       if (auto *repr = typeToDiagnose->getTypeRepr())
@@ -171,219 +133,6 @@ void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
                        diag::classes_automatic_protocol_synthesis,
                        protocol->getName().str());
   }
-}
-
-/// Creates a named variable based on a prefix character and a numeric index.
-/// \p prefixChar The prefix character for the variable's name.
-/// \p index The numeric index to append to the variable's name.
-/// \p type The type of the variable.
-/// \p varContext The context of the variable.
-/// \return A VarDecl named with the prefix and number.
-static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
-                               DeclContext *varContext) {
-  ASTContext &C = varContext->getASTContext();
-
-  llvm::SmallString<8> indexVal;
-  indexVal.append(1, prefixChar);
-  APInt(32, index).toString(indexVal, 10, /*signed*/ false);
-  auto indexStr = C.AllocateCopy(indexVal);
-  auto indexStrRef = StringRef(indexStr.data(), indexStr.size());
-
-  auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                                 /*IsCaptureList*/true, SourceLoc(),
-                                 C.getIdentifier(indexStrRef),
-                                 varContext);
-  varDecl->setInterfaceType(type);
-  varDecl->setHasNonPatternBindingInit(true);
-  return varDecl;
-}
-
-/// Returns the pattern used to match and bind the associated values (if any) of
-/// an enum case.
-/// \p enumElementDecl The enum element to match.
-/// \p varPrefix The prefix character for variable names (e.g., a0, a1, ...).
-/// \p varContext The context into which payload variables should be declared.
-/// \p boundVars The array to which the pattern's variables will be appended.
-static Pattern*
-enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
-                             char varPrefix, DeclContext *varContext,
-                             SmallVectorImpl<VarDecl*> &boundVars) {
-  auto parentDC = enumElementDecl->getDeclContext();
-  ASTContext &C = parentDC->getASTContext();
-
-  // No arguments, so no subpattern to match.
-  if (!enumElementDecl->hasAssociatedValues())
-    return nullptr;
-
-  auto argumentType = enumElementDecl->getArgumentInterfaceType();
-  if (auto tupleType = argumentType->getAs<TupleType>()) {
-    // Either multiple (labeled or unlabeled) arguments, or one labeled
-    // argument. Return a tuple pattern that matches the enum element in arity,
-    // types, and labels. For example:
-    // case a(x: Int) => (x: let a0)
-    // case b(Int, String) => (let a0, let a1)
-    SmallVector<TuplePatternElt, 3> elementPatterns;
-    int index = 0;
-    for (auto tupleElement : tupleType->getElements()) {
-      auto payloadVar = indexedVarDecl(varPrefix, index++,
-                                       tupleElement.getType(), varContext);
-      boundVars.push_back(payloadVar);
-
-      auto namedPattern = new (C) NamedPattern(payloadVar);
-      namedPattern->setImplicit();
-      auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
-                                           namedPattern);
-      elementPatterns.push_back(TuplePatternElt(tupleElement.getName(),
-                                                SourceLoc(), letPattern));
-    }
-
-    auto pat = TuplePattern::create(C, SourceLoc(), elementPatterns,
-                                    SourceLoc());
-    pat->setImplicit();
-    return pat;
-  }
-
-  // Otherwise, a one-argument unlabeled payload. Return a paren pattern whose
-  // underlying type is the same as the payload. For example:
-  // case a(Int) => (let a0)
-  auto underlyingType = argumentType->getWithoutParens();
-  auto payloadVar = indexedVarDecl(varPrefix, 0, underlyingType, varContext);
-  boundVars.push_back(payloadVar);
-
-  auto namedPattern = new (C) NamedPattern(payloadVar);
-  namedPattern->setImplicit();
-  auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
-                                       namedPattern);
-  auto pat = new (C) ParenPattern(SourceLoc(), letPattern, SourceLoc());
-  pat->setImplicit();
-  return pat;
-}
-
-/// Build a type-checked integer literal.
-static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
-  Type intType = C.getIntDecl()->getDeclaredType();
-
-  auto literal = IntegerLiteralExpr::createFromUnsigned(C, index);
-  literal->setType(intType);
-  literal->setBuiltinInitializer(C.getIntBuiltinInitDecl(C.getIntDecl()));
-
-  return literal;
-}
-
-/// Create AST statements which convert from an enum to an Int with a switch.
-/// \p stmts The generated statements are appended to this vector.
-/// \p parentDC Either an extension or the enum itself.
-/// \p enumDecl The enum declaration.
-/// \p enumVarDecl The enum input variable.
-/// \p funcDecl The parent function.
-/// \p indexName The name of the output variable.
-/// \return A DeclRefExpr of the output variable (of type Int).
-static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
-                                       DeclContext *parentDC,
-                                       EnumDecl *enumDecl,
-                                       VarDecl *enumVarDecl,
-                                       AbstractFunctionDecl *funcDecl,
-                                       const char *indexName) {
-  ASTContext &C = enumDecl->getASTContext();
-  Type enumType = enumVarDecl->getType();
-  Type intType = C.getIntDecl()->getDeclaredType();
-
-  auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                                  /*IsCaptureList*/false, SourceLoc(),
-                                  C.getIdentifier(indexName),
-                                  funcDecl);
-  indexVar->setInterfaceType(intType);
-  indexVar->setImplicit();
-
-  // generate: var indexVar
-  Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
-  indexPat->setType(intType);
-  indexPat = TypedPattern::createImplicit(C, indexPat, intType);
-  indexPat->setType(intType);
-  auto *indexBind = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, indexPat, /*InitExpr*/ nullptr, funcDecl);
-
-  unsigned index = 0;
-  SmallVector<ASTNode, 4> cases;
-  for (auto elt : enumDecl->getAllElements()) {
-    // generate: case .<Case>:
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), DeclNameLoc(),
-                                          DeclNameRef(), elt, nullptr);
-    pat->setImplicit();
-    pat->setType(enumType);
-
-    auto labelItem = CaseLabelItem(pat);
-
-    // generate: indexVar = <index>
-    auto indexExpr = buildIntegerLiteral(C, index++);
-
-    auto indexRef = new (C) DeclRefExpr(indexVar, DeclNameLoc(),
-                                        /*implicit*/true,
-                                        AccessSemantics::Ordinary,
-                                        LValueType::get(intType));
-    auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
-                                         indexExpr, /*implicit*/ true);
-    assignExpr->setType(TupleType::getEmpty(C));
-    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
-                                  SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
-                                     SourceLoc(), body,
-                                     /*case body vardecls*/ None));
-  }
-
-  // generate: switch enumVar { }
-  auto enumRef = new (C) DeclRefExpr(enumVarDecl, DeclNameLoc(),
-                                     /*implicit*/true,
-                                     AccessSemantics::Ordinary,
-                                     enumVarDecl->getType());
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
-
-  stmts.push_back(indexBind);
-  stmts.push_back(switchStmt);
-
-  return new (C) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit*/ true,
-                             AccessSemantics::Ordinary, intType);
-}
-
-/// Returns a generated guard statement that checks whether the given lhs and
-/// rhs expressions are equal. If not equal, the else block for the guard
-/// returns false.
-/// \p C The AST context.
-/// \p lhsExpr The first expression to compare for equality.
-/// \p rhsExpr The second expression to compare for equality.
-static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
-                                        Expr *lhsExpr,
-                                        Expr *rhsExpr) {
-  SmallVector<StmtConditionElement, 1> conditions;
-  SmallVector<ASTNode, 1> statements;
-
-  // First, generate the statement for the body of the guard.
-  // return false
-  auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
-                                              /*Implicit*/true);
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
-  statements.emplace_back(ASTNode(returnStmt));
-
-  // Next, generate the condition being checked.
-  // lhs == rhs
-  auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
-    DeclNameLoc());
-  auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
-                                        { lhsExpr, rhsExpr },
-                                        { }, { }, SourceLoc(),
-                                        /*HasTrailingClosure*/false,
-                                        /*Implicit*/true);
-  auto cmpExpr = new (C) BinaryExpr(cmpFuncExpr, cmpArgsTuple,
-                                    /*Implicit*/true);
-  conditions.emplace_back(cmpExpr);
-
-  // Build and return the complete guard statement.
-  // guard lhs == rhs else { return false }
-  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
 }
 
 static std::pair<BraceStmt *, bool>
@@ -437,9 +186,9 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
   // Generate the conversion from the enums to integer indices.
   SmallVector<ASTNode, 6> statements;
-  DeclRefExpr *aIndex = convertEnumToIndex(statements, parentDC, enumDecl,
+  DeclRefExpr *aIndex = DerivedConformance::convertEnumToIndex(statements, parentDC, enumDecl,
                                            aParam, eqDecl, "index_a");
-  DeclRefExpr *bIndex = convertEnumToIndex(statements, parentDC, enumDecl,
+  DeclRefExpr *bIndex = DerivedConformance::convertEnumToIndex(statements, parentDC, enumDecl,
                                            bParam, eqDecl, "index_b");
 
   // Generate the compare of the indices.
@@ -508,7 +257,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 3> lhsPayloadVars;
-    auto lhsSubpattern = enumElementPayloadSubpattern(elt, 'l', eqDecl,
+    auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', eqDecl,
                                                       lhsPayloadVars);
     auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                                  SourceLoc(), DeclNameLoc(),
@@ -518,7 +267,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
     // .<elt>(let r0, let r1, ...)
     SmallVector<VarDecl*, 3> rhsPayloadVars;
-    auto rhsSubpattern = enumElementPayloadSubpattern(elt, 'r', eqDecl,
+    auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', eqDecl,
                                                       rhsPayloadVars);
     auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                                  SourceLoc(), DeclNameLoc(),
@@ -564,7 +313,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
       auto rhsVar = rhsPayloadVars[varIdx];
       auto rhsExpr = new (C) DeclRefExpr(rhsVar, DeclNameLoc(),
                                          /*Implicit*/true);
-      auto guardStmt = returnIfNotEqualGuard(C, lhsExpr, rhsExpr);
+      auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C, 
+          lhsExpr, rhsExpr);
       statementsInCase.emplace_back(guardStmt);
     }
 
@@ -650,7 +400,8 @@ deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
     auto bPropertyExpr = new (C) DotSyntaxCallExpr(bPropertyRef, SourceLoc(),
                                                    bParamRef);
 
-    auto guardStmt = returnIfNotEqualGuard(C, aPropertyExpr, bPropertyExpr);
+    auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C,
+      aPropertyExpr, bPropertyExpr);
     statements.emplace_back(guardStmt);
   }
 
@@ -975,7 +726,7 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
 
   // generate: switch self {...}
   SmallVector<ASTNode, 3> stmts;
-  auto discriminatorExpr = convertEnumToIndex(stmts, parentDC, enumDecl,
+  auto discriminatorExpr = DerivedConformance::convertEnumToIndex(stmts, parentDC, enumDecl,
                                               selfDecl, hashIntoDecl,
                                               "discriminator");
   // generate: hasher.combine(discriminator)
@@ -1030,7 +781,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
     SmallVector<VarDecl*, 3> payloadVars;
     SmallVector<ASTNode, 3> statements;
 
-    auto payloadPattern = enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
+    auto payloadPattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                           SourceLoc(), DeclNameLoc(),

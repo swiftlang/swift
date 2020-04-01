@@ -19,6 +19,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -35,8 +36,10 @@ class DependencyCollector;
 namespace swift {
 
 class AbstractFunctionDecl;
+struct AutoDiffConfig;
 class ClangImporterOptions;
 class ClassDecl;
+class FileUnit;
 class ModuleDecl;
 class NominalTypeDecl;
 class TypeDecl;
@@ -100,7 +103,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) = 0;
+  virtual bool canImportModule(Located<Identifier> named) = 0;
 
   /// Import a module with the given module path.
   ///
@@ -113,7 +116,7 @@ public:
   /// emits a diagnostic and returns NULL.
   virtual
   ModuleDecl *loadModule(SourceLoc importLoc,
-                         ArrayRef<std::pair<Identifier, SourceLoc>> path) = 0;
+                         ArrayRef<Located<Identifier>> path) = 0;
 
   /// Load extensions to the given nominal type.
   ///
@@ -151,8 +154,29 @@ public:
                  unsigned previousGeneration,
                  llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) = 0;
 
+  /// Load derivative function configurations for the given
+  /// AbstractFunctionDecl.
+  ///
+  /// \param originalAFD The declaration whose derivative function
+  /// configurations should be loaded.
+  ///
+  /// \param previousGeneration The previous generation number. The AST already
+  /// contains derivative function configurations loaded from any generation up
+  /// to and including this one.
+  ///
+  /// \param results The result list of derivative function configurations.
+  /// This list will be extended with any methods found in subsequent
+  /// generations.
+  virtual void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
+      llvm::SetVector<AutoDiffConfig> &results) {};
+
   /// Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }
+
+  /// Discover overlays declared alongside this file and add infomation about
+  /// them to it.
+  void findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module, FileUnit *file);
 };
 
 } // namespace swift

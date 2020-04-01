@@ -67,7 +67,7 @@ class ArrayAllocation {
   /// A map of Array indices to element values
   llvm::DenseMap<uint64_t, SILValue> ElementValueMap;
 
-  bool mapInitializationStores(SILValue ElementBuffer);
+  bool mapInitializationStores(ArraySemanticsCall arrayUninitCall);
   bool recursivelyCollectUses(ValueBase *Def);
   bool replacementsAreValid();
 
@@ -93,64 +93,16 @@ public:
 };
 
 /// Map the indices of array element initialization stores to their values.
-bool ArrayAllocation::mapInitializationStores(SILValue ElementBuffer) {
-  assert(ElementBuffer &&
-         "Must have identified an array element storage pointer");
-
-  // Match initialization stores.
-  // %83 = struct_extract %element_buffer : $UnsafeMutablePointer<Int>
-  // %84 = pointer_to_address %83 : $Builtin.RawPointer to strict $*Int
-  // store %85 to %84 : $*Int
-  // %87 = integer_literal $Builtin.Word, 1
-  // %88 = index_addr %84 : $*Int, %87 : $Builtin.Word
-  // store %some_value to %88 : $*Int
-
-  auto *UnsafeMutablePointerExtract =
-      dyn_cast_or_null<StructExtractInst>(getSingleNonDebugUser(ElementBuffer));
-  if (!UnsafeMutablePointerExtract)
+bool ArrayAllocation::mapInitializationStores(
+    ArraySemanticsCall arrayUninitCall) {
+  llvm::DenseMap<uint64_t, StoreInst *> elementStoreMap;
+  if (!arrayUninitCall.mapInitializationStores(elementStoreMap))
     return false;
-  auto *PointerToAddress = dyn_cast_or_null<PointerToAddressInst>(
-      getSingleNonDebugUser(UnsafeMutablePointerExtract));
-  if (!PointerToAddress)
-    return false;
-
-  // Match the stores. We can have either a store directly to the address or
-  // to an index_addr projection.
-  for (auto *Op : PointerToAddress->getUses()) {
-    auto *Inst = Op->getUser();
-
-    // Store to the base.
-    auto *SI = dyn_cast<StoreInst>(Inst);
-    if (SI && SI->getDest() == PointerToAddress) {
-      // We have already seen an entry for this index bail.
-      if (ElementValueMap.count(0))
-        return false;
-      ElementValueMap[0] = SI->getSrc();
-      continue;
-    } else if (SI)
-      return false;
-
-    // Store an index_addr projection.
-    auto *IndexAddr = dyn_cast<IndexAddrInst>(Inst);
-    if (!IndexAddr)
-      return false;
-    SI = dyn_cast_or_null<StoreInst>(getSingleNonDebugUser(IndexAddr));
-    if (!SI || SI->getDest() != IndexAddr)
-      return false;
-    auto *Index = dyn_cast<IntegerLiteralInst>(IndexAddr->getIndex());
-    if (!Index)
-      return false;
-    auto IndexVal = Index->getValue();
-    // Let's not blow up our map.
-    if (IndexVal.getActiveBits() > 16)
-      return false;
-    // Already saw an entry.
-    if (ElementValueMap.count(IndexVal.getZExtValue()))
-      return false;
-
-    ElementValueMap[IndexVal.getZExtValue()] = SI->getSrc();
-  }
-  return !ElementValueMap.empty();
+  // Extract the SIL values of the array elements from the stores.
+  ElementValueMap.grow(elementStoreMap.size());
+  for (auto keyValue : elementStoreMap)
+    ElementValueMap[keyValue.getFirst()] = keyValue.getSecond()->getSrc();
+  return true;
 }
 
 bool ArrayAllocation::replacementsAreValid() {
@@ -217,12 +169,8 @@ bool ArrayAllocation::analyze(ApplyInst *Alloc) {
   if (!ArrayValue)
     return false;
 
-  SILValue ElementBuffer = Uninitialized.getArrayElementStoragePointer();
-  if (!ElementBuffer)
-    return false;
-
   // Figure out all stores to the array.
-  if (!mapInitializationStores(ElementBuffer))
+  if (!mapInitializationStores(Uninitialized))
     return false;
 
   // Check if the array value was stored or has escaped.

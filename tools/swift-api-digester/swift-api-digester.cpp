@@ -789,6 +789,22 @@ void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
         emitDiag(Loc, diag::super_class_changed, LSuperClass, RSuperClass);
       }
     }
+
+    // Check for @_hasMissingDesignatedInitializers and
+    // @_inheritsConvenienceInitializers changes.
+    if (isOpen() && R->isOpen()) {
+      // It's not safe to add new, invisible designated inits to open
+      // classes.
+      if (!hasMissingDesignatedInitializers() &&
+          R->hasMissingDesignatedInitializers())
+        R->emitDiag(R->getLoc(), diag::added_invisible_designated_init);
+    }
+
+    // It's not safe to stop inheriting convenience inits, it changes
+    // the set of initializers that are available.
+    if (inheritsConvenienceInitializers() &&
+        !R->inheritsConvenienceInitializers())
+      R->emitDiag(R->getLoc(), diag::not_inheriting_convenience_inits);
     break;
   }
   default:
@@ -1163,7 +1179,14 @@ public:
           }
         }
       }
-
+      // Adding an enum case is source-breaking.
+      if (!Ctx.checkingABI()) {
+        if (auto *Var = dyn_cast<SDKNodeDeclVar>(Right)) {
+          if (Var->getDeclKind() == DeclKind::EnumElement) {
+            Var->emitDiag(Var->getLoc(), diag::enum_case_added);
+          }
+        }
+      }
       return;
     case NodeMatchReason::Removed:
       assert(!Right);
@@ -2254,8 +2277,8 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     OS = FileOS.get();
   }
   std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
-    llvm::make_unique<PrintingDiagnosticConsumer>():
-    llvm::make_unique<ModuleDifferDiagsConsumer>(true, *OS);
+    std::make_unique<PrintingDiagnosticConsumer>():
+    std::make_unique<ModuleDifferDiagsConsumer>(true, *OS);
 
   Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
@@ -2329,8 +2352,8 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
   std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
-    llvm::make_unique<PrintingDiagnosticConsumer>():
-    llvm::make_unique<ModuleDifferDiagsConsumer>(false);
+    std::make_unique<PrintingDiagnosticConsumer>():
+    std::make_unique<ModuleDifferDiagsConsumer>(false);
   SDKContext Ctx(Opts);
   Ctx.addDiagConsumer(*pConsumer);
 

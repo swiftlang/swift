@@ -21,6 +21,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/Hashing.h"
@@ -55,6 +56,8 @@ template <typename Range>
 unsigned findIndexInRange(Decl *D, const Range &Decls) {
   unsigned N = 0;
   for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
+    if ((*I)->isImplicit())
+      continue;
     if (*I == D)
       return N;
     ++N;
@@ -64,10 +67,14 @@ unsigned findIndexInRange(Decl *D, const Range &Decls) {
 
 /// Return the element at \p N in \p Decls .
 template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
-  assert(std::distance(Decls.begin(), Decls.end()) > N);
-  auto I = Decls.begin();
-  std::advance(I, N);
-  return *I;
+  for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
+    if ((*I)->isImplicit())
+      continue;
+    if (N == 0)
+      return *I;
+    --N;
+  }
+  return nullptr;
 }
 
 /// Find the equivalent \c DeclContext with \p DC from \p SF AST.
@@ -85,10 +92,26 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
   SmallVector<unsigned, 4> IndexStack;
   do {
     auto *D = newDC->getAsDecl();
+    if (!D)
+      return nullptr;
     auto *parentDC = newDC->getParent();
     unsigned N;
+
+    if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+      // The AST for accessors is like:
+      //   DeclContext -> AbstractStorageDecl -> AccessorDecl
+      // We need to push the index of the accessor within the accessor list
+      // of the storage.
+      auto *storage = accessor->getStorage();
+      if (!storage)
+        return nullptr;
+      auto accessorN = findIndexInRange(accessor, storage->getAllAccessors());
+      IndexStack.push_back(accessorN);
+      D = storage;
+    }
+
     if (auto parentSF = dyn_cast<SourceFile>(parentDC))
-      N = findIndexInRange(D, parentSF->Decls);
+      N = findIndexInRange(D, parentSF->getTopLevelDecls());
     else if (auto parentIDC =
                  dyn_cast<IterableDeclContext>(parentDC->getAsDecl()))
       N = findIndexInRange(D, parentIDC->getMembers());
@@ -114,12 +137,22 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     auto N = IndexStack.pop_back_val();
     Decl *D;
     if (auto parentSF = dyn_cast<SourceFile>(newDC))
-      D = getElementAt(parentSF->Decls, N);
+      D = getElementAt(parentSF->getTopLevelDecls(), N);
     else if (auto parentIDC = dyn_cast<IterableDeclContext>(newDC->getAsDecl()))
       D = getElementAt(parentIDC->getMembers(), N);
     else
       llvm_unreachable("invalid DC kind for finding equivalent DC (query)");
+
+    if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
+      if (IndexStack.empty())
+        return nullptr;
+      auto accessorN = IndexStack.pop_back_val();
+      D = getElementAt(storage->getAllAccessors(), accessorN);
+    }
+
     newDC = dyn_cast<DeclContext>(D);
+    if (!newDC)
+      return nullptr;
   } while (!IndexStack.empty());
 
   assert(newDC->getContextKind() == DC->getContextKind());
@@ -143,92 +176,176 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     return false;
 
   auto &CI = *CachedCI;
+  auto *oldSF = CI.getCodeCompletionFile().get();
 
-  auto &oldState = CI.getPersistentParserState();
-  if (!oldState.hasCodeCompletionDelayedDeclState())
-    return false;
+  auto *oldState = oldSF->getDelayedParserState();
+  assert(oldState->hasCodeCompletionDelayedDeclState());
+  auto &oldInfo = oldState->getCodeCompletionDelayedDeclState();
 
   auto &SM = CI.getSourceMgr();
   if (SM.getIdentifierForBuffer(SM.getCodeCompletionBufferID()) !=
       completionBuffer->getBufferIdentifier())
     return false;
 
-  auto &oldInfo = oldState.getCodeCompletionDelayedDeclState();
-
-  // Currently, only completions within a function body is supported.
-  if (oldInfo.Kind != CodeCompletionDelayedDeclKind::FunctionBody)
-    return false;
-
-  auto newBufferID = SM.addMemBufferCopy(completionBuffer);
-  SM.setCodeCompletionPoint(newBufferID, Offset);
-
   // Parse the new buffer into temporary SourceFile.
+  SourceManager tmpSM;
+  auto tmpBufferID = tmpSM.addMemBufferCopy(completionBuffer);
+  tmpSM.setCodeCompletionPoint(tmpBufferID, Offset);
+
   LangOptions langOpts;
   langOpts.DisableParserLookup = true;
   TypeCheckerOptions typeckOpts;
   SearchPathOptions searchPathOpts;
-  DiagnosticEngine Diags(SM);
-  std::unique_ptr<ASTContext> Ctx(
-      ASTContext::get(langOpts, typeckOpts, searchPathOpts, SM, Diags));
-  registerIDERequestFunctions(Ctx->evaluator);
-  registerTypeCheckerRequestFunctions(Ctx->evaluator);
-  ModuleDecl *M = ModuleDecl::create(Identifier(), *Ctx);
-  unsigned BufferID = SM.getCodeCompletionBufferID();
-  PersistentParserState newState;
-  SourceFile *newSF =
-      new (*Ctx) SourceFile(*M, SourceFileKind::Library, BufferID,
-                            SourceFile::ImplicitModuleImportKind::None);
-  newSF->enableInterfaceHash();
-  parseIntoSourceFileFull(*newSF, BufferID, &newState);
+  DiagnosticEngine tmpDiags(tmpSM);
+  std::unique_ptr<ASTContext> tmpCtx(
+      ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
+  registerParseRequestFunctions(tmpCtx->evaluator);
+  registerIDERequestFunctions(tmpCtx->evaluator);
+  registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
+  registerSILGenRequestFunctions(tmpCtx->evaluator);
+  ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
+  SourceFile *tmpSF =
+      new (*tmpCtx) SourceFile(*tmpM, oldSF->Kind, tmpBufferID,
+                               SourceFile::ImplicitModuleImportKind::None);
+  tmpSF->enableInterfaceHash();
+  // Ensure all non-function-body tokens are hashed into the interface hash
+  tmpCtx->LangOpts.EnableTypeFingerprints = false;
+
   // Couldn't find any completion token?
-  if (!newState.hasCodeCompletionDelayedDeclState())
+  auto *newState = tmpSF->getDelayedParserState();
+  if (!newState->hasCodeCompletionDelayedDeclState())
     return false;
 
-  auto &newInfo = newState.getCodeCompletionDelayedDeclState();
+  auto &newInfo = newState->getCodeCompletionDelayedDeclState();
+  unsigned newBufferID;
 
-  // The new completion must happens in function body too.
-  if (newInfo.Kind != CodeCompletionDelayedDeclKind::FunctionBody)
-    return false;
+  switch (newInfo.Kind) {
+  case CodeCompletionDelayedDeclKind::FunctionBody: {
+    // If the interface has changed, AST must be refreshed.
+    llvm::SmallString<32> oldInterfaceHash{};
+    llvm::SmallString<32> newInterfaceHash{};
+    oldSF->getInterfaceHash(oldInterfaceHash);
+    tmpSF->getInterfaceHash(newInterfaceHash);
+    if (oldInterfaceHash != newInterfaceHash)
+      return false;
 
-  auto *oldSF = oldInfo.ParentContext->getParentSourceFile();
+    DeclContext *DC =
+        getEquivalentDeclContextFromSourceFile(newInfo.ParentContext, oldSF);
+    if (!DC)
+      return false;
 
-  // If the interface has changed, AST must be refreshed.
-  llvm::SmallString<32> oldInterfaceHash{};
-  llvm::SmallString<32> newInterfaceHash{};
-  oldSF->getInterfaceHash(oldInterfaceHash);
-  newSF->getInterfaceHash(newInterfaceHash);
-  if (oldInterfaceHash != newInterfaceHash)
-    return false;
+    // OK, we can perform fast completion for this. Update the orignal delayed
+    // decl state.
 
-  DeclContext *DC =
-      getEquivalentDeclContextFromSourceFile(newInfo.ParentContext, oldSF);
-  if (!DC)
-    return false;
+    // Fast completion keeps the buffer in memory for multiple completions.
+    // To reduce the consumption, slice the source buffer so it only holds
+    // the portion that is needed for the second pass.
+    auto startOffset = newInfo.StartOffset;
+    if (newInfo.PrevOffset != ~0u)
+      startOffset = newInfo.PrevOffset;
+    auto startLoc = tmpSM.getLocForOffset(tmpBufferID, startOffset);
+    startLoc = Lexer::getLocForStartOfLine(tmpSM, startLoc);
+    startOffset = tmpSM.getLocOffsetInBuffer(startLoc, tmpBufferID);
 
-  // OK, we can perform fast completion for this. Update the orignal delayed
-  // decl state.
+    auto endOffset = newInfo.EndOffset;
+    auto endLoc = tmpSM.getLocForOffset(tmpBufferID, endOffset);
+    endLoc = Lexer::getLocForEndOfToken(tmpSM, endLoc);
+    endOffset = tmpSM.getLocOffsetInBuffer(endLoc, tmpBufferID);
 
-  // Construct dummy scopes. We don't need to restore the original scope
-  // because they are probably not 'isResolvable()' anyway.
-  auto &SI = oldState.getScopeInfo();
-  assert(SI.getCurrentScope() == nullptr);
-  Scope Top(SI, ScopeKind::TopLevel);
-  Scope Body(SI, ScopeKind::FunctionBody);
+    newInfo.StartOffset -= startOffset;
+    newInfo.EndOffset -= startOffset;
+    if (newInfo.PrevOffset != ~0u)
+      newInfo.PrevOffset -= startOffset;
 
-  oldInfo.ParentContext = DC;
-  oldInfo.StartOffset = newInfo.StartOffset;
-  oldInfo.EndOffset = newInfo.EndOffset;
-  oldInfo.PrevOffset = newInfo.PrevOffset;
-  oldState.restoreCodeCompletionDelayedDeclState(oldInfo);
+    auto sourceText =
+        completionBuffer->getBuffer().slice(startOffset, endOffset);
+    auto newOffset = Offset - startOffset;
 
-  auto *AFD = cast<AbstractFunctionDecl>(DC);
-  if (AFD->isBodySkipped())
-    AFD->setBodyDelayed(AFD->getBodySourceRange());
+    newBufferID = SM.addMemBufferCopy(sourceText,
+                                      completionBuffer->getBufferIdentifier());
+    SM.openVirtualFile(SM.getLocForBufferStart(newBufferID),
+                       tmpSM.getDisplayNameForLoc(startLoc),
+                       tmpSM.getLineAndColumn(startLoc).first - 1);
+    SM.setCodeCompletionPoint(newBufferID, newOffset);
+
+    // Construct dummy scopes. We don't need to restore the original scope
+    // because they are probably not 'isResolvable()' anyway.
+    auto &SI = oldState->getScopeInfo();
+    assert(SI.getCurrentScope() == nullptr);
+    Scope Top(SI, ScopeKind::TopLevel);
+    Scope Body(SI, ScopeKind::FunctionBody);
+
+    oldInfo.ParentContext = DC;
+    oldInfo.StartOffset = newInfo.StartOffset;
+    oldInfo.EndOffset = newInfo.EndOffset;
+    oldInfo.PrevOffset = newInfo.PrevOffset;
+    oldState->restoreCodeCompletionDelayedDeclState(oldInfo);
+
+    auto *AFD = cast<AbstractFunctionDecl>(DC);
+    if (AFD->isBodySkipped())
+      AFD->setBodyDelayed(AFD->getBodySourceRange());
+
+    break;
+  }
+  case CodeCompletionDelayedDeclKind::Decl:
+  case CodeCompletionDelayedDeclKind::TopLevelCodeDecl: {
+    // Support decl/top-level code only if the completion happens in a single
+    // file 'main' script (e.g. playground).
+    auto *oldM = oldInfo.ParentContext->getParentModule();
+    if (oldM->getFiles().size() != 1 || oldSF->Kind != SourceFileKind::Main)
+      return false;
+
+    // Perform fast completion.
+
+    // Prepare the new buffer in the source manager.
+    auto sourceText = completionBuffer->getBuffer();
+    if (newInfo.Kind == CodeCompletionDelayedDeclKind::TopLevelCodeDecl) {
+      // We don't need the source text after the top-level code.
+      auto endOffset = newInfo.EndOffset;
+      auto endLoc = tmpSM.getLocForOffset(tmpBufferID, endOffset);
+      endLoc = Lexer::getLocForEndOfToken(tmpSM, endLoc);
+      endOffset = tmpSM.getLocOffsetInBuffer(endLoc, tmpBufferID);
+      sourceText = sourceText.slice(0, endOffset);
+    }
+    newBufferID = SM.addMemBufferCopy(sourceText,
+                                      completionBuffer->getBufferIdentifier());
+    SM.setCodeCompletionPoint(newBufferID, Offset);
+
+    // Create a new module and a source file using the current AST context.
+    auto &Ctx = oldM->getASTContext();
+    auto newM = ModuleDecl::create(oldM->getName(), Ctx);
+    CompilerInstance::ImplicitImports implicitImport(CI);
+    SourceFile *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main,
+                                             newBufferID, implicitImport.kind);
+    newM->addFile(*newSF);
+    CompilerInstance::addAdditionalInitialImportsTo(newSF, implicitImport);
+    newSF->enableInterfaceHash();
+
+    // Tell the compiler instance we've replaced the code completion file.
+    CI.setCodeCompletionFile(newSF);
+
+    // Re-process the whole file (parsing will be lazily triggered). Still
+    // re-use imported modules.
+    performImportResolution(*newSF);
+    bindExtensions(*newSF);
+
+#ifndef NDEBUG
+    const auto *reparsedState = newSF->getDelayedParserState();
+    assert(reparsedState->hasCodeCompletionDelayedDeclState() &&
+           "Didn't find completion token?");
+
+    auto &reparsedInfo = reparsedState->getCodeCompletionDelayedDeclState();
+    assert(reparsedInfo.Kind == newInfo.Kind);
+#endif
+    break;
+  }
+  }
+
   if (DiagC)
     CI.addDiagnosticConsumer(DiagC);
 
-  CI.getDiags().diagnose(SM.getLocForOffset(BufferID, newInfo.StartOffset),
-                          diag::completion_reusing_astcontext);
+  CI.getDiags().diagnose(SM.getLocForOffset(newBufferID, newInfo.StartOffset),
+                         diag::completion_reusing_astcontext);
 
   Callback(CI);
 
@@ -248,26 +365,42 @@ bool CompletionInstance::performNewOperation(
     llvm::function_ref<void(CompilerInstance &)> Callback) {
 
   auto TheInstance = std::make_unique<CompilerInstance>();
-  auto &CI = *TheInstance;
-  if (DiagC)
-    CI.addDiagnosticConsumer(DiagC);
+  {
+    auto &CI = *TheInstance;
+    if (DiagC)
+      CI.addDiagnosticConsumer(DiagC);
 
-  if (FileSystem != llvm::vfs::getRealFileSystem())
-    CI.getSourceMgr().setFileSystem(FileSystem);
+    SWIFT_DEFER {
+      if (DiagC)
+        CI.removeDiagnosticConsumer(DiagC);
+    };
 
-  Invocation.setCodeCompletionPoint(completionBuffer, Offset);
+    if (FileSystem != llvm::vfs::getRealFileSystem())
+      CI.getSourceMgr().setFileSystem(FileSystem);
 
-  if (CI.setup(Invocation)) {
-    Error = "failed to setup compiler instance";
-    return false;
+    Invocation.setCodeCompletionPoint(completionBuffer, Offset);
+
+    if (CI.setup(Invocation)) {
+      Error = "failed to setup compiler instance";
+      return false;
+    }
+    registerIDERequestFunctions(CI.getASTContext().evaluator);
+
+    CI.performParseAndResolveImportsOnly();
+
+    // If we didn't create a source file for completion, bail. This can happen
+    // if for example we fail to load the stdlib.
+    auto completionFile = CI.getCodeCompletionFile();
+    if (!completionFile)
+      return true;
+
+    // If we didn't find a code completion token, bail.
+    auto *state = completionFile.get()->getDelayedParserState();
+    if (!state->hasCodeCompletionDelayedDeclState())
+      return true;
+
+    Callback(CI);
   }
-  registerIDERequestFunctions(CI.getASTContext().evaluator);
-
-  CI.performParseAndResolveImportsOnly();
-  Callback(CI);
-
-  if (DiagC)
-    CI.removeDiagnosticConsumer(DiagC);
 
   if (ArgsHash.hasValue()) {
     CachedCI = std::move(TheInstance);
@@ -292,6 +425,13 @@ bool swift::ide::CompletionInstance::performOperation(
   // Disable to build syntax tree because code-completion skips some portion of
   // source text. That breaks an invariant of syntax tree building.
   Invocation.getLangOptions().BuildSyntaxTree = false;
+
+  // Since caching uses the interface hash, and since per type fingerprints
+  // weaken that hash, disable them here:
+  Invocation.getLangOptions().EnableTypeFingerprints = false;
+
+  // We don't need token list.
+  Invocation.getLangOptions().CollectParsedToken = false;
 
   // FIXME: ASTScopeLookup doesn't support code completion yet.
   Invocation.disableASTScopeLookup();

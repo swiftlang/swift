@@ -5,8 +5,6 @@
 
 // BCANALYZER-NOT: UnknownCode
 
-// REQUIRES: differentiable_programming
-
 import _Differentiation
 
 // Dummy `Differentiable`-conforming type.

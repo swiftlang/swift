@@ -18,8 +18,8 @@ protocol R {}
 // Make sure we use native reference counting when the existential has a Swift
 // class bound.
 
-// CHECK-objc-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkRefcounting(%T21subclass_existentials1CC*, i8**, %objc_object*, i8**)
-// CHECK-native-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkRefcounting(%T21subclass_existentials1CC*, i8**, %swift.refcounted*, i8**)
+// CHECK-objc-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkRefcounting(%T21subclass_existentials1CC* %0, i8** %1, %objc_object* %2, i8** %3)
+// CHECK-native-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkRefcounting(%T21subclass_existentials1CC* %0, i8** %1, %swift.refcounted* %2, i8** %3)
 // CHECK-NEXT: entry:
 // CHECK-objc-NEXT:   call void @swift_unknownObjectRelease(%objc_object* %2)
 // CHECK-native-NEXT: call void @swift_release(%swift.refcounted* %2)
@@ -55,7 +55,7 @@ bb0:
   return %4 : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { %T21subclass_existentials1CC*, i8** } @eraseToExistential(%T21subclass_existentials1DC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { %T21subclass_existentials1CC*, i8** } @eraseToExistential(%T21subclass_existentials1DC* %0)
 // CHECK:       [[INSTANCE:%.*]] = bitcast %T21subclass_existentials1DC* %0 to %T21subclass_existentials1CC*
 // CHECK-NEXT:  [[RESULT1:%.*]] = insertvalue { %T21subclass_existentials1CC*, i8** } undef, %T21subclass_existentials1CC* [[INSTANCE]], 0
 // CHECK-NEXT:  [[RESULT2:%.*]] = insertvalue { %T21subclass_existentials1CC*, i8** } [[RESULT1]], i8** @"$s21subclass_existentials1DCAA1PAAWP", 1
@@ -66,7 +66,7 @@ bb0(%0 : $D):
   return %2 : $C & P
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { %T21subclass_existentials1GC*, i8** } @eraseToExistentialWithGeneric(%T21subclass_existentials1EC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { %T21subclass_existentials1GC*, i8** } @eraseToExistentialWithGeneric(%T21subclass_existentials1EC* %0)
 // CHECK:       [[INSTANCE:%.*]] = bitcast %T21subclass_existentials1EC* %0 to %T21subclass_existentials1GC*
 // CHECK-NEXT:  [[RESULT1:%.*]] = insertvalue { %T21subclass_existentials1GC*, i8** } undef, %T21subclass_existentials1GC* [[INSTANCE]], 0
 // CHECK-NEXT:  [[RESULT2:%.*]] = insertvalue { %T21subclass_existentials1GC*, i8** } [[RESULT1]], i8** @"$s21subclass_existentials1ECyxGAA1PAAWP", 1
@@ -77,7 +77,7 @@ bb0(%0 : $E<τ_0_0>):
   return %2 : $G<τ_0_0> & P
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialDowncast(%T21subclass_existentials1CC*, %T21subclass_existentials1CC*, i8**)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialDowncast(%T21subclass_existentials1CC* %0, %T21subclass_existentials1CC* %1, i8** %2)
 sil [ossa] @checkExistentialDowncast : $@convention(thin) (@owned C, @owned C & P) -> () {
 bb0(%0 : @owned $C, %1 : @owned $C & P):
 
@@ -109,7 +109,7 @@ bb0(%0 : @owned $C, %1 : @owned $C & P):
   return %result : $()
 }
 
-// CHECK-LABEL: define private { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8*, %swift.type*, %swift.type*
+// CHECK-LABEL: define private { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8* %0, %swift.type* %1, %swift.type*
 // CHECK:     entry:
 // CHECK-NEXT:  [[RESULT:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %1, %swift.type* %2)
 // CHECK-NEXT:  [[IS_SUBCLASS:%.*]] = icmp ne %swift.type* [[RESULT]], null
@@ -129,7 +129,7 @@ bb0(%0 : @owned $C, %1 : @owned $C & P):
 // CHECK-NEXT:  call void @llvm.trap()
 // CHECK-NEXT:  unreachable
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialSameClassDowncast(%T21subclass_existentials1CC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialSameClassDowncast(%T21subclass_existentials1CC* %0)
 sil [ossa] @checkExistentialSameClassDowncast : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
 
@@ -150,7 +150,7 @@ bb0(%0 : @owned $C):
   return %result : $()
 }
 
-// CHECK-LABEL: define private { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8*, %swift.type*
+// CHECK-LABEL: define private { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* %0, %swift.type*
 // CHECK:     entry:
 // CHECK-NEXT:  [[WTABLE:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %1, {{.*}} %2)
 // CHECK-NEXT:  [[IS_NOT_CONFORMING:%.*]] = icmp eq i8** [[WTABLE]], null
@@ -165,7 +165,7 @@ bb0(%0 : @owned $C):
 // CHECK-NEXT:  call void @llvm.trap()
 // CHECK-NEXT:  unreachable
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialMetatypeDowncast(%swift.type*, %swift.type*, i8**)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialMetatypeDowncast(%swift.type* %0, %swift.type* %1, i8** %2)
 sil @checkExistentialMetatypeDowncast : $@convention(thin) (@owned @thick C.Type, @owned @thick (C & P).Type) -> () {
 bb0(%0 : $@thick C.Type, %1 : $@thick (C & P).Type):
 
@@ -186,7 +186,7 @@ bb0(%0 : $@thick C.Type, %1 : $@thick (C & P).Type):
   return %result : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialSameClassMetatypeDowncast(%swift.type*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialSameClassMetatypeDowncast(%swift.type* %0)
 sil @checkExistentialSameClassMetatypeDowncast : $@convention(thin) (@owned @thick C.Type) -> () {
 bb0(%0 : $@thick C.Type):
 

@@ -64,6 +64,17 @@ namespace swift {
     /// This represents the minimum deployment target.
     llvm::Triple Target;
 
+    /// \brief The second target for a zippered build
+    ///
+    /// This represents the target and minimum deployment version for the
+    /// second ('variant') target when performing a zippered build.
+    /// For example, if the target is x86_64-apple-macosx10.14 then
+    /// a target-variant of x86_64-apple-ios12.0-macabi will produce
+    /// a zippered binary that can be loaded into both macCatalyst and
+    /// macOS processes. A value of 'None' means no zippering will be
+    /// performed.
+    llvm::Optional<llvm::Triple> TargetVariant;
+
     ///
     /// Language features
     ///
@@ -97,6 +108,9 @@ namespace swift {
     /// If false, '#file' evaluates to the full path rather than a
     /// human-readable string.
     bool EnableConcisePoundFile = false;
+
+    /// Detect and automatically import modules' cross-import overlays.
+    bool EnableCrossImportOverlays = false;
 
     ///
     /// Support for alternate usage modes
@@ -173,9 +187,12 @@ namespace swift {
     
     /// Whether to dump debug info for request evaluator cycles.
     bool DebugDumpCycles = false;
-    
+
+    /// Whether to build a request dependency graph for debugging.
+    bool BuildRequestDependencyGraph = false;
+
     /// Enable SIL type lowering
-    bool EnableSubstSILFunctionTypesForFunctionValues = false;
+    bool EnableSubstSILFunctionTypesForFunctionValues = true;
 
     /// Whether to diagnose an ephemeral to non-ephemeral conversion as an
     /// error.
@@ -279,13 +296,28 @@ namespace swift {
     /// incrementals parsing.
     bool BuildSyntaxTree = false;
 
+    /// Whether parsing is occurring for creation of syntax tree only, and no typechecking will occur after
+    /// parsing e.g. when parsing for SwiftSyntax. This is intended to affect parsing, e.g. disable
+    /// unnecessary name lookups that are not useful for pure syntactic parsing.
+    bool ParseForSyntaxTreeOnly = false;
+
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
-    /// Scaffolding to permit experimentation with finer-grained dependencies
-    /// and faster rebuilds.
-    bool EnableFineGrainedDependencies = false;
-    
+    /// Emit the newer, finer-grained swiftdeps file. Eventually will support
+    /// faster rebuilds.
+    bool EnableFineGrainedDependencies = true;
+
+    /// Instead of hashing tokens inside of NominalType and ExtensionBodies into
+    /// the interface hash, hash them into per-iterable-decl-context
+    /// fingerprints. Fine-grained dependency types won't dirty every provides
+    /// in a file when the user adds a member to, e.g., a struct.
+    bool EnableTypeFingerprints = true;
+
+    /// When using fine-grained dependencies, emit dot files for every swiftdeps
+    /// file.
+    bool EmitFineGrainedDependencySourcefileDotFiles = false;
+
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true.
@@ -294,6 +326,16 @@ namespace swift {
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
     bool EnableExperimentalDifferentiableProgramming = false;
+
+    /// Whether to enable experimental `AdditiveArithmetic` derived
+    /// conformances.
+    bool EnableExperimentalAdditiveArithmeticDerivedConformances = false;
+
+    /// Enable verification when every SubstitutionMap is constructed.
+    bool VerifyAllSubstitutionMaps = false;
+
+    /// If set to \c false, fall back to the legacy manual reference name tracking code.
+    bool EnableRequestBasedIncrementalDependencies = true;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -321,7 +363,7 @@ namespace swift {
     /// Sets an implicit platform condition.
     void addPlatformConditionValue(PlatformConditionKind Kind, StringRef Value) {
       assert(!Value.empty());
-      PlatformConditionValues.emplace_back(Kind, Value);
+      PlatformConditionValues.emplace_back(Kind, Value.str());
     }
 
     /// Removes all values added with addPlatformConditionValue.
@@ -339,7 +381,7 @@ namespace swift {
     /// compiler flag.
     void addCustomConditionalCompilationFlag(StringRef Name) {
       assert(!Name.empty());
-      CustomConditionalCompilationFlags.push_back(Name);
+      CustomConditionalCompilationFlags.push_back(Name.str());
     }
 
     /// Determines if a given conditional compilation flag has been set.
@@ -363,39 +405,13 @@ namespace swift {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the class metadata update callback mechanism:
-    //
-    // - macOS 10.14.4
-    // - iOS 12.2
-    // - tvOS 12.2
-    // - watchOS 5.2
-    bool doesTargetSupportObjCMetadataUpdateCallback() const;
-
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the objc_getClass() hook:
-    //
-    // - macOS 10.14.4
-    // - iOS 12.2
-    // - tvOS 12.2
-    // - watchOS 5.2
-    bool doesTargetSupportObjCGetClassHook() const;
-
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the objc_loadClassref() entry point:
-    //
-    // - macOS 10.15
-    // - iOS 13
-    // - tvOS 13
-    // - watchOS 6
-    bool doesTargetSupportObjCClassStubs() const;
-
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
     /// \param suggestedKind Populated with suggested replacement platform condition
     /// \param suggestedValues Populated with suggested replacement values
-    /// if a match is not found.
+    /// if a match is not found, or if the value has been deprecated
+    /// in favor of a newer one.
     static bool checkPlatformConditionSupported(
       PlatformConditionKind Kind, StringRef Value,
       PlatformConditionKind &suggestedKind,
@@ -411,7 +427,7 @@ namespace swift {
     }
 
   private:
-    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 6>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };
@@ -511,6 +527,7 @@ namespace swift {
     /// Enable constraint solver support for experimental
     ///        operator protocol designator feature.
     bool SolverEnableOperatorDesignatedTypes = false;
+    
   };
 } // end namespace swift
 

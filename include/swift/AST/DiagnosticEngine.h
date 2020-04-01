@@ -346,7 +346,7 @@ namespace swift {
     std::vector<Diagnostic> ChildNotes;
     SourceLoc Loc;
     bool IsChildNote = false;
-    const Decl *Decl = nullptr;
+    const swift::Decl *Decl = nullptr;
 
     friend DiagnosticEngine;
 
@@ -676,9 +676,6 @@ namespace swift {
     /// Print diagnostic names after their messages
     bool printDiagnosticNames = false;
 
-    /// Use descriptive diagnostic style when available.
-    bool useDescriptiveDiagnostics = false;
-
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
 
@@ -705,6 +702,11 @@ namespace swift {
       return state.getShowDiagnosticsAfterFatalError();
     }
 
+    void flushConsumers() {
+      for (auto consumer : Consumers)
+        consumer->flush();
+    }
+
     /// Whether to skip emitting warnings
     void setSuppressWarnings(bool val) { state.setSuppressWarnings(val); }
     bool getSuppressWarnings() const {
@@ -723,13 +725,6 @@ namespace swift {
     }
     bool getPrintDiagnosticNames() const {
       return printDiagnosticNames;
-    }
-
-    void setUseDescriptiveDiagnostics(bool val) {
-       useDescriptiveDiagnostics = val;
-    }
-    bool getUseDescriptiveDiagnostics() const {
-      return useDescriptiveDiagnostics;
     }
 
     void setDiagnosticDocumentationPath(std::string path) {

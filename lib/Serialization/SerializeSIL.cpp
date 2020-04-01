@@ -183,6 +183,12 @@ namespace {
     /// Holds the list of Properties.
     std::vector<BitOffset> PropertyOffset;
 
+    /// Maps differentiability witness identifier to an ID.
+    Table DifferentiabilityWitnessList;
+    /// Holds the list of SIL differentiability witnesses.
+    std::vector<BitOffset> DifferentiabilityWitnessOffset;
+    uint32_t /*DeclID*/ NextDifferentiabilityWitnessID = 1;
+
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock *, unsigned> BasicBlockMap;
 
@@ -192,6 +198,10 @@ namespace {
 
     /// Global variables that we've emitted a reference to.
     llvm::DenseSet<const SILGlobalVariable *> GlobalsToEmit;
+
+    /// Referenced differentiability witnesses that need to be emitted.
+    llvm::DenseSet<const SILDifferentiabilityWitness *>
+        DifferentiabilityWitnessesToEmit;
 
     /// Additional functions we might need to serialize.
     llvm::SmallVector<const SILFunction *, 16> Worklist;
@@ -232,6 +242,8 @@ namespace {
     void writeSILWitnessTable(const SILWitnessTable &wt);
     void writeSILWitnessTableEntry(const SILWitnessTable::Entry &entry);
     void writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt);
+    void
+    writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw);
     void writeSILProperty(const SILProperty &prop);
 
     void writeSILBlock(const SILModule *SILMod);
@@ -422,7 +434,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
-      (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
+      (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
       F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
@@ -525,7 +537,6 @@ static void handleSILDeclRef(Serializer &S, const SILDeclRef &Ref,
                              SmallVectorImpl<ValueID> &ListOfValues) {
   ListOfValues.push_back(S.addDeclRef(Ref.getDecl()));
   ListOfValues.push_back((unsigned)Ref.kind);
-  ListOfValues.push_back(Ref.isCurried);
   ListOfValues.push_back(Ref.isForeign);
 }
 
@@ -2141,6 +2152,86 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     break;
   }
+  case SILInstructionKind::DifferentiableFunctionInst: {
+    auto *dfi = cast<DifferentiableFunctionInst>(&SI);
+    SmallVector<ValueID, 4> trailingInfo;
+    auto *paramIndices = dfi->getParameterIndices();
+    for (unsigned idx : paramIndices->getIndices())
+      trailingInfo.push_back(idx);
+    for (auto &op : dfi->getAllOperands()) {
+      auto val = op.get();
+      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
+      trailingInfo.push_back((unsigned)val->getType().getCategory());
+      trailingInfo.push_back(addValueRef(val));
+    }
+    SILInstDifferentiableFunctionLayout::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiableFunctionLayout::Code],
+        paramIndices->getCapacity(), dfi->hasDerivativeFunctions(),
+        trailingInfo);
+    break;
+  }
+  case SILInstructionKind::LinearFunctionInst: {
+    auto *lfi = cast<LinearFunctionInst>(&SI);
+    SmallVector<ValueID, 4> trailingInfo;
+    auto *paramIndices = lfi->getParameterIndices();
+    for (unsigned idx : paramIndices->getIndices())
+      trailingInfo.push_back(idx);
+    for (auto &op : lfi->getAllOperands()) {
+      auto val = op.get();
+      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
+      trailingInfo.push_back((unsigned)val->getType().getCategory());
+      trailingInfo.push_back(addValueRef(val));
+    }
+    SILInstLinearFunctionLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstLinearFunctionLayout::Code],
+        paramIndices->getCapacity(), lfi->hasTransposeFunction(),
+        trailingInfo);
+    break;
+  }
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto *dfei = cast<DifferentiableFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(dfei->getOperand());
+    auto operandType = dfei->getOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto rawExtractee = (unsigned)dfei->getExtractee();
+    SILInstDifferentiableFunctionExtractLayout::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
+        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
+        rawExtractee, (unsigned)dfei->hasExplicitExtracteeType());
+    break;
+  }
+  case SILInstructionKind::LinearFunctionExtractInst: {
+    auto *lfei = cast<LinearFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(lfei->getFunctionOperand());
+    auto operandType = lfei->getFunctionOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto rawExtractee = (unsigned)lfei->getExtractee();
+    SILInstLinearFunctionExtractLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstLinearFunctionExtractLayout::Code],
+        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
+        rawExtractee);
+    break;
+  }
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
+    auto *witness = dwfi->getWitness();
+    DifferentiabilityWitnessesToEmit.insert(witness);
+    Mangle::ASTMangler mangler;
+    auto mangledKey =
+        mangler.mangleSILDifferentiabilityWitnessKey(witness->getKey());
+    auto rawWitnessKind = (unsigned)dwfi->getWitnessKind();
+    // We only store the type when the instruction has an explicit type.
+    bool hasExplicitFnTy = dwfi->getHasExplicitFunctionType();
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneOperandLayout::Code],
+        (unsigned)dwfi->getKind(), rawWitnessKind,
+        hasExplicitFnTy ? S.addTypeRef(dwfi->getType().getASTType()) : TypeID(),
+        hasExplicitFnTy ? (unsigned)dwfi->getType().getCategory() : 0,
+        S.addUniquedStringRef(mangledKey));
+    break;
+  }
   }
   // Non-void values get registered in the value table.
   for (auto result : SI.getResults()) {
@@ -2159,9 +2250,10 @@ static void writeIndexTable(Serializer &S,
           kind == sil_index_block::SIL_VTABLE_NAMES ||
           kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
           kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
-          kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES) &&
-         "SIL function table, global, vtable and (default) witness table "
-         "are supported");
+          kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
+          kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES) &&
+         "SIL function table, global, vtable, (default) witness table, and "
+         "differentiability witness table are supported");
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
   {
@@ -2215,6 +2307,15 @@ void SILSerializer::writeIndexTables() {
     Offset.emit(ScratchRecord,
                 sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
                 DefaultWitnessTableOffset);
+  }
+
+  if (!DifferentiabilityWitnessList.empty()) {
+    writeIndexTable(S, List,
+                    sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES,
+                    DifferentiabilityWitnessList);
+    Offset.emit(ScratchRecord,
+                sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
+                DifferentiabilityWitnessOffset);
   }
 
   if (!PropertyOffset.empty()) {
@@ -2413,6 +2514,52 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
   }
 }
 
+void SILSerializer::writeSILDifferentiabilityWitness(
+    const SILDifferentiabilityWitness &dw) {
+  Mangle::ASTMangler mangler;
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(dw.getKey());
+  size_t nameLength = mangledKey.size();
+  char *stringStorage =
+      static_cast<char *>(StringTable.Allocate(nameLength, 1));
+  std::memcpy(stringStorage, mangledKey.data(), nameLength);
+  DifferentiabilityWitnessList[StringRef(stringStorage, nameLength)] =
+      NextDifferentiabilityWitnessID++;
+  DifferentiabilityWitnessOffset.push_back(Out.GetCurrentBitNo());
+
+  auto *original = dw.getOriginalFunction();
+  IdentifierID jvpID = 0;
+  IdentifierID vjpID = 0;
+  if (auto *jvp = dw.getJVP())
+    jvpID = addSILFunctionRef(jvp);
+  if (auto *vjp = dw.getVJP())
+    vjpID = addSILFunctionRef(vjp);
+  SmallVector<unsigned, 8> parameterAndResultIndices(
+      dw.getParameterIndices()->begin(), dw.getParameterIndices()->end());
+  parameterAndResultIndices.append(dw.getResultIndices()->begin(),
+                                   dw.getResultIndices()->end());
+  auto originalFnType = original->getLoweredFunctionType();
+  assert(originalFnType->getNumParameters() ==
+             dw.getParameterIndices()->getCapacity() &&
+         "Original function parameter count should match differentiability "
+         "witness parameter indices capacity");
+  unsigned numInoutParameters = llvm::count_if(
+      originalFnType->getParameters(), [](SILParameterInfo paramInfo) {
+        return paramInfo.isIndirectMutating();
+      });
+  assert(originalFnType->getNumResults() + numInoutParameters ==
+             dw.getResultIndices()->getCapacity() &&
+         "Original function result count should match differentiability "
+         "witness result indices capacity");
+
+  DifferentiabilityWitnessLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[DifferentiabilityWitnessLayout::Code],
+      addSILFunctionRef(original), toStableSILLinkage(dw.getLinkage()),
+      dw.isDeclaration(), dw.isSerialized(),
+      S.addGenericSignatureRef(dw.getDerivativeGenericSignature()), jvpID,
+      vjpID, dw.getParameterIndices()->getNumIndices(),
+      dw.getResultIndices()->getNumIndices(), parameterAndResultIndices);
+}
+
 /// Helper function for whether to emit a function body.
 bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
                                            bool isReference) {
@@ -2460,6 +2607,12 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstNoOperandLayout>();
   registerSILAbbr<SILOneOperandLayout>();
   registerSILAbbr<SILTwoOperandsLayout>();
+  registerSILAbbr<SILInstWitnessMethodLayout>();
+  registerSILAbbr<SILSpecializeAttrLayout>();
+  registerSILAbbr<SILInstDifferentiableFunctionLayout>();
+  registerSILAbbr<SILInstLinearFunctionLayout>();
+  registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
+  registerSILAbbr<SILInstLinearFunctionExtractLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();
@@ -2473,9 +2626,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DefaultWitnessTableLayout>();
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
   registerSILAbbr<PropertyLayout>();
-
-  registerSILAbbr<SILInstWitnessMethodLayout>();
-  registerSILAbbr<SILSpecializeAttrLayout>();
+  registerSILAbbr<DifferentiabilityWitnessLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.
@@ -2549,6 +2700,24 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     addMandatorySILFunction(&F, emitDeclarationsForOnoneSupport);
     processSILFunctionWorklist();
   }
+
+  // Write out differentiability witnesses.
+  // Note: this must be done after visiting SIL functions above so that
+  // differentiability witness references (`differentiability_witness_function`
+  // instructions) have been tracked.
+  for (const auto &diffWitness : SILMod->getDifferentiabilityWitnessList()) {
+    // TODO(TF-893): Consider checking
+    // `SILMod->shouldSerializeEntitiesAssociatedWithDeclContext` on the JVP/VJP
+    // functions.
+    if ((ShouldSerializeAll || diffWitness.isSerialized()))
+      DifferentiabilityWitnessesToEmit.insert(&diffWitness);
+  }
+  for (auto *diffWitness : DifferentiabilityWitnessesToEmit)
+    writeSILDifferentiabilityWitness(*diffWitness);
+  // Process SIL functions referenced by differentiability witnesses.
+  // Note: this is necessary despite processing `FuncsToEmit` below because
+  // `Worklist` is processed separately.
+  processSILFunctionWorklist();
 
   // Now write function declarations for every function we've
   // emitted a reference to without emitting a function body for.

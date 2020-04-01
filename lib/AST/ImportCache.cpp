@@ -57,7 +57,7 @@ void ImportSet::Profile(
   for (auto import : topLevelImports) {
     ID.AddInteger(import.first.size());
     for (auto accessPathElt : import.first) {
-      ID.AddPointer(accessPathElt.first.getAsOpaquePointer());
+      ID.AddPointer(accessPathElt.Item.getAsOpaquePointer());
     }
     ID.AddPointer(import.second);
   }
@@ -179,6 +179,7 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
     ModuleDecl::ImportFilter importFilter;
     importFilter |= ModuleDecl::ImportFilterKind::Private;
     importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    importFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
     file->getImportedModules(imports, importFilter);
   }
 
@@ -263,6 +264,7 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
     ModuleDecl::ImportFilter importFilter;
     importFilter |= ModuleDecl::ImportFilterKind::Private;
     importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    importFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
     file->getImportedModules(stack, importFilter);
   }
 

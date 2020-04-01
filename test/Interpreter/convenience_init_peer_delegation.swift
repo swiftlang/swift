@@ -11,6 +11,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// XFAIL: CPU=arm64e
 
 import Darwin
 

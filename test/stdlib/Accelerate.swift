@@ -529,51 +529,51 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         expectTrue(elementsAlmostEqual(result, legacyResult))
         expectTrue(elementsAlmostEqual(result, returnedResult))
     }
-    
-    //===----------------------------------------------------------------------===//
-    //
-    //  Array almost equal.
-    //
-    //===----------------------------------------------------------------------===//
-    
-    func elementsAlmostEqual<T: FloatingPoint>(_ lhs: [T], _ rhs: [T]) -> Bool {
-        var returnValue = true
-        zip(lhs, rhs).forEach {
-            if !isAlmostEqual($0.0, $0.1) {
-                returnValue = false
-                return
-            }
-        }
-        return returnValue
+}
+
+//===----------------------------------------------------------------------===//
+//
+//  Array almost equal.
+//
+//===----------------------------------------------------------------------===//
+
+func elementsAlmostEqual<T: FloatingPoint>(_ lhs: [T], _ rhs: [T]) -> Bool {
+  var returnValue = true
+  zip(lhs, rhs).forEach {
+    if !isAlmostEqual($0.0, $0.1) {
+      returnValue = false
+      return
     }
-    
-    func isAlmostEqual<T: FloatingPoint>(_ lhs: T,
-                                         _ rhs: T,
-                                         tolerance: T = T.ulpOfOne.squareRoot()) -> Bool {
-        assert(tolerance >= .ulpOfOne && tolerance < 1, "tolerance should be in [.ulpOfOne, 1).")
-        guard lhs.isFinite && rhs.isFinite else {
-            return rescaledAlmostEqual(lhs, rhs, tolerance: tolerance)
-        }
-        let scale = max(abs(lhs), abs(rhs), .leastNormalMagnitude)
-        return abs(lhs - rhs) < scale*tolerance
-    }
-    
-    func rescaledAlmostEqual<T: FloatingPoint>(_ lhs: T,
-                                               _ rhs: T,
-                                               tolerance: T) -> Bool {
-        if lhs.isNaN || rhs.isNaN { return false }
-        if lhs.isInfinite {
-            if rhs.isInfinite { return lhs == rhs }
-            let scaledLhs = T(sign: lhs.sign,
-                              exponent: T.greatestFiniteMagnitude.exponent,
-                              significand: 1)
-            let scaledRhs = T(sign: .plus,
-                              exponent: -1,
-                              significand: rhs)
-            return isAlmostEqual(scaledLhs, scaledRhs, tolerance: tolerance)
-        }
-        return rescaledAlmostEqual(rhs, lhs, tolerance: tolerance)
-    }
+  }
+  return returnValue
+}
+
+func isAlmostEqual<T: FloatingPoint>(_ lhs: T,
+  _ rhs: T,
+  tolerance: T = T.ulpOfOne.squareRoot()) -> Bool {
+  assert(tolerance >= .ulpOfOne && tolerance < 1, "tolerance should be in [.ulpOfOne, 1).")
+  guard lhs.isFinite && rhs.isFinite else {
+    return rescaledAlmostEqual(lhs, rhs, tolerance: tolerance)
+  }
+  let scale = max(abs(lhs), abs(rhs), .leastNormalMagnitude)
+  return abs(lhs - rhs) < scale*tolerance
+}
+
+func rescaledAlmostEqual<T: FloatingPoint>(_ lhs: T,
+  _ rhs: T,
+  tolerance: T) -> Bool {
+  if lhs.isNaN || rhs.isNaN { return false }
+  if lhs.isInfinite {
+    if rhs.isInfinite { return lhs == rhs }
+    let scaledLhs = T(sign: lhs.sign,
+      exponent: T.greatestFiniteMagnitude.exponent,
+      significand: 1)
+    let scaledRhs = T(sign: .plus,
+      exponent: -1,
+      significand: rhs)
+    return isAlmostEqual(scaledLhs, scaledRhs, tolerance: tolerance)
+  }
+  return rescaledAlmostEqual(rhs, lhs, tolerance: tolerance)
 }
 
 runAllTests()

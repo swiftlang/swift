@@ -1,5 +1,8 @@
 # Toolchain-only build products
 
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake/modules)
+include(AddSwiftStdlib)
+
 set(CXX_COMPILE_FLAGS)
 set(CXX_LINK_FLAGS)
 

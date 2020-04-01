@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,41 +10,47 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This file defines extensions for interpolating strings into a OSLogMesage.
+// This file defines extensions for interpolating strings into an OSLogMesage.
 // It defines `appendInterpolation` function for String type. It also defines
 // extensions for serializing strings into the argument buffer passed to
 // os_log ABIs. Note that os_log requires passing a stable pointer to an
 // interpolated string. The SPI: `_convertConstStringToUTF8PointerArgument`
 // is used to construct a stable pointer to a (dynamic) string.
 //
-// The `appendInterpolation` function defined in this file accept formatting
-// and privacy options along with the interpolated expression as shown below:
+// The `appendInterpolation` function defined in this file accept privacy and
+// alignment options along with the interpolated expression as shown below:
 //
-//         "\(x, privacy: .public\)"
-//
-// TODO: support formatting options such as left and right padding
-// (e.g. %10s, %-10s).
+//  1.  "\(x, privacy: .private, align: .right\)"
+//  2.  "\(x, align: .right(columns: 10)\)"
 
 extension OSLogInterpolation {
 
   /// Define interpolation for expressions of type String.
   /// - Parameters:
   ///  - argumentString: the interpolated expression of type String, which is autoclosured.
-  ///  - privacy: a privacy qualifier which is either private or public. Default is private.
-  ///  TODO: create a specifier to denote auto-inferred privacy level and make it default.
+  ///  - align: left or right alignment with the minimum number of columns as
+  ///    defined by the type `OSLogStringAlignment`.
+  ///  - privacy: a privacy qualifier which is either private or public.
+  ///  It is auto-inferred by default.
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
     _ argumentString: @autoclosure @escaping () -> String,
-    privacy: Privacy = .private
+    align: OSLogStringAlignment = .none,
+    privacy: OSLogPrivacy = .auto
   ) {
     guard argumentCount < maxOSLogArgumentCount else { return }
 
-    let isPrivateArgument = isPrivate(privacy)
-    formatString += getStringFormatSpecifier(isPrivateArgument)
-    addStringHeaders(isPrivateArgument)
+    formatString += getStringFormatSpecifier(align, privacy)
 
+    // If minimum column width is specified, append this value first. Note that the
+    // format specifier would use a '*' for width e.g. %*s.
+    if let minColumns = align.minimumColumnWidth {
+      appendPrecisionArgument(minColumns)
+    }
+
+    addStringHeaders(privacy)
     arguments.append(argumentString)
     argumentCount += 1
   }
@@ -54,9 +60,9 @@ extension OSLogInterpolation {
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
-  internal mutating func addStringHeaders(_ isPrivate: Bool) {
+  internal mutating func addStringHeaders(_ privacy: OSLogPrivacy) {
     // Append argument header.
-    let header = getArgumentHeader(isPrivate: isPrivate, type: .string)
+    let header = getArgumentHeader(privacy: privacy, type: .string)
     arguments.append(header)
 
     // Append number of bytes needed to serialize the argument.
@@ -68,7 +74,7 @@ extension OSLogInterpolation {
     // two bytes needed for the headers.
     totalBytesForSerializingArguments += byteCount + 2
 
-    preamble = getUpdatedPreamble(isPrivate: isPrivate, isScalar: false)
+    preamble = getUpdatedPreamble(privacy: privacy, isScalar: false)
   }
 
   /// Construct an os_log format specifier from the given parameters.
@@ -78,9 +84,27 @@ extension OSLogInterpolation {
   @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
-  internal func getStringFormatSpecifier(_ isPrivate: Bool) -> String {
-    // TODO: create a specifier to denote auto-inferred privacy.
-    return isPrivate ? "%{private}s" : "%{public}s"
+  internal func getStringFormatSpecifier(
+    _ align: OSLogStringAlignment,
+    _ privacy: OSLogPrivacy
+  ) -> String {
+    var specifier = "%"
+    switch privacy {
+    case .private:
+      specifier += "{private}"
+    case .public:
+      specifier += "{public}"
+    default:
+      break
+    }
+    if case .start = align.anchor {
+      specifier += "-"
+    }
+    if let _ = align.minimumColumnWidth {
+      specifier += "*"
+    }
+    specifier += "s"
+    return specifier
   }
 }
 
@@ -101,10 +125,10 @@ extension OSLogArguments {
 /// bitWidth property, and since MemoryLayout is not supported by the constant
 /// evaluator, this function returns the byte size of Int, which must equal the
 /// word length of the target architecture and hence the pointer size.
-/// This function must be constant evaluable.
-@_semantics("constant_evaluable")
-@inlinable
-@_optimize(none)
+/// This function must be constant evaluable. Note that it is marked transparent
+/// instead of @inline(__always) as it is used in optimize(none) functions.
+@_transparent
+@usableFromInline
 internal func pointerSizeInBytes() -> Int {
   return Int.bitWidth &>> logBitsPerByte
 }

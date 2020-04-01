@@ -126,6 +126,31 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   //                                 Decls
   //===--------------------------------------------------------------------===//
 
+  bool visitGenericParamListIfNeeded(GenericContext *GC) {
+    // Must check this first in case extensions have not been bound yet
+    if (Walker.shouldWalkIntoGenericParams()) {
+      if (auto *params = GC->getGenericParams()) {
+        visitGenericParamList(params);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  bool visitTrailingRequirements(GenericContext *GC) {
+    if (const auto Where = GC->getTrailingWhereClause()) {
+      for (auto &Req: Where->getRequirements())
+        if (doIt(Req))
+          return true;
+    } else if (!isa<ExtensionDecl>(GC)) {
+      if (const auto GP = GC->getGenericParams())
+        for (auto Req: GP->getTrailingRequirements())
+          if (doIt(Req))
+            return true;
+    }
+    return false;
+  }
+
   bool visitImportDecl(ImportDecl *ID) {
     return false;
   }
@@ -138,12 +163,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (doIt(Inherit))
         return true;
     }
-    if (auto *Where = ED->getTrailingWhereClause()) {
-      for(auto &Req: Where->getRequirements()) {
-        if (doIt(Req))
-          return true;
-      }
-    }
+    if (visitTrailingRequirements(ED))
+      return true;
+
     for (Decl *M : ED->getMembers()) {
       if (doIt(M))
         return true;
@@ -223,22 +245,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    if (TAD->getGenericParams() &&
-        Walker.shouldWalkIntoGenericParams()) {
-
-      if (visitGenericParamList(TAD->getGenericParams()))
-        return true;
-    }
+    bool WalkGenerics = visitGenericParamListIfNeeded(TAD);
 
     if (auto typerepr = TAD->getUnderlyingTypeRepr())
       if (doIt(typerepr))
         return true;
-    return false;
+
+    return WalkGenerics && visitTrailingRequirements(TAD);
   }
   
   bool visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    if (OTD->getGenericParams() &&
-        Walker.shouldWalkIntoGenericParams()) {
+    if (Walker.shouldWalkIntoGenericParams() && OTD->getGenericParams()) {
       if (visitGenericParamList(OTD->getGenericParams()))
         return true;
     }
@@ -250,8 +267,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (doIt(Inherit))
         return true;
     }
-    
-    if (auto *ATD = dyn_cast<AssociatedTypeDecl>(TPD)) {
+
+    if (const auto ATD = dyn_cast<AssociatedTypeDecl>(TPD)) {
+      if (const auto DefaultTy = ATD->getDefaultDefinitionTypeRepr())
+        if (doIt(DefaultTy))
+          return true;
+
       if (auto *WhereClause = ATD->getTrailingWhereClause()) {
         for (auto &Req: WhereClause->getRequirements()) {
           if (doIt(Req))
@@ -272,21 +293,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     // Visit requirements
-    if (auto *Protocol = dyn_cast<ProtocolDecl>(NTD)) {
-      if (auto *WhereClause = Protocol->getTrailingWhereClause()) {
-        for (auto &Req: WhereClause->getRequirements()) {
-          if (doIt(Req))
-            return true;
-        }
-      }
-    }
-    if (WalkGenerics) {
-      for (auto Req: NTD->getGenericParams()->getTrailingRequirements()) {
-        if (doIt(Req))
-          return true;
-      }
-    }
-    
+    if (WalkGenerics && visitTrailingRequirements(NTD))
+      return true;
+
     for (Decl *Member : NTD->getMembers()) {
       if (doIt(Member))
         return true;
@@ -322,6 +331,31 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitParamDecl(ParamDecl *P) {
+    // Don't walk into the type if the decl is implicit, or if the type is
+    // implicit.
+    if (!P->isImplicit()) {
+      if (auto *repr = P->getTypeRepr()) {
+        if (doIt(repr)) {
+          return true;
+        }
+      }
+    }
+    if (auto *E = P->getStructuralDefaultExpr()) {
+      auto res = doIt(E);
+      if (!res) return true;
+      P->setDefaultExpr(res, /*isTypeChecked*/ (bool)res->getType());
+    }
+
+    if (!Walker.shouldWalkAccessorsTheOldWay()) {
+      for (auto *AD : P->getAllAccessors())
+        if (doIt(AD))
+          return true;
+    }
+
+    return false;
+  }
+
   bool visitSubscriptDecl(SubscriptDecl *SD) {
     bool WalkGenerics = visitGenericParamListIfNeeded(SD);
 
@@ -329,13 +363,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (doIt(SD->getElementTypeLoc()))
       return true;
 
-    if (WalkGenerics) {
-      // Visit generic requirements
-      for (auto Req : SD->getGenericParams()->getTrailingRequirements()) {
-        if (doIt(Req))
-          return true;
-      }
-    }
+   // Visit trailing requirements
+    if (WalkGenerics && visitTrailingRequirements(SD))
+      return true;
 
     if (!Walker.shouldWalkAccessorsTheOldWay()) {
       for (auto *AD : SD->getAllAccessors())
@@ -368,13 +398,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         if (doIt(FD->getBodyResultTypeLoc()))
           return true;
 
-    if (WalkGenerics) {
-      // Visit trailing requirments
-      for (auto Req : AFD->getGenericParams()->getTrailingRequirements()) {
-        if (doIt(Req))
-          return true;
-      }
-    }
+    // Visit trailing requirements
+    if (WalkGenerics && visitTrailingRequirements(AFD))
+      return true;
 
     if (AFD->getBody(/*canSynthesize=*/false)) {
       AbstractFunctionDecl::BodyKind PreservedKind = AFD->getBodyKind();
@@ -402,11 +428,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (auto *rawLiteralExpr = ED->getRawValueUnchecked()) {
-      Expr *newRawExpr = doIt(rawLiteralExpr);
-      if (auto newRawLiteralExpr = dyn_cast<LiteralExpr>(newRawExpr))
-        ED->setRawValueExpr(newRawLiteralExpr);
-      else
+      if (Expr *newRawExpr = doIt(rawLiteralExpr)) {
+        auto *newLiteralRawExpr = cast<LiteralExpr>(newRawExpr);
+        ED->setRawValueExpr(newLiteralRawExpr);
+      } else {
         return true;
+      }
     }
     return false;
   }
@@ -778,7 +805,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return nullptr;
     }
 
-    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+    if (!Walker.shouldWalkIntoNonSingleExpressionClosure(expr))
       return expr;
 
     // Handle other closures.
@@ -1108,7 +1135,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
 
-    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+    if (!Walker.shouldWalkIntoTapExpression())
       return E;
 
     if (auto oldBody = E->getBody()) {
@@ -1144,22 +1171,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       // Walk each parameter's decl and typeloc and default value.
       if (doIt(P))
         return true;
-
-      // Don't walk into the type if the decl is implicit, or if the type is
-      // implicit.
-      if (!P->isImplicit()) {
-        if (auto *repr = P->getTypeRepr()) {
-          if (doIt(repr)) {
-            return true;
-          }
-        }
-      }
-
-      if (auto *E = P->getStructuralDefaultExpr()) {
-        auto res = doIt(E);
-        if (!res) return true;
-        P->setDefaultExpr(res, /*isTypeChecked*/ (bool)res->getType());
-      }
     }
 
     return Walker.walkToParameterListPost(PL);
@@ -1323,18 +1334,6 @@ public:
       if (doIt(Req.getFirstTypeLoc()))
         return true;
       break;
-    }
-    return false;
-  }
-
-private:
-  bool visitGenericParamListIfNeeded(GenericContext *gc) {
-    // Must check this first in case extensions have not been bound yet
-    if (Walker.shouldWalkIntoGenericParams()) {
-      if (auto *params = gc->getGenericParams()) {
-        visitGenericParamList(params);
-        return true;
-      }
     }
     return false;
   }

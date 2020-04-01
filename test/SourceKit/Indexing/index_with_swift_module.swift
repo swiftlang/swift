@@ -4,7 +4,7 @@
 // RUN: %sourcekitd-test -req=index %s -- %s -I %t | %FileCheck %s
 
 // RUN: %sourcekitd-test -req=index %t/test_module.swiftmodule | %sed_clean > %t.response
-// RUN: diff -u %S/Inputs/test_module.index.response %t.response
+// RUN: diff --strip-trailing-cr -u %S/Inputs/test_module.index.response %t.response
 
 import test_module
 

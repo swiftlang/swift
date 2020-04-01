@@ -15,6 +15,10 @@
 public class Base<In, Out> {
 // CHECK-NEXT: public init(x: @escaping (In) -> Out)
   public init(x: @escaping (In) -> Out) {}
+
+// CHECK-NEXT: public init<A>(_: A, _: A)
+  public init<A>(_: A, _: A) {}
+
 // CHECK: }
 }
 
@@ -22,6 +26,7 @@ public class Base<In, Out> {
 public class Derived<T> : Base<T, T> {
 // CHECK-NEXT: {{(@objc )?}}deinit
 // CHECK-NEXT: override public init(x: @escaping (T) -> T)
+// CHECK-NEXT: override public init<A>(_ argument: A, _ argument: A)
 // CHECK-NEXT: }
 }
 

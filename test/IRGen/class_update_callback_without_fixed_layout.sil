@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-library-evolution -O %s -target %target-pre-stable-abi-triple
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: CPU=arm64e
 
 // With the old deployment target, these classes use the 'singleton' metadata
 // initialization pattern. The class is not statically visible to Objective-C,
@@ -59,7 +60,7 @@ sil_vtable SubclassOfClassWithResilientField {}
 // CHECK-NEW-SAME: i32 192,
 
 // -- the update callback
-// CHECK-NEW-SAME: @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMU"
+// CHECK-NEW-SAME: @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMU{{(\.ptrauth)?}}"
 
 // CHECK-SAME: }, section "__DATA, __objc_const"
 
@@ -185,8 +186,8 @@ bb0:
 // Accessing a field whose offset depends on resilient types should
 // use the field offset global.
 
-// CHECK-32-LABEL: define swiftcc {{(dllexport )?}}{{(protected )?}}i32 @accessClassWithResilientField(%T42class_update_callback_without_fixed_layout23ClassWithResilientFieldC*)
-// CHECK-64-LABEL: define swiftcc {{(dllexport )?}}{{(protected )?}}i64 @accessClassWithResilientField(%T42class_update_callback_without_fixed_layout23ClassWithResilientFieldC*)
+// CHECK-32-LABEL: define swiftcc {{(dllexport )?}}{{(protected )?}}i32 @accessClassWithResilientField(%T42class_update_callback_without_fixed_layout23ClassWithResilientFieldC* %0)
+// CHECK-64-LABEL: define swiftcc {{(dllexport )?}}{{(protected )?}}i64 @accessClassWithResilientField(%T42class_update_callback_without_fixed_layout23ClassWithResilientFieldC* %0)
 sil @accessClassWithResilientField : $@convention(thin) (@guaranteed ClassWithResilientField) -> Int {
 bb0(%0 : $ClassWithResilientField):
 
@@ -208,9 +209,9 @@ bb0(%0 : $ClassWithResilientField):
 
 // Objective-C metadata update callback function for ClassWithResilientField:
 
-// CHECK-OLD-NOT: define internal %objc_class* @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMU"(%objc_class*, i8*)
+// CHECK-OLD-NOT: define internal %objc_class* @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMU"(%objc_class* %0, i8* %1)
 
-// CHECK-NEW-LABEL: define internal %objc_class* @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMU"(%objc_class*, i8*)
+// CHECK-NEW-LABEL: define internal %objc_class* @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMU"(%objc_class* %0, i8* %1)
 // CHECK-NEW: entry:
 // CHECK-NEW-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMa"([[INT]] 0)
 // CHECK-NEW-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
@@ -221,7 +222,7 @@ bb0(%0 : $ClassWithResilientField):
 // Metadata initialization function for ClassWithResilientField calls swift_updateClassMetadata2()
 // with the new deployment target:
 
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMr"(%swift.type* %0, i8* %1, i8** %2)
 
 // CHECK: entry:
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [3 x i8**]
@@ -270,7 +271,7 @@ bb0(%0 : $ClassWithResilientField):
 
 // Metadata initialization function for SubclassOfClassWithResilientField:
 
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s42class_update_callback_without_fixed_layout33SubclassOfClassWithResilientFieldCMr"(%swift.type*, i8*, i8**)
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s42class_update_callback_without_fixed_layout33SubclassOfClassWithResilientFieldCMr"(%swift.type* %0, i8* %1, i8** %2)
 
 // CHECK: entry:
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [0 x i8**]
@@ -320,3 +321,13 @@ bb0(%0 : $ClassWithResilientField):
 // CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
+// Make sure we cache the construction of fully bound optional types.
+
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s42class_update_callback_without_fixed_layout21ClassWithResilientRefCMr"
+// CHECK: call swiftcc %swift.metadata_response @"$s16resilient_struct12ResilientRefVSgMa"
+// CHECK: ret
+
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s16resilient_struct12ResilientRefVSgMa"
+// CHECK:  call swiftcc %swift.metadata_response @"$s16resilient_struct12ResilientRefVMa"
+// CHECK:  call swiftcc %swift.metadata_response @"$sSqMa"
+// CHECK:  ret

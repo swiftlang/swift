@@ -428,8 +428,14 @@ ERROR(operator_decl_inner_scope,none,
       "'operator' may only be declared at file scope", ())
 ERROR(expected_operator_name_after_operator,PointsToFirstBadToken,
       "expected operator name in operator declaration", ())
-ERROR(identifier_when_expecting_operator,PointsToFirstBadToken,
-      "%0 is considered to be an identifier, not an operator", (Identifier))
+ERROR(identifier_within_operator_name,PointsToFirstBadToken,
+      "'%0' is considered an identifier and must not "
+      "appear within an operator name", (StringRef))
+ERROR(operator_name_invalid_char,PointsToFirstBadToken,
+      "'%0' is not allowed in operator names", (StringRef))
+ERROR(postfix_operator_name_cannot_start_with_unwrap,PointsToFirstBadToken,
+      "postfix operator names starting with '?' or '!' are disallowed "
+      "to avoid collisions with built-in unwrapping operators", ())
 
 ERROR(deprecated_operator_body,PointsToFirstBadToken,
       "operator should no longer be declared with body", ())
@@ -470,6 +476,8 @@ ERROR(expected_precedencegroup_relation,none,
       (StringRef))
 
 // SIL
+ERROR(expected_sil_keyword,none,
+      "expected SIL keyword", ())
 ERROR(inout_not_attribute, none,
       "@inout is no longer an attribute", ())
 ERROR(only_allowed_in_sil,none,
@@ -496,6 +504,9 @@ ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
 ERROR(expected_sil_tuple_index,none,
       "expected tuple element index", ())
+ERROR(invalid_index_subset,none,
+      "invalid index subset; expected '[SU]+' where 'S' represents set indices "
+      "and 'U' represents unset indices", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -678,6 +689,18 @@ ERROR(sil_witness_assoc_conf_not_found,none,
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
 
+// SIL differentiability witnesses
+ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
+      "expected '%0' in differentiability witness", (StringRef))
+ERROR(sil_diff_witness_serialized_declaration,none,
+      "differentiability witness declaration should not be serialized", ())
+ERROR(sil_diff_witness_undefined,PointsToFirstBadToken,
+      "reference to undefined differentiability witness", ())
+ERROR(sil_diff_witness_invalid_generic_signature,PointsToFirstBadToken,
+      "expected witness generic signature '%0' does not have same generic "
+      "parameters as original function generic signature '%1'",
+      (StringRef, StringRef))
+
 // SIL Coverage Map
 ERROR(sil_coverage_invalid_hash, none,
       "expected coverage hash", ())
@@ -807,7 +830,15 @@ ERROR(sil_box_expected_r_angle,none,
 ERROR(sil_function_subst_expected_l_angle,none,
       "expected '<' to begin SIL function type substitution list after 'for'", ())
 ERROR(sil_function_subst_expected_r_angle,none,
-      "expected '>' to begin SIL function type substitution list after 'for'", ())
+      "expected '>' to end SIL function type substitution list after 'for <...'", ())
+ERROR(sil_function_subst_expected_generics,none,
+      "expected '<' to begin substituted parameter list after '@substituted'", ())
+ERROR(sil_function_subst_expected_function,none,
+      "expected function type after '@substituted'", ())
+ERROR(sil_function_subst_expected_subs,none,
+      "expected 'for' to begin substitutions after '@substituted' function type", ())
+ERROR(sil_function_subs_without_generics,none,
+      "unexpected 'for' to begin substitutions after non-generic function type", ())
 
 // Opaque types
 ERROR(opaque_mid_composition,none,
@@ -933,6 +964,8 @@ ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
 ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
+ERROR(labeled_block_needs_do,none,
+      "labeled block needs 'do'", ())
 
 ERROR(snake_case_deprecated,none,
       "%0 has been replaced with %1 in Swift 3",
@@ -1037,7 +1070,11 @@ ERROR(expected_expr_repeat_while,PointsToFirstBadToken,
       "expected expression in 'repeat-while' condition", ())
 
 ERROR(do_while_now_repeat_while,none,
-      "'do-while' statement is not allowed; use 'repeat-while' instead", ())
+      "'do-while' statement is not allowed", ())
+NOTE(do_while_expected_repeat_while, none,
+      "did you mean 'repeat-while' statement?", ())
+NOTE(do_while_expected_separate_stmt, none,
+      "did you mean separate 'do' and 'while' statements?", ())
 
 // Do/Catch Statement
 ERROR(expected_lbrace_after_do,PointsToFirstBadToken,
@@ -1358,6 +1395,8 @@ ERROR(projection_value_property_not_identifier,none,
 // Access control
 ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
+ERROR(attr_access_expected_spi_name,none,
+      "expected an SPI identifier as subject of the '@_spi' attribute", ())
 
 // Attributes
 ERROR(attr_renamed, none,
@@ -1470,6 +1509,11 @@ ERROR(attr_dynamic_replacement_expected_for,none,
 ERROR(attr_dynamic_replacement_expected_colon,none,
       "expected ':' after @_dynamicReplacement(for", ())
 
+ERROR(attr_type_eraser_expected_type_name,none,
+      "expected a type name in @_typeEraser()", ())
+ERROR(attr_type_eraser_expected_rparen,none,
+      "expected ')' after type name for @_typeEraser", ())
+
 ERROR(attr_private_import_expected_rparen,none,
       "expected ')' after function name for @_private", ())
 ERROR(attr_private_import_expected_sourcefile, none,
@@ -1538,20 +1582,13 @@ ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
 // differentiable
-ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
-      "expected a %0 function name", (StringRef))
 ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
-ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
-      "missing label '%0:' in '@differentiable' attribute", (StringRef))
 ERROR(attr_differentiable_expected_label,none,
-      "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
-      "or 'vjp:'", ())
-ERROR(differentiable_attribute_expected_rparen,none,
-      "expected ')' in '@differentiable' attribute", ())
-ERROR(unexpected_argument_differentiable,none,
+      "expected 'wrt:' or 'where' in '@differentiable' attribute", ())
+ERROR(attr_differentiable_unexpected_argument,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
 
 // differentiation `wrt` parameters clause
@@ -1567,6 +1604,41 @@ ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
 // Automatic differentiation attributes
 ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
       "expected an original function name", ())
+
+// SIL autodiff
+ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
+      "expected '[' to start the %0", (StringRef))
+ERROR(sil_autodiff_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' to complete the %0", (StringRef))
+ERROR(sil_autodiff_expected_index_list,PointsToFirstBadToken,
+      "expected a space-separated list of indices, e.g. '0 1'", ())
+ERROR(sil_autodiff_expected_index_list_label,PointsToFirstBadToken,
+      "expected label '%0' in index list", (StringRef))
+ERROR(sil_autodiff_expected_parameter_index,PointsToFirstBadToken,
+      "expected the index of a parameter to differentiate with respect to", ())
+ERROR(sil_autodiff_expected_result_index,PointsToFirstBadToken,
+      "expected the index of a result to differentiate from", ())
+ERROR(sil_inst_autodiff_operand_list_expected_lbrace,PointsToFirstBadToken,
+      "expected '{' to start a derivative function list", ())
+ERROR(sil_inst_autodiff_operand_list_expected_comma,PointsToFirstBadToken,
+      "expected ',' between operands in a derivative function list", ())
+ERROR(sil_inst_autodiff_operand_list_expected_rbrace,PointsToFirstBadToken,
+      "expected '}' to start a derivative function list", ())
+ERROR(sil_inst_autodiff_expected_differentiable_extractee_kind,PointsToFirstBadToken,
+      "expected an extractee kind attribute, which can be one of '[original]', "
+      "'[jvp]', and '[vjp]'", ())
+ERROR(sil_inst_autodiff_expected_linear_extractee_kind,PointsToFirstBadToken,
+      "expected an extractee kind attribute, which can be one of '[original]' "
+      "and '[transpose]'", ())
+ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
+      "expected an operand of a function type", ())
+ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBadToken,
+      "expected a differentiability witness kind, which can be one of '[jvp]', "
+      "'[vjp]', or '[transpose]'", ())
+ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
+      "expected witness_generic signature '%0' does not have same generic "
+      "parameters as original function generic signature '%1'",
+      (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
@@ -1593,10 +1665,6 @@ ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
-ERROR(where_without_generic_params,none,
-      "'where' clause cannot be attached to "
-      "%select{a non-generic|a protocol|an associated type}0 "
-      "declaration", (unsigned))
 ERROR(where_inside_brackets,none,
         "'where' clause next to generic parameters is obsolete, "
         "must be written following the declaration's type", ())
@@ -1642,6 +1710,8 @@ ERROR(empty_version_string,none,
 WARNING(unknown_platform_condition_argument,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))
+WARNING(renamed_platform_condition_argument,none,
+      "'%0' has been renamed to '%1'", (StringRef, StringRef))
 WARNING(likely_simulator_platform_condition,none,
       "platform condition appears to be testing for simulator environment; "
       "use 'targetEnvironment(simulator)' instead",

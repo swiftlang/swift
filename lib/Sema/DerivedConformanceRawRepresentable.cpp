@@ -206,7 +206,7 @@ struct RuntimeVersionCheck {
 
     // availableInfo = "#available(\(platformSpec), \(otherSpec))"
     auto availableInfo = PoundAvailableInfo::create(
-        C, SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
+        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
 
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
@@ -438,14 +438,17 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   return initDecl;
 }
 
-static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
-  auto enumDecl = cast<EnumDecl>(derived.Nominal);
+bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
+                                                   NominalTypeDecl *type) {
+  auto enumDecl = dyn_cast<EnumDecl>(type);
+  if (!enumDecl)
+    return false;
 
   Type rawType = enumDecl->getRawType();
   if (!rawType)
     return false;
-  auto parentDC = cast<DeclContext>(derived.ConformanceDecl);
-  rawType       = parentDC->mapTypeIntoContext(rawType);
+
+  rawType = DC->mapTypeIntoContext(rawType);
 
   auto inherited = enumDecl->getInherited();
   if (!inherited.empty() && inherited.front().wasValidated() &&
@@ -460,10 +463,25 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   if (!equatableProto)
     return false;
 
-  if (TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl, None)
+  if (TypeChecker::conformsToProtocol(rawType, equatableProto, DC, None)
           .isInvalid())
     return false;
-  
+
+  auto &C = type->getASTContext();
+  auto rawValueDecls = enumDecl->lookupDirect(DeclName(C.Id_RawValue));
+  if (rawValueDecls.size() > 1)
+    return false;
+
+  // Check that the RawValue matches the expected raw type.
+  if (!rawValueDecls.empty()) {
+    if (auto alias = dyn_cast<TypeDecl>(rawValueDecls.front())) {
+      auto ty = alias->getDeclaredInterfaceType();
+      if (!DC->mapTypeIntoContext(ty)->isEqual(rawType)) {
+        return false;
+      }
+    }
+  }
+
   // There must be enum elements.
   if (enumDecl->getAllElements().empty())
     return false;
@@ -488,12 +506,8 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
 
 ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
 
-  // We can only synthesize RawRepresentable for enums.
-  if (!isa<EnumDecl>(Nominal))
-    return nullptr;
-
-  // Check other preconditions for synthesized conformance.
-  if (!canSynthesizeRawRepresentable(*this))
+  // Check preconditions for synthesized conformance.
+  if (!canDeriveRawRepresentable(cast<DeclContext>(ConformanceDecl), Nominal))
     return nullptr;
 
   if (requirement->getBaseName() == Context.Id_rawValue)
@@ -509,12 +523,8 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
 
 Type DerivedConformance::deriveRawRepresentable(AssociatedTypeDecl *assocType) {
 
-  // We can only synthesize RawRepresentable for enums.
-  if (!isa<EnumDecl>(Nominal))
-    return nullptr;
-
-  // Check other preconditions for synthesized conformance.
-  if (!canSynthesizeRawRepresentable(*this))
+  // Check preconditions for synthesized conformance.
+  if (!canDeriveRawRepresentable(cast<DeclContext>(ConformanceDecl), Nominal))
     return nullptr;
 
   if (assocType->getName() == Context.Id_RawValue) {

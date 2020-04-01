@@ -71,7 +71,7 @@ getErrorDomainStringForObjC(const EnumDecl *ED) {
     outerTypes.push_back(D);
   }
 
-  std::string buffer = ED->getParentModule()->getNameStr();
+  std::string buffer = ED->getParentModule()->getNameStr().str();
   for (auto D : llvm::reverse(outerTypes)) {
     buffer += ".";
     buffer += D->getNameStr();

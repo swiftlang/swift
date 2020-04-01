@@ -89,6 +89,7 @@ struct CodeCompletionInfo {
   StringRef DocBrief;
   StringRef AssocUSRs;
   UIdent SemanticContext;
+  UIdent TypeRelation;
   Optional<uint8_t> ModuleImportDepth;
   bool NotRecommended;
   unsigned NumBytesToErase;
@@ -202,6 +203,7 @@ struct DiagnosticEntryInfoBase {
   std::string Filename;
   SmallVector<std::pair<unsigned, unsigned>, 2> Ranges;
   SmallVector<Fixit, 2> Fixits;
+  SmallVector<std::string, 1> EducationalNotePaths;
 };
 
 struct DiagnosticEntryInfo : DiagnosticEntryInfoBase {
@@ -483,6 +485,7 @@ struct DocEntityInfo {
   llvm::SmallString<64> LocalizationKey;
   std::vector<DocGenericParam> GenericParams;
   std::vector<std::string> GenericRequirements;
+  std::vector<std::string> RequiredBystanders;
   unsigned Offset = 0;
   unsigned Length = 0;
   bool IsUnavailable = false;

@@ -135,7 +135,7 @@ extension NormalProtoAssocHolder {
 }
 
 @inlinable func testMultipleConformances() {
-  _ = NormalProtoAssocHolder<NormalStruct>.testAnotherConformance(NormalClass.self)
+  NormalProtoAssocHolder<NormalStruct>.testAnotherConformance(NormalClass.self)
  // expected-error@-1 2 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
   // expected-error@-2 {{cannot use conformance of 'NormalClass' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 }

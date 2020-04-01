@@ -19,6 +19,7 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
@@ -345,7 +346,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
     llvm::SmallString<64> Str;
     Str += "-fmodule-name=";
     Str += ClangInvok->getLangOpts()->CurrentModule;
-    CCArgs.push_back(Str.str());
+    CCArgs.push_back(std::string(Str.str()));
   }
 
   if (PPOpts.DetailedRecord) {
@@ -354,7 +355,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
 
   if (!ClangInvok->getFrontendOpts().Inputs.empty()) {
     Invok.getFrontendOptions().ImplicitObjCHeaderPath =
-      ClangInvok->getFrontendOpts().Inputs[0].getFile();
+        ClangInvok->getFrontendOpts().Inputs[0].getFile().str();
   }
 
   return false;
@@ -497,7 +498,7 @@ static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
       std::tie(CurLine, Lines) = Lines.split('\n');
       unsigned Begin = CurLine.find("<string>") + strlen("<string>");
       unsigned End = CurLine.find("</string>");
-      return CurLine.substr(Begin, End-Begin);
+      return CurLine.substr(Begin, End - Begin).str();
     }
   }
 
@@ -508,7 +509,7 @@ std::string ide::getSDKName(StringRef Path) {
   std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
                                    "CanonicalName");
   if (Name.empty() && Path.endswith(".sdk")) {
-    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk"));
+    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk")).str();
   }
   return Name;
 }
@@ -850,7 +851,7 @@ struct swift::ide::SourceEditJsonConsumer::Implementation {
   }
   void accept(SourceManager &SM, CharSourceRange Range,
               llvm::StringRef Text) {
-    AllEdits.push_back({SM, Range, Text});
+    AllEdits.push_back({SM, Range, Text.str()});
   }
 };
 
@@ -989,28 +990,9 @@ std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr) {
     expr = selfApplyExpr->getFn();
 
   // Look through curry thunks.
-  if (auto *closure = dyn_cast<AutoClosureExpr>(expr)) {
-    if (closure->isThunk()) {
-      auto *body = closure->getSingleExpressionBody();
-      if (isa<AutoClosureExpr>(body) &&
-          closure->getParameters()->size() == 1)
-       expr = closure->getSingleExpressionBody();
-    }
-  }
-
-  if (auto *closure = dyn_cast<AutoClosureExpr>(expr)) {
-    if (closure->isThunk()) {
-      auto *body = closure->getSingleExpressionBody();
-      body = body->getSemanticsProvidingExpr();
-      if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
-        if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
-          if (auto *declRef = dyn_cast<DeclRefExpr>(innerCall->getFn())) {
-            expr = declRef;
-          }
-        }
-      }
-    }
-  }
+  if (auto *closure = dyn_cast<AutoClosureExpr>(expr))
+    if (auto *unwrappedThunk = closure->getUnwrappedCurryThunkExpr())
+      expr = unwrappedThunk;
 
   // If this is an IUO result, unwrap the optional type.
   auto refDecl = expr->getReferencedDecl();

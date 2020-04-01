@@ -13,5 +13,5 @@ func testFSEventStreamRef(stream: FSEventStreamRef) {
   FSEventStreamRetain(stream) // no-warning
   FSEventStreamRelease(stream)
 
-  let _: AnyObject = stream // expected-error {{value of type 'FSEventStreamRef' (aka 'OpaquePointer') does not conform to specified type 'AnyObject'}}
+  let _: AnyObject = stream // expected-error {{value of type 'FSEventStreamRef' (aka 'OpaquePointer') expected to be instance of class or class-constrained type}}
 }

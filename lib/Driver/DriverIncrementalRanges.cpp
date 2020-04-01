@@ -84,10 +84,14 @@ Optional<SourceRangeBasedInfo> SourceRangeBasedInfo::loadInfoForOnePrimary(
     DiagnosticEngine &diags) {
 
   auto removeSupplementaryPaths = [&] {
-    if (auto ec = llvm::sys::fs::remove(compiledSourcePath))
+    if (auto ec = llvm::sys::fs::remove(compiledSourcePath)) {
+      (void)ec;
       llvm::errs() << "WARNING could not remove: " << compiledSourcePath;
-    if (auto ec = llvm::sys::fs::remove(swiftRangesPath))
+    }
+    if (auto ec = llvm::sys::fs::remove(swiftRangesPath)) {
+      (void)ec;
       llvm::errs() << "WARNING could not remove: " << swiftRangesPath;
+    }
   };
 
   assert(!primaryInputPath.empty() && "Must have a primary to load info.");

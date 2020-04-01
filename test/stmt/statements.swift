@@ -59,7 +59,7 @@ func funcdecl5(_ a: Int, y: Int) {
   }
 
   // This diagnostic is terrible - rdar://12939553
-  if x {}   // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if x {}   // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
   if true {
     if (B) {
@@ -235,9 +235,26 @@ func DoStmt() {
   }
 }
 
-func DoWhileStmt() {
-  do { // expected-error {{'do-while' statement is not allowed; use 'repeat-while' instead}} {{3-5=repeat}}
+
+func DoWhileStmt1() {
+  do { // expected-error {{'do-while' statement is not allowed}}
+  // expected-note@-1 {{did you mean 'repeat-while' statement?}} {{3-5=repeat}}
+  // expected-note@-2 {{did you mean separate 'do' and 'while' statements?}} {{5-5=\n}}
   } while true
+}
+
+func DoWhileStmt2() {
+  do {
+
+  }
+  while true {
+
+  }
+}
+
+func LabeledDoStmt() {
+  LABEL: { // expected-error {{labeled block needs 'do'}} {{10-10=do }}
+  }
 }
 
 //===--- Repeat-while statement.
@@ -371,12 +388,39 @@ enum DeferThrowError: Error {
 }
 
 func throwInDefer() {
-  defer { throw DeferThrowError.someError } // expected-error {{'throw' cannot transfer control out of a defer statement}}
+  defer { throw DeferThrowError.someError } // expected-error {{errors cannot be thrown out of a defer body}}
   print("Foo")
+}
+
+func throwInDeferOK1() {
+  defer {
+    do {
+      throw DeferThrowError.someError
+    } catch {}
+  }
+  print("Bar")
+}
+
+func throwInDeferOK2() throws {
+  defer {
+    do {
+      throw DeferThrowError.someError
+    } catch {}
+  }
+  print("Bar")
 }
 
 func throwingFuncInDefer1() throws {
   defer { try throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
+  print("Bar")
+}
+
+func throwingFuncInDefer1a() throws {
+  defer {
+    do {
+      try throwingFunctionCalledInDefer()
+    } catch {}
+  }
   print("Bar")
 }
 
@@ -385,13 +429,48 @@ func throwingFuncInDefer2() throws {
   print("Bar")
 }
 
+func throwingFuncInDefer2a() throws {
+  defer {
+    do {
+      throwingFunctionCalledInDefer()
+      // expected-error@-1 {{call can throw but is not marked with 'try'}}
+      // expected-note@-2 {{did you mean to use 'try'?}}
+      // expected-note@-3 {{did you mean to handle error as optional value?}}
+      // expected-note@-4 {{did you mean to disable error propagation?}}
+    } catch {}
+  }
+  print("Bar")
+}
+
 func throwingFuncInDefer3() {
   defer { try throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
   print("Bar")
 }
 
+func throwingFuncInDefer3a() {
+  defer {
+    do {
+      try throwingFunctionCalledInDefer()
+    } catch {}
+  }
+  print("Bar")
+}
+
 func throwingFuncInDefer4() {
   defer { throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
+  print("Bar")
+}
+
+func throwingFuncInDefer4a() {
+  defer {
+    do {
+      throwingFunctionCalledInDefer()
+      // expected-error@-1 {{call can throw but is not marked with 'try'}}
+      // expected-note@-2 {{did you mean to use 'try'?}}
+      // expected-note@-3 {{did you mean to handle error as optional value?}}
+      // expected-note@-4 {{did you mean to disable error propagation?}}
+    } catch {}
+  }
   print("Bar")
 }
 
@@ -475,8 +554,7 @@ func testThrowNil() throws {
 // Even if the condition fails to typecheck, save it in the AST anyway; the old
 // condition may have contained a SequenceExpr.
 func r23684220(_ b: Any) {
-  if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any'}}
-  // expected-warning@-1 {{left side of nil coalescing operator '??' has non-optional type 'Any', so the right side is never used}}
+  if let _ = b ?? b {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'Any', so the right side is never used}}
 }
 
 
@@ -566,7 +644,7 @@ func fn(x: Int) {
 }
 
 func bad_if() {
-  if 1 {} // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if 1 {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
   if (x: false) {} // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
   if (x: 1) {} // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
   if nil {} // expected-error {{'nil' is not compatible with expected condition type 'Bool'}}

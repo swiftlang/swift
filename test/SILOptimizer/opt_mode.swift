@@ -15,16 +15,6 @@ class B : A {
 
 func donothing(_ x: Int) -> Int { return x }
 
-// CHECK-LABEL: sil {{.*}} [Ospeed] @{{.*}}test_ospeed
-// CHECK: checked_cast_br
-// CHECK: checked_cast_br
-// CHECK: }
-// CHECK-IR: define hidden {{.*}}test_ospeed{{.*}} [[NOSIZE_ATTR:#[0-9]+]]
-@_optimize(speed)
-func test_ospeed(_ a: A) -> Int {
-  return donothing(a.foo(27))
-}
-
 // CHECK-LABEL: sil {{.*}} [Osize] @{{.*}}test_osize
 // CHECK: [[M:%[0-9]+]] = class_method
 // CHECK: [[A:%[0-9]+]] = apply [[M]]
@@ -46,6 +36,16 @@ func test_onone(_ a: A) -> Int {
   return donothing(a.foo(27))
 }
 
+// CHECK-LABEL: sil {{.*}} [Ospeed] @{{.*}}test_ospeed
+// CHECK: [[M:%[0-9]+]] = class_method
+// CHECK: [[A:%[0-9]+]] = apply [[M]]
+// CHECK: return [[A]]
+// CHECK-IR: define hidden {{.*}}test_ospeed{{.*}} [[NOSIZE_ATTR:#[0-9]+]]
+@_optimize(speed)
+func test_ospeed(_ a: A) -> Int {
+  return donothing(a.foo(27))
+}
 
-// CHECK-IR: attributes [[NOSIZE_ATTR]] = { "
+
 // CHECK-IR: attributes [[SIZE_ATTR]] = { minsize "
+// CHECK-IR: attributes [[NOSIZE_ATTR]] = { "

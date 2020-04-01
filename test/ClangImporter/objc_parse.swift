@@ -550,8 +550,8 @@ func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
   _ = cell as NSCopying
   _ = cell as SomeCell
   
-  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
-  _ = plainCell as CopyableSomeCell // expected-error {{'SomeCell' is not convertible to 'CopyableSomeCell' (aka 'SomeCell & NSCopying'); did you mean to use 'as!' to force downcast?}}
+  _ = plainObj as CopyableNSObject // expected-error {{value of type 'NSObject' does not conform to 'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') in coercion}} 
+  _ = plainCell as CopyableSomeCell // expected-error {{value of type 'SomeCell' does not conform to 'CopyableSomeCell' (aka 'SomeCell & NSCopying') in coercion}}
 }
 
 extension Printing {

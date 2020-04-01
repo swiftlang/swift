@@ -19,16 +19,22 @@
 #define SWIFT_IRGEN_CALLEE_H
 
 #include <type_traits>
+#include "swift/AST/IRGenOptions.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/SIL/SILType.h"
 #include "IRGen.h"
 #include "Signature.h"
+
+namespace llvm {
+  class ConstantInt;
+}
 
 namespace swift {
 
 namespace irgen {
   class Callee;
   class IRGenFunction;
+  class PointerAuthEntity;
 
   class CalleeInfo {
   public:
@@ -50,10 +56,78 @@ namespace irgen {
     }
   };
 
+  /// Information necessary for pointer authentication.
+  class PointerAuthInfo {
+    unsigned Signed : 1;
+    unsigned Key : 31;
+    llvm::Value *Discriminator;
+  public:
+    PointerAuthInfo() {
+      Signed = false;
+    }
+    PointerAuthInfo(unsigned key, llvm::Value *discriminator)
+        : Discriminator(discriminator) {
+      assert(discriminator->getType()->isIntegerTy() ||
+             discriminator->getType()->isPointerTy());
+      Signed = true;
+      Key = key;
+    }
+
+    static PointerAuthInfo emit(IRGenFunction &IGF,
+                                const PointerAuthSchema &schema,
+                                llvm::Value *storageAddress,
+                                const PointerAuthEntity &entity);
+
+    static PointerAuthInfo forFunctionPointer(IRGenModule &IGM,
+                                              CanSILFunctionType fnType);
+
+    static llvm::ConstantInt *getOtherDiscriminator(IRGenModule &IGM,
+                                           const PointerAuthSchema &schema,
+                                           const PointerAuthEntity &entity);
+
+    explicit operator bool() const {
+      return isSigned();
+    }
+
+    bool isSigned() const {
+      return Signed;
+    }
+
+    bool isConstant() const {
+      return (!isSigned() || isa<llvm::Constant>(Discriminator));
+    }
+
+    unsigned getKey() const {
+      assert(isSigned());
+      return Key;
+    }
+    llvm::Value *getDiscriminator() const {
+      assert(isSigned());
+      return Discriminator;
+    }
+
+    /// Are the auth infos obviously the same?
+    friend bool operator==(const PointerAuthInfo &lhs,
+                           const PointerAuthInfo &rhs) {
+      if (!lhs.Signed)
+        return !rhs.Signed;
+      if (!rhs.Signed)
+        return false;
+
+      return (lhs.Key == rhs.Key && lhs.Discriminator == rhs.Discriminator);
+    }
+    friend bool operator!=(const PointerAuthInfo &lhs,
+                           const PointerAuthInfo &rhs) {
+      return !(lhs == rhs);
+    }
+  };
+
   /// A function pointer value.
   class FunctionPointer {
     /// The actual function pointer.
     llvm::Value *Value;
+
+    PointerAuthInfo AuthInfo;
 
     Signature Sig;
 
@@ -61,12 +135,17 @@ namespace irgen {
     /// Construct a FunctionPointer for an arbitrary pointer value.
     /// We may add more arguments to this; try to use the other
     /// constructors/factories if possible.
-    explicit FunctionPointer(llvm::Value *value, const Signature &signature)
-        : Value(value), Sig(signature) {
+    explicit FunctionPointer(llvm::Value *value, PointerAuthInfo authInfo,
+                             const Signature &signature)
+        : Value(value), AuthInfo(authInfo), Sig(signature) {
       // The function pointer should have function type.
       assert(value->getType()->getPointerElementType()->isFunctionTy());
       // TODO: maybe assert similarity to signature.getType()?
     }
+
+    // Temporary only!
+    explicit FunctionPointer(llvm::Value *value, const Signature &signature)
+      : FunctionPointer(value, PointerAuthInfo(), signature) {}
 
     static FunctionPointer forDirect(IRGenModule &IGM,
                                      llvm::Constant *value,
@@ -74,7 +153,7 @@ namespace irgen {
 
     static FunctionPointer forDirect(llvm::Constant *value,
                                      const Signature &signature) {
-      return FunctionPointer(value, signature);
+      return FunctionPointer(value, PointerAuthInfo(), signature);
     }
 
     static FunctionPointer forExplosionValue(IRGenFunction &IGF,
@@ -84,7 +163,7 @@ namespace irgen {
     /// Is this function pointer completely constant?  That is, can it
     /// be safely moved to a different function context?
     bool isConstant() const {
-      return (isa<llvm::Constant>(Value));
+      return (isa<llvm::Constant>(Value) && AuthInfo.isConstant());
     }
 
     /// Return the actual function pointer.
@@ -99,6 +178,10 @@ namespace irgen {
     llvm::FunctionType *getFunctionType() const {
       return cast<llvm::FunctionType>(
                                   Value->getType()->getPointerElementType());
+    }
+
+    const PointerAuthInfo &getAuthInfo() const {
+      return AuthInfo;
     }
 
     const Signature &getSignature() const {

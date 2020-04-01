@@ -22,14 +22,18 @@ import shutil
 import subprocess
 import sys
 from contextlib import contextmanager
-from multiprocessing import Lock, Pool, cpu_count
-
-from . import diagnostics
 
 
 DEVNULL = getattr(subprocess, 'DEVNULL', subprocess.PIPE)
 
 dry_run = False
+
+
+def _fatal_error(message):
+    """Raises a SystemExit error with the given message.
+    """
+
+    raise SystemExit('ERROR: {}\n'.format(message))
 
 
 def _quote(arg):
@@ -85,11 +89,11 @@ def call(command, stderr=None, env=None, dry_run=None, echo=True):
     try:
         subprocess.check_call(command, env=_env, stderr=stderr)
     except subprocess.CalledProcessError as e:
-        diagnostics.fatal(
+        _fatal_error(
             "command terminated with a non-zero exit status " +
             str(e.returncode) + ", aborting")
     except OSError as e:
-        diagnostics.fatal(
+        _fatal_error(
             "could not execute '" + quote_command(command) +
             "': " + e.strerror)
 
@@ -136,13 +140,13 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
             return e.output
         if optional:
             return None
-        diagnostics.fatal(
+        _fatal_error(
             "command terminated with a non-zero exit status " +
             str(e.returncode) + ", aborting")
     except OSError as e:
         if optional:
             return None
-        diagnostics.fatal(
+        _fatal_error(
             "could not execute '" + quote_command(command) +
             "': " + e.strerror)
 
@@ -230,37 +234,3 @@ def run(*args, **kwargs):
         eout.stderr = stderr
         raise eout
     return (stdout, 0, args)
-
-
-def init(l):
-    global lock
-    lock = l
-
-
-def run_parallel(fn, pool_args, n_processes=0):
-    if n_processes == 0:
-        n_processes = cpu_count() * 2
-
-    lk = Lock()
-    print("Running ``%s`` with up to %d processes." %
-          (fn.__name__, n_processes))
-    pool = Pool(processes=n_processes, initializer=init, initargs=(lk,))
-    results = pool.map_async(func=fn, iterable=pool_args).get(999999)
-    pool.close()
-    pool.join()
-    return results
-
-
-def check_parallel_results(results, op):
-    fail_count = 0
-    if results is None:
-        return 0
-    for r in results:
-        if r is not None:
-            if fail_count == 0:
-                print("======%s FAILURES======" % op)
-            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
-            fail_count += 1
-            if r.stderr:
-                print(r.stderr)
-    return fail_count

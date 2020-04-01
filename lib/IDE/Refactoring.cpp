@@ -1077,7 +1077,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
       InputFile("<extract>", true, InputBuffer.get()));
   Invocation.getFrontendOptions().ModuleName = "extract";
 
-  auto Instance = llvm::make_unique<swift::CompilerInstance>();
+  auto Instance = std::make_unique<swift::CompilerInstance>();
   if (Instance->setup(Invocation))
     llvm_unreachable("Failed setup");
 
@@ -1763,8 +1763,8 @@ findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
   assert(E);
 
   struct StringInterpolationExprFinder: public SourceEntityWalker {
-    std::unique_ptr<llvm::SetVector<Expr*>> Bucket = llvm::
-    make_unique<llvm::SetVector<Expr*>>();
+    std::unique_ptr<llvm::SetVector<Expr *>> Bucket =
+        std::make_unique<llvm::SetVector<Expr *>>();
     ASTContext &Ctx;
 
     bool IsValidInterpolation = true;
@@ -1995,11 +1995,11 @@ findExpandableTernaryExpression(ResolvedRangeInfo Info) {
 
   if (auto D = Info.ContainedNodes[0].dyn_cast<Decl*>())
     if (auto Binding = dyn_cast<PatternBindingDecl>(D))
-      return llvm::make_unique<ExpandableBindingTernaryExprInfo>(Binding);
+      return std::make_unique<ExpandableBindingTernaryExprInfo>(Binding);
 
   if (auto E = Info.ContainedNodes[0].dyn_cast<Expr*>())
     if (auto Assign = dyn_cast<AssignExpr>(E))
-      return llvm::make_unique<ExpandableAssignTernaryExprInfo>(Assign);
+      return std::make_unique<ExpandableAssignTernaryExprInfo>(Assign);
 
   return nullptr;
 }
@@ -2240,6 +2240,272 @@ bool RefactoringActionConvertGuardExprToIfLetExpr::performChange() {
   auto ReplaceRange = RangeInfo.ContentRange;
   EditConsumer.accept(SM, ReplaceRange, DeclBuffer.str());
   
+  return false;
+}
+
+bool RefactoringActionConvertToSwitchStmt::
+isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+
+  class ConditionalChecker : public ASTWalker {
+  public:
+    bool ParamsUseSameVars = true;
+    bool ConditionUseOnlyAllowedFunctions = false;
+    StringRef ExpectName;
+
+    Expr *walkToExprPost(Expr *E) {
+      if (E->getKind() != ExprKind::DeclRef)
+        return E;
+      auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
+      if (D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param)
+        ParamsUseSameVars = checkName(dyn_cast<VarDecl>(D));
+      if (D->getKind() == DeclKind::Func)
+        ConditionUseOnlyAllowedFunctions = checkName(dyn_cast<FuncDecl>(D));
+      if (allCheckPassed())
+        return E;
+      return nullptr;
+    }
+
+    bool allCheckPassed() {
+      return ParamsUseSameVars && ConditionUseOnlyAllowedFunctions;
+    }
+
+  private:
+    bool checkName(VarDecl *VD) {
+      auto Name = VD->getName().str();
+      if (ExpectName.empty())
+        ExpectName = Name;
+      return Name == ExpectName;
+    }
+
+    bool checkName(FuncDecl *FD) {
+      auto Name = FD->getName().str();
+      return Name == "~="
+      || Name == "=="
+      || Name == "__derived_enum_equals"
+      || Name == "__derived_struct_equals"
+      || Name == "||"
+      || Name == "...";
+    }
+  };
+
+  class SwitchConvertable {
+  public:
+    SwitchConvertable(ResolvedRangeInfo Info) {
+      this->Info = Info;
+    }
+
+    bool isApplicable() {
+      if (Info.Kind != RangeKind::SingleStatement)
+        return false;
+      if (!findIfStmt())
+        return false;
+      return checkEachCondition();
+    }
+
+  private:
+    ResolvedRangeInfo Info;
+    IfStmt *If = nullptr;
+    ConditionalChecker checker;
+
+    bool findIfStmt() {
+      if (Info.ContainedNodes.size() != 1)
+        return false;
+      if (auto S = Info.ContainedNodes.front().dyn_cast<Stmt*>())
+        If = dyn_cast<IfStmt>(S);
+      return If != nullptr;
+    }
+
+    bool checkEachCondition() {
+      checker = ConditionalChecker();
+      do {
+        if (!checkEachElement())
+          return false;
+      } while ((If = dyn_cast_or_null<IfStmt>(If->getElseStmt())));
+      return true;
+    }
+
+    bool checkEachElement() {
+      bool result = true;
+      auto ConditionalList = If->getCond();
+      for (auto Element : ConditionalList) {
+        result &= check(Element);
+      }
+      return result;
+    }
+
+    bool check(StmtConditionElement ConditionElement) {
+      if (ConditionElement.getKind() == StmtConditionElement::CK_Availability)
+        return false;
+      if (ConditionElement.getKind() == StmtConditionElement::CK_PatternBinding)
+        checker.ConditionUseOnlyAllowedFunctions = true;
+      ConditionElement.walk(checker);
+      return checker.allCheckPassed();
+    }
+  };
+  return SwitchConvertable(Info).isApplicable();
+}
+
+bool RefactoringActionConvertToSwitchStmt::performChange() {
+
+  class VarNameFinder : public ASTWalker {
+  public:
+    std::string VarName;
+
+    Expr *walkToExprPost(Expr *E) {
+      if (E->getKind() != ExprKind::DeclRef)
+        return E;
+      auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
+      if (D->getKind() != DeclKind::Var && D->getKind() != DeclKind::Param)
+        return E;
+      VarName = dyn_cast<VarDecl>(D)->getName().str().str();
+      return nullptr;
+    }
+  };
+
+  class ConditionalPatternFinder : public ASTWalker {
+  public:
+    ConditionalPatternFinder(SourceManager &SM) : SM(SM) {}
+
+    SmallString<64> ConditionalPattern = SmallString<64>();
+
+    Expr *walkToExprPost(Expr *E) {
+      if (E->getKind() != ExprKind::Binary)
+        return E;
+      auto BE = dyn_cast<BinaryExpr>(E);
+      if (isFunctionNameAllowed(BE))
+        appendPattern(dyn_cast<BinaryExpr>(E)->getArg());
+      return E;
+    }
+
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) {
+      ConditionalPattern.append(Lexer::getCharSourceRangeFromSourceRange(SM, P->getSourceRange()).str());
+      if (P->getKind() == PatternKind::OptionalSome)
+        ConditionalPattern.append("?");
+      return { true, nullptr };
+    }
+
+  private:
+
+    SourceManager &SM;
+
+    bool isFunctionNameAllowed(BinaryExpr *E) {
+      auto FunctionBody = dyn_cast<DotSyntaxCallExpr>(E->getFn())->getFn();
+      auto FunctionDeclaration = dyn_cast<DeclRefExpr>(FunctionBody)->getDecl();
+      auto FunctionName = dyn_cast<FuncDecl>(FunctionDeclaration)->getName().str();
+      return FunctionName == "~="
+      || FunctionName == "=="
+      || FunctionName == "__derived_enum_equals"
+      || FunctionName == "__derived_struct_equals";
+    }
+
+    void appendPattern(TupleExpr *Tuple) {
+      auto PatternArgument = Tuple->getElements().back();
+      if (PatternArgument->getKind() == ExprKind::DeclRef)
+        PatternArgument = Tuple->getElements().front();
+      if (ConditionalPattern.size() > 0)
+        ConditionalPattern.append(", ");
+      ConditionalPattern.append(Lexer::getCharSourceRangeFromSourceRange(SM, PatternArgument->getSourceRange()).str());
+    }
+  };
+
+  class ConverterToSwitch {
+  public:
+    ConverterToSwitch(ResolvedRangeInfo Info, SourceManager &SM) : SM(SM) {
+      this->Info = Info;
+    }
+
+    void performConvert(SmallString<64> &Out) {
+      If = findIf();
+      OptionalLabel = If->getLabelInfo().Name.str().str();
+      ControlExpression = findControlExpression();
+      findPatternsAndBodies(PatternsAndBodies);
+      DefaultStatements = findDefaultStatements();
+      makeSwitchStatement(Out);
+    }
+
+  private:
+    ResolvedRangeInfo Info;
+    SourceManager &SM;
+
+    IfStmt *If;
+    IfStmt *PreviousIf;
+
+    std::string OptionalLabel;
+    std::string ControlExpression;
+    SmallVector<std::pair<std::string, std::string>, 16> PatternsAndBodies;
+    std::string DefaultStatements;
+
+    IfStmt *findIf() {
+      auto S = Info.ContainedNodes[0].dyn_cast<Stmt*>();
+      return dyn_cast<IfStmt>(S);
+    }
+
+    std::string findControlExpression() {
+      auto ConditionElement = If->getCond().front();
+      auto Finder = VarNameFinder();
+      ConditionElement.walk(Finder);
+      return Finder.VarName;
+    }
+
+    void findPatternsAndBodies(SmallVectorImpl<std::pair<std::string, std::string>> &Out) {
+      do {
+        auto pattern = findPattern();
+        auto body = findBodyStatements();
+        Out.push_back(std::make_pair(pattern, body));
+        PreviousIf = If;
+      } while ((If = dyn_cast_or_null<IfStmt>(If->getElseStmt())));
+    }
+
+    std::string findPattern() {
+      auto ConditionElement = If->getCond().front();
+      auto Finder = ConditionalPatternFinder(SM);
+      ConditionElement.walk(Finder);
+      return Finder.ConditionalPattern.str().str();
+    }
+
+    std::string findBodyStatements() {
+      return findBodyWithoutBraces(If->getThenStmt());
+    }
+
+    std::string findDefaultStatements() {
+      auto ElseBody = dyn_cast_or_null<BraceStmt>(PreviousIf->getElseStmt());
+      if (!ElseBody)
+        return getTokenText(tok::kw_break).str();
+      return findBodyWithoutBraces(ElseBody);
+    }
+
+    std::string findBodyWithoutBraces(Stmt *body) {
+      auto BS = dyn_cast<BraceStmt>(body);
+      if (!BS)
+        return Lexer::getCharSourceRangeFromSourceRange(SM, body->getSourceRange()).str().str();
+      if (BS->getElements().empty())
+        return getTokenText(tok::kw_break).str();
+      SourceRange BodyRange = BS->getElements().front().getSourceRange();
+      BodyRange.widen(BS->getElements().back().getSourceRange());
+      return Lexer::getCharSourceRangeFromSourceRange(SM, BodyRange).str().str();
+    }
+
+    void makeSwitchStatement(SmallString<64> &Out) {
+      StringRef Space = " ";
+      StringRef NewLine = "\n";
+      llvm::raw_svector_ostream OS(Out);
+      if (OptionalLabel.size() > 0)
+        OS << OptionalLabel << ":" << Space;
+      OS << tok::kw_switch << Space << ControlExpression << Space << tok::l_brace << NewLine;
+      for (auto &pair : PatternsAndBodies) {
+        OS << tok::kw_case << Space << pair.first << tok::colon << NewLine;
+        OS << pair.second << NewLine;
+      }
+      OS << tok::kw_default << tok::colon << NewLine;
+      OS << DefaultStatements << NewLine;
+      OS << tok::r_brace;
+    }
+
+  };
+
+  SmallString<64> result;
+  ConverterToSwitch(RangeInfo, SM).performConvert(result);
+  EditConsumer.accept(SM, RangeInfo.ContentRange, result.str());
   return false;
 }
 
@@ -2986,8 +3252,11 @@ static std::string insertUnderscore(StringRef Text) {
 
 static void insertUnderscoreInDigits(StringRef Digits,
                                      llvm::raw_ostream &OS) {
-  std::string BeforePoint, AfterPoint;
-  std::tie(BeforePoint, AfterPoint) = Digits.split('.');
+  StringRef BeforePointRef, AfterPointRef;
+  std::tie(BeforePointRef, AfterPointRef) = Digits.split('.');
+
+  std::string BeforePoint(BeforePointRef);
+  std::string AfterPoint(AfterPointRef);
 
   // Insert '_' for the part before the decimal point.
   std::reverse(BeforePoint.begin(), BeforePoint.end());
@@ -3165,6 +3434,97 @@ static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {
       return false;
   }
   llvm_unreachable("unhandled kind");
+}
+    
+bool RefactoringActionConvertToComputedProperty::
+isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  if (Info.Kind != RangeKind::SingleDecl) {
+    return false;
+  }
+  
+  if (Info.ContainedNodes.size() != 1) {
+    return false;
+  }
+  
+  auto D = Info.ContainedNodes[0].dyn_cast<Decl*>();
+  if (!D) {
+    return false;
+  }
+  
+  auto Binding = dyn_cast<PatternBindingDecl>(D);
+  if (!Binding) {
+    return false;
+  }
+
+  auto SV = Binding->getSingleVar();
+  if (!SV) {
+    return false;
+  }
+
+  // willSet, didSet cannot be provided together with a getter
+  for (auto AD : SV->getAllAccessors()) {
+    if (AD->isObservingAccessor()) {
+      return false;
+    }
+  }
+  
+  // 'lazy' must not be used on a computed property
+  // NSCopying and IBOutlet attribute requires property to be mutable
+  auto Attributies = SV->getAttrs();
+  if (Attributies.hasAttribute<LazyAttr>() ||
+      Attributies.hasAttribute<NSCopyingAttr>() ||
+      Attributies.hasAttribute<IBOutletAttr>()) {
+    return false;
+  }
+
+  // Property wrapper cannot be applied to a computed property
+  if (SV->hasAttachedPropertyWrapper()) {
+    return false;
+  }
+
+  // has an initializer
+  return Binding->hasInitStringRepresentation(0);
+}
+
+bool RefactoringActionConvertToComputedProperty::performChange() {
+  // Get an initialization
+  auto D = RangeInfo.ContainedNodes[0].dyn_cast<Decl*>();
+  auto Binding = dyn_cast<PatternBindingDecl>(D);
+  SmallString<128> scratch;
+  auto Init = Binding->getInitStringRepresentation(0, scratch);
+  
+  // Get type
+  auto SV = Binding->getSingleVar();
+  auto SVType = SV->getType();
+  auto TR = SV->getTypeReprOrParentPatternTypeRepr();
+  
+  llvm::SmallString<64> DeclBuffer;
+  llvm::raw_svector_ostream OS(DeclBuffer);
+  llvm::StringRef Space = " ";
+  llvm::StringRef NewLine = "\n";
+  
+  OS << tok::kw_var << Space;
+  // Add var name
+  OS << SV->getNameStr().str() << ":" << Space;
+  // For computed property must write a type of var
+  if (TR) {
+    OS << Lexer::getCharSourceRangeFromSourceRange(SM, TR->getSourceRange()).str();
+  } else {
+    SVType.print(OS);
+  }
+
+  OS << Space << tok::l_brace << NewLine;
+  // Add an initialization
+  OS << tok::kw_return << Space << Init.str() << NewLine;
+  OS << tok::r_brace;
+  
+  // Replace initializer to computed property
+  auto ReplaceStartLoc = Binding->getLoc();
+  auto ReplaceEndLoc = Binding->getSourceRange().End;
+  auto ReplaceRange = SourceRange(ReplaceStartLoc, ReplaceEndLoc);
+  auto ReplaceCharSourceRange = Lexer::getCharSourceRangeFromSourceRange(SM, ReplaceRange);
+  EditConsumer.accept(SM, ReplaceCharSourceRange, DeclBuffer.str());
+  return false; // success
 }
 }// end of anonymous namespace
 
@@ -3395,7 +3755,7 @@ refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
 
   // Use the default name if not specified.
   if (Opts.PreferredName.empty()) {
-    Opts.PreferredName = getDefaultPreferredName(Opts.Kind);
+    Opts.PreferredName = getDefaultPreferredName(Opts.Kind).str();
   }
 
   switch (Opts.Kind) {

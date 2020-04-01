@@ -39,7 +39,6 @@ class DeclContext;
 class FuncDecl;
 class NormalProtocolConformance;
 class ProtocolDecl;
-class TypeChecker;
 class TypeRepr;
 class ValueDecl;
 
@@ -209,6 +208,13 @@ enum class MatchKind : uint8_t {
 
   /// The witness is explicitly @nonobjc but the requirement is @objc.
   NonObjC,
+
+  /// The witness is missing a `@differentiable` attribute from the requirement.
+  MissingDifferentiableAttr,
+  
+  /// The witness did not match because it is an enum case with
+  /// associated values.
+  EnumCaseWithAssociatedValues,
 };
 
 /// Describes the kind of optional adjustment performed when
@@ -355,6 +361,14 @@ struct RequirementMatch {
   }
 
   RequirementMatch(ValueDecl *witness, MatchKind kind,
+                   const DeclAttribute *attr)
+      : Witness(witness), Kind(kind), WitnessType(), UnmetAttribute(attr),
+        ReqEnv(None) {
+    assert(!hasWitnessType() && "Should have witness type");
+    assert(hasUnmetAttribute() && "Should have unmet attribute");
+  }
+
+  RequirementMatch(ValueDecl *witness, MatchKind kind,
                    Type witnessType,
                    Optional<RequirementEnvironment> env = None,
                    ArrayRef<OptionalAdjustment> optionalAdjustments = {})
@@ -390,6 +404,9 @@ struct RequirementMatch {
   /// Requirement not met.
   Optional<Requirement> MissingRequirement;
 
+  /// Unmet attribute from the requirement.
+  const DeclAttribute *UnmetAttribute = nullptr;
+
   /// The requirement environment to use for the witness thunk.
   Optional<RequirementEnvironment> ReqEnv;
 
@@ -423,6 +440,8 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+    case MatchKind::MissingDifferentiableAttr:
+    case MatchKind::EnumCaseWithAssociatedValues:
       return false;
     }
 
@@ -452,6 +471,8 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+    case MatchKind::MissingDifferentiableAttr:
+    case MatchKind::EnumCaseWithAssociatedValues:
       return false;
     }
 
@@ -460,6 +481,11 @@ struct RequirementMatch {
 
   /// Determine whether this requirement match has a requirement.
   bool hasRequirement() { return Kind == MatchKind::MissingRequirement; }
+
+  /// Determine whether this requirement match has an unmet attribute.
+  bool hasUnmetAttribute() {
+    return Kind == MatchKind::MissingDifferentiableAttr;
+  }
 
   swift::Witness getWitness(ASTContext &ctx) const;
 };

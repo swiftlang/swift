@@ -50,12 +50,3 @@ void PersistentParserState::restoreCodeCompletionDelayedDeclState(
       ScopeInfo.saveCurrentScope(), other.StartOffset, other.EndOffset,
       other.PrevOffset));
 }
-
-void PersistentParserState::delayDeclList(IterableDeclContext *D) {
-  DelayedDeclLists.push_back(D);
-}
-
-void PersistentParserState::parseAllDelayedDeclLists() {
-  for (auto IDC : DelayedDeclLists)
-    IDC->loadAllMembers();
-}

@@ -42,8 +42,8 @@ static bool swiftConformingMethodListImpl(
             ide::makeConformingMethodListCallbacksFactory(ExpectedTypeNames,
                                                           Consumer));
 
-        performCodeCompletionSecondPass(CI.getPersistentParserState(),
-                                        *callbacksFactory);
+        auto SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
       });
 }
 

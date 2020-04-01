@@ -35,7 +35,9 @@ IDENTIFIER(buildBlock)
 IDENTIFIER(buildDo)
 IDENTIFIER(buildEither)
 IDENTIFIER(buildExpression)
+IDENTIFIER(buildFinalResult)
 IDENTIFIER(buildIf)
+IDENTIFIER(buildOptional)
 IDENTIFIER(callAsFunction)
 IDENTIFIER(Change)
 IDENTIFIER_WITH_NAME(code_, "_code")
@@ -64,6 +66,7 @@ IDENTIFIER(encode)
 IDENTIFIER(encodeIfPresent)
 IDENTIFIER(Encoder)
 IDENTIFIER(encoder)
+IDENTIFIER(erasing)
 IDENTIFIER(error)
 IDENTIFIER(errorDomain)
 IDENTIFIER(first)
@@ -142,7 +145,10 @@ IDENTIFIER_WITH_NAME(NativeClassLayout, "_NativeClass")
 
 // Operators
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")
+IDENTIFIER_WITH_NAME(LessThanOperator, "<")
 IDENTIFIER_WITH_NAME(EqualsOperator, "==")
+IDENTIFIER_WITH_NAME(NegationOperator, "!")
+IDENTIFIER_WITH_NAME(derived_enum_less_than, "__derived_enum_less_than")
 IDENTIFIER_WITH_NAME(derived_enum_equals, "__derived_enum_equals")
 IDENTIFIER_WITH_NAME(derived_struct_equals, "__derived_struct_equals")
 
@@ -198,7 +204,13 @@ IDENTIFIER_(nsError)
 IDENTIFIER(OSLogMessage)
 
 // Differentiable programming
+IDENTIFIER(along)
+IDENTIFIER(differential)
+IDENTIFIER(direction)
+IDENTIFIER(move)
+IDENTIFIER(pullback)
 IDENTIFIER(TangentVector)
+IDENTIFIER(zero)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

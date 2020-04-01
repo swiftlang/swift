@@ -262,7 +262,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
       CCCache(new SwiftCompletionCache) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
-  RuntimeResourcePath = LibPath.str();
+  RuntimeResourcePath = std::string(LibPath.str());
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
@@ -273,10 +273,10 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   CompletionInst = std::make_unique<CompletionInstance>();
 
   // By default, just use the in-memory cache.
-  CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
+  CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
 
   // Provide a default file system provider.
-  setFileSystemProvider("in-memory-vfs", llvm::make_unique<InMemoryFileSystemProvider>());
+  setFileSystemProvider("in-memory-vfs", std::make_unique<InMemoryFileSystemProvider>());
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
@@ -771,7 +771,6 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
     }
 
     // Ignore these.
-    case DAK_ImplicitlySynthesizesNestedRequirement:
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
     case DAK_HasInitialValue:
@@ -898,11 +897,11 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
 }
 
 std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
-  std::string InputPath = FilePath;
+  std::string InputPath = FilePath.str();
   llvm::SmallString<256> output;
   if (llvm::sys::fs::real_path(InputPath, output))
     return InputPath;
-  return output.str();
+  return std::string(output.str());
 }
 
 void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {

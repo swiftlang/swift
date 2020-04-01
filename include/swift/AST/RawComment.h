@@ -86,6 +86,7 @@ struct LineColumn {
 
 struct BasicDeclLocs {
   StringRef SourceFilePath;
+  SmallVector<std::pair<LineColumn, uint32_t>, 4> DocRanges;
   LineColumn Loc;
   LineColumn StartLoc;
   LineColumn EndLoc;

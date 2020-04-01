@@ -100,11 +100,11 @@ func f7() -> (c: Int, v: A) {
 }
 
 func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
-// expected-note@-1 {{required by global function 'f8' where 'T' = '(Int, Double)'}}
+// expected-note@-1 {{required by global function 'f8' where 'T' = 'Tup' (aka '(Int, Double)')}}
 f8(3, f4) // expected-error {{global function 'f8' requires that 'Int' conform to 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{type '(Int, Double)' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
+f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -127,7 +127,9 @@ protocol Shoes {
 
 // Here the opaque value has type (metatype_type (archetype_type ... ))
 func f(_ x: Shoes, asType t: Shoes.Type) {
-  return t.select(x) // expected-error{{unexpected non-void return value in void function}}
+  return t.select(x) 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 precedencegroup Starry {
@@ -184,7 +186,9 @@ func perform<T>() {}  // expected-error {{generic parameter 'T' is not used in f
 
 // <rdar://problem/17080659> Error Message QOI - wrong return type in an overload
 func recArea(_ h: Int, w : Int) {
-  return h * w  // expected-error {{unexpected non-void return value in void function}}
+  return h * w  
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong
@@ -195,10 +199,10 @@ func r17224804(_ monthNumber : Int) {
 
 // <rdar://problem/17020197> QoI: Operand of postfix '!' should have optional type; type is 'Int?'
 func r17020197(_ x : Int?, y : Int) {
-  if x! {  }  // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if x! {  }  // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
   // <rdar://problem/12939553> QoI: diagnostic for using an integer in a condition is utterly terrible
-  if y {}    // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if y {}    // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 }
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
@@ -251,7 +255,8 @@ struct Toe {
   let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
 
   func clip() {
-    toenail.inspect { x in
+    // TODO(diagnostics): Solver should stop once it has detected that `toenail` doesn't exist and report that.
+    toenail.inspect { x in // expected-error {{type of expression is ambiguous without more context}}
       toenail.inspect { y in }
     }
   }
@@ -288,7 +293,7 @@ func r18800223(_ i : Int) {
 
   
   var buttonTextColor: String?
-  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{unable to infer closure type in the current context}}
+  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
@@ -399,11 +404,11 @@ f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to ex
 f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-let f8 = f7(2)
-_ = f8(1)
-f8(10)          // expected-warning {{result of call to function returning 'Int' is unused}}
-f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
+let f10 = f7(2)
+_ = f10(1)
+f10(10)          // expected-warning {{result of call to function returning 'Int' is unused}}
+f10(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+f10(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 
@@ -492,7 +497,9 @@ enum Color {
   static func rainbow() -> Color {}
   
   static func overload(a : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(a:)')}}
+  // expected-note@-1 {{candidate has partially matching parameter list (a: Int)}}
   static func overload(b : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(b:)')}}
+  // expected-note@-1 {{candidate has partially matching parameter list (b: Int)}}
   
   static func frob(_ a : Int, b : inout Int) -> Color {}
   static var svar: Color { return .Red }
@@ -517,8 +524,7 @@ let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of t
 let _ : Color = .rainbow  // expected-error {{member 'rainbow()' is a function; did you mean to call it?}} {{25-25=()}}
 
 let _: Color = .overload(a : 1.0)  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-let _: Color = .overload(1.0)  // expected-error {{ambiguous reference to member 'overload'}}
-// expected-note @-1 {{overloads for 'overload' exist with these partially matching parameter lists: (a: Int), (b: Int)}}
+let _: Color = .overload(1.0)  // expected-error {{no exact matches in call to static method 'overload'}}
 let _: Color = .overload(1)  // expected-error {{no exact matches in call to static method 'overload'}}
 let _: Color = .frob(1.0, &i) // expected-error {{missing argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
@@ -633,11 +639,11 @@ func r18397777(_ d : r21447318?) {
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
   }
   
-  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{8-8= != nil)}}
+  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
 
   }
 
-  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{18-18= != nil)}}
+  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
   }
 }
 
@@ -661,9 +667,10 @@ _ = (i = 6) ? 42 : 57 // expected-error {{use of '=' in a boolean context, did y
 // <rdar://problem/22263468> QoI: Not producing specific argument conversion diagnostic for tuple init
 func r22263468(_ a : String?) {
   typealias MyTuple = (Int, String)
-  _ = MyTuple(42, a) // expected-error {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
-  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // TODO(diagnostics): This is a regression from diagnosing missing optional unwrap for `a`, we have to
+  // re-think the way errors in tuple elements are detected because it's currently impossible to detect
+  // exactly what went wrong here and aggregate fixes for different elements at the same time.
+  _ = MyTuple(42, a) // expected-error {{tuple type 'MyTuple' (aka '(Int, String)') is not convertible to tuple type '(Int, String?)'}}
 }
 
 
@@ -721,7 +728,6 @@ func r23560128() {
   var a : (Int,Int)?
   a.0 = 42 // expected-error{{value of optional type '(Int, Int)?' must be unwrapped to refer to member '0' of wrapped base type '(Int, Int)'}}
   // expected-note@-1{{chain the optional }}
-  // expected-note@-2{{force-unwrap using '!'}}
 }
 
 // <rdar://problem/21890157> QoI: wrong error message when accessing properties on optional structs without unwrapping
@@ -731,7 +737,6 @@ struct ExampleStruct21890157 {
 var example21890157: ExampleStruct21890157?
 example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' must be unwrapped to refer to member 'property' of wrapped base type 'ExampleStruct21890157'}}
   // expected-note@-1{{chain the optional }}
-  // expected-note@-2{{force-unwrap using '!'}}
 
 
 struct UnaryOp {}
@@ -751,7 +756,9 @@ func segfault23433271(_ a : UnsafeMutableRawPointer) {
 // <rdar://problem/23272739> Poor diagnostic due to contextual constraint
 func r23272739(_ contentType: String) {
   let actualAcceptableContentTypes: Set<String> = []
-  return actualAcceptableContentTypes.contains(contentType)  // expected-error {{unexpected non-void return value in void function}}
+  return actualAcceptableContentTypes.contains(contentType)  
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
@@ -862,8 +869,8 @@ class Foo23752537 {
 extension Foo23752537 {
   func isEquivalent(other: Foo23752537) {
     // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
-    // expected-error @+1 {{unexpected non-void return value in void function}}
-    return (self.title != other.title && self.message != other.message)
+    // expected-error@+1 {{unexpected non-void return value in void function}} 
+    return (self.title != other.title && self.message != other.message) // expected-note {{did you mean to add a return type?}}
   }
 }
 
@@ -889,7 +896,9 @@ func f23213302() {
 
 // <rdar://problem/24202058> QoI: Return of call to overloaded function in void-return context
 func rdar24202058(a : Int) {
-  return a <= 480 // expected-error {{unexpected non-void return value in void function}}
+  return a <= 480 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // SR-1752: Warning about unused result with ternary operator
@@ -926,7 +935,7 @@ class CacheValue {
 
 func valueForKey<K>(_ key: K) -> CacheValue? {
   let cache = NSCache<K, CacheValue>()
-  return cache.object(forKey: key)?.value // expected-error {{no exact matches in call to instance method 'value'}}
+  return cache.object(forKey: key)?.value // expected-error {{no exact matches in reference to instance method 'value'}}
 }
 
 // SR-2242: poor diagnostic when argument label is omitted
@@ -952,7 +961,9 @@ r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unname
 
 // SR-1255
 func foo1255_1() {
-  return true || false // expected-error {{unexpected non-void return value in void function}}
+  return true || false 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 func foo1255_2() -> Int {
   return true || false // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
@@ -1074,7 +1085,7 @@ func SR_6272_c() {
 struct SR_6272_D: ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral: Int) {}
-  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note 2 {{candidate expects value of type 'Int' for parameter #2}}
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 }
 }
 
 func SR_6272_d() {
@@ -1149,6 +1160,7 @@ func sr5045() {
   let doubles: [Double] = [1, 2, 3]
   return doubles.reduce(0, +)
   // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // rdar://problem/32934129 - QoI: misleading diagnostic
@@ -1164,7 +1176,9 @@ class L_32934129<T : Comparable> {
 
   func length() -> Int {
     func inner(_ list: L_32934129<T>?, _ count: Int) {
-    guard let list = list else { return count } // expected-error {{unexpected non-void return value in void function}}
+    guard let list = list else { return count } 
+      // expected-error@-1 {{unexpected non-void return value in void function}}
+      // expected-note@-2 {{did you mean to add a return type?}}
       return inner(list.next, count + 1)
     }
 
@@ -1270,7 +1284,7 @@ func badTypes() {
 // rdar://34357545
 func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
-  // expected-error@-1 {{expression type 'Bool' is ambiguous without more context}}
+  // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
 }
 
 func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
@@ -1314,3 +1328,90 @@ takesGenericFunction(true) // expected-error {{cannot convert value of type 'Boo
 func takesTuple<T>(_ x: ([T], [T])) {} // expected-note {{in call to function 'takesTuple'}}
 takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([T], [T])'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+
+// Void function returns non-void result fix-it
+
+func voidFunc() {
+  return 1 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{16-16= -> <#Return Type#>}}
+}
+
+func voidFuncWithArgs(arg1: Int) {
+  return 1 
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{33-33= -> <#Return Type#>}}
+}
+
+func voidFuncWithCondFlow() {
+  if Bool.random() {
+    return 1
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{28-28= -> <#Return Type#>}}
+  } else {
+    return 2
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{28-28= -> <#Return Type#>}}
+  }
+}
+
+func voidFuncWithNestedVoidFunc() {
+  func nestedVoidFunc() {
+    return 1
+    // expected-error@-1 {{unexpected non-void return value in void function}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{24-24= -> <#Return Type#>}}
+  }
+}
+
+// Special cases: These should not offer a note + fix-it
+
+func voidFuncExplicitType() -> Void {
+  return 1 // expected-error {{unexpected non-void return value in void function}}
+}
+
+class ClassWithDeinit {
+  deinit {
+    return 0 // expected-error {{unexpected non-void return value in void function}}
+  }
+}
+
+class ClassWithVoidProp {
+  var propertyWithVoidType: () { return 5 } // expected-error {{unexpected non-void return value in void function}}
+}
+
+class ClassWithPropContainingSetter {
+  var propWithSetter: Int {
+    get { return 0 }
+    set { return 1 } // expected-error {{unexpected non-void return value in void function}}
+  }
+}
+
+// https://bugs.swift.org/browse/SR-11964
+struct Rect {
+    let width: Int
+    let height: Int
+}
+
+struct Frame {
+    func rect(width: Int, height: Int) -> Rect {
+        Rect(width: width, height: height)
+    }
+
+    let rect: Rect
+}
+
+func foo(frame: Frame) {
+    frame.rect.width + 10.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+    // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
+
+}
+
+// Make sure we prefer the conformance failure.
+func f11(_ n: Int) {}
+func f11<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
+f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform to 'P2'}}
+
+// FIXME: Arguably we should also prefer the conformance failure in this case.
+let f12: (Int) -> Void = { _ in }
+func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}
+f12(3, f4)// expected-error {{extra argument in call}}

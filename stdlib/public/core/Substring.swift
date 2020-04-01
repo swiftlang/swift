@@ -200,8 +200,9 @@ extension Substring: StringProtocol {
     return _slice.distance(from: start, to: end)
   }
 
+  @inlinable
   public subscript(i: Index) -> Character {
-    return _slice[i]
+    @inline(__always) get { return _slice[i] }
   }
 
   public mutating func replaceSubrange<C>(
@@ -389,6 +390,13 @@ extension Substring.UTF8View: BidirectionalCollection {
     return _slice.distance(from: start, to: end)
   }
 
+  @_alwaysEmitIntoClient
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try _slice.withContiguousStorageIfAvailable(body)
+  }
+
   @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _slice._failEarlyRangeCheck(index, bounds: bounds)
@@ -401,12 +409,15 @@ extension Substring.UTF8View: BidirectionalCollection {
     _slice._failEarlyRangeCheck(range, bounds: bounds)
   }
 
+  @inlinable
   public func index(before i: Index) -> Index { return _slice.index(before: i) }
 
+  @inlinable
   public func formIndex(before i: inout Index) {
     _slice.formIndex(before: &i)
   }
 
+  @inlinable
   public subscript(r: Range<Index>) -> Substring.UTF8View {
     // FIXME(strings): tests.
     _precondition(r.lowerBound >= startIndex && r.upperBound <= endIndex,
@@ -803,5 +814,3 @@ extension Substring {
     return Substring(_slice[r])
   }
 }
-
-

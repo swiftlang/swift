@@ -160,6 +160,12 @@ func foo(n: Float) -> Int {
 
 // CHECK: <kw>protocol</kw> Prot
 protocol Prot {
+  // CHECK: <kw>associatedtype</kw> Assoc1 = <type>Array</type><<type>Never</type>>
+  associatedtype Assoc1 = Array<Never>
+  // CHECK: <kw>associatedtype</kw> Assoc2 = <type>Void</type> <kw>where</kw> <type>Assoc2</type>: <type>Equatable</type>
+  associatedtype Assoc2 = Void where Assoc2: Equatable
+  // CHECK: <kw>associatedtype</kw> Assoc3: <type>Prot</type>, <type>Prot</type> = <type>Void</type> <kw>where</kw> <type>Assoc3</type>: <type>Prot</type>
+  associatedtype Assoc3: Prot, Prot = Void where Assoc3: Prot
   // CHECK: <kw>typealias</kw> Blarg
   typealias Blarg
   // CHECK: <kw>func</kw> protMeth(x: <type>Int</type>)
@@ -494,3 +500,50 @@ func typeAttr3(a: @ escaping () -> Int) {}
 
 // CHECK: <kw>func</kw> typeAttr2(a: @ <comment-block>/*this is fine...*/</comment-block> escaping () -> <type>Int</type>, b: <attr-builtin>@ escaping</attr-builtin> () -> <type>Int</type>) {}
 func typeAttr2(a: @ /*this is fine...*/ escaping () -> Int, b: @ escaping () -> Int) {}
+
+// CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+// CHECK: <kw>var</kw> iHave = <int>10</int>, multipleVars = <int>20</int>
+@available(iOS 99, *)
+var iHave = 10, multipleVars = 20
+
+enum MultipleCaseElements {
+  // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+  // CHECK: <kw>case</kw> foo, bar
+  @available(iOS 99, *)
+  case foo, bar
+}
+
+protocol P {}
+enum E {
+  // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <int>99</int>, *)
+  // CHECK: <kw>case</kw> a(<type>P</type>)
+  @available(iOS 99, *)
+  case a(P)
+}
+
+// Ideally this would be attr-builtin, but we don't actually have the attribute
+// in the AST at all.
+//
+// CHECK: <attr-id>@available</attr-id>(<kw>iOS</kw> <int>99</int>, *)
+// CHECK: <kw>var</kw> <kw>_</kw> = <int>10</int>
+@available(iOS 99, *)
+var _ = 10
+
+// CHECK: <type>Array</type><<type>T</type>> <kw>where</kw> <type>T</type>: <type>Equatable</type>
+typealias GenericAlias<T> = Array<T> where T: Equatable
+
+// Where clauses on contextually generic declarations
+//
+struct FreeWhere<T> {
+  // CHECK: <kw>func</kw> foo() <kw>where</kw> <type>T</type> == <type>Int</type>
+  func foo() where T == Int {}
+
+  // CHECK: <kw>subscript</kw>() -> <type>Int</type> <kw>where</kw> <type>T</type>: <type>Sequence</type>
+  subscript() -> Int where T: Sequence {}
+
+  // CHECK: <kw>enum</kw> Enum <kw>where</kw> <type>T</type> == <type>Int</type>
+  enum Enum where T == Int {}
+
+  // CHECK: <kw>typealias</kw> Alias = <type>Int</type> <kw>where</kw> <type>T</type> == <type>Int</type>
+  typealias Alias = Int where T == Int
+}

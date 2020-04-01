@@ -13,6 +13,12 @@
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "llvm/Support/CommandLine.h"
+
+llvm::cl::opt<std::string>
+    SILInlineNeverFuns("sil-inline-never-functions", llvm::cl::init(""),
+                       llvm::cl::desc("Never inline functions whose name "
+                                      "includes this string."));
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -556,49 +562,6 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
   return false;
 }
 
-// Returns true if the callee contains a partial apply instruction,
-// whose substitutions list would contain opened existentials after
-// inlining.
-static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
-  if (!AI.hasSubstitutions())
-    return false;
-
-  SILFunction *Callee = AI.getReferencedFunctionOrNull();
-  assert(Callee && "Trying to optimize a dynamic function?!");
-
-  auto SubsMap = AI.getSubstitutionMap();
-
-  // Bail if there are no open existentials in the list of substitutions.
-  bool HasNoOpenedExistentials = true;
-  for (auto Replacement : SubsMap.getReplacementTypes()) {
-    if (Replacement->hasOpenedExistential()) {
-      HasNoOpenedExistentials = false;
-      break;
-    }
-  }
-
-  if (HasNoOpenedExistentials)
-    return false;
-
-  for (auto &BB : *Callee) {
-    for (auto &I : BB) {
-      if (auto PAI = dyn_cast<PartialApplyInst>(&I)) {
-        if (!PAI->hasSubstitutions())
-          continue;
-
-        // Check if any of substitutions would contain open existentials
-        // after inlining.
-        auto PAISubMap = PAI->getSubstitutionMap();
-        PAISubMap = PAISubMap.subst(SubsMap);
-        if (PAISubMap.hasOpenedExistential())
-          return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 // Returns true if a given apply site should be skipped during the
 // early inlining pass.
 //
@@ -680,6 +643,13 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   if (!SILInliner::canInlineApplySite(AI))
     return nullptr;
 
+  // If our inline selection is only always inline, do a quick check if we have
+  // an always inline function and bail otherwise.
+  if (WhatToInline == InlineSelection::OnlyInlineAlways &&
+      Callee->getInlineStrategy() != AlwaysInline) {
+    return nullptr;
+  }
+
   ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();
   bool IsInStdlib = (SwiftModule->isStdlibModule() ||
                      SwiftModule->isOnoneSupportModule());
@@ -687,7 +657,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   // Don't inline functions that are marked with the @_semantics or @_effects
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
-    if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
+    if (WhatToInline >= InlineSelection::NoSemanticsAndGlobalInit) {
       if (shouldSkipApplyDuringEarlyInlining(AI))
         return nullptr;
       if (Callee->hasSemanticsAttr("inline_late"))
@@ -723,6 +693,10 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
+  if (!SILInlineNeverFuns.empty()
+      && Callee->getName().find(SILInlineNeverFuns, 0) != StringRef::npos)
+    return nullptr;
+
   if (!Callee->shouldOptimize()) {
     return nullptr;
   }
@@ -735,13 +709,14 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     // Check if passed Self is the same as the Self of the caller.
     // In this case, it is safe to inline because both functions
     // use the same Self.
-    if (AI.hasSelfArgument() && Caller->hasSelfMetadataParam()) {
-      auto CalleeSelf = stripCasts(AI.getSelfArgument());
-      auto CallerSelf = Caller->getSelfMetadataArgument();
-      if (CalleeSelf != SILValue(CallerSelf))
-        return nullptr;
-    } else
+    if (!AI.hasSelfArgument() || !Caller->hasSelfMetadataParam()) {
       return nullptr;
+    }
+    auto CalleeSelf = stripCasts(AI.getSelfArgument());
+    auto CallerSelf = Caller->getSelfMetadataArgument();
+    if (CalleeSelf != SILValue(CallerSelf)) {
+      return nullptr;
+    }
   }
 
   // Detect self-recursive calls.
@@ -779,12 +754,6 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
         // functions. Some tests depend on it.
         Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
       return nullptr;
-  }
-
-  // IRGen cannot handle partial_applies containing opened_existentials
-  // in its substitutions list.
-  if (calleeHasPartialApplyWithOpenedExistentials(AI)) {
-    return nullptr;
   }
 
   return Callee;

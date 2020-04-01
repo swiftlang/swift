@@ -127,6 +127,20 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
     const DeclContext *moduleScopeContext) {
   assert(moduleOrFile->isModuleScopeContext());
 
+  // Does the module scope have any separately-imported overlays shadowing
+  // the module we're looking into?
+  SmallVector<ModuleDecl *, 4> overlays;
+  moduleScopeContext->getSeparatelyImportedOverlays(
+      moduleOrFile->getParentModule(), overlays);
+  if (!overlays.empty()) {
+    // If so, look in each of those overlays.
+    for (auto overlay : overlays)
+      lookupInModule(decls, overlay, accessPath, moduleScopeContext);
+    // FIXME: This may not work gracefully if more than one of these lookups
+    // finds something.
+    return;
+  }
+
   const size_t initialCount = decls.size();
   size_t currentCount = decls.size();
 
@@ -229,17 +243,16 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
               decls.end());
 }
 
-llvm::Expected<QualifiedLookupResult> LookupInModuleRequest::evaluate(
+QualifiedLookupResult
+LookupInModuleRequest::evaluate(
     Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
     NLKind lookupKind, ResolutionKind resolutionKind,
     const DeclContext *moduleScopeContext) const {
   assert(moduleScopeContext->isModuleScopeContext());
 
-  auto &ctx = moduleOrFile->getASTContext();
-  FrontendStatsTracer tracer(ctx.Stats, "lookup-in-module");
-
   QualifiedLookupResult decls;
-  LookupByName lookup(ctx, resolutionKind, name, lookupKind);
+  LookupByName lookup(moduleOrFile->getASTContext(), resolutionKind,
+                      name, lookupKind);
   lookup.lookupInModule(decls, moduleOrFile, {}, moduleScopeContext);
   return decls;
 }

@@ -206,6 +206,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
       auto varInterfaceType = var->getValueInterfaceType();
+      bool isAutoClosure = false;
 
       if (var->getAttrs().hasAttribute<LazyAttr>()) {
         // If var is a lazy property, its value is provided for the underlying
@@ -221,7 +222,11 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         // accept a value of the original property type. Otherwise, the
         // memberwise initializer will be in terms of the backing storage
         // type.
-        if (!var->isPropertyMemberwiseInitializedWithWrappedType()) {
+        if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
+          varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
+          isAutoClosure =
+            var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure();
+        } else {
           varInterfaceType = backingPropertyType;
         }
       }
@@ -233,6 +238,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
+      arg->setAutoClosure(isAutoClosure);
 
       // Don't allow the parameter to accept temporary pointer conversions.
       arg->setNonEphemeralIfPossible();
@@ -411,10 +417,8 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
       auto *gp = cast<GenericTypeParamType>(type);
       if (gp->getDepth() < superclassDepth)
         return Type(gp).subst(subMap);
-      return CanGenericTypeParamType::get(
-        gp->getDepth() - superclassDepth + depth,
-          gp->getIndex(),
-          ctx);
+      return genericParams->getParams()[gp->getIndex()]
+                 ->getDeclaredInterfaceType();
     };
 
     auto lookupConformanceFn =
@@ -791,7 +795,7 @@ static void diagnoseMissingRequiredInitializer(
                      diag::required_initializer_here);
 }
 
-llvm::Expected<bool> AreAllStoredPropertiesDefaultInitableRequest::evaluate(
+bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *decl) const {
   assert(!decl->hasClangNode());
 
@@ -800,23 +804,35 @@ llvm::Expected<bool> AreAllStoredPropertiesDefaultInitableRequest::evaluate(
     // synthesize an initial value (e.g. for an optional) then we suppress
     // generation of the default initializer.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
-      if (pbd->hasStorage() && !pbd->isStatic()) {
-        for (auto idx : range(pbd->getNumPatternEntries())) {
-          if (pbd->isInitialized(idx)) continue;
+      // Static variables are irrelevant.
+      if (pbd->isStatic()) {
+        continue;
+      }
 
+      for (auto idx : range(pbd->getNumPatternEntries())) {
+        bool HasStorage = false;
+        bool CheckDefaultInitializer = true;
+        pbd->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
           // If one of the bound variables is @NSManaged, go ahead no matter
           // what.
-          bool CheckDefaultInitializer = true;
-          pbd->getPattern(idx)->forEachVariable([&](VarDecl *vd) {
-            if (vd->getAttrs().hasAttribute<NSManagedAttr>())
-              CheckDefaultInitializer = false;
-          });
-        
-          // If we cannot default initialize the property, we cannot
-          // synthesize a default initializer for the class.
-          if (CheckDefaultInitializer && !pbd->isDefaultInitializable())
-            return false;
-        }
+          if (VD->getAttrs().hasAttribute<NSManagedAttr>())
+            CheckDefaultInitializer = false;
+
+          if (VD->hasStorage())
+            HasStorage = true;
+          auto *backing = VD->getPropertyWrapperBackingProperty();
+          if (backing && backing->hasStorage())
+            HasStorage = true;
+        });
+
+        if (!HasStorage) continue;
+
+        if (pbd->isInitialized(idx)) continue;
+
+        // If we cannot default initialize the property, we cannot
+        // synthesize a default initializer for the class.
+        if (CheckDefaultInitializer && !pbd->isDefaultInitializable())
+          return false;
       }
     }
   }
@@ -833,7 +849,7 @@ static bool areAllStoredPropertiesDefaultInitializable(Evaluator &eval,
       eval, AreAllStoredPropertiesDefaultInitableRequest{decl}, false);
 }
 
-llvm::Expected<bool>
+bool
 HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
                                               NominalTypeDecl *decl) const {
   assert(!decl->hasClangNode());
@@ -999,16 +1015,21 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   }
 }
 
-llvm::Expected<bool>
+bool
 InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
                                                 ClassDecl *decl) const {
+  // Check if we parsed the @_inheritsConvenienceInitializers attribute.
+  if (decl->getAttrs().hasAttribute<InheritsConvenienceInitializersAttr>())
+    return true;
+
   auto superclass = decl->getSuperclass();
   assert(superclass);
 
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
   auto *superclassDecl = superclass->getClassOrBoundGenericClass();
-  if (superclassDecl->hasMissingDesignatedInitializers())
+  if (superclassDecl->getModuleContext() != decl->getParentModule() &&
+      superclassDecl->hasMissingDesignatedInitializers())
     return false;
 
   // If we're allowed to inherit designated initializers, then we can inherit
@@ -1064,15 +1085,18 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   (void)decl->getDefaultInitializer();
 }
 
-llvm::Expected<bool>
+evaluator::SideEffect
 ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *target,
                                        ImplicitMemberAction action) const {
   // FIXME: This entire request is a layering violation made of smaller,
   // finickier layering violations. See rdar://56844567
 
-  auto &Context = target->getASTContext();
-  auto tryToInstallCodingKeys = [&](ProtocolDecl *protocol) {
+  // Checks whether the target conforms to the given protocol. If the
+  // conformance is incomplete, force the conformance.
+  //
+  // Returns whether the target conforms to the protocol.
+  auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
     if (!protocol)
       return false;
 
@@ -1095,6 +1119,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     return true;
   };
 
+  auto &Context = target->getASTContext();
   switch (action) {
   case ImplicitMemberAction::ResolveImplicitInit:
     TypeChecker::addImplicitConstructors(target);
@@ -1112,16 +1137,35 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     // synthesized, it will be synthesized.
     auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
     auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-    if (!tryToInstallCodingKeys(decodableProto)) {
-      (void)tryToInstallCodingKeys(encodableProto);
+    if (!evaluateTargetConformanceTo(decodableProto)) {
+      (void)evaluateTargetConformanceTo(encodableProto);
     }
   }
     break;
+  case ImplicitMemberAction::ResolveEncodable: {
+    // encode(to:) may be synthesized as part of derived conformance to the
+    // Encodable protocol.
+    // If the target should conform to the Encodable protocol, check the
+    // conformance here to attempt synthesis.
+    auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
+    (void)evaluateTargetConformanceTo(encodableProto);
   }
-  return true;
+    break;
+  case ImplicitMemberAction::ResolveDecodable: {
+    // init(from:) may be synthesized as part of derived conformance to the
+    // Decodable protocol.
+    // If the target should conform to the Decodable protocol, check the
+    // conformance here to attempt synthesis.
+    TypeChecker::addImplicitConstructors(target);
+    auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
+    (void)evaluateTargetConformanceTo(decodableProto);
+  }
+    break;
+  }
+  return std::make_tuple<>();
 }
 
-llvm::Expected<bool>
+bool
 HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                    StructDecl *decl) const {
   if (!shouldAttemptInitializerSynthesis(decl))
@@ -1146,7 +1190,7 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-llvm::Expected<ConstructorDecl *>
+ConstructorDecl *
 SynthesizeMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                           NominalTypeDecl *decl) const {
   // Create the implicit memberwise constructor.
@@ -1157,7 +1201,94 @@ SynthesizeMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   return ctor;
 }
 
-llvm::Expected<bool>
+ConstructorDecl *
+ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
+                                                NominalTypeDecl *decl) const {
+  // Compute the access level for the memberwise initializer. The minimum of:
+  // - Public, by default. This enables public nominal types to have public
+  //   memberwise initializers.
+  //   - The `public` default is important for synthesized member types, e.g.
+  //     `TangentVector` structs synthesized during `Differentiable` derived
+  //     conformances. Manually extending these types to define a public
+  //     memberwise initializer causes a redeclaration error.
+  // - The minimum access level of memberwise-initialized properties in the
+  //   nominal type declaration.
+  auto accessLevel = AccessLevel::Public;
+  for (auto *member : decl->getMembers()) {
+    auto *var = dyn_cast<VarDecl>(member);
+    if (!var ||
+        !var->isMemberwiseInitialized(/*preferDeclaredProperties*/ true))
+      continue;
+    accessLevel = std::min(accessLevel, var->getFormalAccess());
+  }
+  auto &ctx = decl->getASTContext();
+
+  // If a memberwise initializer exists, set its access level and return it.
+  if (auto *initDecl = decl->getMemberwiseInitializer()) {
+    initDecl->overwriteAccess(accessLevel);
+    return initDecl;
+  }
+
+  auto isEffectiveMemberwiseInitializer = [&](ConstructorDecl *initDecl) {
+    // Check for `nullptr`.
+    if (!initDecl)
+      return false;
+    // Get all stored properties, excluding `let` properties with initial
+    // values.
+    SmallVector<VarDecl *, 8> storedProperties;
+    for (auto *vd : decl->getStoredProperties()) {
+      if (vd->isLet() && vd->hasInitialValue())
+        continue;
+      storedProperties.push_back(vd);
+    }
+    // Return false if initializer does not have interface type set. It is not
+    // possible to determine whether it is a memberwise initializer.
+    if (!initDecl->hasInterfaceType())
+      return false;
+    auto initDeclType =
+        initDecl->getMethodInterfaceType()->getAs<AnyFunctionType>();
+    // Return false if initializer does not have a valid interface type.
+    if (!initDeclType)
+      return false;
+    // Return false if stored property count does not have parameter count.
+    if (storedProperties.size() != initDeclType->getNumParams())
+      return false;
+    // Return true if all stored property types/names match initializer
+    // parameter types/labels.
+    return llvm::all_of(
+        llvm::zip(storedProperties, initDeclType->getParams()),
+        [&](std::tuple<VarDecl *, AnyFunctionType::Param> pair) {
+          auto *storedProp = std::get<0>(pair);
+          auto param = std::get<1>(pair);
+          return storedProp->getInterfaceType()->isEqual(
+                     param.getPlainType()) &&
+                 storedProp->getName() == param.getLabel();
+        });
+  };
+
+  // Otherwise, look for a user-defined effective memberwise initializer.
+  ConstructorDecl *memberwiseInitDecl = nullptr;
+  auto initDecls = decl->lookupDirect(DeclBaseName::createConstructor());
+  for (auto *decl : initDecls) {
+    auto *initDecl = dyn_cast<ConstructorDecl>(decl);
+    if (!isEffectiveMemberwiseInitializer(initDecl))
+      continue;
+    assert(!memberwiseInitDecl && "Memberwise initializer already found");
+    memberwiseInitDecl = initDecl;
+  }
+
+  // Otherwise, create a memberwise initializer, set its access level, and
+  // return it.
+  if (!memberwiseInitDecl) {
+    memberwiseInitDecl = createImplicitConstructor(
+        decl, ImplicitConstructorKind::Memberwise, ctx);
+    memberwiseInitDecl->overwriteAccess(accessLevel);
+    decl->addMember(memberwiseInitDecl);
+  }
+  return memberwiseInitDecl;
+}
+
+bool
 HasDefaultInitRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *decl) const {
   assert(isa<StructDecl>(decl) || isa<ClassDecl>(decl));
@@ -1197,12 +1328,13 @@ synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
            /*isTypeChecked=*/true };
 }
 
-llvm::Expected<ConstructorDecl *>
+ConstructorDecl *
 SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
-  FrontendStatsTracer StatsTracer(ctx.Stats, "define-default-ctor", decl);
+  FrontendStatsTracer StatsTracer(ctx.Stats,
+                                  "define-default-ctor", decl);
   PrettyStackTraceDecl stackTrace("defining default constructor for",
                                   decl);
 
@@ -1217,4 +1349,41 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
   // Lazily synthesize an empty body for the default constructor.
   ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
   return ctor;
+}
+
+ValueDecl *swift::getProtocolRequirement(ProtocolDecl *protocol,
+                                         Identifier name) {
+  auto lookup = protocol->lookupDirect(name);
+  // Erase declarations that are not protocol requirements.
+  // This is important for removing default implementations of the same name.
+  llvm::erase_if(lookup, [](ValueDecl *v) {
+    return !isa<ProtocolDecl>(v->getDeclContext()) ||
+           !v->isProtocolRequirement();
+  });
+  assert(lookup.size() == 1 && "Ambiguous protocol requirement");
+  return lookup.front();
+}
+
+bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
+  return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
+    return v->isLet() && v->hasInitialValue();
+  });
+}
+
+void swift::addFixedLayoutAttr(NominalTypeDecl *nominal) {
+  auto &C = nominal->getASTContext();
+  // If nominal already has `@_fixed_layout`, return.
+  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
+    return;
+  auto access = nominal->getEffectiveAccess();
+  // If nominal does not have at least internal access, return.
+  if (access < AccessLevel::Internal)
+    return;
+  // If nominal is internal, it should have the `@usableFromInline` attribute.
+  if (access == AccessLevel::Internal &&
+      !nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    nominal->getAttrs().add(new (C) UsableFromInlineAttr(/*Implicit*/ true));
+  }
+  // Add `@_fixed_layout` to the nominal.
+  nominal->getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
 }

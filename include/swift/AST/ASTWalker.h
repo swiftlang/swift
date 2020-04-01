@@ -20,6 +20,7 @@ namespace swift {
 
 class Decl;
 class Expr;
+class ClosureExpr;
 class ModuleDecl;
 class Stmt;
 class Pattern;
@@ -219,7 +220,13 @@ public:
   /// For work that is performed for every top-level expression, this should
   /// be overridden to return false, to avoid duplicating work or visiting
   /// bodies of closures that have not yet been type checked.
-  virtual bool shouldWalkIntoNonSingleExpressionClosure() { return true; }
+  virtual bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *) {
+    return true;
+  }
+
+  /// This method configures whether the walker should visit the body of a
+  /// TapExpr.
+  virtual bool shouldWalkIntoTapExpression() { return true; }
 
   /// This method configures whether the walker should exhibit the legacy
   /// behavior where accessors appear as peers of their storage, rather

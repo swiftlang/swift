@@ -165,6 +165,7 @@ SIL_KEYWORD(sil_vtable)
 SIL_KEYWORD(sil_global)
 SIL_KEYWORD(sil_witness_table)
 SIL_KEYWORD(sil_default_witness_table)
+SIL_KEYWORD(sil_differentiability_witness)
 SIL_KEYWORD(sil_coverage_map)
 SIL_KEYWORD(sil_scope)
 

@@ -54,6 +54,9 @@ SIMPLE_LOCATOR_PATH_ELT(AutoclosureResult)
 /// The result of a closure.
 SIMPLE_LOCATOR_PATH_ELT(ClosureResult)
 
+/// The type of a closure body.
+CUSTOM_LOCATOR_PATH_ELT(ClosureBody)
+
 /// The lookup for a constructor member.
 SIMPLE_LOCATOR_PATH_ELT(ConstructorMember)
 
@@ -171,6 +174,12 @@ CUSTOM_LOCATOR_PATH_ELT(Witness)
 SIMPLE_LOCATOR_PATH_ELT(Condition)
 
 SIMPLE_LOCATOR_PATH_ELT(DynamicCallable)
+
+/// The 'true' or 'false' branch of a ternary operator.
+CUSTOM_LOCATOR_PATH_ELT(TernaryBranch)
+
+/// Performing a pattern patch.
+CUSTOM_LOCATOR_PATH_ELT(PatternMatch)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

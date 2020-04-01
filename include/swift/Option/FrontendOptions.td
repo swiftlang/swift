@@ -126,8 +126,14 @@ def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
   
-def enable_descriptive_diagnostics : Flag<["-"], "enable-descriptive-diagnostics">,
-  HelpText<"Show descriptive diagnostic information, if available.">;
+def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
+  HelpText<"Automatically import declared cross-import overlays.">;
+def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
+  HelpText<"Do not automatically import declared cross-import overlays.">;
+  
+def enable_experimental_diagnostic_formatting :
+  Flag<["-"], "enable-experimental-diagnostic-formatting">,
+  HelpText<"Enable experimental diagnostic formatting features.">;
   
 def diagnostic_documentation_path
   : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
@@ -181,10 +187,6 @@ def autolink_library : Separate<["-"], "autolink-library">,
 
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
-
-def disable_serialization_nested_type_lookup_table :
-  Flag<["-"], "disable-serialization-nested-type-lookup-table">,
-  HelpText<"Force module merging to use regular lookups to find nested types">;
 
 } // end let Flags = [FrontendOption, NoDriverOption]
 
@@ -246,8 +248,10 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
 
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
+def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph">,
+  HelpText<"Build request dependency graph">;
 def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
-  HelpText<"Emit GraphViz output visualizing the request graph">;
+  HelpText<"Emit GraphViz output visualizing the request dependency graph">;
 
 def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
   HelpText<"Prints the time taken by each compilation phase">;
@@ -279,6 +283,9 @@ def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
 
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
+
+def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
+  HelpText<"Enable speculative devirtualization pass.">;
 
 def enable_ownership_stripping_after_serialization
   : Flag<["-"], "enable-ownership-stripping-after-serialization">,
@@ -331,6 +338,10 @@ def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
 def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;
+
+def function_sections: Flag<["-"], "function-sections">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit functions to separate sections.">;
 
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
@@ -496,6 +507,10 @@ def disable_debugger_shadow_copies : Flag<["-"], "disable-debugger-shadow-copies
            "This option is only useful for testing the compiler.">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def disable_concrete_type_metadata_mangled_name_accessors : Flag<["-"], "disable-concrete-type-metadata-mangled-name-accessors">,
+  HelpText<"Disable concrete type metadata access by mangled name">,
+  Flags<[FrontendOption, HelpHidden]>;
+  
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
 
@@ -534,6 +549,9 @@ def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
 
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
+  
+def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
+  HelpText<"Verify all SubstitutionMaps on construction">;
 
 def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
   HelpText<"Do not eliminate functions in Mandatory Inlining/SILCombine dead "
@@ -583,6 +601,10 @@ def external_pass_pipeline_filename : Separate<["-"], "external-pass-pipeline-fi
 def index_system_modules : Flag<["-"], "index-system-modules">,
   HelpText<"Emit index data for imported serialized swift system modules">;
 
+def index_ignore_stdlib :
+  Flag<["-"], "index-ignore-stdlib">,
+  HelpText<"Avoid emitting index data for the standard library.">;
+
 def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
    ModeOpt;
@@ -601,6 +623,11 @@ def module_interface_preserve_types_as_written :
   Flag<["-"], "module-interface-preserve-types-as-written">,
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
+
+def experimental_print_full_convention :
+ Flag<["-"], "experimental-print-full-convention">,
+ HelpText<"When emitting a module interface, emit additional @convention "
+          "arguments, regardless of whether they were written in the source">;
 
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
@@ -637,6 +664,14 @@ def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
 def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
   HelpText<"Completely disable legacy type layout">;
 
+def disable_generic_metadata_prespecialization : Flag<["-"], "disable-generic-metadata-prespecialization">,
+  HelpText<"Do not statically specialize metadata for generic types at types "
+           "that are known to be used in source.">;
+
+def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata">,
+   HelpText<"Statically specialize metadata for generic types at types that "
+            "are known to be used in source.">;
+
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
 
@@ -647,4 +682,21 @@ def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
 def emit_ldadd_cfile_path
   : Separate<["-"], "emit-ldadd-cfile-path">, MetaVarName<"<path>">,
     HelpText<"Generate .c file defining symbols to add back">;
+
+def previous_module_installname_map_file
+  : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
+    HelpText<"Path to a Json file indicating module name to installname map for @_originallyDefinedIn">;
+
+def enable_type_layouts : Flag<["-"], "enable-type-layout">,
+  HelpText<"Enable type layout based lowering">;
+
+def disable_type_layouts : Flag<["-"], "disable-type-layout">,
+  HelpText<"Disable type layout based lowering">;
+
+def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
+  HelpText<"Don't lock interface file when building module">;
+
+def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
+    HelpText<"Directory for bridging header to be printed in compatibility header">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

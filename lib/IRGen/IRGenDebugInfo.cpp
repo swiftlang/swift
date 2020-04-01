@@ -143,7 +143,8 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
 public:
   IRGenDebugInfoImpl(const IRGenOptions &Opts, ClangImporter &CI,
                      IRGenModule &IGM, llvm::Module &M,
-                     StringRef MainOutputFilenameForDebugInfo);
+                     StringRef MainOutputFilenameForDebugInfo,
+                     StringRef PrivateDiscriminator);
   void finalize();
 
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
@@ -658,10 +659,8 @@ private:
       }
     }
 
-    StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
     llvm::DIModule *M =
-        DBuilder.createModule(Parent, Name, ConfigMacros, RemappedIncludePath,
-                              Sysroot);
+        DBuilder.createModule(Parent, Name, ConfigMacros, RemappedIncludePath);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
@@ -789,6 +788,11 @@ private:
 
       break;
     }
+    
+    // TODO: Eliminate substitutions in SILFunctionTypes for now.
+    // On platforms where the substitutions affect representation, we will need
+    // to preserve this info and teach type reconstruction about it.
+    Ty = Ty->replaceSubstitutedSILFunctionTypesWithUnsubstituted(IGM.getSILModule());
 
     Mangle::ASTMangler Mangler;
     std::string Result = Mangler.mangleTypeForDebugger(
@@ -1607,7 +1611,7 @@ private:
       ClangDecl = ND->getClangDecl();
     }
     if (ClangDecl) {
-      clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
+      clang::ASTReader &Reader = *CI.getClangInstance().getASTReader();
       auto Idx = ClangDecl->getOwningModuleID();
       auto SubModuleDesc = Reader.getSourceDescriptor(Idx);
       auto TopLevelModuleDesc = getClangModule(*TypeDecl->getModuleContext());
@@ -1664,7 +1668,8 @@ private:
 IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        ClangImporter &CI, IRGenModule &IGM,
                                        llvm::Module &M,
-                                       StringRef MainOutputFilenameForDebugInfo)
+                                       StringRef MainOutputFilenameForDebugInfo,
+                                       StringRef PD)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), M(M), DBuilder(M),
       IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap) {
   assert(Opts.DebugInfoLevel > IRGenDebugInfoLevel::None &&
@@ -1678,7 +1683,6 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   unsigned Lang = llvm::dwarf::DW_LANG_Swift;
   std::string Producer = version::getSwiftFullVersion(
       IGM.Context.LangOpts.EffectiveLanguageVersion);
-  StringRef Flags = Opts.DebugFlags;
   unsigned Major, Minor;
   std::tie(Major, Minor) = version::getSwiftNumericVersion();
   unsigned MajorRuntimeVersion = Major;
@@ -1691,12 +1695,27 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       DBuilder.createFile(DebugPrefixMap.remapPath(SourcePath),
                           DebugPrefixMap.remapPath(Opts.DebugCompilationDir));
 
+  StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
+  StringRef SDK;
+  {
+    auto B = llvm::sys::path::rbegin(Sysroot);
+    auto E = llvm::sys::path::rend(Sysroot);
+    auto It = std::find_if(B, E, [](auto SDK) { return SDK.endswith(".sdk"); });
+    if (It != E)
+      SDK = *It;
+  }
+
   TheCU = DBuilder.createCompileUnit(
       Lang, MainFile,
-      Producer, Opts.shouldOptimize(), Flags, MajorRuntimeVersion, SplitName,
+      Producer, Opts.shouldOptimize(), Opts.getDebugFlags(PD),
+      MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
-          : llvm::DICompileUnit::LineTablesOnly);
+      : llvm::DICompileUnit::LineTablesOnly,
+      /* DWOId */ 0, /* SplitDebugInlining */ true,
+      /* DebugInfoForProfiling */ false,
+      llvm::DICompileUnit::DebugNameTableKind::Default,
+      /* RangesBaseAddress */ false, Sysroot, SDK);
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading
@@ -1845,7 +1864,7 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
   auto DL = llvm::DebugLoc::get(L.Line, L.Column, Scope, InlinedAt);
   Builder.SetCurrentDebugLocation(DL);
 }
-  
+
 void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
                                                        StringRef failureMsg) {
   auto TrapLoc = Builder.getCurrentDebugLocation();
@@ -1862,7 +1881,7 @@ void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
   FuncName += failureMsg;
 
   llvm::DISubprogram *TrapSP = DBuilder.createFunction(
-     MainModule, StringRef(), FuncName, TrapLoc->getFile(), 0, DIFnTy, 0,
+     MainModule, FuncName, StringRef(), TrapLoc->getFile(), 0, DIFnTy, 0,
      llvm::DINode::FlagArtificial, llvm::DISubprogram::SPFlagDefinition,
      nullptr, nullptr, nullptr);
 
@@ -2311,7 +2330,8 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (!Var)
     Expr = DBuilder.createConstantValueExpression(0);
   auto *GV = DBuilder.createGlobalVariableExpression(
-      MainModule, Name, LinkageName, File, L.Line, DITy, IsLocalToUnit, Expr);
+      MainModule, Name, LinkageName, File, L.Line, DITy, IsLocalToUnit, true,
+      Expr);
   if (Var)
     Var->addDebugInfo(GV);
 }
@@ -2355,9 +2375,11 @@ SILLocation::DebugLoc IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
 
 std::unique_ptr<IRGenDebugInfo> IRGenDebugInfo::createIRGenDebugInfo(
     const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
-    llvm::Module &M, StringRef MainOutputFilenameForDebugInfo) {
-  return llvm::make_unique<IRGenDebugInfoImpl>(Opts, CI, IGM, M,
-                                               MainOutputFilenameForDebugInfo);
+    llvm::Module &M, StringRef MainOutputFilenameForDebugInfo,
+    StringRef PrivateDiscriminator) {
+  return std::make_unique<IRGenDebugInfoImpl>(Opts, CI, IGM, M,
+                                               MainOutputFilenameForDebugInfo,
+                                               PrivateDiscriminator);
 }
 
 

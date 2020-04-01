@@ -140,11 +140,11 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
 -> SourceLocArgs {
   auto &ctx = getASTContext();
   
-  StringRef filename = "";
+  std::string filename = "";
   unsigned line = 0;
   unsigned column = 0;
   if (sourceLoc.isValid()) {
-    filename = ctx.SourceMgr.getDisplayNameForLoc(sourceLoc);
+    filename = getMagicFileString(sourceLoc);
     std::tie(line, column) = ctx.SourceMgr.getLineAndColumn(sourceLoc);
   }
   
@@ -160,7 +160,7 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
   auto i1Ty = SILType::getBuiltinIntegerType(1, ctx);
   
   SourceLocArgs result;
-  SILValue literal = B.createStringLiteral(emitLoc, filename,
+  SILValue literal = B.createStringLiteral(emitLoc, StringRef(filename),
                                            StringLiteralInst::Encoding::UTF8);
   result.filenameStartPointer = ManagedValue::forUnmanaged(literal);
   // File length
@@ -971,9 +971,8 @@ SILGenFunction::emitOpenExistential(
     existentialType = existentialValue.getType();
     assert(existentialType.isObject());
     if (loweredOpenedType.isAddress()) {
-      return ManagedValue::forUnmanaged(
-        B.createOpenExistentialBox(loc, existentialValue.getValue(),
-                                   loweredOpenedType));
+      return B.createOpenExistentialBox(loc, existentialValue,
+                                        loweredOpenedType);
     } else {
       assert(!silConv.useLoweredAddresses());
       return B.createOpenExistentialBoxValue(
@@ -1164,12 +1163,14 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
   case SubstToOrig:
     return SGF.emitSubstToOrigValue(loc, value,
                                     getReabstractionOrigType(),
-                                    getReabstractionSubstType(), C);
+                                    getReabstractionSubstType(),
+                                    getReabstractionLoweredResultType(), C);
 
   case OrigToSubst:
     return SGF.emitOrigToSubstValue(loc, value,
                                     getReabstractionOrigType(),
-                                    getReabstractionSubstType(), C);
+                                    getReabstractionSubstType(),
+                                    getReabstractionLoweredResultType(), C);
   }
   llvm_unreachable("bad kind");
 }
@@ -1231,6 +1232,8 @@ static void printReabstraction(const Conversion &conversion,
   conversion.getReabstractionOrigType().print(out);
   out << ", subst: ";
   conversion.getReabstractionSubstType().print(out);
+  out << ", loweredResult: ";
+  conversion.getReabstractionLoweredResultType().print(out);
   out << ')';
 }
 

@@ -16,5 +16,5 @@ import Swift
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: return
 
-var a = doSomething()
+public var a = doSomething()
 a.isBConfused()

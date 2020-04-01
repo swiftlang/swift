@@ -96,6 +96,7 @@ extension _AbstractStringStorage {
     // Handle the case where both strings were bridged from Swift.
     // We can't use String.== because it doesn't match NSString semantics.
     let knownOther = _KnownCocoaString(other)
+    var otherIsTagged = false
     switch knownOther {
     case .storage:
       return _nativeIsEqual(
@@ -105,6 +106,9 @@ extension _AbstractStringStorage {
         _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
 #if !(arch(i386) || arch(arm))
     case .tagged:
+      // Tagged means ASCII. If we're equal, our UTF-8 length is the same as our
+      // UTF-16 length, so just compare the UTF-8 length (which is faster).
+      otherIsTagged = true
       fallthrough
 #endif
     case .cocoa:
@@ -118,7 +122,11 @@ extension _AbstractStringStorage {
 
       defer { _fixLifetime(other) }
 
+
       let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
+      if otherIsTagged && self.count != otherUTF16Length {
+        return 0
+      }
 
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
@@ -131,7 +139,7 @@ extension _AbstractStringStorage {
           (memcmp(start, otherStart, count) == 0)) ? 1 : 0
       }
 
-      if UTF16Length != otherUTF16Length {
+      if self.UTF16Length != otherUTF16Length {
         return 0
       }
 

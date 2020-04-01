@@ -37,7 +37,7 @@ struct swift::ide::api::SDKNodeInitInfo {
 #define KEY_STRING_ARR(X, Y) std::vector<StringRef> X;
 #include "swift/IDE/DigesterEnums.def"
 
-  ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
+  swift::ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
   std::vector<DeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
 
@@ -126,7 +126,9 @@ SDKNodeTypeAlias::SDKNodeTypeAlias(SDKNodeInitInfo Info):
 SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclType), SuperclassUsr(Info.SuperclassUsr),
   SuperclassNames(Info.SuperclassNames),
-  EnumRawTypeName(Info.EnumRawTypeName), IsExternal(Info.IsExternal) {}
+  EnumRawTypeName(Info.EnumRawTypeName), IsExternal(Info.IsExternal),
+  HasMissingDesignatedInitializers(Info.HasMissingDesignatedInitializers),
+  InheritsConvenienceInitializers(Info.InheritsConvenienceInitializers) {}
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::Conformance),
@@ -590,7 +592,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   };
 
   static auto getAsInt = [&](llvm::yaml::Node *N) -> int {
-    return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
+    return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue().str());
   };
   static auto getAsBool = [&](llvm::yaml::Node *N) -> bool {
     auto txt = cast<llvm::yaml::ScalarNode>(N)->getRawValue();
@@ -1148,7 +1150,7 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
   if (auto *GC = D->getAsGenericContext()) {
     if (auto Sig = GC->getGenericSignature()) {
       if (Canonical)
-        Sig->getCanonicalSignature()->print(OS, Opts);
+        Sig.getCanonicalSignature()->print(OS, Opts);
       else
         Sig->print(OS, Opts);
       return Ctx.buffer(OS.str());
@@ -1403,6 +1405,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
         SuperclassNames.push_back(getPrintedName(Ctx, T->getCanonicalType()));
       }
     }
+    HasMissingDesignatedInitializers = CD->hasMissingDesignatedInitializers();
+    InheritsConvenienceInitializers = CD->inheritsSuperclassInitializers();
   }
 
   if (auto *FD = dyn_cast<FuncDecl>(VD)) {
@@ -1690,7 +1694,8 @@ SwiftDeclCollector::constructVarNode(ValueDecl *VD) {
   Info.IsImplicitlyUnwrappedOptional = VD->isImplicitlyUnwrappedOptional();
   Var->addChild(constructTypeNode(VD->getInterfaceType(), Info));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
-    for(auto *AC: VAD->getAllAccessors()) {
+    llvm::SmallVector<AccessorDecl*, 4> scratch;
+    for(auto *AC: VAD->getOpaqueAccessors(scratch)) {
       if (!Ctx.shouldIgnore(AC, VAD)) {
         Var->addAccessor(constructFunctionNode(AC, SDKNodeKind::DeclAccessor));
       }
@@ -1724,7 +1729,8 @@ SwiftDeclCollector::constructSubscriptDeclNode(SubscriptDecl *SD) {
   for (auto *Node: createParameterNodes(SD->getIndices())) {
     Subs->addChild(Node);
   }
-  for(auto *AC: SD->getAllAccessors()) {
+  llvm::SmallVector<AccessorDecl*, 4> scratch;
+  for(auto *AC: SD->getOpaqueAccessors(scratch)) {
     if (!Ctx.shouldIgnore(AC, SD)) {
       Subs->addAccessor(constructFunctionNode(AC, SDKNodeKind::DeclAccessor));
     }
@@ -1975,6 +1981,10 @@ void SDKNodeDeclType::jsonize(json::Output &out) {
   output(out, KeyKind::KK_superclassUsr, SuperclassUsr);
   output(out, KeyKind::KK_enumRawTypeName, EnumRawTypeName);
   output(out, KeyKind::KK_isExternal, IsExternal);
+  output(out, KeyKind::KK_hasMissingDesignatedInitializers,
+         HasMissingDesignatedInitializers);
+  output(out, KeyKind::KK_inheritsConvenienceInitializers,
+         InheritsConvenienceInitializers);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_superclassNames).data(), SuperclassNames);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_conformances).data(), Conformances);
 }

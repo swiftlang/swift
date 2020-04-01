@@ -1313,6 +1313,12 @@ FUNCTION(ProtocolAddProtocol, protocol_addProtocol,
          ARGS(ProtocolDescriptorPtrTy, ProtocolDescriptorPtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(ObjCOptSelf, objc_opt_self,
+         C_CC, AlwaysAvailable,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(ObjCClassPtrTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(Malloc, malloc, C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
          ARGS(SizeTy),

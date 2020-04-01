@@ -64,6 +64,9 @@ static SourceRange getRangeableSourceRange(const Rangeable *const p) {
 static SourceRange getRangeableSourceRange(const SpecializeAttr *a) {
   return a->getRange();
 }
+static SourceRange getRangeableSourceRange(const DifferentiableAttr *a) {
+  return a->getRange();
+}
 static SourceRange getRangeableSourceRange(const ASTNode n) {
   return n.getSourceRange();
 }
@@ -96,6 +99,17 @@ static void dumpRangeable(SpecializeAttr *r,
                           llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
 static void dumpRangeable(SpecializeAttr *r, llvm::raw_ostream &f) {
   llvm::errs() << "SpecializeAttr\n";
+}
+
+static void dumpRangeable(const DifferentiableAttr *a,
+                          llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
+static void dumpRangeable(const DifferentiableAttr *a, llvm::raw_ostream &f) {
+  llvm::errs() << "DifferentiableAttr\n";
+}
+static void dumpRangeable(DifferentiableAttr *a,
+                          llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
+static void dumpRangeable(DifferentiableAttr *a, llvm::raw_ostream &f) {
+  llvm::errs() << "DifferentiableAttr\n";
 }
 
 /// For Debugging
@@ -439,6 +453,22 @@ public:
       fn(specializeAttr);
   }
 
+  void forEachDifferentiableAttrInSourceOrder(
+      Decl *decl, function_ref<void(DifferentiableAttr *)> fn) {
+    std::vector<DifferentiableAttr *> sortedDifferentiableAttrs;
+    for (auto *attr : decl->getAttrs())
+      if (auto *diffAttr = dyn_cast<DifferentiableAttr>(attr))
+        // NOTE(TF-835): Skipping implicit `@differentiable` attributes is
+        // necessary to avoid verification failure in
+        // `ASTScopeImpl::verifyThatChildrenAreContainedWithin`.
+        // Perhaps this check may no longer be necessary after TF-835: robust
+        // `@derivative` attribute lowering.
+        if (!diffAttr->isImplicit())
+          sortedDifferentiableAttrs.push_back(diffAttr);
+    for (auto *diffAttr : sortBySourceRange(sortedDifferentiableAttrs))
+      fn(diffAttr);
+  }
+
   std::vector<ASTNode> expandIfConfigClausesThenCullAndSortElementsOrMembers(
       ArrayRef<ASTNode> input) const {
     auto cleanedupNodes = sortBySourceRange(cull(expandIfConfigClauses(input)));
@@ -493,7 +523,7 @@ private:
           // get inactive nodes that nest in active clauses
           for (auto n : clause.Elements) {
             if (auto *const d = n.dyn_cast<Decl *>())
-              if (auto *const icd = dyn_cast<IfConfigDecl>(d))
+              if (isa<IfConfigDecl>(d))
                 expandIfConfigClausesInto(expansion, {d}, true);
           }
         } else if (includeInactiveIfConfigClauses) {
@@ -1039,6 +1069,13 @@ void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
                   return enclosingAbstractStorageDecl == ad->getStorage();
                 });
 
+  // Create scopes for `@differentiable` attributes.
+  forEachDifferentiableAttrInSourceOrder(
+      asd, [&](DifferentiableAttr *diffAttr) {
+        ifUniqueConstructExpandAndInsert<DifferentiableAttributeScope>(
+            parent, diffAttr, asd);
+      });
+
   // Sort in order to include synthesized ones, which are out of order.
   for (auto *accessor : sortBySourceRange(accessorsToScope))
     addToScopeTree(accessor, parent);
@@ -1084,7 +1121,7 @@ ASTScopeImpl::expandAndBeCurrentDetectingRecursion(ScopeCreator &scopeCreator) {
                            ExpandASTScopeRequest{this, &scopeCreator}, nullptr);
 }
 
-llvm::Expected<ASTScopeImpl *>
+ASTScopeImpl *
 ExpandASTScopeRequest::evaluate(Evaluator &evaluator, ASTScopeImpl *parent,
                                 ScopeCreator *scopeCreator) const {
   auto *insertionPoint = parent->expandAndBeCurrent(*scopeCreator);
@@ -1183,6 +1220,7 @@ NO_NEW_INSERTION_POINT(WholeClosureScope)
 NO_EXPANSION(GenericParamScope)
 NO_EXPANSION(ClosureParametersScope)
 NO_EXPANSION(SpecializeAttributeScope)
+NO_EXPANSION(DifferentiableAttributeScope)
 NO_EXPANSION(ConditionalClausePatternUseScope)
 NO_EXPANSION(LookupParentDiversionScope)
 
@@ -1193,7 +1231,7 @@ AnnotatedInsertionPoint
 ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   ASTScopeAssert(SF, "Must already have a SourceFile.");
-  ArrayRef<Decl *> decls = SF->Decls;
+  ArrayRef<Decl *> decls = SF->getTopLevelDecls();
   // Assume that decls are only added at the end, in source order
   ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
   std::vector<ASTNode> newNodes(newDecls.begin(), newDecls.end());
@@ -1352,6 +1390,13 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
       decl, [&](SpecializeAttr *specializeAttr) {
         scopeCreator.ifUniqueConstructExpandAndInsert<SpecializeAttributeScope>(
             this, specializeAttr, decl);
+      });
+  // Create scopes for `@differentiable` attributes.
+  scopeCreator.forEachDifferentiableAttrInSourceOrder(
+      decl, [&](DifferentiableAttr *diffAttr) {
+        scopeCreator
+            .ifUniqueConstructExpandAndInsert<DifferentiableAttributeScope>(
+                this, diffAttr, decl);
       });
   // Create scopes for generic and ordinary parameters.
   // For a subscript declaration, the generic and ordinary parameters are in an
@@ -1681,6 +1726,10 @@ SpecializeAttributeScope::getEnclosingAbstractStorageDecl() const {
   return getParent().get()->getEnclosingAbstractStorageDecl();
 }
 NullablePtr<AbstractStorageDecl>
+DifferentiableAttributeScope::getEnclosingAbstractStorageDecl() const {
+  return getParent().get()->getEnclosingAbstractStorageDecl();
+}
+NullablePtr<AbstractStorageDecl>
 AbstractFunctionDeclScope::getEnclosingAbstractStorageDecl() const {
   return getParent().get()->getEnclosingAbstractStorageDecl();
 }
@@ -1727,7 +1776,7 @@ void ScopeCreator::forEachClosureIn(
       return {true, E};
     }
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      if (auto *bs = dyn_cast<BraceStmt>(S)) { // closures hidden in here
+      if (isa<BraceStmt>(S)) { // closures hidden in here
         return {true, S};
       }
       return {false, S};
@@ -1807,6 +1856,7 @@ GET_REFERRENT(AbstractStmtScope, getStmt())
 GET_REFERRENT(CaptureListScope, getExpr())
 GET_REFERRENT(WholeClosureScope, getExpr())
 GET_REFERRENT(SpecializeAttributeScope, specializeAttr)
+GET_REFERRENT(DifferentiableAttributeScope, differentiableAttr)
 GET_REFERRENT(GenericTypeOrExtensionScope, portion->getReferrentOfScope(this));
 
 const Decl *
@@ -1865,10 +1915,10 @@ void ASTScopeImpl::beCurrent() {}
 bool ASTScopeImpl::isCurrentIfWasExpanded() const { return true; }
 
 void ASTSourceFileScope::beCurrent() {
-  numberOfDeclsAlreadySeen = SF->Decls.size();
+  numberOfDeclsAlreadySeen = SF->getTopLevelDecls().size();
 }
 bool ASTSourceFileScope::isCurrentIfWasExpanded() const {
-  return SF->Decls.size() == numberOfDeclsAlreadySeen;
+  return SF->getTopLevelDecls().size() == numberOfDeclsAlreadySeen;
 }
 
 void IterableTypeScope::beCurrent() { portion->beCurrent(this); }
@@ -2082,7 +2132,7 @@ private:
     auto f = SM.getIdentifierForBuffer(bufID);
     auto lin = SM.getLineNumber(loc);
     if (f.endswith(file) && lin == line)
-      if (auto *v = dyn_cast<PatternBindingDecl>(D))
+      if (isa<PatternBindingDecl>(D))
         llvm::errs() << "*** catchForDebugging: " << lin << " ***\n";
   }
 };

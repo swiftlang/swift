@@ -396,7 +396,6 @@ bb3:
 //
 // CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] : @guaranteed
 // CHECK-NEXT:   [[CAST_VALUE_COPY:%.*]] = copy_value [[CAST_VALUE]]
-// CHECK-NEXT:   end_borrow [[CAST_VALUE]]
 // CHECK-NEXT:   end_borrow [[RELOADED_ARG]]
 // CHECK-NEXT:   store [[CAST_VALUE_COPY]] to [init] [[DEST_ADDR]]
 // CHECK-NEXT:   destroy_addr [[DEST_ADDR]]
@@ -404,7 +403,6 @@ bb3:
 // CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
 //
 // CHECK: [[FAILURE_BB]]([[FAILURE_BORROWED_ARG:%.*]] :
-// CHECK-NEXT:   end_borrow [[FAILURE_BORROWED_ARG]]
 // CHECK-NEXT:   end_borrow [[RELOADED_ARG]]
 // CHECK-NEXT:   destroy_addr [[SRC_ADDR]]
 // CHECK-NEXT:   br [[CONT_BB]]
@@ -530,7 +528,7 @@ bb2:
 // CHECK: } // end sil function 'begin_apply_devirt_caller'
 sil [ossa] @begin_apply_devirt_caller : $@convention(method) (@owned C2) -> @error Error {
 bb0(%0 : @owned $C2):
-  %1 = class_method %0 : $C2, #C2.i!modify.1 : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  %1 = class_method %0 : $C2, #C2.i!modify : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   (%mem, %tok) = begin_apply %1(%0) : $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   br bb1
 
@@ -546,7 +544,7 @@ bb1:
 // CHECK: } // end sil function 'begin_apply_devirt_caller_2'
 sil [ossa] @begin_apply_devirt_caller_2 : $@convention(method) (@owned C2) -> @error Error {
 bb0(%0 : @owned $C2):
-  %1 = class_method %0 : $C2, #C2.i!modify.1 : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  %1 = class_method %0 : $C2, #C2.i!modify : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   (%mem, %tok) = begin_apply %1(%0) : $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   br bb1
 
@@ -562,7 +560,7 @@ bb1:
 // CHECK: } // end sil function 'begin_apply_devirt_caller_3'
 sil [ossa] @begin_apply_devirt_caller_3 : $@convention(method) (@owned C2) -> @error Error {
 bb0(%0 : @owned $C2):
-  %1 = class_method %0 : $C2, #C2.i!modify.1 : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  %1 = class_method %0 : $C2, #C2.i!modify : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   (%mem, %tok) = begin_apply %1(%0) : $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   cond_br undef, bb1, bb2
 
@@ -582,5 +580,5 @@ bb3:
 
 
 sil_vtable C2 {
-  #C2.i!modify.1: (C2) -> () -> () : @devirt_callee
+  #C2.i!modify: (C2) -> () -> () : @devirt_callee
 }

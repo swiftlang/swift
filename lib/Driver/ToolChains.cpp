@@ -151,6 +151,12 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
     break;
   }
 
+  if (const Arg *variant = inputArgs.getLastArg(options::OPT_target_variant)) {
+    arguments.push_back("-target-variant");
+    std::string normalized = llvm::Triple::normalize(variant->getValue());
+    arguments.push_back(inputArgs.MakeArgString(normalized));
+  }
+
   // Enable address top-byte ignored in the ARM64 backend.
   if (Triple.getArch() == llvm::Triple::aarch64) {
     arguments.push_back("-Xllvm");
@@ -192,6 +198,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
+  inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability);
+  inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
   inputArgs.AddLastArg(arguments, options::OPT_enable_cxx_interop);
@@ -231,16 +239,25 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_fine_grained_dependencies);
   inputArgs.AddLastArg(arguments,
+                       options::OPT_disable_fine_grained_dependencies);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_type_fingerprints);
+  inputArgs.AddLastArg(arguments, options::OPT_disable_type_fingerprints);
+  inputArgs.AddLastArg(arguments,
                        options::OPT_fine_grained_dependency_include_intrafile);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_emit_fine_grained_dependency_sourcefile_dot_files);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
   inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
   inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);
+  inputArgs.AddLastArg(arguments, options::OPT_print_educational_notes);
   inputArgs.AddLastArg(arguments, options::OPT_enable_astscope_lookup);
   inputArgs.AddLastArg(arguments, options::OPT_disable_astscope_lookup);
   inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
-
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_verify_incremental_dependencies);
+  
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
@@ -249,6 +266,9 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
 
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
+
+  // Pass on module names whose symbols should be embeded in tbd.
+  inputArgs.AddAllArgs(arguments, options::OPT_embed_tbd_for_module);
 
   if (auto *A = inputArgs.getLastArg(options::OPT_working_directory)) {
     // Add -Xcc -working-directory before any other -Xcc options to ensure it is
@@ -384,11 +404,19 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     }
     if (usePersistentPCH) {
       context.Args.AddLastArg(Arguments, options::OPT_pch_output_dir);
-      if (context.OI.CompilerMode == OutputInfo::Mode::StandardCompile) {
+      switch (context.OI.CompilerMode) {
+      case OutputInfo::Mode::StandardCompile:
+      case OutputInfo::Mode::BatchModeCompile:
         // In the 'multiple invocations for each file' mode we don't need to
         // validate the PCH every time, it has been validated with the initial
         // -emit-pch invocation.
         Arguments.push_back("-pch-disable-validation");
+        break;
+
+      case OutputInfo::Mode::Immediate:
+      case OutputInfo::Mode::REPL:
+      case OutputInfo::Mode::SingleCompile:
+        break;
       }
     }
   }
@@ -406,8 +434,29 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-cross-module-optimization");
   }
                                  
-  addOutputsOfType(Arguments, context.Output, context.Args,
-                   file_types::TY_OptRecord, "-save-optimization-record-path");
+
+  file_types::ID remarksFileType = file_types::TY_YAMLOptRecord;
+  // If a specific format is specified for the remarks, forward that as is.
+  if (auto remarksFormat =
+          context.Args.getLastArg(options::OPT_save_optimization_record_EQ)) {
+    Arguments.push_back(context.Args.MakeArgString(
+        Twine("-save-optimization-record=") + remarksFormat->getValue()));
+    // If that's the case, add the proper output file for the type.
+    if (llvm::Expected<file_types::ID> fileType =
+            remarkFileTypeFromArgs(context.Args))
+      remarksFileType = *fileType;
+    else
+      consumeError(fileType.takeError()); // Don't report errors here. This will
+                                          // be reported later anyway.
+  }
+  addOutputsOfType(Arguments, context.Output, context.Args, remarksFileType,
+                   "-save-optimization-record-path");
+
+  if (auto remarksFilter = context.Args.getLastArg(
+          options::OPT_save_optimization_record_passes)) {
+    Arguments.push_back("-save-optimization-record-passes");
+    Arguments.push_back(remarksFilter->getValue());
+  }
 
   if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
     Arguments.push_back("-migrate-keep-objc-visibility");
@@ -542,9 +591,13 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_CompiledSource:
   case file_types::TY_ModuleTrace:
   case file_types::TY_TBD:
-  case file_types::TY_OptRecord:
+  case file_types::TY_YAMLOptRecord:
+  case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_SwiftSourceInfoFile:
+  case file_types::TY_SwiftCrossImportDir:
+  case file_types::TY_SwiftOverlayFile:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -659,6 +712,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::ID::TY_SwiftModuleInterfaceFile,
                    "-emit-module-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
+                   "-emit-private-module-interface-path");
 
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SerializedDiagnostics,
@@ -791,9 +848,13 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_CompiledSource:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
-    case file_types::TY_OptRecord:
+    case file_types::TY_YAMLOptRecord:
+    case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
+    case file_types::TY_PrivateSwiftModuleInterfaceFile:
     case file_types::TY_SwiftSourceInfoFile:
+    case file_types::TY_SwiftCrossImportDir:
+    case file_types::TY_SwiftOverlayFile:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -937,6 +998,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::ID::TY_SwiftModuleInterfaceFile,
                    "-emit-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
+                   "-emit-private-module-interface-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
@@ -1213,8 +1277,28 @@ void ToolChain::getResourceDirPath(SmallVectorImpl<char> &resourceDirPath,
     llvm::sys::path::append(resourceDirPath, "lib",
                             shared ? "swift" : "swift_static");
   }
-  llvm::sys::path::append(resourceDirPath,
-                          getPlatformNameForTriple(getTriple()));
+
+  StringRef libSubDir = getPlatformNameForTriple(getTriple());
+  if (tripleIsMacCatalystEnvironment(getTriple()))
+    libSubDir = "maccatalyst";
+  llvm::sys::path::append(resourceDirPath, libSubDir);
+}
+
+// Get the secondary runtime library link path given the primary path.
+// The compiler will look for runtime libraries in the secondary path if they
+// can't be found in the primary path.
+void ToolChain::getSecondaryResourceDirPath(
+    SmallVectorImpl<char> &secondaryResourceDirPath,
+    StringRef primaryPath) const {
+  if (!tripleIsMacCatalystEnvironment(getTriple()))
+    return;
+
+  // For macCatalyst, the secondary runtime library path is the macOS library
+  // path. The compiler will find zippered libraries here.
+  secondaryResourceDirPath.append(primaryPath.begin(), primaryPath.end());
+  // Remove '/maccatalyst' and replace with 'macosx'.
+  llvm::sys::path::remove_filename(secondaryResourceDirPath);
+  llvm::sys::path::append(secondaryResourceDirPath, "macosx");
 }
 
 void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibPaths,
@@ -1222,12 +1306,27 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
                                        StringRef SDKPath, bool shared) const {
   SmallString<128> scratchPath;
   getResourceDirPath(scratchPath, args, shared);
-  runtimeLibPaths.push_back(scratchPath.str());
+  runtimeLibPaths.push_back(std::string(scratchPath.str()));
+
+  // If there's a secondary resource dir, add it too.
+  scratchPath.clear();
+  getSecondaryResourceDirPath(scratchPath, runtimeLibPaths[0]);
+  if (!scratchPath.empty())
+    runtimeLibPaths.push_back(std::string(scratchPath.str()));
 
   if (!SDKPath.empty()) {
+    if (!scratchPath.empty()) {
+      // If we added the secondary resource dir, we also need the iOSSupport
+      // directory.
+      scratchPath = SDKPath;
+      llvm::sys::path::append(scratchPath, "System", "iOSSupport");
+      llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
+      runtimeLibPaths.push_back(std::string(scratchPath.str()));
+    }
+
     scratchPath = SDKPath;
     llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
-    runtimeLibPaths.push_back(scratchPath.str());
+    runtimeLibPaths.push_back(std::string(scratchPath.str()));
   }
 }
 

@@ -200,24 +200,12 @@ void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
 #define CONFORMANCE_SUBCLASS_DISPATCH(Method, Args)                          \
 switch (getKind()) {                                                         \
   case ProtocolConformanceKind::Normal:                                      \
-    static_assert(&ProtocolConformance::Method !=                            \
-                    &NormalProtocolConformance::Method,                      \
-                  "Must override NormalProtocolConformance::" #Method);      \
     return cast<NormalProtocolConformance>(this)->Method Args;               \
   case ProtocolConformanceKind::Self:                                        \
-    static_assert(&ProtocolConformance::Method !=                            \
-                    &SelfProtocolConformance::Method,                        \
-                  "Must override SelfProtocolConformance::" #Method);        \
     return cast<SelfProtocolConformance>(this)->Method Args;                 \
   case ProtocolConformanceKind::Specialized:                                 \
-    static_assert(&ProtocolConformance::Method !=                            \
-                    &SpecializedProtocolConformance::Method,                 \
-                  "Must override SpecializedProtocolConformance::" #Method); \
     return cast<SpecializedProtocolConformance>(this)->Method Args;          \
   case ProtocolConformanceKind::Inherited:                                   \
-    static_assert(&ProtocolConformance::Method !=                            \
-                    &InheritedProtocolConformance::Method,                   \
-                  "Must override InheritedProtocolConformance::" #Method);   \
     return cast<InheritedProtocolConformance>(this)->Method Args;            \
 }                                                                            \
 llvm_unreachable("bad ProtocolConformanceKind");
@@ -225,14 +213,8 @@ llvm_unreachable("bad ProtocolConformanceKind");
 #define ROOT_CONFORMANCE_SUBCLASS_DISPATCH(Method, Args)                     \
 switch (getKind()) {                                                         \
   case ProtocolConformanceKind::Normal:                                      \
-    static_assert(&RootProtocolConformance::Method !=                        \
-                    &NormalProtocolConformance::Method,                      \
-                  "Must override NormalProtocolConformance::" #Method);      \
     return cast<NormalProtocolConformance>(this)->Method Args;               \
   case ProtocolConformanceKind::Self:                                        \
-    static_assert(&RootProtocolConformance::Method !=                        \
-                    &SelfProtocolConformance::Method,                        \
-                  "Must override SelfProtocolConformance::" #Method);        \
     return cast<SelfProtocolConformance>(this)->Method Args;                 \
   case ProtocolConformanceKind::Specialized:                                 \
   case ProtocolConformanceKind::Inherited:                                   \
@@ -565,8 +547,8 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
   }
 
   auto extensionSig = ext->getGenericSignature();
-  auto canExtensionSig = extensionSig->getCanonicalSignature();
-  auto canTypeSig = typeSig->getCanonicalSignature();
+  auto canExtensionSig = extensionSig.getCanonicalSignature();
+  auto canTypeSig = typeSig.getCanonicalSignature();
   if (canTypeSig == canExtensionSig) {
     success({});
     return;
@@ -1345,16 +1327,14 @@ NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
 }
 
 SmallVector<ProtocolDecl *, 2>
-DeclContext::getLocalProtocols(
-  ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
-{
+DeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
   SmallVector<ProtocolDecl *, 2> result;
 
   // Dig out the nominal type.
   NominalTypeDecl *nominal = getSelfNominalTypeDecl();
-  if (!nominal)
+  if (!nominal) {
     return result;
+  }
 
   // Update to record all potential conformances.
   nominal->prepareConformanceTable();
@@ -1364,28 +1344,29 @@ DeclContext::getLocalProtocols(
     lookupKind,
     &result,
     nullptr,
-    diagnostics);
+    nullptr);
 
   return result;
 }
 
 SmallVector<ProtocolConformance *, 2>
-DeclContext::getLocalConformances(
-  ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
-{
+DeclContext::getLocalConformances(ConformanceLookupKind lookupKind) const {
   SmallVector<ProtocolConformance *, 2> result;
 
   // Dig out the nominal type.
   NominalTypeDecl *nominal = getSelfNominalTypeDecl();
-  if (!nominal)
+  if (!nominal) {
     return result;
+  }
 
   // Protocols only have self-conformances.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
-    if (protocol->requiresSelfConformanceWitnessTable())
-      return { protocol->getASTContext().getSelfConformance(protocol) };
-    return { };
+    if (protocol->requiresSelfConformanceWitnessTable()) {
+      return SmallVector<ProtocolConformance *, 2>{
+        protocol->getASTContext().getSelfConformance(protocol)
+      };
+    }
+    return SmallVector<ProtocolConformance *, 2>();
   }
 
   // Update to record all potential conformances.
@@ -1396,7 +1377,35 @@ DeclContext::getLocalConformances(
     lookupKind,
     nullptr,
     &result,
-    diagnostics);
+    nullptr);
+
+  return result;
+}
+
+SmallVector<ConformanceDiagnostic, 4>
+DeclContext::takeConformanceDiagnostics() const {
+  SmallVector<ConformanceDiagnostic, 4> result;
+
+  // Dig out the nominal type.
+  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
+  if (!nominal) {
+    return { };
+  }
+
+  // Protocols are not subject to the checks for supersession.
+  if (isa<ProtocolDecl>(nominal)) {
+    return { };
+  }
+
+  // Update to record all potential conformances.
+  nominal->prepareConformanceTable();
+  nominal->ConformanceTable->lookupConformances(
+    nominal,
+    const_cast<DeclContext *>(this),
+    ConformanceLookupKind::All,
+    nullptr,
+    nullptr,
+    &result);
 
   return result;
 }

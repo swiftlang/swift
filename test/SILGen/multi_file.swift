@@ -20,7 +20,7 @@ func lazyPropertiesAreNotStored(_ container: LazyContainer) {
 // CHECK-LABEL: sil hidden [ossa] @$s10multi_file29lazyRefPropertiesAreNotStored{{[_0-9a-zA-Z]*}}F
 func lazyRefPropertiesAreNotStored(_ container: LazyContainerClass) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $LazyContainerClass):
-  // CHECK:   {{%[0-9]+}} = class_method [[ARG]] : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : (LazyContainerClass) -> () -> Int, $@convention(method) (@guaranteed LazyContainerClass) -> Int
+  // CHECK:   {{%[0-9]+}} = class_method [[ARG]] : $LazyContainerClass, #LazyContainerClass.lazyVar!getter : (LazyContainerClass) -> () -> Int, $@convention(method) (@guaranteed LazyContainerClass) -> Int
   markUsed(container.lazyVar)
 }
 
@@ -29,7 +29,7 @@ func finalVarsAreDevirtualized(_ obj: FinalPropertyClass) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $FinalPropertyClass):
   // CHECK:   ref_element_addr [[ARG]] : $FinalPropertyClass, #FinalPropertyClass.foo
   markUsed(obj.foo)
-  // CHECK: class_method [[ARG]] : $FinalPropertyClass, #FinalPropertyClass.bar!getter.1
+  // CHECK: class_method [[ARG]] : $FinalPropertyClass, #FinalPropertyClass.bar!getter
   markUsed(obj.bar)
 }
 
@@ -52,4 +52,4 @@ class HasComputedProperty: ProtocolWithProperty {
   }
 }
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s10multi_file19HasComputedPropertyC3fooSivM : $@yield_once @convention(method) (@guaranteed HasComputedProperty) -> @yields @inout Int {
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s10multi_file19HasComputedPropertyCAA012ProtocolWithE0A2aDP3fooSivMTW : $@yield_once @convention(witness_method: ProtocolWithProperty) (@inout HasComputedProperty) -> @yields @inout Int {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s10multi_file19HasComputedPropertyCAA012ProtocolWithE0A2aDP3fooSivMTW : $@yield_once @convention(witness_method: ProtocolWithProperty) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout Int for <HasComputedProperty> {

@@ -529,7 +529,7 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
   // Demangle old-style class and protocol names, which are still used in the
   // ObjC metadata.
   if (nextIf("_Tt"))
-    return demangleObjCTypeName();
+    return demangleOldSymbolAsNode(Text, *this);
 
   unsigned PrefixLength = getManglingPrefixLength(MangledName);
   if (PrefixLength == 0)
@@ -1692,7 +1692,7 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
   return createWithChildren(kind, createType(Nominal), args);
 }
 
-NodePointer Demangler::demangleImplParamConvention() {
+NodePointer Demangler::demangleImplParamConvention(Node::Kind ConvKind) {
   const char *attr = nullptr;
   switch (nextChar()) {
     case 'i': attr = "@in"; break;
@@ -1710,7 +1710,7 @@ NodePointer Demangler::demangleImplParamConvention() {
       pushBack();
       return nullptr;
   }
-  return createWithChild(Node::Kind::ImplParameter,
+  return createWithChild(ConvKind,
                          createNode(Node::Kind::ImplConvention, attr));
 }
 
@@ -1738,12 +1738,27 @@ NodePointer Demangler::demangleImplFunctionType() {
     NodePointer SubstitutionRetroConformances;
     if (!demangleBoundGenerics(Substitutions, SubstitutionRetroConformances))
       return nullptr;
-    
-    bool isImplied = !nextIf('i');
-    
-    auto subsNode = createNode(isImplied
-                               ? Node::Kind::ImplImpliedSubstitutions
-                               : Node::Kind::ImplSubstitutions);
+
+    NodePointer sig = popNode(Node::Kind::DependentGenericSignature);
+    if (!sig)
+      return nullptr;
+
+    auto subsNode = createNode(Node::Kind::ImplPatternSubstitutions);
+    subsNode->addChild(sig, *this);
+    assert(Substitutions.size() == 1);
+    subsNode->addChild(Substitutions[0], *this);
+    if (SubstitutionRetroConformances)
+      subsNode->addChild(SubstitutionRetroConformances, *this);
+    type->addChild(subsNode, *this);
+  }
+
+  if (nextIf('I')) {
+    Vector<NodePointer> Substitutions;
+    NodePointer SubstitutionRetroConformances;
+    if (!demangleBoundGenerics(Substitutions, SubstitutionRetroConformances))
+      return nullptr;
+
+    auto subsNode = createNode(Node::Kind::ImplInvocationSubstitutions);
     assert(Substitutions.size() == 1);
     subsNode->addChild(Substitutions[0], *this);
     if (SubstitutionRetroConformances)
@@ -1757,6 +1772,11 @@ NodePointer Demangler::demangleImplFunctionType() {
 
   if (nextIf('e'))
     type->addChild(createNode(Node::Kind::ImplEscaping), *this);
+
+  if (nextIf('d'))
+    type->addChild(createNode(Node::Kind::ImplDifferentiable), *this);
+  if (nextIf('l'))
+    type->addChild(createNode(Node::Kind::ImplLinear), *this);
 
   const char *CAttr = nullptr;
   switch (nextChar()) {
@@ -1783,16 +1803,33 @@ NodePointer Demangler::demangleImplFunctionType() {
   if (FAttr)
     type->addChild(createNode(Node::Kind::ImplFunctionAttribute, FAttr), *this);
 
+  const char *CoroAttr = nullptr;
+  if (nextIf('A'))
+    CoroAttr = "@yield_once";
+  else if (nextIf('G'))
+    CoroAttr = "@yield_many";
+  if (CoroAttr)
+    type->addChild(createNode(Node::Kind::ImplFunctionAttribute, CoroAttr), *this);
+
   addChild(type, GenSig);
 
   int NumTypesToAdd = 0;
-  while (NodePointer Param = demangleImplParamConvention()) {
+  while (NodePointer Param =
+           demangleImplParamConvention(Node::Kind::ImplParameter)) {
     type = addChild(type, Param);
     NumTypesToAdd++;
   }
   while (NodePointer Result = demangleImplResultConvention(
                                                     Node::Kind::ImplResult)) {
     type = addChild(type, Result);
+    NumTypesToAdd++;
+  }
+  while (nextIf('Y')) {
+    NodePointer YieldResult =
+      demangleImplParamConvention(Node::Kind::ImplYield);
+    if (!YieldResult)
+      return nullptr;
+    type = addChild(type, YieldResult);
     NumTypesToAdd++;
   }
   if (nextIf('z')) {
@@ -2759,6 +2796,14 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::ObjCBlock);
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
+    case 'F':
+      return popFunctionType(Node::Kind::DifferentiableFunctionType);
+    case 'G':
+      return popFunctionType(Node::Kind::EscapingDifferentiableFunctionType);
+    case 'H':
+      return popFunctionType(Node::Kind::LinearFunctionType);
+    case 'I':
+      return popFunctionType(Node::Kind::EscapingLinearFunctionType);
     case 'o':
       return createType(createWithChild(Node::Kind::Unowned,
                                         popNode(Node::Kind::Type)));
@@ -3211,46 +3256,4 @@ NodePointer Demangler::demangleValueWitness() {
   NodePointer VW = createNode(Node::Kind::ValueWitness);
   addChild(VW, createNode(Node::Kind::Index, unsigned(Kind)));
   return addChild(VW, popNode(Node::Kind::Type));
-}
-
-NodePointer Demangler::demangleObjCTypeName() {
-  NodePointer Ty = createNode(Node::Kind::Type);
-  NodePointer Global = addChild(createNode(Node::Kind::Global),
-                         addChild(createNode(Node::Kind::TypeMangling), Ty));
-  NodePointer Nominal = nullptr;
-  bool isProto = false;
-  if (nextIf('C')) {
-    Nominal = createNode(Node::Kind::Class);
-    addChild(Ty, Nominal);
-  } else if (nextIf('P')) {
-    isProto = true;
-    Nominal = createNode(Node::Kind::Protocol);
-    addChild(Ty, addChild(createNode(Node::Kind::ProtocolList),
-                    addChild(createNode(Node::Kind::TypeList),
-                      addChild(createNode(Node::Kind::Type), Nominal))));
-  } else {
-    return nullptr;
-  }
-
-  if (nextIf('s')) {
-    Nominal->addChild(createNode(Node::Kind::Module, "Swift"), *this);
-  } else {
-    NodePointer Module = demangleIdentifier();
-    if (!Module)
-      return nullptr;
-    Nominal->addChild(changeKind(Module, Node::Kind::Module), *this);
-  }
-
-  NodePointer Ident = demangleIdentifier();
-  if (!Ident)
-    return nullptr;
-  Nominal->addChild(Ident, *this);
-
-  if (isProto && !nextIf('_'))
-    return nullptr;
-
-  if (Pos < Text.size())
-    return nullptr;
-
-  return Global;
 }

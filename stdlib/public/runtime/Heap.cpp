@@ -21,6 +21,10 @@
 #include "../SwiftShims/RuntimeShims.h"
 #include <algorithm>
 #include <stdlib.h>
+#if defined(__APPLE__)
+#include "swift/Basic/Lazy.h"
+#include <malloc/malloc.h>
+#endif
 
 using namespace swift;
 
@@ -57,6 +61,13 @@ using namespace swift;
 static_assert(_swift_MinAllocationAlignment > MALLOC_ALIGN_MASK,
               "Swift's default alignment must exceed platform malloc mask.");
 
+#if defined(__APPLE__)
+static inline malloc_zone_t *DEFAULT_ZONE() {
+  static malloc_zone_t *z = SWIFT_LAZY_CONSTANT(malloc_default_zone());
+  return z;
+}
+#endif
+
 // When alignMask == ~(size_t(0)), allocation uses the "default"
 // _swift_MinAllocationAlignment. This is different than calling swift_slowAlloc
 // with `alignMask == _swift_MinAllocationAlignment - 1` because it forces
@@ -77,7 +88,11 @@ void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
   void *p;
   // This check also forces "default" alignment to use AlignedAlloc.
   if (alignMask <= MALLOC_ALIGN_MASK) {
+#if defined(__APPLE__)
+    p = malloc_zone_malloc(DEFAULT_ZONE(), size);
+#else
     p = malloc(size);
+#endif
   } else {
     size_t alignment = (alignMask == ~(size_t(0)))
                            ? _swift_MinAllocationAlignment
@@ -106,7 +121,11 @@ void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
 //   consistent with allocation with the same alignment.
 void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask) {
   if (alignMask <= MALLOC_ALIGN_MASK) {
+#if defined(__APPLE__)
+    malloc_zone_free(DEFAULT_ZONE(), ptr);
+#else
     free(ptr);
+#endif
   } else {
     AlignedFree(ptr);
   }

@@ -65,6 +65,10 @@ class SILCombiner :
   /// If set to true then the optimizer is free to erase cond_fail instructions.
   bool RemoveCondFails;
 
+  /// Set to true if some alloc/dealloc_stack instruction are inserted and at
+  /// the end of the run stack nesting needs to be corrected.
+  bool invalidatedStackNesting = false;
+
   /// The current iteration of the SILCombine.
   unsigned Iteration;
 
@@ -159,8 +163,6 @@ public:
   /// Instruction visitors.
   SILInstruction *visitReleaseValueInst(ReleaseValueInst *DI);
   SILInstruction *visitRetainValueInst(RetainValueInst *CI);
-  SILInstruction *visitReleaseValueAddrInst(ReleaseValueAddrInst *DI);
-  SILInstruction *visitRetainValueAddrInst(RetainValueAddrInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
@@ -204,14 +206,12 @@ public:
   SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
   SILInstruction *visitFixLifetimeInst(FixLifetimeInst *FLI);
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
-  SILInstruction *visitSelectValueInst(SelectValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
   SILInstruction *
   visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
-  SILInstruction *visitEnumInst(EnumInst *EI);
       
   SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
   SILInstruction *visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI);

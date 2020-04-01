@@ -66,7 +66,7 @@ final private class FinalPrivateNonfinalSubclass<U>: PrivateNonfinal<U, String, 
     // CHECK: [[TYPE:%.*]] = load {{.*}} [[TYPE_GEP]]
     // CHECK: call {{.*}} @useMetadata(%swift.type* [[TYPE]], %swift.type* [[TYPE]])
     useMetadata(FinalPrivateNonfinalSubclass<U>.self)
-    // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}}FinalPrivateNonfinalSubclass
+    // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}}FinalPrivateNonfinalSubclass
     // CHECK: call {{.*}} @useMetadata(%swift.type* [[INSTANTIATED_TYPE]], %swift.type* [[INSTANTIATED_TYPE]])
     useMetadata(FinalPrivateNonfinalSubclass<Int>.self)
   }
@@ -85,7 +85,7 @@ final private class PrivateFinal<T, U, V> {
     // CHECK: [[TYPE:%.*]] = load {{.*}} [[TYPE_GEP]]
     // CHECK: call {{.*}} @useMetadata(%swift.type* [[TYPE]], %swift.type* [[TYPE]])
     useMetadata(PrivateFinal<T, U, V>.self)
-    // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}}PrivateFinal
+    // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}}PrivateFinal
     // CHECK: call {{.*}} @useMetadata(%swift.type* [[INSTANTIATED_TYPE]], %swift.type* [[INSTANTIATED_TYPE]])
     useMetadata(PrivateFinal<Int, String, Float>.self)
   }
@@ -101,4 +101,5 @@ public func useStuff<T, U, V>(_: T, _: U, _: V) {
   FinalPrivateNonfinalSubclass<U>().burts()
   PrivateFinal<T, U, V>().butts()
 }
+
 

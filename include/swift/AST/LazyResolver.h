@@ -81,10 +81,7 @@ public:
 
   /// Populates a vector with all members of \p IDC that have DeclName
   /// matching \p N.
-  ///
-  /// Returns None if an error occurred \em or named member-lookup
-  /// was otherwise unsupported in this implementation or Decl.
-  virtual Optional<TinyPtrVector<ValueDecl *>>
+  virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) = 0;
 

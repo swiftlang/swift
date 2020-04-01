@@ -63,4 +63,3 @@ bool checkDesignatedTypes(OperatorDecl *OD,
 }
 
 #endif
-

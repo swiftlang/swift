@@ -78,6 +78,7 @@ struct S {
 // expected-note@-2{{did you mean 'FreeBSD'?}} {{8-15=FreeBSD}}
 // expected-note@-3{{did you mean 'Android'?}} {{8-15=Android}}
 // expected-note@-4{{did you mean 'OSX'?}} {{8-15=OSX}}
+// expected-note@-5{{did you mean 'OpenBSD'?}} {{8-15=OpenBSD}}
 #endif
 
 #if arch(leg) // expected-warning {{unknown architecture for build configuration 'arch'}} expected-note{{did you mean 'arm'?}} {{10-13=arm}}
@@ -148,7 +149,7 @@ undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'
 #if _endian(arm64) // expected-warning {{unknown endianness for build configuration '_endian'}} expected-note {{did you mean 'arch'}} {{5-12=arch}}
 #endif
 
-#if targetEnvironment(_ObjC) // expected-warning {{unknown target environment for build configuration 'targetEnvironment'}} expected-note {{did you mean 'simulator'}} {{23-28=simulator}}
+#if targetEnvironment(_ObjC) // expected-warning {{unknown target environment for build configuration 'targetEnvironment'}} expected-note {{did you mean 'macabi'}} {{23-28=macabi}}
 #endif
 
 #if os(iOS) || os(simulator) // expected-warning {{unknown operating system for build configuration 'os'}} expected-note {{did you mean 'targetEnvironment'}} {{16-18=targetEnvironment}}

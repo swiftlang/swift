@@ -7,6 +7,11 @@ if(POLICY CMP0068)
   cmake_policy(SET CMP0068 OLD)
 endif()
 
+# Honour CMAKE_CXX_STANDARD in try_compile(), needed for check_cxx_native_regex.
+if(POLICY CMP0067)
+  cmake_policy(SET CMP0067 NEW)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -26,6 +31,11 @@ else()
 endif()
 
 ENABLE_LANGUAGE(C)
+
+# Use C++14.
+set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
+set(CMAKE_CXX_STANDARD_REQUIRED YES)
+set(CMAKE_CXX_EXTENSIONS NO)
 
 # First include general CMake utilities.
 include(SwiftUtils)
@@ -127,7 +137,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.2")
+set(SWIFT_VERSION "5.3")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -385,63 +395,6 @@ option(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING
 # End of user-configurable options.
 #
 
-# Look for either a program in execute_process()'s path or for a hardcoded path.
-# Find a program's version and set it in the parent scope.
-# Replace newlines with spaces so it prints on one line.
-function(find_version cmd flag find_in_path)
-  if(find_in_path)
-    message(STATUS "Finding installed version for: ${cmd}")
-  else()
-    message(STATUS "Finding version for: ${cmd}")
-  endif()
-  execute_process(
-    COMMAND ${cmd} ${flag}
-    OUTPUT_VARIABLE out
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT out)
-    if(find_in_path)
-      message(STATUS "tried to find version for ${cmd}, but ${cmd} not found in path, continuing")
-    else()
-      message(FATAL_ERROR "tried to find version for ${cmd}, but ${cmd} not found")
-    endif()
-  else()
-    string(REPLACE "\n" " " out2 ${out})
-    message(STATUS "Found version: ${out2}")
-  endif()
-  message(STATUS "")
-endfunction()
-
-# Print out path and version of any installed commands.
-# We migth be using the wrong version of a command, so record them all.
-function(print_versions)
-  find_version("${CMAKE_COMMAND}" "--version" TRUE)
-
-  message(STATUS "Finding version for: ${CMAKE_COMMAND}")
-  message(STATUS "Found version: ${CMAKE_VERSION}")
-  message(STATUS "")
-
-  get_filename_component(CMAKE_MAKE_PROGRAM_BN "${CMAKE_MAKE_PROGRAM}" NAME_WE)
-  if(${CMAKE_MAKE_PROGRAM_BN} STREQUAL "ninja" OR
-     ${CMAKE_MAKE_PROGRAM_BN} STREQUAL "make")
-    find_version(${CMAKE_MAKE_PROGRAM_BN} "--version" TRUE)
-    find_version(${CMAKE_MAKE_PROGRAM} "--version" FALSE)
-  endif()
-
-  if(${SWIFT_PATH_TO_CMARK_BUILD})
-    find_version("cmark" "--version" TRUE)
-    find_version("${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark" "--version" FALSE)
-  endif()
-
-  message(STATUS "Finding version for: ${CMAKE_C_COMPILER}")
-  message(STATUS "Found version: ${CMAKE_C_COMPILER_VERSION}")
-  message(STATUS "")
-
-  message(STATUS "Finding version for: ${CMAKE_CXX_COMPILER}")
-  message(STATUS "Found version: ${CMAKE_CXX_COMPILER_VERSION}")
-  message(STATUS "")
-endfunction()
-
-
 set(SWIFT_BUILT_STANDALONE FALSE)
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
   set(SWIFT_BUILT_STANDALONE TRUE)
@@ -493,7 +446,21 @@ include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
 include(CMakePushCheckState)
 
-print_versions()
+# Print out path and version of any installed commands
+message(STATUS "CMake (${CMAKE_COMMAND}) Version: ${CMAKE_VERSION}")
+execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} --version
+  OUTPUT_VARIABLE _CMAKE_MAKE_PROGRAM_VERSION
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+message(STATUS "CMake Make Program (${CMAKE_MAKE_PROGRAM}) Version: ${_CMAKE_MAKE_PROGRAM_VERSION}")
+message(STATUS "C Compiler (${CMAKE_C_COMPILER}) Version: ${CMAKE_C_COMPILER_VERSION}")
+message(STATUS "C++ Compiler (${CMAKE_CXX_COMPILER}) Version: ${CMAKE_CXX_COMPILER_VERSION}")
+if(SWIFT_PATH_TO_CMARK_BUILD)
+  execute_process(COMMAND ${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark --version
+    OUTPUT_VARIABLE _CMARK_VERSION
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "CMark Version: ${_CMARK_VERSION}")
+endif()
+message(STATUS "")
 
 include(SwiftSharedCMakeConfig)
 
@@ -510,7 +477,6 @@ endif()
 include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
-include(SwiftSource)
 include(AddSwift)
 include(SwiftConfigureSDK)
 include(SwiftComponents)
@@ -872,6 +838,9 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Building Swift runtime with:")
   message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
   message(STATUS "")
+
+  message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
+  message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
   message(STATUS "")
@@ -924,14 +893,24 @@ else()
   find_package(LibXml2)
 endif()
 
-# You need libedit linked in order to check if you have el_wgets.
-cmake_push_check_state()
-list(APPEND CMAKE_REQUIRED_LIBRARIES "edit")
-check_symbol_exists(el_wgets "histedit.h" HAVE_EL_WGETS)
-if(HAVE_EL_WGETS)
-  set(HAVE_UNICODE_LIBEDIT 1)
+if(LLVM_ENABLE_LIBEDIT)
+  find_package(LibEdit REQUIRED)
+else()
+  find_package(LibEdit)
 endif()
-cmake_pop_check_state()
+
+if(LibEdit_FOUND)
+  cmake_push_check_state()
+  list(APPEND CMAKE_REQUIRED_INCLUDES ${LibEdit_INCLUDE_DIRS})
+  list(APPEND CMAKE_REQUIRED_LIBRARIES ${LibEdit_LIBRARIES})
+  check_symbol_exists(el_wgets "histedit.h" HAVE_EL_WGETS)
+  if(HAVE_EL_WGETS)
+    set(LibEdit_HAS_UNICODE YES)
+  else()
+    set(LibEdit_HAS_UNICODE NO)
+  endif()
+  cmake_pop_check_state()
+endif()
 
 check_symbol_exists(wait4 "sys/wait.h" HAVE_WAIT4)
 

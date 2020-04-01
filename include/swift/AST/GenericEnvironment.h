@@ -109,7 +109,7 @@ public:
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
-  void operator delete(void *Data) SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *Data) = delete;
 
   /// Only allow placement new.
   void *operator new(size_t Bytes, void *Mem) {

@@ -53,7 +53,7 @@ func otherExistential<T : EqualComparable>(_ t1: T) {
   otherEqComp2 = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp2
 
-  _ = t1 as EqualComparable & OtherEqualComparable // expected-error{{'T' is not convertible to 'EqualComparable & OtherEqualComparable'; did you mean to use 'as!' to force downcast?}} {{10-12=as!}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
+  _ = t1 as EqualComparable & OtherEqualComparable // expected-error{{value of type 'T' does not conform to 'EqualComparable & OtherEqualComparable' in coercion}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
 }
 
 protocol Runcible {
@@ -78,9 +78,9 @@ protocol Overload {
   func f1(_: B) -> B // expected-note {{candidate expects value of type 'OtherOvl.B' for parameter #1}}
   func f2(_: Int) -> A // expected-note{{found this candidate}}
   func f2(_: Int) -> B // expected-note{{found this candidate}}
-  func f3(_: Int) -> Int // expected-note {{found candidate with type '(Int) -> Int'}}
-  func f3(_: Float) -> Float // expected-note {{found candidate with type '(Float) -> Float'}}
-  func f3(_: Self) -> Self // expected-note {{found candidate with type '(OtherOvl) -> OtherOvl'}}
+  func f3(_: Int) -> Int // expected-note {{found this candidate}}
+  func f3(_: Float) -> Float // expected-note {{found this candidate}}
+  func f3(_: Self) -> Self // expected-note {{found this candidate}}
 
   var prop : Self { get }
 }
@@ -112,7 +112,7 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(_ ovl: Ovl, ovl2: Ovl,
   var f3f : (Float) -> Float = ovl.f3
   var f3ovl_1 : (Ovl) -> Ovl = ovl.f3
   var f3ovl_2 : (Ovl) -> Ovl = ovl2.f3
-  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{no 'f3' candidates produce the expected contextual result type '(Ovl) -> Ovl'}}
+  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{no exact matches in reference to instance method 'f3'}}
 
   var f3i_unbound : (Ovl) -> (Int) -> Int = Ovl.f3
   var f3f_unbound : (Ovl) -> (Float) -> Float = Ovl.f3

@@ -99,13 +99,13 @@ static_assert(IsTriviallyDestructible<DWARFModuleUnit>::value,
               "DWARFModuleUnits are BumpPtrAllocated; the d'tor is not called");
 
 ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
-    SourceLoc importLoc, ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+    SourceLoc importLoc, ArrayRef<Located<Identifier>> path) {
   // There's no importing from debug info if no importer is installed.
   if (!DWARFImporter)
     return nullptr;
 
   // FIXME: Implement submodule support!
-  Identifier name = path[0].first;
+  Identifier name = path[0].Item;
   auto it = DWARFModuleUnits.find(name);
   if (it != DWARFModuleUnits.end())
     return it->second->getParentModule();

@@ -204,8 +204,13 @@ public:
       addPointer();
     }
   }
-  void addGenericArgument(ClassDecl *forClass) { addPointer(); }
-  void addGenericWitnessTable(ClassDecl *forClass) { addPointer(); }
+  void addGenericArgument(GenericRequirement requirement, ClassDecl *forClass) {
+    addPointer();
+  }
+  void addGenericWitnessTable(GenericRequirement requirement,
+                              ClassDecl *forClass) {
+    addPointer();
+  }
   void addPlaceholder(MissingMemberDecl *MMD) {
     for (auto i : range(MMD->getNumberOfVTableEntries())) {
       (void)i;

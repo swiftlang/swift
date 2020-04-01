@@ -72,6 +72,7 @@ def main():
                                      serialization_format='json',
                                      omit_node_ids=False,
                                      output_file=incremental_serialized_file,
+                                     diags_output_file=None,
                                      temp_dir=temp_dir + '/temp',
                                      swift_syntax_test=swift_syntax_test,
                                      print_visual_reuse_info=False)

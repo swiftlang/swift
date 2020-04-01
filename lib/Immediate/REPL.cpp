@@ -25,7 +25,6 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/Utils.h"
-#include "swift/Parse/PersistentParserState.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
@@ -37,7 +36,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
 
-#if HAVE_UNICODE_LIBEDIT
+#if HAVE_LIBEDIT
 #include <histedit.h>
 #include <wchar.h>
 #endif
@@ -120,8 +119,8 @@ public:
 };
 
 using Convert = ConvertForWcharSize<sizeof(wchar_t)>;
-  
-#if HAVE_UNICODE_LIBEDIT
+
+#if HAVE_LIBEDIT
 static void convertFromUTF8(llvm::StringRef utf8,
                             llvm::SmallVectorImpl<wchar_t> &out) {
   size_t reserve = out.size() + utf8.size();
@@ -135,7 +134,7 @@ static void convertFromUTF8(llvm::StringRef utf8,
   (void)res;
   out.set_size(wide_begin - out.begin());
 }
-  
+
 static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
                           llvm::SmallVectorImpl<char> &out) {
   size_t reserve = out.size() + wide.size()*4;
@@ -153,11 +152,10 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 } // end anonymous namespace
 
-#if HAVE_UNICODE_LIBEDIT
+#if HAVE_LIBEDIT
 
 static ModuleDecl *
 typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
-                   PersistentParserState &PersistentState,
                    std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   using ImplicitModuleImportKind = SourceFile::ImplicitModuleImportKind;
   assert(MostRecentModule);
@@ -187,11 +185,6 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
     REPLInputFile.addImports(ImportsWithOptions);
   }
 
-  bool Done;
-  do {
-    parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
-                        &PersistentState);
-  } while (!Done);
   performTypeChecking(REPLInputFile);
   return REPLModule;
 }
@@ -438,9 +431,8 @@ private:
     PromptString.clear();
 
     if (ShowColors) {
-      const char *colorCode =
-        llvm::sys::Process::OutputColor(llvm::raw_ostream::YELLOW,
-                                        false, false);
+      const char *colorCode = llvm::sys::Process::OutputColor(
+          static_cast<char>(llvm::raw_ostream::YELLOW), false, false);
       if (colorCode)
         appendEscapeSequence(PromptString, colorCode);
     }
@@ -758,7 +750,6 @@ class REPLEnvironment {
   const SILOptions SILOpts;
 
   REPLInput Input;
-  PersistentParserState PersistentState;
   unsigned NextLineNumber = 0;
 
 private:
@@ -858,12 +849,17 @@ private:
   }
 
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
+    SWIFT_DEFER {
+      // Always flush diagnostic consumers after executing a line.
+      CI.getDiags().flushConsumers();
+    };
+
     // Parse the current line(s).
     auto InputBuf = llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
     SmallString<8> Name{"REPL_"};
     llvm::raw_svector_ostream(Name) << NextLineNumber;
     ++NextLineNumber;
-    ModuleDecl *M = typeCheckREPLInput(MostRecentModule, Name, PersistentState,
+    ModuleDecl *M = typeCheckREPLInput(MostRecentModule, Name,
                                        std::move(InputBuf));
     
     // SILGen the module and produce SIL diagnostics.
@@ -962,8 +958,7 @@ public:
       DumpModule("REPL", LLVMContext),
       IRGenOpts(),
       SILOpts(),
-      Input(*this),
-      PersistentState()
+      Input(*this)
   {
     ASTContext &Ctx = CI.getASTContext();
     Ctx.LangOpts.EnableAccessControl = false;
@@ -1001,10 +996,6 @@ public:
     IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::None;
     IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::None;
 
-    // The very first module is a dummy.
-    CI.getMainModule()->getMainSourceFile(SourceFileKind::REPL).ASTStage =
-        SourceFile::TypeChecked;
-
     if (!ParseStdlib) {
       // Force standard library to be loaded immediately.  This forces any
       // errors to appear upfront, and helps eliminate some nasty lag after the
@@ -1014,8 +1005,7 @@ public:
       auto Buffer =
           llvm::MemoryBuffer::getMemBufferCopy(WarmUpStmt,
                                                "<REPL Initialization>");
-      (void)typeCheckREPLInput(MostRecentModule, "__Warmup", PersistentState,
-                               std::move(Buffer));
+      (void)typeCheckREPLInput(MostRecentModule, "__Warmup", std::move(Buffer));
 
       if (Ctx.hadError())
         return;

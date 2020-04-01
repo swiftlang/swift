@@ -4,7 +4,7 @@
 // REQUIRES: CPU=armv7k
 // REQUIRES: OS=watchos
 
-// CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k9addFloats{{.*}}"(float, float)
+// CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k9addFloats{{.*}}"(float %0, float %1)
 // CHECK: fadd float %0, %1
 // CHECK: ret float
 // V7K-LABEL: _$s8test_v7k9addFloats{{.*}}
@@ -13,7 +13,7 @@ func addFloats(x: Float, y : Float) -> Float {
   return x+y
 }
 
-// CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k10addDoubles{{.*}}"(double, double, double)
+// CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k10addDoubles{{.*}}"(double %0, double %1, double %2)
 // CHECK: fadd double %0, %1
 // CHECK: fadd double
 // CHECK: ret double
@@ -24,7 +24,7 @@ func addDoubles(x: Double, y: Double, z: Double) -> Double {
   return x+y+z
 }
 
-// CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k6addFDF{{.*}}"(float, double, float)
+// CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k6addFDF{{.*}}"(float %0, double %1, float %2)
 // CHECK: fmul float
 // CHECK: ret float
 // V7K-LABEL: _$s8test_v7k6addFDF
@@ -34,7 +34,7 @@ func addFDF(x: Float, y: Double, z: Float) -> Float {
   return x*z
 }
 
-// CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k8addStack{{.*}}"(double, double, double, double, double, double, double, float, double)
+// CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k8addStack{{.*}}"(double %0, double %1, double %2, double %3, double %4, double %5, double %6, float %7, double %8)
 // CHECK: fadd double
 // CHECK: ret double
 // V7K-LABEL: _$s8test_v7k8addStack
@@ -47,7 +47,7 @@ func addStack(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
   return a+c
 }
 
-// CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k9addStack{{.*}}"(double, double, double, double, double, double, double, float, double, float)
+// CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k9addStack{{.*}}"(double %0, double %1, double %2, double %3, double %4, double %5, double %6, float %7, double %8, float %9)
 // CHECK: fadd float
 // V7K-LABEL: _$s8test_v7k9addStack
 // V7K: sub     sp, #80
@@ -78,7 +78,7 @@ func testSingle(x: SingleCase) -> Int32{
   }
 }
 
-// CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A4Data{{.*}}"(i32, double)
+// CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A4Data{{.*}}"(i32 %0, double %1)
 // CHECK: ret double
 // V7K-LABEL: _$s8test_v7k0A4Data
 // V7K: vstr d0
@@ -91,7 +91,7 @@ func testData(x: DataCase) -> Double {
   }
 }
 
-// CHECK-LABEL: define hidden swiftcc i32 @"$s8test_v7k0A6Clike2{{.*}}"(i8)
+// CHECK-LABEL: define hidden swiftcc i32 @"$s8test_v7k0A6Clike2{{.*}}"(i8 %0)
 // CHECK: [[ID:%[0-9]+]] = phi i32 [ 2, {{.*}} ], [ 1, {{.*}} ]
 // CHECK: ret i32 [[ID]]
 // V7K-LABEL: _$s8test_v7k0A6Clike2
@@ -111,7 +111,7 @@ func testClike2(x: CLike2) -> Int {
   }
 }
 
-// CHECK-LABEL: define hidden swiftcc i32 @"$s8test_v7k0A6Clike8{{.*}}"(i32, i8)
+// CHECK-LABEL: define hidden swiftcc i32 @"$s8test_v7k0A6Clike8{{.*}}"(i32 %0, i8 %1)
 // CHECK: [[ID:%[0-9]+]] = phi i32 [ -1, {{.*}} ], [ 1, {{.*}} ]
 // CHECK: ret i32 [[ID]]
 // V7K-LABEL: _$s8test_v7k0A6Clike8
@@ -140,7 +140,7 @@ func testClike8(t: Int, x: CLike8) -> Int {
 
 // layout of the enum: the tag bit is set for the no-data cases, which are then
 // assigned values in the data area of the enum in declaration order
-// CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A7SingleP{{.*}}"(i32, i32, i8)
+// CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A7SingleP{{.*}}"(i32 %0, i32 %1, i8 %2)
 // CHECK: br i1
 // CHECK: switch i64 [[ID:%[0-9]+]]
 // CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
@@ -168,7 +168,7 @@ func testSingleP(x: SinglePayload) -> Double {
   }
 }
 
-// CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A6MultiP{{.*}}"(i32, i32, i8)
+// CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A6MultiP{{.*}}"(i32 %0, i32 %1, i8 %2)
 // CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
 // CHECK: [[F1:%[0-9]+]] = and i64 [[FIRST]], 4294967295
 // CHECK: [[SECOND:%[0-9]+]] = zext i32 %1 to i64
@@ -201,7 +201,7 @@ func testMultiP(x: MultiPayload) -> Double {
   }
 }
 
-// CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k0A3Opt{{.*}}"(i32, i8)
+// CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k0A3Opt{{.*}}"(i32 %0, i8 %1)
 // CHECK: entry:
 // CHECK: [[TR:%.*]] = trunc i8 %1
 // CHECK: br i1 [[TR]], {{.*}}, label %[[PAYLOADLABEL:.*]]
@@ -221,7 +221,7 @@ func testOpt(x: Float?) -> Float {
 }
 
 // Returning tuple: (Int, Int)
-// CHECK-LABEL: define hidden swiftcc { i32, i32 } @"$s8test_v7k6minMax{{.*}}"(i32, i32)
+// CHECK-LABEL: define hidden swiftcc { i32, i32 } @"$s8test_v7k6minMax{{.*}}"(i32 %0, i32 %1)
 // V7K-LABEL: _$s8test_v7k6minMax
 // V7K: ldr r0
 // V7K: ldr r1
@@ -269,7 +269,7 @@ struct MyRect4 {
    s = MySize(w: 1.0, h: 2.0)
   }
 }
-// CHECK-LABEL: define hidden swiftcc { double, double, double, double } @"$s8test_v7k0A4Ret2{{.*}}"(double, i32)
+// CHECK-LABEL: define hidden swiftcc { double, double, double, double } @"$s8test_v7k0A4Ret2{{.*}}"(double %0, i32 %1)
 // V7K-LABEL: _$s8test_v7k0A4Ret2
 // double in d0, i32 in r0, return in d0,...,d3
 // V7K: vmov [[ID:s[0-9]+]], r0
@@ -292,7 +292,7 @@ func testRet3() -> MyRect2 {
 }
 
 // Returning tuple?: (Int x 6)?
-// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax2{{.*}}"({{%TSi.*}} noalias nocapture sret, i32, i32)
+// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax2{{.*}}"({{%TSi.*}} noalias nocapture sret %0, i32 %1, i32 %2)
 // V7K-LABEL: _$s8test_v7k7minMax2
 // We will indirectly return an optional with the address in r0, input parameters will be in r1 and r2
 // V7K: cmp r1, r2
@@ -320,7 +320,7 @@ func minMax2(x : Int, y : Int) -> (min: Int, max: Int, min2: Int, max2: Int, min
 }
 
 // Returning struct?: {Int x 6}?
-// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax3{{.*}}"({{%T.*}} noalias nocapture sret, i32, i32)
+// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax3{{.*}}"({{%T.*}} noalias nocapture sret %0, i32 %1, i32 %2)
 // V7K-LABEL: _$s8test_v7k7minMax3
 struct Ret {
   var min:Int

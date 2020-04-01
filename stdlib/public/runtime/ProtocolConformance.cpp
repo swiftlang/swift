@@ -481,7 +481,7 @@ recur:
 
 namespace {
   /// Describes a protocol conformance "candidate" that can be checked
-  /// against the
+  /// against a type metadata.
   class ConformanceCandidate {
     const void *candidate;
     bool candidateIsMetadata;
@@ -492,15 +492,15 @@ namespace {
     ConformanceCandidate(const ProtocolConformanceDescriptor &conformance)
       : ConformanceCandidate()
     {
-      if (auto metadata = conformance.getCanonicalTypeMetadata()) {
-        candidate = metadata;
-        candidateIsMetadata = true;
-        return;
-      }
-
       if (auto description = conformance.getTypeDescriptor()) {
         candidate = description;
         candidateIsMetadata = false;
+        return;
+      }
+
+      if (auto metadata = conformance.getCanonicalTypeMetadata()) {
+        candidate = metadata;
+        candidateIsMetadata = true;
         return;
       }
     }
@@ -513,6 +513,29 @@ namespace {
                                  : nullptr;
     }
 
+    const ContextDescriptor *
+    getContextDescriptor(const Metadata *conformingType) const {
+      const auto *description = conformingType->getTypeContextDescriptor();
+      if (description)
+        return description;
+
+      // Handle single-protocol existential types for self-conformance.
+      auto *existentialType = dyn_cast<ExistentialTypeMetadata>(conformingType);
+      if (existentialType == nullptr ||
+          existentialType->getProtocols().size() != 1 ||
+          existentialType->getSuperclassConstraint() != nullptr)
+        return nullptr;
+
+      auto proto = existentialType->getProtocols()[0];
+
+#if SWIFT_OBJC_INTEROP
+      if (proto.isObjC())
+        return nullptr;
+#endif
+
+      return proto.getSwiftProtocol();
+    }
+
     /// Whether the conforming type exactly matches the conformance candidate.
     bool matches(const Metadata *conformingType) const {
       // Check whether the types match.
@@ -521,7 +544,7 @@ namespace {
 
       // Check whether the nominal type descriptors match.
       if (!candidateIsMetadata) {
-        const auto *description = conformingType->getTypeContextDescriptor();
+        const auto *description = getContextDescriptor(conformingType);
         auto candidateDescription =
           static_cast<const ContextDescriptor *>(candidate);
         if (description && equalContexts(description, candidateDescription))
@@ -640,22 +663,6 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
     }
   }
   return nullptr;
-}
-
-void
-swift::_forEachProtocolConformanceSectionAfter(
-  size_t *start, 
-  const std::function<void(const ProtocolConformanceRecord *,
-                           const ProtocolConformanceRecord *)> &f) {
-  auto snapshot = Conformances.get().SectionsToScan.snapshot();
-  if (snapshot.Count > *start) {
-    auto *begin = snapshot.begin() + *start;
-    auto *end = snapshot.end();
-    for (auto *section = begin; section != end; section++) {
-      f(section->Begin, section->End);
-    }
-    *start = snapshot.Count;
-  }
 }
 
 bool swift::_checkGenericRequirements(

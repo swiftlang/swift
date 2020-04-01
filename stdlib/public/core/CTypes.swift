@@ -93,6 +93,8 @@ public typealias CLongDouble = Double
 #if arch(arm)
 public typealias CLongDouble = Double
 #endif
+#elseif os(OpenBSD)
+public typealias CLongDouble = Float80
 #endif
 
 // FIXME: Is it actually UTF-32 on Darwin?

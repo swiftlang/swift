@@ -114,16 +114,25 @@ public:
   DiagnosticEngine &Diags;
   SourceFile &SF;
   Lexer *L;
-  SILParserTUStateBase *SIL; // Non-null when parsing a .sil file.
+  SILParserTUStateBase *SIL; // Non-null when parsing SIL decls.
   PersistentParserState *State;
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
-  std::vector<std::pair<SourceLoc, std::vector<ParamDecl*>>> AnonClosureVars;
+  std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
-  bool IsParsingInterfaceTokens = false;
-  
+  /// Tracks parsed decls that LLDB requires to be inserted at the top-level.
+  std::vector<Decl *> ContextSwitchedTopLevelDecls;
+
+  NullablePtr<llvm::MD5> CurrentTokenHash;
+  void recordTokenHash(const Token Tok) {
+    if (!Tok.getText().empty())
+      recordTokenHash(Tok.getText());
+  }
+
+  void recordTokenHash(StringRef token);
+
   /// DisabledVars is a list of variables for whom local name lookup is
   /// disabled.  This is used when parsing a PatternBindingDecl to reject self
   /// uses and to disable uses of the bound variables in a let/else block.  The
@@ -167,9 +176,14 @@ public:
 
   LocalContext *CurLocalContext = nullptr;
 
-  bool isDelayedParsingEnabled() const {
-    return DelayBodyParsing || isCodeCompletionFirstPass();
-  }
+  /// Whether we should delay parsing nominal type, extension, and function
+  /// bodies.
+  bool isDelayedParsingEnabled() const;
+
+  /// Whether to evaluate the conditions of #if decls, meaning that the bodies
+  /// of any active clauses are hoisted such that they become sibling nodes with
+  /// the #if decl.
+  bool shouldEvaluatePoundIfDecls() const;
 
   void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
     CodeCompletion = Callbacks;
@@ -206,16 +220,6 @@ public:
   /// trailing trivias for \c Tok.
   /// Always empty if !SF.shouldBuildSyntaxTree().
   ParsedTrivia TrailingTrivia;
-
-  /// Whether we should delay parsing nominal type and extension bodies,
-  /// and skip function bodies.
-  ///
-  /// This is false in primary files, since we want to type check all
-  /// declarations and function bodies.
-  ///
-  /// This is true for non-primary files, where declarations only need to be
-  /// lazily parsed and type checked.
-  bool DelayBodyParsing;
 
   /// The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
@@ -394,20 +398,18 @@ public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
          SILParserTUStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   ~Parser();
 
-  bool isInSILMode() const { return SIL != nullptr; }
+  /// Returns true if the buffer being parsed is allowed to contain SIL.
+  bool isInSILMode() const;
 
   /// Calling this function to finalize libSyntax tree creation without destroying
   /// the parser instance.
@@ -424,9 +426,8 @@ public:
                           PreviousLoc);
   }
 
-  ParserPosition getParserPosition(const PersistentParserState::ParserPos &Pos){
-    return ParserPosition(L->getStateForBeginningOfTokenLoc(Pos.Loc),
-                          Pos.PrevLoc);
+  ParserPosition getParserPosition(SourceLoc loc, SourceLoc previousLoc) {
+    return ParserPosition(L->getStateForBeginningOfTokenLoc(loc), previousLoc);
   }
 
   void restoreParserPosition(ParserPosition PP, bool enableDiagnostics = false) {
@@ -655,6 +656,9 @@ public:
   /// Returns \c true if the parser hit the eof before finding matched '}'.
   bool skipBracedBlock();
 
+  /// Skip over SIL decls until we encounter the start of a Swift decl or eof.
+  void skipSILUntilSwiftDecl();
+
   /// If the parser is generating only a syntax tree, try loading the current
   /// node from a previously generated syntax tree.
   /// Returns \c true if the node has been loaded and inserted into the current
@@ -874,10 +878,17 @@ public:
   //===--------------------------------------------------------------------===//
   // Decl Parsing
 
-  /// Return true if parser is at the start of a decl or decl-import.
-  bool isStartOfDecl();
+  /// Returns true if parser is at the start of a Swift decl or decl-import.
+  bool isStartOfSwiftDecl();
 
-  void parseTopLevel();
+  /// Returns true if the parser is at the start of a SIL decl.
+  bool isStartOfSILDecl();
+
+  /// Parse the top-level Swift decls into the provided vector.
+  void parseTopLevel(SmallVectorImpl<Decl *> &decls);
+
+  /// Parse the top-level SIL decls into the SIL module.
+  void parseTopLevelSIL();
 
   /// Flags that control the parsing of declarations.
   enum ParseDeclFlags {
@@ -921,7 +932,8 @@ public:
                                bool IsAtStartOfLineOrPreviousHadSemi,
                                llvm::function_ref<void(Decl*)> Handler);
 
-  std::vector<Decl *> parseDeclListDelayed(IterableDeclContext *IDC);
+  std::pair<std::vector<Decl *>, Optional<std::string>>
+  parseDeclListDelayed(IterableDeclContext *IDC);
 
   bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                            SourceLoc PosBeforeLB,
@@ -998,16 +1010,15 @@ public:
   /// Parse the arguments inside the @differentiable attribute.
   bool parseDifferentiableAttributeArguments(
       bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
-      Optional<DeclNameRefWithLoc> &jvpSpec,
-      Optional<DeclNameRefWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
-  /// Parse a differentiation parameters clause, i.e. the 'wrt:' clause in
-  /// `@differentiable` and `@derivative` attributes.
+  /// Parse a differentiability parameters clause, i.e. the 'wrt:' clause in
+  /// `@differentiable`, `@derivative`, and `@transpose` attributes.
+  ///
   /// If `allowNamedParameters` is false, allow only index parameters and
-  /// 'self'.
-  bool parseDifferentiationParametersClause(
-      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName,
+  /// 'self'. Used for `@transpose` attributes.
+  bool parseDifferentiabilityParametersClause(
+      SmallVectorImpl<ParsedAutoDiffParameter> &parameters, StringRef attrName,
       bool allowNamedParameters = true);
 
   /// Parse the @derivative attribute.
@@ -1056,12 +1067,12 @@ public:
                                 bool allowClassRequirement,
                                 bool allowAnyObject);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
-                             Parser::ParseDeclOptions Options,
+                             ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
-  std::vector<Decl *> parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                                    Diag<> ErrorDiag, ParseDeclOptions Options,
-                                    IterableDeclContext *IDC,
-                                    bool &hadError);
+  std::pair<std::vector<Decl *>, Optional<std::string>>
+  parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
+                ParseDeclOptions Options, IterableDeclContext *IDC,
+                bool &hadError);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,
@@ -1104,6 +1115,8 @@ public:
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes,
                                        bool HasFuncKeyword = true);
+  ParserResult<BraceStmt>
+  parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
@@ -1602,7 +1615,8 @@ public:
   ParserResult<Stmt> parseStmtGuard();
   ParserResult<Stmt> parseStmtWhile(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);
-  ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo);
+  ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo,
+                                 bool shouldSkipDoTokenConsume = false);
   ParserResult<CatchStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
@@ -1621,14 +1635,10 @@ public:
   void
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
 
-  enum class WhereClauseKind : unsigned {
-    Declaration,
-    Protocol,
-    AssociatedType
-  };
   ParserStatus
-  parseFreestandingGenericWhereClause(GenericParamList *GPList,
-                             WhereClauseKind kind=WhereClauseKind::Declaration);
+  parseFreestandingGenericWhereClause(GenericContext *genCtx,
+                                      GenericParamList *&GPList,
+                                      ParseDeclOptions flags);
 
   ParserStatus parseGenericWhereClause(
       SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,
@@ -1713,6 +1723,15 @@ struct ParsedDeclName {
 
   /// Form a declaration name from this parsed declaration name.
   DeclNameRef formDeclNameRef(ASTContext &ctx) const;
+};
+
+/// To assist debugging parser crashes, tell us the location of the
+/// current token.
+class PrettyStackTraceParser : public llvm::PrettyStackTraceEntry {
+  Parser &P;
+public:
+  explicit PrettyStackTraceParser(Parser &P) : P(P) {}
+  void print(llvm::raw_ostream &out) const override;
 };
 
 /// Parse a stringified Swift declaration name,

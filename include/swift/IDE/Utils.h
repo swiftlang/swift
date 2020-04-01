@@ -240,7 +240,7 @@ class NameMatcher: public ASTWalker {
 
   /// The \c Expr argument of a parent \c CustomAttr (if one exists) and
   /// the \c SourceLoc of the type name it applies to.
-  llvm::Optional<std::pair<SourceLoc, Expr *>> CustomAttrArg;
+  llvm::Optional<Located<Expr *>> CustomAttrArg;
   unsigned InactiveConfigRegionNestings = 0;
   unsigned SelectorNestings = 0;
 

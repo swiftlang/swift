@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o - -module-name a \
-// RUN:   -disable-debugger-shadow-copies | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-ir -g -o %t.ll -module-name a 
+// RUN: cat %t.ll | %FileCheck %s --check-prefix=CASE_0
+// RUN: cat %t.ll | %FileCheck %s --check-prefix=CASE_1
+// RUN: cat %t.ll | %FileCheck %s --check-prefix=CASE_2
 public enum Result<Value> {
   case success(Value)
   case failure(Error)
@@ -16,7 +18,9 @@ extension Result {
   }
 }
 
+@inline(never)
 func use<T>(_ t : T) {
+  print(t)
 }
 
 public class SomeClass {
@@ -52,36 +56,29 @@ y.g()
 // identifier.
 
 // (0) unsized.
-// CHECK: !DISubprogram(name: "map", {{.*}}line: 9, type: ![[SBTY:[0-9]+]]
-// CHECK: ![[SBTY]] = !DISubroutineType(types: ![[SBTYS:[0-9]+]])
-// CHECK: ![[SBTYS]] = !{!{{[0-9]+}}, !{{[0-9]+}}, ![[SELFTY:[0-9]+]]}
-// CHECK: ![[SELFTY]] =
-// CHECK-SAME:  !DICompositeType(tag: DW_TAG_structure_type, {{.*}}line: 3,
-// CHECK-SAME:                   elements: ![[UNSIZED_ELTS:[0-9]+]]
-// CHECK: ![[UNSIZED_ELTS]] = !{![[UNSIZED_MEM:[0-9]+]]}
-// CHECK: ![[UNSIZED_MEM]] = !DIDerivedType(tag: DW_TAG_member,
-// CHECK-SAME:                              baseType: ![[UNIQ:[0-9]+]]
+// CASE_0-DAG: !DISubprogram(name: "map", {{.*}}line: 11, type: ![[SBTY:[0-9]+]]
+// CASE_0-DAG: ![[SBTY]] = !DISubroutineType(types: ![[SBTYS:[0-9]+]])
+// CASE_0-DAG: ![[SBTYS]] = !{!{{[0-9]+}}, !{{[0-9]+}}, ![[SELFTY:[0-9]+]]}
+// CASE_0-DAG: ![[SELFTY]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}line: 5, {{.*}}elements: ![[UNSIZED_ELTS:[0-9]+]]
+// CASE_0-DAG: ![[UNSIZED_ELTS]] = !{![[UNSIZED_MEM:[0-9]+]]}
+// CASE_0-DAG: ![[UNSIZED_MEM]] = !DIDerivedType(tag: DW_TAG_member, {{.*}} baseType: ![[UNIQ:[0-9]+]]
 
 // The unique unsized type.
-// CHECK: ![[UNIQ]] = !DICompositeType(
-// CHECK-SAME:            tag: DW_TAG_structure_type, name: "Result",
-// CHECK-SAME:            line: 3,
-// CHECK-NOT:             size:
-// CHECK-SAME:            runtimeLang: DW_LANG_Swift,
-// CHECK-SAME:            identifier: "$s1a6ResultOyxGD")
-
-// (2)
-// CHECK: !DILocalVariable(name: "self", arg: 2, {{.*}}line: 9,
-// CHECK-SAME:             type: ![[C_TUP:[0-9]+]]
-// CHECK: ![[C_TUP]] = !DIDerivedType(tag: DW_TAG_const_type,
-// CHECK-SAME:                        baseType: ![[TUP:[0-9]+]])
-// CHECK: ![[TUP]] = !DICompositeType(tag: DW_TAG_structure_type,
-// CHECK-SAME:                        line: 3, size: {{256|512}},
+// CASE_0: ![[UNIQ]] = !DICompositeType(
+// CASE_0-SAME:            tag: DW_TAG_structure_type, name: "Result",
+// CASE_0-SAME:            line: 5,
+// CASE_0-NOT:             size:
+// CASE_0-SAME:            runtimeLang: DW_LANG_Swift,
+// CASE_0-SAME:            identifier: "$s1a6ResultOyxGD")
 
 // (1)
-// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}}line: 27,
-// CHECK-SAME:             type: ![[C_CLASS:[0-9]+]]
-// CHECK: ![[C_CLASS]] = !DIDerivedType(tag: DW_TAG_const_type,
-// CHECK-SAME:                          baseType: ![[CLASS:[0-9]+]])
-// CHECK: ![[CLASS]] = !DICompositeType(tag: DW_TAG_structure_type,
-// CHECK-SAME:                          line: 3, size:
+// CASE_1-DAG: ![[F:[0-9]+]] = distinct !DISubprogram(name: "f", 
+// CASE_1-DAG: !DILocalVariable(name: "self", arg: 1, scope: ![[F]],{{.*}} line: 31,{{.*}} type: ![[C_CLASS:[0-9]+]]
+// CASE_1-DAG: ![[C_CLASS]] = !DIDerivedType(tag: DW_TAG_const_type,{{.*}} baseType: ![[CLASS:[0-9]+]])
+// CASE_1-DAG: ![[CLASS]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} line: 5, size: {{40|72}}
+
+// (2)
+// CASE_2-DAG: ![[G:[0-9]+]] = distinct !DISubprogram(name: "g", 
+// CASE_2-DAG: !DILocalVariable(name: "self", arg: 1, scope: ![[G]],{{.*}} line: 38,{{.*}} type: ![[C_TUP:[0-9]+]]
+// CASE_2-DAG: ![[C_TUP]] = !DIDerivedType(tag: DW_TAG_const_type,{{.*}} baseType: ![[TUP:[0-9]+]])
+// CASE_2-DAG: ![[TUP]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} line: 5, size: {{264|512}},

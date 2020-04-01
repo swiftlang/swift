@@ -31,6 +31,7 @@ struct CodeCompletionResultsArrayBuilder::Implementation {
                       Optional<StringRef>,
                       Optional<StringRef>,
                       UIdent,
+                      UIdent,
                       uint8_t> Builder;
 };
 
@@ -53,6 +54,7 @@ void CodeCompletionResultsArrayBuilder::add(
     Optional<StringRef> DocBrief,
     Optional<StringRef> AssocUSRs,
     UIdent SemanticContext,
+    UIdent TypeRelation,
     bool NotRecommended,
     unsigned NumBytesToErase) {
 
@@ -67,6 +69,7 @@ void CodeCompletionResultsArrayBuilder::add(
                         DocBrief,
                         AssocUSRs,
                         SemanticContext,
+                        TypeRelation,
                         BytesAndNotRecommended);
 }
 
@@ -88,6 +91,7 @@ public:
                              const char *,
                              const char *,
                              sourcekitd_uid_t,
+                             sourcekitd_uid_t,
                              uint8_t> CompactArrayReaderTy;
 
   static bool
@@ -105,6 +109,7 @@ public:
     const char *DocBrief;
     const char *AssocUSRs;
     sourcekitd_uid_t SemanticContext;
+    sourcekitd_uid_t TypeRelation;
     uint8_t BytesAndNotRecommended;
 
     Reader.readEntries(Index,
@@ -117,6 +122,7 @@ public:
                   DocBrief,
                   AssocUSRs,
                   SemanticContext,
+                  TypeRelation,
                   BytesAndNotRecommended);
 
     unsigned NumBytesToErase = BytesAndNotRecommended >> 1;
@@ -144,6 +150,7 @@ public:
       APPLY(KeyAssociatedUSRs, String, AssocUSRs);
     }
     APPLY(KeyContext, UID, SemanticContext);
+    APPLY(KeyTypeRelation, UID, TypeRelation);
     APPLY(KeyNumBytesToErase, Int, NumBytesToErase);
     if (NotRecommended) {
       APPLY(KeyNotRecommended, Bool, NotRecommended);

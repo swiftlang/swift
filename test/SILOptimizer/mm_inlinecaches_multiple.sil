@@ -41,18 +41,18 @@ bb0(%0 : $Foo):
 
 sil @_TF8testcase7my_mainFCS_3FooT_ : $@convention(thin) (@owned Foo) -> () {
 bb0(%0 : $Foo):
-  %1 = class_method %0 : $Foo, #Foo.ping!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> () // user: %2
+  %1 = class_method %0 : $Foo, #Foo.ping : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> () // user: %2
   %2 = apply %1(%0) : $@convention(method) (@guaranteed Foo) -> ()
   %3 = tuple ()                                   // user: %4
   return %3 : $()                                 // id: %4
 }
 
 sil_vtable Foo {
-  #Foo.ping!1: @_TFC8testcase3Foo4pingfS0_FT_T_	// testcase.Foo.ping (testcase.Foo)() -> ()
-  #Foo.init!initializer.1: @_TFC8testcase3FoocfMS0_FT_S0_	// testcase.Foo.init (testcase.Foo.Type)() -> testcase.Foo
+  #Foo.ping: @_TFC8testcase3Foo4pingfS0_FT_T_	// testcase.Foo.ping (testcase.Foo)() -> ()
+  #Foo.init!initializer: @_TFC8testcase3FoocfMS0_FT_S0_	// testcase.Foo.init (testcase.Foo.Type)() -> testcase.Foo
 }
 
 sil_vtable Bar {
-  #Foo.ping!1: @_TFC8testcase3Foo4pingfS0_FT_T_	// testcase.Foo.ping (testcase.Foo)() -> ()
-  #Foo.init!initializer.1: @_TFC8testcase3FoocfMS0_FT_S0_	// testcase.Foo.init (testcase.Foo.Type)() -> testcase.Foo
+  #Foo.ping: @_TFC8testcase3Foo4pingfS0_FT_T_	// testcase.Foo.ping (testcase.Foo)() -> ()
+  #Foo.init!initializer: @_TFC8testcase3FoocfMS0_FT_S0_	// testcase.Foo.init (testcase.Foo.Type)() -> testcase.Foo
 }

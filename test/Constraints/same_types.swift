@@ -333,3 +333,25 @@ class R<T>: P7 where T: P7, T.A == T.Type { // expected-note {{'T' declared as p
 
 R.fn(args: R.self) // expected-error {{generic parameter 'T' could not be inferred}}
 // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+
+// rdar://problem/58607155
+protocol AssocType1 { associatedtype A }
+protocol AssocType2 { associatedtype A }
+
+func rdar58607155() {
+  func f<T1: AssocType1, T2: AssocType2>(t1: T1, t2: T2) where T1.A == T2.A {}
+  // expected-note@-1 2 {{where 'T2' = 'MissingConformance'}}
+  // expected-note@-2 2 {{where 'T1' = 'MissingConformance'}}
+
+  class Conformance: AssocType1, AssocType2 { typealias A = Int }
+  class MissingConformance {}
+
+  // One generic argument has a conformance failure
+  f(t1: MissingConformance(), t2: Conformance()) // expected-error {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType1'}}
+  f(t1: Conformance(), t2: MissingConformance()) // expected-error {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType2'}}
+
+  // Both generic arguments have a conformance failure
+  f(t1: MissingConformance(), t2: MissingConformance())
+  // expected-error@-1 {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType1'}}
+  // expected-error@-2 {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType2'}}
+}

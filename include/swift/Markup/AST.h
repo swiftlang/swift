@@ -37,10 +37,10 @@ struct CommentParts {
   Optional<const Paragraph *> Brief;
   ArrayRef<const MarkupASTNode *> BodyNodes;
   ArrayRef<ParamField *> ParamFields;
-  Optional<const ReturnsField *> ReturnsField;
-  Optional<const ThrowsField *> ThrowsField;
+  Optional<const swift::markup::ReturnsField *> ReturnsField;
+  Optional<const swift::markup::ThrowsField *> ThrowsField;
   llvm::SmallSetVector<StringRef, 8> Tags;
-  Optional<const LocalizationKeyField *> LocalizationKeyField;
+  Optional<const swift::markup::LocalizationKeyField *> LocalizationKeyField;
 
   bool isEmpty() const {
     return !Brief.hasValue() &&
