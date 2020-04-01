@@ -7902,10 +7902,27 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 
 Type ClassDecl::getSuperclass() const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    SuperclassTypeRequest{const_cast<ClassDecl *>(this),
-                          TypeResolutionStage::Interface},
-    Type());
+  const auto intefaceSuperclassReq =
+      SuperclassTypeRequest{const_cast<ClassDecl *>(this),
+                            TypeResolutionStage::Interface};
+
+  // The interface stage of realizing a bound generic superclass type
+  // will cause a circularity when applying a generic argument that must
+  // satisfy a superclass constraint involving the superclass being computed:
+  //
+  // class Bottom<T: Bottom<Top>> {}
+  // class Top: Bottom<Top> {}
+  //                   ^ applying Top requires checking whether Top: Bottom<Top>
+  //
+  // To evade the circularity, skip requirement checks until the interface
+  // stage completes.
+  if (ctx.evaluator.hasActiveRequest(intefaceSuperclassReq)) {
+    return evaluateOrDefault(ctx.evaluator,
+      SuperclassTypeRequest{const_cast<ClassDecl *>(this),
+                            TypeResolutionStage::Structural},
+      Type());
+  }
+  return evaluateOrDefault(ctx.evaluator, intefaceSuperclassReq, Type());
 }
 
 ClassDecl *ClassDecl::getSuperclassDecl() const {

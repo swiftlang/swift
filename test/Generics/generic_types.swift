@@ -231,14 +231,18 @@ class Bottom<T : Bottom<Top>> {}
 // expected-error@-1 {{'Bottom' requires that 'Top' inherit from 'Bottom<Top>'}}
 // expected-note@-2 {{requirement specified as 'T' : 'Bottom<Top>' [with T = Top]}}
 
-// FIXME: Superclass validation circularity.
-class Top2: Bottom2<Top2> {}
-// expected-error@-1 {{'Top2' inherits from itself}}
-// expected-error@-2 {{'Bottom2' requires that 'Top2' inherit from 'Bottom2<Top2>'}}
-// expected-note@-3 {{through reference here}}
 class Bottom2<T: Bottom2<Top2>> {}
-// expected-note@-1 2{{requirement specified as 'T' : 'Bottom2<Top2>' [with T = Top2]}}
-// expected-error@-2 {{'Bottom2' requires that 'Top2' inherit from 'Bottom2<Top2>'}}
+class Top2: Bottom2<Top2> {} // OK
+
+class Bottom3<T: Bottom3<Top3, Top3, Top3>,
+              U: Bottom3<Top3, Top3, Top3>,
+              R: Bottom3<Top3, Top3, Top3>> {}
+class Top3: Bottom3<Top3, Top3, Top3> {} // OK
+
+// FIXME: Unlock recursive superclass constraints.
+class ProtoSuperclass<T> {}
+protocol Proto: ProtoSuperclass<Self> {} // expected-error {{superclass constraint 'Self' : 'ProtoSuperclass<Self>' is recursive}}
+func recursiveSuperclassFunc<T: ProtoSuperclass<T>>(t: T) {} // expected-error {{superclass constraint 'T' : 'ProtoSuperclass<T>' is recursive}}
 
 // Invalid inheritance clause
 

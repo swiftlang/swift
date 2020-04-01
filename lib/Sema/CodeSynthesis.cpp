@@ -927,13 +927,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
   decl->setAddedImplicitInitializers();
 
-  // We can only inherit initializers if we have a superclass.
-  // FIXME: We should be bailing out earlier in the function, but unfortunately
-  // that currently regresses associated type inference for cases like
-  // compiler_crashers_2_fixed/0124-sr5825.swift due to the fact that we no
-  // longer eagerly compute the interface types of the other constructors.
-  auto superclassTy = decl->getSuperclass();
-  if (!superclassTy)
+  if (!decl->getSuperclass())
     return;
 
   // Check whether the user has defined a designated initializer for this class,

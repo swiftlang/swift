@@ -111,7 +111,7 @@ public:
   void diagnoseCycle(DiagnosticEngine &diags) const;
 
   // Separate caching.
-  bool isCached() const;
+  bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };

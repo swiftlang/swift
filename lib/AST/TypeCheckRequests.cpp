@@ -129,10 +129,6 @@ void SuperclassTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
                  nominalDecl->getName());
 }
 
-bool SuperclassTypeRequest::isCached() const {
-  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
-}
-
 Optional<Type> SuperclassTypeRequest::getCachedResult() const {
   auto nominalDecl = std::get<0>(getStorage());
 
