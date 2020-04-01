@@ -500,11 +500,23 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
+  DifferentiabilityKind diffKind;
+  switch (flags.getDifferentiabilityKind()) {
+  case ImplFunctionDifferentiabilityKind::NonDifferentiable:
+    diffKind = DifferentiabilityKind::NonDifferentiable;
+    break;
+  case ImplFunctionDifferentiabilityKind::Normal:
+    diffKind = DifferentiabilityKind::Normal;
+    break;
+  case ImplFunctionDifferentiabilityKind::Linear:
+    diffKind = DifferentiabilityKind::Linear;
+    break;
+  }
+
   // TODO: [store-sil-clang-function-type]
-  auto einfo = SILFunctionType::ExtInfo(
-      representation, flags.isPseudogeneric(), !flags.isEscaping(),
-      DifferentiabilityKind::NonDifferentiable,
-      /*clangFunctionType*/ nullptr);
+  auto einfo = SILFunctionType::ExtInfo(representation, flags.isPseudogeneric(),
+                                        !flags.isEscaping(), diffKind,
+                                        /*clangFunctionType*/ nullptr);
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;
