@@ -101,6 +101,9 @@ class DestroyHoisting {
 
   void moveDestroys(MemoryDataflow &dataFlow);
 
+  bool locationOverlaps(const MemoryLocations::Location *loc,
+                        const Bits &destroys);
+
   void moveDestroysInBlock(SILBasicBlock *block, Bits &activeDestroys,
                            SmallVectorImpl<SILInstruction *> &toRemove);
 
@@ -415,6 +418,19 @@ void DestroyHoisting::moveDestroys(MemoryDataflow &dataFlow) {
   }
 }
 
+bool DestroyHoisting::locationOverlaps(const MemoryLocations::Location *loc,
+                                       const Bits &destroys) {
+  // We cannot just check if 'loc->subLocations' has any common bits with
+  // 'destroys', because subLocations don't include the "self" bit if all sub
+  // locations cover the whole location.
+  for (int subIdx = loc->subLocations.find_first(); subIdx >= 0;
+       subIdx = loc->subLocations.find_next(subIdx)) {
+    if (destroys.anyCommon(locations.getLocation(subIdx)->selfAndParents))
+      return true;
+  }
+  return false;
+}
+
 void DestroyHoisting::moveDestroysInBlock(
                                 SILBasicBlock *block, Bits &activeDestroys,
                                 SmallVectorImpl<SILInstruction *> &toRemove) {
@@ -435,11 +451,9 @@ void DestroyHoisting::moveDestroysInBlock(
       // debug_value_addr does not count as real use of a location. If we are
       // moving a destroy_addr above a debug_value_addr, just delete that
       // debug_value_addr.
-      if (auto *dvaLoc = locations.getLocation(DVA->getOperand())) {
-        if (activeDestroys.anyCommon(dvaLoc->subLocations) ||
-            activeDestroys.anyCommon(dvaLoc->selfAndParents))
-          toRemove.push_back(DVA);
-      }
+      auto *dvaLoc = locations.getLocation(DVA->getOperand());
+      if (dvaLoc && locationOverlaps(dvaLoc, activeDestroys))
+        toRemove.push_back(DVA);
     } else if (I.mayHaveSideEffects()) {
       // Delete all destroy_addr and debug_value_addr which are scheduled for
       // removal.
