@@ -1,0 +1,51 @@
+// RUN: %target-sil-opt -O -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class Foo {
+  @_hasStorage @_hasInitialValue var x: Int { get set }
+  init()
+  deinit
+}
+
+// CHECK-LABEL: sil @simple_stack_to_obj
+// CHECK-NOT: alloc_ref
+// CHECK: [[I:%.*]] = integer_literal
+// CHECK-NEXT: [[X:%.*]] = struct $Int ([[I]]
+// CHECK-NEXT: [[OBJ:%.*]] = object $Foo (%3 : $Int)
+// CHECK-NEXT: [[E:%.*]] = ref_element_addr [[OBJ]] : $Foo, #Foo.x
+// CHECK-NEXT: begin_access
+// CHECK-NEXT: [[VAL:%.*]] = load
+// CHECK-NEXT: end_access
+// CHECK-NEXT: return [[VAL]]
+// CHECK-LABEL: end sil function 'simple_stack_to_obj'
+sil @simple_stack_to_obj : $@convention(thin) () -> Int {
+bb0:
+  %1 = alloc_ref [stack] $Foo                     // users: %17, %16, %15, %14, %18, %10, %9, %5, %2
+  debug_value %1 : $Foo, let, name "self", argno 1 // id: %2
+  %3 = integer_literal $Builtin.Int64, 0          // user: %4
+  %4 = struct $Int (%3 : $Builtin.Int64)          // user: %7
+  %5 = ref_element_addr %1 : $Foo, #Foo.x         // users: %11, %6
+  %6 = begin_access [modify] [dynamic] [no_nested_conflict] %5 : $*Int // users: %8, %7
+  store %4 to %6 : $*Int                          // id: %7
+  end_access %6 : $*Int                           // id: %8
+  debug_value %1 : $Foo, let, name "f"            // id: %9
+  debug_value %1 : $Foo, let, name "self", argno 1 // id: %10
+  %11 = begin_access [read] [static] [no_nested_conflict] %5 : $*Int // users: %13, %12
+  %12 = load %11 : $*Int                          // user: %19
+  end_access %11 : $*Int                          // id: %13
+  set_deallocating %1 : $Foo                      // id: %14
+  debug_value %1 : $Foo, let, name "self", argno 1 // id: %15
+  debug_value %1 : $Foo, let, name "self", argno 1 // id: %16
+  dealloc_ref %1 : $Foo                           // id: %17
+  dealloc_ref [stack] %1 : $Foo                   // id: %18
+  return %12 : $Int                               // id: %19
+}
+
+sil_vtable Foo {
+
+}
