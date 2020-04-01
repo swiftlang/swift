@@ -31,6 +31,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
+#include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Migrator/MigratorOptions.h"
@@ -405,6 +406,7 @@ class CompilerInstance {
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<SILModule> TheSILModule;
+  std::unique_ptr<DiagnosticVerifier> DiagVerifier;
 
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
@@ -585,6 +587,7 @@ private:
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
+  void setupDiagnosticVerifierIfNeeded();
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Set up all state in the CompilerInstance to process the given input file.
@@ -623,7 +626,7 @@ public:
   void performParseOnly(bool EvaluateConditionals = false,
                         bool CanDelayBodies = true);
 
-  /// Parses and performs name binding on all input files.
+  /// Parses and performs import resolution on all input files.
   ///
   /// This is similar to a parse-only invocation, but module imports will also
   /// be processed.

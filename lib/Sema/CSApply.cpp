@@ -483,6 +483,10 @@ namespace {
 
         // Handle operator requirements found in protocols.
         if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+          bool isCurried = shouldBuildCurryThunk(choice,
+                                                 /*baseIsInstance=*/false,
+                                                 /*extraUncurryLevel=*/false);
+
           // If we have a concrete conformance, build a call to the witness.
           //
           // FIXME: This is awful. We should be able to handle this as a call to
@@ -494,49 +498,53 @@ namespace {
                       ConformanceCheckFlags::InExpression);
           if (conformance.isConcrete()) {
             if (auto witness = conformance.getConcrete()->getWitnessDecl(decl)) {
-              // The fullType was computed by substituting the protocol
-              // requirement so it always has a (Self) -> ... curried
-              // application. Strip it off if the witness was a top-level
-              // function.
-              Type refType;
-              if (witness->getDeclContext()->isTypeContext())
-                refType = fullType;
-              else
-                refType = fullType->castTo<AnyFunctionType>()->getResult();
+              bool isMemberOperator = witness->getDeclContext()->isTypeContext();
 
-              // Build the AST for the call to the witness.
-              auto subMap = getOperatorSubstitutions(witness, refType);
-              if (subMap) {
-                ConcreteDeclRef witnessRef(witness, *subMap);
-                auto declRefExpr =  new (ctx) DeclRefExpr(witnessRef, loc,
-                                                          /*Implicit=*/false);
-                declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
-                cs.setType(declRefExpr, refType);
+              if (!isMemberOperator || !isCurried) {
+                // The fullType was computed by substituting the protocol
+                // requirement so it always has a (Self) -> ... curried
+                // application. Strip it off if the witness was a top-level
+                // function.
+                Type refType;
+                if (isMemberOperator)
+                  refType = fullType;
+                else
+                  refType = fullType->castTo<AnyFunctionType>()->getResult();
 
-                Expr *refExpr;
-                if (witness->getDeclContext()->isTypeContext()) {
-                  // If the operator is a type member, add the implicit
-                  // (Self) -> ... call.
-                  Expr *base =
-                    TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
-                                                 ctx);
-                  cs.setType(base, MetatypeType::get(baseTy));
+                // Build the AST for the call to the witness.
+                auto subMap = getOperatorSubstitutions(witness, refType);
+                if (subMap) {
+                  ConcreteDeclRef witnessRef(witness, *subMap);
+                  auto declRefExpr =  new (ctx) DeclRefExpr(witnessRef, loc,
+                                                            /*Implicit=*/false);
+                  declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
+                  cs.setType(declRefExpr, refType);
 
-                  refExpr = new (ctx) DotSyntaxCallExpr(declRefExpr,
-                                                        SourceLoc(), base);
-                  auto refType = fullType->castTo<FunctionType>()->getResult();
-                  cs.setType(refExpr, refType);
-                } else {
-                  refExpr = declRefExpr;
+                  Expr *refExpr;
+                  if (isMemberOperator) {
+                    // If the operator is a type member, add the implicit
+                    // (Self) -> ... call.
+                    Expr *base =
+                      TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
+                                                   ctx);
+                    cs.setType(base, MetatypeType::get(baseTy));
+
+                    refExpr = new (ctx) DotSyntaxCallExpr(declRefExpr,
+                                                          SourceLoc(), base);
+                    auto refType = fullType->castTo<FunctionType>()->getResult();
+                    cs.setType(refExpr, refType);
+                  } else {
+                    refExpr = declRefExpr;
+                  }
+
+                  return forceUnwrapIfExpected(refExpr, choice, locator);
                 }
-
-                return forceUnwrapIfExpected(refExpr, choice, locator);
               }
             }
           }
         }
 
-        // Build a reference to the protocol requirement.
+        // Build a reference to the member.
         Expr *base =
           TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy, ctx);
         cs.cacheExprTypes(base);
@@ -792,6 +800,244 @@ namespace {
       return true;
     }
 
+    /// Determines if a partially-applied member reference should be
+    /// converted into a fully-applied member reference with a pair of
+    /// closures.
+    bool shouldBuildCurryThunk(OverloadChoice choice,
+                               bool baseIsInstance,
+                               bool extraUncurryLevel) {
+      ValueDecl *member = choice.getDecl();
+      auto isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+
+      // FIXME: We should finish plumbing this through for dynamic
+      // lookup as well.
+      if (isDynamic || member->getAttrs().hasAttribute<OptionalAttr>())
+        return false;
+
+      // If we're inside a selector expression, don't build the thunk.
+      // Were not actually going to emit the member reference, just
+      // look at the AST.
+      for (auto expr : ExprStack)
+        if (isa<ObjCSelectorExpr>(expr))
+          return false;
+
+      // Unbound instance method references always build a thunk, even if
+      // we apply the arguments (eg, SomeClass.method(self)(a)), to avoid
+      // representational issues.
+      if (!baseIsInstance && member->isInstanceMember())
+        return true;
+
+      // Figure out how many argument lists we need.
+      unsigned maxArgCount = member->getNumCurryLevels();
+
+      unsigned argCount = [&]() -> unsigned {
+        Expr *prev = ExprStack.back();
+
+        // FIXME: Representational gunk because "T(...)" is really
+        // "T.init(...)" -- pretend it has two argument lists like
+        // a real '.' call.
+        if (isa<ConstructorDecl>(member) &&
+            isa<CallExpr>(prev) &&
+            isa<TypeExpr>(cast<CallExpr>(prev)->getFn())) {
+          assert(maxArgCount == 2);
+          return 1;
+        }
+
+        // Similarly, ".foo(...)" really applies two argument lists.
+        if (auto *unresolvedMemberExpr = dyn_cast<UnresolvedMemberExpr>(prev)) {
+          if (unresolvedMemberExpr->hasArguments() ||
+              unresolvedMemberExpr->hasTrailingClosure())
+            return 1;
+          return 0;
+        }
+
+        return getArgCount(maxArgCount);
+      }();
+
+      // Sometimes we build a member reference that has an implicit
+      // level of function application in the AST. For example,
+      // @dynamicCallable and callAsFunction are handled this way.
+      //
+      // FIXME: It would be nice to simplify this and the argCount
+      // computation above somehow.
+      if (extraUncurryLevel)
+        argCount++;
+
+      // If we have fewer argument lists than expected, build a thunk.
+      if (argCount < maxArgCount)
+        return true;
+
+      return false;
+    }
+
+    AutoClosureExpr *buildCurryThunk(ValueDecl *member,
+                                     FunctionType *selfFnTy,
+                                     Expr *selfParamRef,
+                                     Expr *ref,
+                                     ConstraintLocatorBuilder locator) {
+      auto &context = cs.getASTContext();
+
+      OptionSet<ParameterList::CloneFlags> options
+        = (ParameterList::Implicit |
+           ParameterList::NamedArguments);
+      auto *params = getParameterList(member)->clone(context, options);
+
+      for (auto idx : indices(*params)) {
+        auto *param = params->get(idx);
+        auto arg = selfFnTy->getParams()[idx];
+
+        param->setInterfaceType(
+            arg.getParameterType()->mapTypeOutOfContext());
+        param->setSpecifier(
+          ParamDecl::getParameterSpecifierForValueOwnership(
+            arg.getValueOwnership()));
+      }
+
+      auto resultTy = selfFnTy->getResult();
+      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
+      auto closure =
+          new (context) AutoClosureExpr(/*set body later*/nullptr, resultTy,
+                                        discriminator, cs.DC);
+      closure->setParameterList(params);
+      closure->setType(selfFnTy);
+      closure->setThunkKind(AutoClosureExpr::Kind::SingleCurryThunk);
+      cs.cacheType(closure);
+
+      auto refTy = cs.getType(ref)->castTo<FunctionType>();
+      auto calleeParams = refTy->getResult()->castTo<FunctionType>()->getParams();
+      auto calleeResultTy = refTy->getResult()->castTo<FunctionType>()->getResult();
+
+      auto selfParam = refTy->getParams()[0];
+      auto selfParamTy = selfParam.getPlainType();
+
+      Expr *selfOpenedRef = selfParamRef;
+
+      if (selfParamTy->hasOpenedExistential()) {
+        // If we're opening an existential:
+        // - the type of 'ref' inside the closure is written in terms of the
+        //   open existental archetype
+        // - the type of the closure, 'selfFnTy' is written in terms of the
+        //   erased existential bounds
+        if (selfParam.isInOut())
+          selfParamTy = LValueType::get(selfParamTy);
+
+        selfOpenedRef =
+            new (context) OpaqueValueExpr(SourceLoc(), selfParamTy);
+        cs.cacheType(selfOpenedRef);
+      }
+
+      // (Self) -> ...
+      auto *selfCall =
+        CallExpr::createImplicit(context, ref, selfOpenedRef, { },
+                                 [&](const Expr *E) { return cs.getType(E); });
+      selfCall->setType(refTy->getResult());
+      cs.cacheType(selfCall->getArg());
+      cs.cacheType(selfCall);
+
+      // FIXME: This is a holdover from the old tuple-based function call
+      // representation.
+      auto selfArgTy = ParenType::get(context,
+                                      selfParam.getPlainType(),
+                                      selfParam.getParameterFlags());
+      selfCall->getArg()->setType(selfArgTy);
+      cs.cacheType(selfCall->getArg());
+
+      if (selfParamRef->isSuperExpr())
+        selfCall->setIsSuper(true);
+
+      // Pass all the closure parameters to the call.
+      SmallVector<Identifier, 4> labels;
+      SmallVector<SourceLoc, 4> labelLocs;
+      SmallVector<Expr *, 4> args;
+
+      for (auto idx : indices(*params)) {
+        auto *param = params->get(idx);
+        auto calleeParamType = calleeParams[idx].getParameterType();
+
+        auto type = param->getType();
+
+        Expr *paramRef =
+          new (context) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
+        paramRef->setType(
+            param->isInOut()
+              ? LValueType::get(type)
+              : type);
+        cs.cacheType(paramRef);
+
+        paramRef = coerceToType(
+            paramRef,
+            param->isInOut()
+              ? LValueType::get(calleeParamType)
+              : calleeParamType,
+            locator);
+
+        if (param->isInOut()) {
+          paramRef =
+            new (context) InOutExpr(SourceLoc(), paramRef, calleeParamType,
+                                    /*implicit=*/true);
+          cs.cacheType(paramRef);
+        } else if (param->isVariadic()) {
+          paramRef =
+            new (context) VarargExpansionExpr(paramRef, /*implicit*/ true);
+          paramRef->setType(calleeParamType);
+          cs.cacheType(paramRef);
+        }
+
+        args.push_back(paramRef);
+
+        labels.push_back(calleeParams[idx].getLabel());
+        labelLocs.push_back(SourceLoc());
+      }
+
+      Expr *closureArg;
+      if (args.size() == 1 &&
+          labels[0].empty() &&
+          !calleeParams[0].getParameterFlags().isVariadic()) {
+        closureArg = new (context) ParenExpr(SourceLoc(), args[0], SourceLoc(),
+                                             /*hasTrailingClosure=*/false);
+        closureArg->setImplicit();
+      } else {
+        closureArg = TupleExpr::create(context, SourceLoc(), args, labels, labelLocs,
+                                       SourceLoc(), /*hasTrailingClosure=*/false,
+                                       /*implicit=*/true);
+      }
+
+      auto argTy = AnyFunctionType::composeInput(context, calleeParams,
+                                                 /*canonical*/false);
+      closureArg->setType(argTy);
+      cs.cacheType(closureArg);
+
+      // (Self) -> (Args...) -> ...
+      auto *closureCall =
+        CallExpr::create(context, selfCall, closureArg, { }, { },
+                         /*hasTrailingClosure=*/false,
+                         /*implicit=*/true);
+      closureCall->setType(calleeResultTy);
+      cs.cacheType(closureCall);
+
+      Expr *closureBody = closureCall;
+      closureBody = coerceToType(closureCall, resultTy, locator);
+
+      if (selfFnTy->getExtInfo().throws()) {
+        closureBody = new (context) TryExpr(closureBody->getStartLoc(), closureBody,
+                                            cs.getType(closureBody),
+                                            /*implicit=*/true);
+        cs.cacheType(closureBody);
+      }
+
+      if (selfParam.getPlainType()->hasOpenedExistential()) {
+        closureBody =
+          new (context) OpenExistentialExpr(
+            selfParamRef, cast<OpaqueValueExpr>(selfOpenedRef),
+            closureBody, resultTy);
+        cs.cacheType(closureBody);
+      }
+
+      closure->setBody(closureBody);
+
+      return closure;
+    }
+
     /// Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, SourceLoc dotLoc,
                          SelectedOverload overload, DeclNameLoc memberLoc,
@@ -851,6 +1097,8 @@ namespace {
 
       bool isUnboundInstanceMember =
         (!baseIsInstance && member->isInstanceMember());
+      bool isPartialApplication =
+        shouldBuildCurryThunk(choice, baseIsInstance, extraUncurryLevel);
 
       auto refTy = simplifyType(openedFullType);
 
@@ -871,11 +1119,29 @@ namespace {
                            getConstraintSystem().getConstraintLocator(
                              memberLocator));
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
-        // Open the existential before performing the member reference.
-        base = openExistentialReference(base, knownOpened->second, member);
-        baseTy = knownOpened->second;
-        selfTy = baseTy;
-        openedExistential = true;
+        // Determine if we're going to have an OpenExistentialExpr around
+        // this member reference.
+        //
+        // If we have a partial application of a protocol method, we open
+        // the existential in the curry thunk, instead of opening it here,
+        // because we won't have a 'self' value until the curry thunk is
+        // applied.
+        //
+        // However, a partial application of a class method on a subclass
+        // existential does need to open the existential, so that it can be
+        // upcast to the appropriate class reference type.
+        if (!isPartialApplication || !containerTy->hasOpenedExistential()) {
+          // Open the existential before performing the member reference.
+          base = openExistentialReference(base, knownOpened->second, member);
+          baseTy = knownOpened->second;
+          selfTy = baseTy;
+          openedExistential = true;
+        } else {
+          // Erase opened existentials from the type of the thunk; we're
+          // going to open the existential inside the thunk's body.
+          containerTy = containerTy->eraseOpenedExistential(knownOpened->second);
+          selfTy = containerTy;
+        }
       }
 
       // References to properties with accessors and storage usually go
@@ -1024,6 +1290,133 @@ namespace {
       declRefExpr->setType(refTy);
       cs.setType(declRefExpr, refTy);
       Expr *ref = declRefExpr;
+
+      if (isPartialApplication) {
+        auto curryThunkTy = refTy->castTo<FunctionType>();
+
+        // A partial application thunk consists of two nested closures:
+        //
+        // { self in { args... in self.method(args...) } }
+        //
+        // If the reference has an applied 'self', eg 'let fn = foo.method',
+        // the outermost closure is wrapped inside a single ApplyExpr:
+        //
+        // { self in { args... in self.method(args...) } }(foo)
+        //
+        // This is done instead of just hoising the expression 'foo' up
+        // into the closure, which would change evaluation order.
+        //
+        // However, for a super method reference, eg, 'let fn = super.foo',
+        // the base expression is always a SuperRefExpr, possibly wrapped
+        // by an upcast. Since SILGen expects super method calls to have a
+        // very specific shape, we only emit a single closure here and
+        // capture the original SuperRefExpr, since its evaluation does not
+        // have side effects, instead of abstracting out a 'self' parameter.
+        if (isSuper) {
+          auto selfFnTy = curryThunkTy->getResult()->castTo<FunctionType>();
+
+          auto closure = buildCurryThunk(member, selfFnTy, base, ref,
+                                         memberLocator);
+
+          // Skip the code below -- we're not building an extra level of
+          // call by applying the 'super', instead the closure we just
+          // built is the curried reference.
+          return closure;
+        }
+
+        // Another case where we want to build a single closure is when
+        // we have a partial application of a constructor on a statically-
+        // derived metatype value. Again, there are no order of evaluation
+        // concerns here, and keeping the call and base together in the AST
+        // improves SILGen.
+        if (isa<ConstructorDecl>(member) &&
+            cs.isStaticallyDerivedMetatype(base)) {
+          auto selfFnTy = curryThunkTy->getResult()->castTo<FunctionType>();
+
+          // Add a useless ".self" to avoid downstream diagnostics.
+          base = new (context) DotSelfExpr(base, SourceLoc(), base->getEndLoc(),
+                                           cs.getType(base));
+          cs.setType(base, base->getType());
+
+          auto closure = buildCurryThunk(member, selfFnTy, base, ref,
+                                         memberLocator);
+
+          // Skip the code below -- we're not building an extra level of
+          // call by applying the metatype instead the closure we just
+          // built is the curried reference.
+          return closure;
+        }
+
+        // Check if we need to open an existential stored inside 'self'.
+        auto knownOpened = solution.OpenedExistentialTypes.find(
+                             getConstraintSystem().getConstraintLocator(
+                               memberLocator));
+        if (knownOpened != solution.OpenedExistentialTypes.end()) {
+          curryThunkTy =
+            curryThunkTy->eraseOpenedExistential(knownOpened->second)
+              ->castTo<FunctionType>();
+        }
+
+        auto discriminator = AutoClosureExpr::InvalidDiscriminator;
+
+        // The outer closure.
+        //
+        //    let outerClosure = "{ self in \(closure) }"
+        auto selfParam = curryThunkTy->getParams()[0];
+        auto selfParamDecl = new (context) ParamDecl(
+            SourceLoc(),
+            /*argument label*/ SourceLoc(), Identifier(),
+            /*parameter name*/ SourceLoc(), context.Id_self,
+            cs.DC);
+
+        auto selfParamTy = selfParam.getPlainType();
+        bool isLValue = selfParam.isInOut();
+
+        selfParamDecl->setInterfaceType(selfParamTy->mapTypeOutOfContext());
+        selfParamDecl->setSpecifier(
+          ParamDecl::getParameterSpecifierForValueOwnership(
+            selfParam.getValueOwnership()));
+
+        auto *outerParams =
+            ParameterList::create(context, SourceLoc(), selfParamDecl,
+                                  SourceLoc());
+
+        // The inner closure.
+        //
+        //     let closure = "{ args... in self.member(args...) }"
+        auto selfFnTy = curryThunkTy->getResult()->castTo<FunctionType>();
+
+        Expr *selfParamRef =
+            new (context) DeclRefExpr(selfParamDecl, DeclNameLoc(),
+                                      /*implicit=*/true);
+
+        selfParamRef->setType(
+          isLValue ? LValueType::get(selfParamTy) : selfParamTy);
+        cs.cacheType(selfParamRef);
+
+        if (isLValue) {
+          selfParamRef =
+            new (context) InOutExpr(SourceLoc(), selfParamRef, selfParamTy,
+                                    /*implicit=*/true);
+          cs.cacheType(selfParamRef);
+        }
+
+        auto closure = buildCurryThunk(member, selfFnTy, selfParamRef, ref,
+                                       memberLocator);
+
+        auto outerClosure =
+            new (context) AutoClosureExpr(closure, selfFnTy,
+                                          discriminator, cs.DC);
+        outerClosure->setThunkKind(AutoClosureExpr::Kind::DoubleCurryThunk);
+
+        outerClosure->setParameterList(outerParams);
+        outerClosure->setType(curryThunkTy);
+        cs.cacheType(outerClosure);
+
+        // Replace the DeclRefExpr with a closure expression which SILGen
+        // knows how to emit.
+        ref = outerClosure;
+      }
 
       // If this is a method whose result type is dynamic Self, or a
       // construction, replace the result type with the actual object type.
@@ -1573,14 +1966,19 @@ namespace {
 
       // Looks like there is a chain of implicit `subscript(dynamicMember:)`
       // calls necessary to resolve a member reference.
-      if (overload.choice.getKind() ==
-          OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+      switch (overload.choice.getKind()) {
+      case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
         buildKeyPathSubscriptComponent(overload, dotLoc, /*indexExpr=*/nullptr,
                                        ctx.Id_dynamicMember, componentLoc,
                                        components);
         keyPath->resolveComponents(ctx, components);
         cs.cacheExprTypes(keyPath);
         return keyPath;
+      }
+
+      default:
+        break;
       }
 
       // We can't reuse existing expression because type-check
@@ -2738,9 +3136,6 @@ namespace {
                                              selected.choice.getTupleIndex(),
                                              nameLoc.getBaseNameLoc(), toType));
       }
-
-      case OverloadChoiceKind::BaseType:
-        return base;
 
       case OverloadChoiceKind::KeyPathApplication:
         llvm_unreachable("should only happen in a subscript");
@@ -5537,6 +5932,80 @@ getSemanticExprForDeclOrMemberRef(Expr *expr) {
 }
 
 static void
+maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
+                                                 Expr *expr,
+                                                 AnyFunctionType *toType) {
+  ASTContext &ctx = cs.getASTContext();
+  Type fromType = cs.getType(expr);
+  auto fromFnType = fromType->getAs<AnyFunctionType>();
+  auto isToTypeLinear =
+      toType->getDifferentiabilityKind() == DifferentiabilityKind::Linear;
+  // Conversion from a `@differentiable` function to a `@differentiable(linear)`
+  // function is not allowed, because the from-expression will never be a
+  // closure expression or a declaration/member reference.
+  if (fromFnType->getDifferentiabilityKind() == DifferentiabilityKind::Normal &&
+      toType->getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+    ctx.Diags.diagnose(expr->getLoc(),
+                       diag::invalid_differentiable_function_conversion_expr,
+                       isToTypeLinear);
+    return;
+  }
+  // Conversion from a non-`@differentiable` function to a `@differentiable` is
+  // only allowed from a closure expression or a declaration/member reference.
+  if (!fromFnType->isDifferentiable() && toType->isDifferentiable()) {
+    std::function<void(Expr *)> maybeDiagnoseFunctionRef;
+    maybeDiagnoseFunctionRef = [&](Expr *semanticExpr) {
+      if (auto *capture = dyn_cast<CaptureListExpr>(semanticExpr))
+        semanticExpr = capture->getClosureBody();
+      if (isa<ClosureExpr>(semanticExpr)) return;
+      if (auto *declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
+        if (isa<FuncDecl>(declRef->getDecl())) return;
+        // If the referenced decl is a function parameter, the user may want
+        // to change the declaration to be a '@differentiable' closure. Emit a
+        // note with a fix-it.
+        if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
+          ctx.Diags.diagnose(
+              expr->getLoc(),
+              diag::invalid_differentiable_function_conversion_expr,
+              isToTypeLinear);
+          if (paramDecl->getType()->is<AnyFunctionType>()) {
+            auto *typeRepr = paramDecl->getTypeRepr();
+            while (auto *attributed = dyn_cast<AttributedTypeRepr>(typeRepr))
+              typeRepr = attributed->getTypeRepr();
+            std::string attributeString = "@differentiable";
+            if (isToTypeLinear)
+              attributeString += "(linear)";
+            auto *funcTypeRepr = cast<FunctionTypeRepr>(typeRepr);
+            auto paramListLoc = funcTypeRepr->getArgsTypeRepr()->getStartLoc();
+            ctx.Diags.diagnose(paramDecl->getLoc(),
+                    diag::invalid_differentiable_function_conversion_parameter,
+                    attributeString)
+                .highlight(paramDecl->getTypeRepr()->getSourceRange())
+                .fixItInsert(paramListLoc, attributeString + " ");
+          }
+          return;
+        }
+      } else if (auto *memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
+        if (isa<FuncDecl>(memberRef->getMember().getDecl())) return;
+      } else if (auto *dotSyntaxCall =
+                     dyn_cast<DotSyntaxCallExpr>(semanticExpr)) {
+        Expr *fnExpr = dotSyntaxCall->getFn()->getSemanticsProvidingExpr();
+        while (auto *autoclosureExpr = dyn_cast<AutoClosureExpr>(fnExpr))
+          if (auto *unwrappedFnExpr = autoclosureExpr->getUnwrappedCurryThunkExpr())
+            fnExpr = unwrappedFnExpr;
+        // Recurse on the function expression.
+        maybeDiagnoseFunctionRef(fnExpr);
+        return;
+      }
+      ctx.Diags.diagnose(expr->getLoc(),
+                         diag::invalid_differentiable_function_conversion_expr,
+                         isToTypeLinear);
+    };
+    maybeDiagnoseFunctionRef(getSemanticExprForDeclOrMemberRef(expr));
+  }
+}
+
+static void
 maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
                                            AnyFunctionType *toType) {
   auto &de = cs.getASTContext().Diags;
@@ -6175,6 +6644,63 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                     InitializerKind::DefaultArgument);
     auto toEI = toFunc->getExtInfo();
     assert(toType->is<FunctionType>());
+
+    // Handle implicit conversions between non-@differentiable and
+    // @differentiable functions.
+    {
+      auto fromEI = fromFunc->getExtInfo();
+      auto isFromDifferentiable = fromEI.isDifferentiable();
+      auto isToDifferentiable = toEI.isDifferentiable();
+      // Handle implicit conversion from @differentiable.
+      if (isFromDifferentiable && !isToDifferentiable) {
+        fromFunc = fromFunc->getWithoutDifferentiability()
+            ->castTo<FunctionType>();
+        switch (fromEI.getDifferentiabilityKind()) {
+        case DifferentiabilityKind::Normal:
+          expr = cs.cacheType(new (ctx)
+              DifferentiableFunctionExtractOriginalExpr(expr, fromFunc));
+          break;
+        case DifferentiabilityKind::Linear:
+          expr = cs.cacheType(new (ctx)
+              LinearFunctionExtractOriginalExpr(expr, fromFunc));
+          break;
+        case DifferentiabilityKind::NonDifferentiable:
+          llvm_unreachable("Cannot be NonDifferentiable");
+        }
+      }
+      // Handle implicit conversion from @differentiable(linear) to
+      // @differentiable.
+      else if (fromEI.getDifferentiabilityKind() ==
+                   DifferentiabilityKind::Linear &&
+               toEI.getDifferentiabilityKind() == DifferentiabilityKind::Normal) {
+        // TODO(TF-908): Create a `LinearToDifferentiableFunctionExpr` and SILGen
+        // it as thunk application. Remove the diagnostic.
+        ctx.Diags.diagnose(expr->getLoc(),
+                           diag::unsupported_linear_to_differentiable_conversion);
+      }
+      // Handle implicit conversion from non-@differentiable to @differentiable.
+      maybeDiagnoseUnsupportedDifferentiableConversion(cs, expr, toFunc);
+      if (!isFromDifferentiable && isToDifferentiable) {
+        auto newEI =
+            fromEI.withDifferentiabilityKind(toEI.getDifferentiabilityKind());
+        fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult())
+            ->withExtInfo(newEI)
+            ->castTo<FunctionType>();
+        switch (toEI.getDifferentiabilityKind()) {
+        case DifferentiabilityKind::Normal:
+          expr = cs.cacheType(new (ctx)
+                              DifferentiableFunctionExpr(expr, fromFunc));
+          break;
+        case DifferentiabilityKind::Linear:
+          expr = cs.cacheType(new (ctx)
+                              LinearFunctionExpr(expr, fromFunc));
+          break;
+        case DifferentiabilityKind::NonDifferentiable:
+          llvm_unreachable("Cannot be NonDifferentiable");
+        }
+      }
+    }
+
     // If we have a ClosureExpr, then we can safely propagate the 'no escape'
     // bit to the closure without invalidating prior analysis.
     auto fromEI = fromFunc->getExtInfo();
@@ -7395,7 +7921,9 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
   TypeResolutionOptions options =
       isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
       ? TypeResolverContext::EditorPlaceholderExpr
-      : TypeResolverContext::InExpression;
+      : target.getInitializationPatternBindingDecl()
+        ? TypeResolverContext::PatternBindingDecl
+        : TypeResolverContext::InExpression;
   options |= TypeResolutionFlags::OverrideType;
 
   // Determine the type of the pattern.
@@ -7411,9 +7939,7 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
   finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
 
   // Apply the solution to the pattern as well.
-  auto contextualPattern =
-      ContextualPattern::forRawPattern(target.getInitializationPattern(),
-                                       target.getDeclContext());
+  auto contextualPattern = target.getInitializationContextualPattern();
   if (auto coercedPattern = TypeChecker::coercePatternToType(
           contextualPattern, finalPatternType, options)) {
     resultTarget.setPattern(coercedPattern);
@@ -7631,6 +8157,17 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
       // If we didn't manage to diagnose anything well, so fall back to
       // diagnosing mining the system to construct a reasonable error message.
       diagnoseFailureFor(target);
+      return None;
+    }
+  }
+
+  // If there are no fixes recorded but score indicates that there
+  // should have been at least one, let's fail application and
+  // produce a fallback diagnostic to highlight the problem.
+  {
+    const auto &score = solution.getFixedScore();
+    if (score.Data[SK_Fix] > 0 || score.Data[SK_Hole] > 0) {
+      maybeProduceFallbackDiagnostic(target);
       return None;
     }
   }

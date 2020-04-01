@@ -91,7 +91,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11.3](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11.4](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -102,6 +102,10 @@ which can be installed via a package manager:
 **[Homebrew](https://brew.sh/)**
 
     brew install cmake ninja
+    
+You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle) to install all of these dependencies:
+
+    brew bundle
 
 **[MacPorts](https://macports.org)**
 

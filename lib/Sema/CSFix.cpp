@@ -747,7 +747,8 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
     return failure.diagnose(asNote);
   }
 
-  case RefKind::Method: {
+  case RefKind::Method:
+  case RefKind::Initializer: {
     InvalidMethodRefInKeyPath failure(solution, Member, getLocator());
     return failure.diagnose(asNote);
   }
@@ -763,6 +764,11 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, ValueDecl *member,
   if (isa<FuncDecl>(member))
     return AllowInvalidRefInKeyPath::create(cs, RefKind::Method, member,
                                             locator);
+
+  // Referencing initializers in key path is not currently allowed.
+  if (isa<ConstructorDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, RefKind::Initializer,
+                                            member, locator);
 
   // Referencing static members in key path is not currently allowed.
   if (member->isStatic())

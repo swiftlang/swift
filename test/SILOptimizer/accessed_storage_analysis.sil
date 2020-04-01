@@ -434,7 +434,7 @@ enum TreeB<T> {
 // CHECK: [read] Argument %1 = argument of bb0 : $*TreeB<T>
 sil @readIndirectEnum : $@convention(thin) <T> (@in TreeB<T>) -> (@out TreeB<T>) {
 bb0(%0 : $*TreeB<T>, %1 : $*TreeB<T>):
-  %enumAddr = unchecked_take_enum_data_addr %1 : $*TreeB<T>, #TreeB.Branch!enumelt.1
+  %enumAddr = unchecked_take_enum_data_addr %1 : $*TreeB<T>, #TreeB.Branch!enumelt
   %box = load %enumAddr : $*<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>
   %boxAddr = project_box %box : $<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>, 0
   %boxAccess = begin_access [read] [dynamic] %boxAddr : $*(left: TreeB<T>, right: TreeB<T>)
@@ -486,7 +486,7 @@ class CP : P {
 // CHECK: unidentified accesses: read
 sil @readUnexpected : $@convention(thin) (@inout Int, @inout Int?, @inout Builtin.UnsafeValueBuffer) -> () {
 bb0(%inout : $*Int, %oi : $*Optional<Int>, %b : $*Builtin.UnsafeValueBuffer):
-  %ea = init_enum_data_addr %oi : $*Optional<Int>, #Optional.some!enumelt.1
+  %ea = init_enum_data_addr %oi : $*Optional<Int>, #Optional.some!enumelt
   %eaAccess = begin_access [read] [dynamic] %ea : $*Int
   %eaload = load %eaAccess : $*Int
   end_access %eaAccess : $*Int
@@ -555,11 +555,11 @@ bb0(%0 : $C, %1 : $Int):
 
 // Test a class argument access from an optional caller value.
 // CHECK-LABEL: @readOptionalArgumentInCallee
-// CHECK:   [read] Class   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
+// CHECK:   [read] Class   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt
 // CHECK:   Field: var property: Int
 sil @readOptionalArgumentInCallee : $@convention(thin) (@guaranteed Optional<C>) -> Int {
 bb0(%0 : $Optional<C>):
-  %c = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
+  %c = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt
   %f = function_ref @readOptionalArgumentInCalleeHelper : $@convention(thin) (@guaranteed C) -> Int
   %call = apply %f(%c) : $@convention(thin) (@guaranteed C) -> Int
   return %call : $Int
@@ -586,7 +586,7 @@ bb0(%0 : $Optional<C>, %1 : $C):
   %access = begin_access [read] [dynamic] %propaddr : $*Int
   %val = load %access : $*Int
   end_access %access : $*Int
-  %c = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
+  %c = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt
   %f = function_ref @readRecursiveOptionalArgument : $@convention(thin) (@guaranteed Optional<C>, @guaranteed C) -> Int
   %call = apply %f(%0, %c) : $@convention(thin) (@guaranteed Optional<C>, @guaranteed C) -> Int
   return %call : $Int
@@ -612,7 +612,7 @@ enum IndirectEnum {
 // CHECK:   unidentified accesses: read
 sil @readUnidentifiedArgCaller : $@convention(thin) (@guaranteed IndirectEnum, Int) -> Int {
 bb0(%0 : $IndirectEnum, %1 : $Int):
-  switch_enum %0 : $IndirectEnum, case #IndirectEnum.V!enumelt.1: bb2, default bb1
+  switch_enum %0 : $IndirectEnum, case #IndirectEnum.V!enumelt: bb2, default bb1
 
 bb1:
   br bb3(%1 : $Int)

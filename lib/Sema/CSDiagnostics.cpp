@@ -520,10 +520,11 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   // about missing conformance just in case.
   auto operatorID = name.getIdentifier();
 
-  auto *applyExpr = cast<ApplyExpr>(findParentExpr(anchor));
-  if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
-    auto lhsType = getType(binaryOp->getArg()->getElement(0));
-    auto rhsType = getType(binaryOp->getArg()->getElement(1));
+  auto *fnType = getType(anchor)->getAs<AnyFunctionType>();
+  auto params = fnType->getParams();
+  if (params.size() == 2) {
+    auto lhsType = params[0].getPlainType();
+    auto rhsType = params[1].getPlainType();
 
     if (lhsType->isEqual(rhsType)) {
       emitDiagnostic(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
@@ -534,7 +535,7 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
     }
   } else {
     emitDiagnostic(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
-                   operatorID.str(), getType(applyExpr->getArg()));
+                   operatorID.str(), params[0].getPlainType());
   }
 
   diagnoseAsNote();
@@ -659,6 +660,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::ClosureBody:
     case ConstraintLocator::ClosureResult: {
       diagnostic = diag::cannot_convert_closure_result;
       break;
@@ -670,6 +672,15 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
         diagnostic = getDiagnosticFor(CTP_AssignSource);
         fromType = getType(assignExpr->getSrc());
         toType = getType(assignExpr->getDest());
+      }
+      break;
+    }
+    
+    case ConstraintLocator::OptionalPayload: {
+      // If we have an inout expression, this comes from an
+      // InoutToPointer argument mismatch failure.
+      if (isa<InOutExpr>(anchor)) {
+        diagnostic = diag::cannot_convert_argument_value;
       }
       break;
     }
@@ -1902,6 +1913,7 @@ bool ContextualFailure::diagnoseAsError() {
 
   Diag<Type, Type> diagnostic;
   switch (path.back().getKind()) {
+  case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
     auto *closure = cast<ClosureExpr>(getRawAnchor());
     if (closure->hasExplicitResultType() &&
@@ -3708,15 +3720,19 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // Fall back to a fix-it with a full type qualifier
-    if (auto *NTD = Member->getDeclContext()->getSelfNominalTypeDecl()) {
-      auto type = NTD->getSelfInterfaceType();
-      if (auto *SE = dyn_cast<SubscriptExpr>(getRawAnchor())) {
-        auto *baseExpr = SE->getBase();
-        Diag->fixItReplace(baseExpr->getSourceRange(), diag::replace_with_type,
-                           type);
-      } else {
-        Diag->fixItInsert(loc, diag::insert_type_qualification, type);
-      }
+    const Expr *baseExpr = nullptr;
+    if (const auto SE = dyn_cast<SubscriptExpr>(getRawAnchor()))
+      baseExpr = SE->getBase();
+    else if (const auto UDE = dyn_cast<UnresolvedDotExpr>(getRawAnchor()))
+      baseExpr = UDE->getBase();
+
+    // An implicit 'self' reference base expression means we should
+    // prepend with qualification.
+    if (baseExpr && !baseExpr->isImplicit()) {
+      Diag->fixItReplace(baseExpr->getSourceRange(),
+                         diag::replace_with_type, baseTy);
+    } else {
+      Diag->fixItInsert(loc, diag::insert_type_qualification, baseTy);
     }
 
     return true;
@@ -3786,7 +3802,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   if (!(locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
         locator->isLastElement<LocatorPathElt::ContextualType>() ||
         locator->isLastElement<LocatorPathElt::ApplyArgument>() ||
-        locator->isLastElement<LocatorPathElt::ClosureResult>()))
+        locator->isLastElement<LocatorPathElt::ClosureResult>() ||
+        locator->isLastElement<LocatorPathElt::ClosureBody>()))
     return false;
 
   // If this is a misplaced `missng argument` situation, it would be
@@ -4045,7 +4062,8 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
     if (auto objectType = paramType->getOptionalObjectType())
       paramType = objectType;
     funcType = paramType->getAs<FunctionType>();
-  } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
+  } else if (locator->isLastElement<LocatorPathElt::ClosureResult>() ||
+             locator->isLastElement<LocatorPathElt::ClosureBody>()) {
     // Based on the locator we know this this is something like this:
     // `let _: () -> ((Int) -> Void) = { return {} }`.
     funcType = getType(getRawAnchor())
@@ -4847,12 +4865,27 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   }
 
   if (locator->isForSequenceElementType()) {
-    diagnostic.emplace(
-        emitDiagnostic(anchor->getLoc(),
-                       contextualType->isExistentialType()
-                           ? diag::cannot_convert_sequence_element_protocol
-                           : diag::cannot_convert_sequence_element_value,
-                       eltType, contextualType));
+    auto &cs = getConstraintSystem();
+    // If this is a conversion failure related to binding of `for-each`
+    // statement it has to be diagnosed as pattern match if there are
+    // holes present in the contextual type.
+    if (cs.getContextualTypePurpose(anchor) ==
+            ContextualTypePurpose::CTP_ForEachStmt &&
+        contextualType->hasHole()) {
+      diagnostic.emplace(emitDiagnostic(
+          anchor->getLoc(),
+          (contextualType->is<TupleType>() && !eltType->is<TupleType>())
+              ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
+              : diag::cannot_match_unresolved_expr_pattern_with_value,
+          eltType));
+    } else {
+      diagnostic.emplace(
+          emitDiagnostic(anchor->getLoc(),
+                         contextualType->isExistentialType()
+                             ? diag::cannot_convert_sequence_element_protocol
+                             : diag::cannot_convert_sequence_element_value,
+                         eltType, contextualType));
+    }
   }
 
   if (!diagnostic)

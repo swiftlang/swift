@@ -14,7 +14,7 @@ bb0(%0 : $SelfCasts, %1 : $@thick SelfCasts.Type):
   // CHECK: checked_cast_br
   checked_cast_br %0 : $SelfCasts to @dynamic_self SelfCasts, bb1, bb2
 bb1(%7 : $SelfCasts):
-  %8 = enum $Optional<SelfCasts>, #Optional.some!enumelt.1, %7 : $SelfCasts
+  %8 = enum $Optional<SelfCasts>, #Optional.some!enumelt, %7 : $SelfCasts
   br bb3(%8 : $Optional<SelfCasts>)
 
 bb2:
@@ -33,7 +33,7 @@ bb0(%0 : $SelfCasts, %1 : $@thick SelfCasts.Type):
   // CHECK-NOT: checked_cast_br
   checked_cast_br %0 : $SelfCasts to SelfCasts, bb1, bb2
 bb1(%7 : $SelfCasts):
-  %8 = enum $Optional<SelfCasts>, #Optional.some!enumelt.1, %7 : $SelfCasts
+  %8 = enum $Optional<SelfCasts>, #Optional.some!enumelt, %7 : $SelfCasts
   br bb3(%8 : $Optional<SelfCasts>)
 
 bb2:

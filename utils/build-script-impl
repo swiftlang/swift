@@ -1868,6 +1868,17 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLDB_TEST_USER_ARGS="${DOTEST_ARGS}"
                 )
 
+                if [[ $(is_cross_tools_host ${host}) ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
+                        -DCLANG_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/clang-tblgen
+                        -DLLDB_TABLEGEN=$(build_directory "${LOCAL_HOST}" lldb)/bin/lldb-tblgen
+                        -DLLDB_TABLEGEN_EXE=$(build_directory "${LOCAL_HOST}" lldb)/bin/lldb-tblgen
+                        -DLLVM_NATIVE_BUILD=$(build_directory "${LOCAL_HOST}" llvm)
+                    )
+                fi
+
                 if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_USE_SYSTEM_DEBUGSERVER})" == "TRUE" ]]; then
                   cmake_options+=(
                     -DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL="${LLDB_USE_SYSTEM_DEBUGSERVER}"

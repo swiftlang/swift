@@ -552,31 +552,30 @@ public:
   ///
   /// \param lookupKind The kind of lookup to perform.
   ///
-  /// \param diagnostics If non-null, will be populated with the set of
-  /// diagnostics that should be emitted for this declaration context.
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolDecl *, 2>
   getLocalProtocols(ConformanceLookupKind lookupKind
-                      = ConformanceLookupKind::All,
-                    SmallVectorImpl<ConformanceDiagnostic> *diagnostics
-                      = nullptr) const;
+                      = ConformanceLookupKind::All) const;
 
   /// Retrieve the set of protocol conformances associated with this
   /// declaration context.
   ///
   /// \param lookupKind The kind of lookup to perform.
   ///
-  /// \param diagnostics If non-null, will be populated with the set of
-  /// diagnostics that should be emitted for this declaration context.
-  ///
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolConformance *, 2>
   getLocalConformances(ConformanceLookupKind lookupKind
-                         = ConformanceLookupKind::All,
-                       SmallVectorImpl<ConformanceDiagnostic> *diagnostics
-                         = nullptr) const;
+                         = ConformanceLookupKind::All) const;
+
+  /// Retrieve diagnostics discovered while expanding conformances for this
+  /// declaration context. This operation then removes those diagnostics from
+  /// consideration, so subsequent calls to this function with the same
+  /// declaration context that have not had any new extensions bound
+  /// will see an empty array.
+  SmallVector<ConformanceDiagnostic, 4>
+  takeConformanceDiagnostics() const;
 
   /// Retrieves a list of separately imported overlays which are shadowing
   /// \p declaring. If any \p overlays are returned, qualified lookups into

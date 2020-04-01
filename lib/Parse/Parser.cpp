@@ -114,25 +114,31 @@ void SILParserTUStateBase::anchor() { }
 
 void swift::performCodeCompletionSecondPass(
     SourceFile &SF, CodeCompletionCallbacksFactory &Factory) {
+  return (void)evaluateOrDefault(SF.getASTContext().evaluator,
+                                 CodeCompletionSecondPassRequest{&SF, &Factory},
+                                 false);
+}
+
+bool CodeCompletionSecondPassRequest::evaluate(
+    Evaluator &evaluator, SourceFile *SF,
+    CodeCompletionCallbacksFactory *Factory) const {
   // If we didn't find the code completion token, bail.
-  auto *parserState = SF.getDelayedParserState();
+  auto *parserState = SF->getDelayedParserState();
   if (!parserState->hasCodeCompletionDelayedDeclState())
-    return;
+    return true;
 
   auto state = parserState->takeCodeCompletionDelayedDeclState();
-  auto &Ctx = SF.getASTContext();
-
-  FrontendStatsTracer tracer(Ctx.Stats,
-                             "CodeCompletionSecondPass");
+  auto &Ctx = SF->getASTContext();
 
   auto BufferID = Ctx.SourceMgr.getCodeCompletionBufferID();
-  Parser TheParser(BufferID, SF, nullptr, parserState, nullptr);
+  Parser TheParser(BufferID, *SF, nullptr, parserState, nullptr);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
-      Factory.createCodeCompletionCallbacks(TheParser));
+      Factory->createCodeCompletionCallbacks(TheParser));
   TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
 
   TheParser.performCodeCompletionSecondPassImpl(*state);
+  return true;
 }
 
 void Parser::performCodeCompletionSecondPassImpl(

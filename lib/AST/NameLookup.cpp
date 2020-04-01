@@ -707,12 +707,15 @@ void namelookup::filterForDiscriminator(SmallVectorImpl<Result> &results,
 template void namelookup::filterForDiscriminator<LookupResultEntry>(
     SmallVectorImpl<LookupResultEntry> &results, DebuggerClient *debugClient);
 
+// FIXME(Evaluator Incremental Dependencies): Remove this function. It is
+// obviated by ModuleQualifiedLookupRequest and LookupInModuleRequest, which
+// both automatically register edges into the request-based name tracker.
 void namelookup::recordLookupOfTopLevelName(DeclContext *topLevelContext,
                                             DeclName name, bool isCascading) {
   auto SF = dyn_cast<SourceFile>(topLevelContext);
   if (!SF)
     return;
-  auto *nameTracker = SF->getReferencedNameTracker();
+  auto *nameTracker = SF->getLegacyReferencedNameTracker();
   if (!nameTracker)
     return;
   nameTracker->addTopLevelName(name.getBaseName(), isCascading);
@@ -1242,7 +1245,7 @@ NominalTypeDecl::lookupDirect(DeclName name,
                            DirectLookupRequest({this, name, flags}), {});
 }
 
-llvm::Expected<TinyPtrVector<ValueDecl *>>
+TinyPtrVector<ValueDecl *>
 DirectLookupRequest::evaluate(Evaluator &evaluator,
                               DirectLookupDescriptor desc) const {
   const auto &name = desc.Name;
@@ -1371,18 +1374,14 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
 ///
 /// This utility is used by qualified name lookup.
 static void configureLookup(const DeclContext *dc,
-                            NLOptions &options,
+                            NLOptions options,
                             ReferencedNameTracker *&tracker,
                             bool &isLookupCascading) {
-  auto &ctx = dc->getASTContext();
-  if (ctx.isAccessControlDisabled())
-    options |= NL_IgnoreAccessControl;
-
   // Find the dependency tracker we'll need for this lookup.
   tracker = nullptr;
   if (auto containingSourceFile =
           dyn_cast<SourceFile>(dc->getModuleScopeContext())) {
-    tracker = containingSourceFile->getReferencedNameTracker();
+    tracker = containingSourceFile->getLegacyReferencedNameTracker();
   }
 
   auto checkLookupCascading = [dc, options]() -> Optional<bool> {
@@ -1439,7 +1438,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   }
 
   // Check access.
-  if (!(options & NL_IgnoreAccessControl)) {
+  if (!(options & NL_IgnoreAccessControl) &&
+      !dc->getASTContext().isAccessControlDisabled()) {
     return decl->isAccessibleFrom(dc);
   }
 
@@ -1573,7 +1573,7 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
   return !decls.empty();
 }
 
-llvm::Expected<QualifiedLookupResult>
+QualifiedLookupResult
 QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                                  SmallVector<NominalTypeDecl *, 4> typeDecls,
                                  DeclNameRef member, NLOptions options) const {
@@ -1612,19 +1612,18 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
 
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
-  auto &ctx = DC->getASTContext();
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
   while (!stack.empty()) {
     auto current = stack.back();
     stack.pop_back();
 
+    // FIXME(Evaluator Incremental Dependencies): Remove this. Each direct
+    // lookup in the stack registers this edge automatically.
     if (tracker)
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
     // Make sure we've resolved property wrappers, if we need them.
-    if (ctx.areLegacySemanticQueriesEnabled()) {
-      installPropertyWrapperMembersIfNeeded(current, member);
-    }
+    installPropertyWrapperMembersIfNeeded(current, member);
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
@@ -1715,7 +1714,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclNameRef member,
   return !decls.empty();
 }
 
-llvm::Expected<QualifiedLookupResult>
+QualifiedLookupResult
 ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                                        ModuleDecl *module, DeclNameRef member,
                                        NLOptions options) const {
@@ -1768,7 +1767,7 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   return decls;
 }
 
-llvm::Expected<QualifiedLookupResult>
+QualifiedLookupResult
 AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
                                  DeclNameRef member, NLOptions options) const {
   using namespace namelookup;
@@ -2194,7 +2193,7 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
 }
 
 /// Evaluate a superclass declaration request.
-llvm::Expected<ClassDecl *>
+ClassDecl *
 SuperclassDeclRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *subject) const {
   auto &Ctx = subject->getASTContext();
@@ -2241,7 +2240,24 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
-llvm::Expected<NominalTypeDecl *>
+ArrayRef<ProtocolDecl *>
+InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
+                                    ProtocolDecl *PD) const {
+  llvm::SmallVector<ProtocolDecl *, 2> result;
+  SmallPtrSet<const ProtocolDecl *, 2> known;
+  known.insert(PD);
+  bool anyObject = false;
+  for (const auto found : getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
+      if (known.insert(proto).second)
+        result.push_back(proto);
+    }
+  }
+
+  return PD->getASTContext().AllocateCopy(result);
+}
+
+NominalTypeDecl *
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                                  ExtensionDecl *ext) const {
   auto typeRepr = ext->getExtendedTypeRepr();
@@ -2278,7 +2294,7 @@ static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
   return true;
 }
 
-llvm::Expected<NominalTypeDecl *>
+NominalTypeDecl *
 CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                    CustomAttr *attr, DeclContext *dc) const {
   // Find the types referenced by the custom attribute.

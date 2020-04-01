@@ -66,7 +66,7 @@ func forceHasMemberwiseInit() {
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_y33_{{.*}}23WrapperWithInitialValueVyxGvpfi : $@convention(thin) <T where T : DefaultInit> () -> @out 
 // CHECK: bb0(%0 : $*T):
 // CHECK-NOT: return
-// CHECK: witness_method $T, #DefaultInit.init!allocator.1 : <Self where Self : DefaultInit> (Self.Type) -> () -> Self : $@convention(witness_method: DefaultInit) <τ_0_0 where τ_0_0 : DefaultInit> (@thick τ_0_0.Type) -> @out τ_0_0
+// CHECK: witness_method $T, #DefaultInit.init!allocator : <Self where Self : DefaultInit> (Self.Type) -> () -> Self : $@convention(witness_method: DefaultInit) <τ_0_0 where τ_0_0 : DefaultInit> (@thick τ_0_0.Type) -> @out τ_0_0
 
 // variable initialization expression of HasMemberwiseInit._z
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_z33_{{.*}}23WrapperWithInitialValueVySiGvpfi : $@convention(thin) <T where T : DefaultInit> () -> WrapperWithInitialValue<Int> {
@@ -228,10 +228,10 @@ struct UseLazy<T: DefaultInit> {
   @Lazy var bar = T()
   @Lazy var wibble = [1, 2, 3]
 
-  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers7UseLazyV3foo3bar6wibbleACyxGSi_xSaySiGtcfC : $@convention(method) <T where T : DefaultInit> (Int, @in T, @owned Array<Int>, @thin UseLazy<T>.Type) -> @out UseLazy<T>
-  // CHECK: function_ref @$s17property_wrappers7UseLazyV3fooSivpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (Int) -> @owned Lazy<Int>
-  // CHECK: function_ref @$s17property_wrappers7UseLazyV3barxvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@in τ_0_0) -> @out Lazy<τ_0_0>
-  // CHECK: function_ref @$s17property_wrappers7UseLazyV6wibbleSaySiGvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned Array<Int>) -> @owned Lazy<Array<Int>>
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers7UseLazyV3foo3bar6wibbleACyxGSiyXA_xyXASaySiGyXAtcfC : $@convention(method) <T where T : DefaultInit> (@owned @callee_guaranteed () -> Int, @owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>, @owned @callee_guaranteed () -> @owned Array<Int>, @thin UseLazy<T>.Type) -> @out UseLazy<T> {
+  // CHECK: function_ref @$s17property_wrappers7UseLazyV3fooSivpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned @callee_guaranteed () -> Int) -> @owned Lazy<Int>
+  // CHECK: function_ref @$s17property_wrappers7UseLazyV3barxvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>) -> @out Lazy<τ_0_0>
+  // CHECK: function_ref @$s17property_wrappers7UseLazyV6wibbleSaySiGvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned @callee_guaranteed () -> @owned Array<Int>) -> @owned Lazy<Array<Int>>
 }
 
 struct X { }
@@ -241,6 +241,46 @@ func triggerUseLazy() {
   _ = UseLazy<Int>(foo: 17)
   _ = UseLazy(bar: 17)
   _ = UseLazy<Int>(wibble: [1, 2, 3])
+}
+
+func computeInt() -> Int {
+  return 42
+}
+
+func triggerUseLazyTestAutoclosure() {
+  _ = UseLazy(bar: computeInt())
+
+  // triggerUseLazyTestAutoclosure()
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers29triggerUseLazyTestAutoclosureyyF
+
+  // computeInt() must not get called here
+  // CHECK-NOT: // function_ref computeInt()
+  // CHECK-NOT: function_ref @$s17property_wrappers10computeIntSiyF : $@convention(thin) () -> Int
+
+  // Rather, an implicit closure is referenced
+  // CHECK: // function_ref implicit closure #1 in triggerUseLazyTestAutoclosure()
+  // CHECK: function_ref @$s17property_wrappers29triggerUseLazyTestAutoclosureyyFSiycfu_ : $@convention(thin) () -> Int
+
+  // And the implicit closure calls computeInt()
+  // CHECK: sil private [transparent] [ossa] @$s17property_wrappers29triggerUseLazyTestAutoclosureyyFSiycfu_ : $@convention(thin) () -> Int
+  // CHECK: // function_ref computeInt()
+  // CHECK: function_ref @$s17property_wrappers10computeIntSiyF : $@convention(thin) () -> Int
+}
+
+@propertyWrapper
+struct WrapperWithNonEscapingAutoclosure<V> {
+  var wrappedValue: V
+  init(wrappedValue: @autoclosure () -> V) {
+    self.wrappedValue = wrappedValue()
+  }
+}
+
+struct UseWrapperWithNonEscapingAutoclosure {
+  @WrapperWithNonEscapingAutoclosure var foo: Int
+
+  // Memberwise init should take an Int arg, not a closure
+  // CHECK: // UseWrapperWithNonEscapingAutoclosure.init(foo:)
+  // CHECK: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV3fooACSi_tcfC : $@convention(method) (Int, @thin UseWrapperWithNonEscapingAutoclosure.Type) -> UseWrapperWithNonEscapingAutoclosure
 }
 
 struct UseStatic {
@@ -332,6 +372,24 @@ struct CompositionMembers {
 
 func testComposition() {
   _ = CompositionMembers(p1: nil)
+}
+
+@propertyWrapper
+struct WrapperWithAutoclosure<V> {
+  var wrappedValue: V
+  init(wrappedValue: @autoclosure @escaping () -> V) {
+    self.wrappedValue = wrappedValue()
+  }
+}
+
+struct CompositionWithAutoclosure {
+  @WrapperA @WrapperB @WrapperWithAutoclosure var p1: Int
+  @WrapperA @WrapperWithAutoclosure @WrapperB var p2: Int
+  @WrapperWithAutoclosure @WrapperA @WrapperB var p3: Int
+
+  // In the memberwise init, only p1 should be a closure - p2 and p3 should be just Int
+  // CompositionWithAutoclosure.init(p1:p2:p3:)
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers26CompositionWithAutoclosureV2p12p22p3ACSiyXA_S2itcfC : $@convention(method) (@owned @callee_guaranteed () -> Int, Int, Int, @thin CompositionWithAutoclosure.Type) -> CompositionWithAutoclosure
 }
 
 // Observers with non-default mutatingness.
@@ -452,6 +510,8 @@ public protocol TestProtocol {}
 public class TestClass<T> {
   @WrapperWithInitialValue var value: T
 
+  // CHECK-LABEL: sil [ossa] @$s17property_wrappers9TestClassC5valuexvpfP : $@convention(thin) <T> (@in T) -> @out WrapperWithInitialValue<T>
+
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers9TestClassC5value8protocolACyxGx_qd__tcAA0C8ProtocolRd__lufc
   // CHECK: [[BACKING_INIT:%.*]] = function_ref @$s17property_wrappers9TestClassC5valuexvpfP : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out WrapperWithInitialValue<τ_0_0>
   // CHECK-NEXT: partial_apply [callee_guaranteed] [[BACKING_INIT]]<T>()
@@ -483,8 +543,7 @@ struct Inner<Value> {
 struct ComposedInit {
   @Outer @Inner var value: Int
 
-  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers12ComposedInitV5valueSivpfP : $@convention(thin) (Int) -> Outer<Inner<Int>> {
-  // CHECK: function_ref @$s17property_wrappers12ComposedInitV6_value33_F728088E0028E14D18C6A10CF68512E8LLAA5OuterVyAA5InnerVySiGGvpfiSiycfu_
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers12ComposedInitV5valueSivpfP : $@convention(thin) (@owned @callee_guaranteed () -> Int) -> Outer<Inner<Int>> {
   // CHECK: function_ref @$s17property_wrappers5InnerV12wrappedValue1dACyxGxyXA_SdtcfcfA0_
   // CHECK: function_ref @$s17property_wrappers5InnerV12wrappedValue1dACyxGxyXA_SdtcfC
   // CHECK: function_ref @$s17property_wrappers5OuterV1a12wrappedValue1sACyxGSi_xSStcfcfA_
@@ -511,7 +570,7 @@ open class TestMyWrapper {
 // rdar://problem/54352235 - crash due to reference to private backing var
 extension UsesMyPublished {
   // CHECK-LABEL: sil hidden [ossa] @$s21property_wrapper_defs15UsesMyPublishedC0A9_wrappersE6setFooyySiF : $@convention(method) (Int, @guaranteed UsesMyPublished) -> ()
-  // CHECK: class_method %1 : $UsesMyPublished, #UsesMyPublished.foo!setter.1
+  // CHECK: class_method %1 : $UsesMyPublished, #UsesMyPublished.foo!setter
   // CHECK-NOT: assign_by_wrapper
   // CHECK: return
   func setFoo(_ x: Int) {
@@ -585,13 +644,45 @@ struct HasStaticWrapper {
   }
 }
 
+@propertyWrapper
+struct ObservedObject<ObjectType : AnyObject > {
+  var wrappedValue: ObjectType
+
+  init(defaulted: Int = 17, wrappedValue: ObjectType) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+// rdar://problem/58986940 - composition of wrappers with autoclosure
+@propertyWrapper
+struct Once<Value> {
+  enum Storage {
+    case initialValue(() -> Value)
+    case value(Value)
+  }
+
+  var storage: Storage
+
+  init(defaulted: Int = 0, wrappedValue value: @escaping @autoclosure () -> Value) {
+    storage = .initialValue(value)
+  }
+
+  var wrappedValue: Value { fatalError() }
+}
+
+class Model {}
+
+struct TestAutoclosureComposition {
+  @Once @ObservedObject var model = Model()
+}
+
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
-// CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
-// CHECK-NEXT:  #ClassUsingWrapper.x!setter.1: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter
-// CHECK-NEXT:  #ClassUsingWrapper.x!modify.1: (ClassUsingWrapper) -> () -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivM    // ClassUsingWrapper.x.modify
-// CHECK-NEXT:  #ClassUsingWrapper.init!allocator.1: (ClassUsingWrapper.Type) -> () -> ClassUsingWrapper : @$s17property_wrappers17ClassUsingWrapperCACycfC
-// CHECK-NEXT: #ClassUsingWrapper.deinit!deallocator.1: @$s17property_wrappers17ClassUsingWrapperCfD
+// CHECK-NEXT:  #ClassUsingWrapper.x!getter: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
+// CHECK-NEXT:  #ClassUsingWrapper.x!setter: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter
+// CHECK-NEXT:  #ClassUsingWrapper.x!modify: (ClassUsingWrapper) -> () -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivM    // ClassUsingWrapper.x.modify
+// CHECK-NEXT:  #ClassUsingWrapper.init!allocator: (ClassUsingWrapper.Type) -> () -> ClassUsingWrapper : @$s17property_wrappers17ClassUsingWrapperCACycfC
+// CHECK-NEXT: #ClassUsingWrapper.deinit!deallocator: @$s17property_wrappers17ClassUsingWrapperCfD
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_vtable [serialized] TestMyWrapper
-// CHECK: #TestMyWrapper.$useMyWrapper!getter.1
+// CHECK: #TestMyWrapper.$useMyWrapper!getter

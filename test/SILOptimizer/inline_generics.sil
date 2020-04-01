@@ -78,7 +78,7 @@ bb0(%0 : $P):
   // function_ref P.combine<A> (first : A1) -> (A1) -> Bool
   %3 = function_ref @P_combine : $@convention(method) <τ_0_0 where τ_0_0 : P><τ_1_0> (@in τ_1_0, @guaranteed τ_0_0) -> @owned @callee_owned (@in τ_1_0) -> Bool
   %4 = open_existential_ref %0 : $P to $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P
-  %5 = witness_method $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P, #P.getSelf!1 : <Self where Self : P> (Self) -> () -> Self, %4 : $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+  %5 = witness_method $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P, #P.getSelf : <Self where Self : P> (Self) -> () -> Self, %4 : $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
   %6 = apply %5<@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P>(%4) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
   %7 = init_existential_ref %6 : $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P : $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P, $P
   %8 = alloc_stack $P

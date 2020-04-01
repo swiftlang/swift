@@ -396,9 +396,6 @@ void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
         if (AvAttr->isUnconditionallyDeprecated()) {
           OS.attribute("isUnconditionallyDeprecated", true);
         }
-        if (AvAttr->isUnconditionallyUnavailable()) {
-          OS.attribute("isUnconditionallyUnavailable", true);
-        }
       }); // end availability object
     }
   }); // end availability: []

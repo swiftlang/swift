@@ -24,6 +24,7 @@ namespace swift {
 class AbstractFunctionDecl;
 class BraceStmt;
 class ClosureExpr;
+class CodeCompletionCallbacksFactory;
 class ConstructorDecl;
 class CustomAttr;
 class Decl;
@@ -42,7 +43,9 @@ class OpaqueTypeDecl;
 class PatternBindingEntry;
 class ParamDecl;
 enum class ParamSpecifier : uint8_t;
+class PostfixOperatorDecl;
 class PrecedenceGroupDecl;
+class PrefixOperatorDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;
 enum class CtorInitializerKind;

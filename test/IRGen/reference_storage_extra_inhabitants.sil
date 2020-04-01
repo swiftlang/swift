@@ -19,7 +19,7 @@ func example(_ os: S?)
 // CHECK-NEXT:    %1 = icmp eq [[WORD]] %0, 1
 sil hidden @$s35reference_storage_extra_inhabitants7exampleyyAA1SVSgF : $@convention(thin) (Optional<S>) -> () {
 bb0(%0 : $Optional<S>):
-  switch_enum %0 : $Optional<S>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1 // id: %2
+  switch_enum %0 : $Optional<S>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1 // id: %2
 
 bb1:                                              // Preds: bb0
   br bb4                                          // id: %3

@@ -526,12 +526,9 @@ static std::string getDifferentiationParametersClauseString(
 /// Print the arguments of the given `@differentiable` attribute.
 /// - If `omitWrtClause` is true, omit printing the `wrt:` differentiation
 ///   parameters clause.
-/// - If `omitDerivativeFunctions` is true, omit printing the JVP/VJP derivative
-///   functions.
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
-    const Decl *D, bool omitWrtClause = false,
-    bool omitDerivativeFunctions = false) {
+    const Decl *D, bool omitWrtClause = false) {
   assert(D);
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
@@ -572,19 +569,6 @@ static void printDifferentiableAttrArguments(
     if (!diffParamsString.empty()) {
       printCommaIfNecessary();
       stream << diffParamsString;
-    }
-  }
-  // Print derivative function names, unless they are to be omitted.
-  if (!omitDerivativeFunctions) {
-    // Print jvp function name, if specified.
-    if (auto jvp = attr->getJVP()) {
-      printCommaIfNecessary();
-      stream << "jvp: " << jvp->Name;
-    }
-    // Print vjp function name, if specified.
-    if (auto vjp = attr->getVJP()) {
-      printCommaIfNecessary();
-      stream << "vjp: " << vjp->Name;
     }
   }
   // Print 'where' clause, if any.
@@ -750,6 +734,39 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Rethrows:
   case DAK_Infix:
     return false;
+  case DAK_Override: {
+    if (!Options.IsForSwiftInterface)
+      break;
+    // When we are printing Swift interface, we have to skip the override keyword
+    // if the overriden decl is invisible from the interface. Otherwise, an error
+    // will occur while building the Swift module because the overriding decl
+    // doesn't override anything.
+    // We couldn't skip every `override` keywords becuase they change the
+    // ABI if the overriden decl is also publically visible.
+    // For public-override-internal case, having `override` doesn't have ABI
+    // implication. Thus we can skip them.
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (auto *BD = VD->getOverriddenDecl()) {
+        if (!BD->hasClangNode() &&
+            VD->isEffectiveLinkageMoreVisibleThan(BD))
+          return false;
+      }
+    }
+    break;
+  }
+  case DAK_Custom: {
+    if (!Options.IsForSwiftInterface)
+      break;
+    // For Swift interface, we should only print function builder attribute
+    // on parameter decls. Printing the attribute elsewhere isn't ABI relevant.
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->getAttachedFunctionBuilder() == this) {
+        if (!isa<ParamDecl>(D))
+          return false;
+      }
+    }
+    break;
+  }
   default:
     break;
   }
@@ -1583,12 +1600,9 @@ SPIAccessControlAttr::create(ASTContext &context,
 DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
                                        SourceRange baseRange, bool linear,
                                        ArrayRef<ParsedAutoDiffParameter> params,
-                                       Optional<DeclNameRefWithLoc> jvp,
-                                       Optional<DeclNameRefWithLoc> vjp,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-    Linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
-    VJP(std::move(vjp)), WhereClause(clause) {
+    Linear(linear), NumParsedParameters(params.size()), WhereClause(clause) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
@@ -1597,12 +1611,9 @@ DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
                                        bool linear,
                                        IndexSubset *parameterIndices,
-                                       Optional<DeclNameRefWithLoc> jvp,
-                                       Optional<DeclNameRefWithLoc> vjp,
                                        GenericSignature derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-      OriginalDeclaration(original), Linear(linear), JVP(std::move(jvp)),
-      VJP(std::move(vjp)) {
+      OriginalDeclaration(original), Linear(linear) {
   setParameterIndices(parameterIndices);
   setDerivativeGenericSignature(derivativeGenSig);
 }
@@ -1612,29 +1623,23 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
                            bool linear,
                            ArrayRef<ParsedAutoDiffParameter> parameters,
-                           Optional<DeclNameRefWithLoc> jvp,
-                           Optional<DeclNameRefWithLoc> vjp,
                            TrailingWhereClause *clause) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(parameters.size());
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(implicit, atLoc, baseRange, linear,
-                                      parameters, std::move(jvp),
-                                      std::move(vjp), clause);
+                                      parameters, clause);
 }
 
 DifferentiableAttr *
 DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange, bool linear,
                            IndexSubset *parameterIndices,
-                           Optional<DeclNameRefWithLoc> jvp,
-                           Optional<DeclNameRefWithLoc> vjp,
                            GenericSignature derivativeGenSig) {
   auto &ctx = original->getASTContext();
   void *mem = ctx.Allocate(sizeof(DifferentiableAttr),
                            alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
-                                      linear, parameterIndices, std::move(jvp),
-                                      std::move(vjp), derivativeGenSig);
+                                      linear, parameterIndices, derivativeGenSig);
 }
 
 void DifferentiableAttr::setOriginalDeclaration(Decl *originalDeclaration) {
@@ -1668,18 +1673,6 @@ void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
       std::move(paramIndices));
 }
 
-void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {
-  JVPFunction = decl;
-  if (decl && !JVP)
-    JVP = {decl->createNameRef(), DeclNameLoc(decl->getNameLoc())};
-}
-
-void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
-  VJPFunction = decl;
-  if (decl && !VJP)
-    VJP = {decl->createNameRef(), DeclNameLoc(decl->getNameLoc())};
-}
-
 GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
     AbstractFunctionDecl *original) const {
   GenericEnvironment *derivativeGenEnv = original->getGenericEnvironment();
@@ -1689,12 +1682,10 @@ GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
 }
 
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
-                               bool omitWrtClause,
-                               bool omitDerivativeFunctions) const {
+                               bool omitWrtClause) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
-  printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause,
-                                   omitDerivativeFunctions);
+  printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause);
 }
 
 DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,

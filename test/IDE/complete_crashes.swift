@@ -378,3 +378,14 @@ struct test_54215016 {
 // RDAR_54215016: Begin completions
   }
 }
+
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=CRASH_CALL_AS_FUNCTION -source-filename=%s | %FileCheck %s -check-prefix=CRASH_CALL_AS_FUNCTION
+protocol HasCallAsFunctionRequirement {
+  func callAsFunction()
+}
+struct StructWithCallAsFunction: HasCallAsFunctionRequirement {
+  let f = #^CRASH_CALL_AS_FUNCTION^#
+  func callAsFunction() {}
+}
+// CRASH_CALL_AS_FUNCTION: Begin completion
+// CRASH_CALL_AS_FUNCTION: End completions

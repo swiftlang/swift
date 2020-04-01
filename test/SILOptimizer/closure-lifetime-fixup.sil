@@ -23,16 +23,16 @@ sil @$sSSSgIegg_So8FakeNSStringCSgIyBy_TR : $@convention(c) (@inout_aliasable @b
 sil [ossa] @test1 : $@convention(thin) (@guaranteed Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>, @guaranteed Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>) -> () {
 bb0(%0 : @guaranteed $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>, %1 : @guaranteed $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>):
   %2 = copy_value %0 : $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>
-  switch_enum %2 : $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb12
+  switch_enum %2 : $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb12
 
 bb1(%4 : @owned $@callee_guaranteed (@guaranteed Optional<String>) -> ()):
   %5 = convert_escape_to_noescape [not_guaranteed] %4 : $@callee_guaranteed (@guaranteed Optional<String>) -> () to $@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()
-  %6 = enum $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>, #Optional.some!enumelt.1, %5 : $@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()
+  %6 = enum $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>, #Optional.some!enumelt, %5 : $@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()
   destroy_value %4 : $@callee_guaranteed (@guaranteed Optional<String>) -> ()
   br bb2(%6 : $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>)
 
 bb2(%9 : $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>):
-  switch_enum %9 : $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb4
+  switch_enum %9 : $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>, case #Optional.some!enumelt: bb3, case #Optional.none!enumelt: bb4
 
 bb3(%11 : $@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()):
   %12 = function_ref @$sSSSgIgg_AAIegg_TR : $@convention(thin) (@guaranteed Optional<String>, @noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()) -> ()
@@ -45,7 +45,7 @@ bb3(%11 : $@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()):
   %19 = function_ref @$sSSSgIegg_So8FakeNSStringCSgIyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@guaranteed Optional<String>) -> (), Optional<FakeNSString>) -> ()
   %20 = init_block_storage_header %16 : $*@block_storage @callee_guaranteed (@guaranteed Optional<String>) -> (), invoke %19 : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@guaranteed Optional<String>) -> (), Optional<FakeNSString>) -> (), type $@convention(block) @noescape (Optional<FakeNSString>) -> ()
   %21 = copy_block_without_escaping %20 : $@convention(block) @noescape (Optional<FakeNSString>) -> () withoutEscaping %14 : $@callee_guaranteed (@guaranteed Optional<String>) -> ()
-  %22 = enum $Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>, #Optional.some!enumelt.1, %21 : $@convention(block) @noescape (Optional<FakeNSString>) -> ()
+  %22 = enum $Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>, #Optional.some!enumelt, %21 : $@convention(block) @noescape (Optional<FakeNSString>) -> ()
   destroy_addr %17 : $*@callee_guaranteed (@guaranteed Optional<String>) -> ()
   dealloc_stack %16 : $*@block_storage @callee_guaranteed (@guaranteed Optional<String>) -> ()
   br bb5(%22 : $Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>)
@@ -56,16 +56,16 @@ bb4:
 
 bb5(%28 : @owned $Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>):
   %29 = copy_value %1 : $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>
-  switch_enum %29 : $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>, case #Optional.some!enumelt.1: bb6, case #Optional.none!enumelt: bb11
+  switch_enum %29 : $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb11
 
 bb6(%31 : @owned $@callee_guaranteed (@guaranteed Optional<String>) -> ()):
   %32 = convert_escape_to_noescape [not_guaranteed] %31 : $@callee_guaranteed (@guaranteed Optional<String>) -> () to $@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()
-  %33 = enum $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>, #Optional.some!enumelt.1, %32 : $@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()
+  %33 = enum $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>, #Optional.some!enumelt, %32 : $@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()
   destroy_value %31 : $@callee_guaranteed (@guaranteed Optional<String>) -> ()
   br bb7(%33 : $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>)
 
 bb7(%36 : $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>):
-  switch_enum %36 : $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>, case #Optional.some!enumelt.1: bb8, case #Optional.none!enumelt: bb9
+  switch_enum %36 : $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>, case #Optional.some!enumelt: bb8, case #Optional.none!enumelt: bb9
 
 bb8(%38 : $@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()):
   %39 = function_ref @$sSSSgIgg_AAIegg_TR : $@convention(thin) (@guaranteed Optional<String>, @noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()) -> ()
@@ -78,7 +78,7 @@ bb8(%38 : $@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()):
   %46 = function_ref @$sSSSgIegg_So8FakeNSStringCSgIyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@guaranteed Optional<String>) -> (), Optional<FakeNSString>) -> ()
   %47 = init_block_storage_header %43 : $*@block_storage @callee_guaranteed (@guaranteed Optional<String>) -> (), invoke %46 : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@guaranteed Optional<String>) -> (), Optional<FakeNSString>) -> (), type $@convention(block) @noescape (Optional<FakeNSString>) -> ()
   %48 = copy_block_without_escaping %47 : $@convention(block) @noescape (Optional<FakeNSString>) -> () withoutEscaping %41 : $@callee_guaranteed (@guaranteed Optional<String>) -> ()
-  %49 = enum $Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>, #Optional.some!enumelt.1, %48 : $@convention(block) @noescape (Optional<FakeNSString>) -> ()
+  %49 = enum $Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>, #Optional.some!enumelt, %48 : $@convention(block) @noescape (Optional<FakeNSString>) -> ()
   destroy_addr %44 : $*@callee_guaranteed (@guaranteed Optional<String>) -> ()
   dealloc_stack %43 : $*@block_storage @callee_guaranteed (@guaranteed Optional<String>) -> ()
   br bb10(%49 : $Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>)
@@ -98,7 +98,7 @@ bb10(%55 : @owned $Optional<@convention(block) @noescape (Optional<FakeNSString>
   %63 = begin_borrow %61 : $String
   %64 = apply %62(%63) : $@convention(method) (@guaranteed String) -> @owned FakeNSString
   end_borrow %63 : $String
-  %66 = enum $Optional<FakeNSString>, #Optional.some!enumelt.1, %64 : $FakeNSString
+  %66 = enum $Optional<FakeNSString>, #Optional.some!enumelt, %64 : $FakeNSString
   destroy_value %61 : $String
   %68 = function_ref @noescapeBlock3 : $@convention(c) (Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>, Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>, Optional<FakeNSString>) -> ()
   %69 = apply %68(%28, %55, %66) : $@convention(c) (Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>, Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>, Optional<FakeNSString>) -> ()
@@ -147,7 +147,7 @@ bb1:
   %52 = function_ref @blockThunk : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
   %53 = init_block_storage_header %49 : $*@block_storage @callee_guaranteed () -> (), invoke %52 : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
   %54 = copy_block_without_escaping %53 : $@convention(block) @noescape () -> () withoutEscaping %47 : $@callee_guaranteed () -> ()
-  %55 = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt.1, %54 : $@convention(block) @noescape () -> ()
+  %55 = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt, %54 : $@convention(block) @noescape () -> ()
   destroy_addr %50 : $*@callee_guaranteed () -> ()
   dealloc_stack %49 : $*@block_storage @callee_guaranteed () -> ()
   destroy_value %43 : $@callee_guaranteed () -> ()

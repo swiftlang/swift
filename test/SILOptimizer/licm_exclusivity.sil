@@ -21,7 +21,7 @@ var globalY: X
 sil_global hidden @globalY : $X
 
 
-sil hidden_external [global_init] @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+sil hidden_external @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
 
 // public func hoist_access_with_conflict() {
 // Tests Hoisting of begin/end access when there's a "sandwiched" unidentified access

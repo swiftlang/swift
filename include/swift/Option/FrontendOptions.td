@@ -130,9 +130,6 @@ def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
   HelpText<"Automatically import declared cross-import overlays.">;
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
-
-def enable_educational_notes : Flag<["-"], "enable-educational-notes">,
-  HelpText<"Show educational notes, if available.">;
   
 def enable_experimental_diagnostic_formatting :
   Flag<["-"], "enable-experimental-diagnostic-formatting">,
@@ -510,6 +507,10 @@ def disable_debugger_shadow_copies : Flag<["-"], "disable-debugger-shadow-copies
            "This option is only useful for testing the compiler.">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def disable_concrete_type_metadata_mangled_name_accessors : Flag<["-"], "disable-concrete-type-metadata-mangled-name-accessors">,
+  HelpText<"Disable concrete type metadata access by mangled name">,
+  Flags<[FrontendOption, HelpHidden]>;
+  
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
 
@@ -599,6 +600,10 @@ def external_pass_pipeline_filename : Separate<["-"], "external-pass-pipeline-fi
 
 def index_system_modules : Flag<["-"], "index-system-modules">,
   HelpText<"Emit index data for imported serialized swift system modules">;
+
+def index_ignore_stdlib :
+  Flag<["-"], "index-ignore-stdlib">,
+  HelpText<"Avoid emitting index data for the standard library.">;
 
 def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,

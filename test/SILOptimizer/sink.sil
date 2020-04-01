@@ -38,7 +38,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y
   strong_retain %0 : $Y
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   br bb1
 
 bb1:
@@ -57,7 +57,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y
   strong_retain %0 : $Y
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   cond_br undef, bb1, bb2
 
 bb1:
@@ -86,7 +86,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y
   strong_retain %0 : $Y
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   cond_br undef, bb1, bb2
 
 bb1:
@@ -115,7 +115,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y
   strong_retain %0 : $Y
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   br bb1
 
 bb1:
@@ -144,7 +144,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y
   strong_retain %0 : $Y
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   br bb1
 
 // This is a loop!
@@ -167,7 +167,7 @@ bb2:
 sil @sink_nested_loop : $@convention(thin) (@owned Y) -> Int {
 bb0(%0 : $Y):
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   br bb1
 
 bb1:
@@ -228,7 +228,7 @@ sil @dont_sink_open_existential : $@convention(thin) (@owned P) -> () {
 bb0(%0 : $P):
   %1 = open_existential_ref %0 : $P to $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P
   %2 = metatype $@thick (@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P).Type
-  %3 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P, #P.foo!1, %1 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  %3 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P, #P.foo, %1 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
   br bb1
 
 bb1:
@@ -239,12 +239,12 @@ bb1:
 }
 
 sil_vtable X {
-  #X.ping!1: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
-  #X.init!initializer.1: @_TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
+  #X.ping: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer: @_TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
 }
 
 sil_vtable Y {
-  #X.ping!1: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
-  #X.init!initializer.1: @_TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
+  #X.ping: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer: @_TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
 }
 

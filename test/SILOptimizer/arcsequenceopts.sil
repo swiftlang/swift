@@ -1462,7 +1462,7 @@ bb0(%0 : $S, %1 : $FakeOptional<Builtin.NativeObject>):
   %2 = struct_extract %0 : $S, #S.x
   strong_retain %2 : $Builtin.NativeObject
   release_value %0 : $S
-  %3 = unchecked_enum_data %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1
+  %3 = unchecked_enum_data %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
   strong_retain %3 : $Builtin.NativeObject
   release_value %1 : $FakeOptional<Builtin.NativeObject>
   %5 = tuple()
@@ -1474,7 +1474,7 @@ bb0(%0 : $S, %1 : $FakeOptional<Builtin.NativeObject>):
 // CHECK-NOT: strong_release
 sil @strip_off_single_pred_args : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : $FakeOptional<Builtin.NativeObject>):
-  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%1 : $Builtin.NativeObject):
   retain_value %0 : $FakeOptional<Builtin.NativeObject>
@@ -1535,7 +1535,7 @@ bb2:
 sil @strip_off_multi_payload_unchecked_enum_data : $@convention(thin) (Either<C, S>) -> () {
 bb0(%0 : $Either<C, S>):
   retain_value %0 : $Either<C, S>
-  %1 = unchecked_enum_data %0 : $Either<C, S>, #Either.Right!enumelt.1
+  %1 = unchecked_enum_data %0 : $Either<C, S>, #Either.Right!enumelt
   release_value %1 : $S
   %2 = tuple()
   return %2 : $()
@@ -1569,7 +1569,7 @@ bb0(%0 : $S2, %1 : $S3):
 // CHECK-NOT: strong_release
 sil @strip_off_enum_from_payload : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1, %0 : $Builtin.NativeObject
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %0 : $Builtin.NativeObject
   strong_retain %0 : $Builtin.NativeObject
   release_value %1 : $FakeOptional<Builtin.NativeObject>
   %2 = tuple()

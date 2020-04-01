@@ -349,6 +349,11 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(PointerToPointer, getSubExpr);
   PASS_THROUGH_REFERENCE(ForeignObjectConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(UnevaluatedInstance, getSubExpr);
+  PASS_THROUGH_REFERENCE(DifferentiableFunction, getSubExpr);
+  PASS_THROUGH_REFERENCE(LinearFunction, getSubExpr);
+  PASS_THROUGH_REFERENCE(DifferentiableFunctionExtractOriginal, getSubExpr);
+  PASS_THROUGH_REFERENCE(LinearFunctionExtractOriginal, getSubExpr);
+  PASS_THROUGH_REFERENCE(LinearToDifferentiableFunction, getSubExpr);
   PASS_THROUGH_REFERENCE(BridgeToObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
@@ -667,6 +672,11 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::PointerToPointer:
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
+  case ExprKind::DifferentiableFunction:
+  case ExprKind::LinearFunction:
+  case ExprKind::DifferentiableFunctionExtractOriginal:
+  case ExprKind::LinearFunctionExtractOriginal:
+  case ExprKind::LinearToDifferentiableFunction:
   case ExprKind::EnumIsCase:
   case ExprKind::ConditionalBridgeFromObjC:
   case ExprKind::BridgeFromObjC:
@@ -1851,6 +1861,11 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
   case AutoClosureExpr::Kind::SingleCurryThunk: {
     auto *body = getSingleExpressionBody();
     body = body->getSemanticsProvidingExpr();
+
+    if (auto *openExistential = dyn_cast<OpenExistentialExpr>(body)) {
+      body = openExistential->getSubExpr();
+    }
+
     if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
       return outerCall->getFn();
     }
@@ -1866,6 +1881,11 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
                AutoClosureExpr::Kind::SingleCurryThunk);
       auto *innerBody = innerClosure->getSingleExpressionBody();
       innerBody = innerBody->getSemanticsProvidingExpr();
+
+      if (auto *openExistential = dyn_cast<OpenExistentialExpr>(innerBody)) {
+        innerBody = openExistential->getSubExpr();
+      }
+
       if (auto *outerCall = dyn_cast<ApplyExpr>(innerBody)) {
         if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
           if (auto *declRef = dyn_cast<DeclRefExpr>(innerCall->getFn())) {

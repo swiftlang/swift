@@ -263,7 +263,7 @@ class ComponentIdentTypeRepr : public IdentTypeRepr {
   /// component.
   ///
   /// The initial parsed representation is always an identifier, and
-  /// name binding will resolve this to a specific declaration.
+  /// name lookup will resolve this to a specific declaration.
   llvm::PointerUnion<DeclNameRef, TypeDecl *> IdOrDecl;
 
   /// The declaration context from which the bound declaration was
@@ -282,7 +282,8 @@ public:
   /// correction.
   void overwriteNameRef(DeclNameRef newId) { IdOrDecl = newId; }
 
-  /// Return true if this has been name-bound already.
+  /// Return true if this name has been resolved to a type decl. This happens
+  /// during type resolution.
   bool isBound() const { return IdOrDecl.is<TypeDecl *>(); }
 
   TypeDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<TypeDecl*>(); }

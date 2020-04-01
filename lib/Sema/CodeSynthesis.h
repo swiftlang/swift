@@ -60,6 +60,16 @@ Expr *buildSelfReference(VarDecl *selfDecl,
 Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                   ASTContext &ctx);
 
+/// Returns the protocol requirement with the specified name.
+ValueDecl *getProtocolRequirement(ProtocolDecl *protocol, Identifier name);
+
+// Returns true if given nominal type declaration has a `let` stored property
+// with an initial value.
+bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal);
+
+/// Add `@_fixed_layout` attribute to the nominal type, if possible.
+void addFixedLayoutAttr(NominalTypeDecl *nominal);
+
 } // end namespace swift
 
 #endif

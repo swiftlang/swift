@@ -283,7 +283,7 @@ bb0(%0 : $Optional<A>):
   checked_cast_br %0 : $Optional<A> to CP, bb1, bb2
 
 bb1(%3 : $CP):
-  %4 = enum $Optional<CP>, #Optional.some!enumelt.1, %3 : $CP
+  %4 = enum $Optional<CP>, #Optional.some!enumelt, %3 : $CP
   retain_value %0 : $Optional<A>
   br bb3(%4 : $Optional<CP>)
 
@@ -375,7 +375,7 @@ bb0(%0: $P & AnyObject):
   checked_cast_br %0 : $P & AnyObject to C & P, bb1, bb2
 
 bb1(%2 : $C & P):
-  %3 = enum $Optional<C & P>, #Optional.some!enumelt.1, %2 : $C & P
+  %3 = enum $Optional<C & P>, #Optional.some!enumelt, %2 : $C & P
   br bb3(%3 : $Optional<C & P>)
 
 bb2:
@@ -396,7 +396,7 @@ bb0(%0: $PAnyObject):
   checked_cast_br %0 : $PAnyObject to C & PAnyObject, bb1, bb2
 
 bb1(%2 : $C & PAnyObject):
-  %3 = enum $Optional<C & PAnyObject>, #Optional.some!enumelt.1, %2 : $C & PAnyObject
+  %3 = enum $Optional<C & PAnyObject>, #Optional.some!enumelt, %2 : $C & PAnyObject
   br bb3(%3 : $Optional<C & PAnyObject>)
 
 bb2:

@@ -141,13 +141,13 @@ enum SortaOptional1 {
 
 sil @rewrap_optional_1 : $@convention(thin) (@owned SortaOptional1) -> @owned SortaOptional1 {
 bb0(%0 : $SortaOptional1):
-  switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt.1: bb1, case #SortaOptional1.Nope!enumelt: bb2
+  switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt: bb1, case #SortaOptional1.Nope!enumelt: bb2
 
 bb1:
 // CHECK-NOT: unchecked_enum_data
 // CHECK: return %0
-  %2 = unchecked_enum_data %0 : $SortaOptional1, #SortaOptional1.Yup!enumelt.1
-  %3 = enum $SortaOptional1, #SortaOptional1.Yup!enumelt.1, %2 : $IntClass
+  %2 = unchecked_enum_data %0 : $SortaOptional1, #SortaOptional1.Yup!enumelt
+  %3 = enum $SortaOptional1, #SortaOptional1.Yup!enumelt, %2 : $IntClass
   return %3 : $SortaOptional1
 
 bb2:
@@ -162,14 +162,14 @@ enum SortaOptional2 {
 
 sil @rewrap_optional_2 : $@convention(thin) (@owned SortaOptional1) -> @owned SortaOptional2 {
 bb0(%0 : $SortaOptional1):
-  switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt.1: bb1, case #SortaOptional1.Nope!enumelt: bb2
+  switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt: bb1, case #SortaOptional1.Nope!enumelt: bb2
 
 bb1:
 // CHECK: [[DATA:%[0-9a-zA-Z]+]] = unchecked_enum_data %0
-// CHECK: [[RESULT:%[0-9a-zA-Z]+]] = enum $SortaOptional2, #SortaOptional2.Yup!enumelt.1, [[DATA]] : $IntClass
+// CHECK: [[RESULT:%[0-9a-zA-Z]+]] = enum $SortaOptional2, #SortaOptional2.Yup!enumelt, [[DATA]] : $IntClass
 // CHECK: return [[RESULT]]
-  %2 = unchecked_enum_data %0 : $SortaOptional1, #SortaOptional1.Yup!enumelt.1
-  %3 = enum $SortaOptional2, #SortaOptional2.Yup!enumelt.1, %2 : $IntClass // user: %4
+  %2 = unchecked_enum_data %0 : $SortaOptional1, #SortaOptional1.Yup!enumelt
+  %3 = enum $SortaOptional2, #SortaOptional2.Yup!enumelt, %2 : $IntClass // user: %4
   return %3 : $SortaOptional2                      // id: %4
 
 bb2:
@@ -191,8 +191,8 @@ public enum GenericEnum<T> {
 sil @combine_enum_data_and_enum : $@convention(thin) (@in_guaranteed GenericEnum<Int>) -> GenericEnum<Int> {
 bb0(%0 : $*GenericEnum<Int>):
   %5 = load %0 : $*GenericEnum<Int>       // users: %6, %7, %8, %23
-  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt.1 // user: %24
-  %24 = enum $GenericEnum<Int>, #GenericEnum.B!enumelt.1, %23 : $Int
+  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt // user: %24
+  %24 = enum $GenericEnum<Int>, #GenericEnum.B!enumelt, %23 : $Int
   return %24 : $GenericEnum<Int>
 }
 
@@ -204,8 +204,8 @@ bb0(%0 : $*GenericEnum<Int>):
 sil @dont_combine_enum_data_and_enum : $@convention(thin) (@in_guaranteed GenericEnum<Int>) -> GenericEnum<Double> {
 bb0(%0 : $*GenericEnum<Int>):
   %5 = load %0 : $*GenericEnum<Int>       // users: %6, %7, %8, %23
-  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt.1 // user: %24
-  %24 = enum $GenericEnum<Double>, #GenericEnum.B!enumelt.1, %23 : $Int
+  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt // user: %24
+  %24 = enum $GenericEnum<Double>, #GenericEnum.B!enumelt, %23 : $Int
   return %24 : $GenericEnum<Double>
 }
 

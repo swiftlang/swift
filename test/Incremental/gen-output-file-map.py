@@ -61,11 +61,11 @@ def main(arguments):
         'swift-dependencies': './main-buildrecord.swiftdeps'
     }
 
-    with open(output_path, 'w') as f:
+    with open(output_path, 'wb') as f:
         json.dump(all_records, f)
 
     if args.response_output_file is not None:
-        with open(args.response_output_file, 'w') as f:
+        with open(args.response_output_file, 'wb') as f:
             for line in response_file_contents:
                 f.write(line + " ")
 

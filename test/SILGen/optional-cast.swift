@@ -10,7 +10,7 @@ class B : A {}
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 //   Check whether the temporary holds a value.
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
-// CHECK:      switch_enum [[ARG_COPY]] : $Optional<A>, case #Optional.some!enumelt.1: [[IS_PRESENT:bb[0-9]+]], case #Optional.none!enumelt: [[NOT_PRESENT:bb[0-9]+]]
+// CHECK:      switch_enum [[ARG_COPY]] : $Optional<A>, case #Optional.some!enumelt: [[IS_PRESENT:bb[0-9]+]], case #Optional.none!enumelt: [[NOT_PRESENT:bb[0-9]+]]
 //
 //   If so, pull the value out and check whether it's a B.
 // CHECK:    [[IS_PRESENT]]([[VAL:%.*]] :
@@ -54,25 +54,25 @@ func foo(_ y : A?) {
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 // -- Check for some(...)
 // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[ARG]]
-// CHECK-NEXT: switch_enum [[ARG_COPY]] : ${{.*}}, case #Optional.some!enumelt.1: [[P:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_1:bb[0-9]+]]
+// CHECK-NEXT: switch_enum [[ARG_COPY]] : ${{.*}}, case #Optional.some!enumelt: [[P:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_1:bb[0-9]+]]
 //
 // CHECK: [[NIL_DEPTH_1]]:
 // CHECK:   br [[FINISH_NIL_0:bb[0-9]+]]
 //
 //   If so, drill down another level and check for some(some(...)).
 // CHECK:    [[P]]([[VALUE_OOOA:%.*]] :
-// CHECK-NEXT: switch_enum [[VALUE_OOOA]] : ${{.*}}, case #Optional.some!enumelt.1: [[PP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_2:bb[0-9]+]]
+// CHECK-NEXT: switch_enum [[VALUE_OOOA]] : ${{.*}}, case #Optional.some!enumelt: [[PP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_2:bb[0-9]+]]
 //
 // CHECK: [[NIL_DEPTH_2]]:
 // CHECK:   br [[FINISH_NIL_0]]
 //
 //   If so, drill down another level and check for some(some(some(...))).
 // CHECK:    [[PP]]([[VALUE_OOA:%.*]] :
-// CHECK-NEXT: switch_enum [[VALUE_OOA]] : ${{.*}}, case #Optional.some!enumelt.1: [[PPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_3:bb[0-9]+]]
+// CHECK-NEXT: switch_enum [[VALUE_OOA]] : ${{.*}}, case #Optional.some!enumelt: [[PPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_3:bb[0-9]+]]
 //
 //   If so, drill down another level and check for some(some(some(some(...)))).
 // CHECK:    [[PPP]]([[VALUE_OA:%.*]] :
-// CHECK-NEXT: switch_enum [[VALUE_OA]] : ${{.*}}, case #Optional.some!enumelt.1: [[PPPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_4:bb[0-9]+]]
+// CHECK-NEXT: switch_enum [[VALUE_OA]] : ${{.*}}, case #Optional.some!enumelt: [[PPPP:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_4:bb[0-9]+]]
 //
 //   If so, pull out the A and check whether it's a B.
 // CHECK:    [[PPPP]]([[VAL:%.*]] :
@@ -81,7 +81,7 @@ func foo(_ y : A?) {
 //   If so, inject it back into an optional.
 //   TODO: We're going to switch back out of this; we really should peephole it.
 // CHECK:    [[IS_B]]([[T0:%.*]] : @owned $B):
-// CHECK-NEXT: enum $Optional<B>, #Optional.some!enumelt.1, [[T0]]
+// CHECK-NEXT: enum $Optional<B>, #Optional.some!enumelt, [[T0]]
 // CHECK-NEXT: br [[SWITCH_OB2:bb[0-9]+]](
 //
 //   If not, inject nothing into an optional.
@@ -92,22 +92,22 @@ func foo(_ y : A?) {
 //
 //   Switch out on the value in [[OB2]].
 // CHECK:    [[SWITCH_OB2]]([[VAL:%[0-9]+]] : @owned $Optional<B>):
-// CHECK-NEXT: switch_enum [[VAL]] : ${{.*}}, case #Optional.some!enumelt.1: [[HAVE_B:bb[0-9]+]], case #Optional.none!enumelt: [[FINISH_NIL_4:bb[0-9]+]]
+// CHECK-NEXT: switch_enum [[VAL]] : ${{.*}}, case #Optional.some!enumelt: [[HAVE_B:bb[0-9]+]], case #Optional.none!enumelt: [[FINISH_NIL_4:bb[0-9]+]]
 //
 // CHECK:    [[FINISH_NIL_4]]:
 // CHECK:      br [[FINISH_NIL_0]]
 //
 // CHECK:    [[HAVE_B]]([[UNWRAPPED_VAL:%.*]] :
-// CHECK:      [[REWRAPPED_VAL:%.*]] = enum $Optional<B>, #Optional.some!enumelt.1, [[UNWRAPPED_VAL]]
+// CHECK:      [[REWRAPPED_VAL:%.*]] = enum $Optional<B>, #Optional.some!enumelt, [[UNWRAPPED_VAL]]
 // CHECK:      br [[DONE_DEPTH0:bb[0-9]+]]
 //
 // CHECK:    [[DONE_DEPTH0]](
-// CHECK-NEXT: enum $Optional<Optional<B>>, #Optional.some!enumelt.1,
+// CHECK-NEXT: enum $Optional<Optional<B>>, #Optional.some!enumelt,
 // CHECK-NEXT: br [[DONE_DEPTH1:bb[0-9]+]]
 //
 //   Set X := some(OOB).
 // CHECK:    [[DONE_DEPTH1]]
-// CHECK-NEXT: enum $Optional<Optional<Optional<B>>>, #Optional.some!enumelt.1,
+// CHECK-NEXT: enum $Optional<Optional<Optional<B>>>, #Optional.some!enumelt,
 // CHECK:      br [[DONE_DEPTH2:bb[0-9]+]]
 // CHECK:    [[DONE_DEPTH2]]
 // CHECK-NEXT: destroy_value [[X]]

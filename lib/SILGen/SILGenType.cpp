@@ -90,6 +90,14 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     implFn = getDynamicThunk(
         derived, Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
                      .SILFnType);
+  } else if (auto *derivativeId = derived.derivativeFunctionIdentifier) {
+    // For JVP/VJP methods, create a vtable entry thunk. The thunk contains an
+    // `differentiable_function` instruction, which is later filled during the
+    // differentiation transform.
+    auto derivedFnType =
+        Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
+            .SILFnType;
+    implFn = getOrCreateAutoDiffClassMethodThunk(derived, derivedFnType);
   } else {
     implFn = getFunction(derived, NotForDefinition);
   }
@@ -158,6 +166,17 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
         cast<ConstructorDecl>(baseDecl),
         cast<ConstructorDecl>(derivedDecl),
         base.kind == SILDeclRef::Kind::Allocator);
+    }
+    // TODO(TF-685): Use proper autodiff thunk mangling.
+    if (auto *derivativeId = derived.derivativeFunctionIdentifier) {
+      switch (derivativeId->getKind()) {
+      case AutoDiffDerivativeFunctionKind::JVP:
+        name += "_jvp";
+        break;
+      case AutoDiffDerivativeFunctionKind::VJP:
+        name += "_vjp";
+        break;
+      }
     }
   }
 
@@ -368,15 +387,28 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
 
 public:
   void addMethod(SILDeclRef requirementRef) {
-    auto reqAccessor = dyn_cast<AccessorDecl>(requirementRef.getDecl());
+    auto reqDecl = requirementRef.getDecl();
+
+    // Static functions can be witnessed by enum cases with payload
+    if (!(isa<AccessorDecl>(reqDecl) || isa<ConstructorDecl>(reqDecl))) {
+      auto FD = cast<FuncDecl>(reqDecl);
+      if (auto witness = asDerived().getWitness(FD)) {
+        if (auto EED = dyn_cast<EnumElementDecl>(witness.getDecl())) {
+          return addMethodImplementation(
+              requirementRef, SILDeclRef(EED, SILDeclRef::Kind::EnumElement),
+              witness);
+        }
+      }
+    }
+
+    auto reqAccessor = dyn_cast<AccessorDecl>(reqDecl);
 
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
-      if (auto witness = asDerived().getWitness(requirementRef.getDecl())) {
-        return addMethodImplementation(requirementRef,
-                                       SILDeclRef(witness.getDecl(),
-                                                  requirementRef.kind),
-                                       witness);
+      if (auto witness = asDerived().getWitness(reqDecl)) {
+        return addMethodImplementation(
+            requirementRef, requirementRef.withDecl(witness.getDecl()),
+            witness);
       }
 
       return asDerived().addMissingMethod(requirementRef);
@@ -388,6 +420,13 @@ public:
     if (!witness)
       return asDerived().addMissingMethod(requirementRef);
 
+    // Static properties can be witnessed by enum cases without payload
+    if (auto EED = dyn_cast<EnumElementDecl>(witness.getDecl())) {
+      return addMethodImplementation(
+          requirementRef, SILDeclRef(EED, SILDeclRef::Kind::EnumElement),
+          witness);
+    }
+
     auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
     if (reqAccessor->isSetter() && !witnessStorage->supportsMutation())
       return asDerived().addMissingMethod(requirementRef);
@@ -395,10 +434,8 @@ public:
     auto witnessAccessor =
       witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
 
-    return addMethodImplementation(requirementRef,
-                                   SILDeclRef(witnessAccessor,
-                                              SILDeclRef::Kind::Func),
-                                   witness);
+    return addMethodImplementation(
+        requirementRef, requirementRef.withDecl(witnessAccessor), witness);
   }
 
 private:
@@ -550,6 +587,10 @@ public:
         witnessLinkage = SILLinkage::Shared;
     }
 
+    if (isa<EnumElementDecl>(witnessRef.getDecl())) {
+      assert(witnessRef.isEnumElement() && "Witness decl, but different kind?");
+    }
+
     SILFunction *witnessFn = SGM.emitProtocolWitness(
         ProtocolConformanceRef(Conformance), witnessLinkage, witnessSerialized,
         requirementRef, witnessRef, isFree, witness);
@@ -690,6 +731,20 @@ SILFunction *SILGenModule::emitProtocolWitness(
       conformance.isConcrete() ? conformance.getConcrete() : nullptr;
   std::string nameBuffer =
       NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
+  // TODO(TF-685): Proper mangling for derivative witness thunks.
+  if (auto *derivativeId = requirement.derivativeFunctionIdentifier) {
+    std::string kindString;
+    switch (derivativeId->getKind()) {
+    case AutoDiffDerivativeFunctionKind::JVP:
+      kindString = "jvp";
+      break;
+    case AutoDiffDerivativeFunctionKind::VJP:
+      kindString = "vjp";
+      break;
+    }
+    nameBuffer = "AD__" + nameBuffer + "_" + kindString + "_" +
+                 derivativeId->getParameterIndices()->getString();
+  }
 
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
@@ -998,7 +1053,7 @@ public:
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
-                               ConformanceLookupKind::NonInherited, nullptr)) {
+                               ConformanceLookupKind::NonInherited)) {
       if (conformance->isComplete()) {
         if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
           SGM.getWitnessTable(normal);
@@ -1122,8 +1177,7 @@ public:
       // Emit witness tables for protocol conformances introduced by the
       // extension.
       for (auto *conformance : e->getLocalConformances(
-                                 ConformanceLookupKind::All,
-                                 nullptr)) {
+                                 ConformanceLookupKind::All)) {
         if (conformance->isComplete()) {
           if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
             SGM.getWitnessTable(normal);

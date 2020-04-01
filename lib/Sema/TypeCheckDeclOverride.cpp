@@ -655,8 +655,7 @@ static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
     // Get `@differentiable` attribute description.
     std::string baseDiffAttrString;
     llvm::raw_string_ostream os(baseDiffAttrString);
-    baseDA->print(os, derivedDecl, omitWrtClause,
-                  /*omitDerivativeFunctions*/ true);
+    baseDA->print(os, derivedDecl, omitWrtClause);
     os.flush();
     diags
         .diagnose(derivedDecl,
@@ -1454,6 +1453,7 @@ namespace  {
     UNINTERESTING_ATTR(Differentiable)
     UNINTERESTING_ATTR(Derivative)
     UNINTERESTING_ATTR(Transpose)
+    UNINTERESTING_ATTR(NoDerivative)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
@@ -1968,7 +1968,7 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
   return overriddenAssocTypes;
 }
 
-llvm::Expected<llvm::TinyPtrVector<ValueDecl *>>
+llvm::TinyPtrVector<ValueDecl *>
 OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // Value to return in error cases
   auto noResults = llvm::TinyPtrVector<ValueDecl *>();
@@ -2083,9 +2083,8 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
                                          OverrideCheckingAttempt::PerfectMatch);
 }
 
-llvm::Expected<bool>
-IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
-                                         ValueDecl *decl) const {
+bool IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
+                                              ValueDecl *decl) const {
   auto base = decl->getOverriddenDecl();
   if (!base)
     return false;

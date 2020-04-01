@@ -56,19 +56,8 @@ using namespace llvm::yaml;
 using StringSet = llvm::StringSet<>;
 using SymbolKind = llvm::MachO::SymbolKind;
 
-static constexpr StringLiteral ObjC2ClassNamePrefix = "_OBJC_CLASS_$_";
-static constexpr StringLiteral ObjC2MetaClassNamePrefix = "_OBJC_METACLASS_$_";
-
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
-}
-
-// If a symbol is implied, we don't need to emit it explictly into the tbd file.
-// e.g. When a symbol is in the `objc-classes` section in a tbd file, a additional
-// symbol with `_OBJC_CLASS_$_` is implied.
-static bool isSymbolImplied(StringRef name) {
-  return name.startswith(ObjC2ClassNamePrefix) ||
-    name.startswith(ObjC2MetaClassNamePrefix);
 }
 
 void TBDGenVisitor::addSymbolInternal(StringRef name,
@@ -76,8 +65,7 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
                                       bool isLinkerDirective) {
   if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
     return;
-  if (!isSymbolImplied(name))
-    Symbols.addSymbol(kind, name, Targets);
+  Symbols.addSymbol(kind, name, Targets);
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(name).second;
     (void)isNewValue;
@@ -494,21 +482,23 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
       }
     };
 
-    rootConformance->forEachValueWitness(
-        [&](ValueDecl *valueReq, Witness witness) {
-          auto witnessDecl = witness.getDecl();
-          if (isa<AbstractFunctionDecl>(valueReq)) {
-            addSymbolIfNecessary(valueReq, witnessDecl);
-          } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
-            auto witnessStorage = cast<AbstractStorageDecl>(witnessDecl);
-            storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
-              auto witnessAccessor =
-                witnessStorage->getSynthesizedAccessor(
-                  reqtAccessor->getAccessorKind());
-              addSymbolIfNecessary(reqtAccessor, witnessAccessor);
-            });
-          }
-        });
+    rootConformance->forEachValueWitness([&](ValueDecl *valueReq,
+                                             Witness witness) {
+      auto witnessDecl = witness.getDecl();
+      if (isa<AbstractFunctionDecl>(valueReq)) {
+        addSymbolIfNecessary(valueReq, witnessDecl);
+      } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
+        if (auto witnessStorage = dyn_cast<AbstractStorageDecl>(witnessDecl)) {
+          storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
+            auto witnessAccessor = witnessStorage->getSynthesizedAccessor(
+                reqtAccessor->getAccessorKind());
+            addSymbolIfNecessary(reqtAccessor, witnessAccessor);
+          });
+        } else if (isa<EnumElementDecl>(witnessDecl)) {
+          addSymbolIfNecessary(valueReq, witnessDecl);
+        }
+      }
+    });
   }
 }
 
@@ -648,7 +638,7 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
       if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
         // The actual variable has a symbol.
         Mangle::ASTMangler mangler;
-        addSymbol(mangler.mangleEntity(VD, false));
+        addSymbol(mangler.mangleEntity(VD));
       }
 
       if (VD->isLazilyInitializedGlobal())
@@ -986,7 +976,7 @@ static bool hasLinkerDirective(Decl *D) {
   return !getAllMovedPlatformVersions(D).empty();
 }
 
-llvm::Expected<TBDFileAndSymbols>
+TBDFileAndSymbols
 GenerateTBDRequest::evaluate(Evaluator &evaluator,
                              TBDGenDescriptor desc) const {
   auto *M = desc.getParentModule();

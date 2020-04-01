@@ -22,8 +22,6 @@
 // CHECK-NEXT: #pragma clang diagnostic
 // CHECK-NEXT: #endif
 // CHECK-NEXT: @import Foundation;
-// CHECK-NEXT: #else
-// CHECK-NEXT: #import <Foundation.h>
 // CHECK-NEXT: #endif
 
 // NO-IMPORT-NOT: #import

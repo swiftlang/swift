@@ -383,6 +383,16 @@ class DemanglingForTypeRef
 public:
   DemanglingForTypeRef(Demangle::Demangler &Dem) : Dem(Dem) {}
 
+  Demangle::NodePointer visit(const TypeRef *typeRef) {
+    auto node = TypeRefVisitor<DemanglingForTypeRef,
+                                Demangle::NodePointer>::visit(typeRef);
+
+    // Wrap all nodes in a Type node, as consumers generally expect.
+    auto typeNode = Dem.createNode(Node::Kind::Type);
+    typeNode->addChild(node, Dem);
+    return typeNode;
+  }
+
   Demangle::NodePointer visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     return Dem.demangleType(B->getMangledName());
   }
@@ -423,9 +433,7 @@ public:
     if (auto parent = BG->getParent())
       assert(false && "not implemented");
 
-    auto top = Dem.createNode(Node::Kind::Type);
-    top->addChild(genericNode, Dem);
-    return top;
+    return genericNode;
   }
 
   Demangle::NodePointer visitTupleTypeRef(const TupleTypeRef *T) {
@@ -576,18 +584,14 @@ public:
       node = Dem.createNode(Node::Kind::ProtocolListWithAnyObject);
       node->addChild(proto_list, Dem);
     }
-    auto typeNode = Dem.createNode(Node::Kind::Type);
-    typeNode->addChild(node, Dem);
-    return typeNode;
+    return node;
   }
 
   Demangle::NodePointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     auto node = Dem.createNode(Node::Kind::Metatype);
     assert(!M->wasAbstract() && "not implemented");
     node->addChild(visit(M->getInstanceType()), Dem);
-    auto typeNode = Dem.createNode(Node::Kind::Type);
-    typeNode->addChild(node, Dem);
-    return typeNode;
+    return node;
   }
 
   Demangle::NodePointer
@@ -618,8 +622,7 @@ public:
   }
 
   Demangle::NodePointer visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
-    assert(false && "not implemented");
-    return nullptr;
+    return Dem.demangleType(F->getName());
   }
 
   Demangle::NodePointer visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
@@ -636,9 +639,7 @@ public:
     auto node = Dem.createNode(Node::Kind::Protocol);
     node->addChild(module, Dem);
     node->addChild(Dem.createNode(Node::Kind::Identifier, OC->getName()), Dem);
-    auto typeNode = Dem.createNode(Node::Kind::Type);
-    typeNode->addChild(node, Dem);
-    return typeNode;
+    return node;
   }
 
 #define REF_STORAGE(Name, name, ...)                                           \

@@ -947,7 +947,7 @@ enum OperandRelation {
 /// the only possible incoming value.
 ///
 /// bb1:
-///  %3 = unchecked_enum_data %0 : $Optional<X>, #Optional.Some!enumelt.1
+///  %3 = unchecked_enum_data %0 : $Optional<X>, #Optional.Some!enumelt
 ///  checked_cast_br [exact] %3 : $X to $X, bb4, bb5 // id: %4
 ///
 /// bb4(%10 : $X):                                    // Preds: bb1

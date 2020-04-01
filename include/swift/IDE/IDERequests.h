@@ -60,7 +60,7 @@ void simple_display(llvm::raw_ostream &out, const CursorInfoOwner &owner);
 class CursorInfoRequest:
     public SimpleRequest<CursorInfoRequest,
                          ide::ResolvedCursorInfo(CursorInfoOwner),
-                         CacheKind::Cached>
+                         RequestFlags::Cached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -69,8 +69,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ide::ResolvedCursorInfo> evaluate(Evaluator &evaluator,
-    CursorInfoOwner CI) const;
+  ide::ResolvedCursorInfo evaluate(Evaluator &evaluator,
+                                   CursorInfoOwner CI) const;
 
 public:
   // Caching
@@ -121,7 +121,7 @@ void simple_display(llvm::raw_ostream &out, const RangeInfoOwner &owner);
 class RangeInfoRequest:
     public SimpleRequest<RangeInfoRequest,
                          ide::ResolvedRangeInfo(RangeInfoOwner),
-                         CacheKind::Cached>
+                         RequestFlags::Cached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -130,8 +130,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ide::ResolvedRangeInfo> evaluate(Evaluator &evaluator,
-    RangeInfoOwner CI) const;
+  ide::ResolvedRangeInfo evaluate(Evaluator &evaluator,
+                                  RangeInfoOwner CI) const;
 
 public:
   // Caching
@@ -149,7 +149,7 @@ public:
 class ProvideDefaultImplForRequest:
     public SimpleRequest<ProvideDefaultImplForRequest,
                          ArrayRef<ValueDecl*>(ValueDecl*),
-                         CacheKind::Cached>
+                         RequestFlags::Cached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -158,8 +158,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ArrayRef<ValueDecl*>> evaluate(Evaluator &evaluator,
-    ValueDecl* VD) const;
+  ArrayRef<ValueDecl*> evaluate(Evaluator &evaluator,
+                                ValueDecl* VD) const;
 
 public:
   // Caching
@@ -211,7 +211,7 @@ struct OverridenDeclsOwner {
 class CollectOverriddenDeclsRequest:
     public SimpleRequest<CollectOverriddenDeclsRequest,
                          ArrayRef<ValueDecl*>(OverridenDeclsOwner),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -219,8 +219,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ArrayRef<ValueDecl*>> evaluate(Evaluator &evaluator,
-    OverridenDeclsOwner Owner) const;
+  ArrayRef<ValueDecl*> evaluate(Evaluator &evaluator,
+                                OverridenDeclsOwner Owner) const;
 
 public:
   // Caching
@@ -262,7 +262,7 @@ struct ProtocolNameOwner {
 class ResolveProtocolNameRequest:
     public SimpleRequest<ResolveProtocolNameRequest,
                          ProtocolDecl*(ProtocolNameOwner),
-                         CacheKind::Cached>
+                         RequestFlags::Cached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -271,8 +271,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ProtocolDecl*> evaluate(Evaluator &evaluator,
-    ProtocolNameOwner Input) const;
+  ProtocolDecl *evaluate(Evaluator &evaluator,
+                         ProtocolNameOwner Input) const;
 
 public:
   // Caching

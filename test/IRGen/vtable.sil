@@ -47,5 +47,5 @@ sil @$s6vtable1CCfD : $@convention(method) (@owned C) -> ()
 // CHECK-native: }>
 
 sil_vtable C {
-  #C.init!allocator.1: @$s6vtable1CCACycACmcfC
+  #C.init!allocator: @$s6vtable1CCACycACmcfC
 }

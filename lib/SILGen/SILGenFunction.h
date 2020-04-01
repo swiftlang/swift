@@ -652,9 +652,6 @@ public:
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
                                   CleanupLocation cleanupLoc);
 
-  /// Generates code for a curry thunk from one uncurry level
-  /// of a function to another.
-  void emitCurryThunk(SILDeclRef thunk);
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to the conventions.
@@ -1859,6 +1856,23 @@ public:
   createWithoutActuallyEscapingClosure(SILLocation loc,
                                        ManagedValue noEscapingFunctionValue,
                                        SILType escapingFnTy);
+
+  //===--------------------------------------------------------------------===//
+  // Differentiation thunks
+  //===--------------------------------------------------------------------===//
+
+  /// Get or create a thunk for reabstracting and self-reordering
+  /// differentials/pullbacks returned by user-defined JVP/VJP functions, and
+  /// apply it to the given differential/pullback.
+  ///
+  /// If `reorderSelf` is true, reorder self so that it appears as:
+  /// - The last parameter, for differentials.
+  /// - The last result, for pullbacks.
+  ManagedValue getThunkedAutoDiffLinearMap(ManagedValue linearMap,
+                                           AutoDiffLinearMapKind linearMapKind,
+                                           CanSILFunctionType fromType,
+                                           CanSILFunctionType toType,
+                                           bool reorderSelf);
 
   //===--------------------------------------------------------------------===//
   // Declarations

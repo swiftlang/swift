@@ -83,7 +83,7 @@ TypeChecker::gatherGenericParamBindingsText(
 
 /// Get the opaque type representing the return type of a declaration, or
 /// create it if it does not yet exist.
-llvm::Expected<OpaqueTypeDecl *>
+OpaqueTypeDecl *
 OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
                                   ValueDecl *originatingDecl) const {
   auto *repr = originatingDecl->getOpaqueResultTypeRepr();
@@ -577,7 +577,7 @@ static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
   return sig->getGenericParams().back()->getDepth();
 }
 
-llvm::Expected<GenericSignature>
+GenericSignature
 GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                   GenericContext *GC) const {
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
@@ -620,11 +620,15 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       return cast<SubscriptDecl>(accessor->getStorage())->getGenericSignature();
     }
 
-  // ...or we may have a where clause dependent on outer generic parameters.
+  // ...or we may only have a contextual where clause.
   } else if (const auto *where = GC->getTrailingWhereClause()) {
     // If there is no generic context for the where clause to
     // rely on, diagnose that now and bail out.
-    if (!GC->isGenericContext()) {
+    if (GC->getParent()->isModuleScopeContext()) {
+      GC->getASTContext().Diags.diagnose(where->getWhereLoc(),
+                                         diag::where_nongeneric_toplevel);
+      return nullptr;
+    } else if (!GC->isGenericContext()) {
       GC->getASTContext().Diags.diagnose(where->getWhereLoc(),
                                          diag::where_nongeneric_ctx);
       return nullptr;
@@ -915,7 +919,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   return RequirementCheckResult::SubstitutionFailure;
 }
 
-llvm::Expected<Requirement>
+Requirement
 RequirementRequest::evaluate(Evaluator &evaluator,
                              WhereClauseOwner owner,
                              unsigned index,
@@ -970,9 +974,8 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("unhandled kind");
 }
 
-llvm::Expected<Type>
-StructuralTypeRequest::evaluate(Evaluator &evaluator,
-                                TypeAliasDecl *typeAlias) const {  
+Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
+                                     TypeAliasDecl *typeAlias) const {  
   TypeResolutionOptions options((typeAlias->getGenericParams()
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));

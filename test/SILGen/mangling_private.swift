@@ -75,10 +75,10 @@ extension PrivateStruct {
 
 // CHECK-LABEL: sil_vtable Sub {
 class Sub : Base {
-  // CHECK-BASE: #Base.privateMethod!1: {{.*}} : @$s23mangling_private_helper4BaseC0B6Method33_0E108371B0D5773E608A345AC52C7674LLyyF
-  // CHECK-DAG: #Base.privateMethod!1: {{.*}} : @$s23mangling_private_helper4BaseC0B6Method33_0E108371B0D5773E608A345AC52C7674LLyyF
+  // CHECK-BASE: #Base.privateMethod: {{.*}} : @$s23mangling_private_helper4BaseC0B6Method33_0E108371B0D5773E608A345AC52C7674LLyyF
+  // CHECK-DAG: #Base.privateMethod: {{.*}} : @$s23mangling_private_helper4BaseC0B6Method33_0E108371B0D5773E608A345AC52C7674LLyyF
 
-  // CHECK-DAG: #Sub.subMethod!1: {{.*}} : @$s16mangling_private3SubC9subMethod33_A3CCBB841DB59E79A4AD4EE458655068LLyyF
+  // CHECK-DAG: #Sub.subMethod: {{.*}} : @$s16mangling_private3SubC9subMethod33_A3CCBB841DB59E79A4AD4EE458655068LLyyF
   private func subMethod() {}
 } // CHECK: {{^[}]$}}
 

@@ -280,6 +280,9 @@ public:
   /// Whether to disable shadow copies for local variables on the stack. This is
   /// only used for testing.
   unsigned DisableDebuggerShadowCopies : 1;
+  
+  /// Whether to disable using mangled names for accessing concrete type metadata.
+  unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1;
 
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
@@ -327,6 +330,7 @@ public:
         UseSwiftCall(false), UseTypeLayoutValueHandling(true), GenerateProfile(false),
         EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
+        DisableConcreteTypeMetadataMangledNameAccessors(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 

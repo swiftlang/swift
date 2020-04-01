@@ -26,6 +26,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Program.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Threading.h"
@@ -387,6 +388,16 @@ static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
   return Error ? 1 : 0;
 }
 
+static int performShellExecution(ArrayRef<const char *> Args) {
+  auto Program = llvm::sys::findProgramByName(Args[0]);
+  if (std::error_code ec = Program.getError()) {
+    llvm::errs() << "command not found: " << Args[0] << "\n";
+    return ec.value();
+  }
+  SmallVector<StringRef, 8> execArgs(Args.begin(), Args.end());
+  return llvm::sys::ExecuteAndWait(*Program, execArgs);
+}
+
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts);
 
 static int handleTestInvocation(ArrayRef<const char *> Args,
@@ -418,6 +429,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       llvm::outs() << "warning: global configuration request failed\n";
     }
   }
+
+  if (Opts.ShellExecution)
+    return performShellExecution(Opts.CompilerArgs);
 
   assert(Opts.repeatRequest >= 1);
   for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
@@ -579,6 +593,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCodeComplete);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    // Default to sort by name.
+    Opts.RequestOptions.insert(Opts.RequestOptions.begin(), "sort.byname=1");
     addCodeCompleteOptions(Req, Opts);
     break;
 

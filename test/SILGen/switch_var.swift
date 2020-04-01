@@ -595,7 +595,7 @@ enum Foo {
 func test_multiple_patterns3() {
   let f = Foo.C(0, 1, 2.0)
   switch f {
-    // CHECK:   switch_enum {{%.*}} : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
+    // CHECK:   switch_enum {{%.*}} : $Foo, case #Foo.A!enumelt: [[A:bb[0-9]+]], case #Foo.B!enumelt: [[B:bb[0-9]+]], case #Foo.C!enumelt: [[C:bb[0-9]+]]
   case .A(let x, let n), .B(let n, let x), .C(_, let x, let n):
     // CHECK:   [[A]]([[A_TUP:%.*]] : $(Int, Double)):
     // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
@@ -625,11 +625,11 @@ enum Bar {
 func test_multiple_patterns4() {
   let b = Bar.Y(.C(0, 1, 2.0), 3)
   switch b {
-    // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
+    // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt: [[Y:bb[0-9]+]], case #Bar.Z!enumelt: [[Z:bb[0-9]+]]
   case .Y(.A(let x, _), _), .Y(.B(_, let x), _), .Y(.C, let x), .Z(let x, _):
     // CHECK:   [[Y]]([[Y_TUP:%.*]] : $(Foo, Int)):
     // CHECK:     ([[Y_F:%.*]], [[Y_X:%.*]]) = destructure_tuple [[Y_TUP]]
-    // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
+    // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt: [[A:bb[0-9]+]], case #Foo.B!enumelt: [[B:bb[0-9]+]], case #Foo.C!enumelt: [[C:bb[0-9]+]]
     
     // CHECK:   [[A]]([[A_TUP:%.*]] : $(Int, Double)):
     // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
@@ -659,11 +659,11 @@ func aaa(x x: inout Int) {}
 func test_multiple_patterns5() {
   let b = Bar.Y(.C(0, 1, 2.0), 3)
   switch b {
-    // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
+    // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt: [[Y:bb[0-9]+]], case #Bar.Z!enumelt: [[Z:bb[0-9]+]]
   case .Y(.A(var x, _), _), .Y(.B(_, var x), _), .Y(.C, var x), .Z(var x, _):
     // CHECK:   [[Y]]([[Y_TUP:%.*]] : $(Foo, Int)):
     // CHECK:     ([[Y_F:%.*]], [[Y_X:%.*]]) = destructure_tuple [[Y_TUP]]
-    // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
+    // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt: [[A:bb[0-9]+]], case #Foo.B!enumelt: [[B:bb[0-9]+]], case #Foo.C!enumelt: [[C:bb[0-9]+]]
     
     // CHECK:   [[A]]([[A_TUP:%.*]] : $(Int, Double)):
     // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]

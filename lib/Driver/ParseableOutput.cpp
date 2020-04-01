@@ -136,12 +136,12 @@ public:
     if (PrimaryOutputType != file_types::TY_Nothing) {
       for (llvm::StringRef OutputFileName :
            Cmd.getOutput().getPrimaryOutputFilenames()) {
-        Outputs.push_back(OutputPair(PrimaryOutputType, OutputFileName));
+        Outputs.push_back(OutputPair(PrimaryOutputType, OutputFileName.str()));
       }
     }
     file_types::forAllTypes([&](file_types::ID Ty) {
       for (auto Output : Cmd.getOutput().getAdditionalOutputsForType(Ty)) {
-        Outputs.push_back(OutputPair(Ty, Output));
+        Outputs.push_back(OutputPair(Ty, Output.str()));
       }
     });
   }

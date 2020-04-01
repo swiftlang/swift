@@ -1,7 +1,16 @@
-// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil -Xllvm '-sil-inline-never-functions=$sSa6append' %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
-// This is an end-to-end test of the array(contentsOf) -> array(Element) optimization
+// This is an end-to-end test of the Array.append(contentsOf:) ->
+// Array.append(Element) optimization.
+//
+// To check that the optimization produces the expected
+// Array.append(Element) calls, the CHECK lines match those call
+// sites. The optimizer may subsequently inline Array.append(Element),
+// which is good, but to keep the test simple and specific to the
+// optimization, the RUN line prevents inlining Array.append(Element).
+// Likewise, negative tests check for the existence of
+// Array.append(contentsOf:), so don't inline those either.
 
 // CHECK-LABEL: sil @{{.*}}testInt
 // CHECK-NOT: apply
@@ -22,14 +31,13 @@ public func testInt(_ a: inout [Int]) {
 // CHECK-DAG:    apply [[F]]
 // CHECK-DAG:    apply [[F]]
 // CHECK:      } // end sil function '{{.*}}testThreeInts{{.*}}'
-
 public func testThreeInts(_ a: inout [Int]) {
   a += [1, 2, 3]
 }
 
 // CHECK-LABEL: sil @{{.*}}testTooManyInts
 // CHECK-NOT: apply
-// CHECK:        [[F:%[0-9]+]] = function_ref  @$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5Tf4gn_n
+// CHECK:        [[F:%[0-9]+]] = function_ref  @$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5
 // CHECK-NOT: apply
 // CHECK:        apply [[F]]
 // CHECK-NOT: apply
@@ -57,7 +65,7 @@ public func dontPropagateContiguousArray(_ a: inout ContiguousArray<UInt8>) {
 
 // Check if the specialized Array.append<A>(contentsOf:) is reasonably optimized for Array<Int>.
 
-// CHECK-LABEL: sil shared {{.*}}@$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5
+// CHECK-LABEL: sil shared {{.*}}@$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5Tf4gn_n
 
 // There should only be a single call to _createNewBuffer or reserveCapacityForAppend/reserveCapacityImpl.
 

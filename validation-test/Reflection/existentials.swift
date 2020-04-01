@@ -69,6 +69,7 @@ reflect(any: mc)
 // CHECK-64: Type info:
 // CHECK-64: (reference kind=strong refcounting=native)
 // CHECK-64: Mangled name: $s12existentials7MyClassCyS2iG
+// CHECK-64: Demangled name: existentials.MyClass<Swift.Int, Swift.Int>
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -79,6 +80,7 @@ reflect(any: mc)
 // CHECK-32: Type info:
 // CHECK-32: (reference kind=strong refcounting=native)
 // CHECK-32: Mangled name: $s12existentials7MyClassCyS2iG
+// CHECK-32: Demangled name: existentials.MyClass<Swift.Int, Swift.Int>
 
 // This value fits in the 3-word buffer in the container.
 var smallStruct = MyStruct(x: 1, y: 2, z: 3)
@@ -107,6 +109,7 @@ reflect(any: smallStruct)
 // CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))
 // CHECK-64-NEXT:   Mangled name:  $s12existentials8MyStructVyS3iG
+// CHECK-64-NEXT:   Demangled name:  existentials.MyStruct<Swift.Int, Swift.Int, Swift.Int>
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -131,6 +134,7 @@ reflect(any: smallStruct)
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
 // CHECK-32-NEXT:   Mangled name:  $s12existentials8MyStructVyS3iG
+// CHECK-32-NEXT:   Demangled name:  existentials.MyStruct<Swift.Int, Swift.Int, Swift.Int>
 
 // This value will be copied into a heap buffer, with a
 // pointer to it in the existential.
@@ -198,6 +202,7 @@ reflect(any: largeStruct)
 // CHECK-64-NEXT:           (field name=_value offset=0
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
 // CHECK-64-NEXT:   Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itG
+// CHECK-64-NEXT:   Demangled name: existentials.MyStruct<(Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int)>
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -260,11 +265,14 @@ reflect(any: largeStruct)
 // CHECK-32-NEXT:           (field name=_value offset=0
 // CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))))
 // CHECK-32-NEXT:   Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itG
+// CHECK-32-NEXT:   Demangled name: existentials.MyStruct<(Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int)>
 
 // Function type:
 reflect(any: {largeStruct})
 // CHECK-64: Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itGyc
+// CHECK-64: Demangled name: () -> existentials.MyStruct<(Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int)>
 // CHECK-32: Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itGyc
+// CHECK-32: Demangled name: () -> existentials.MyStruct<(Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int)>
 
 // Protocol composition:
 protocol P {}
@@ -273,13 +281,17 @@ protocol Composition : P, Q {}
 struct S : Composition {}
 func getComposition() -> P & Q { return S() }
 reflect(any: getComposition())
-// CHECK-64: Mangled name: $s12existentials1P_AA1Qp
-// CHECK-32: Mangled name: $s12existentials1P_AA1Qp
+// CHECK-64: Mangled name: $s12existentials1PP_AA1QPp
+// CHECK-64: Demangled name: existentials.P & existentials.Q
+// CHECK-32: Mangled name: $s12existentials1PP_AA1QPp
+// CHECK-32: Demangled name: existentials.P & existentials.Q
 
 // Metatype:
 reflect(any: Int.self)
 // CHECK-64: Mangled name: $sSim
+// CHECK-64: Demangled name: Swift.Int.Type
 // CHECK-32: Mangled name: $sSim
+// CHECK-32: Demangled name: Swift.Int.Type
 
 protocol WithType {
   associatedtype T
@@ -332,6 +344,7 @@ reflect(any: he)
 // CHECK-64-NEXT:       (field name=wtable offset=40
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)))))
 // CHECK-64-NEXT:   Mangled name: $s12existentials8HasErrorV
+// CHECK-64-NEXT:   Demangled name: existentials.HasError
 
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -367,6 +380,7 @@ reflect(any: he)
 // CHECK-32-NEXT:       (field name=wtable offset=20
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)))))
 // CHECK-32-NEXT:   Mangled name: $s12existentials8HasErrorV
+// CHECK-32-NEXT:   Demangled name: existentials.HasError
 
 reflect(error: MyError())
 
@@ -382,6 +396,7 @@ reflect(error: MyError())
 // CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))
 // CHECK-64-NEXT:   Mangled name: $s12existentials7MyErrorV
+// CHECK-64-NEXT:   Demangled name: existentials.MyError
 
 // CHECK-32: Reflecting an error existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -395,5 +410,6 @@ reflect(error: MyError())
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
 // CHECK-32-NEXT:   Mangled name: $s12existentials7MyErrorV
+// CHECK-32-NEXT:   Demangled name: existentials.MyError
 
 doneReflecting()

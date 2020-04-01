@@ -1102,14 +1102,14 @@ bb0(%0 : $*Example):
   %3 = integer_literal $Builtin.Int64, 64
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = tuple (%2 : $Int64, %4 : $Int64)
-  %6 = enum $Example, #Example.A!enumelt.1, %5 : $(Int64, Int64)
+  %6 = enum $Example, #Example.A!enumelt, %5 : $(Int64, Int64)
   store %6 to %0 : $*Example
   %8 = integer_literal $Builtin.Int64, 64
   %9 = struct $Int64 (%8 : $Builtin.Int64)
   %10 = integer_literal $Builtin.Int64, 64
   %11 = struct $Int64 (%10 : $Builtin.Int64)
   %12 = tuple (%9 : $Int64, %11 : $Int64)
-  %13 = enum $Example, #Example.A!enumelt.1, %12 : $(Int64, Int64)
+  %13 = enum $Example, #Example.A!enumelt, %12 : $(Int64, Int64)
   store %13 to %0 : $*Example
   release_value %6 : $Example
   %16 = integer_literal $Builtin.Int64, 0

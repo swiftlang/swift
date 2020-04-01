@@ -717,8 +717,8 @@ sil @interpretShapeArea : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %1 = integer_literal $Builtin.Int64, 10
   %2 = struct $Int64 (%1 : $Builtin.Int64)
-  %3 = enum $Shape, #Shape.square!enumelt.1, %2 : $Int64
-  switch_enum %3 : $Shape, case #Shape.square!enumelt.1: bb1, case #Shape.rectangle!enumelt.1: bb2
+  %3 = enum $Shape, #Shape.square!enumelt, %2 : $Int64
+  switch_enum %3 : $Shape, case #Shape.square!enumelt: bb1, case #Shape.rectangle!enumelt: bb2
 
 bb1(%4 : $Int64):
   debug_value %4 : $Int64, let, name "side"

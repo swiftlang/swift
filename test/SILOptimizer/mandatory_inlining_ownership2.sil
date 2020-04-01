@@ -835,7 +835,7 @@ sil hidden [transparent] [ossa] @protocolConstrained : $@convention(thin) <T whe
 bb0(%0 : @owned $T):
   debug_value %0 : $T
   %0copy = copy_value %0 : $T
-  %3 = objc_method %0 : $T, #Foo.foo!1.foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+  %3 = objc_method %0 : $T, #Foo.foo!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
   %4 = apply %3<T>(%0copy) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
   destroy_value %0copy : $T
   destroy_value %0 : $T
@@ -848,7 +848,7 @@ bb0(%0 : @owned $T):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   [[ARG_COPY_2:%.*]] = copy_value [[ARG_COPY]]
 // CHECK-NOT: apply
-// CHECK:   [[METHOD:%[a-zA-Z0-9]+]] = objc_method [[ARG_COPY]] : $Foo, #Foo.foo!1.foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+// CHECK:   [[METHOD:%[a-zA-Z0-9]+]] = objc_method [[ARG_COPY]] : $Foo, #Foo.foo!foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
 // CHECK:   apply [[METHOD]]<Foo>([[ARG_COPY_2]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
 // CHECK:   destroy_value [[ARG_COPY_2]]
 // CHECK:   destroy_value [[ARG_COPY]]
@@ -994,7 +994,7 @@ sil [transparent] [ossa] @P2_s : $@convention(method) <Self where Self : P2> (@i
 bb0(%0 : $*Self):
   %2 = alloc_stack $Self
   copy_addr %0 to [initialization] %2 : $*Self
-  %4 = witness_method $Self, #P2.c!getter.1 : $@convention(witness_method: P2) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  %4 = witness_method $Self, #P2.c!getter : $@convention(witness_method: P2) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
   %5 = apply %4<Self>(%2) : $@convention(witness_method: P2) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
   destroy_addr %2 : $*Self
   %7 = integer_literal $Builtin.Int32, 1
@@ -1013,7 +1013,7 @@ bb0(%0 : $*Self):
 // uses the opened archetype from the caller.
 // CHECK-LABEL: sil hidden [ossa] @L_start
 // CHECK: open_existential_addr immutable_access {{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+"\) P2]]
-// CHECK: witness_method $@[[OPENED_ARCHETYPE]], #P2.c!getter.1 : {{.*}}, %{{[0-9]+}} : $*@[[OPENED_ARCHETYPE]]
+// CHECK: witness_method $@[[OPENED_ARCHETYPE]], #P2.c!getter : {{.*}}, %{{[0-9]+}} : $*@[[OPENED_ARCHETYPE]]
 // CHECK: return
 sil hidden [ossa] @L_start : $@convention(method) (@in_guaranteed L) -> Int32 {
 bb0(%0 : $*L):
@@ -1040,7 +1040,7 @@ bb0(%0 : @owned $C):
 
 sil [transparent] [ossa] @testMandatoryConvertedHelper2 : $@convention(thin) (@owned Optional<C>) -> @owned C {
 bb0(%0 : @owned $Optional<C>):
-  %o = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
+  %o = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt
   return %o : $C
 }
 

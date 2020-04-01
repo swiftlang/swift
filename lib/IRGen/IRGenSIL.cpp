@@ -1042,6 +1042,11 @@ public:
   
   void visitKeyPathInst(KeyPathInst *I);
 
+  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
+  void visitLinearFunctionInst(LinearFunctionInst *i);
+  void
+  visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *i);
+  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
   void visitDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *i);
 
@@ -1812,6 +1817,89 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }
 
+void IRGenSILFunction::visitDifferentiableFunctionInst(
+    DifferentiableFunctionInst *i) {
+  auto origFnExp = getLoweredExplosion(i->getOriginalFunction());
+  Explosion e;
+  e.add(origFnExp.claimAll());
+  // TODO(TF-1211): Uncomment assertions after upstreaming differentiation
+  // transform.
+  // The mandatory differentiation transform canonicalizes
+  // `differentiable_function` instructions and ensures that derivative operands
+  // are populated.
+  /*
+  assert(i->hasDerivativeFunctions());
+  for (auto &derivFnOperand : i->getDerivativeFunctionArray())
+    e.add(getLoweredExplosion(derivFnOperand.get()).claimAll());
+  setLoweredExplosion(i, e);
+  */
+  // Note: code below is a temporary measure until TF-1211. Derivative function
+  // operands should always exist after the differentiation transform.
+  auto getDerivativeExplosion = [&](AutoDiffDerivativeFunctionKind kind) {
+    // If the derivative value exists, get its explosion.
+    if (i->hasDerivativeFunctions())
+      return getLoweredExplosion(i->getDerivativeFunction(kind));
+    // Otherwise, create an undef explosion.
+    auto origFnType =
+        i->getOriginalFunction()->getType().castTo<SILFunctionType>();
+    auto derivativeFnType = origFnType->getAutoDiffDerivativeFunctionType(
+        i->getParameterIndices(), /*resultIndex*/ 0, kind, i->getModule().Types,
+        LookUpConformanceInModule(i->getModule().getSwiftModule()));
+    auto *undef = SILUndef::get(
+        SILType::getPrimitiveObjectType(derivativeFnType), *i->getFunction());
+    return getLoweredExplosion(undef);
+  };
+  auto jvpExp = getDerivativeExplosion(AutoDiffDerivativeFunctionKind::JVP);
+  e.add(jvpExp.claimAll());
+  auto vjpExp = getDerivativeExplosion(AutoDiffDerivativeFunctionKind::VJP);
+  e.add(vjpExp.claimAll());
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::
+visitLinearFunctionInst(LinearFunctionInst *i) {
+  auto origExp = getLoweredExplosion(i->getOriginalFunction());
+  Explosion e;
+  e.add(origExp.claimAll());
+  assert(i->hasTransposeFunction());
+  e.add(getLoweredExplosion(i->getTransposeFunction()).claimAll());
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::visitDifferentiableFunctionExtractInst(
+    DifferentiableFunctionExtractInst *i) {
+  unsigned structFieldOffset = i->getExtractee().rawValue;
+  unsigned fieldSize = 1;
+  auto fnRepr = i->getOperand()->getType().getFunctionRepresentation();
+  if (fnRepr == SILFunctionTypeRepresentation::Thick) {
+    structFieldOffset *= 2;
+    fieldSize = 2;
+  }
+  auto diffFnExp = getLoweredExplosion(i->getOperand());
+  assert(diffFnExp.size() == fieldSize * 3);
+  Explosion e;
+  e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
+  (void)diffFnExp.claimAll();
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::
+visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
+  unsigned structFieldOffset = i->getExtractee().rawValue;
+  unsigned fieldSize = 1;
+  auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
+  if (fnRepr == SILFunctionTypeRepresentation::Thick) {
+    structFieldOffset *= 2;
+    fieldSize = 2;
+  }
+  auto diffFnExp = getLoweredExplosion(i->getFunctionOperand());
+  assert(diffFnExp.size() == fieldSize * 2);
+  Explosion e;
+  e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
+  (void)diffFnExp.claimAll();
+  setLoweredExplosion(i, e);
+}
+
 void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
     DifferentiabilityWitnessFunctionInst *i) {
   llvm::Value *diffWitness =
@@ -2260,11 +2348,33 @@ void IRGenSILFunction::visitTryApplyInst(swift::TryApplyInst *i) {
 }
 
 void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
-  const LoweredValue &calleeLV = getLoweredValue(site.getCallee());
-  
   auto origCalleeType = site.getOrigCalleeType();
   auto substCalleeType = site.getSubstCalleeType();
-  
+  if (site.getOrigCalleeType()->isDifferentiable()) {
+    origCalleeType = origCalleeType->getWithoutDifferentiability();
+    substCalleeType = substCalleeType->getWithoutDifferentiability();
+  }
+
+  // If the callee is a differentiable function, we extract the original
+  // function because we want to call the original function.
+  Optional<LoweredValue> diffCalleeOrigFnLV;
+  if (site.getOrigCalleeType()->isDifferentiable()) {
+    auto diffFnExplosion = getLoweredExplosion(site.getCallee());
+    Explosion origFnExplosion;
+    unsigned fieldSize = 1;
+    if (origCalleeType->getRepresentation() ==
+        SILFunctionTypeRepresentation::Thick) {
+      fieldSize = 2;
+    }
+    origFnExplosion.add(diffFnExplosion.getRange(0, 0 + fieldSize));
+    (void)diffFnExplosion.claimAll();
+    diffCalleeOrigFnLV = LoweredValue(origFnExplosion);
+  }
+
+  const LoweredValue &calleeLV =
+      diffCalleeOrigFnLV ? *diffCalleeOrigFnLV :
+                            getLoweredValue(site.getCallee());
+
   auto args = site.getArguments();
   SILFunctionConventions origConv(origCalleeType, getSILModule());
   assert(origConv.getNumSILArguments() == args.size());
@@ -4495,11 +4605,15 @@ void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     swift::ConvertEscapeToNoEscapeInst *i) {
   // This instruction makes the context trivial.
   Explosion in = getLoweredExplosion(i->getOperand());
-  llvm::Value *fn = in.claimNext();
-  llvm::Value *ctx = in.claimNext();
   Explosion out;
-  out.add(fn);
-  out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
+  // Differentiable functions contain multiple pairs of fn and ctx pointer.
+  for (unsigned index : range(in.size() / 2)) {
+    (void)index;
+    llvm::Value *fn = in.claimNext();
+    llvm::Value *ctx = in.claimNext();
+    out.add(fn);
+    out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
+  }
   setLoweredExplosion(i, out);
 }
 

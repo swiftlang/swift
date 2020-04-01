@@ -366,7 +366,7 @@ class Hoozit : Gizmo {
   // CHECK: [[GIZMO:%[0-9]+]] = upcast [[SELF:%[0-9]+]] : $Hoozit to $Gizmo
   // CHECK: [[BORROWED_GIZMO:%.*]] = begin_borrow [[GIZMO]]
   // CHECK: [[CAST_BORROWED_GIZMO:%.*]] = unchecked_ref_cast [[BORROWED_GIZMO]] : $Gizmo to $Hoozit
-  // CHECK: [[SUPERMETHOD:%[0-9]+]] = objc_super_method [[CAST_BORROWED_GIZMO]] : $Hoozit, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo?, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
+  // CHECK: [[SUPERMETHOD:%[0-9]+]] = objc_super_method [[CAST_BORROWED_GIZMO]] : $Hoozit, #Gizmo.init!initializer.foreign : (Gizmo.Type) -> (Int) -> Gizmo?, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK-NEXT: end_borrow [[BORROWED_GIZMO]]
   // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to Hoozit
@@ -489,23 +489,23 @@ func useHoozit(_ h: Hoozit) {
 // sil [ossa] @$s11objc_thunks9useHoozit1hyAA0D0C_tF
   // In the class decl, overrides importd method, 'dynamic' was inferred
   h.fork()
-  // CHECK: objc_method {{%.*}} : {{.*}}, #Hoozit.fork!1.foreign
+  // CHECK: objc_method {{%.*}} : {{.*}}, #Hoozit.fork!foreign
 
   // In an extension, 'dynamic' was inferred.
   h.foof()
-  // CHECK: objc_method {{%.*}} : {{.*}}, #Hoozit.foof!1.foreign
+  // CHECK: objc_method {{%.*}} : {{.*}}, #Hoozit.foof!foreign
 }
 
 func useWotsit(_ w: Wotsit<String>) {
 // sil [ossa] @$s11objc_thunks9useWotsit1wySo0D0CySSG_tF
   w.plain()
-  // CHECK: class_method {{%.*}} : {{.*}}, #Wotsit.plain!1 :
+  // CHECK: class_method {{%.*}} : {{.*}}, #Wotsit.plain :
   w.generic(2)
-  // CHECK: class_method {{%.*}} : {{.*}}, #Wotsit.generic!1 :
+  // CHECK: class_method {{%.*}} : {{.*}}, #Wotsit.generic :
 
   // Inherited methods only have objc entry points
   w.clone()
-  // CHECK: objc_method {{%.*}} : {{.*}}, #Gizmo.clone!1.foreign
+  // CHECK: objc_method {{%.*}} : {{.*}}, #Gizmo.clone!foreign
 }
 
 func other() { }
@@ -515,16 +515,16 @@ class X { }
 // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks8propertyySiSo5GizmoCF
 func property(_ g: Gizmo) -> Int {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
-  // CHECK:   objc_method [[ARG]] : $Gizmo, #Gizmo.count!getter.1.foreign
+  // CHECK:   objc_method [[ARG]] : $Gizmo, #Gizmo.count!getter.foreign
   return g.count
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks13blockPropertyyySo5GizmoCF
 func blockProperty(_ g: Gizmo) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
-  // CHECK:   objc_method [[ARG]] : $Gizmo, #Gizmo.block!setter.1.foreign
+  // CHECK:   objc_method [[ARG]] : $Gizmo, #Gizmo.block!setter.foreign
   g.block = { }
-  // CHECK:   objc_method [[ARG]] : $Gizmo, #Gizmo.block!getter.1.foreign
+  // CHECK:   objc_method [[ARG]] : $Gizmo, #Gizmo.block!getter.foreign
   g.block()
 }
 
@@ -549,12 +549,12 @@ class DesignatedOverrides : Gizmo {
   // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks19DesignatedOverridesCACSgycfc
   // CHECK-NOT: return
   // CHECK: function_ref @$s11objc_thunks19DesignatedOverridesC1iSivpfi : $@convention(thin) () -> Int
-  // CHECK: objc_super_method [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> () -> Gizmo?, $@convention(objc_method) (@owned Gizmo) -> @owned Optional<Gizmo>
+  // CHECK: objc_super_method [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.foreign : (Gizmo.Type) -> () -> Gizmo?, $@convention(objc_method) (@owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK: return
 
   // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks19DesignatedOverridesC7bellsOnACSgSi_tcfc
   // CHECK: function_ref @$s11objc_thunks19DesignatedOverridesC1iSivpfi : $@convention(thin) () -> Int
-  // CHECK: objc_super_method [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo?, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
+  // CHECK: objc_super_method [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.foreign : (Gizmo.Type) -> (Int) -> Gizmo?, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK: return
 }
 

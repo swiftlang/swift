@@ -103,6 +103,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    bool printSPIs) {
   PrintOptions result;
+  result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
   result.PrintIfConfig = false;
@@ -819,13 +820,13 @@ private:
   bool shouldPrintPattern(const Pattern *P);
   void printPatternType(const Pattern *P);
   void printAccessors(const AbstractStorageDecl *ASD);
-  void printMutatingModifiersIfNeeded(const AccessorDecl *accessor);
+  void printMutabilityModifiersIfNeeded(const FuncDecl *FD);
   void printMembersOfDecl(Decl * NTD, bool needComma = false,
                           bool openBracket = true, bool closeBracket = true);
   void printMembers(ArrayRef<Decl *> members, bool needComma = false,
                     bool openBracket = true, bool closeBracket = true);
   void printGenericDeclGenericParams(GenericContext *decl);
-  void printGenericDeclGenericRequirements(GenericContext *decl);
+  void printDeclGenericRequirements(GenericContext *decl);
   void printInherited(const Decl *decl);
   void printBodyIfNecessary(const AbstractFunctionDecl *decl);
 
@@ -1008,9 +1009,6 @@ void PrintAST::printAttributes(const Decl *D) {
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(X, Class) EXCLUDE_ATTR(Class)
 #include "swift/AST/Attr.def"
-    } else if (isa<FuncDecl>(D)) {
-      Options.ExcludeAttrList.push_back(DAK_Mutating);
-      Options.ExcludeAttrList.push_back(DAK_NonMutating);
     }
 
     // If the declaration is implicitly @objc, print the attribute now.
@@ -1026,17 +1024,21 @@ void PrintAST::printAttributes(const Decl *D) {
     // clients, or if it inherits superclass convenience initializers,
     // then print those attributes specially.
     if (auto CD = dyn_cast<ClassDecl>(D)) {
-      if (Options.PrintImplicitAttrs) {
-        if (CD->inheritsSuperclassInitializers()) {
-          Printer.printAttrName("@_inheritsConvenienceInitializers");
-          Printer << " ";
-        }
-        if (CD->hasMissingDesignatedInitializers()) {
-          Printer.printAttrName("@_hasMissingDesignatedInitializers");
-          Printer << " ";
-        }
+      if (CD->inheritsSuperclassInitializers()) {
+        Printer.printAttrName("@_inheritsConvenienceInitializers");
+        Printer << " ";
+      }
+      if (CD->hasMissingDesignatedInitializers()) {
+        Printer.printAttrName("@_hasMissingDesignatedInitializers");
+        Printer << " ";
       }
     }
+  }
+
+  // We will handle 'mutating' and 'nonmutating' separately.
+  if (isa<FuncDecl>(D)) {
+    Options.ExcludeAttrList.push_back(DAK_Mutating);
+    Options.ExcludeAttrList.push_back(DAK_NonMutating);
   }
 
   D->getAttrs().print(Printer, Options, D);
@@ -1776,12 +1778,15 @@ void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
   printBraceStmt(decl->getBody(), /*newlineIfEmpty*/!isa<AccessorDecl>(decl));
 }
 
-void PrintAST::printMutatingModifiersIfNeeded(const AccessorDecl *accessor) {
-  if (accessor->isAssumedNonMutating() && accessor->isMutating() &&
-      !Options.excludeAttrKind(DAK_Mutating)) {
-    Printer.printKeyword("mutating", Options, " ");
-  } else if (accessor->isExplicitNonMutating() &&
-             !Options.excludeAttrKind(DAK_NonMutating)) {
+void PrintAST::printMutabilityModifiersIfNeeded(const FuncDecl *FD) {
+  const auto *AD = dyn_cast<AccessorDecl>(FD);
+
+  if (FD->isMutating()) {
+    if (AD == nullptr || AD->isAssumedNonMutating())
+      if (!Options.excludeAttrKind(DAK_Mutating))
+        Printer.printKeyword("mutating", Options, " ");
+  } else if (AD && AD->isExplicitNonMutating() &&
+             !Options.excludeAttrKind(DAK_Mutating)) {
     Printer.printKeyword("nonmutating", Options, " ");
   }
 }
@@ -1899,7 +1904,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       return true;
     if (!PrintAccessorBody) {
       Printer << " ";
-      printMutatingModifiersIfNeeded(Accessor);
+      printMutabilityModifiersIfNeeded(Accessor);
       Printer.printKeyword(getAccessorLabel(Accessor->getAccessorKind()), Options);
     } else {
       {
@@ -2050,19 +2055,23 @@ void PrintAST::printGenericDeclGenericParams(GenericContext *decl) {
       printGenericSignature(GenericSig, PrintParams | InnermostOnly);
 }
 
-void PrintAST::printGenericDeclGenericRequirements(GenericContext *decl) {
-  if (decl->isGeneric()) {
-    if (auto genericSig = decl->getGenericSignature()) {
-      auto baseGenericSig = decl->getParent()
-          ->getGenericSignatureOfContext();
-      printGenericSignature(genericSig, PrintRequirements,
-                            [baseGenericSig](const Requirement &req) {
-                              if (baseGenericSig)
-                                return !baseGenericSig->isRequirementSatisfied(req);
-                              return true;
-                            });
-    }
-  }
+void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
+  const auto genericSig = decl->getGenericSignature();
+  if (!genericSig)
+    return;
+
+  // If the declaration is itself non-generic, it might still
+  // carry a contextual where clause.
+  const auto parentSig = decl->getParent()->getGenericSignatureOfContext();
+  if (parentSig && parentSig->isEqual(genericSig))
+    return;
+
+  printGenericSignature(genericSig, PrintRequirements,
+                        [parentSig](const Requirement &req) {
+                          if (parentSig)
+                            return !parentSig->isRequirementSatisfied(req);
+                          return true;
+                        });
 }
 
 void PrintAST::printInherited(const Decl *decl) {
@@ -2173,7 +2182,7 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
 
     printExtendedTypeName(ExtendedType, Printer, Options);
     printInherited(ExtDecl);
-    printGenericDeclGenericRequirements(ExtDecl);
+    printDeclGenericRequirements(ExtDecl);
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(ExtDecl, false,
@@ -2374,7 +2383,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     llvm::SaveAndRestore<GenericEnvironment*> setGenericEnv(Options.GenericEnv,
                                                 decl->getGenericEnvironment());
     printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
-    printGenericDeclGenericRequirements(decl);
+    printDeclGenericRequirements(decl);
   }
 }
 
@@ -2429,7 +2438,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
         printGenericDeclGenericParams(decl);
       });
     printInherited(decl);
-    printGenericDeclGenericRequirements(decl);
+    printDeclGenericRequirements(decl);
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
@@ -2457,7 +2466,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
         printGenericDeclGenericParams(decl);
       });
     printInherited(decl);
-    printGenericDeclGenericRequirements(decl);
+    printDeclGenericRequirements(decl);
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
@@ -2486,7 +2495,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
       });
 
     printInherited(decl);
-    printGenericDeclGenericRequirements(decl);
+    printDeclGenericRequirements(decl);
   }
 
   if (Options.TypeDefinitions) {
@@ -2795,10 +2804,9 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
 void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  // Explicitly print 'mutating' and 'nonmutating' if needed.
+  printMutabilityModifiersIfNeeded(decl);
 
-  // Explicitly print 'mutating' and 'nonmutating' before getters and setters
-  // for which that is true.
-  printMutatingModifiersIfNeeded(decl);
   switch (auto kind = decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
@@ -2855,9 +2863,9 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     if (!Options.SkipIntroducerKeywords) {
       if (decl->isStatic() && Options.PrintStaticKeyword)
         printStaticKeyword(decl->getCorrectStaticSpelling());
-      if (decl->isMutating() && !Options.excludeAttrKind(DAK_Mutating)) {
-        Printer.printKeyword("mutating", Options, " ");
-      } else if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
+
+      printMutabilityModifiersIfNeeded(decl);
+      if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
         Printer.printKeyword("__consuming", Options, " ");
       }
       Printer << tok::kw_func << " ";
@@ -2926,7 +2934,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           ResultTyLoc, decl->isImplicitlyUnwrappedOptional());
       Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
     }
-    printGenericDeclGenericRequirements(decl);
+    printDeclGenericRequirements(decl);
   }
 
   printBodyIfNecessary(decl);
@@ -3075,7 +3083,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printTypeLocForImplicitlyUnwrappedOptional(
     elementTy, decl->isImplicitlyUnwrappedOptional());
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
-  printGenericDeclGenericRequirements(decl);
+  printDeclGenericRequirements(decl);
   printAccessors(decl);
 }
 
@@ -3123,7 +3131,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
       printFunctionParameters(decl);
     });
 
-  printGenericDeclGenericRequirements(decl);
+  printDeclGenericRequirements(decl);
 
   printBodyIfNecessary(decl);
 }
@@ -3582,7 +3590,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   template <typename T>
   void printModuleContext(T *Ty) {
     FileUnit *File = cast<FileUnit>(Ty->getDecl()->getModuleScopeContext());
-    ModuleDecl *Mod = File->getParentModule();
+    const ModuleDecl *Mod =
+        Options.mapModuleToUnderlying(File->getParentModule());
 
     Identifier Name = Mod->getName();
     if (Options.UseExportedModuleNames)

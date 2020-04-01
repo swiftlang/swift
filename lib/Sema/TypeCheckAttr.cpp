@@ -114,9 +114,7 @@ public:
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
   IGNORED_ATTR(OriginallyDefinedIn)
-  // TODO(TF-830): Upstream `@transpose` attribute type-checking from tensorflow
-  // branch.
-  IGNORED_ATTR(Transpose)
+  IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -254,6 +252,7 @@ public:
 
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDerivativeAttr(DerivativeAttr *attr);
+  void visitTransposeAttr(TransposeAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2395,7 +2394,7 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
   }
 }
 
-llvm::Expected<bool>
+bool
 TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
                                          TypeEraserAttr *attr,
                                          ProtocolDecl *protocol) const {
@@ -2643,7 +2642,7 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 }
 
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
-  auto dc = D->getInnermostDeclContext();
+  auto dc = D->getDeclContext();
 
   // Figure out which nominal declaration this custom attribute refers to.
   auto nominal = evaluateOrDefault(
@@ -3097,7 +3096,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   }
 }
 
-llvm::Expected<ValueDecl *>
+ValueDecl *
 DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
                                          ValueDecl *VD) const {
   // Dynamic replacements must be explicit.
@@ -3598,107 +3597,104 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   return originalType;
 }
 
-// Finds a derivative function declaration using the given function specifier,
-// original function declaration, expected type, and "is valid" predicate. If no
-// valid derivative function is found, emits diagnostics and returns false.
-static FuncDecl *findAutoDiffDerivativeFunction(
-    DeclNameRefWithLoc specifier, AbstractFunctionDecl *original,
-    Type expectedTy, std::function<bool(AbstractFunctionDecl *)> isValid) {
-  auto &ctx = original->getASTContext();
-  auto &diags = ctx.Diags;
-  auto noneValidDiagnostic = [&]() {
-    diags.diagnose(specifier.Loc, diag::differentiable_attr_overload_not_found,
-                   specifier.Name, expectedTy);
-  };
-  auto ambiguousDiagnostic = [&]() {
-    diags.diagnose(specifier.Loc, diag::attr_ambiguous_reference_to_decl,
-                   specifier.Name, "differentiable");
-  };
-  auto notFunctionDiagnostic = [&]() {
-    diags.diagnose(specifier.Loc,
-                   diag::differentiable_attr_derivative_not_function,
-                   specifier.Name);
-  };
-  std::function<void()> invalidTypeContextDiagnostic = [&]() {
-    diags.diagnose(specifier.Loc,
-                   diag::differentiable_attr_function_not_same_type_context,
-                   specifier.Name);
-  };
+// Computes the original function type corresponding to the given transpose
+// function type. Used for `@transpose` attribute type-checking.
+static AnyFunctionType *
+getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
+                                 IndexSubset *linearParamIndices,
+                                 bool wrtSelf) {
+  unsigned transposeParamsIndex = 0;
 
-  // Returns true if the original function and derivative function candidate are
-  // defined in compatible type contexts. If the original function and the
-  // derivative function have different parents, or if they both have no type
-  // context and are in different modules, return false.
-  std::function<bool(AbstractFunctionDecl *)> hasValidTypeContext =
-      [&](AbstractFunctionDecl *func) {
-        // Check if both functions are top-level.
-        if (!original->getInnermostTypeContext() &&
-            !func->getInnermostTypeContext() &&
-            original->getParentModule() == func->getParentModule())
-          return true;
-        // Check if both functions are defined in the same type context.
-        if (auto typeCtx1 = original->getInnermostTypeContext())
-          if (auto typeCtx2 = func->getInnermostTypeContext())
-            return typeCtx1->getSelfNominalTypeDecl() ==
-                   typeCtx2->getSelfNominalTypeDecl();
-        return original->getParent() == func->getParent();
-      };
-
-  auto isABIPublic = [&](AbstractFunctionDecl *func) {
-    return func->getFormalAccess() >= AccessLevel::Public ||
-           func->getAttrs().hasAttribute<InlinableAttr>() ||
-           func->getAttrs().hasAttribute<UsableFromInlineAttr>();
-  };
-
-  // If the original function is exported (i.e. it is public or
-  // `@usableFromInline`), then the derivative functions must also be exported.
-  // Returns true on error.
-  auto checkAccessControl = [&](AbstractFunctionDecl *func) {
-    if (!isABIPublic(original))
-      return false;
-    if (isABIPublic(func))
-      return false;
-    diags.diagnose(specifier.Loc, diag::differentiable_attr_invalid_access,
-                   specifier.Name, original->getFullName());
-    return true;
-  };
-
-  auto originalTypeCtx = original->getInnermostTypeContext();
-  if (!originalTypeCtx)
-    originalTypeCtx = original->getParent();
-  assert(originalTypeCtx);
-
-  // Set lookup options.
-  auto lookupOptions =
-      defaultMemberLookupOptions | NameLookupFlags::IgnoreAccessControl;
-
-  auto *candidate = findAbstractFunctionDecl(
-      specifier.Name, specifier.Loc.getBaseNameLoc(), /*baseType*/ Type(),
-      originalTypeCtx, isValid, noneValidDiagnostic, ambiguousDiagnostic,
-      notFunctionDiagnostic, lookupOptions, hasValidTypeContext,
-      invalidTypeContextDiagnostic);
-  if (!candidate)
-    return nullptr;
-  // Reject non-`func` registered derivatives. JVPs and VJPs must be `func`
-  // declarations.
-  if (isa<AccessorDecl>(candidate)) {
-    diags.diagnose(specifier.Loc,
-                   diag::differentiable_attr_derivative_not_function,
-                   specifier.Name);
-    return nullptr;
+  // Get the transpose function's parameters and result type.
+  auto transposeParams = transposeFnType->getParams();
+  auto transposeResult = transposeFnType->getResult();
+  bool isCurried = transposeResult->is<AnyFunctionType>();
+  if (isCurried) {
+    auto methodType = transposeResult->castTo<AnyFunctionType>();
+    transposeParams = methodType->getParams();
+    transposeResult = methodType->getResult();
   }
-  if (checkAccessControl(candidate))
-    return nullptr;
-  // Derivatives of class members must be final.
-  if (original->getDeclContext()->getSelfClassDecl() && !candidate->isFinal()) {
-    diags.diagnose(specifier.Loc,
-                   diag::differentiable_attr_class_derivative_not_final);
-    return nullptr;
+
+  // Get the original function's result type.
+  // The original result type is always equal to the type of the last
+  // parameter of the transpose function type.
+  auto originalResult = transposeParams.back().getPlainType();
+
+  // Get transposed result types.
+  // The transpose function result type may be a singular type or a tuple type.
+  SmallVector<TupleTypeElt, 4> transposeResultTypes;
+  if (auto transposeResultTupleType = transposeResult->getAs<TupleType>()) {
+    transposeResultTypes.append(transposeResultTupleType->getElements().begin(),
+                                transposeResultTupleType->getElements().end());
+  } else {
+    transposeResultTypes.push_back(transposeResult);
   }
-  assert(isa<FuncDecl>(candidate));
-  auto *funcDecl = cast<FuncDecl>(candidate);
-  return funcDecl;
+
+  // Get the `Self` type, if the transpose function type is curried.
+  // - If `self` is a linearity parameter, use the first transpose result type.
+  // - Otherwise, use the first transpose parameter type.
+  unsigned transposeResultTypesIndex = 0;
+  Type selfType;
+  if (isCurried && wrtSelf) {
+    selfType = transposeResultTypes.front().getType();
+    transposeResultTypesIndex++;
+  } else if (isCurried) {
+    selfType = transposeFnType->getParams().front().getPlainType();
+  }
+
+  // Get the original function's parameters.
+  SmallVector<AnyFunctionType::Param, 8> originalParams;
+  // The number of original parameters is equal to the sum of:
+  // - The number of original non-transposed parameters.
+  //   - This is the number of transpose parameters minus one. All transpose
+  //     parameters come from the original function, except the last parameter
+  //     (the transposed original result).
+  // - The number of original transposed parameters.
+  //   - This is the number of linearity parameters.
+  unsigned originalParameterCount =
+      transposeParams.size() - 1 + linearParamIndices->getNumIndices();
+  // Iterate over all original parameter indices.
+  for (auto i : range(originalParameterCount)) {
+    // Skip `self` parameter if `self` is a linearity parameter.
+    // The `self` is handled specially later to form a curried function type.
+    bool isSelfParameterAndWrtSelf =
+        wrtSelf && i == linearParamIndices->getCapacity() - 1;
+    if (isSelfParameterAndWrtSelf)
+      continue;
+    // If `i` is a linearity parameter index, the next original parameter is
+    // the next transpose result.
+    if (linearParamIndices->contains(i)) {
+      auto resultType =
+          transposeResultTypes[transposeResultTypesIndex++].getType();
+      originalParams.push_back(AnyFunctionType::Param(resultType));
+    }
+    // Otherwise, the next original parameter is the next transpose parameter.
+    else {
+      originalParams.push_back(transposeParams[transposeParamsIndex++]);
+    }
+  }
+
+  // Compute the original function type.
+  AnyFunctionType *originalType;
+  // If the transpose type is curried, the original function type is:
+  // `(Self) -> (<original parameters>) -> <original result>`.
+  if (isCurried) {
+    assert(selfType && "`Self` type should be resolved");
+    originalType = makeFunctionType(originalParams, originalResult, nullptr);
+    originalType =
+        makeFunctionType(AnyFunctionType::Param(selfType), originalType,
+                         transposeFnType->getOptGenericSignature());
+  }
+  // Otherwise, the original function type is simply:
+  // `(<original parameters>) -> <original result>`.
+  else {
+    originalType = makeFunctionType(originalParams, originalResult,
+                                    transposeFnType->getOptGenericSignature());
+  }
+  return originalType;
 }
+
+
 
 /// Given a `@differentiable` attribute, attempts to resolve the original
 /// `AbstractFunctionDecl` for which it is registered, using the declaration
@@ -3713,15 +3709,6 @@ resolveDifferentiableAttrOriginalFunction(DifferentiableAttr *attr) {
   auto &diags = ctx.Diags;
   auto *original = dyn_cast<AbstractFunctionDecl>(D);
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
-    // Derivative registration is unsupported for stored properties.
-    if (asd->getImplInfo().isSimpleStored() &&
-        (attr->getJVP() || attr->getVJP())) {
-      diagnoseAndRemoveAttr(
-          diags, D, attr,
-          diag::differentiable_attr_stored_property_variable_unsupported);
-      attr->setInvalid();
-      return nullptr;
-    }
     // If `@differentiable` attribute is declared directly on a
     // `AbstractStorageDecl` (a stored/computed property or subscript),
     // forward the attribute to the storage's getter.
@@ -3917,79 +3904,6 @@ bool resolveDifferentiableAttrDifferentiabilityParameters(
   return false;
 }
 
-/// Given a `@differentiable` attribute, attempts to resolve the JVP and VJP
-/// derivative function declarations, if specified. The JVP and VJP functions
-/// are returned as `jvp` and `vjp`, respectively. On error, emits diagnostic,
-/// assigns `nullptr` to `jvp` and `vjp`, and returns true.
-bool resolveDifferentiableAttrDerivativeFunctions(
-    DifferentiableAttr *attr, AbstractFunctionDecl *original,
-    IndexSubset *resolvedDiffParamIndices, GenericSignature derivativeGenSig,
-    FuncDecl *&jvp, FuncDecl *&vjp) {
-  jvp = nullptr;
-  vjp = nullptr;
-
-  auto &ctx = original->getASTContext();
-  auto &diags = ctx.Diags;
-
-  // `@differentiable` attributes on protocol requirements do not support
-  // JVP/VJP.
-  bool isOriginalProtocolRequirement =
-      isa<ProtocolDecl>(original->getDeclContext()) &&
-      original->isProtocolRequirement();
-  if (isOriginalProtocolRequirement && (attr->getJVP() || attr->getVJP())) {
-    diags.diagnose(attr->getLocation(),
-                   diag::differentiable_attr_protocol_req_assoc_func);
-    attr->setInvalid();
-    return false;
-  }
-
-  auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
-  auto lookupConformance =
-      LookUpConformanceInModule(original->getDeclContext()->getParentModule());
-
-  // Resolve the JVP function, if it is specified and exists.
-  if (attr->getJVP()) {
-    auto *expectedJVPFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        resolvedDiffParamIndices, AutoDiffDerivativeFunctionKind::JVP,
-        lookupConformance, derivativeGenSig, /*makeSelfParamFirst*/ true);
-    auto isValidJVP = [&](AbstractFunctionDecl *jvpCandidate) -> bool {
-      return checkFunctionSignature(
-          cast<AnyFunctionType>(expectedJVPFnTy->getCanonicalType()),
-          jvpCandidate->getInterfaceType()->getCanonicalType());
-    };
-    auto *jvp = findAutoDiffDerivativeFunction(
-        attr->getJVP().getValue(), original, expectedJVPFnTy, isValidJVP);
-    if (!jvp) {
-      attr->setInvalid();
-      return true;
-    }
-    // Set the JVP function in the attribute.
-    attr->setJVPFunction(jvp);
-  }
-
-  // Resolve the VJP function, if it is specified and exists.
-  if (attr->getVJP()) {
-    auto *expectedVJPFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        resolvedDiffParamIndices, AutoDiffDerivativeFunctionKind::VJP,
-        lookupConformance, derivativeGenSig, /*makeSelfParamFirst*/ true);
-    auto isValidVJP = [&](AbstractFunctionDecl *vjpCandidate) -> bool {
-      return checkFunctionSignature(
-          cast<AnyFunctionType>(expectedVJPFnTy->getCanonicalType()),
-          vjpCandidate->getInterfaceType()->getCanonicalType());
-    };
-    auto *vjp = findAutoDiffDerivativeFunction(
-        attr->getVJP().getValue(), original, expectedVJPFnTy, isValidVJP);
-    if (!vjp) {
-      attr->setInvalid();
-      return true;
-    }
-    // Set the VJP function in the attribute.
-    attr->setVJPFunction(vjp);
-  }
-
-  return false;
-}
-
 /// Checks whether differentiable programming is enabled for the given
 /// differentiation-related attribute. Returns true on error.
 bool checkIfDifferentiableProgrammingEnabled(
@@ -4015,7 +3929,7 @@ bool checkIfDifferentiableProgrammingEnabled(
   return false;
 }
 
-llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
+IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
     Evaluator &evaluator, DifferentiableAttr *attr) const {
   // Skip type-checking for implicit `@differentiable` attributes. We currently
   // assume that all implicit `@differentiable` attributes are valid.
@@ -4033,16 +3947,6 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
   // programming to be enabled.
   if (checkIfDifferentiableProgrammingEnabled(ctx, attr))
     return nullptr;
-
-  // Derivative registration is disabled for `@differentiable(linear)`
-  // attributes. Instead, use `@transpose` attribute to register transpose
-  // functions.
-  if (attr->isLinear() && (attr->getVJP() || attr->getJVP())) {
-    diagnoseAndRemoveAttr(diags, D, attr,
-                          diag::differentiable_attr_no_vjp_or_jvp_when_linear);
-    attr->setInvalid();
-    return nullptr;
-  }
 
   // Resolve the original `AbstractFunctionDecl`.
   auto *original = resolveDifferentiableAttrOriginalFunction(attr);
@@ -4142,13 +4046,6 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     return nullptr;
   }
 
-  // Resolve JVP and VJP derivative functions, if specified.
-  FuncDecl *jvp = nullptr;
-  FuncDecl *vjp = nullptr;
-  if (resolveDifferentiableAttrDerivativeFunctions(
-          attr, original, resolvedDiffParamIndices, derivativeGenSig, jvp, vjp))
-    return nullptr;
-
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
     // Remove `@differentiable` attribute from storage declaration to prevent
     // duplicate attribute registration during SILGen.
@@ -4158,10 +4055,8 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
     auto *getterDecl = asd->getAccessor(AccessorKind::Get);
     auto *newAttr = DifferentiableAttr::create(
         getterDecl, /*implicit*/ true, attr->AtLoc, attr->getRange(),
-        attr->isLinear(), resolvedDiffParamIndices, attr->getJVP(),
-        attr->getVJP(), attr->getDerivativeGenericSignature());
-    newAttr->setJVPFunction(attr->getJVPFunction());
-    newAttr->setVJPFunction(attr->getVJPFunction());
+        attr->isLinear(), resolvedDiffParamIndices,
+        attr->getDerivativeGenericSignature());
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
         {getterDecl, resolvedDiffParamIndices}, newAttr);
     // Reject duplicate `@differentiable` attributes.
@@ -4173,6 +4068,10 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
       return nullptr;
     }
     getterDecl->getAttrs().add(newAttr);
+    // Register derivative function configuration.
+    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+    getterDecl->addDerivativeFunctionConfiguration(
+        {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
     return resolvedDiffParamIndices;
   }
   // Reject duplicate `@differentiable` attributes.
@@ -4544,10 +4443,378 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     return true;
   }
 
+  // Register derivative function configuration.
+  auto *resultIndices = IndexSubset::get(Ctx, 1, {0});
+  originalAFD->addDerivativeFunctionConfiguration(
+      {resolvedDiffParamIndices, resultIndices,
+       derivative->getGenericSignature()});
+
   return false;
 }
 
 void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   if (typeCheckDerivativeAttr(Ctx, D, attr))
     attr->setInvalid();
+}
+
+/// Returns true if the given type's `TangentVector` is equal to itself in the
+/// given module.
+static bool tangentVectorEqualsSelf(Type type, DeclContext *DC) {
+  assert(conformsToDifferentiable(type, DC));
+  auto &ctx = type->getASTContext();
+  auto *differentiableProto =
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  auto conf = TypeChecker::conformsToProtocol(
+                  type, differentiableProto, DC,
+                  ConformanceCheckFlags::InExpression);
+  auto tanType = conf.getTypeWitnessByName(type, ctx.Id_TangentVector);
+  return type->getCanonicalType() == tanType->getCanonicalType();
+};
+
+
+// Computes the linearity parameter indices from the given parsed linearity
+// parameters for the given transpose function. On error, emits diagnostics and
+// returns `nullptr`.
+//
+// The attribute location is used in diagnostics.
+static IndexSubset *
+computeLinearityParameters(ArrayRef<ParsedAutoDiffParameter> parsedLinearParams,
+                           AbstractFunctionDecl *transposeFunction,
+                           SourceLoc attrLoc) {
+  auto &ctx = transposeFunction->getASTContext();
+  auto &diags = ctx.Diags;
+
+  // Get the transpose function type.
+  auto *transposeFunctionType =
+      transposeFunction->getInterfaceType()->castTo<AnyFunctionType>();
+  bool isCurried = transposeFunctionType->getResult()->is<AnyFunctionType>();
+
+  // Get transposed result types.
+  // The transpose function result type may be a singular type or a tuple type.
+  ArrayRef<TupleTypeElt> transposeResultTypes;
+  auto transposeResultType = transposeFunctionType->getResult();
+  if (isCurried)
+    transposeResultType =
+        transposeResultType->castTo<AnyFunctionType>()->getResult();
+  if (auto resultTupleType = transposeResultType->getAs<TupleType>()) {
+    transposeResultTypes = resultTupleType->getElements();
+  } else {
+    transposeResultTypes = ArrayRef<TupleTypeElt>(transposeResultType);
+  }
+
+  // If `self` is a linearity parameter, the transpose function must be static.
+  auto isStaticMethod = transposeFunction->isStatic();
+  bool wrtSelf = false;
+  if (!parsedLinearParams.empty())
+    wrtSelf = parsedLinearParams.front().getKind() ==
+              ParsedAutoDiffParameter::Kind::Self;
+  if (wrtSelf && !isStaticMethod) {
+    diags.diagnose(attrLoc, diag::transpose_attr_wrt_self_must_be_static);
+    return nullptr;
+  }
+
+  // Build linearity parameter indices from parsed linearity parameters.
+  auto numUncurriedParams = transposeFunctionType->getNumParams();
+  if (isCurried) {
+    auto *resultFnType =
+        transposeFunctionType->getResult()->castTo<AnyFunctionType>();
+    numUncurriedParams += resultFnType->getNumParams();
+  }
+  auto numParams =
+      numUncurriedParams + parsedLinearParams.size() - 1 - (unsigned)wrtSelf;
+  SmallBitVector parameterBits(numParams);
+  int lastIndex = -1;
+  for (unsigned i : indices(parsedLinearParams)) {
+    auto paramLoc = parsedLinearParams[i].getLoc();
+    switch (parsedLinearParams[i].getKind()) {
+    case ParsedAutoDiffParameter::Kind::Named: {
+      diags.diagnose(paramLoc, diag::transpose_attr_cannot_use_named_wrt_params,
+                     parsedLinearParams[i].getName());
+      return nullptr;
+    }
+    case ParsedAutoDiffParameter::Kind::Self: {
+      // 'self' can only be the first in the list.
+      if (i > 0) {
+        diags.diagnose(paramLoc, diag::diff_params_clause_self_must_be_first);
+        return nullptr;
+      }
+      parameterBits.set(parameterBits.size() - 1);
+      break;
+    }
+    case ParsedAutoDiffParameter::Kind::Ordered: {
+      auto index = parsedLinearParams[i].getIndex();
+      if (index >= numParams) {
+        diags.diagnose(paramLoc,
+                       diag::diff_params_clause_param_index_out_of_range);
+        return nullptr;
+      }
+      // Parameter names must be specified in the original order.
+      if ((int)index <= lastIndex) {
+        diags.diagnose(paramLoc,
+                       diag::diff_params_clause_params_not_original_order);
+        return nullptr;
+      }
+      parameterBits.set(index);
+      lastIndex = index;
+      break;
+    }
+    }
+  }
+  return IndexSubset::get(ctx, parameterBits);
+}
+
+// Checks if the given linearity parameter types are valid for the given
+// original function in the given derivative generic environment and module
+// context. Returns true on error.
+//
+// The parsed differentiability parameters and attribute location are used in
+// diagnostics.
+static bool checkLinearityParameters(
+    AbstractFunctionDecl *originalAFD,
+    SmallVector<AnyFunctionType::Param, 4> linearParams,
+    GenericEnvironment *derivativeGenEnv, ModuleDecl *module,
+    ArrayRef<ParsedAutoDiffParameter> parsedLinearParams, SourceLoc attrLoc) {
+  auto &ctx = originalAFD->getASTContext();
+  auto &diags = ctx.Diags;
+
+  // Check that linearity parameters have allowed types.
+  for (unsigned i : range(linearParams.size())) {
+    auto linearParamType = linearParams[i].getPlainType();
+    if (!linearParamType->hasTypeParameter())
+      linearParamType = linearParamType->mapTypeOutOfContext();
+    if (derivativeGenEnv)
+      linearParamType = derivativeGenEnv->mapTypeIntoContext(linearParamType);
+    else
+      linearParamType = originalAFD->mapTypeIntoContext(linearParamType);
+    SourceLoc loc =
+        parsedLinearParams.empty() ? attrLoc : parsedLinearParams[i].getLoc();
+    // Parameter must conform to `Differentiable` and satisfy
+    // `Self == Self.TangentVector`.
+    if (!conformsToDifferentiable(linearParamType, originalAFD) ||
+        !tangentVectorEqualsSelf(linearParamType, originalAFD)) {
+      diags.diagnose(loc,
+                     diag::transpose_attr_invalid_linearity_parameter_or_result,
+                     linearParamType.getString(), /*isParameter*/ true);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Given a transpose function type where `self` is a linearity parameter,
+// sets `staticSelfType` and `instanceSelfType` and returns true if they are
+// equals. Otherwise, returns false.
+static bool
+doTransposeStaticAndInstanceSelfTypesMatch(AnyFunctionType *transposeType,
+                                           Type &staticSelfType,
+                                           Type &instanceSelfType) {
+  // Transpose type should have the form:
+  // `(StaticSelf) -> (...) -> (InstanceSelf, ...)`.
+  auto methodType = transposeType->getResult()->castTo<AnyFunctionType>();
+  auto transposeResult = methodType->getResult();
+
+  // Get transposed result types.
+  // The transpose function result type may be a singular type or a tuple type.
+  SmallVector<TupleTypeElt, 4> transposeResultTypes;
+  if (auto transposeResultTupleType = transposeResult->getAs<TupleType>()) {
+    transposeResultTypes.append(transposeResultTupleType->getElements().begin(),
+                                transposeResultTupleType->getElements().end());
+  } else {
+    transposeResultTypes.push_back(transposeResult);
+  }
+  assert(!transposeResultTypes.empty());
+
+  // Get the static and instance `Self` types.
+  staticSelfType = transposeType->getParams()
+                       .front()
+                       .getPlainType()
+                       ->getMetatypeInstanceType();
+  instanceSelfType = transposeResultTypes.front().getType();
+
+  // Return true if static and instance `Self` types are equal.
+  return staticSelfType->isEqual(instanceSelfType);
+}
+
+void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
+  auto *transpose = cast<FuncDecl>(D);
+  auto lookupConformance =
+      LookUpConformanceInModule(D->getDeclContext()->getParentModule());
+  auto originalName = attr->getOriginalFunctionName();
+  auto *transposeInterfaceType =
+      transpose->getInterfaceType()->castTo<AnyFunctionType>();
+  bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
+
+  // Get the linearity parameter indices.
+  auto *linearParamIndices = attr->getParameterIndices();
+
+  // Get the parsed linearity parameter indices, which have not yet been
+  // resolved. Parsed linearity parameter indices are defined only for parsed
+  // attributes.
+  auto parsedLinearParams = attr->getParsedParameters();
+
+  // If linearity parameter indices are not resolved, compute them.
+  if (!linearParamIndices)
+    linearParamIndices = computeLinearityParameters(
+        parsedLinearParams, transpose, attr->getLocation());
+  if (!linearParamIndices) {
+    attr->setInvalid();
+    return;
+  }
+
+  // Diagnose empty linearity parameter indices. This occurs when no `wrt:`
+  // clause is declared and no linearity parameters can be inferred.
+  if (linearParamIndices->isEmpty()) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::diff_params_clause_no_inferred_parameters);
+    return;
+  }
+
+  bool wrtSelf = false;
+  if (!parsedLinearParams.empty())
+    wrtSelf = parsedLinearParams.front().getKind() ==
+              ParsedAutoDiffParameter::Kind::Self;
+
+  // If the transpose function is curried and `self` is a linearity parameter,
+  // check that the instance and static `Self` types are equal.
+  Type staticSelfType, instanceSelfType;
+  if (isCurried && wrtSelf) {
+    bool doSelfTypesMatch = doTransposeStaticAndInstanceSelfTypesMatch(
+        transposeInterfaceType, staticSelfType, instanceSelfType);
+    if (!doSelfTypesMatch) {
+      diagnose(attr->getLocation(),
+               diag::transpose_attr_wrt_self_must_be_static);
+      diagnose(attr->getLocation(),
+               diag::transpose_attr_wrt_self_self_type_mismatch_note,
+               staticSelfType, instanceSelfType);
+      attr->setInvalid();
+      return;
+    }
+  }
+
+  auto *expectedOriginalFnType = getTransposeOriginalFunctionType(
+      transposeInterfaceType, linearParamIndices, wrtSelf);
+
+  // `R` result type must conform to `Differentiable` and satisfy
+  // `Self == Self.TangentVector`.
+  auto expectedOriginalResultType = expectedOriginalFnType->getResult();
+  if (isCurried)
+    expectedOriginalResultType =
+        expectedOriginalResultType->castTo<AnyFunctionType>()->getResult();
+  if (expectedOriginalResultType->hasTypeParameter())
+    expectedOriginalResultType = transpose->mapTypeIntoContext(
+        expectedOriginalResultType);
+  if (!conformsToDifferentiable(expectedOriginalResultType, transpose) ||
+      !tangentVectorEqualsSelf(expectedOriginalResultType, transpose)) {
+    diagnoseAndRemoveAttr(
+        attr, diag::transpose_attr_invalid_linearity_parameter_or_result,
+        expectedOriginalResultType.getString(), /*isParameter*/ false);
+    return;
+  }
+
+  // Returns true if the generic parameters in `source` satisfy the generic
+  // requirements in `target`.
+  std::function<bool(GenericSignature, GenericSignature)>
+      checkGenericSignatureSatisfied = [&](GenericSignature source,
+                                           GenericSignature target) {
+        // If target is null, then its requirements are satisfied.
+        if (!target)
+          return true;
+        // If source is null but target is not null, then target's
+        // requirements are not satisfied.
+        if (!source)
+          return false;
+        // Check if target's requirements are satisfied by source.
+        // Cancel diagnostics using `DiagnosticTransaction`.
+        // Diagnostics should not be emitted because this function is used to
+        // check candidates; if no candidates match, a separate diagnostic will
+        // be produced.
+        DiagnosticTransaction transaction(Ctx.Diags);
+        SWIFT_DEFER { transaction.abort(); };
+        return TypeChecker::checkGenericArguments(
+            transpose, originalName.Loc.getBaseNameLoc(),
+            originalName.Loc.getBaseNameLoc(), Type(),
+            source->getGenericParams(), target->getRequirements(),
+            [](SubstitutableType *dependentType) {
+              return Type(dependentType);
+            },
+            lookupConformance, None) == RequirementCheckResult::Success;
+      };
+
+  auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
+    return checkFunctionSignature(
+        cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
+        originalCandidate->getInterfaceType()->getCanonicalType(),
+        checkGenericSignatureSatisfied);
+  };
+
+  auto noneValidDiagnostic = [&]() {
+    diagnose(originalName.Loc,
+             diag::autodiff_attr_original_decl_none_valid_found,
+             originalName.Name, expectedOriginalFnType);
+  };
+  auto ambiguousDiagnostic = [&]() {
+    diagnose(originalName.Loc, diag::attr_ambiguous_reference_to_decl,
+             originalName.Name, attr->getAttrName());
+  };
+  auto notFunctionDiagnostic = [&]() {
+    diagnose(originalName.Loc,
+             diag::autodiff_attr_original_decl_invalid_kind,
+             originalName.Name);
+  };
+  std::function<void()> invalidTypeContextDiagnostic = [&]() {
+    diagnose(originalName.Loc,
+             diag::autodiff_attr_original_decl_not_same_type_context,
+             originalName.Name);
+  };
+
+  // Returns true if the transpose function and original function candidate are
+  // defined in compatible type contexts. If the transpose function and the
+  // original function candidate have different parents, return false.
+  std::function<bool(AbstractFunctionDecl *)> hasValidTypeContext =
+      [&](AbstractFunctionDecl *decl) { return true; };
+
+  auto resolution = TypeResolution::forContextual(transpose->getDeclContext());
+  Type baseType;
+  if (attr->getBaseTypeRepr())
+    baseType = resolution.resolveType(attr->getBaseTypeRepr(), None);
+  auto lookupOptions =
+      (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
+                               : defaultUnqualifiedLookupOptions) |
+      NameLookupFlags::IgnoreAccessControl;
+  auto transposeTypeCtx = transpose->getInnermostTypeContext();
+  if (!transposeTypeCtx) transposeTypeCtx = transpose->getParent();
+  assert(transposeTypeCtx);
+
+  // Look up original function.
+  auto funcLoc = originalName.Loc.getBaseNameLoc();
+  if (attr->getBaseTypeRepr())
+    funcLoc = attr->getBaseTypeRepr()->getLoc();
+  auto *originalAFD = findAbstractFunctionDecl(
+      originalName.Name, funcLoc, baseType, transposeTypeCtx, isValidOriginal,
+      noneValidDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
+      lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
+  if (!originalAFD) {
+    attr->setInvalid();
+    return;
+  }
+
+  attr->setOriginalFunction(originalAFD);
+
+  // Get the linearity parameter types.
+  SmallVector<AnyFunctionType::Param, 4> linearParams;
+  expectedOriginalFnType->getSubsetParameters(linearParamIndices, linearParams,
+                                              /*reverseCurryLevels*/ true);
+
+  // Check if linearity parameter indices are valid.
+  if (checkLinearityParameters(originalAFD, linearParams,
+                               transpose->getGenericEnvironment(),
+                               transpose->getModuleContext(),
+                               parsedLinearParams, attr->getLocation())) {
+    D->getAttrs().removeAttribute(attr);
+    attr->setInvalid();
+    return;
+  }
+
+  // Set the resolved linearity parameter indices in the attribute.
+  attr->setParameterIndices(linearParamIndices);
 }

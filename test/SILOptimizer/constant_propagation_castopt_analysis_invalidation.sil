@@ -139,11 +139,11 @@ bb0:
   checked_cast_br %0 : $Foo2 to Foo2, bb1, bb6    // id: %6
 
 bb1(%7 : $Foo2):                                  // Preds: bb0
-  %8 = enum $Optional<Foo2>, #Optional.some!enumelt.1, %7 : $Foo2 // user: %9
+  %8 = enum $Optional<Foo2>, #Optional.some!enumelt, %7 : $Foo2 // user: %9
   br bb2(%8 : $Optional<Foo2>)                    // id: %9
 
 bb2(%10 : $Optional<Foo2>):                       // Preds: bb1 bb6
-  switch_enum %10 : $Optional<Foo2>, case #Optional.some!enumelt.1: bb3, default bb5 // id: %11
+  switch_enum %10 : $Optional<Foo2>, case #Optional.some!enumelt: bb3, default bb5 // id: %11
 
 bb3(%12 : $Foo2):                                 // Preds: bb2
   // function_ref speakFoo2
@@ -182,7 +182,7 @@ bb0(%0 : $Foo):
   checked_cast_br %0 : $Foo to Foo2, bb1, bb2    // id: %3
 
 bb1(%4 : $Foo2):                                  // Preds: bb0
-  %5 = enum $Optional<Foo2>, #Optional.some!enumelt.1, %4 : $Foo2 // user: %6
+  %5 = enum $Optional<Foo2>, #Optional.some!enumelt, %4 : $Foo2 // user: %6
   br bb3(%5 : $Optional<Foo2>)                    // id: %6
 
 bb2:                                              // Preds: bb0
@@ -191,7 +191,7 @@ bb2:                                              // Preds: bb0
   br bb3(%8 : $Optional<Foo2>)                    // id: %9
 
 bb3(%10 : $Optional<Foo2>):                       // Preds: bb1 bb2
-  switch_enum %10 : $Optional<Foo2>, case #Optional.some!enumelt.1: bb4, default bb5 // id: %11
+  switch_enum %10 : $Optional<Foo2>, case #Optional.some!enumelt: bb4, default bb5 // id: %11
 
 bb4(%12 : $Foo2):                                 // Preds: bb3
   debug_value %12 : $Foo2                         // id: %13
@@ -202,7 +202,7 @@ bb4(%12 : $Foo2):                                 // Preds: bb3
   br bb6                                          // id: %17
 
 bb5:                                              // Preds: bb3
-  %18 = class_method %0 : $Foo, #Foo.speak!1 : Foo -> () -> (), $@convention(method) (@guaranteed Foo) -> () // user: %19
+  %18 = class_method %0 : $Foo, #Foo.speak : Foo -> () -> (), $@convention(method) (@guaranteed Foo) -> () // user: %19
   %19 = apply %18(%0) : $@convention(method) (@guaranteed Foo) -> ()
   br bb6                                          // id: %20
 
@@ -225,13 +225,13 @@ bb0:
 }
 
 sil_vtable Foo {
-  #Foo.speak!1: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713Foo5speakfS0_FT_T_	// main.(Foo in _9ACC0692747077F216D14C36CD927671).speak (main.(Foo in _9ACC0692747077F216D14C36CD927671))() -> ()
-  #Foo.deinit!deallocator.1: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713FooD	// main.(Foo in _9ACC0692747077F216D14C36CD927671).__deallocating_deinit
-  #Foo.init!initializer.1: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713FoocfMS0_FT_S0_	// main.(Foo in _9ACC0692747077F216D14C36CD927671).init (main.(Foo in _9ACC0692747077F216D14C36CD927671).Type)() -> main.(Foo in _9ACC0692747077F216D14C36CD927671)
+  #Foo.speak: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713Foo5speakfS0_FT_T_	// main.(Foo in _9ACC0692747077F216D14C36CD927671).speak (main.(Foo in _9ACC0692747077F216D14C36CD927671))() -> ()
+  #Foo.deinit!deallocator: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713FooD	// main.(Foo in _9ACC0692747077F216D14C36CD927671).__deallocating_deinit
+  #Foo.init!initializer: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713FoocfMS0_FT_S0_	// main.(Foo in _9ACC0692747077F216D14C36CD927671).init (main.(Foo in _9ACC0692747077F216D14C36CD927671).Type)() -> main.(Foo in _9ACC0692747077F216D14C36CD927671)
 }
 
 sil_vtable Foo2 {
-  #Foo.speak!1: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo25speakfS0_FT_T_	// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).speak (main.(Foo2 in _9ACC0692747077F216D14C36CD927671))() -> ()
-  #Foo.init!initializer.1: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo2cfMS0_FT_S0_	// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).init (main.(Foo2 in _9ACC0692747077F216D14C36CD927671).Type)() -> main.(Foo2 in _9ACC0692747077F216D14C36CD927671)
-  #Foo2.deinit!deallocator.1: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo2D	// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).__deallocating_deinit
+  #Foo.speak: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo25speakfS0_FT_T_	// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).speak (main.(Foo2 in _9ACC0692747077F216D14C36CD927671))() -> ()
+  #Foo.init!initializer: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo2cfMS0_FT_S0_	// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).init (main.(Foo2 in _9ACC0692747077F216D14C36CD927671).Type)() -> main.(Foo2 in _9ACC0692747077F216D14C36CD927671)
+  #Foo2.deinit!deallocator: @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo2D	// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).__deallocating_deinit
 }

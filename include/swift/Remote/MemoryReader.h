@@ -62,21 +62,29 @@ public:
   }
 
   /// Attempts to read an integer of the specified size from the given
-  /// address in the remote process.
+  /// address in the remote process.  Following `storeEnumElement`
+  /// in EnumImpl.h, this reads arbitrary-size integers by ignoring
+  /// high-order bits that are outside the range of `IntegerType`.
   ///
-  /// Returns false if the operation failed, or the request size is
-  /// larger than the provided destination.
+  /// Returns false if the operation failed.
   template <typename IntegerType>
   bool readInteger(RemoteAddress address, size_t bytes, IntegerType *dest) {
     *dest = 0;
-    if ((bytes > sizeof(IntegerType))
-        || !readBytes(address, (uint8_t *)dest, bytes)) {
-      return false;
-    }
+    size_t readSize = std::min(bytes, sizeof(IntegerType));
     // FIXME: Assumes host and target have the same endianness.
     // TODO: Query DLQ for endianness of target, compare to endianness of host.
 #if defined(__BIG_ENDIAN__)
-    *dest >>= (sizeof(IntegerType) - bytes);
+    // Read low-order bits of source ...
+    if (!readBytes(address + (bytes - readSize), (uint8_t *)dest, readSize)) {
+      return false;
+    }
+    // ... align result to low-order bits of *dest
+    *dest >>= 8 * (sizeof(IntegerType) - readSize);
+#else
+    // Read from low-order bytes of integer
+    if (!readBytes(address, (uint8_t *)dest, readSize)) {
+      return false;
+    }
 #endif
     return true;
   }

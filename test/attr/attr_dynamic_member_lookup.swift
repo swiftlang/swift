@@ -764,3 +764,28 @@ func test_infinite_self_recursion() {
   _ = Recurse<Int>().foo
   // expected-error@-1 {{value of type 'Recurse<Int>' has no dynamic member 'foo' using key path from root type 'Recurse<Int>'}}
 }
+
+// rdar://problem/60225883 - crash during solution application (ExprRewritter::buildKeyPathDynamicMemberIndexExpr)
+func test_combination_of_keypath_and_string_lookups() {
+  @dynamicMemberLookup
+  struct Outer {
+    subscript(dynamicMember member: String) -> Outer {
+      Outer()
+    }
+
+    subscript(dynamicMember member: KeyPath<Inner, Inner>) -> Outer {
+      Outer()
+    }
+  }
+
+  @dynamicMemberLookup
+  struct Inner {
+    subscript(dynamicMember member: String) -> Inner {
+      Inner()
+    }
+  }
+
+  func test(outer: Outer) {
+    _ = outer.hello.world // Ok
+  }
+}

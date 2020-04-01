@@ -135,7 +135,6 @@ static bool areConservativelyCompatibleArgumentLabels(
     decl = choice.getDecl();
     break;
 
-  case OverloadChoiceKind::BaseType:
   // KeyPath application is not filtered in `performMemberLookup`.
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::DynamicMemberLookup:
@@ -432,24 +431,24 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
   // If we have a trailing closure, it maps to the last parameter.
   if (hasTrailingClosure && numParams > 0) {
+    unsigned lastParamIdx = numParams - 1;
+    bool lastAcceptsTrailingClosure =
+        acceptsTrailingClosure(params[lastParamIdx]);
+
     // If the last parameter is defaulted, this might be
     // an attempt to use a trailing closure with previous
     // parameter that accepts a function type e.g.
     //
     // func foo(_: () -> Int, _ x: Int = 0) {}
     // foo { 42 }
-    bool lastAcceptsTrailingClosure = false;
-    unsigned lastParamIdx = numParams - 1;
-    for (unsigned i : indices(params)) {
-      unsigned idx = numParams - 1 - i;
-      if (acceptsTrailingClosure(params[idx])) {
+    if (!lastAcceptsTrailingClosure && numParams > 1 &&
+        paramInfo.hasDefaultArgument(lastParamIdx)) {
+      auto paramType = params[lastParamIdx - 1].getPlainType();
+      // If the parameter before defaulted last accepts.
+      if (paramType->is<AnyFunctionType>()) {
         lastAcceptsTrailingClosure = true;
-        lastParamIdx = idx;
-        break;
+        lastParamIdx -= 1;
       }
-      if (paramInfo.hasDefaultArgument(idx))
-        continue;
-      break;
     }
 
     bool isExtraClosure = false;
@@ -1370,37 +1369,12 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 static unsigned
 assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
                                ConstraintLocatorBuilder locator) {
+  assert(requirementType);
+
+  unsigned impact = 1;
   auto *anchor = locator.getAnchor();
   if (!anchor)
-    return 1;
-
-  if (requirementType && cs.simplifyType(requirementType)->isStdlibType()) {
-    if (auto last = locator.last()) {
-      if (auto requirement = last->getAs<LocatorPathElt::AnyRequirement>()) {
-        auto kind = requirement->getRequirementKind();
-        if (kind == RequirementKind::Conformance)
-          return 3;
-      }
-    }
-  }
-
-  // If this requirement is associated with an overload choice let's
-  // tie impact to how many times this requirement type is mentioned.
-  if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor)) {
-    if (!(requirementType && requirementType->is<TypeVariableType>()))
-      return 1;
-
-    unsigned choiceImpact = 0;
-    if (auto choice = cs.findSelectedOverloadFor(ODRE)) {
-      auto *typeVar = requirementType->castTo<TypeVariableType>();
-      choice->openedType.visit([&](Type type) {
-        if (type->isEqual(typeVar))
-          ++choiceImpact;
-      });
-    }
-
-    return choiceImpact == 0 ? 1 : choiceImpact;
-  }
+    return impact;
 
   // If this requirement is associated with a member reference and it
   // was possible to check it before overload choice is bound, that means
@@ -1418,13 +1392,53 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   // fix for same-type requirement higher impact vs. requirement associated
   // with method itself e.g. `func foo<U>() -> U where U : P {}` because
   // `foo` is accessible from any `S` regardless of what `T` is.
+  //
+  // Don't add this impact with the others, as we want to keep it consistent
+  // across requirement failures to present the user with a choice.
   if (isa<UnresolvedDotExpr>(anchor) || isa<UnresolvedMemberExpr>(anchor)) {
     auto *calleeLoc = cs.getCalleeLocator(cs.getConstraintLocator(locator));
     if (!cs.findSelectedOverloadFor(calleeLoc))
       return 10;
   }
 
-  return 1;
+  // Increase the impact of a conformance fix for a standard library type,
+  // as it's unlikely to be a good suggestion. Also do the same for the builtin
+  // compiler types Any and AnyObject, which cannot conform to protocols.
+  // FIXME: We ought not to have the is<TypeVariableType>() condition here, but
+  // removing it currently regresses the diagnostic for the test case for
+  // rdar://60727310. Once we better handle the separation of conformance fixes
+  // from argument mismatches in cases like SR-12438, we should be able to
+  // remove it from the condition.
+  auto resolvedTy = cs.simplifyType(requirementType);
+  if ((requirementType->is<TypeVariableType>() && resolvedTy->isStdlibType()) ||
+      resolvedTy->isAny() || resolvedTy->isAnyObject()) {
+    if (auto last = locator.last()) {
+      if (auto requirement = last->getAs<LocatorPathElt::AnyRequirement>()) {
+        auto kind = requirement->getRequirementKind();
+        if (kind == RequirementKind::Conformance)
+          impact += 2;
+      }
+    }
+  }
+
+  // If this requirement is associated with an overload choice let's
+  // tie impact to how many times this requirement type is mentioned.
+  if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor)) {
+    if (auto *typeVar = requirementType->getAs<TypeVariableType>()) {
+      unsigned choiceImpact = 0;
+      if (auto choice = cs.findSelectedOverloadFor(ODRE)) {
+        choice->openedType.visit([&](Type type) {
+          if (type->isEqual(typeVar))
+            ++choiceImpact;
+        });
+      }
+      // If the type is used multiple times in the signature, increase the
+      // impact for every additional use.
+      if (choiceImpact > 1)
+        impact += choiceImpact - 1;
+    }
+  }
+  return impact;
 }
 
 /// Attempt to fix missing arguments by introducing type variables
@@ -1685,6 +1699,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         if (isSingleTupleParam(ctx, func2Params) &&
             canImplodeParams(func1Params)) {
           implodeParams(func1Params);
+          increaseScore(SK_FunctionConversion);
         } else if (!ctx.isSwiftVersionAtLeast(5) &&
                    isSingleTupleParam(ctx, func1Params) &&
                    canImplodeParams(func2Params)) {
@@ -1697,6 +1712,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                isa<OverloadedDeclRefExpr>(simplified) ||
                isa<UnresolvedDeclRefExpr>(simplified))) {
             implodeParams(func2Params);
+            increaseScore(SK_FunctionConversion);
           }
         }
       } else if (last->getKind() == ConstraintLocator::PatternMatch &&
@@ -1724,9 +1740,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         if (isSingleTupleParam(ctx, func1Params) &&
             canImplodeParams(func2Params)) {
           implodeParams(func2Params);
+          increaseScore(SK_FunctionConversion);
         } else if (isSingleTupleParam(ctx, func2Params) &&
                    canImplodeParams(func1Params)) {
           implodeParams(func1Params);
+          increaseScore(SK_FunctionConversion);
         }
       }
     }
@@ -2391,10 +2409,7 @@ ConstraintSystem::matchTypesBindTypeVar(
     TypeMatchOptions flags, ConstraintLocatorBuilder locator,
     llvm::function_ref<TypeMatchResult()> formUnsolvedResult) {
   assert(typeVar->is<TypeVariableType>() && "Expected a type variable!");
-  // FIXME: Due to some SE-0110 related code farther up we can end
-  // up with type variables wrapped in parens that will trip this
-  // assert. For now, maintain the existing behavior.
-  // assert(!type->is<TypeVariableType>() && "Expected a non-type variable!");
+  assert(!type->is<TypeVariableType>() && "Expected a non-type variable!");
 
   // Simplify the right-hand type and perform the "occurs" check.
   typeVar = getRepresentative(typeVar);
@@ -3301,6 +3316,17 @@ bool ConstraintSystem::repairFailures(
     if (hasFixFor(loc, FixKind::AllowInvalidUseOfTrailingClosure))
       return true;
 
+    // Don't attempt to fix an argument being passed to a
+    // _OptionalNilComparisonType parameter. Such an overload should only take
+    // effect when a nil literal is used in valid code, and doesn't offer any
+    // useful fixes for invalid code.
+    if (auto *nominal = rhs->getAnyNominal()) {
+      if (nominal->isStdlibDecl() &&
+          nominal->getName() == getASTContext().Id_OptionalNilComparisonType) {
+        return false;
+      }
+    }
+
     if (repairByInsertingExplicitCall(lhs, rhs))
       break;
 
@@ -3659,6 +3685,7 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
@@ -3881,6 +3908,15 @@ bool ConstraintSystem::repairFailures(
     if (rhs->isExistentialType())
       break;
 
+    // If the types didn't line up, let's allow right-hand side
+    // of the conversion (or pattern match) to have holes. This
+    // helps when conversion if between a type and a tuple e.g.
+    // `Int` vs. `(_, _)`.
+    rhs.visit([&](Type type) {
+      if (auto *typeVar = type->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+    });
+
     conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
@@ -4100,14 +4136,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return getTypeMatchSuccess();
       }
 
-      assert((type1->is<TypeVariableType>() || type2->is<TypeVariableType>()) &&
-             "Expected a type variable!");
-      // FIXME: Due to some SE-0110 related code farther up we can end
-      // up with type variables wrapped in parens that will trip this
-      // assert. For now, maintain the existing behavior.
-      // assert(
-      //     (!type1->is<TypeVariableType>() || !type2->is<TypeVariableType>())
-      //     && "Expected a non-type variable!");
+      assert((type1->is<TypeVariableType>() != type2->is<TypeVariableType>()) &&
+             "Expected a type variable and a non type variable!");
 
       auto *typeVar = typeVar1 ? typeVar1 : typeVar2;
       auto type = typeVar1 ? type2 : type1;
@@ -4788,9 +4818,21 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // literals and expressions representing an implicit return type of the single
   // expression functions.
   if (auto elt = locator.last()) {
-    if (elt->isClosureResult() || elt->isResultOfSingleExprFunction()) {
-      if (kind >= ConstraintKind::Subtype &&
-          (type1->isUninhabited() || type2->isVoid())) {
+    if (kind >= ConstraintKind::Subtype &&
+        (type1->isUninhabited() || type2->isVoid())) {
+      // A conversion from closure body type to its signature result type.
+      if (auto resultElt = elt->getAs<LocatorPathElt::ClosureBody>()) {
+        // If a single statement closure has explicit `return` let's
+        // forbid conversion to `Void` and report an error instead to
+        // honor user's intent.
+        if (type1->isUninhabited() || !resultElt->hasExplicitReturn()) {
+          increaseScore(SK_FunctionConversion);
+          return getTypeMatchSuccess();
+        }
+      }
+
+      // Single expression function with implicit `return`.
+      if (elt->isResultOfSingleExprFunction()) {
         increaseScore(SK_FunctionConversion);
         return getTypeMatchSuccess();
       }
@@ -5054,6 +5096,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ConstraintKind kind,
                                  ConstraintLocatorBuilder locator,
                                  TypeMatchOptions flags) {
+  const auto rawType = type;
   auto *typeVar = type->getAs<TypeVariableType>();
 
   // Dig out the fixed type to which this type refers.
@@ -5066,7 +5109,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // func foo<T: BinaryInteger>(_: T) {}
     // foo(Foo.bar) <- if `Foo` doesn't have `bar` there is
     //                 no reason to complain about missing conformance.
-    increaseScore(SK_Fix);
     return SolutionKind::Solved;
   }
 
@@ -5226,7 +5268,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
       if (auto *fix =
               fixRequirementFailure(*this, type, protocolTy, anchor, path)) {
-        auto impact = assessRequirementFailureImpact(*this, typeVar, locator);
+        auto impact = assessRequirementFailureImpact(*this, rawType, locator);
         if (!recordFix(fix, impact)) {
           // Record this conformance requirement as "fixed".
           recordFixedRequirement(type, RequirementKind::Conformance,
@@ -6299,6 +6341,9 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // which means MetatypeType has to be added after finding a type variable.
     if (locatorEndsWith(baseLocator, ConstraintLocator::MemberRefBase))
       baseType = MetatypeType::get(baseType);
+  } else if (auto *keyPathExpr = dyn_cast<KeyPathExpr>(anchor)) {
+    // Key path can't refer to initializers e.g. `\Type.init`
+    return AllowInvalidRefInKeyPath::forRef(cs, init, locator);
   }
 
   if (!baseType)
@@ -6459,7 +6504,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                baseObjTy->isHole()) {
       // If base type is a "hole" there is no reason to record any
       // more "member not found" fixes for chained member references.
-      increaseScore(SK_Fix);
       markMemberTypeAsPotentialHole(memberTy);
       return SolutionKind::Solved;
     }
@@ -6989,6 +7033,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
   }
 
+  bool hasReturn = hasExplicitResult(closure);
+
   // If this is a multi-statement closure its body doesn't participate
   // in type-checking.
   if (closure->hasSingleExpressionBody()) {
@@ -6996,11 +7042,17 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     if (!closureBody)
       return false;
 
-    // Since result of the closure type has to be r-value type, we have
-    // to use equality here.
     addConstraint(
         ConstraintKind::Conversion, getType(closureBody),
         closureType->getResult(),
+        getConstraintLocator(closure, LocatorPathElt::ClosureBody(hasReturn)));
+  } else if (!hasReturn) {
+    // If multi-statement closure doesn't have an explicit result
+    // (no `return` statements) let's default it to `Void`.
+    auto &ctx = getASTContext();
+    addConstraint(
+        ConstraintKind::Defaultable, inferredClosureType->getResult(),
+        ctx.TheEmptyTupleType,
         getConstraintLocator(closure, ConstraintLocator::ClosureResult));
   }
 
@@ -7278,13 +7330,13 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   if (auto fromKeyValue = isDictionaryType(unwrappedFromType)) {
     if (auto toKeyValue = isDictionaryType(unwrappedToType)) {
       addExplicitConversionConstraint(fromKeyValue->first, toKeyValue->first,
-                                      /*allowFixes=*/false,
+                                      ForgetChoice,
                                       locator.withPathElement(
                                         LocatorPathElt::GenericArgument(0)));
       addExplicitConversionConstraint(fromKeyValue->second, toKeyValue->second,
-                                      /*allowFixes=*/false,
+                                      ForgetChoice,
                                       locator.withPathElement(
-                                        LocatorPathElt::GenericArgument(0)));
+                                        LocatorPathElt::GenericArgument(1)));
       countOptionalInjections();
       return SolutionKind::Solved;
     }
@@ -9688,9 +9740,8 @@ void ConstraintSystem::addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
 }
 
 void ConstraintSystem::addExplicitConversionConstraint(
-                                           Type fromType, Type toType,
-                                           bool allowFixes,
-                                           ConstraintLocatorBuilder locator) {
+    Type fromType, Type toType, RememberChoice_t rememberChoice,
+    ConstraintLocatorBuilder locator) {
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
@@ -9708,9 +9759,7 @@ void ConstraintSystem::addExplicitConversionConstraint(
                      fromType, toType, locatorPtr);
   constraints.push_back(bridgingConstraint);
 
-  addDisjunctionConstraint(constraints, locator,
-                           allowFixes ? RememberChoice
-                                      : ForgetChoice);
+  addDisjunctionConstraint(constraints, locator, rememberChoice);
 }
 
 ConstraintSystem::SolutionKind

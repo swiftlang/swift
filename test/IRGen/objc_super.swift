@@ -82,6 +82,12 @@ class PartialApply : Gizmo {
   // CHECK: }
 }
 
+// CHECK: define internal swiftcc void @"$s10objc_super12PartialApplyC4frobyyFyycfu_"(%T10objc_super12PartialApplyC* %0)
+// CHECK: call swiftcc %swift.metadata_response @"$s10objc_super12PartialApplyCMa"([[INT]] 0)
+// CHECK: @"\01L_selector(frob)"
+// CHECK: @objc_msgSendSuper2
+// CHECK: }
+
 class GenericRuncer<T> : Gizmo {
   var x: Gizmo? = nil
   var y: T?
@@ -130,7 +136,5 @@ class GenericRuncer<T> : Gizmo {
 }
 
 // CHECK: define internal swiftcc void [[PARTIAL_FORWARDING_THUNK]](%swift.refcounted* swiftself %0) {{.*}} {
-// CHECK: call swiftcc %swift.metadata_response @"$s10objc_super12PartialApplyCMa"([[INT]] 0)
-// CHECK: @"\01L_selector(frob)"
-// CHECK: call void bitcast (void ()* @objc_msgSendSuper2
+// CHECK: @"$ss12StaticStringV14withUTF8BufferyxxSRys5UInt8VGXElFyAEcfU_"
 // CHECK: }

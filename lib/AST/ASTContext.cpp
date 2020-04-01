@@ -420,9 +420,9 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
-
-  /// For uniquifying `IndexSubset` allocations.
   llvm::FoldingSet<IndexSubset> IndexSubsets;
+  llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
+      AutoDiffDerivativeFunctionIdentifiers;
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -1468,6 +1468,17 @@ void ASTContext::loadObjCMethods(
   for (auto &loader : getImpl().ModuleLoaders) {
     loader->loadObjCMethods(classDecl, selector, isInstanceMethod,
                             previousGeneration, methods);
+  }
+}
+
+void ASTContext::loadDerivativeFunctionConfigurations(
+    AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
+    llvm::SetVector<AutoDiffConfig> &results) {
+  PrettyStackTraceDecl stackTrace(
+      "loading derivative function configurations for", originalAFD);
+  for (auto &loader : getImpl().ModuleLoaders) {
+    loader->loadDerivativeFunctionConfigurations(originalAFD,
+                                                 previousGeneration, results);
   }
 }
 
@@ -4752,5 +4763,32 @@ IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
       ctx.Allocate(sizeToAlloc, alignof(IndexSubset)));
   auto *newNode = new (buf) IndexSubset(indices);
   foldingSet.InsertNode(newNode, insertPos);
+  return newNode;
+}
+
+AutoDiffDerivativeFunctionIdentifier *AutoDiffDerivativeFunctionIdentifier::get(
+    AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
+    GenericSignature derivativeGenericSignature, ASTContext &C) {
+  assert(parameterIndices);
+  auto &foldingSet = C.getImpl().AutoDiffDerivativeFunctionIdentifiers;
+  llvm::FoldingSetNodeID id;
+  id.AddInteger((unsigned)kind);
+  id.AddPointer(parameterIndices);
+  CanGenericSignature derivativeCanGenSig;
+  if (derivativeGenericSignature)
+    derivativeCanGenSig = derivativeGenericSignature->getCanonicalSignature();
+  id.AddPointer(derivativeCanGenSig.getPointer());
+
+  void *insertPos;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem = C.Allocate(sizeof(AutoDiffDerivativeFunctionIdentifier),
+                         alignof(AutoDiffDerivativeFunctionIdentifier));
+  auto *newNode = ::new (mem) AutoDiffDerivativeFunctionIdentifier(
+      kind, parameterIndices, derivativeGenericSignature);
+  foldingSet.InsertNode(newNode, insertPos);
+
   return newNode;
 }
