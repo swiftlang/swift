@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-differentiable-programming -typecheck -verify -primary-file %s %S/Inputs/class_differentiable_other_module.swift
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/class_differentiable_other_module.swift
 
 import _Differentiation
 

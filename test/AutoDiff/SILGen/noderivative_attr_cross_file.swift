@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-differentiable-programming -emit-silgen %S/Inputs/noderivative_attr_other_file.swift %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %S/Inputs/noderivative_attr_other_file.swift %s | %FileCheck %s
 
 import _Differentiation
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.swiftinterface -enable-library-evolution -enable-experimental-differentiable-programming %s
+// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.swiftinterface -enable-library-evolution %s
 // RUN: %FileCheck %s < %t.swiftinterface
 
 import _Differentiation
