@@ -403,14 +403,17 @@ SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
   } else if (isLargeLoadableType(env, storageType, IGM)) {
     if (param.getConvention() == ParameterConvention::Direct_Guaranteed)
       return SILParameterInfo(storageType.getASTType(),
-                               ParameterConvention::Indirect_In_Guaranteed);
+                              ParameterConvention::Indirect_In_Guaranteed,
+                              param.getDifferentiability());
     else
       return SILParameterInfo(storageType.getASTType(),
-                               ParameterConvention::Indirect_In_Constant);
+                              ParameterConvention::Indirect_In_Constant,
+                              param.getDifferentiability());
   } else {
     auto newType = getNewSILType(env, storageType, IGM);
     return SILParameterInfo(newType.getASTType(),
-                            param.getConvention());
+                            param.getConvention(),
+                            param.getDifferentiability());
   }
 }
 
@@ -1704,6 +1707,9 @@ private:
   bool fixStoreToBlockStorageInstr(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete);
 
+  bool recreateDifferentiabilityWitnessFunction(
+      SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete);
+
 private:
   llvm::SetVector<SILFunction *> modFuncs;
   llvm::SetVector<SingleValueInstruction *> conversionInstrs;
@@ -2708,6 +2714,33 @@ bool LoadableByAddress::fixStoreToBlockStorageInstr(
   return true;
 }
 
+bool LoadableByAddress::recreateDifferentiabilityWitnessFunction(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
+  auto *instr = dyn_cast<DifferentiabilityWitnessFunctionInst>(&I);
+  if (!instr)
+    return false;
+
+  // Check if we need to recreate the instruction.
+  auto *currIRMod = getIRGenModule()->IRGen.getGenModule(instr->getFunction());
+  auto resultFnTy = instr->getType().castTo<SILFunctionType>();
+  auto genSig = resultFnTy->getSubstGenericSignature();
+  GenericEnvironment *genEnv = nullptr;
+  if (genSig)
+    genEnv = genSig->getGenericEnvironment();
+  auto newResultFnTy =
+      MapperCache.getNewSILFunctionType(genEnv, resultFnTy, *currIRMod);
+  if (resultFnTy == newResultFnTy)
+    return true;
+
+  SILBuilderWithScope builder(instr);
+  auto *newInstr = builder.createDifferentiabilityWitnessFunction(
+      instr->getLoc(), instr->getWitnessKind(), instr->getWitness(),
+      SILType::getPrimitiveObjectType(newResultFnTy));
+  instr->replaceAllUsesWith(newInstr);
+  Delete.push_back(instr);
+  return true;
+}
+
 bool LoadableByAddress::recreateTupleInstr(
     SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
   auto *tupleInstr = dyn_cast<TupleInst>(&I);
@@ -2750,6 +2783,19 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   auto currSILFunctionType = currSILType.castTo<SILFunctionType>();
   GenericEnvironment *genEnv =
     getSubstGenericEnvironment(convInstr->getFunction());
+  // Differentiable function conversion instructions can happen while the
+  // function is still generic. In that case, we must calculate the new type
+  // using the converted function's generic environment rather than the
+  // converting function's generic environment.
+  //
+  // This happens in witness thunks for default implementations of derivative
+  // requirements.
+  if (convInstr->getKind() == SILInstructionKind::DifferentiableFunctionInst ||
+      convInstr->getKind() == SILInstructionKind::DifferentiableFunctionExtractInst ||
+      convInstr->getKind() == SILInstructionKind::LinearFunctionInst ||
+      convInstr->getKind() == SILInstructionKind::LinearFunctionExtractInst)
+    if (auto genSig = currSILFunctionType->getSubstGenericSignature())
+      genEnv = genSig->getGenericEnvironment();
   CanSILFunctionType newFnType = MapperCache.getNewSILFunctionType(
       genEnv, currSILFunctionType, *currIRMod);
   SILType newType = SILType::getPrimitiveObjectType(newFnType);
@@ -2788,6 +2834,34 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
     auto instr = cast<MarkDependenceInst>(convInstr);
     newInstr = convBuilder.createMarkDependence(
         instr->getLoc(), instr->getValue(), instr->getBase());
+    break;
+  }
+  case SILInstructionKind::DifferentiableFunctionInst: {
+    auto instr = cast<DifferentiableFunctionInst>(convInstr);
+    newInstr = convBuilder.createDifferentiableFunction(
+        instr->getLoc(), instr->getParameterIndices(),
+        instr->getOriginalFunction(),
+        instr->getOptionalDerivativeFunctionPair());
+    break;
+  }
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto instr = cast<DifferentiableFunctionExtractInst>(convInstr);
+    // Rewrite `differentiable_function_extract` with explicit extractee type.
+    newInstr = convBuilder.createDifferentiableFunctionExtract(
+        instr->getLoc(), instr->getExtractee(), instr->getOperand(), newType);
+    break;
+  }
+  case SILInstructionKind::LinearFunctionInst: {
+    auto instr = cast<LinearFunctionInst>(convInstr);
+    newInstr = convBuilder.createLinearFunction(
+        instr->getLoc(), instr->getParameterIndices(),
+        instr->getOriginalFunction(), instr->getOptionalTransposeFunction());
+    break;
+  }
+  case SILInstructionKind::LinearFunctionExtractInst: {
+    auto instr = cast<LinearFunctionExtractInst>(convInstr);
+    newInstr = convBuilder.createLinearFunctionExtract(
+        instr->getLoc(), instr->getExtractee(), instr->getFunctionOperand());
     break;
   }
   default:
@@ -2878,7 +2952,11 @@ void LoadableByAddress::run() {
               case SILInstructionKind::ConvertEscapeToNoEscapeInst:
               case SILInstructionKind::MarkDependenceInst:
               case SILInstructionKind::ThinFunctionToPointerInst:
-              case SILInstructionKind::ThinToThickFunctionInst: {
+              case SILInstructionKind::ThinToThickFunctionInst:
+              case SILInstructionKind::DifferentiableFunctionInst:
+              case SILInstructionKind::LinearFunctionInst:
+              case SILInstructionKind::LinearFunctionExtractInst:
+              case SILInstructionKind::DifferentiableFunctionExtractInst: {
                 conversionInstrs.insert(
                               cast<SingleValueInstruction>(currInstr));
                 break;
@@ -2945,6 +3023,11 @@ void LoadableByAddress::run() {
           if (modApplies.count(PAI) == 0) {
             modApplies.insert(PAI);
           }
+        } else if (isa<DifferentiableFunctionInst>(&I) ||
+                   isa<LinearFunctionInst>(&I) ||
+                   isa<DifferentiableFunctionExtractInst>(&I) ||
+                   isa<LinearFunctionExtractInst>(&I)) {
+          conversionInstrs.insert(cast<SingleValueInstruction>(&I));
         }
       }
     }
@@ -2987,6 +3070,8 @@ void LoadableByAddress::run() {
         else if (recreateLoadInstr(I, Delete))
           continue;
         else if (recreateApply(I, Delete))
+          continue;
+        else if (recreateDifferentiabilityWitnessFunction(I, Delete))
           continue;
         else
           fixStoreToBlockStorageInstr(I, Delete);
