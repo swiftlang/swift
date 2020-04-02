@@ -1768,7 +1768,7 @@ namespace {
                                            TVO_CanBindToNoEscape);
 
       Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
-      if (!optTy)
+      if (optTy->hasError())
         return Type();
 
       // Prior to Swift 5, 'try?' always adds an additional layer of optionality,
@@ -2828,7 +2828,7 @@ namespace {
       // Try to build the appropriate type for a variadic argument list of
       // the fresh element type.  If that failed, just bail out.
       auto array = TypeChecker::getArraySliceType(expr->getLoc(), element);
-      if (!array) return element;
+      if (array->hasError()) return element;
 
       // Require the operand to be convertible to the array type.
       CS.addConstraint(ConstraintKind::Conversion,
@@ -3200,9 +3200,9 @@ namespace {
     /// worth QoI efforts.
     Type getOptionalType(SourceLoc optLoc, Type valueTy) {
       auto optTy = TypeChecker::getOptionalType(optLoc, valueTy);
-      if (!optTy ||
+      if (optTy->hasError() ||
           TypeChecker::requireOptionalIntrinsics(CS.getASTContext(), optLoc))
-        return Type();
+        return ErrorType::get(CS.getASTContext());
 
       return optTy;
     }
@@ -3233,7 +3233,7 @@ namespace {
                                            TVO_CanBindToNoEscape);
 
       Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
-      if (!optTy)
+      if (optTy->hasError())
         return Type();
 
       CS.addConstraint(ConstraintKind::Conversion,

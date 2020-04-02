@@ -364,7 +364,7 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
   ASTContext &ctx = elementType->getASTContext();
   if (!ctx.getArrayDecl()) {
     ctx.Diags.diagnose(loc, diag::sugar_type_not_found, 0);
-    return Type();
+    return ErrorType::get(ctx);
   }
 
   return ArraySliceType::get(elementType);
@@ -375,7 +375,7 @@ Type TypeChecker::getDictionaryType(SourceLoc loc, Type keyType,
   ASTContext &ctx = keyType->getASTContext();
   if (!ctx.getDictionaryDecl()) {
     ctx.Diags.diagnose(loc, diag::sugar_type_not_found, 3);
-    return Type();
+    return ErrorType::get(ctx);
   }
 
   return DictionaryType::get(keyType, valueType);
@@ -385,7 +385,7 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   ASTContext &ctx = elementType->getASTContext();
   if (!ctx.getOptionalDecl()) {
     ctx.Diags.diagnose(loc, diag::sugar_type_not_found, 1);
-    return Type();
+    return ErrorType::get(ctx);
   }
 
   return OptionalType::get(elementType);
@@ -395,35 +395,35 @@ Type TypeChecker::getStringType(ASTContext &Context) {
   if (auto typeDecl = Context.getStringDecl())
     return typeDecl->getDeclaredInterfaceType();
 
-  return Type();
+  llvm_unreachable("Broken Standard library: TypeChecker::getStringType failed.");
 }
 
 Type TypeChecker::getSubstringType(ASTContext &Context) {
   if (auto typeDecl = Context.getSubstringDecl())
     return typeDecl->getDeclaredInterfaceType();
 
-  return Type();
+  llvm_unreachable("Broken Standard library: TypeChecker::getSubstringType failed.");
 }
 
 Type TypeChecker::getIntType(ASTContext &Context) {
   if (auto typeDecl = Context.getIntDecl())
     return typeDecl->getDeclaredInterfaceType();
 
-  return Type();
+  llvm_unreachable("Broken Standard library: TypeChecker::getIntType failed.");
 }
 
 Type TypeChecker::getInt8Type(ASTContext &Context) {
   if (auto typeDecl = Context.getInt8Decl())
     return typeDecl->getDeclaredInterfaceType();
 
-  return Type();
+  llvm_unreachable("Broken Standard library: TypeChecker::getInt8Type failed.");
 }
 
 Type TypeChecker::getUInt8Type(ASTContext &Context) {
   if (auto typeDecl = Context.getUInt8Decl())
     return typeDecl->getDeclaredInterfaceType();
 
-  return Type();
+  llvm_unreachable("Broken Standard library: TypeChecker::getUInt8Type failed.");
 }
 
 Type
@@ -1802,12 +1802,11 @@ namespace {
                                   = nullptr,
                                 DifferentiabilityKind diffKind
                                   = DifferentiabilityKind::NonDifferentiable);
-    bool
+    SmallVector<AnyFunctionType::Param, 8>
     resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                  TypeResolutionOptions options,
                                  bool requiresMappingOut,
-                                 DifferentiabilityKind diffKind,
-                                 SmallVectorImpl<AnyFunctionType::Param> &ps);
+                                 DifferentiabilityKind diffKind);
 
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
                                 TypeResolutionOptions options,
@@ -2523,11 +2522,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   return ty;
 }
 
-bool TypeResolver::resolveASTFunctionTypeParams(
-    TupleTypeRepr *inputRepr, TypeResolutionOptions options,
-    bool requiresMappingOut, DifferentiabilityKind diffKind,
-    SmallVectorImpl<AnyFunctionType::Param> &elements) {
-  elements.reserve(inputRepr->getNumElements());
+SmallVector<AnyFunctionType::Param, 8> TypeResolver::resolveASTFunctionTypeParams(
+  TupleTypeRepr *inputRepr, TypeResolutionOptions options,
+  bool requiresMappingOut, DifferentiabilityKind diffKind) {
+  
+  SmallVector<AnyFunctionType::Param, 8> params;
+  params.reserve(inputRepr->getNumElements());
 
   auto elementOptions = options.withoutContext(true);
   elementOptions.setContext(TypeResolverContext::FunctionInput);
@@ -2540,17 +2540,16 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     auto thisElementOptions = elementOptions;
     bool variadic = false;
     if (inputRepr->hasEllipsis() &&
-        elements.size() == inputRepr->getEllipsisIndex()) {
+        params.size() == inputRepr->getEllipsisIndex()) {
       thisElementOptions = elementOptions.withoutContext();
       thisElementOptions.setContext(TypeResolverContext::VariadicFunctionInput);
       variadic = true;
     }
 
     Type ty = resolveType(eltTypeRepr, thisElementOptions);
-    if (!ty) return true;
 
     if (ty->hasError()) {
-      elements.emplace_back(ErrorType::get(Context));
+      params.emplace_back(ErrorType::get(Context));
       continue;
     }
 
@@ -2607,7 +2606,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
         noDerivative);
-    elements.emplace_back(ty, Identifier(), paramFlags);
+    params.emplace_back(ty, Identifier(), paramFlags);
   }
 
   // All non-`@noDerivative` parameters of `@differentiable` and
@@ -2619,15 +2618,15 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     // differentiability/linearity parameter. Otherwise, adding `@noDerivative`
     // produces an ill-formed function type.
     auto hasValidDifferentiabilityParam =
-        llvm::find_if(elements, [&](AnyFunctionType::Param param) {
+        llvm::find_if(params, [&](AnyFunctionType::Param param) {
           if (param.isNoDerivative())
             return false;
           return isDifferentiable(param.getPlainType(),
                                   /*tangentVectorEqualsSelf*/ isLinear);
-        }) != elements.end();
+        }) != params.end();
     for (unsigned i = 0, end = inputRepr->getNumElements(); i != end; ++i) {
       auto *eltTypeRepr = inputRepr->getElementType(i);
-      auto param = elements[i];
+      auto param = params[i];
       if (param.isNoDerivative())
         continue;
       auto paramType = param.getPlainType();
@@ -2643,7 +2642,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     }
   }
 
-  return false;
+  return params;
 }
 
 Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
@@ -2657,10 +2656,6 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
   if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
     for (auto argRepr : generic->getGenericArgs()) {
       auto argTy = resolveType(argRepr, options);
-      // If we cannot resolve the generic parameter, propagate the error out.
-      if (!argTy || argTy->hasError()) {
-        return ErrorType::get(Context);
-      }
       TypeArgsBuf.push_back(argTy);
     }
   }
@@ -2697,12 +2692,11 @@ Type TypeResolver::resolveASTFunctionType(
   TypeResolutionOptions options = None;
   options |= parentOptions.withoutContext().getFlags();
 
-  SmallVector<AnyFunctionType::Param, 8> params;
-  if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options,
-                                   repr->getGenericEnvironment() != nullptr,
-                                   diffKind, params)) {
-    return Type();
-  }
+  SmallVector<AnyFunctionType::Param, 8> params =
+    resolveASTFunctionTypeParams(repr->getArgsTypeRepr(),
+                                 options,
+                                 repr->getGenericEnvironment() != nullptr,
+                                 diffKind);
 
   Type outputTy = resolveType(repr->getResultTypeRepr(), options);
   if (!outputTy || outputTy->hasError()) return outputTy;
@@ -3307,9 +3301,6 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
 
   auto sliceTy =
     TypeChecker::getArraySliceType(repr->getBrackets().Start, baseTy);
-  if (!sliceTy)
-    return ErrorType::get(Context);
-
   return sliceTy;
 }
 
@@ -3324,22 +3315,21 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
   if (!valueTy || valueTy->hasError()) return valueTy;
 
   auto dictDecl = Context.getDictionaryDecl();
-
-  if (auto dictTy = TypeChecker::getDictionaryType(repr->getBrackets().Start,
-                                                   keyTy, valueTy)) {
+  
+  auto dictTy = TypeChecker::getDictionaryType(repr->getBrackets().Start,
+                                               keyTy, valueTy);
+  if (!dictTy->hasError()) {
     auto unboundTy = dictDecl->getDeclaredType()->castTo<UnboundGenericType>();
 
     Type args[] = {keyTy, valueTy};
 
     if (!TypeChecker::applyUnboundGenericArguments(
             unboundTy, dictDecl, repr->getStartLoc(), resolution, args)) {
-      return nullptr;
+      return ErrorType::get(Context);
     }
-
-    return dictTy;
   }
 
-  return ErrorType::get(Context);
+  return dictTy;
 }
 
 Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
@@ -3354,7 +3344,6 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
 
   auto optionalTy = TypeChecker::getOptionalType(repr->getQuestionLoc(),
                                                  baseTy);
-  if (!optionalTy) return ErrorType::get(Context);
 
   return optionalTy;
 }
@@ -3425,9 +3414,6 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   Type uncheckedOptionalTy;
   uncheckedOptionalTy = TypeChecker::getOptionalType(repr->getExclamationLoc(),
                                                      baseTy);
-
-  if (!uncheckedOptionalTy)
-    return ErrorType::get(Context);
 
   return uncheckedOptionalTy;
 }
@@ -3877,13 +3863,13 @@ Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
   ASTContext &ctx = dc->getASTContext();
   auto resolution = TypeResolution::forContextual(dc, options);
   if (TypeChecker::validateType(attr->getTypeLoc(), resolution))
-    return Type();
+    return attr->getTypeLoc().getType();
 
   // We always require the type to resolve to a nominal type.
   Type type = attr->getTypeLoc().getType();
   if (!type->getAnyNominal()) {
     assert(ctx.Diags.hadAnyError());
-    return Type();
+    return ErrorType::get(ctx);
   }
 
   return type;

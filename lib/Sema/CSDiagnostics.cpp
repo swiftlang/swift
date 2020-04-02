@@ -2688,7 +2688,7 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   auto String = TypeChecker::getStringType(getASTContext());
   auto Substring = TypeChecker::getSubstringType(getASTContext());
 
-  if (!String || !Substring)
+  if (String->hasError() || Substring->hasError())
     return false;
 
   // Substring -> String conversion
