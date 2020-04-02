@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-differentiable-programming -module-name mangling -Xllvm -sil-full-demangle %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend -module-name mangling -Xllvm -sil-full-demangle %s -emit-silgen | %FileCheck %s
 
 // Note: adapted from test/SILGen/mangling.swift.
 

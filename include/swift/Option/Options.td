@@ -498,11 +498,6 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
 // Experimental feature options
-def enable_experimental_differentiable_programming :
-  Flag<["-"], "enable-experimental-differentiable-programming">,
-  Flags<[FrontendOption]>,
-  HelpText<"Enable experimental differentiable programming features">;
-
 def enable_experimental_additive_arithmetic_derivation :
   Flag<["-"], "enable-experimental-additive-arithmetic-derivation">,
   Flags<[FrontendOption]>,
