@@ -2265,6 +2265,59 @@ public:
             "cannot directly copy type with inaccessible ABI");
   }
 
+  void checkCopyToRefInst(CopyToRefInst *copy) {
+    require(copy->getSrc()->getType().isAddress(),
+            "Src value should be an address");
+    require(copy->getDest()->getType().isAnyClassReferenceType(),
+            "Dest value should be a class reference type");
+
+    auto classDecl = copy->getDest()->getType().getClassOrBoundGenericClass();
+    if (classDecl->getStoredProperties().size() == 1) {
+      require(
+          classDecl->getStoredProperties().front()->getType().getPointer() ==
+              copy->getSrc()->getType().getASTType().getPointer(),
+          "The source type must be the same as the class's only property type");
+      return;
+    }
+
+    Type srcType = copy->getSrc()->getType().getAs<TupleType>();
+    if (!srcType) {
+      srcType = copy->getSrc()->getType().getAs<StructType>();
+    }
+    require(!srcType.isNull(),
+            "The source value must be either a tuple or struct if there is "
+            "not one stored property in the class");
+
+    unsigned i = 0;
+    for (auto *prop : classDecl->getStoredProperties()) {
+      Type srcPropType;
+      if (auto tupleType = srcType->getAs<TupleType>()) {
+        srcPropType = tupleType->getElement(i++).getType();
+      } else {
+        srcPropType = srcType->getStructOrBoundGenericStruct()
+                          ->getStoredProperties()[i++]
+                          ->getType();
+      }
+      require(
+          srcPropType.getPointer() == prop->getType().getPointer(),
+          "All stored properties must exist as operands of the source value");
+    }
+
+    unsigned numElements;
+    if (auto tupleType = srcType->getAs<TupleType>()) {
+      numElements = tupleType->getNumElements();
+    } else {
+      numElements = srcType->getStructOrBoundGenericStruct()
+                        ->getStoredProperties()
+                        .size();
+    }
+    require(i == numElements, "Source operands must only be stored properties "
+                              "of the destination type");
+
+    require(F.isTypeABIAccessible(copy->getDest()->getType()),
+            "cannot directly copy type with inaccessible ABI");
+  }
+
   void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");

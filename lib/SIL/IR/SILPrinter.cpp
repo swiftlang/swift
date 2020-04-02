@@ -1465,6 +1465,11 @@ public:
     *this << getIDAndType(CI->getDest());
   }
 
+  void visitCopyToRefInst(CopyToRefInst *copy) {
+    *this << Ctx.getID(copy->getSrc()) << " to "
+          << getIDAndType(copy->getDest());
+  }
+
   void visitBindMemoryInst(BindMemoryInst *BI) {
     *this << getIDAndType(BI->getBase()) << ", ";
     *this << getIDAndType(BI->getIndex()) << " to ";

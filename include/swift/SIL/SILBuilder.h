@@ -967,6 +967,14 @@ public:
         getSILDebugLocation(Loc), srcAddr, destAddr, isTake, isInitialize));
   }
 
+  CopyToRefInst *createCopyToRef(SILLocation Loc, SILValue srcAddr,
+                                 SILValue destRef) {
+    assert(srcAddr->getType().isAddress());
+    assert(destRef->getType().isAnyClassReferenceType());
+    return insert(new (getModule()) CopyToRefInst(getSILDebugLocation(Loc),
+                                                  srcAddr, destRef));
+  }
+
   BindMemoryInst *createBindMemory(SILLocation Loc, SILValue base,
                                    SILValue index, SILType boundType) {
     return insert(BindMemoryInst::create(getSILDebugLocation(Loc), base, index,

@@ -4200,6 +4200,40 @@ object which is created by an ``alloc_ref`` with ``tail_elems``.
 It is undefined behavior if the class instance does not have tail-allocated
 arrays or if the element-types do not match.
 
+copy_to_ref
+```````````
+::
+  
+  sil-instruction ::= 'copy_to_ref' sil-value 'to' sil-operand
+  
+  copy_to_ref %0 to %1 : $C
+  // %0 must be a pointer.
+  // %1 must be class type.
+  
+Given an instance of a tuple or struct, bitcasts the "from" value to a byte
+pointer and emits a memcopy to the "to" operand which is a reference. The "from" value must have all stored properties of the "to" operand. I.e. the following would be allowed:
+
+  class Foo {
+    var x: Int
+    var y: Int
+    var z: Int
+    var cond: Bool
+  }
+  
+  %f = alloc_ref $Foo
+  %sa = alloc_stack $(Int, Int, Int, Bool)
+  %t = tuple (%0 : $Int, %1 : Int, %2 : Int, %3 : Bool)
+  store %t to %sa : $*(Int, Int, Int, Bool)
+  
+  copy_to_ref %sa to %f : $Foo
+
+And the following is not allowed:
+
+  // ...
+  %t = tuple (%0 : $Int, %1 : Int, %2 : Int)
+  store %t to %sa : $*(Int, Int, Int)
+  copy_to_ref %sa to %f : $Foo // Error!
+
 Enums
 ~~~~~
 

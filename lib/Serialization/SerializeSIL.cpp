@@ -1718,6 +1718,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::CopyAddrInst:
+  case SILInstructionKind::CopyToRefInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreBorrowInst: {
     SILValue operand, value;

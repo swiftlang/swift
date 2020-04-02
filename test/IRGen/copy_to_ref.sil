@@ -1,0 +1,107 @@
+// RUN: %swift run %s -emit-ir -o - | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class SingleInt {
+  var x : Int
+}
+
+sil @test_int : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = struct $Int (%0 : $Builtin.Int64)
+
+  %tsa = alloc_stack $Int
+  %f = alloc_ref [stack] $SingleInt
+  
+  store %1 to %tsa : $*Int
+
+  copy_to_ref %tsa : $*Int to %f : $SingleInt
+  
+  dealloc_ref [stack] %f : $SingleInt
+  dealloc_stack %tsa : $*Int
+  
+  %999 = tuple ()
+  return %999 : $()
+}
+
+class XYZCheck {
+  var x : Int
+  var y : Int
+  var z : Int
+  var check : Bool
+}
+
+sil @test_xyzcheck_tuple : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = struct $Int (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  %4 = tuple (%1 : $Int, %3 : $Int, %3 : $Int)
+
+  %tsa = alloc_stack $(Int, Int, Int)
+  %f = alloc_ref [stack] $XYZCheck
+  
+  store %4 to %tsa : $*(Int, Int, Int)
+
+  copy_to_ref %tsa : $*(Int, Int, Int) to %f : $XYZCheck
+  
+  dealloc_ref [stack] %f : $XYZCheck
+  dealloc_stack %tsa : $*(Int, Int, Int)
+  
+  %999 = tuple ()
+  return %999 : $()
+}
+
+struct XYZB {
+  var x : Int
+  var y : Int
+  var z : Int
+  var check : Bool
+}
+
+sil @test_xyzcheck_struct : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = struct $Int (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  %4 = struct $XYZB (%1 : $Int, %3 : $Int, %3 : $Int)
+
+  %tsa = alloc_stack $XYZB
+  %f = alloc_ref [stack] $XYZCheck
+  
+  store %4 to %tsa : $*XYZB
+
+  copy_to_ref %tsa : $*XYZB to %f : $XYZCheck
+  
+  dealloc_ref [stack] %f : $XYZCheck
+  dealloc_stack %tsa : $*XYZB
+  
+  %999 = tuple ()
+  return %999 : $()
+}
+
+class Empty { }
+
+sil @test_xyzcheck : $@convention(thin) () -> () {
+bb0:
+  %empty_tuple = tuple ()
+
+  %tsa = alloc_stack $()
+  %f = alloc_ref [stack] $Empty
+
+  store %empty_tuple to %tsa : $*()
+
+  copy_to_ref %tsa : $*() to %f : $Empty
+
+  dealloc_ref [stack] %f : $Empty
+  dealloc_stack %tsa : $*()
+
+  %999 = tuple ()
+  return %999 : $()
+}

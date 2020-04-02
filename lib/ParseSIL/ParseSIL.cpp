@@ -4352,6 +4352,36 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                    IsInitialization_t(IsInit));
       break;
     }
+    case SILInstructionKind::CopyToRefInst: {
+      SILValue srcVal;
+      SILValue destVal;
+      SourceLoc toLoc, srcLoc, destLoc;
+      Identifier toToken;
+      if (parseTypedValueRef(srcVal, srcLoc, B) ||
+          parseSILIdentifier(toToken, toLoc, diag::expected_tok_in_sil_instr,
+                             "to") ||
+          parseTypedValueRef(destVal, destLoc, B) ||
+          parseSILDebugLocation(InstLoc, B))
+        return true;
+
+      if (toToken.str() != "to") {
+        P.diagnose(toLoc, diag::expected_tok_in_sil_instr, "to");
+        return true;
+      }
+
+      if (!destVal->getType().isAnyClassReferenceType()) {
+        P.diagnose(destLoc, diag::sil_invalid_instr_operands);
+        return true;
+      }
+
+      if (!srcVal->getType().isAddress()) {
+        P.diagnose(destLoc, diag::sil_invalid_instr_operands);
+        return true;
+      }
+
+      ResultVal = B.createCopyToRef(InstLoc, srcVal, destVal);
+      break;
+    }
     case SILInstructionKind::BindMemoryInst: {
       SILValue IndexVal;
       Identifier ToToken;

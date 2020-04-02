@@ -982,6 +982,7 @@ public:
   void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
 
   void visitCopyAddrInst(CopyAddrInst *i);
+  void visitCopyToRefInst(CopyToRefInst *i);
   void visitDestroyAddrInst(DestroyAddrInst *i);
 
   void visitBindMemoryInst(BindMemoryInst *i);
@@ -5585,6 +5586,33 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
       addrTI.assignWithCopy(*this, dest, src, addrTy, false);
     }
   }
+}
+
+void IRGenSILFunction::visitCopyToRefInst(swift::CopyToRefInst *i) {
+  // If the class is empty we don't have to do anything.
+  if (i->getDest()
+          ->getType()
+          .getClassOrBoundGenericClass()
+          ->getStoredProperties()
+          .empty())
+    return;
+  // Otherwise, get the soruce address and the destination reference.
+  Address src = getLoweredAddress(i->getSrc());
+  Explosion classRefExplosion = getLoweredExplosion(i->getDest());
+  llvm::Value *classRef = classRefExplosion.claimNext();
+  // Get the size of the source object for memcpy.
+  const auto &size =
+      getTypeInfo(i->getSrc()->getType().getAddressType())
+          .getSize(*this, i->getSrc()->getType().getAddressType());
+  // Find where we want to copy our source into. This is the first element of
+  // the struct, the one directly after the refcounted object.
+  auto start = Builder.CreateGEP(classRef, {IGM.getInt32(0), IGM.getInt32(1)});
+  // Bitcast both to a byte pointer for memcpy.
+  auto bytePtr = Builder.CreateBitCast(src.getAddress(), IGM.Int8PtrTy);
+  start = Builder.CreateBitCast(start, IGM.Int8PtrTy);
+  // Copy the whole source object into the start of the stored properties in the
+  // reference class.
+  emitMemCpy(start, bytePtr, size, src.getAlignment());
 }
 
 // This is a no-op because we do not lower Swift TBAA info to LLVM IR, and it

@@ -646,6 +646,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(RefTailAddrInst, ref_tail_addr,
                     SingleValueInstruction, None, DoesNotRelease)
+  NON_VALUE_INST(CopyToRefInst, copy_to_ref,
+                 SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
   // Enums
   SINGLE_VALUE_INST(EnumInst, enum,

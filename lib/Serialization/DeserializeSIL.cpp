@@ -1968,6 +1968,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     IsInitialization_t(isInit));
     break;
   }
+  case SILInstructionKind::CopyToRefInst: {
+    SILType addrType =
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
+    SILType referenceType =
+        getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory, Fn);
+    ResultVal = Builder.createCopyToRef(Loc, getLocalValue(ValID, addrType),
+                                        getLocalValue(ValID2, referenceType));
+    break;
+  }
   case SILInstructionKind::AssignInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory, Fn);

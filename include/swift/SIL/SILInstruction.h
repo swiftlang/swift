@@ -4210,6 +4210,40 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
+/// CopyToRef - Represents a copy from one memory location to a reference. This
+/// is similar to:
+///   copy_addr %0 to %1 : $Foo
+/// but is valid for reference types.
+class CopyToRefInst : public InstructionBase<SILInstructionKind::CopyToRefInst,
+                                             NonValueInstruction> {
+  friend SILBuilder;
+
+public:
+  enum {
+    /// The lvalue being loaded from.
+    src,
+
+    /// The lvalue being stored to.
+    dest
+  };
+
+private:
+  FixedOperandList<2> Operands;
+
+  CopyToRefInst(SILDebugLocation debugLog, SILValue src, SILValue dest)
+      : InstructionBase(debugLog), Operands(this, src, dest) {}
+
+public:
+  SILValue getSrc() const { return Operands[src].get(); }
+  SILValue getDest() const { return Operands[dest].get(); }
+
+  void setSrc(SILValue val) { Operands[src].set(val); }
+  void setDest(SILValue val) { Operands[dest].set(val); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+};
+
 /// BindMemoryInst -
 /// "bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T"
 /// Binds memory at the raw pointer %0 to type $T with enough capacity
