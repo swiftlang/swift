@@ -1562,6 +1562,8 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
 
   if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
     // Determine the foreign error convention.
+    Optional<ForeignErrorConvention> inheritedConvention;
+    AbstractFunctionDecl *declProvidingInheritedConvention = nullptr;
     if (auto baseMethod = method->getOverriddenDecl()) {
       // If the overridden method has a foreign error convention,
       // adopt it.  Set the foreign error convention for a throwing
@@ -1570,14 +1572,44 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
       if (method->hasThrows()) {
         if (auto baseErrorConvention
               = baseMethod->getForeignErrorConvention()) {
-          errorConvention = baseErrorConvention;
+          inheritedConvention = baseErrorConvention;
+          declProvidingInheritedConvention = baseMethod;
         }
-
-        assert(errorConvention && "Missing error convention");
-        method->setForeignErrorConvention(*errorConvention);
       }
+    }
+    
+    for (auto req : findWitnessedObjCRequirements(method)) {
+      auto reqMethod = dyn_cast<AbstractFunctionDecl>(req);
+      if (!reqMethod) continue;
+      
+      // If the method witnesses an ObjC requirement that throws, adopt its
+      // error convention.
+      if (reqMethod->hasThrows()) {
+        if (auto reqErrorConvention = reqMethod->getForeignErrorConvention()) {
+          // Check for a conflict among protocol conformances or inherited
+          // methods.
+          if (declProvidingInheritedConvention
+              && inheritedConvention != reqErrorConvention) {
+            method->diagnose(diag::objc_ambiguous_error_convention,
+                             method->getFullName());
+            declProvidingInheritedConvention->diagnose(
+                             diag::objc_ambiguous_error_convention_candidate,
+                             declProvidingInheritedConvention->getFullName());
+            reqMethod->diagnose(diag::objc_ambiguous_error_convention_candidate,
+                                reqMethod->getFullName());
+            break;
+          }
+
+          inheritedConvention = reqErrorConvention;
+          declProvidingInheritedConvention = reqMethod;
+        }
+      }
+    }
+    
+    // Attach the foreign error convention.
+    if (inheritedConvention) {
+      method->setForeignErrorConvention(*inheritedConvention);
     } else if (method->hasThrows()) {
-      // Attach the foreign error convention.
       assert(errorConvention && "Missing error convention");
       method->setForeignErrorConvention(*errorConvention);
     }
