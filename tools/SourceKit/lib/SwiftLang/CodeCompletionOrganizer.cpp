@@ -1249,10 +1249,6 @@ void CompletionBuilder::getDescription(SwiftResult *result, raw_ostream &OS,
     for (auto C : str->getChunks().slice(*FirstTextChunk)) {
       using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
-      // FIXME: we need a more uniform way to handle operator completions.
-      if (C.is(ChunkKind::Equal))
-        isOperator = true;
-
       if (C.is(ChunkKind::TypeAnnotation) ||
           C.is(ChunkKind::CallParameterClosureType) ||
           C.is(ChunkKind::Whitespace))
