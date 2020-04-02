@@ -117,7 +117,7 @@
 
 // SIMPLE: {{(bin/)?}}ld{{"? }}
 // SIMPLE-NOT: -syslibroot
-// SIMPLE: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
+// SIMPLE: -platform_version macos 10.{{[0-9]+}}.{{[0-9]+}} 0.0.0
 // SIMPLE-NOT: -syslibroot
 // SIMPLE: -o linker
 
@@ -133,7 +133,7 @@
 // IOS_SIMPLE-DAG: -L {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)iphonesimulator}}
 // IOS_SIMPLE-DAG: -lSystem
 // IOS_SIMPLE-DAG: -arch x86_64
-// IOS_SIMPLE-DAG: -ios_simulator_version_min 7.1.{{[0-9]+}}
+// IOS_SIMPLE-DAG: -platform_version ios-sim 7.1.{{[0-9]+}} 0.0.0
 // IOS_SIMPLE: -o linker
 
 
@@ -145,7 +145,7 @@
 // tvOS_SIMPLE-DAG: -L {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)appletvsimulator}}
 // tvOS_SIMPLE-DAG: -lSystem
 // tvOS_SIMPLE-DAG: -arch x86_64
-// tvOS_SIMPLE-DAG: -tvos_simulator_version_min 9.0.{{[0-9]+}}
+// tvOS_SIMPLE-DAG: -platform_version tvos-sim 9.0.{{[0-9]+}} 0.0.0
 // tvOS_SIMPLE: -o linker
 
 
@@ -157,7 +157,7 @@
 // watchOS_SIMPLE-DAG: -L {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)watchsimulator}}
 // watchOS_SIMPLE-DAG: -lSystem
 // watchOS_SIMPLE-DAG: -arch i386
-// watchOS_SIMPLE-DAG: -watchos_simulator_version_min 2.0.{{[0-9]+}}
+// watchOS_SIMPLE-DAG: -platform_version watchos-sim 2.0.{{[0-9]+}} 0.0.0
 // watchOS_SIMPLE: -o linker
 
 
@@ -298,7 +298,7 @@
 // COMPLEX-DAG: -L baz
 // COMPLEX-DAG: -F garply -F car -F cdr
 // COMPLEX-DAG: -undefined dynamic_lookup
-// COMPLEX-DAG: -macosx_version_min 10.9.1
+// COMPLEX-DAG: -platform_version macos 10.9.1 0.0.0
 // COMPLEX: -o sdk.out
 
 // LINUX_DYNLIB-x86_64: swift

@@ -484,58 +484,71 @@ toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
 void
 toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
                                             const JobContext &context) const {
-  const llvm::Triple &Triple = getTriple();
-  // FIXME: Properly handle deployment targets.
-  assert(Triple.isiOS() || Triple.isWatchOS() || Triple.isMacOSX());
-  if (Triple.isiOS()) {
-    bool isiOSSimulator = tripleIsiOSSimulator(Triple);
-    if (Triple.isTvOS()) {
-      if (isiOSSimulator)
-        Arguments.push_back("-tvos_simulator_version_min");
-      else
-        Arguments.push_back("-tvos_version_min");
+
+  auto addPlatformVersionArg = [&](const llvm::Triple &triple) {
+    // Compute the name of the platform for the linker.
+    const char *platformName;
+    if (tripleIsMacCatalystEnvironment(triple)) {
+      platformName = "mac catalyst";
     } else {
-      if (isiOSSimulator)
-        Arguments.push_back("-ios_simulator_version_min");
-      else if (tripleIsMacCatalystEnvironment(Triple))
-        Arguments.push_back("-maccatalyst_version_min");
-      else
-        Arguments.push_back("-iphoneos_version_min");
+      switch (getDarwinPlatformKind(triple)) {
+      case DarwinPlatformKind::MacOS:
+        platformName = "macos";
+        break;
+      case DarwinPlatformKind::IPhoneOS:
+        platformName = "ios";
+        break;
+      case DarwinPlatformKind::IPhoneOSSimulator:
+        platformName = "ios-sim";
+        break;
+      case DarwinPlatformKind::TvOS:
+        platformName = "tvos";
+        break;
+      case DarwinPlatformKind::TvOSSimulator:
+        platformName = "tvos-sim";
+        break;
+      case DarwinPlatformKind::WatchOS:
+        platformName = "watchos";
+        break;
+      case DarwinPlatformKind::WatchOSSimulator:
+        platformName = "watchos-sim";
+        break;
+      }
     }
-    unsigned major, minor, micro;
-    Triple.getiOSVersion(major, minor, micro);
-    addVersionString(context.Args, Arguments, major, minor, micro);
 
-    if (TargetVariant) {
-      assert(triplesAreValidForZippering(Triple, *TargetVariant));
-      assert(TargetVariant->isMacOSX());
-      Arguments.push_back("-macosx_version_min");
-      unsigned major, minor, micro;
-      TargetVariant->getMacOSXVersion(major, minor, micro);
-      addVersionString(context.Args, Arguments, major, minor, micro);
+    // Compute the platform version.
+    unsigned major, minor, micro;
+    if (tripleIsMacCatalystEnvironment(triple)) {
+      triple.getiOSVersion(major, minor, micro);
+    } else {
+      switch (getDarwinPlatformKind((triple))) {
+      case DarwinPlatformKind::MacOS:
+        triple.getMacOSXVersion(major, minor, micro);
+        break;
+      case DarwinPlatformKind::IPhoneOS:
+      case DarwinPlatformKind::IPhoneOSSimulator:
+      case DarwinPlatformKind::TvOS:
+      case DarwinPlatformKind::TvOSSimulator:
+        triple.getiOSVersion(major, minor, micro);
+        break;
+      case DarwinPlatformKind::WatchOS:
+      case DarwinPlatformKind::WatchOSSimulator:
+        triple.getOSVersion(major, minor, micro);
+        break;
+      }
     }
-  } else if (Triple.isWatchOS()) {
-    if (tripleIsWatchSimulator(Triple))
-      Arguments.push_back("-watchos_simulator_version_min");
-    else
-      Arguments.push_back("-watchos_version_min");
-    unsigned major, minor, micro;
-    Triple.getOSVersion(major, minor, micro);
-    addVersionString(context.Args, Arguments, major, minor, micro);
-  } else {
-    Arguments.push_back("-macosx_version_min");
-    unsigned major, minor, micro;
-    Triple.getMacOSXVersion(major, minor, micro);
-    addVersionString(context.Args, Arguments, major, minor, micro);
 
-    if (TargetVariant) {
-      assert(triplesAreValidForZippering(Triple, *TargetVariant));
-      assert(tripleIsMacCatalystEnvironment(*TargetVariant));
-      Arguments.push_back("-maccatalyst_version_min");
-      unsigned major, minor, micro;
-      TargetVariant->getiOSVersion(major, minor, micro);
-      addVersionString(context.Args, Arguments, major, minor, micro);
-    }
+    Arguments.push_back("-platform_version");
+    Arguments.push_back(platformName);
+    addVersionString(context.Args, Arguments, major, minor, micro);
+    addVersionString(context.Args, Arguments, 0, 0, 0);
+  };
+
+  addPlatformVersionArg(getTriple());
+
+  if (auto targetVariant = getTargetVariant()) {
+    assert(triplesAreValidForZippering(getTriple(), *targetVariant));
+    addPlatformVersionArg(*targetVariant);
   }
 }
 
