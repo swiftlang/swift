@@ -240,8 +240,8 @@
     "DifferentiationUtilities.swift",
     "DifferentiationSupport.swift",
     "ArrayDifferentiation.swift",
-    "FloatingPointTypesDerivatives.swift",
-    "tgmathDerivatives.swift",
-    "SIMDVectorTypesDerivatives.swift"
+    "FloatingPointDifferentiation.swift",
+    "SIMDDifferentiation.swift",
+    "TgmathDerivatives.swift"
   ]
 }

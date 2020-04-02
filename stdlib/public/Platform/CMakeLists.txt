@@ -2,9 +2,9 @@ set(swift_platform_sources
     Platform.swift
     TiocConstants.swift)
 set(swift_platform_gyb_sources
-# SWIFT_ENABLE_TENSORFLOW_START
-    ../Differentiation/tgmathDerivatives.swift.gyb
-# SWIFT_ENABLE_TENSORFLOW_END
+    # SWIFT_ENABLE_TENSORFLOW_START
+    ../Differentiation/TgmathDerivatives.swift.gyb
+    # SWIFT_ENABLE_TENSORFLOW_END
     tgmath.swift.gyb)
 
 set(darwin_depends)

@@ -1,4 +1,4 @@
-//===--- FloatingPointTypesDerivatives.swift.gyb --------------*- swift -*-===//
+//===--- FloatingPointDifferentiation.swift.gyb ---------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,6 +19,55 @@ import SwiftShims
 % if self_type.bits == 80:
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 % end
+
+//===----------------------------------------------------------------------===//
+// Protocol conformances
+//===----------------------------------------------------------------------===//
+
+extension ${Self} : EuclideanDifferentiable {
+  public typealias TangentVector = ${Self}
+
+  public mutating func move(along direction: TangentVector) {
+    self += direction
+  }
+}
+
+extension ${Self} : VectorProtocol {
+  public typealias VectorSpaceScalar = ${Self}
+
+  public func adding(_ x: ${Self}) -> ${Self} {
+    self + x
+  }
+
+  public mutating func add(_ x: ${Self}) {
+    self += x
+  }
+
+  public func subtracting(_ x: ${Self}) -> ${Self} {
+    self - x
+  }
+
+  public mutating func subtract(_ x: ${Self}) {
+    self -= x
+  }
+
+  public func scaled(by scalar: ${Self}) -> ${Self} {
+    self * scalar
+  }
+
+  public mutating func scale(by scalar: ${Self}) {
+    self *= scalar
+  }
+}
+
+% if self_type.bits == 80:
+#endif
+% end
+% end
+
+//===----------------------------------------------------------------------===//
+// Derivatives
+//===----------------------------------------------------------------------===//
 
 /// Derivatives of standard unary operators.
 extension ${Self} {
@@ -202,54 +251,12 @@ extension ${Self} {
   }
 }
 
-extension ${Self} : EuclideanDifferentiable {
-  public typealias TangentVector = ${Self}
-
-  public mutating func move(along direction: TangentVector) {
-    self += direction
-  }
-}
-
-extension ${Self} : VectorProtocol {
-  public typealias VectorSpaceScalar = ${Self}
-
-  public func adding(_ x: ${Self}) -> ${Self} {
-    self + x
-  }
-
-  public mutating func add(_ x: ${Self}) {
-    self += x
-  }
-
-  public func subtracting(_ x: ${Self}) -> ${Self} {
-    self - x
-  }
-
-  public mutating func subtract(_ x: ${Self}) {
-    self -= x
-  }
-
-  public func scaled(by scalar: ${Self}) -> ${Self} {
-    self * scalar
-  }
-
-  public mutating func scale(by scalar: ${Self}) {
-    self *= scalar
-  }
-}
-
-% if self_type.bits == 80:
-#endif
-% end
-% end
-
-
-extension FloatingPoint where Self : Differentiable,
-                              Self == Self.TangentVector {
-  /// The vector-Jacobian product function of `addingProduct`. Returns the
-  /// original result and pullback of `addingProduct` with respect to `self`,
-  /// `lhs` and `rhs`.
-  @inlinable
+extension FloatingPoint
+where
+  Self: Differentiable,
+  Self == Self.TangentVector
+{
+  @inlinable // FIXME(sil-serialize-all)
   @derivative(of: addingProduct)
   func _vjpAddingProduct(
     _ lhs: Self, _ rhs: Self
@@ -257,8 +264,6 @@ extension FloatingPoint where Self : Differentiable,
     return (addingProduct(lhs, rhs), { _ in (1, rhs, lhs) })
   }
 
-  /// The vector-Jacobian product function of `squareRoot`. Returns the original
-  /// result and pullback of `squareRoot` with respect to `self`.
   @inlinable // FIXME(sil-serialize-all)
   @derivative(of: squareRoot)
   func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
@@ -266,4 +271,3 @@ extension FloatingPoint where Self : Differentiable,
     return (y, { v in v / (2 * y) })
   }
 }
-
