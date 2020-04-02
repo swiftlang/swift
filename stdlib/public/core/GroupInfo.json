@@ -239,6 +239,7 @@
     "DifferentialOperators.swift",
     "DifferentiationUtilities.swift",
     "DifferentiationSupport.swift",
+    "ArrayDifferentiation.swift",
     "FloatingPointTypesDerivatives.swift"
   ]
 }

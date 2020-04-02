@@ -2,8 +2,7 @@ set(swift_platform_sources
     Platform.swift
     TiocConstants.swift)
 set(swift_platform_gyb_sources
-    tgmath.swift.gyb
-    tgmath_derivatives.swift.gyb)
+    tgmath.swift.gyb)
 
 set(darwin_depends)
 if(NOT BUILD_STANDALONE)

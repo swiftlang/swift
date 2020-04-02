@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import _Differentiation
 #if os(macOS)
 import Darwin.C
 #else

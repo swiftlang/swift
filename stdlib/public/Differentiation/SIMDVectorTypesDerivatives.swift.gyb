@@ -1,0 +1,50 @@
+//===--- SIMDVectorTypesDerivatives.swift.gyb ----------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2018 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+storagescalarCounts = [2,4,8,16,32,64]
+vectorscalarCounts = storagescalarCounts + [3]
+}%
+
+%for n in vectorscalarCounts:
+
+
+extension SIMD${n} : AdditiveArithmetic where Scalar : FloatingPoint {}
+
+extension SIMD${n} : Differentiable
+  where Scalar : Differentiable & BinaryFloatingPoint,
+        Scalar.TangentVector : BinaryFloatingPoint {
+  public typealias TangentVector = SIMD${n}
+}
+
+extension SIMD${n} : EuclideanDifferentiable
+  where Scalar : EuclideanDifferentiable & BinaryFloatingPoint,
+        Scalar.TangentVector : BinaryFloatingPoint {
+}
+
+extension SIMD${n}
+  where Scalar : EuclideanDifferentiable & BinaryFloatingPoint,
+        Scalar.TangentVector : BinaryFloatingPoint {
+  // NOTE(TF-1094): serialized `@derivative` for `.swiftinterface` compilation.
+  @inlinable
+  @derivative(of: subscript(_:))
+  internal func _vjpSubscript(index: Int)
+  -> (value: Scalar, pullback: (Scalar.TangentVector) -> TangentVector) {
+    return (self[index], { v in
+      var zeros = Self.zero
+      zeros[index] = Scalar(v)
+      return zeros
+    })
+  }
+}
+
+%end

@@ -211,6 +211,7 @@ if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     ../Differentiation/DifferentialOperators.swift
     ../Differentiation/DifferentiationUtilities.swift
     ../Differentiation/DifferentiationSupport.swift)
+    ../Differentiation/ArrayDifferentiation.swift)
   list(APPEND SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_GYB_SOURCES
     ../Differentiation/FloatingPointTypesDerivatives.swift.gyb)
   message(STATUS "Differentiable programming standard library additions enabled.")
