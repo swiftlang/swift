@@ -261,6 +261,17 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
 }
 #endif
 
+// TODO: replace this with a float16 implementation instead of calling _float.
+// Argument type will have to stay float, though; only the formatting changes.
+// Note, return type is __swift_ssize_t, not uint64_t as with the other
+// formatters. We'd use this type there if we could, but it's ABI so we can't
+// go back and change it.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+__swift_ssize_t swift_float16ToString(char *Buffer, size_t BufferLength,
+                                      float Value, bool Debug) {
+  return swift_format_float(Value, Buffer, BufferLength);
+}
+
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 uint64_t swift_float32ToString(char *Buffer, size_t BufferLength,
                                float Value, bool Debug) {
