@@ -384,6 +384,11 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::Ampersand:
     case ChunkKind::Equal:
     case ChunkKind::Whitespace:
+    case ChunkKind::Keyword:
+    case ChunkKind::Attribute:
+    case ChunkKind::BaseName:
+    case ChunkKind::TypeIdSystem:
+    case ChunkKind::TypeIdUser:
       AnnotatedTextChunk = C.isAnnotation();
       LLVM_FALLTHROUGH;
     case ChunkKind::CallParameterName:
@@ -412,6 +417,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       break;
     case ChunkKind::OptionalBegin:
     case ChunkKind::CallParameterBegin:
+    case ChunkKind::CallParameterTypeBegin:
     case ChunkKind::GenericParameterBegin:
       OS << "{#";
       break;
@@ -790,6 +796,188 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
     setNotRecommended(CodeCompletionResult::Deprecated);
 }
 
+namespace {
+class AnnotatedTypePrinter : public ASTPrinter {
+  using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
+  CodeCompletionResultBuilder &Builder;
+  SmallString<16> Buffer;
+  ChunkKind CurrChunkKind = ChunkKind::Text;
+  ChunkKind NextChunkKind = ChunkKind::Text;
+
+  Optional<ChunkKind> getChunkKindForPrintNameContext(PrintNameContext context) {
+    switch (context) {
+    case PrintNameContext::Keyword:
+      return ChunkKind::Keyword;
+    case PrintNameContext::Attribute:
+      return ChunkKind::Attribute;
+    default:
+      return None;
+    }
+  }
+
+public:
+  AnnotatedTypePrinter(CodeCompletionResultBuilder &Builder) : Builder(Builder) {}
+
+  ~AnnotatedTypePrinter() {
+    // Add remaining buffer.
+    Builder.addChunkWithText(CurrChunkKind, Buffer);
+  }
+
+  void printText(StringRef Text) override {
+    if (CurrChunkKind != NextChunkKind) {
+      // If the next desired kind is different from the current buffer, flush the
+      // current buffer.
+      if (!Buffer.empty()) {
+        Builder.addChunkWithText(CurrChunkKind, Buffer);
+        Buffer.clear();
+      }
+      CurrChunkKind = NextChunkKind;
+    }
+    Buffer.append(Text);
+  }
+
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
+
+    NextChunkKind = TD->getModuleContext()->isSystemModule()
+      ? ChunkKind::TypeIdSystem
+      : ChunkKind::TypeIdUser;
+
+    ASTPrinter::printTypeRef(T, TD, Name, NameContext);
+    NextChunkKind = ChunkKind::Text;
+  }
+
+  void printNamePre(PrintNameContext context) override {
+    if (auto Kind = getChunkKindForPrintNameContext(context))
+      NextChunkKind = *Kind;
+  }
+
+  void printNamePost(PrintNameContext context) override {
+    if (auto Kind = getChunkKindForPrintNameContext(context))
+      NextChunkKind = ChunkKind::Text;
+  }
+};
+} // namespcae
+
+void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
+                                                   Identifier LocalName,
+                                                   Type Ty,
+                                                   Type ContextTy,
+                                                   bool IsVarArg,
+                                                   bool IsInOut,
+                                                   bool IsIUO,
+                                                   bool isAutoClosure) {
+  CurrentNestingLevel++;
+  using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
+
+  addSimpleChunk(ChunkKind::CallParameterBegin);
+
+  if (shouldAnnotateResults()) {
+    if (!Name.empty() || !LocalName.empty()) {
+      llvm::SmallString<16> EscapedKeyword;
+
+      if (!Name.empty()) {
+        addChunkWithText(
+            CodeCompletionString::Chunk::ChunkKind::CallParameterName,
+            escapeKeyword(Name.str(), false, EscapedKeyword));
+
+        if (!LocalName.empty() && Name != LocalName) {
+          addChunkWithTextNoCopy(ChunkKind::Text, " ");
+          getLastChunk().setIsAnnotation();
+          addChunkWithText(ChunkKind::CallParameterInternalName,
+              escapeKeyword(LocalName.str(), false, EscapedKeyword));
+          getLastChunk().setIsAnnotation();
+        }
+      } else {
+        assert(!LocalName.empty());
+        addChunkWithTextNoCopy(ChunkKind::CallParameterName, "_");
+        getLastChunk().setIsAnnotation();
+        addChunkWithTextNoCopy(ChunkKind::Text, " ");
+        getLastChunk().setIsAnnotation();
+        addChunkWithText(ChunkKind::CallParameterInternalName,
+            escapeKeyword(LocalName.str(), false, EscapedKeyword));
+      }
+      addChunkWithTextNoCopy(ChunkKind::CallParameterColon, ": ");
+    }
+  } else {
+    if (!Name.empty()) {
+      llvm::SmallString<16> EscapedKeyword;
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterName,
+          escapeKeyword(Name.str(), false, EscapedKeyword));
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
+    } else if (!LocalName.empty()) {
+      // Use local (non-API) parameter name if we have nothing else.
+      llvm::SmallString<16> EscapedKeyword;
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
+            escapeKeyword(LocalName.str(), false, EscapedKeyword));
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
+    }
+  }
+
+  // 'inout' arguments are printed specially.
+  if (IsInOut) {
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::Ampersand, "&");
+    Ty = Ty->getInOutObjectType();
+  }
+
+  // If the parameter is of the type @autoclosure ()->output, then the
+  // code completion should show the parameter of the output type
+  // instead of the function type ()->output.
+  if (isAutoClosure) {
+    // 'Ty' may be ErrorType.
+    if (auto funcTy = Ty->getAs<FunctionType>())
+      Ty = funcTy->getResult();
+  }
+
+  PrintOptions PO;
+  PO.SkipAttributes = true;
+  PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
+  PO.OpaqueReturnTypePrinting =
+      PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+  if (ContextTy)
+    PO.setBaseType(ContextTy);
+  if (shouldAnnotateResults()) {
+    CurrentNestingLevel++;
+    addSimpleChunk(ChunkKind::CallParameterTypeBegin);
+    {
+      AnnotatedTypePrinter printer(*this);
+      Ty->print(printer, PO);
+    }
+    CurrentNestingLevel--;
+  } else {
+    std::string TypeName = Ty->getString(PO);
+    addChunkWithText(ChunkKind::CallParameterType, TypeName);
+  }
+
+  // Look through optional types and type aliases to find out if we have
+  // function type.
+  Ty = Ty->lookThroughAllOptionalTypes();
+  if (auto AFT = Ty->getAs<AnyFunctionType>()) {
+    // If this is a closure type, add ChunkKind::CallParameterClosureType.
+    PrintOptions PO;
+    PO.PrintFunctionRepresentationAttrs =
+      PrintOptions::FunctionRepresentationMode::None;
+    PO.SkipAttributes = true;
+    PO.OpaqueReturnTypePrinting =
+        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    if (ContextTy)
+      PO.setBaseType(ContextTy);
+    addChunkWithText(
+        CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
+        AFT->getString(PO));
+  }
+
+  if (IsVarArg)
+    addEllipsis();
+  CurrentNestingLevel--;
+}
+
 StringRef CodeCompletionContext::copyString(StringRef Str) {
   return ::copyString(*CurrentResults.Allocator, Str);
 }
@@ -1115,6 +1303,11 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::Equal:
     case ChunkKind::DeclAttrParamKeyword:
     case ChunkKind::DeclAttrKeyword:
+    case ChunkKind::Keyword:
+    case ChunkKind::Attribute:
+    case ChunkKind::BaseName:
+    case ChunkKind::TypeIdSystem:
+    case ChunkKind::TypeIdUser:
       return i;
     case ChunkKind::Dot:
     case ChunkKind::ExclamationMark:
@@ -1136,6 +1329,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::RethrowsKeyword:
     case ChunkKind::DeclIntroducer:
     case ChunkKind::CallParameterColon:
+    case ChunkKind::CallParameterTypeBegin:
     case ChunkKind::DeclAttrParamColon:
     case ChunkKind::CallParameterType:
     case ChunkKind::CallParameterClosureType:
@@ -1732,7 +1926,7 @@ public:
                                           expectedTypeContext);
       auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
       Builder.setAssociatedDecl(MD);
-      Builder.addTextChunk(MD->getNameStr());
+      Builder.addBaseName(MD->getNameStr());
       Builder.addTypeAnnotation("Module");
       if (Pair.second)
         Builder.setNotRecommended(CodeCompletionResult::NotRecommendedReason::
@@ -1776,7 +1970,7 @@ public:
         SemanticContextKind::None,
         expectedTypeContext);
     Builder.setAssociatedDecl(MD);
-    Builder.addTextChunk(MD->getNameStr());
+    Builder.addBaseName(MD->getNameStr());
     Builder.addTypeAnnotation("Module");
     if (R)
       Builder.setNotRecommended(*R);
@@ -1902,10 +2096,10 @@ public:
     }
 
     if (!shouldEscapeKeywords) {
-      Builder.addTextChunk(NameStr);
+      Builder.addBaseName(NameStr);
     } else {
       SmallString<16> buffer;
-      Builder.addTextChunk(Builder.escapeKeyword(NameStr, true, buffer));
+      Builder.addBaseName(Builder.escapeKeyword(NameStr, true, buffer));
     }
   }
 
@@ -2337,7 +2531,7 @@ public:
       return;
     CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::ResultKind::Keyword,
       SemanticContextKind::ExpressionSpecific, expectedTypeContext);
-    Builder.addTextChunk("available");
+    Builder.addBaseName("available");
     Builder.addLeftParen();
     Builder.addSimpleTypedParameter("Platform", /*IsVarArg=*/true);
     Builder.addComma();
@@ -2715,9 +2909,9 @@ public:
       if (needInit) {
         assert(addName.empty());
         addLeadingDot(Builder);
-        Builder.addTextChunk("init");
+        Builder.addBaseName("init");
       } else if (!addName.empty()) {
-        Builder.addTextChunk(addName.str());
+        Builder.addBaseName(addName.str());
       }
 
       if (!ConstructorType) {
@@ -2840,7 +3034,7 @@ public:
     Builder.setAssociatedDecl(NTD);
     setClangDeclKeywords(NTD, Pairs, Builder);
     addLeadingDot(Builder);
-    Builder.addTextChunk(NTD->getName().str());
+    Builder.addBaseName(NTD->getName().str());
     addTypeAnnotation(Builder, NTD->getDeclaredType());
   }
 
@@ -2856,7 +3050,7 @@ public:
     Builder.setAssociatedDecl(TAD);
     setClangDeclKeywords(TAD, Pairs, Builder);
     addLeadingDot(Builder);
-    Builder.addTextChunk(TAD->getName().str());
+    Builder.addBaseName(TAD->getName().str());
     if (auto underlyingType = TAD->getUnderlyingType()) {
       if (underlyingType->hasError()) {
         Type parentType;
@@ -2885,7 +3079,7 @@ public:
     setClangDeclKeywords(GP, Pairs, Builder);
     Builder.setAssociatedDecl(GP);
     addLeadingDot(Builder);
-    Builder.addTextChunk(GP->getName().str());
+    Builder.addBaseName(GP->getName().str());
     addTypeAnnotation(Builder, GP->getDeclaredInterfaceType());
   }
 
@@ -2899,7 +3093,7 @@ public:
     setClangDeclKeywords(AT, Pairs, Builder);
     Builder.setAssociatedDecl(AT);
     addLeadingDot(Builder);
-    Builder.addTextChunk(AT->getName().str());
+    Builder.addBaseName(AT->getName().str());
     if (Type T = getAssociatedTypeType(AT))
       addTypeAnnotation(Builder, T);
   }
@@ -2911,7 +3105,7 @@ public:
       Sink, CodeCompletionResult::ResultKind::Declaration,
       semanticContext, {});
 
-    builder.addTextChunk(PGD->getName().str());
+    builder.addBaseName(PGD->getName().str());
     builder.setAssociatedDecl(PGD);
   };
 
@@ -2962,7 +3156,7 @@ public:
         Sink, CodeCompletionResult::ResultKind::Keyword, SK,
         expectedTypeContext);
     addLeadingDot(Builder);
-    Builder.addTextChunk(Name);
+    Builder.addKeyword(Name);
     Builder.setKeywordKind(KeyKind);
     if (TypeAnnotation)
       addTypeAnnotation(Builder, TypeAnnotation);
@@ -2978,7 +3172,7 @@ public:
         CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, expectedTypeContext);
     addLeadingDot(Builder);
-    Builder.addTextChunk(Name);
+    Builder.addKeyword(Name);
     Builder.setKeywordKind(KeyKind);
     if (!TypeAnnotation.empty())
       Builder.addTypeAnnotation(TypeAnnotation);
@@ -3262,14 +3456,14 @@ public:
           SemanticContextKind::CurrentNominal, expectedTypeContext);
       addLeadingDot(Builder);
       if (TupleElt.hasName()) {
-        Builder.addTextChunk(TupleElt.getName().str());
+        Builder.addBaseName(TupleElt.getName().str());
       } else {
         llvm::SmallString<4> IndexStr;
         {
           llvm::raw_svector_ostream OS(IndexStr);
           OS << Index;
         }
-        Builder.addTextChunk(IndexStr.str());
+        Builder.addBaseName(IndexStr.str());
       }
       addTypeAnnotation(Builder, TupleElt.getType());
       Index++;
@@ -3459,7 +3653,7 @@ public:
     if (HaveLeadingSpace)
       builder.setNumBytesToErase(1);
     builder.setAssociatedDecl(op);
-    builder.addTextChunk(op->getName().str());
+    builder.addBaseName(op->getName().str());
     assert(resultType);
     addTypeAnnotation(builder, resultType);
   }
@@ -3510,7 +3704,7 @@ public:
       builder.addAnnotatedWhitespace(" ");
     else
       builder.addWhitespace(" ");
-    builder.addTextChunk(op->getName().str());
+    builder.addBaseName(op->getName().str());
     builder.addWhitespace(" ");
     if (RHSType) {
       Type contextTy;
@@ -3670,7 +3864,7 @@ public:
           SemanticContextKind::None, {});
       builder.setLiteralKind(literalKind);
       builder.setKeywordKind(kwKind);
-      builder.addTextChunk(name);
+      builder.addBaseName(name);
       addTypeRelationFromProtocol(builder, literalKind, defaultTypeName);
     };
 
@@ -3717,13 +3911,13 @@ public:
       builder.addTextChunk("0");
     });
     addFromProto(LK::BooleanLiteral, "Bool", [](Builder &builder) {
-      builder.addTextChunk("true");
+      builder.addBaseName("true");
     }, /*isKeyword=*/true);
     addFromProto(LK::BooleanLiteral, "Bool", [](Builder &builder) {
-      builder.addTextChunk("false");
+      builder.addBaseName("false");
     }, /*isKeyword=*/true);
     addFromProto(LK::NilLiteral, "", [](Builder &builder) {
-      builder.addTextChunk("nil");
+      builder.addBaseName("nil");
     }, /*isKeyword=*/true);
     addFromProto(LK::StringLiteral, "String", [&](Builder &builder) {
       builder.addTextChunk("\"");
@@ -3745,7 +3939,7 @@ public:
 
     auto floatType = context.getFloatDecl()->getDeclaredType();
     addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
-      builder.addTextChunk("#colorLiteral");
+      builder.addBaseName("#colorLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("red"), floatType);
       builder.addComma();
@@ -3759,7 +3953,7 @@ public:
 
     auto stringType = context.getStringDecl()->getDeclaredType();
     addFromProto(LK::ImageLiteral, "", [&](Builder &builder) {
-      builder.addTextChunk("#imageLiteral");
+      builder.addBaseName("#imageLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
                                stringType);
@@ -4385,7 +4579,7 @@ public:
       }
     }
 
-    if (!hasDeclIntroducer)
+    if (!hasDeclIntroducer && NameOffset != 0)
       Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
 
     Builder.addTextChunk(DeclStr.str().substr(NameOffset));
@@ -4956,7 +5150,7 @@ addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
                                       CodeCompletionResult::ResultKind::Keyword,
                                       SemanticContextKind::None, {});
   Builder.setKeywordKind(Kind);
-  Builder.addTextChunk(Name);
+  Builder.addKeyword(Name);
   if (!TypeAnnotation.empty())
     Builder.addTypeAnnotation(TypeAnnotation);
   Builder.setExpectedTypeRelation(TypeRelation);
@@ -5158,7 +5352,7 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
               nullptr) {
         CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::Keyword,
                                             SemanticContextKind::None, {});
-        Builder.addTextChunk(name);
+        Builder.addBaseName(name);
         Builder.setKeywordKind(K);
         if (consumer)
           consumer(Builder);
@@ -5216,7 +5410,7 @@ static void addPlatformConditions(CodeCompletionResultSink &Sink) {
         CodeCompletionResultBuilder Builder(
             Sink, CodeCompletionResult::ResultKind::Pattern,
             SemanticContextKind::ExpressionSpecific, {});
-        Builder.addTextChunk(Name);
+        Builder.addBaseName(Name);
         Builder.addLeftParen();
         consumer(Builder);
         Builder.addRightParen();
