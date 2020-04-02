@@ -415,6 +415,35 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
 #endif
 }
 
+bool swift::isDifferentiableProgrammingEnabled(SourceFile &SF) {
+  auto &ctx = SF.getASTContext();
+  // Return true if differentiable programming is explicitly enabled.
+  if (ctx.LangOpts.EnableExperimentalDifferentiableProgramming)
+    return true;
+  // Otherwise, return true iff the `_Differentiation` module is imported in
+  // the given source file.
+  bool importsDifferentiationModule = false;
+  for (auto import : namelookup::getAllImports(&SF)) {
+    if (import.second->getName() == ctx.Id_Differentiation) {
+      importsDifferentiationModule = true;
+      break;
+    }
+  }
+  return importsDifferentiationModule;
+}
+
+bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
+  auto &ctx = SF.getASTContext();
+  // Return true if `AdditiveArithmetic` derived conformances are explicitly
+  // enabled.
+  if (ctx.LangOpts.EnableExperimentalAdditiveArithmeticDerivedConformances)
+    return true;
+  // Otherwise, return true iff differentiable programming is enabled.
+  // Differentiable programming depends on `AdditiveArithmetic` derived
+  // conformances.
+  return isDifferentiableProgrammingEnabled(SF);
+}
+
 void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {
   bool hasAnyImplementationOnlyImports =
       llvm::any_of(MainModule->getFiles(), [](const FileUnit *F) -> bool {

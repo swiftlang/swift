@@ -755,7 +755,7 @@ void DiagnosticVerifier::printRemainingDiagnostics() const {
 
     SM.getLLVMSourceMgr().PrintMessage(
         llvm::errs(), getRawLoc(diag.Loc), SMKind,
-        "diagnostic produced by Clang: " + diag.Message.str(),
+        "diagnostic produced elsewhere: " + diag.Message.str(),
         /*Ranges=*/{}, {});
   }
 }

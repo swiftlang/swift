@@ -315,8 +315,8 @@ void drawStringRenamed(const char *, int xPos, int yPos)
 ```swift
 // C header imported in Swift.
 
-func drawString(_: UnsafePointer<CChar>!, _ xPos: Int, _ yPos: Int)
-func drawStringRenamed(_: UnsafePointer<CChar>!, x: Int, y: Int)
+func drawString(_: UnsafePointer<CChar>!, _ xPos: CInt, _ yPos: CInt)
+func drawStringRenamed(_: UnsafePointer<CChar>!, x: CInt, y: CInt)
 
 drawString("hello", 10, 20)
 drawStringRenamed("hello", x: 10, y: 20)
@@ -602,9 +602,9 @@ memory layout.
 
 As discussed above, there are cases where bridging that adjusts memory layout is
 not possible, for example, when importing pointers to function pointers. For
-example, while C's int `(*)(char)` can be imported as `(Int8) -> Int` (requires
+example, while C's `int (*)(char)` can be imported as `(CChar) -> CInt` (requires
 an adjustment of memory layout), C's `int (**)(char)` can't be imported as
-`UnsafePointer<(Int8) -> Int>`, because the pointee must have identical memory
+`UnsafePointer<(CChar) -> CInt>`, because the pointee must have identical memory
 layout in C and in Swift.
 
 Therefore, we need a Swift type that has a memory layout identical to C function
@@ -800,9 +800,9 @@ union IntOrFloat {
 
 struct IntOrFloat {
   var i: CInt { get set } // Computed property.
-  var f: Float { get set } // Computed property.
+  var f: CFloat { get set } // Computed property.
   init(i: CInt)
-  init(f: Float)
+  init(f: CFloat)
   init()
 }
 ```

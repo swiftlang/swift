@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-differentiable-programming -print-ast %s | %FileCheck %s --check-prefix=CHECK-AST
+// RUN: %target-swift-frontend -print-ast %s | %FileCheck %s --check-prefix=CHECK-AST
 
 import _Differentiation
 

@@ -935,9 +935,7 @@ void checkPatternBindingCaptures(IterableDeclContext *DC);
 
 /// Change the context of closures in the given initializer
 /// expression to the given context.
-///
-/// \returns true if any closures were found
-bool contextualizeInitializer(Initializer *DC, Expr *init);
+void contextualizeInitializer(Initializer *DC, Expr *init);
 void contextualizeTopLevelCode(TopLevelCodeDecl *TLCD);
 
 /// Retrieve the default type for the given protocol.
@@ -1521,6 +1519,12 @@ bool isMemberOperator(FuncDecl *decl, Type type);
 
 /// Complain if @objc or dynamic is used without importing Foundation.
 void diagnoseAttrsRequiringFoundation(SourceFile &SF);
+
+/// Returns `true` iff differentiable programming is enabled.
+bool isDifferentiableProgrammingEnabled(SourceFile &SF);
+
+/// Returns `true` iff `AdditiveArithmetic` derived conformances are enabled.
+bool isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF);
 
 /// Diagnose any Objective-C method overrides that aren't reflected
 /// as overrides in Swift.

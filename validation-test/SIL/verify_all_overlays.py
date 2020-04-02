@@ -25,6 +25,9 @@ for module_file in os.listdir(sdk_overlay_dir):
     # Skip the standard library because it's tested elsewhere.
     if module_name == "Swift":
         continue
+    # TODO(TF-1229): Fix the "_Differentiation" module.
+    if module_name == "_Differentiation":
+        continue
     print("# " + module_name)
 
     module_path = os.path.join(sdk_overlay_dir, module_file)

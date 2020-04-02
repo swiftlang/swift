@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -emit-module -parse-as-library -enable-experimental-differentiable-programming -o %t
+// RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
 // RUN: llvm-bcanalyzer %t/differentiable_function.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/differentiable_function.swiftmodule -enable-experimental-differentiable-programming -o - | %FileCheck %s
+// RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/differentiable_function.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
 
