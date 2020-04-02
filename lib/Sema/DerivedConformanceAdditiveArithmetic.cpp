@@ -57,7 +57,7 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
                                                      DeclContext *DC) {
   // Experimental `AdditiveArithmetic` derivation must be enabled.
   if (auto *SF = DC->getParentSourceFile())
-    if (!areAdditiveArithmeticDerivedConformancesEnabled(*SF))
+    if (!isAdditiveArithmeticConformanceDerivationEnabled(*SF))
       return false;
   // Nominal type must be a struct. (No stored properties is okay.)
   auto *structDecl = dyn_cast<StructDecl>(nominal);

@@ -1524,7 +1524,7 @@ void diagnoseAttrsRequiringFoundation(SourceFile &SF);
 bool isDifferentiableProgrammingEnabled(SourceFile &SF);
 
 /// Returns `true` iff `AdditiveArithmetic` derived conformances are enabled.
-bool areAdditiveArithmeticDerivedConformancesEnabled(SourceFile &SF);
+bool isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF);
 
 /// Diagnose any Objective-C method overrides that aren't reflected
 /// as overrides in Swift.

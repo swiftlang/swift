@@ -432,7 +432,7 @@ bool swift::isDifferentiableProgrammingEnabled(SourceFile &SF) {
   return importsDifferentiationModule;
 }
 
-bool swift::areAdditiveArithmeticDerivedConformancesEnabled(SourceFile &SF) {
+bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
   auto &ctx = SF.getASTContext();
   // Return true if `AdditiveArithmetic` derived conformances are explicitly
   // enabled.
