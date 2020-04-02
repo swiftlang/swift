@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-differentiable-programming -typecheck -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 // REQUIRES: asserts
 
 // SWIFT_ENABLE_TENSORFLOW

@@ -449,15 +449,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
 
-  if (Args.hasArg(OPT_enable_experimental_differentiable_programming)) {
-    Opts.EnableExperimentalDifferentiableProgramming = true;
-    // Differentiable programming implies `AdditiveArithmetic` derived
-    // conformances.
-    Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
-  }
-
-  // TODO: Ignore differentiation-related flags if
-  // `enable-experimental-differentiable-programming` is false.
   Opts.EnableExperimentalCrossFileDerivativeRegistration |=
       Args.hasArg(OPT_enable_experimental_cross_file_derivative_registration);
   Opts.EnableExperimentalForwardModeDifferentiation |=

@@ -2263,13 +2263,17 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
       if (attrs.has(TAK_differentiable)) {
-        if (Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+        auto *SF = DC->getParentSourceFile();
+        if (SF && isDifferentiableProgrammingEnabled(*SF)) {
           diffKind = attrs.linear ? DifferentiabilityKind::Linear
                                   : DifferentiabilityKind::Normal;
         } else {
           diagnoseInvalid(
               repr, attrs.getLoc(TAK_differentiable),
-              diag::experimental_differentiable_programming_disabled);
+              diag::
+                  differentiable_programming_attr_used_without_required_module,
+              TypeAttributes::getAttrName(TAK_differentiable),
+              Context.Id_Differentiation);
         }
       }
 
@@ -2311,13 +2315,17 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
       if (attrs.has(TAK_differentiable)) {
-        if (Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+        auto *SF = DC->getParentSourceFile();
+        if (SF && isDifferentiableProgrammingEnabled(*SF)) {
           diffKind = attrs.linear ? DifferentiabilityKind::Linear
                                   : DifferentiabilityKind::Normal;
         } else {
           diagnoseInvalid(
               repr, attrs.getLoc(TAK_differentiable),
-              diag::experimental_differentiable_programming_disabled);
+              diag::
+                  differentiable_programming_attr_used_without_required_module,
+              TypeAttributes::getAttrName(TAK_differentiable),
+              Context.Id_Differentiation);
         }
       }
 
@@ -2440,9 +2448,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   if (attrs.has(TAK_noDerivative)) {
-    if (!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-      diagnose(attrs.getLoc(TAK_noDerivative),
-               diag::experimental_differentiable_programming_disabled);
+    auto *SF = DC->getParentSourceFile();
+    if (SF && !isDifferentiableProgrammingEnabled(*SF)) {
+      diagnose(
+          attrs.getLoc(TAK_noDerivative),
+          diag::differentiable_programming_attr_used_without_required_module,
+          TypeAttributes::getAttrName(TAK_noDerivative),
+          Context.Id_Differentiation);
     } else if (!isParam) {
       // @noDerivative is only valid on parameters.
       diagnose(attrs.getLoc(TAK_noDerivative),
@@ -2577,7 +2589,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(eltTypeRepr)) {
       if (attrTypeRepr->getAttrs().has(TAK_noDerivative)) {
         if (diffKind == DifferentiabilityKind::NonDifferentiable &&
-            Context.LangOpts.EnableExperimentalDifferentiableProgramming)
+            isDifferentiableProgrammingEnabled(*DC->getParentSourceFile()))
           diagnose(eltTypeRepr->getLoc(),
                    diag::attr_only_on_parameters_of_differentiable,
                    "@noDerivative")

@@ -1304,7 +1304,6 @@ function(add_swift_target_library name)
 
     # SWIFT_ENABLE_TENSORFLOW
     list(APPEND swiftlib_swift_compile_flags_all
-         -Xfrontend -enable-experimental-differentiable-programming
          -Xfrontend -enable-experimental-cross-file-derivative-registration)
     # SWIFT_ENABLE_TENSORFLOW END
 

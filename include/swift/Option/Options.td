@@ -498,10 +498,6 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
 // Experimental feature options
-def enable_experimental_differentiable_programming :
-  Flag<["-"], "enable-experimental-differentiable-programming">,
-  Flags<[FrontendOption]>,
-  HelpText<"Enable experimental differentiable programming features">;
 
 // SWIFT_ENABLE_TENSORFLOW
 // TODO(TF-1097): Remove this flag and always enable cross-file derivative registration.

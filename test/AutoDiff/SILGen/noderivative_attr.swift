@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-differentiable-programming -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -verify %s | %FileCheck %s
 // REQUIRES: asserts
 
 import _Differentiation

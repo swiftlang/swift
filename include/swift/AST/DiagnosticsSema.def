@@ -5078,9 +5078,10 @@ NOTE(function_builder_remove_returns, none,
 //------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics
 //------------------------------------------------------------------------------
-ERROR(experimental_differentiable_programming_disabled, none,
-      "differentiable programming is an experimental feature that is "
-      "currently disabled", ())
+
+ERROR(differentiable_programming_attr_used_without_required_module, none,
+      "'@%0' attribute used without importing module %1",
+      (StringRef, Identifier))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

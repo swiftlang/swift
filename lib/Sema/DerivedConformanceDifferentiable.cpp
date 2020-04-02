@@ -109,9 +109,9 @@ static StructDecl *getTangentVectorStructDecl(DeclContext *DC) {
 bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
                                                  DeclContext *DC) {
   // Experimental differentiable programming must be enabled.
-  auto &ctx = nominal->getASTContext();
-  if (!ctx.LangOpts.EnableExperimentalDifferentiableProgramming)
-    return false;
+  if (auto *SF = DC->getParentSourceFile())
+    if (!isDifferentiableProgrammingEnabled(*SF))
+      return false;
   // Nominal type must be a struct or class. (No stored properties is okay.)
   if (!isa<StructDecl>(nominal) && !isa<ClassDecl>(nominal))
     return false;

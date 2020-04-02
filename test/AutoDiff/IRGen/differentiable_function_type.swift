@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-differentiable-programming -emit-ir -g %s
+// RUN: %target-swift-frontend -emit-ir -g %s
 
 // TF-1225: IRGenDebugInfo crash when reconstructing `@differentiable` and
 // `@differentiable(linear)` function types.

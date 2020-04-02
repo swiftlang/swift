@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-differentiable-programming -typecheck -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 // SWIFT_ENABLE_TENSORFLOW
 // Expected to fail on `tensorflow` branch because the `Differentiable` protocol
@@ -6,12 +6,10 @@
 // XFAIL: tensorflow
 // SWIFT_ENABLE_TENSORFLOW END
 
-// Tests that Sema fails gracefully when the `Differentiable` protocol is missing.
+// Tests that Sema fails gracefully when the `_Differentiation` module is not imported.
 
-// expected-error @+2 {{parameter type 'Float' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
-// expected-error @+1 {{result type 'Float' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
+// expected-error @+1 {{'@differentiable' attribute used without importing module '_Differentiation'}}
 let _: @differentiable (Float) -> Float
 
-// expected-error @+2 {{parameter type 'T' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
-// expected-error @+1 {{result type 'T' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
+// expected-error @+1 2 {{'@differentiable' attribute used without importing module '_Differentiation'}}
 func hasDifferentiableFunctionArg<T>(_ f: @differentiable (T) -> T) {}
