@@ -40,11 +40,12 @@ struct ConformsToCircularAssocTypeDefault : CircularAssocTypeDefault { }
 
 // rdar://problem/20000145
 public protocol P {
-  associatedtype T // expected-note 2{{through reference here}} // expected-note {{protocol requires nested type 'T'; do you want to add it?}}
+  associatedtype T // expected-note {{protocol requires nested type 'T'; do you want to add it?}}
 }
 
 // Used to cause a circularity issue during gen. signature validation
-public struct S<A: P> where A.T == S<A> { // OK
+public struct S<A: P> where A.T == S<A> {
+// expected-note@-1 {{requirement specified as 'A.T' == 'S<A>' [with A = InvalidSubstForS1]}}
   func f(a: A.T) {
     g(a: id(t: a))
     _ = A.T.self
@@ -60,9 +61,15 @@ public struct S<A: P> where A.T == S<A> { // OK
   }
 }
 
-// FIXME: Another circularity issue, this should be legal.
-struct SubstitutionForS: P { // expected-error {{type 'SubstitutionForS' does not conform to protocol 'P'}}
-  typealias T = S<SubstitutionForS> // expected-error 2{{type alias 'T' references itself}} // expected-note {{through reference here}}
+struct SubstitutionForS: P { // OK
+  typealias T = S<SubstitutionForS>
+}
+struct InvalidSubstForS1: P {
+  typealias T = S<InvalidSubstForS2>
+}
+struct InvalidSubstForS2: P { // expected-error {{type 'InvalidSubstForS2' does not conform to protocol 'P'}}
+  typealias T = S<InvalidSubstForS1>
+  // expected-error@-1 {{'S' requires the types 'InvalidSubstForS1.T' (aka 'S<InvalidSubstForS2>') and 'S<InvalidSubstForS1>' be equivalent}}
 }
 
 protocol I {
@@ -70,11 +77,12 @@ protocol I {
 }
 
 protocol PI {
-  associatedtype T : I
+  associatedtype T : I //expected-note {{protocol requires nested type 'T'; do you want to add it?}}
 }
 
 // Used to cause a circularity issue during gen. signature validation
 struct SI<A: PI> : I where A : I, A.T == SI<A> {
+// expected-note@-1 {{requirement specified as 'A.T' == 'SI<A>' [with A = InvalidSubstForSI1]}}
   func ggg<T : I>(t: T.Type) -> T {
     return T()
   }
@@ -91,6 +99,17 @@ struct SI<A: PI> : I where A : I, A.T == SI<A> {
     _ = self.ggg(t: A.self)
     _ = self.ggg(t: A.T.self)
   }
+}
+
+struct SubstitutionForSI: PI, I {
+  typealias T = SI<SubstitutionForSI> // OK
+}
+struct InvalidSubstForSI1: PI, I {
+  typealias T = SI<InvalidSubstForSI2>
+}
+struct InvalidSubstForSI2: PI, I { // expected-error {{type 'InvalidSubstForSI2' does not conform to protocol 'PI'}}
+  typealias T = SI<InvalidSubstForSI1>
+  // expected-error@-1 {{'SI' requires the types 'InvalidSubstForSI1.T' (aka 'SI<InvalidSubstForSI2>') and 'SI<InvalidSubstForSI1>' be equivalent}}
 }
 
 // Used to hit infinite recursion

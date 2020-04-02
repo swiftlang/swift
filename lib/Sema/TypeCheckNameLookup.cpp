@@ -390,6 +390,8 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
 LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
                                                Type type, DeclNameRef name,
                                                NameLookupOptions options) {
+  assert(!type->isTypeParameter() &&
+         "Use EquivalenceClass::lookupNestedType instead");
   LookupTypeResult result;
 
   // Look for members with the given name.
@@ -412,8 +414,25 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.
+  bool foundTypeAlias = false;
   llvm::SmallPtrSet<CanType, 4> types;
   SmallVector<AssociatedTypeDecl *, 4> inferredAssociatedTypes;
+
+  const auto maybeAddResult = [&](TypeDecl *const typeDecl) {
+    // Skip associated types if we already found a type alias.
+    if (isa<AssociatedTypeDecl>(typeDecl) && foundTypeAlias)
+      return;
+
+    // If we haven't seen this type result yet, add it to the result set.
+    const auto memberType =
+        typeDecl->getAvailableDeclaredInterfaceType(/*desugared*/true);
+    if (types.insert(memberType->getCanonicalType()).second) {
+      if (isa<TypeAliasDecl>(typeDecl))
+        foundTypeAlias = true;
+      result.addResult({typeDecl, nullptr});
+    }
+  };
+
   for (auto decl : decls) {
     auto *typeDecl = cast<TypeDecl>(decl);
 
@@ -424,12 +443,9 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     }
 
     if (isUnsupportedMemberTypeAccess(type, typeDecl)) {
-      auto memberType = typeDecl->getDeclaredInterfaceType();
-
       // Add the type to the result set, so that we can diagnose the
       // reference instead of just saying the member does not exist.
-      if (types.insert(memberType->getCanonicalType()).second)
-        result.addResult({typeDecl, memberType, nullptr});
+      maybeAddResult(typeDecl);
 
       continue;
     }
@@ -439,8 +455,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     // direct typealias with the same name later.
     if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-        if (!type->is<ArchetypeType>() &&
-            !type->isTypeParameter()) {
+        if (!type->is<ArchetypeType>()) {
           if (options.contains(NameLookupFlags::PerformConformanceCheck))
             inferredAssociatedTypes.push_back(assocType);
           continue;
@@ -452,7 +467,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
         if (isa<ProtocolDecl>(aliasDecl->getDeclContext()) &&
             !type->is<ArchetypeType>() &&
-            !type->isTypeParameter() &&
             aliasDecl->getUnderlyingType()->getCanonicalType()
               ->hasTypeParameter() &&
             !options.contains(NameLookupFlags::PerformConformanceCheck)) {
@@ -469,16 +483,11 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       }
     }
 
-    // Substitute the base into the member's type.
-    auto memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                              typeDecl, type);
-
-    // If we haven't seen this type result yet, add it to the result set.
-    if (types.insert(memberType->getCanonicalType()).second)
-      result.addResult({typeDecl, memberType, nullptr});
+    // Add the type to the result set.
+    maybeAddResult(typeDecl);
   }
 
-  if (!result) {
+  if (!result && options.contains(NameLookupFlags::PerformConformanceCheck)) {
     // We couldn't find any normal declarations. Let's try inferring
     // associated types.
     ConformanceCheckOptions conformanceOptions;
@@ -517,7 +526,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       auto memberType =
           substMemberTypeWithBase(dc->getParentModule(), typeDecl, type);
       if (types.insert(memberType->getCanonicalType()).second)
-        result.addResult({typeDecl, memberType, assocType});
+        result.addResult({typeDecl, assocType});
     }
   }
 

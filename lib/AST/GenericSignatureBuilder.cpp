@@ -3555,22 +3555,6 @@ PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
   return pa;
 }
 
-static Type getStructuralType(TypeDecl *typeDecl, bool keepSugar) {
-  if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    if (typealias->getUnderlyingTypeRepr() != nullptr) {
-      auto type = typealias->getStructuralType();
-      if (!keepSugar)
-        if (auto *aliasTy = cast<TypeAliasType>(type.getPointer()))
-          return aliasTy->getSinglyDesugaredType();
-      return type;
-    }
-    if (!keepSugar)
-      return typealias->getUnderlyingType();
-  }
-
-  return typeDecl->getDeclaredInterfaceType();
-}
-
 static Type substituteConcreteType(GenericSignatureBuilder &builder,
                                    PotentialArchetype *basePA,
                                    TypeDecl *concreteDecl) {
@@ -3581,7 +3565,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
   // Form an unsubstituted type referring to the given type declaration,
   // for use in an inferred same-type requirement.
-  auto type = getStructuralType(concreteDecl, /*keepSugar=*/true);
+  const auto type = concreteDecl->getStructuralType(/*desugared*/false);
 
   SubstitutionMap subMap;
   if (proto) {
@@ -3983,8 +3967,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   // An inferred same-type requirement between the two type declarations
   // within this protocol or a protocol it inherits.
   auto addInferredSameTypeReq = [&](TypeDecl *first, TypeDecl *second) {
-    Type firstType = getStructuralType(first, /*keepSugar=*/false);
-    Type secondType = getStructuralType(second, /*keepSugar=*/false);
+    const Type firstType = first->getStructuralType(/*desugared*/true);
+    const Type secondType = second->getStructuralType(/*desugared*/true);
 
     auto inferredSameTypeSource =
       FloatingRequirementSource::viaProtocolRequirement(

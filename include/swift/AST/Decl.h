@@ -2837,6 +2837,19 @@ public:
   /// metatype.
   Type getDeclaredInterfaceType() const;
 
+  /// When the underlying interface type of a \c TypeAliasDecl is not
+  /// available due to an ongoing request, retrieve its structural type.
+  /// Otherwise, return the declared interface type.
+  ///
+  /// \param desugared Whether to pull out the underlying type for an alias
+  /// declaration.
+  Type getAvailableDeclaredInterfaceType(bool desugared = false) const;
+
+  /// The structural type of this declaration's values. Otherwise equivalent
+  /// to \c getDeclaredInterfaceType(), this method forwards the call to
+  /// \c TypeAliasDecl::getStructuralType for a \c TypeAliasDecl.
+  Type getStructuralType(bool desugared) const;
+
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
@@ -3027,13 +3040,16 @@ public:
   Type getUnderlyingType() const;
   void setUnderlyingType(Type type);
 
+  bool isComputingUnderlyingType() const;
+
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
 
-  /// Retrieve a sugared interface type containing the structure of the interface
+  /// Retrieve an interface type containing the structure of the interface
   /// type before any semantic validation has occured.
-  Type getStructuralType() const;
-  
+  /// \param desugared Whether to pull out the underlying type.
+  Type getStructuralType(bool desugared = false) const;
+
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;
   }

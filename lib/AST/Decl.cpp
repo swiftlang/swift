@@ -3556,6 +3556,25 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   return getInterfaceType()->getMetatypeInstanceType();
 }
 
+Type TypeDecl::getAvailableDeclaredInterfaceType(bool desugared) const {
+   if (const auto aliasDecl = dyn_cast<TypeAliasDecl>(this)) {
+     if (aliasDecl->isComputingUnderlyingType())
+       return aliasDecl->getStructuralType(desugared);
+
+     if (desugared)
+       return aliasDecl->getUnderlyingType();
+   }
+
+   return getDeclaredInterfaceType();
+}
+
+Type TypeDecl::getStructuralType(bool desugared) const {
+  if (const auto aliasDecl = dyn_cast<TypeAliasDecl>(this))
+    return aliasDecl->getStructuralType(desugared);
+
+  return getDeclaredInterfaceType();
+}
+
 int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
   // Order based on the enclosing declaration.
   auto dc1 = type1->getDeclContext();
@@ -3841,7 +3860,7 @@ Type TypeAliasDecl::getUnderlyingType() const {
     return type;
   return ErrorType::get(ctx);
 }
-      
+
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
   // lldb creates global typealiases containing archetypes
   // sometimes...
@@ -3853,6 +3872,11 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
   getASTContext().evaluator.cacheOutput(
           UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)},
           std::move(underlying));
+}
+
+bool TypeAliasDecl::isComputingUnderlyingType() const {
+  return getASTContext().evaluator.hasActiveRequest(
+      UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)});
 }
 
 UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
@@ -3868,13 +3892,18 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
       parentTy, getASTContext());
 }
 
-Type TypeAliasDecl::getStructuralType() const {
+Type TypeAliasDecl::getStructuralType(bool desugared) const {
   auto &ctx = getASTContext();
-  if (auto type = evaluateOrDefault(
-      ctx.evaluator,
-      StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)},
-      Type()))
+  if (const auto type = evaluateOrDefault(
+          ctx.evaluator,
+          StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)},
+          Type())) {
+    if (desugared)
+      if (const auto sugaredTy = dyn_cast<TypeAliasType>(type.getPointer()))
+        return sugaredTy->getSinglyDesugaredType();
     return type;
+  }
+
   return ErrorType::get(ctx);
 }
 

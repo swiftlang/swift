@@ -36,7 +36,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -248,7 +247,7 @@ Type TypeResolution::resolveDependentMemberType(
   }
 
   return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), concrete,
-                                              baseTy);
+                                              baseTy, stage);
 }
 
 Type TypeResolution::resolveSelfAssociatedType(Type baseTy,
@@ -296,7 +295,7 @@ Type TypeResolution::resolveSelfAssociatedType(Type baseTy,
   }
 
   return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), nestedType,
-                                              baseTy);
+                                              baseTy, stage);
 }
 
 bool TypeResolution::areSameType(Type type1, Type type2) const {
@@ -577,10 +576,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
             typeDecl = assocType->getAssociatedTypeAnchor();
           }
         }
-      }
-
       // FIXME: Remove this once the above FIXME is addressed.
-      if (typeDecl->getDeclContext()->getSelfClassDecl()) {
+      } else if (typeDecl->getDeclContext()->getSelfClassDecl()) {
         // We found a member of a class from a protocol or protocol
         // extension.
         //
@@ -599,7 +596,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
 
   // Finally, substitute the base type into the member type.
   return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl, selfType,
-                                 resolution.usesArchetypes());
+                                 resolution.getStage());
 }
 
 static TypeResolutionOptions
@@ -1407,7 +1404,9 @@ static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
       .highlight(baseRange);
   }
   for (const auto &member : lookup) {
-    member.Member->diagnose(diag::found_candidate_type, member.MemberType);
+    const auto memberType = TypeChecker::substMemberTypeWithBase(
+        member.Member->getModuleContext(), member.Member, baseTy);
+    member.Member->diagnose(diag::found_candidate_type, memberType);
   }
 }
 
@@ -1492,7 +1491,7 @@ static Type resolveNestedIdentTypeComponent(
   if (auto *typeDecl = comp->getBoundDecl()) {
     auto memberType =
       TypeChecker::substMemberTypeWithBase(DC->getParentModule(), typeDecl,
-                                           parentTy);
+                                           parentTy, resolution.getStage());
     return maybeDiagnoseBadMemberType(typeDecl, memberType, nullptr);
   }
 
@@ -1519,7 +1518,7 @@ static Type resolveNestedIdentTypeComponent(
   // Name lookup was ambiguous. Complain.
   // FIXME: Could try to apply generic arguments first, and see whether
   // that resolves things. But do we really want that to succeed?
-  if (memberTypes.size() > 1) {
+  if (memberTypes.isAmbiguous()) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors))
       diagnoseAmbiguousMemberType(parentTy, parentRange, comp->getNameRef(),
                                   comp->getNameLoc(), memberTypes);
@@ -1542,8 +1541,9 @@ static Type resolveNestedIdentTypeComponent(
     if (!member)
       return ErrorType::get(ctx);
   } else {
-    memberType = memberTypes.back().MemberType;
     member = memberTypes.back().Member;
+    memberType = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
+                                                      member, parentTy);
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     comp->setValue(member, nullptr);
   }
@@ -3605,21 +3605,21 @@ Type TypeResolver::buildProtocolType(
 Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
                                           TypeDecl *member,
                                           Type baseTy,
-                                          bool useArchetypes) {
+                                          TypeResolutionStage stage) {
   Type sugaredBaseTy = baseTy;
-
-  // For type members of a base class, make sure we use the right
-  // derived class as the parent type. If the base type is an error
-  // type, we have an invalid extension, so do nothing.
-  if (!baseTy->is<ErrorType>()) {
-    if (auto *ownerClass = member->getDeclContext()->getSelfClassDecl()) {
-      baseTy = baseTy->getSuperclassForDecl(ownerClass, useArchetypes);
-    }
-  }
 
   if (baseTy->is<ModuleType>()) {
     baseTy = Type();
     sugaredBaseTy = Type();
+
+  // For type members of a base class, make sure we use the right
+  // derived class as the parent type. If the base type is an error
+  // type, we have an invalid extension, so do nothing.
+  } else if (!baseTy->is<ErrorType>()) {
+    if (auto *ownerClass = member->getDeclContext()->getSelfClassDecl()) {
+      baseTy = baseTy->getSuperclassForDecl(
+          ownerClass, stage == TypeResolutionStage::Contextual);
+    }
   }
 
   // The declared interface type for a generic type will have the type
@@ -3647,17 +3647,22 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   }
 
   auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);
-  if (aliasDecl) {
-    if (aliasDecl->getGenericParams()) {
-      return UnboundGenericType::get(
-          aliasDecl, baseTy,
-          aliasDecl->getASTContext());
-    }
+  if (aliasDecl && aliasDecl->isGeneric()) {
+    return UnboundGenericType::get(
+        aliasDecl, baseTy,
+        aliasDecl->getASTContext());
   }
 
   Type resultType;
-  auto memberType = aliasDecl ? aliasDecl->getUnderlyingType()
-                              : member->getDeclaredInterfaceType();
+  Type memberType;
+  if (aliasDecl) {
+    memberType = stage == TypeResolutionStage::Structural
+        ? aliasDecl->getStructuralType(/*desugared*/true)
+        : aliasDecl->getUnderlyingType();
+  } else {
+    memberType = member->getDeclaredInterfaceType();
+  }
+
   SubstitutionMap subs;
   if (baseTy) {
     // Cope with the presence of unbound generic types, which are ill-formed

@@ -26,6 +26,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRefinementContext.h"
+#include "swift/AST/TypeResolutionStage.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
@@ -78,7 +79,6 @@ enum class DeclTypeCheckingSemantics {
 /// An individual result of a name lookup for a type.
 struct LookupTypeResultEntry {
   TypeDecl *Member;
-  Type MemberType;
   /// The associated type that the Member/MemberType were inferred for, but only
   /// if inference happened when creating this entry.
   AssociatedTypeDecl *InferredAssociatedType;
@@ -498,10 +498,10 @@ Type applyUnboundGenericArguments(UnboundGenericType *unboundType,
 /// \param member The member whose type projection is being computed.
 /// \param baseTy The base type that will be substituted for the 'Self' of the
 /// member.
-/// \param useArchetypes Whether to use context archetypes for outer generic
-/// parameters if the class is nested inside a generic function.
+/// \param stage The type resolution stage to use for substitution.
 Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member, Type baseTy,
-                             bool useArchetypes = true);
+                             TypeResolutionStage stage =
+                                 TypeResolutionStage::Contextual);
 
 /// Determine whether this is a "pass-through" typealias, which has the
 /// same type parameters as the nominal type it references and specializes

@@ -3759,6 +3759,12 @@ ConformanceChecker::resolveWitnessTryingAllStrategies(ValueDecl *requirement) {
   return ResolveWitnessResult::Missing;
 }
 
+/// A candidate for a type witness.
+struct TypeWitnessCandidate {
+  TypeDecl *Member;
+  Type MemberType;
+};
+
 /// Attempt to resolve a type witness via member name lookup.
 ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
@@ -3782,25 +3788,43 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   }
 
   // Determine which of the candidates is viable.
-  SmallVector<LookupTypeResultEntry, 2> viable;
+  SmallVector<TypeWitnessCandidate, 2> viable;
   SmallVector<std::pair<TypeDecl *, CheckTypeWitnessResult>, 2> nonViable;
-  for (auto candidate : candidates) {
+  for (const auto &candidate : candidates) {
+    const auto member = cast<GenericTypeDecl>(candidate.Member);
+
     // Skip nested generic types.
-    if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.Member))
-      if (genericDecl->isGeneric())
+    if (member->isGeneric())
         continue;
 
     // Skip typealiases with an unbound generic type as their underlying type.
-    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(candidate.Member))
-      if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(member))
+      if (typeAliasDecl->getAvailableDeclaredInterfaceType(/*desugared*/true)
+              ->is<UnboundGenericType>())
         continue;
 
+    auto memberTy = member->getAvailableDeclaredInterfaceType();
+
+    // If we found a typealias coming from a protocol and containing a type
+    // parameter, substitute known witnesses into its underlying type.
+    if (member->getDeclContext()->getSelfProtocolDecl()) {
+      const auto alias = dyn_cast<TypeAliasDecl>(member);
+      if (alias && memberTy->hasTypeParameter()) {
+        const auto subs = Adoptee->getContextSubstitutionMap(
+            member->getParentModule(), member->getDeclContext());
+
+        const auto underlyingTy =
+            alias->getAvailableDeclaredInterfaceType(/*desugared*/true);
+        memberTy = TypeAliasType::get(alias, Adoptee, subs,
+                                      underlyingTy.subst(subs));
+      }
+    }
+
     // Check this type against the protocol requirements.
-    if (auto checkResult =
-            checkTypeWitness(DC, Proto, assocType, candidate.MemberType)) {
+    if (auto checkResult = checkTypeWitness(DC, Proto, assocType, memberTy)) {
       nonViable.push_back({candidate.Member, checkResult});
     } else {
-      viable.push_back(candidate);
+      viable.push_back({member, memberTy});
     }
   }
 
