@@ -3906,27 +3906,21 @@ bool resolveDifferentiableAttrDifferentiabilityParameters(
 
 /// Checks whether differentiable programming is enabled for the given
 /// differentiation-related attribute. Returns true on error.
-bool checkIfDifferentiableProgrammingEnabled(
-    ASTContext &ctx, DeclAttribute *attr) {
+bool checkIfDifferentiableProgrammingEnabled(ASTContext &ctx,
+                                             DeclAttribute *attr,
+                                             DeclContext *DC) {
   auto &diags = ctx.Diags;
-  // The experimental differentiable programming flag must be enabled.
-  if (!ctx.LangOpts.EnableExperimentalDifferentiableProgramming) {
-    diags
-        .diagnose(attr->getLocation(),
-                  diag::experimental_differentiable_programming_disabled)
-        .highlight(attr->getRangeWithAt());
-    return true;
-  }
+  auto *SF = DC->getParentSourceFile();
+  assert(SF && "Source file not found");
   // The `Differentiable` protocol must be available.
   // If unavailable, the `_Differentiation` module should be imported.
-  if (!ctx.getProtocol(KnownProtocolKind::Differentiable)) {
-    diags
-        .diagnose(attr->getLocation(), diag::attr_used_without_required_module,
-                  attr, ctx.Id_Differentiation)
-        .highlight(attr->getRangeWithAt());
-    return true;
-  }
-  return false;
+  if (isDifferentiableProgrammingEnabled(*SF))
+    return false;
+  diags
+      .diagnose(attr->getLocation(), diag::attr_used_without_required_module,
+                attr, ctx.Id_Differentiation)
+      .highlight(attr->getRangeWithAt());
+  return true;
 }
 
 IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
@@ -3945,7 +3939,7 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
   auto &diags = ctx.Diags;
   // `@differentiable` attribute requires experimental differentiable
   // programming to be enabled.
-  if (checkIfDifferentiableProgrammingEnabled(ctx, attr))
+  if (checkIfDifferentiableProgrammingEnabled(ctx, attr, D->getDeclContext()))
     return nullptr;
 
   // Resolve the original `AbstractFunctionDecl`.
@@ -4111,7 +4105,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   auto &diags = Ctx.Diags;
   // `@derivative` attribute requires experimental differentiable programming
   // to be enabled.
-  if (checkIfDifferentiableProgrammingEnabled(Ctx, attr))
+  if (checkIfDifferentiableProgrammingEnabled(Ctx, attr, D->getDeclContext()))
     return true;
   auto *derivative = cast<FuncDecl>(D);
   auto lookupConformance =

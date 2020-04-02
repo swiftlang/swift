@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-differentiable-programming
+// RUN: %target-typecheck-verify-swift
 
 import _Differentiation
 
