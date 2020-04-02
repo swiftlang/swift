@@ -2,7 +2,6 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-
 #if os(macOS)
 import Darwin.C
 #else
