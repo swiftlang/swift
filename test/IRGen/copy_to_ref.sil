@@ -1,4 +1,4 @@
-// RUN: %swift run %s -emit-ir -o - | %FileCheck %s
+// RUN: %swift %s -emit-ir -O -module-name run | %FileCheck %s
 
 sil_stage canonical
 
@@ -9,6 +9,16 @@ class SingleInt {
   var x : Int
 }
 
+// CHECK-LABEL: define swiftcc void @test_int
+// CHECK: [[ALLOC:%.*]] = alloca %T3run9SingleIntC
+// CHECK-NEXT: [[META:%.*]] = tail call swiftcc %swift.metadata_response @"$s3run9SingleIntCMa"
+// CHECK-NEXT: [[META_E:%.*]] = extractvalue %swift.metadata_response [[META]]
+// CHECK-NEXT: [[REF_COUNT:%.*]] = getelementptr inbounds %T3run9SingleIntC, %T3run9SingleIntC* [[ALLOC]]
+// CHECK-NEXT: [[OBJ_REF:%.*]] = call %swift.refcounted* @swift_initStackObject(%swift.type* [[META_E]], %swift.refcounted* nonnull [[REF_COUNT]])
+// CHECK-NEXT: [[SROA_IDX:%.*]] = getelementptr inbounds %swift.refcounted, %swift.refcounted* [[OBJ_REF]], [[IT:i32|i64]] 1
+// CHECK-NEXT: [[X_PTR:%.*]] = bitcast %swift.refcounted* [[SROA_IDX]] to [[IT]]*
+// CHECK-NEXT: store [[IT]] 1, [[IT]]* [[X_PTR]]
+// CHECK: ret void
 sil @test_int : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int64, 1
@@ -28,12 +38,27 @@ bb0:
   return %999 : $()
 }
 
-class XYZCheck {
+class XYZClass {
   var x : Int
   var y : Int
   var z : Int
-  var check : Bool
 }
+
+// Check both tuple and struct (tuple at the bottom of the file):
+
+// CHECK-LABEL: define swiftcc void @test_xyzcheck_struct
+// CHECK: [[ALLOC:%.*]] = alloca %T3run8XYZClassC
+// CHECK-NEXT: [[META:%.*]] = tail call swiftcc %swift.metadata_response @"$s3run8XYZClassCMa"
+// CHECK-NEXT: [[META_E:%.*]] = extractvalue %swift.metadata_response [[META]]
+// CHECK-NEXT: [[REF_COUNT:%.*]] = getelementptr inbounds %T3run8XYZClassC, %T3run8XYZClassC* [[ALLOC]]
+// CHECK-NEXT: [[OBJ_REF:%.*]] = call %swift.refcounted* @swift_initStackObject(%swift.type* [[META_E]], %swift.refcounted* nonnull [[REF_COUNT]])
+// CHECK-NEXT: [[SROA_IDX:%.*]] = getelementptr inbounds %swift.refcounted, %swift.refcounted* [[OBJ_REF]], [[IT:i32|i64]] 1
+// CHECK-NEXT: [[XY_PTR:%.*]] = bitcast %swift.refcounted* [[SROA_IDX]] to <2 x [[IT]]>*
+// CHECK-NEXT: store <2 x [[IT]]> <[[IT]] 1, [[IT]] 2>, <2 x [[IT]]>* [[XY_PTR]]
+// CHECK-NEXT: [[Z_PTR:%.*]] = getelementptr inbounds %swift.refcounted, %swift.refcounted* [[OBJ_REF]], i64 2
+// CHECK-NEXT: [[Z_IPTR:%.*]] = bitcast %swift.refcounted* [[Z_PTR]] to [[IT]]*
+// CHECK-NEXT: store [[IT]] 2, [[IT]]* [[Z_IPTR]]
+// CHECK: ret void
 
 sil @test_xyzcheck_tuple : $@convention(thin) () -> () {
 bb0:
@@ -44,24 +69,23 @@ bb0:
   %4 = tuple (%1 : $Int, %3 : $Int, %3 : $Int)
 
   %tsa = alloc_stack $(Int, Int, Int)
-  %f = alloc_ref [stack] $XYZCheck
+  %f = alloc_ref [stack] $XYZClass
   
   store %4 to %tsa : $*(Int, Int, Int)
 
-  copy_to_ref %tsa : $*(Int, Int, Int) to %f : $XYZCheck
+  copy_to_ref %tsa : $*(Int, Int, Int) to %f : $XYZClass
   
-  dealloc_ref [stack] %f : $XYZCheck
+  dealloc_ref [stack] %f : $XYZClass
   dealloc_stack %tsa : $*(Int, Int, Int)
   
   %999 = tuple ()
   return %999 : $()
 }
 
-struct XYZB {
+struct XYZStruct {
   var x : Int
   var y : Int
   var z : Int
-  var check : Bool
 }
 
 sil @test_xyzcheck_struct : $@convention(thin) () -> () {
@@ -70,17 +94,17 @@ bb0:
   %1 = struct $Int (%0 : $Builtin.Int64)
   %2 = integer_literal $Builtin.Int64, 2
   %3 = struct $Int (%2 : $Builtin.Int64)
-  %4 = struct $XYZB (%1 : $Int, %3 : $Int, %3 : $Int)
+  %4 = struct $XYZStruct (%1 : $Int, %3 : $Int, %3 : $Int)
 
-  %tsa = alloc_stack $XYZB
-  %f = alloc_ref [stack] $XYZCheck
+  %tsa = alloc_stack $XYZStruct
+  %f = alloc_ref [stack] $XYZClass
   
-  store %4 to %tsa : $*XYZB
+  store %4 to %tsa : $*XYZStruct
 
-  copy_to_ref %tsa : $*XYZB to %f : $XYZCheck
+  copy_to_ref %tsa : $*XYZStruct to %f : $XYZClass
   
-  dealloc_ref [stack] %f : $XYZCheck
-  dealloc_stack %tsa : $*XYZB
+  dealloc_ref [stack] %f : $XYZClass
+  dealloc_stack %tsa : $*XYZStruct
   
   %999 = tuple ()
   return %999 : $()
@@ -88,7 +112,15 @@ bb0:
 
 class Empty { }
 
-sil @test_xyzcheck : $@convention(thin) () -> () {
+// CHECK-LABEL: define swiftcc void @test_empty
+// CHECK: [[ALLOC:%.*]] = alloca %swift.refcounted
+// CHECK-NEXT: [[META:%.*]] = tail call swiftcc %swift.metadata_response @"$s3run5EmptyCMa"
+// CHECK-NEXT: [[META_E:%.*]] = extractvalue %swift.metadata_response [[META]]
+// CHECK-NEXT: [[OBJ_REF:%.*]] = call %swift.refcounted* @swift_initStackObject(%swift.type* [[META_E]], %swift.refcounted* nonnull [[ALLOC]])
+// CHECK-NEXT: bitcast
+// CHECK-NEXT: llvm.lifetime.end
+// CHECK: ret void
+sil @test_empty : $@convention(thin) () -> () {
 bb0:
   %empty_tuple = tuple ()
 
@@ -105,3 +137,11 @@ bb0:
   %999 = tuple ()
   return %999 : $()
 }
+
+sil_vtable SingleInt { }
+sil_vtable XYZClass { }
+sil_vtable Empty { }
+
+// CHECK-LABEL: define swiftcc void @test_xyzcheck_tuple
+// CHECK: tail call swiftcc void @test_xyzcheck_struct()
+// CHECK-NEXT: ret void
