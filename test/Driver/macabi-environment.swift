@@ -17,6 +17,22 @@
 // IOS13-MACABI-DAG: -rpath [[MACOSX_SDK_STDLIB_PATH]]
 // IOS13-MACABI-DAG: -platform_version "mac catalyst" 13.0.0 0.0.0
 
+// Adjust iOS versions < 13.0 to 13.0 for the linker's sake.
+
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios12.0-macabi -sdk %S/../Inputs/clang-importer-sdk %s | %FileCheck -check-prefix=IOS12-MACABI %s
+// IOS12-MACABI: bin/swift
+// IOS12-MACABI: -target x86_64-apple-ios12.0-macabi
+
+// IOS12-MACABI: bin/ld
+// IOS12-MACABI-DAG: -L [[MACCATALYST_STDLIB_PATH:[^ ]+/lib/swift/maccatalyst]]
+// IOS12-MACABI-DAG: -L [[MACOSX_STDLIB_PATH:[^ ]+/lib/swift/macosx]]
+// IOS12-MACABI-DAG: -L [[MACCATALYST_SDK_STDLIB_PATH:[^ ]+/clang-importer-sdk/System/iOSSupport/usr/lib/swift]]
+// IOS12-MACABI-DAG: -L [[MACOSX_SDK_STDLIB_PATH:[^ ]+/clang-importer-sdk/usr/lib/swift]]
+// IOS12-MACABI-DAG: -rpath [[MACCATALYST_STDLIB_PATH]]
+// IOS12-MACABI-DAG: -rpath [[MACOSX_STDLIB_PATH]]
+// IOS12-MACABI-DAG: -rpath [[MACCATALYST_SDK_STDLIB_PATH]]
+// IOS12-MACABI-DAG: -rpath [[MACOSX_SDK_STDLIB_PATH]]
+// IOS12-MACABI-DAG: -platform_version "mac catalyst" 13.0.0 0.0.0
 
 // Test using target-variant to build zippered outputs
 

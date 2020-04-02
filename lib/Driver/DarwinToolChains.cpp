@@ -520,6 +520,14 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
     unsigned major, minor, micro;
     if (tripleIsMacCatalystEnvironment(triple)) {
       triple.getiOSVersion(major, minor, micro);
+
+      // Mac Catalyst was introduced with an iOS deployment target of 13.0;
+      // the linker doesn't want to see a deployment target before that.
+      if (major < 13) {
+        major = 13;
+        minor = 0;
+        micro = 0;
+      }
     } else {
       switch (getDarwinPlatformKind((triple))) {
       case DarwinPlatformKind::MacOS:
