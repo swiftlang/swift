@@ -182,6 +182,16 @@ public:
            getKind() == NonZeroResult);
     return ResultType;
   }
+  
+  bool operator==(ForeignErrorConvention other) const {
+    return info.TheKind == other.info.TheKind
+      && info.ErrorIsOwned == other.info.ErrorIsOwned
+      && info.ErrorParameterIsReplaced == other.info.ErrorParameterIsReplaced
+      && info.ErrorParameterIndex == other.info.ErrorParameterIndex;
+  }
+  bool operator!=(ForeignErrorConvention other) const {
+    return !(*this == other);
+  }
 };
 
 }
