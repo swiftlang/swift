@@ -2416,19 +2416,19 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       if (i == TAK_escaping && ty->getOptionalObjectType()) {
         auto diag = diagnoseInvalid(repr, attrs.getLoc(i),
-                                    diag::optional_closures_are_already_escaping);
-        diag.fixItRemove(getTypeAttrRangeWithAt(Context,
-                                              attrs.getLoc(TAK_escaping)));
+                                    diag::escaping_optional_type_argument);
+        diag.fixItRemove(
+            getTypeAttrRangeWithAt(Context, attrs.getLoc(TAK_escaping)));
       } else {
         auto diag = diagnoseInvalid(repr, attrs.getLoc(i),
                                     diag::attribute_requires_function_type,
                                     TypeAttributes::getAttrName(i));
 
-        // If we see @escaping among the attributes on this type, because it isn't
-        // a function type, we'll remove it.
+        // If we see @escaping among the attributes on this type, because it
+        // isn't a function type, we'll remove it.
         if (i == TAK_escaping) {
-          diag.fixItRemove(getTypeAttrRangeWithAt(Context,
-                                                  attrs.getLoc(TAK_escaping)));
+          diag.fixItRemove(
+              getTypeAttrRangeWithAt(Context, attrs.getLoc(TAK_escaping)));
         }
       }
       attrs.clearAttribute(i);
