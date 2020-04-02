@@ -6,6 +6,6 @@
 // RUN: not %target-typecheck-verify-swift -I %S/Inputs/broken-c-module 2>&1 | %FileCheck %s
 
 // CHECK: [[@LINE+3]]:8: error: unexpected error produced: could not build
-// CHECK: note: diagnostic produced by Clang: in file included from <module-includes>
-// CHECK: broken_c.h:2:11: error: diagnostic produced by Clang: expected function body after function declarator
+// CHECK: note: diagnostic produced elsewhere: in file included from <module-includes>
+// CHECK: broken_c.h:2:11: error: diagnostic produced elsewhere: expected function body after function declarator
 import BrokenCModule
