@@ -3,6 +3,11 @@
 // SR-12493: SIL verification error regarding substituted function types and
 // `differentiable_function_extract` instruction. Occurs only with `-O`.
 
+// SWIFT_ENABLE_TENSORFLOW
+// Note: SR-12493 occurs only on master branch, not on tensorflow branch.
+// UNSUPPORTED: tensorflow
+// SWIFT_ENABLE_TENSORFLOW END
+
 import _Differentiation
 
 func exampleVJP_1(_ x0: Float) -> (Float, (Float) -> (Float)) {
