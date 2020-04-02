@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 extension FixedWidthInteger {
   /// Creates a new integer value from the given string and radix.
   ///
@@ -46,10 +48,17 @@ extension FixedWidthInteger {
   @inlinable @inline(__always)
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     precondition(2...36 ~= radix)
+    // Check we can load the UTF-8 in UInt64 chunks.
     let wholeGuts = text._wholeGuts
-    // The specialized paths require that all of the contiguous bytes can
-    // be read using UInt64 loads from (address & ~7).
-    if wholeGuts._object.isPreferredRepresentation, Self.bitWidth <= 64 {
+    let canChunkLoad: Bool
+    if S.self == String.self {
+      canChunkLoad = wholeGuts.isSmall || wholeGuts.count >= 9 // +1 for sign.
+    } else {
+      canChunkLoad = (wholeGuts.isSmall ? 16 : wholeGuts.count)
+        &- text.startIndex._encodedOffset >= 9
+    }
+    if _fastPath(canChunkLoad), _fastPath(wholeGuts.isFastUTF8),
+        Self.bitWidth <= 64 {
       let r64_ = wholeGuts.withFastUTF8({ utf8 -> UInt64? in
         let utf8 = (S.self == String.self) ? utf8 :
           UnsafeBufferPointer(rebasing: utf8[text._offsetRange])
@@ -215,7 +224,7 @@ internal func _parseUnsignedBase10(
   let p = UnsafeRawPointer(utf8.baseAddress._unsafelyUnwrappedUnchecked)
   let count = utf8.count
   let firstCount = (count &- 1) % 8 &+ 1
-  let firstChunk = _loadUnalignedChunk(p, count: firstCount)
+  let firstChunk = _loadUnalignedUInt64LittleEndian(p)
   let firstDigits_ = convertToDigits(firstChunk, bitCount: firstCount &* 8)
   guard _fastPath(firstDigits_ != nil), let firstDigits = firstDigits_
       else { return nil }
@@ -224,7 +233,7 @@ internal func _parseUnsignedBase10(
   value &+= parseDigitChunk(UInt32(truncatingIfNeeded: firstDigits)) &* 10_000
   var consumed = firstCount
   while consumed < count {
-    let chunk = _loadUnalignedChunk(p + consumed, count: 8)
+    let chunk = _loadUnalignedUInt64LittleEndian(p + consumed)
     let chunkDigits_ = convertToDigits(chunk, bitCount: 64)
     guard _fastPath(chunkDigits_ != nil), let chunkDigits = chunkDigits_
       else { return nil }
@@ -281,14 +290,14 @@ internal func _parseUnsignedBase16(
   let p = UnsafeRawPointer(utf8.baseAddress._unsafelyUnwrappedUnchecked)
   let count = utf8.count
   let firstCount = (count &- 1) % 8 &+ 1
-  let firstChunk = _loadUnalignedChunk(p, count: firstCount)
+  let firstChunk = _loadUnalignedUInt64LittleEndian(p)
   let firstValue_ = parseChunk(firstChunk, bitCount: firstCount &* 8)
   guard _fastPath(firstValue_ != nil), var value = firstValue_
       else { return nil }
   var consumed = firstCount
   while consumed < count {
     guard _fastPath(value < 0x1_0000_0000) else { return nil }
-    let chunk = _loadUnalignedChunk(p + consumed, count: 8)
+    let chunk = _loadUnalignedUInt64LittleEndian(p + consumed)
     let chunkValue_ = parseChunk(chunk, bitCount: 64)
     guard _fastPath(chunkValue_ != nil), let chunkValue = chunkValue_
       else { return nil }
@@ -329,14 +338,14 @@ internal func _parseUnsignedBase2(
   let p = UnsafeRawPointer(utf8.baseAddress._unsafelyUnwrappedUnchecked)
   let count = utf8.count
   let firstCount = (count &- 1) % 8 &+ 1
-  let firstChunk = _loadUnalignedChunk(p, count: firstCount)
+  let firstChunk = _loadUnalignedUInt64LittleEndian(p)
   let firstValue_ = parseChunk(firstChunk, bitCount: firstCount &* 8)
   guard _fastPath(firstValue_ != nil), var value = firstValue_
       else { return nil }
   var consumed = firstCount
   while consumed < count {
     guard _fastPath(value < 0x100_0000_0000_0000) else { return nil }
-    let chunk = _loadUnalignedChunk(p + consumed, count: 8)
+    let chunk = _loadUnalignedUInt64LittleEndian(p + consumed)
     let chunkValue_ = parseChunk(chunk, bitCount: 64)
     guard _fastPath(chunkValue_ != nil), let chunkValue = chunkValue_
       else { return nil }
@@ -347,31 +356,8 @@ internal func _parseUnsignedBase2(
 }
 
 @_alwaysEmitIntoClient
-internal func _loadUnalignedChunk(
-  _ ptr: UnsafeRawPointer, count: Int
-) -> UInt64 {
-  // Load up to 8 bytes into a UInt64, in little-endian order. Caller must
-  // guarantee that for each byte the entire 64 bits in which it falls using
-  // 64-bit alignment is allowed to be read. The unused parts of the UInt64
-  // are garbage and are the caller's resposibility to ignore.
-  let first = UInt(bitPattern: ptr)
-  let last = first &+ UInt(bitPattern: count) &- 1
-    let w1 = UnsafeRawPointer(bitPattern: first & ~0x07)
-    ._unsafelyUnwrappedUnchecked.load(as: UInt64.self)
-  let w2 = UnsafeRawPointer(bitPattern: last & ~0x07)
-    ._unsafelyUnwrappedUnchecked.load(as: UInt64.self)
-  let offset = (first & 0x07) &* 8 // Bit offset inside first UInt64.
-  // Combine the two words.
-  // If count is not high enough to push `last` into the next UInt64, w1 and w2
-  // will be identical, but the shift below will push the second copy out of
-  // relevance. Also note that if offset is 0, the second shift will mask to 0
-  // instead of 64, but in this case w1 and w2 must be identical and neither
-  // is shifted thus making `w1 | w2` still correct.
-  if 1 == 1.littleEndian {
-    return (w1 &>> offset) | (w2 &<< (64 &- offset))
-  } else {
-    return ((w1 &<< offset) | (w2 &>> (64 &- offset))).littleEndian
-  }
+internal func _loadUnalignedUInt64LittleEndian(_ ptr: UnsafeRawPointer) -> UInt64 {
+  return _swift_stdlib_loadUInt64Unaligned(ptr).littleEndian
 }
 
 @usableFromInline

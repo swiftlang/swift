@@ -39,6 +39,13 @@ SWIFT_RUNTIME_STDLIB_API
 void
 _swift_stdlib_overrideUnsafeArgvArgc(char * _Nullable * _Nonnull argv, int argc);
 
+static inline SWIFT_ALWAYS_INLINE
+__swift_uint64_t _swift_stdlib_loadUInt64Unaligned(const void * _Nonnull p) {
+  __swift_uint64_t result;
+  __builtin_memcpy(&result, p, sizeof result);
+  return result;
+}
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifdef __cplusplus
