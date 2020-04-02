@@ -1278,7 +1278,7 @@ public:
           Context.SourceMgr.extractText({VD->getNameLoc(), 1}) != "`") {
         auto &DE = getASTContext().Diags;
         DE.diagnose(VD->getNameLoc(), diag::reserved_member_name,
-                    VD->getFullName(), VD->getBaseName().getIdentifier().str());
+                    VD->getFullName(), VD->getBaseIdentifier().str());
         DE.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
             .fixItReplace(VD->getNameLoc(),
                           "`" + VD->getBaseName().userFacingName().str() + "`");

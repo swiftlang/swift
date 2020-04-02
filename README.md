@@ -45,12 +45,11 @@ You will also need [CMake](https://cmake.org), [Ninja](https://ninja-build.org),
 
 **[Homebrew](https://brew.sh/)**
 
-```shell
-brew install cmake ninja
-brew cask install java # required for Bazel
-```
-
-You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle) to install all of these dependencies:
+    brew install cmake ninja
+    
+You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle)
+from the root of this repository's working directory to install all of these
+dependencies:
 
     brew bundle
 
@@ -341,7 +340,7 @@ particular the section on [lit.py](docs/Testing.md#using-litpy).
 
 ### CMake
 [CMake](https://cmake.org) is the core infrastructure used to configure builds of
-Swift and its companion projects; at least version 3.4.3 is required.
+Swift and its companion projects; at least version 3.16.5 is required.
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded

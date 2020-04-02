@@ -2180,7 +2180,7 @@ public:
         VD->shouldHideFromEditor())
       return;
 
-    Identifier Name = VD->getName();
+    const Identifier Name = VD->getName();
     assert(!Name.empty() && "name should not be empty");
 
     CommandWordsPairs Pairs;
@@ -2579,17 +2579,17 @@ public:
 
   void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason,
                      DynamicLookupInfo dynamicLookupInfo) {
-    if (FD->getName().empty())
+    if (FD->getBaseIdentifier().empty())
       return;
 
     // Suppress "sequenced" as a result, because it crashes completions.
     // TODO(TF-315): Fix properly and then remove this.
-    if (FD->getName().str() == "sequenced")
+    if (FD->getBaseIdentifier().str() == "sequenced")
       return;
 
     foundFunction(FD);
 
-    Identifier Name = FD->getName();
+    const Identifier Name = FD->getBaseIdentifier();
     assert(!Name.empty() && "name should not be empty");
 
     Type FunctionType = getTypeOfMember(FD, dynamicLookupInfo);
@@ -2953,7 +2953,7 @@ public:
     setAssociatedDecl(EED, Builder);
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
-    addValueBaseName(Builder, EED->getName());
+    addValueBaseName(Builder, EED->getBaseIdentifier());
 
     // Enum element is of function type; (Self.type) -> Self or
     // (Self.Type) -> (Args...) -> Self.

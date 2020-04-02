@@ -1149,7 +1149,7 @@ static ManagedValue emitBuiltinApplyDerivative(
   auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
       cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
           ->getDecl());
-  auto builtinName = builtinDecl->getName().str();
+  const auto builtinName = builtinDecl->getBaseIdentifier().str();
   AutoDiffDerivativeFunctionKind kind;
   unsigned arity;
   bool throws;
@@ -1167,7 +1167,7 @@ static ManagedValue emitBuiltinApplyTranspose(
   auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
       cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
           ->getDecl());
-  auto builtinName = builtinDecl->getName().str();
+  const auto builtinName = builtinDecl->getBaseIdentifier().str();
   unsigned arity;
   bool throws;
   auto successfullyParsed = autodiff::getBuiltinApplyTransposeConfig(
@@ -1202,7 +1202,8 @@ static ManagedValue emitBuiltinLinearFunction(
   auto linearFn = SGF.B.createLinearFunction(
       loc,
       IndexSubset::getDefault(
-          SGF.getASTContext(), origType->getNumParameters(),
+          SGF.getASTContext(),
+          origType->getNumParameters(),
           /*includeAll*/ true),
       origFn.forward(SGF), args[1].forward(SGF));
   return SGF.emitManagedRValueWithCleanup(linearFn);
@@ -1346,7 +1347,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   if (!isa<BuiltinUnit>(decl->getDeclContext()))
     return None;
 
-  auto name = decl->getBaseName().getIdentifier();
+  const auto name = decl->getBaseIdentifier();
   const BuiltinInfo &builtin = SGM.M.getBuiltinInfo(name);
   switch (builtin.ID) {
   // All the non-SIL, non-type-trait builtins should use the

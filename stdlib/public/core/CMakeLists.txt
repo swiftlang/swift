@@ -208,6 +208,8 @@ set(SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_GYB_SOURCES)
 if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
   list(APPEND SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES
     ../Differentiation/Differentiable.swift
+    ../Differentiation/DifferentialOperators.swift
+    ../Differentiation/DifferentiationUtilities.swift
     ../Differentiation/DifferentiationSupport.swift)
   list(APPEND SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_GYB_SOURCES
     ../Differentiation/FloatingPointTypesDerivatives.swift.gyb)

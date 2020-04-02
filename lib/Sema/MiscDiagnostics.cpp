@@ -597,7 +597,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
-                         VD->getBaseName().getIdentifier(),
+                         VD->getBaseIdentifier(),
                          VD->getDescriptiveKind(),
                          declParent->getDescriptiveKind(),
                          declParent->getFullName());
@@ -656,7 +656,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (TypeChecker::getDeclTypeCheckingSemantics(DRE->getDecl())
             != DeclTypeCheckingSemantics::Normal) {
         Ctx.Diags.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
-                           DRE->getDecl()->getBaseName().getIdentifier());
+                           DRE->getDecl()->getBaseIdentifier());
       }
     }
     
@@ -1504,7 +1504,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           memberLoc = DSCE->getLoc();
           Diags.diagnose(DSCE->getLoc(),
                          diag::method_call_in_closure_without_explicit_self,
-                         MethodExpr->getDecl()->getBaseName().getIdentifier());
+                         MethodExpr->getDecl()->getBaseIdentifier());
         }
 
       if (memberLoc.isValid()) {

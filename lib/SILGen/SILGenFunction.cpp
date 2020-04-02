@@ -253,7 +253,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
                      isDeferBody
                      ? diag::capture_before_declaration_defer
                      : diag::capture_before_declaration,
-                     vd->getBaseName().getIdentifier());
+                     vd->getBaseIdentifier());
       Diags.diagnose(vd->getLoc(), diag::captured_value_declared_here);
       Diags.diagnose(capture.getLoc(), diag::value_captured_here);
 

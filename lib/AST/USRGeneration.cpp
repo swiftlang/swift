@@ -225,7 +225,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
 
     auto ClangMacroInfo = ClangN.getAsMacro();
     bool Ignore = clang::index::generateUSRForMacro(
-        D->getBaseName().getIdentifier().str(),
+        D->getBaseIdentifier().str(),
         ClangMacroInfo->getDefinitionLoc(),
         Importer.getClangASTContext().getSourceManager(), Buffer);
     if (!Ignore)

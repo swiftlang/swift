@@ -1463,7 +1463,7 @@ bool AssignmentFailure::diagnoseAsError() {
         std::string message = "key path is read-only";
         if (auto *SE = dyn_cast<SubscriptExpr>(immutableExpr)) {
           if (auto *DRE = dyn_cast<DeclRefExpr>(getKeyPathArgument(SE))) {
-            auto identifier = DRE->getDecl()->getBaseName().getIdentifier();
+            auto identifier = DRE->getDecl()->getBaseIdentifier();
             message =
                 "'" + identifier.str().str() + "' is a read-only key path";
           }
@@ -1576,7 +1576,7 @@ bool AssignmentFailure::diagnoseAsError() {
     // If we're trying to set an unapplied method, say that.
     if (auto *VD = choice->getDecl()) {
       std::string message = "'";
-      message += VD->getBaseName().getIdentifier().str();
+      message += VD->getBaseIdentifier().str();
       message += "'";
 
       auto diagID = DeclDiagnostic;
@@ -1641,7 +1641,7 @@ bool AssignmentFailure::diagnoseAsError() {
 
     if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn()->getValueProvidingExpr()))
       name = std::string("'") +
-             DRE->getDecl()->getBaseName().getIdentifier().str().str() + "'";
+             DRE->getDecl()->getBaseIdentifier().str().str() + "'";
 
     emitDiagnostic(Loc, DeclDiagnostic, name + " returns immutable value")
         .highlight(AE->getSourceRange());
@@ -3062,7 +3062,7 @@ bool MissingCallFailure::diagnoseAsError() {
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
     emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function,
-                   DRE->getDecl()->getBaseName().getIdentifier())
+                   DRE->getDecl()->getBaseIdentifier())
         .fixItInsertAfter(insertLoc, "()");
     return true;
   }
@@ -3077,7 +3077,7 @@ bool MissingCallFailure::diagnoseAsError() {
   if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(baseExpr)) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
       emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_method,
-                     DRE->getDecl()->getBaseName().getIdentifier())
+                     DRE->getDecl()->getBaseIdentifier())
           .fixItInsertAfter(insertLoc, "()");
       return true;
     }
@@ -3202,7 +3202,7 @@ DeclName MissingMemberFailure::findCorrectEnumCaseName(
   auto candidate =
       corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
         return (isa<EnumElementDecl>(candidate) &&
-                candidate->getFullName().getBaseIdentifier().str().equals_lower(
+                candidate->getBaseIdentifier().str().equals_lower(
                     memberName.getBaseIdentifier().str()));
       });
   return (candidate ? candidate->getFullName() : DeclName());
@@ -4821,7 +4821,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
     // because certain decls will have empty name (like setters).
     if (FD->getBodyResultTypeLoc().getLoc().isInvalid() &&
         FD->getParameters()->getStartLoc().isValid() &&
-        !FD->getName().empty()) {
+        !FD->getBaseIdentifier().empty()) {
       auto fixItLoc = Lexer::getLocForEndOfToken(
           getASTContext().SourceMgr, FD->getParameters()->getEndLoc());
       emitDiagnostic(anchor->getLoc(), diag::add_return_type_note)
@@ -5742,7 +5742,7 @@ bool ExtraneousCallFailure::diagnoseAsError() {
       if (auto *enumCase = dyn_cast<EnumElementDecl>(decl)) {
         auto diagnostic = emitDiagnostic(
             anchor->getLoc(), diag::unexpected_arguments_in_enum_case,
-            enumCase->getName());
+            enumCase->getBaseIdentifier());
         removeParensFixIt(diagnostic);
         return true;
       }
