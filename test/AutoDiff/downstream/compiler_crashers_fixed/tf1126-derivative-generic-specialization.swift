@@ -5,8 +5,6 @@
 // Related to `@differentiable` function with `partial_apply` operands,
 // to be specialized. Occurs only with `-O`.
 
-import _Differentiation
-
 struct A: Differentiable{
   var b: SIMD8<Float>
 }
