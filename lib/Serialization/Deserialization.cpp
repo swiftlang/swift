@@ -562,7 +562,11 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
     ProtocolConformanceXrefLayout::readRecord(scratch, protoID, nominalID,
                                               moduleID);
 
-    auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
+    auto maybeNominal = getDeclChecked(nominalID);
+    if (!maybeNominal)
+      return maybeNominal.takeError();
+
+    auto nominal = cast<NominalTypeDecl>(maybeNominal.get());
     PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
     auto proto = cast<ProtocolDecl>(getDecl(protoID));
     PrettyStackTraceDecl traceTo("... to", proto);

@@ -3062,6 +3062,16 @@ void SILDeserializer::readWitnessTableEntries(
 
 SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
                                                    SILWitnessTable *existingWt) {
+  auto deserialized = readWitnessTableChecked(WId, existingWt);
+  if (!deserialized) {
+    MF->fatal(deserialized.takeError());
+  }
+  return deserialized.get();
+}
+
+llvm::Expected<SILWitnessTable *>
+  SILDeserializer::readWitnessTableChecked(DeclID WId,
+                                           SILWitnessTable *existingWt) {
   if (WId == 0)
     return nullptr;
   assert(WId <= WitnessTables.size() && "invalid WitnessTable ID");
@@ -3108,8 +3118,12 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   }
 
   // Deserialize Conformance.
+  auto maybeConformance = MF->readConformanceChecked(SILCursor);
+  if (!maybeConformance)
+    return maybeConformance.takeError();
+
   auto theConformance = cast<RootProtocolConformance>(
-                          MF->readConformance(SILCursor).getConcrete());
+                          maybeConformance.get().getConcrete());
 
   PrettyStackTraceConformance trace(SILMod.getASTContext(),
                                     "deserializing SIL witness table for",
@@ -3186,8 +3200,18 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
 void SILDeserializer::getAllWitnessTables() {
   if (!WitnessTableList)
     return;
-  for (unsigned I = 0, E = WitnessTables.size(); I < E; I++)
-    readWitnessTable(I + 1, nullptr);
+  for (unsigned I = 0, E = WitnessTables.size(); I < E; I++) {
+    auto maybeTable = readWitnessTableChecked(I + 1, nullptr);
+    if (!maybeTable) {
+      if (maybeTable.errorIsA<XRefNonLoadedModuleError>()) {
+        // This is most likely caused by decls hidden by an implementation-only
+        // import, it is safe to ignore for this function's purpose.
+        consumeError(maybeTable.takeError());
+      } else {
+        MF->fatal(maybeTable.takeError());
+      }
+    }
+  }
 }
 
 SILWitnessTable *
