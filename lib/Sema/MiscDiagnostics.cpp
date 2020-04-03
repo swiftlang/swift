@@ -2236,10 +2236,11 @@ class VarDeclUsageChecker : public ASTWalker {
   DiagnosticEngine &Diags;
   // Keep track of some information about a variable.
   enum {
-    RK_Read        = 1,      ///< Whether it was ever read.
-    RK_Written     = 2,      ///< Whether it was ever written or passed inout.
+    RK_Defined     = 1,      ///< Whether it was ever defined in this scope.
+    RK_Read        = 2,      ///< Whether it was ever read.
+    RK_Written     = 4,      ///< Whether it was ever written or passed inout.
     
-    RK_CaptureList = 4       ///< Var is an entry in a capture list.
+    RK_CaptureList = 8       ///< Var is an entry in a capture list.
   };
   
   /// These are all of the variables that we are tracking.  VarDecls get added
@@ -2280,7 +2281,7 @@ public:
       if (FD->getAccessorKind() == AccessorKind::Set) {
         if (auto getter = dyn_cast<VarDecl>(FD->getStorage())) {
           auto arguments = FD->getParameters();
-          VarDecls[arguments->get(0)] = 0;
+          VarDecls[arguments->get(0)] = RK_Defined;
           AssociatedGetter = getter;
         }
       }
@@ -2291,9 +2292,9 @@ public:
 
   VarDeclUsageChecker(VarDecl *vd) : Diags(vd->getASTContext().Diags) {
     // Track a specific VarDecl
-    VarDecls[vd] = 0;
+    VarDecls[vd] = RK_Defined;
     if (auto *childVd = vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
-      VarDecls[childVd] = 0;
+      VarDecls[childVd] = RK_Defined;
     }
   }
 
@@ -2323,10 +2324,6 @@ public:
     }
     return sawMutation;
   }
-    
-  bool isVarDeclEverWritten(VarDecl *VD) {
-    return (VarDecls[VD] & RK_Written) != 0;
-  }
 
   bool shouldTrackVarDecl(VarDecl *VD) {
     // If the variable is implicit, ignore it.
@@ -2355,9 +2352,7 @@ public:
     auto *vd = dyn_cast<VarDecl>(D);
     if (!vd) return;
 
-    auto vdi = VarDecls.find(vd);
-    if (vdi != VarDecls.end())
-      vdi->second |= Flag;
+    VarDecls[vd] |= Flag;
   }
   
   void markBaseOfStorageUse(Expr *E, ConcreteDeclRef decl, unsigned flags);
@@ -2385,17 +2380,17 @@ public:
           // that fact for better diagnostics.
           auto parentAsExpr = Parent.getAsExpr();
           if (parentAsExpr && isa<CaptureListExpr>(parentAsExpr))
-            return RK_CaptureList;
+            return RK_CaptureList | RK_Defined;
           // Otherwise, return none.
-          return 0;
+          return RK_Defined;
         }();
 
         if (!vd->isImplicit()) {
           if (auto *childVd =
                   vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
             // Child vars are never in capture lists.
-            assert(defaultFlags == 0);
-            VarDecls[childVd] |= 0;
+            assert(defaultFlags == RK_Defined);
+            VarDecls[childVd] |= RK_Defined;
           }
         }
         VarDecls[vd] |= defaultFlags;
@@ -2437,7 +2432,7 @@ public:
           if (!PBD) continue;
           for (auto idx : range(PBD->getNumPatternEntries())) {
             PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
-              VarDecls[VD] = RK_Read|RK_Written;
+              VarDecls[VD] = RK_Read|RK_Written|RK_Defined;
             });
           }
         } else if (node.is<Stmt *>()) {
@@ -2448,7 +2443,7 @@ public:
           for (StmtConditionElement SCE : GS->getCond()) {
             if (auto pattern = SCE.getPatternOrNull()) {
               pattern->forEachVariable([&](VarDecl *VD) {
-                VarDecls[VD] = RK_Read|RK_Written;
+                VarDecls[VD] = RK_Read|RK_Written|RK_Defined;
               });
             }
           }
@@ -2507,7 +2502,7 @@ public:
     // Make sure that we setup our case body variables.
     if (auto *caseStmt = dyn_cast<CaseStmt>(S)) {
       for (auto *vd : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
-        VarDecls[vd] |= 0;
+        VarDecls[vd] |= RK_Defined;
       }
     }
 
@@ -2660,6 +2655,10 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     VarDecl *var;
     unsigned access;
     std::tie(var, access) = p;
+
+    // If the variable was not defined in this scope, we can safely ignore it.
+    if (!(access & RK_Defined))
+      continue;
 
     if (auto *caseStmt =
             dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {

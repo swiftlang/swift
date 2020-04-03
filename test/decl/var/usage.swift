@@ -435,3 +435,14 @@ func testLocalFunc() {
     mutatedVar = 1
   }
 }
+
+// False positive "'var' was never mutated" warning - rdar://60563962
+func testForwardReferenceCapture() {
+  func innerFunc() {
+    x = 10
+  }
+
+  var x: Int = 1
+  innerFunc()
+  print(x)
+}
