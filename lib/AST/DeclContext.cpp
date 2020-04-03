@@ -1081,6 +1081,7 @@ bool DeclContext::isClassConstrainedProtocolExtension() const {
 SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   switch (dc->getContextKind()) {
   case DeclContextKind::Module:
+    return SourceLoc();
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::ExtensionDecl:
