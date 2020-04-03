@@ -141,7 +141,7 @@ struct PropertyWrapperBackingPropertyInfo {
   ///
   /// \code
   /// @Lazy var i = 17
-  /// \end
+  /// \endcode
   ///
   /// This is the specified initial value (\c 17), which is suitable for
   /// embedding in the expression \c initializeFromOriginal.
