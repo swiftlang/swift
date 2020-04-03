@@ -4157,6 +4157,7 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.convertType = convertType;
   expression.pattern = nullptr;
   expression.wrappedVar = nullptr;
+  expression.innermostWrappedValueInit = nullptr;
   expression.isDiscarded = isDiscarded;
   expression.bindPatternVarsOneWay = false;
   expression.patternBinding = nullptr;
