@@ -151,7 +151,7 @@ class DumpConfig:
         for path in self.inputs:
             cmd.extend(['-I', path])
         if self.abi:
-            cmd.extend(['-abi'])
+            cmd.extend(['-abi', '-swift-only'])
         cmd.extend(['-' + o for o in opts])
         if self.verbose:
             cmd.extend(['-v'])
