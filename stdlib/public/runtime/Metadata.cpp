@@ -5512,6 +5512,8 @@ bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
   if (auto *metadata = dyn_cast<EnumMetadata>(this))
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<ClassMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
 
   return false;
 }
