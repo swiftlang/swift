@@ -50,10 +50,15 @@ enum class SelfAccessorKind {
   Super,
 };
 
-Expr *buildSelfReference(VarDecl *selfDecl,
-                         SelfAccessorKind selfAccessorKind,
-                         bool isLValue,
-                         ASTContext &ctx);
+/// Builds a reference to the \c self decl in a function.
+///
+/// \param selfDecl The self decl to reference.
+/// \param selfAccessorKind The kind of access being performed.
+/// \param isLValue Whether the resulting expression is an lvalue.
+/// \param convertTy The type of the resulting expression. For a reference to
+/// super, this can be a superclass type to upcast to.
+Expr *buildSelfReference(VarDecl *selfDecl, SelfAccessorKind selfAccessorKind,
+                         bool isLValue, Type convertTy = Type());
 
 /// Build an expression that evaluates the specified parameter list as a tuple
 /// or paren expr, suitable for use in an apply expr.

@@ -654,6 +654,13 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       semantics = AccessSemantics::Ordinary;
       selfAccessKind = SelfAccessorKind::Super;
 
+      auto isMetatype = false;
+      if (auto *metaTy = selfTypeForAccess->getAs<MetatypeType>()) {
+        isMetatype = true;
+        selfTypeForAccess = metaTy->getInstanceType();
+      }
+
+      // Adjust the self type of the access to refer to the relevant superclass.
       auto *baseClass = override->getDeclContext()->getSelfClassDecl();
       selfTypeForAccess = selfTypeForAccess->getSuperclassForDecl(baseClass);
       subs =
@@ -662,6 +669,9 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
           baseClass);
 
       storage = override;
+
+      if (isMetatype)
+        selfTypeForAccess = MetatypeType::get(selfTypeForAccess);
 
     // Otherwise do a self-reference, which is dynamically bogus but
     // should be statically valid.  This should only happen in invalid cases.    
@@ -751,6 +761,11 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   bool isMemberLValue = isLValue;
   auto propertyWrapperMutability =
       [&](Decl *decl) -> Optional<std::pair<bool, bool>> {
+    // If we're not accessing via a property wrapper, we don't need to adjust
+    // the mutability.
+    if (target != TargetImpl::Wrapper && target != TargetImpl::WrapperStorage)
+      return None;
+
     auto var = dyn_cast<VarDecl>(decl);
     if (!var)
       return None;
@@ -781,17 +796,8 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       isSelfLValue |= mut->second;
   }
 
-  Expr *selfDRE =
-    buildSelfReference(selfDecl, selfAccessKind, isSelfLValue,
-                       ctx);
-  if (isSelfLValue)
-    selfTypeForAccess = LValueType::get(selfTypeForAccess);
-
-  if (!selfDRE->getType()->isEqual(selfTypeForAccess)) {
-    assert(selfAccessKind == SelfAccessorKind::Super);
-    selfDRE = new (ctx) DerivedToBaseExpr(selfDRE, selfTypeForAccess);
-  }
-
+  Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, isSelfLValue,
+                                     /*convertTy*/ selfTypeForAccess);
   Expr *lookupExpr;
   ConcreteDeclRef memberRef(storage, subs);
   auto type = storage->getValueInterfaceType().subst(subs);
@@ -1452,8 +1458,8 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     ValueDRE->setType(arg->getType());
 
     if (SelfDecl) {
-      auto *SelfDRE = buildSelfReference(SelfDecl, SelfAccessorKind::Peer,
-                                         IsSelfLValue, Ctx);
+      auto *SelfDRE =
+          buildSelfReference(SelfDecl, SelfAccessorKind::Peer, IsSelfLValue);
       SelfDRE = maybeWrapInOutExpr(SelfDRE, Ctx);
       auto *DSCE = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
 
