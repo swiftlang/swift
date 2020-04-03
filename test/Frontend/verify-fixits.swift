@@ -1,26 +1,24 @@
-// RUN: cp %s %t
-// RUN: not %swift -typecheck -target %target-triple -verify-apply-fixes %t
-// RUN: diff %t %s.result
+// Tests for fix-its on `-verify` mode.
 
-func f1() {
-  guard true { return } // expected-error {{...}}
-
-  guard true { return } // expected-error {{expected 'else' after 'guard' condition}} {{none}}
-}
+// RUN: not %target-typecheck-verify-swift 2>&1 | %FileCheck %s
 
 func labeledFunc(aa: Int, bb: Int) {}
 
 func test0Fixits() {
   undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
 
+  // CHECK: [[@LINE+1]]:86: error: expected fix-it not seen
   undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}}
 
+  // CHECK: [[@LINE+1]]:86: error: expected fix-it not seen
   undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}} {{2-2=b}}
 
   undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{none}}
 
+  // CHECK: [[@LINE+1]]:86: error: expected fix-it not seen
   undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}} {{none}}
 
+  // CHECK: [[@LINE+1]]:86: error: expected fix-it not seen
   undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}} {{2-2=b}} {{none}}
 }
 
@@ -29,20 +27,27 @@ func test1Fixits() {
 
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=aa}}
 
+  // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}}
 
+  // CHECK: [[@LINE+1]]:134: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=aa}} {{15-18=xx}}
 
+  // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}} {{15-18=aa}}
 
+  // CHECK: [[@LINE+1]]:121: error: expected no fix-its; actual fix-it seen: {{{{}}15-18=aa}}
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{none}}
 
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=aa}} {{none}}
 
+  // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}} {{none}}
 
+  // CHECK: [[@LINE+1]]:134: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=aa}} {{15-18=xx}} {{none}}
 
+  // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}} {{15-18=aa}} {{none}}
 }
 
@@ -51,17 +56,22 @@ func test2Fixits() {
 
   labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}}
 
+  // CHECK: [[@LINE+1]]:124: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}} {{{{}}23-26=bb}}
   labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=xx}}
 
   labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{23-26=bb}}
 
+  // CHECK: [[@LINE+1]]:137: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}} {{{{}}23-26=bb}}
   labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{23-26=xx}}
 
+  // CHECK: [[@LINE+1]]:124: error: expected no fix-its; actual fix-it seen: {{{{}}15-18=aa}} {{{{}}23-26=bb}}
   labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{none}}
 
+  // CHECK: [[@LINE+1]]:137: error: unexpected fix-it seen; actual fix-it seen: {{{{}}15-18=aa}} {{{{}}23-26=bb}}
   labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{none}}
 
   labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{23-26=bb}} {{none}}
 
+  // CHECK: [[@LINE+1]]:137: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}} {{{{}}23-26=bb}}
   labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{23-26=xx}} {{none}}
 }

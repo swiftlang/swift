@@ -547,46 +547,87 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     
     auto &FoundDiagnostic = *FoundDiagnosticIter;
 
-    const char *IncorrectFixit = nullptr;
+    const char *missedFixitLoc = nullptr;
     // Verify that any expected fix-its are present in the diagnostic.
     for (auto fixit : expected.Fixits) {
       // If we found it, we're ok.
-      if (!checkForFixIt(fixit, FoundDiagnostic, InputFile))
-        IncorrectFixit = fixit.StartLoc;
+      if (!checkForFixIt(fixit, FoundDiagnostic, InputFile)) {
+        missedFixitLoc = fixit.StartLoc;
+        break;
+      }
     }
 
-    bool matchedAllFixIts =
-        expected.Fixits.size() == FoundDiagnostic.FixIts.size();
+    bool isUnexpectedFixitsSeen =
+        expected.Fixits.size() < FoundDiagnostic.FixIts.size();
 
     // If we have any expected fixits that didn't get matched, then they are
     // wrong.  Replace the failed fixit with what actually happened.
-    if (IncorrectFixit) {
-      if (FoundDiagnostic.FixIts.empty()) {
-        addError(IncorrectFixit, "expected fix-it not seen");
-      } else {
-        // If we had an incorrect expected fixit, render it and produce a fixit
-        // of our own.
-        auto actual = renderFixits(FoundDiagnostic.FixIts, InputFile);
-        auto replStartLoc = SMLoc::getFromPointer(expected.Fixits[0].StartLoc);
-        auto replEndLoc = SMLoc::getFromPointer(expected.Fixits.back().EndLoc);
 
-        llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
-        addError(IncorrectFixit,
-                 "expected fix-it not seen; actual fix-its: " + actual, fix);
+    if (missedFixitLoc ||
+        (expected.noExtraFixitsMayAppear && isUnexpectedFixitsSeen)) {
+      const char *fixItsStartLoc = missedFixitLoc;
+      if (!fixItsStartLoc) {
+        assert(expected.noExtraFixitsMayAppear);
+        fixItsStartLoc = expected.ExpectedEnd - 8; // {{none}} length
       }
-    } else if (expected.noExtraFixitsMayAppear &&
-               !matchedAllFixIts &&
-               !expected.mayAppear) {
+
+      // If we had an incorrect expected fixit, render it and produce a fixit
+      // of our own.
       // If there was no fixit specification, but some were produced, add a
       // fixit to add them in.
-      auto actual = renderFixits(FoundDiagnostic.FixIts, InputFile);
-      auto replStartLoc = SMLoc::getFromPointer(expected.ExpectedEnd - 8); // {{none}} length
-      auto replEndLoc = SMLoc::getFromPointer(expected.ExpectedEnd);
+      std::string actualFixits;
+      const char *replStartLoc = nullptr, *replEndLoc = nullptr;
+      if (!FoundDiagnostic.FixIts.empty()) {
+        actualFixits = renderFixits(FoundDiagnostic.FixIts, InputFile);
+      }
 
-      llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
-      addError(replStartLoc.getPointer(), "expected no fix-its; actual fix-it seen: " + actual, fix);
+      if (!expected.Fixits.empty()) {
+        replStartLoc = expected.Fixits.front().StartLoc;
+        replEndLoc = expected.Fixits.back().EndLoc;
+      } else {
+        assert(expected.noExtraFixitsMayAppear);
+        // insert fix-its before {{none}}
+        replStartLoc = fixItsStartLoc;
+        replEndLoc = replStartLoc;
+      }
+
+      std::string message;
+      if (missedFixitLoc) {
+        message = "expected fix-it not seen";
+      } else {
+        assert(expected.noExtraFixitsMayAppear);
+        if (expected.Fixits.empty()) {
+          message = "expected no fix-its";
+        } else {
+          message = "unexpected fix-it seen";
+        }
+      }
+
+      if (replStartLoc && replEndLoc) {
+        if (!actualFixits.empty()) {
+          message += "; actual fix-it seen: " + actualFixits;
+        }
+
+        std::string fixRepl = actualFixits;
+        if (fixRepl.empty()) {
+          if (replStartLoc[-1] == ' ') {
+            replStartLoc--;
+          }
+        } else {
+          if (replStartLoc == replEndLoc) {
+            fixRepl += " ";
+          }
+        }
+
+        llvm::SMFixIt fix(llvm::SMRange(SMLoc::getFromPointer(replStartLoc),
+                                        SMLoc::getFromPointer(replEndLoc)),
+                          fixRepl);
+        addError(fixItsStartLoc, message, fix);
+      } else {
+        addError(fixItsStartLoc, message);
+      }
     }
-    
+
     // Actually remove the diagnostic from the list, so we don't match it
     // again. We do have to do this after checking fix-its, though, because
     // the diagnostic owns its fix-its.
