@@ -5892,7 +5892,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
             SF.hasTestableOrPrivateImport(
                 AccessLevel::Internal, TheModule,
                 SourceFile::ImportQueryKind::PrivateOnly),
-            Ctx.LangOpts.CodeCompleteInitsInPostfixExpr};
+            Ctx.LangOpts.CodeCompleteInitsInPostfixExpr,
+            CompletionContext.getAnnnoateResult(),
+        };
 
         using PairType = llvm::DenseSet<swift::ide::CodeCompletionCache::Key,
             llvm::DenseMapInfo<CodeCompletionCache::Key>>::iterator;
@@ -6088,6 +6090,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     if (!V.hasValue()) {
       // No cached results found. Fill the cache.
       V = context.Cache.createValue();
+      (*V)->Sink.annotateResult = context.getAnnnoateResult();
       lookupCodeCompletionResultsFromModule(
           (*V)->Sink, R.TheModule, R.Key.AccessPath,
           R.Key.ResultsHaveLeadingDot, DCForModules);
