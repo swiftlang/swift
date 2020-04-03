@@ -194,7 +194,7 @@ foreach(SDK ${SWIFT_SDKS})
     foreach(BUILD_FLAVOR ${build_flavors})
     # Configure variables for this subdirectory.
     set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-    set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
+    get_versioned_target_triple(VARIANT_TRIPLE ${SDK} ${ARCH} "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
     set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
     set(DEFAULT_OSX_VARIANT_SUFFIX "")
 
