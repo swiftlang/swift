@@ -1754,9 +1754,12 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   PrettyStackTraceType stackTrace(IGM.Context, "converting", ty);
 
   switch (ty->getKind()) {
-  case TypeKind::Error:
-    llvm_unreachable("found an ErrorType in IR-gen");
-
+  case TypeKind::Error: {
+    // We might see error types if type checking has failed.
+    // Try to do something graceful and return an zero sized type.
+    auto &ctx = ty->getASTContext();
+    return convertTupleType(cast<TupleType>(ctx.TheEmptyTupleType));
+  }
 #define UNCHECKED_TYPE(id, parent) \
   case TypeKind::id: \
     llvm_unreachable("found a " #id "Type in IR-gen");
