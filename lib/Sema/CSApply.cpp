@@ -1966,14 +1966,19 @@ namespace {
 
       // Looks like there is a chain of implicit `subscript(dynamicMember:)`
       // calls necessary to resolve a member reference.
-      if (overload.choice.getKind() ==
-          OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+      switch (overload.choice.getKind()) {
+      case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
         buildKeyPathSubscriptComponent(overload, dotLoc, /*indexExpr=*/nullptr,
                                        ctx.Id_dynamicMember, componentLoc,
                                        components);
         keyPath->resolveComponents(ctx, components);
         cs.cacheExprTypes(keyPath);
         return keyPath;
+      }
+
+      default:
+        break;
       }
 
       // We can't reuse existing expression because type-check
@@ -2839,7 +2844,7 @@ namespace {
           // assigned case comes from Optional<T>
           if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
             isOptional = EED->getParentEnum()->isOptionalDecl();
-            memberName = EED->getBaseName().getIdentifier();
+            memberName = EED->getBaseIdentifier();
           }
           
           // Return if the enum case doesn't come from Optional<T>
@@ -6640,62 +6645,65 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto toEI = toFunc->getExtInfo();
     assert(toType->is<FunctionType>());
 
-    // SWIFT_ENABLE_TENSORFLOW
-    auto fromEI = fromFunc->getExtInfo();
-    auto isFromDifferentiable = fromEI.isDifferentiable();
-    auto isToDifferentiable = toEI.isDifferentiable();
-    // Handle implicit conversion from @differentiable.
-    if (isFromDifferentiable && !isToDifferentiable) {
-      fromFunc = fromFunc->getWithoutDifferentiability()
-          ->castTo<FunctionType>();
-      switch (fromEI.getDifferentiabilityKind()) {
-      case DifferentiabilityKind::Normal:
-        expr = cs.cacheType(new (ctx)
-            DifferentiableFunctionExtractOriginalExpr(expr, fromFunc));
-        break;
-      case DifferentiabilityKind::Linear:
-        expr = cs.cacheType(new (ctx)
-            LinearFunctionExtractOriginalExpr(expr, fromFunc));
-        break;
-      case DifferentiabilityKind::NonDifferentiable:
-        llvm_unreachable("Cannot be NonDifferentiable");
+    // Handle implicit conversions between non-@differentiable and
+    // @differentiable functions.
+    {
+      auto fromEI = fromFunc->getExtInfo();
+      auto isFromDifferentiable = fromEI.isDifferentiable();
+      auto isToDifferentiable = toEI.isDifferentiable();
+      // Handle implicit conversion from @differentiable.
+      if (isFromDifferentiable && !isToDifferentiable) {
+        fromFunc = fromFunc->getWithoutDifferentiability()
+            ->castTo<FunctionType>();
+        switch (fromEI.getDifferentiabilityKind()) {
+        case DifferentiabilityKind::Normal:
+          expr = cs.cacheType(new (ctx)
+              DifferentiableFunctionExtractOriginalExpr(expr, fromFunc));
+          break;
+        case DifferentiabilityKind::Linear:
+          expr = cs.cacheType(new (ctx)
+              LinearFunctionExtractOriginalExpr(expr, fromFunc));
+          break;
+        case DifferentiabilityKind::NonDifferentiable:
+          llvm_unreachable("Cannot be NonDifferentiable");
+        }
       }
-    }
-    // Handle implicit conversion from @differentiable(linear) to
-    // @differentiable.
-    else if (fromEI.getDifferentiabilityKind() ==
-                 DifferentiabilityKind::Linear &&
-             toEI.getDifferentiabilityKind() == DifferentiabilityKind::Normal) {
-      // TODO(TF-908): Create a `LinearToDifferentiableFunctionExpr` and SILGen
-      // it as thunk application. Remove the diagnostic.
-      ctx.Diags.diagnose(expr->getLoc(),
-                         diag::unsupported_linear_to_differentiable_conversion);
-    }
-    // Handle implicit conversion from non-@differentiable to @differentiable.
-    maybeDiagnoseUnsupportedDifferentiableConversion(cs, expr, toFunc);
-    if (!isFromDifferentiable && isToDifferentiable) {
-      auto newEI =
-          fromEI.withDifferentiabilityKind(toEI.getDifferentiabilityKind());
-      fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult())
-          ->withExtInfo(newEI)
-          ->castTo<FunctionType>();
-      switch (toEI.getDifferentiabilityKind()) {
-      case DifferentiabilityKind::Normal:
-        expr = cs.cacheType(new (ctx)
-                            DifferentiableFunctionExpr(expr, fromFunc));
-        break;
-      case DifferentiabilityKind::Linear:
-        expr = cs.cacheType(new (ctx)
-                            LinearFunctionExpr(expr, fromFunc));
-        break;
-      case DifferentiabilityKind::NonDifferentiable:
-        llvm_unreachable("Cannot be NonDifferentiable");
+      // Handle implicit conversion from @differentiable(linear) to
+      // @differentiable.
+      else if (fromEI.getDifferentiabilityKind() ==
+                   DifferentiabilityKind::Linear &&
+               toEI.getDifferentiabilityKind() == DifferentiabilityKind::Normal) {
+        // TODO(TF-908): Create a `LinearToDifferentiableFunctionExpr` and SILGen
+        // it as thunk application. Remove the diagnostic.
+        ctx.Diags.diagnose(expr->getLoc(),
+                           diag::unsupported_linear_to_differentiable_conversion);
+      }
+      // Handle implicit conversion from non-@differentiable to @differentiable.
+      maybeDiagnoseUnsupportedDifferentiableConversion(cs, expr, toFunc);
+      if (!isFromDifferentiable && isToDifferentiable) {
+        auto newEI =
+            fromEI.withDifferentiabilityKind(toEI.getDifferentiabilityKind());
+        fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult())
+            ->withExtInfo(newEI)
+            ->castTo<FunctionType>();
+        switch (toEI.getDifferentiabilityKind()) {
+        case DifferentiabilityKind::Normal:
+          expr = cs.cacheType(new (ctx)
+                              DifferentiableFunctionExpr(expr, fromFunc));
+          break;
+        case DifferentiabilityKind::Linear:
+          expr = cs.cacheType(new (ctx)
+                              LinearFunctionExpr(expr, fromFunc));
+          break;
+        case DifferentiabilityKind::NonDifferentiable:
+          llvm_unreachable("Cannot be NonDifferentiable");
+        }
       }
     }
 
     // If we have a ClosureExpr, then we can safely propagate the 'no escape'
     // bit to the closure without invalidating prior analysis.
-    fromEI = fromFunc->getExtInfo();
+    auto fromEI = fromFunc->getExtInfo();
     if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
       auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
       if (!isInDefaultArgumentContext &&
@@ -7048,7 +7056,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 static bool isValidDynamicCallableMethod(FuncDecl *method,
                                          AnyFunctionType *methodType) {
   auto &ctx = method->getASTContext();
-  if (method->getName() != ctx.Id_dynamicallyCall)
+  if (method->getBaseIdentifier() != ctx.Id_dynamicallyCall)
     return false;
   if (methodType->getParams().size() != 1)
     return false;
@@ -8149,6 +8157,17 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
       // If we didn't manage to diagnose anything well, so fall back to
       // diagnosing mining the system to construct a reasonable error message.
       diagnoseFailureFor(target);
+      return None;
+    }
+  }
+
+  // If there are no fixes recorded but score indicates that there
+  // should have been at least one, let's fail application and
+  // produce a fallback diagnostic to highlight the problem.
+  {
+    const auto &score = solution.getFixedScore();
+    if (score.Data[SK_Fix] > 0 || score.Data[SK_Hole] > 0) {
+      maybeProduceFallbackDiagnostic(target);
       return None;
     }
   }

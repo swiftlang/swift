@@ -323,10 +323,10 @@ static void typeCheckDelayedFunctions(SourceFile &SF) {
 
 void swift::performTypeChecking(SourceFile &SF) {
   return (void)evaluateOrDefault(SF.getASTContext().evaluator,
-                                 TypeCheckSourceFileRequest{&SF}, false);
+                                 TypeCheckSourceFileRequest{&SF}, {});
 }
 
-llvm::Expected<bool>
+evaluator::SideEffect
 TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   assert(SF && "Source file cannot be null!");
   assert(SF->ASTStage != SourceFile::TypeChecked &&
@@ -343,10 +343,10 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
   BufferIndirectlyCausingDiagnosticRAII cpr(*SF);
 
-  // Make sure that name binding has been completed before doing any type
+  // Make sure that import resolution has been completed before doing any type
   // checking.
-  performNameBinding(*SF);
-                                  
+  performImportResolution(*SF);
+
   // Could build scope maps here because the AST is stable now.
 
   {
@@ -374,7 +374,6 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     // Type check the top-level elements of the source file.
     for (auto D : SF->getTopLevelDecls()) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-        // Immediately perform global name-binding etc.
         TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
         TypeChecker::contextualizeTopLevelCode(TLCD);
       } else {
@@ -395,7 +394,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     performWholeModuleTypeChecking(*SF);
   }
 
-  return true;
+  return std::make_tuple<>();
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
@@ -421,6 +420,35 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
     Ctx.verifyAllLoadedModules();
   }
 #endif
+}
+
+bool swift::isDifferentiableProgrammingEnabled(SourceFile &SF) {
+  auto &ctx = SF.getASTContext();
+  // Return true if differentiable programming is explicitly enabled.
+  if (ctx.LangOpts.EnableExperimentalDifferentiableProgramming)
+    return true;
+  // Otherwise, return true iff the `_Differentiation` module is imported in
+  // the given source file.
+  bool importsDifferentiationModule = false;
+  for (auto import : namelookup::getAllImports(&SF)) {
+    if (import.second->getName() == ctx.Id_Differentiation) {
+      importsDifferentiationModule = true;
+      break;
+    }
+  }
+  return importsDifferentiationModule;
+}
+
+bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
+  auto &ctx = SF.getASTContext();
+  // Return true if `AdditiveArithmetic` derived conformances are explicitly
+  // enabled.
+  if (ctx.LangOpts.EnableExperimentalAdditiveArithmeticDerivedConformances)
+    return true;
+  // Otherwise, return true iff differentiable programming is enabled.
+  // Differentiable programming depends on `AdditiveArithmetic` derived
+  // conformances.
+  return isDifferentiableProgrammingEnabled(SF);
 }
 
 void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {

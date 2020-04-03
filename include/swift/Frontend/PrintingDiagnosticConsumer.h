@@ -31,6 +31,7 @@ class AnnotatedSourceSnippet;
 class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   llvm::raw_ostream &Stream;
   bool ForceColors = false;
+  bool PrintEducationalNotes = false;
   bool DidErrorOccur = false;
   bool ExperimentalFormattingEnabled = false;
   // The current snippet used to display an error/warning/remark and the notes
@@ -40,6 +41,7 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   // Educational notes which are buffered until the consumer is finished
   // constructing a snippet.
   SmallVector<std::string, 1> BufferedEducationalNotes;
+  bool SuppressOutput = false;
 
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());
@@ -59,10 +61,18 @@ public:
     llvm::sys::Process::UseANSIEscapeCodes(true);
   }
 
+  void setPrintEducationalNotes(bool ShouldPrint) {
+    PrintEducationalNotes = ShouldPrint;
+  }
+
   void enableExperimentalFormatting() { ExperimentalFormattingEnabled = true; }
 
   bool didErrorOccur() {
     return DidErrorOccur;
+  }
+
+  void setSuppressOutput(bool suppressOutput) {
+    SuppressOutput = suppressOutput;
   }
 
 private:

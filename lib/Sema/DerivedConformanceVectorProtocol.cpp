@@ -30,28 +30,6 @@
 
 using namespace swift;
 
-// Return the protocol requirement with the specified name.
-// TODO: Move function to shared place for use with other derived conformances.
-static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
-  auto lookup = proto->lookupDirect(name);
-  // Erase declarations that are not protocol requirements.
-  // This is important for removing default implementations of the same name.
-  llvm::erase_if(lookup, [](ValueDecl *v) {
-    return !isa<ProtocolDecl>(v->getDeclContext()) ||
-           !v->isProtocolRequirement();
-  });
-  assert(lookup.size() == 1 && "Ambiguous protocol requirement");
-  return lookup.front();
-}
-
-// Return true if given nominal type has a `let` stored with an initial value.
-// TODO: Move function to shared place for use with other derived conformances.
-static bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
-  return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
-    return v->isLet() && v->hasInitialValue();
-  });
-}
-
 // Return the `VectorSpaceScalar` associated type for the given `ValueDecl` if
 // it conforms to `VectorProtocol` in the given context. Otherwise, return
 // `nullptr`.
@@ -229,17 +207,6 @@ static ValueDecl *deriveVectorProtocol_method(
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({funcDecl});
-
-  // Returned nominal type must define a memberwise initializer.
-  // Add memberwise initializer if necessary.
-  if (!nominal->getEffectiveMemberwiseInitializer()) {
-    // The implicit memberwise constructor must be explicitly created so that
-    // it can called in `VectorProtocol` methods. Normally, the memberwise
-    // constructor is synthesized during SILGen, which is too late.
-    auto *initDecl = createMemberwiseImplicitConstructor(C, nominal);
-    nominal->addMember(initDecl);
-  }
-
   return funcDecl;
 }
 

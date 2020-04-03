@@ -365,7 +365,6 @@ Type ASTBuilder::createFunctionType(
     auto parameterFlags = ParameterTypeFlags()
                               .withValueOwnership(ownership)
                               .withVariadic(flags.isVariadic())
-                              // SWIFT_ENABLE_TENSORFLOW
                               .withAutoClosure(flags.isAutoClosure())
                               .withNoDerivative(flags.isNoDerivative());
 
@@ -408,9 +407,7 @@ Type ASTBuilder::createFunctionType(
 
   FunctionType::ExtInfo incompleteExtInfo(
     FunctionTypeRepresentation::Swift,
-    noescape, flags.throws(),
-    diffKind,
-    /*clangFunctionType*/nullptr);
+    noescape, flags.throws(), diffKind, /*clangFunctionType*/nullptr);
 
   const clang::Type *clangFunctionType = nullptr;
   if (representation == FunctionTypeRepresentation::CFunctionPointer)
@@ -503,11 +500,23 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
+  DifferentiabilityKind diffKind;
+  switch (flags.getDifferentiabilityKind()) {
+  case ImplFunctionDifferentiabilityKind::NonDifferentiable:
+    diffKind = DifferentiabilityKind::NonDifferentiable;
+    break;
+  case ImplFunctionDifferentiabilityKind::Normal:
+    diffKind = DifferentiabilityKind::Normal;
+    break;
+  case ImplFunctionDifferentiabilityKind::Linear:
+    diffKind = DifferentiabilityKind::Linear;
+    break;
+  }
+
   // TODO: [store-sil-clang-function-type]
-  auto einfo = SILFunctionType::ExtInfo(
-      representation, flags.isPseudogeneric(), !flags.isEscaping(),
-      DifferentiabilityKind::NonDifferentiable,
-      /*clangFunctionType*/ nullptr);
+  auto einfo = SILFunctionType::ExtInfo(representation, flags.isPseudogeneric(),
+                                        !flags.isEscaping(), diffKind,
+                                        /*clangFunctionType*/ nullptr);
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;

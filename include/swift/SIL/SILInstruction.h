@@ -8095,47 +8095,8 @@ public:
   }
 };
 
-/// DifferentiableFunctionExtractInst - extracts either the original or
-/// derivative function value from a `@differentiable` function.
-class DifferentiableFunctionExtractInst
-    : public UnaryInstructionBase<
-          SILInstructionKind::DifferentiableFunctionExtractInst,
-          SingleValueInstruction> {
-private:
-  /// The extractee.
-  NormalDifferentiableFunctionTypeComponent Extractee;
-  /// True if the instruction has an explicit extractee type.
-  bool HasExplicitExtracteeType;
-
-  static SILType
-  getExtracteeType(SILValue function,
-                   NormalDifferentiableFunctionTypeComponent extractee,
-                   SILModule &module);
-
-public:
-  /// Note: explicit extractee type may be specified only in lowered SIL.
-  explicit DifferentiableFunctionExtractInst(
-      SILModule &module, SILDebugLocation debugLoc,
-      NormalDifferentiableFunctionTypeComponent extractee, SILValue function,
-      Optional<SILType> extracteeType = None);
-
-  NormalDifferentiableFunctionTypeComponent getExtractee() const {
-    return Extractee;
-  }
-
-  AutoDiffDerivativeFunctionKind getDerivativeFunctionKind() const {
-    auto kind = Extractee.getAsDerivativeFunctionKind();
-    assert(kind);
-    return *kind;
-  }
-
-  bool hasExplicitExtracteeType() const { return HasExplicitExtracteeType; }
-};
-
-// SWIFT_ENABLE_TENSORFLOW
-/// `linear_function` - given a function, differentiation parameter indices,
-/// result indices, and its derivative functions, create an `@differentiable`
-/// function that represents a bundle of these functions and configurations.
+/// LinearFunctionInst - given a function, its derivative and traspose functions,
+/// create an `@differentiable(linear)` function that represents a bundle of these.
 class LinearFunctionInst final :
     public InstructionBaseWithTrailingOperands<
                SILInstructionKind::LinearFunctionInst,
@@ -8173,7 +8134,44 @@ public:
   }
 };
 
-/// `linear_function_extract` - given an `@differentiable(linear)` function
+/// DifferentiableFunctionExtractInst - extracts either the original or
+/// derivative function value from a `@differentiable` function.
+class DifferentiableFunctionExtractInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::DifferentiableFunctionExtractInst,
+          SingleValueInstruction> {
+private:
+  /// The extractee.
+  NormalDifferentiableFunctionTypeComponent Extractee;
+  /// True if the instruction has an explicit extractee type.
+  bool HasExplicitExtracteeType;
+
+  static SILType
+  getExtracteeType(SILValue function,
+                   NormalDifferentiableFunctionTypeComponent extractee,
+                   SILModule &module);
+
+public:
+  /// Note: explicit extractee type may be specified only in lowered SIL.
+  explicit DifferentiableFunctionExtractInst(
+      SILModule &module, SILDebugLocation debugLoc,
+      NormalDifferentiableFunctionTypeComponent extractee, SILValue function,
+      Optional<SILType> extracteeType = None);
+
+  NormalDifferentiableFunctionTypeComponent getExtractee() const {
+    return Extractee;
+  }
+
+  AutoDiffDerivativeFunctionKind getDerivativeFunctionKind() const {
+    auto kind = Extractee.getAsDerivativeFunctionKind();
+    assert(kind);
+    return *kind;
+  }
+
+  bool hasExplicitExtracteeType() const { return HasExplicitExtracteeType; }
+};
+
+/// LinearFunctionExtractInst - given an `@differentiable(linear)` function
 /// representing a bundle of the original function and the transpose function,
 /// extract the specified function.
 class LinearFunctionExtractInst
@@ -8205,7 +8203,6 @@ public:
   ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
 };
-// SWIFT_ENABLE_TENSORFLOW END
 
 /// DifferentiabilityWitnessFunctionInst - Looks up a differentiability witness
 /// function for a given original function.

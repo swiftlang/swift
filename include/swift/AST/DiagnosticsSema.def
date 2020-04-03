@@ -184,6 +184,9 @@ ERROR(value_type_comparison_with_nil_illegal,none,
 ERROR(cannot_match_expr_pattern_with_value,none,
       "expression pattern of type %0 cannot match values of type %1",
       (Type, Type))
+ERROR(cannot_match_expr_tuple_pattern_with_nontuple_value,none,
+      "tuple pattern cannot match values of non-tuple type %0",
+      (Type))
 ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
       "pattern cannot match values of type %0",
       (Type))
@@ -661,7 +664,7 @@ NOTE(add_return_type_note,none,
      "did you mean to add a return type?", ())
 
 //------------------------------------------------------------------------------
-// MARK: Name Binding
+// MARK: Import Resolution
 //------------------------------------------------------------------------------
 
 ERROR(sema_no_import,Fatal,
@@ -1201,19 +1204,16 @@ ERROR(c_function_pointer_from_method,none,
 ERROR(c_function_pointer_from_generic_function,none,
       "a C function pointer cannot be formed from a reference to a generic "
       "function", ())
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-908): Remove this diagnostic once linear-to-differentiable conversion
-// is supported.
 ERROR(unsupported_linear_to_differentiable_conversion,none,
       "conversion from '@differentiable(linear)' to '@differentiable' is not "
       "yet supported", ())
+ERROR(invalid_autoclosure_forwarding,none,
+      "add () to forward @autoclosure parameter", ())
 ERROR(invalid_differentiable_function_conversion_expr,none,
       "a '@differentiable%select{|(linear)}0' function can only be formed from "
       "a reference to a 'func' or a literal closure", (bool))
 NOTE(invalid_differentiable_function_conversion_parameter,none,
      "did you mean to take a '%0' closure?", (StringRef))
-ERROR(invalid_autoclosure_forwarding,none,
-      "add () to forward @autoclosure parameter", ())
 ERROR(invalid_autoclosure_pointer_conversion,none,
       "cannot perform pointer conversion of value of type %0 to autoclosure "
       "result type %1",
@@ -1893,8 +1893,9 @@ ERROR(requirement_restricts_self,none,
       "'Self'",
       (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
-      "%select{method|initializer}0 %1 has different argument labels from those "
-      "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
+      "%0 %1 has different argument labels "
+      "from those required by protocol %2 (%3)",
+      (DescriptiveDeclKind, DeclName, Type, DeclName))
 ERROR(witness_initializer_not_required,none,
       "initializer requirement %0 can only be satisfied by a 'required' "
       "initializer in%select{| the definition of}1 non-final class %2",
@@ -2120,6 +2121,9 @@ NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,none,
      "candidate is explicitly '@nonobjc'", ())
+NOTE(protocol_witness_enum_case_payload, none,
+     "candidate is an enum case with associated values, "
+     "but protocol does not allow it", ())
 
 NOTE(protocol_witness_type,none,
      "possibly intended match", ())
@@ -2686,6 +2690,8 @@ ERROR(cannot_synthesize_in_crossfile_extension,none,
       "implementation of %0 cannot be automatically synthesized in an extension "
       "in a different file to the type", (Type))
 
+ERROR(broken_additive_arithmetic_requirement,none,
+      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
 ERROR(broken_case_iterable_requirement,none,
       "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,
@@ -2714,25 +2720,8 @@ ERROR(broken_encodable_requirement,none,
       "Encodable protocol is broken: unexpected requirement", ())
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
-// SWIFT_ENABLE_TENSORFLOW
-ERROR(broken_additive_arithmetic_requirement,none,
-      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
-ERROR(broken_pointwise_multiplicative_requirement,none,
-      "PointwiseMultiplicative protocol is broken: unexpected requirement", ())
-ERROR(broken_elementary_functions_requirement,none,
-      "ElementaryFunctions protocol is broken: unexpected requirement", ())
-ERROR(broken_vector_protocol_requirement,none,
-      "VectorProtocol protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
-ERROR(broken_euclidean_differentiable_requirement,none,
-      "EuclideanDifferentiable protocol is broken: unexpected requirement", ())
-ERROR(broken_key_path_iterable_requirement,none,
-      "KeyPathIterable protocol is broken: unexpected requirement", ())
-ERROR(broken_tensor_array_protocol_requirement,none,
-      "TensorArrayProtocol protocol is broken: unexpected requirement", ())
-ERROR(broken_tensor_group_requirement,none,
-      "TensorGroup protocol is broken: unexpected requirement", ())
 WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
       "stored property %0 has no derivative because %1 does not conform to "
       "'Differentiable'; add an explicit '@noDerivative' attribute"
@@ -2744,6 +2733,22 @@ WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
       "an explicit '@noDerivative' attribute"
       "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
       (Identifier, Identifier, bool))
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(broken_pointwise_multiplicative_requirement,none,
+      "PointwiseMultiplicative protocol is broken: unexpected requirement", ())
+ERROR(broken_elementary_functions_requirement,none,
+      "ElementaryFunctions protocol is broken: unexpected requirement", ())
+ERROR(broken_vector_protocol_requirement,none,
+      "VectorProtocol protocol is broken: unexpected requirement", ())
+ERROR(broken_euclidean_differentiable_requirement,none,
+      "EuclideanDifferentiable protocol is broken: unexpected requirement", ())
+ERROR(broken_key_path_iterable_requirement,none,
+      "KeyPathIterable protocol is broken: unexpected requirement", ())
+ERROR(broken_tensor_array_protocol_requirement,none,
+      "TensorArrayProtocol protocol is broken: unexpected requirement", ())
+ERROR(broken_tensor_group_requirement,none,
+      "TensorGroup protocol is broken: unexpected requirement", ())
+// SWIFT_ENABLE_TENSORFLOW END
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2769,6 +2774,19 @@ NOTE(decodable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)'?", ())
 NOTE(codable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)' and 'encode(to:)'?", ())
+
+WARNING(decodable_property_will_not_be_decoded, none,
+        "immutable property will not be decoded because it is declared with "
+        "an initial value which cannot be overwritten", ())
+NOTE(decodable_property_init_or_codingkeys_implicit, none,
+     "set the initial value via the initializer or explicitly define a "
+     "CodingKeys enum %select{including|without}0 a %1 case to silence "
+     "this warning", (unsigned, DeclName))
+NOTE(decodable_property_init_or_codingkeys_explicit, none,
+     "set the initial value via the initializer or remove the %0 case from "
+     "the CodingKeys enum to silence this warning", (DeclName))
+NOTE(decodable_make_property_mutable, none,
+     "make the property mutable instead", ())
 
 NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "%select{associated value|stored property}0 type %1 does not conform to "
@@ -4112,7 +4130,6 @@ ERROR(opaque_type_in_protocol_requirement,none,
 ERROR(attr_only_on_parameters_of_differentiable,none,
       "'%0' may only be used on parameters of '@differentiable' function "
       "types", (StringRef))
-// SWIFT_ENABLE_TENSORFLOW
 ERROR(differentiable_function_type_invalid_parameter,none,
       "parameter type '%0' does not conform to 'Differentiable'"
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
@@ -4128,7 +4145,6 @@ ERROR(differentiable_function_type_invalid_result,none,
 ERROR(attr_differentiable_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use "
       "'transpose:' instead", ())
-// SWIFT_ENABLE_TENSORFLOW END
 
 // SIL
 ERROR(opened_non_protocol,none,
@@ -5062,9 +5078,10 @@ NOTE(function_builder_remove_returns, none,
 //------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics
 //------------------------------------------------------------------------------
-ERROR(experimental_differentiable_programming_disabled, none,
-      "differentiable programming is an experimental feature that is "
-      "currently disabled", ())
+
+ERROR(differentiable_programming_attr_used_without_required_module, none,
+      "'@%0' attribute used without importing module %1",
+      (StringRef, Identifier))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

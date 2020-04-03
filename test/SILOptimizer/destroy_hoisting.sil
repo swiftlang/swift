@@ -28,6 +28,16 @@ struct Mixed {
   var i: Int
 }
 
+public struct S2 {
+  let s: S
+}
+
+
+public enum E {
+  case A
+  case B
+}
+
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
 
@@ -277,3 +287,24 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_debug_value
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    struct_element_addr
+// CHECK-NEXT:    destroy_addr
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'test_debug_value'
+sil [ossa] @test_debug_value : $@convention(method) (@inout S2, @owned X, @owned S, @inout E) -> () {
+bb0(%0 : $*S2, %1 : @owned $X, %2 : @owned $S, %3 : $*E):
+  debug_value_addr %0 : $*S2, var, name "self", argno 1
+  br bb1
+
+bb1:
+  %60 = struct_element_addr %0 : $*S2, #S2.s
+  destroy_addr %60 : $*S
+  store %2 to [init] %60 : $*S
+  %71 = struct_element_addr %60 : $*S, #S.x
+  store %1 to [assign] %71 : $*X
+
+  %75 = tuple ()
+  return %75 : $()
+}

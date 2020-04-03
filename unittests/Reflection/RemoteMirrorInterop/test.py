@@ -16,13 +16,21 @@ args = sys.argv[1:]
 if len(args) == 0:
     print >> sys.stderr, "Usage:", sys.argv[0], "swift-build-dirs..."
     print >> sys.stderr, ("Note: pass paths to the swift-macosx-x86_64"
-                          " directories.")
+                          " directories, or /usr to test the OS.")
     sys.exit(1)
 
 absoluteArgs = [os.path.abspath(arg) for arg in args]
 swiftcs = [os.path.join(arg, 'bin', 'swiftc') for arg in absoluteArgs]
-swiftlibs = [os.path.join(arg, 'lib', 'swift', 'macosx')
-             for arg in absoluteArgs]
+
+
+def libPath(path):
+    libPath = os.path.join(path, 'lib', 'swift', 'macosx')
+    if not os.path.isdir(libPath):
+        libPath = os.path.join(path, 'lib', 'swift')
+    return libPath
+
+
+swiftlibs = [libPath(arg) for arg in absoluteArgs]
 mirrorlibs = [os.path.join(lib, 'libswiftRemoteMirror.dylib')
               for lib in swiftlibs]
 

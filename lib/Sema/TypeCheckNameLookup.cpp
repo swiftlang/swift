@@ -626,7 +626,8 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
 
   if (baseTypeOrNull) {
     lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC,
-                             /*include instance members*/ true, gsb);
+                             /*includeInstanceMembers*/true,
+                             /*includeDerivedRequirements*/false, gsb);
   } else {
     lookupVisibleDecls(consumer, DC, /*top level*/ true,
                        corrections.Loc.getBaseNameLoc());

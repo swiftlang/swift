@@ -555,15 +555,16 @@ DECL_ATTR(transpose, Transpose,
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   99)
 
+SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
+  OnAbstractFunction | OnVar | OnSubscript |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  100)
+
 // SWIFT_ENABLE_TENSORFLOW
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
   OnAccessor | OnFunc | OnConstructor | OnSubscript |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove |
   NotSerialized, 102)
-SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
-  OnAbstractFunction | OnVar | OnSubscript |
-  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  103)
 // SWIFT_ENABLE_TENSORFLOW END
 
 #undef TYPE_ATTR

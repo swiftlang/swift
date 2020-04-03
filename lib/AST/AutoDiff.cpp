@@ -279,25 +279,6 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
       nullptr);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-// Not-yet-upstreamed `tensorflow` branch additions are below.
-
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/Module.h"
-#include "swift/SIL/SILLinkage.h"
-#include "llvm/ADT/StringSwitch.h"
-
-using namespace swift;
-
-bool SILAutoDiffIndices::operator==(const SILAutoDiffIndices &other) const {
-  return source == other.source && parameters == other.parameters;
-}
-
-void AutoDiffConfig::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
-
 // Given the rest of a `Builtin.applyDerivative_{jvp|vjp}` or
 // `Builtin.applyTranspose` operation name, attempts to parse the arity and
 // throwing-ness from the operation name. Modifies the operation name argument
@@ -368,7 +349,25 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
   return operationName.empty();
 }
-// SWIFT_ENABLE_TENSORFLOW END
+
+// SWIFT_ENABLE_TENSORFLOW
+// Not-yet-upstreamed `tensorflow` branch additions are below.
+
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Module.h"
+#include "swift/SIL/SILLinkage.h"
+#include "llvm/ADT/StringSwitch.h"
+
+using namespace swift;
+
+bool SILAutoDiffIndices::operator==(const SILAutoDiffIndices &other) const {
+  return source == other.source && parameters == other.parameters;
+}
+
+void AutoDiffConfig::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
 
 Type TangentSpace::getType() const {
   switch (kind) {

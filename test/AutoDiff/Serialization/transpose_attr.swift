@@ -1,18 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-differentiable-programming %s -emit-module -parse-as-library -o %t
+// RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
 // RUN: llvm-bcanalyzer %t/transpose_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -enable-experimental-differentiable-programming -disable-sil-linking -enable-sil-verify-all %t/transpose_attr.swiftmodule -o - | %FileCheck %s
+// RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/transpose_attr.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
-
-// SWIFT_ENABLE_TENSORFLOW
-// This test is enabled on `tensorflow` branch.
-// `@differentiable` attribute serialization does not yet work on `master`
-// branch only.
-
-// TODO(TF-838): Enable this test.
-// Blocked by TF-830: `@transpose` attribute type-checking.
-// FAIL: *
 
 import _Differentiation
 

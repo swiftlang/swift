@@ -2013,7 +2013,7 @@ ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name,
   if (name.empty() || name.front().empty())
     return getContext().TheBuiltinModule;
 
-  // FIXME: duplicated from NameBinder::getModule
+  // FIXME: duplicated from ImportResolver::getModule
   if (name.size() == 1 &&
       name.front() == FileContext->getParentModule()->getName()) {
     if (!UnderlyingModule && allowLoading) {
@@ -4369,7 +4369,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
-      // SWIFT_ENABLE_TENSORFLOW
       case decls_block::Transpose_DECL_ATTR: {
         bool isImplicit;
         uint64_t origNameId;
@@ -4393,7 +4392,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         Attr = transposeAttr;
         break;
       }
-      // SWIFT_ENABLE_TENSORFLOW END
 
       case decls_block::SPIAccessControl_DECL_ATTR: {
         ArrayRef<uint64_t> spiIds;

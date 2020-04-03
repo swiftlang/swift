@@ -469,7 +469,6 @@ BUILTIN_SIL_OPERATION(ConvertStrongToUnownedUnsafe, "convertStrongToUnownedUnsaf
 /// now.
 BUILTIN_SIL_OPERATION(ConvertUnownedUnsafeToGuaranteed, "convertUnownedUnsafeToGuaranteed", Special)
 
-// SWIFT_ENABLE_TENSORFLOW
 /// applyDerivative
 BUILTIN_SIL_OPERATION(ApplyDerivative, "applyDerivative", Special)
 
@@ -481,7 +480,6 @@ BUILTIN_SIL_OPERATION(DifferentiableFunction, "differentiableFunction", Special)
 
 /// linearFunction
 BUILTIN_SIL_OPERATION(LinearFunction, "linearFunction", Special)
-// SWIFT_ENABLE_TENSORFLOW END
 
 #undef BUILTIN_SIL_OPERATION
 

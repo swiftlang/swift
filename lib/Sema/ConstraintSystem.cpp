@@ -3888,7 +3888,7 @@ Optional<Identifier> constraints::getOperatorName(Expr *expr) {
   }
 
   if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(choice))
-    return FD->getBaseName().getIdentifier();
+    return FD->getBaseIdentifier();
 
   return None;
 }
@@ -4200,17 +4200,26 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   if (Expr *initializer = expression.expression) {
     // Form init(wrappedValue:) call(s).
     Expr *wrappedInitializer =
-        buildPropertyWrapperInitialValueCall(
+        buildPropertyWrapperWrappedValueCall(
             singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
     if (!wrappedInitializer)
       return;
 
     backingInitializer = wrappedInitializer;
-  } else if (auto outermostArg = outermostWrapperAttr->getArg()) {
+  } else {
     Type outermostWrapperType =
         singleVar->getAttachedPropertyWrapperType(0);
     if (!outermostWrapperType)
       return;
+
+    // Retrieve the outermost wrapper argument. If there isn't one, we're
+    // performing default initialization.
+    auto outermostArg = outermostWrapperAttr->getArg();
+    if (!outermostArg) {
+      SourceLoc fakeParenLoc = outermostWrapperAttr->getRange().End;
+      outermostArg = TupleExpr::createEmpty(
+          ctx, fakeParenLoc, fakeParenLoc, /*Implicit=*/true);
+    }
 
     auto typeExpr = TypeExpr::createImplicitHack(
         outermostWrapperAttr->getTypeLoc().getLoc(),
@@ -4221,8 +4230,6 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
         outermostWrapperAttr->getArgumentLabelLocs(),
         /*hasTrailingClosure=*/false,
         /*implicit=*/false);
-  } else {
-    llvm_unreachable("No initializer anywhere?");
   }
   wrapperAttrs[0]->setSemanticInit(backingInitializer);
 
@@ -4387,9 +4394,6 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
   auto &ctx = getASTContext();
 
-  if (ctx.LangOpts.DisableAvailabilityChecking)
-    return false;
-
   // First check whether this declaration is universally unavailable.
   if (D->getAttrs().isUnavailable(ctx))
     return true;
@@ -4402,6 +4406,23 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
   }
 
   // If not, let's check contextual unavailability.
-  AvailabilityContext result = AvailabilityContext::alwaysAvailable();
-  return !TypeChecker::isDeclAvailable(D, loc, DC, result);
+  auto result = TypeChecker::checkDeclarationAvailability(D, loc, DC);
+  return result.hasValue();
+}
+
+/// If we aren't certain that we've emitted a diagnostic, emit a fallback
+/// diagnostic.
+void ConstraintSystem::maybeProduceFallbackDiagnostic(
+    SolutionApplicationTarget target) const {
+  if (Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
+    return;
+
+  // Before producing fatal error here, let's check if there are any "error"
+  // diagnostics already emitted or waiting to be emitted. Because they are
+  // a better indication of the problem.
+  ASTContext &ctx = getASTContext();
+  if (ctx.Diags.hadAnyError() || ctx.hasDelayedConformanceErrors())
+    return;
+
+  ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
 }

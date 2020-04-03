@@ -634,6 +634,8 @@ enum ScoreKind {
 
   /// A fix needs to be applied to the source.
   SK_Fix,
+  /// A hole in the constraint system.
+  SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
   /// A use of a disfavored overload.
@@ -2321,8 +2323,8 @@ public:
   /// system, to avoid.
   ///
   /// FIXME: This caching should almost certainly be performed at the
-  /// module level, since type checking occurs after name binding,
-  /// and no new names are introduced after name binding.
+  /// module level, since type checking occurs after import resolution,
+  /// and no new names are introduced after that point.
   ///
   /// \returns A reference to the member-lookup result.
   LookupResult &lookupMember(Type base, DeclNameRef name);
@@ -2853,8 +2855,14 @@ public:
   }
 
   /// Add an explicit conversion constraint (e.g., \c 'x as T').
+  ///
+  /// \param fromType The type of the expression being converted.
+  /// \param toType The type to convert to.
+  /// \param rememberChoice Whether the conversion disjunction should record its
+  /// choice.
+  /// \param locator The locator.
   void addExplicitConversionConstraint(Type fromType, Type toType,
-                                       bool allowFixes,
+                                       RememberChoice_t rememberChoice,
                                        ConstraintLocatorBuilder locator);
 
   /// Add a disjunction constraint.
@@ -4642,6 +4650,10 @@ public:
   void partitionDisjunction(ArrayRef<Constraint *> Choices,
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
+
+  /// If we aren't certain that we've emitted a diagnostic, emit a fallback
+  /// diagnostic.
+  void maybeProduceFallbackDiagnostic(SolutionApplicationTarget target) const;
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));

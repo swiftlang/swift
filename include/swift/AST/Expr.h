@@ -1335,9 +1335,9 @@ public:
   }
 };
 
-/// A reference to a type in expression context, spelled out as a TypeLoc. Sema
-/// forms this expression as a result of name binding.  This always has
-/// MetaTypetype.
+/// A reference to a type in expression context, spelled out as a TypeLoc.
+///
+/// The type of this expression is always \c MetaTypeType.
 class TypeExpr : public Expr {
   TypeLoc Info;
   TypeExpr(Type Ty);
@@ -2968,7 +2968,6 @@ public:
   }
 };
 
-// SWIFT_ENABLE_TENSORFLOW
 class DifferentiableFunctionExpr : public ImplicitConversionExpr {
 public:
   DifferentiableFunctionExpr(Expr *subExpr, Type ty)
@@ -3022,7 +3021,7 @@ public:
     return E->getKind() == ExprKind::LinearToDifferentiableFunction;
   }
 };
-// SWIFT_ENABLE_TENSORFLOW END
+
 
 /// Use an opaque type to abstract a value of the underlying concrete type.
 class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
@@ -4834,7 +4833,7 @@ public:
 };
 
 /// A pattern production that has been parsed but hasn't been resolved
-/// into a complete pattern. Name binding converts these into standalone pattern
+/// into a complete pattern. Pattern checking converts these into standalone pattern
 /// nodes or raises an error if a pattern production appears in an invalid
 /// position.
 class UnresolvedPatternExpr : public Expr {

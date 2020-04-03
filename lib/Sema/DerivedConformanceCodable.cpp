@@ -82,9 +82,11 @@ static CodableConformanceType typeConformsToCodable(DeclContext *context,
                                                     ProtocolDecl *proto) {
   target = context->mapTypeIntoContext(target);
 
-  if (isIUO)
-    return typeConformsToCodable(context, target->getOptionalObjectType(),
+  if (isIUO) {
+    return typeConformsToCodable(context,
+                                 target->lookThroughSingleOptionalType(),
                                  false, proto);
+  }
 
   auto conf = TypeChecker::conformsToProtocol(target, proto, context, None);
   return conf.isInvalid() ? DoesNotConform : Conforms;
@@ -154,10 +156,10 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
 
   bool propertiesAreValid = true;
   for (auto elt : codingKeysDecl->getAllElements()) {
-    auto it = properties.find(elt->getName());
+    auto it = properties.find(elt->getBaseIdentifier());
     if (it == properties.end()) {
       elt->diagnose(diag::codable_extraneous_codingkey_case_here,
-                    elt->getName());
+                    elt->getBaseIdentifier());
       // TODO: Investigate typo-correction here; perhaps the case name was
       //       misspelled and we can provide a fix-it.
       propertiesAreValid = false;
@@ -493,7 +495,8 @@ static std::tuple<VarDecl *, Type, bool>
 lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
                                EnumElementDecl *elt,
                                NominalTypeDecl *targetDecl) {
-  for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
+  for (auto decl : targetDecl->lookupDirect(
+                                   DeclName(elt->getBaseIdentifier()))) {
     if (auto *vd = dyn_cast<VarDecl>(decl)) {
       // If we found a property with an attached wrapper, retrieve the
       // backing property.
@@ -830,9 +833,67 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
       std::tie(varDecl, varType, useIfPresentVariant) =
           lookupVarDeclForCodingKeysCase(conformanceDC, elt, targetDecl);
 
-      // Don't output a decode statement for a var let with a default value.
-      if (varDecl->isLet() && varDecl->isParentInitialized())
+      // Don't output a decode statement for a let with an initial value.
+      if (varDecl->isLet() && varDecl->isParentInitialized()) {
+        // But emit a warning to let the user know that it won't be decoded.
+        auto lookupResult =
+            codingKeysEnum->lookupDirect(varDecl->getBaseName());
+        auto keyExistsInCodingKeys =
+            llvm::any_of(lookupResult, [&](ValueDecl *VD) {
+              if (isa<EnumElementDecl>(VD)) {
+                return VD->getBaseName() == varDecl->getBaseName();
+              }
+              return false;
+            });
+        auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
+        bool conformsToEncodable =
+            TypeChecker::conformsToProtocol(
+                targetDecl->getDeclaredInterfaceType(), encodableProto,
+                conformanceDC,
+                ConformanceCheckFlags::SkipConditionalRequirements) != nullptr;
+
+        // Strategy to use for CodingKeys enum diagnostic part - this is to
+        // make the behaviour more explicit:
+        //
+        // 1. If we have an *implicit* CodingKeys enum:
+        // (a) If the type is Decodable only, explicitly define the enum and
+        //     remove the key from it. This makes it explicit that the key
+        //     will not be decoded.
+        // (b) If the type is Codable, explicitly define the enum and keep the
+        //     key in it. This is because removing the key will break encoding
+        //     which is mostly likely not what the user expects.
+        //
+        // 2. If we have an *explicit* CodingKeys enum:
+        // (a) If the type is Decodable only and the key exists in the enum,
+        //     then explicitly remove the key from the enum. This makes it
+        //     explicit that the key will not be decoded.
+        // (b) If the type is Decodable only and the key does not exist in
+        //     the enum, do nothing. This is because the user has explicitly
+        //     made it clear that that they don't want the key to be decoded.
+        // (c) If the type is Codable, do nothing. This is because removing
+        //     the key will break encoding which is most likely not what the
+        //     user expects.
+        if (!codingKeysEnum->isImplicit()) {
+          if (conformsToEncodable || !keyExistsInCodingKeys) {
+            continue;
+          }
+        }
+
+        varDecl->diagnose(diag::decodable_property_will_not_be_decoded);
+        if (codingKeysEnum->isImplicit()) {
+          varDecl->diagnose(
+              diag::decodable_property_init_or_codingkeys_implicit,
+              conformsToEncodable ? 0 : 1, varDecl->getName());
+        } else {
+          varDecl->diagnose(
+              diag::decodable_property_init_or_codingkeys_explicit,
+              varDecl->getName());
+        }
+        varDecl->diagnose(diag::decodable_make_property_mutable)
+            .fixItReplace(varDecl->getAttributeInsertionLoc(true), "var");
+
         continue;
+      }
 
       auto methodName =
           useIfPresentVariant ? C.Id_decodeIfPresent : C.Id_decode;

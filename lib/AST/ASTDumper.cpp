@@ -2354,7 +2354,6 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E) {
     printCommon(E, "differentiable_function") << '\n';
     printRec(E->getSubExpr());
@@ -2383,7 +2382,6 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   void visitInOutExpr(InOutExpr *E) {
     printCommon(E, "inout_expr") << '\n';
@@ -2615,7 +2613,7 @@ public:
   }
   void visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
     printCommon(E, "enum_is_case_expr") << ' ' <<
-      E->getEnumElement()->getName() << "\n";
+      E->getEnumElement()->getBaseIdentifier() << "\n";
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

@@ -2,15 +2,13 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// SWIFT_ENABLE_TENSORFLOW
 //
 // This file implements explicit derivation of the Differentiable protocol for
 // struct and class types.
@@ -32,20 +30,6 @@
 #include "DerivedConformances.h"
 
 using namespace swift;
-
-/// Return the protocol requirement with the specified name.
-/// TODO: Move function to shared place for use with other derived conformances.
-static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
-  auto lookup = proto->lookupDirect(name);
-  // Erase declarations that are not protocol requirements.
-  // This is important for removing default implementations of the same name.
-  llvm::erase_if(lookup, [](ValueDecl *v) {
-    return !isa<ProtocolDecl>(v->getDeclContext()) ||
-           !v->isProtocolRequirement();
-  });
-  assert(lookup.size() <= 1 && "Ambiguous protocol requirement");
-  return lookup.front();
-}
 
 /// Get the stored properties of a nominal type that are relevant for
 /// differentiation, except the ones tagged `@noDerivative`.
@@ -124,6 +108,10 @@ static StructDecl *getTangentVectorStructDecl(DeclContext *DC) {
 
 bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
                                                  DeclContext *DC) {
+  // Experimental differentiable programming must be enabled.
+  if (auto *SF = DC->getParentSourceFile())
+    if (!isDifferentiableProgrammingEnabled(*SF))
+      return false;
   // Nominal type must be a struct or class. (No stored properties is okay.)
   if (!isa<StructDecl>(nominal) && !isa<ClassDecl>(nominal))
     return false;
@@ -194,10 +182,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   });
 }
 
-/// Determine if a EuclideanDifferentiable requirement can be derived for a
-/// type.
-///
-/// \returns True if the requirement can be derived.
+// SWIFT_ENABLE_TENSORFLOW
 bool DerivedConformance::canDeriveEuclideanDifferentiable(
     NominalTypeDecl *nominal, DeclContext *DC) {
   if (!canDeriveDifferentiable(nominal, DC))
@@ -217,6 +202,7 @@ bool DerivedConformance::canDeriveEuclideanDifferentiable(
                                                  None);
   });
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// Synthesize body for a `Differentiable` method requirement.
 static std::pair<BraceStmt *, bool>
@@ -308,8 +294,7 @@ deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
 static std::pair<BraceStmt *, bool>
 deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
   auto &C = funcDecl->getASTContext();
-  return deriveBodyDifferentiable_method(funcDecl, C.Id_move,
-                                         C.getIdentifier("along"));
+  return deriveBodyDifferentiable_method(funcDecl, C.Id_move, C.Id_along);
 }
 
 /// Synthesize function declaration for a `Differentiable` method requirement.
@@ -354,11 +339,11 @@ static ValueDecl *deriveDifferentiable_move(DerivedConformance &derived) {
   auto tangentType = tangentDecl->getDeclaredInterfaceType();
 
   return deriveDifferentiable_method(
-      derived, C.Id_move, C.getIdentifier("along"),
-      C.getIdentifier("direction"), tangentType, C.TheEmptyTupleType,
-      {deriveBodyDifferentiable_move, nullptr});
+      derived, C.Id_move, C.Id_along, C.Id_direction, tangentType,
+      C.TheEmptyTupleType, {deriveBodyDifferentiable_move, nullptr});
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 /// Synthesize the `differentiableVectorView` property declaration.
 static ValueDecl *deriveEuclideanDifferentiable_differentiableVectorView(
     DerivedConformance &derived) {
@@ -461,6 +446,7 @@ static ValueDecl *deriveEuclideanDifferentiable_differentiableVectorView(
   derived.addMembersToConformanceContext({vectorViewDecl, pbDecl});
   return vectorViewDecl;
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// Return associated `TangentVector` struct for a nominal type, if it exists.
 /// If not, synthesize the struct.
@@ -485,6 +471,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
+  // SWIFT_ENABLE_TENSORFLOW
   auto *pointMulProto =
       C.getProtocol(KnownProtocolKind::PointwiseMultiplicative);
   auto pointMulType = TypeLoc::withoutLoc(pointMulProto->getDeclaredType());
@@ -494,6 +481,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   auto vectorType = TypeLoc::withoutLoc(vectorProto->getDeclaredType());
   auto *kpIterableProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
   auto kpIterableType = TypeLoc::withoutLoc(kpIterableProto->getDeclaredType());
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // By definition, `TangentVector` must conform to `Differentiable` and
   // `AdditiveArithmetic`.
@@ -503,6 +491,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   SmallVector<VarDecl *, 8> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
 
+  // SWIFT_ENABLE_TENSORFLOW
   // Add ad-hoc implicit conformances for `TangentVector`.
   // TODO(TF-632): Remove this implicit conformance logic when synthesized
   // member types can be extended.
@@ -568,6 +557,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // struct conform to `KeyPathIterable`.
   if (shouldDeriveKeyPathIterable)
     inherited.push_back(kpIterableType);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   auto *structDecl =
       new (C) StructDecl(SourceLoc(), C.Id_TangentVector, SourceLoc(),
@@ -639,7 +629,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // If nominal type is `@_fixed_layout`, also mark `TangentVector` struct as
   // `@_fixed_layout`.
   if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
-    structDecl->addFixedLayoutAttr();
+    addFixedLayoutAttr(structDecl);
 
   // If nominal type is `@frozen`, also mark `TangentVector` struct as
   // `@frozen`.
@@ -654,8 +644,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // The implicit memberwise constructor must be explicitly created so that it
   // can called in `AdditiveArithmetic` and `Differentiable` methods. Normally,
   // the memberwise constructor is synthesized during SILGen, which is too late.
-  auto *initDecl = createMemberwiseImplicitConstructor(C, structDecl);
-  structDecl->addMember(initDecl);
+  TypeChecker::addImplicitConstructors(structDecl);
 
   // After memberwise initializer is synthesized, mark members as implicit.
   for (auto *member : structDecl->getStoredProperties())
@@ -868,9 +857,7 @@ Type DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
   return nullptr;
 }
 
-/// Derive a EuclideanDifferentiable requirement for a nominal type.
-///
-/// \returns the derived member, which will also be added to the type.
+// SWIFT_ENABLE_TENSORFLOW
 ValueDecl *
 DerivedConformance::deriveEuclideanDifferentiable(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
@@ -882,3 +869,4 @@ DerivedConformance::deriveEuclideanDifferentiable(ValueDecl *requirement) {
                          diag::broken_euclidean_differentiable_requirement);
   return nullptr;
 }
+// SWIFT_ENABLE_TENSORFLOW END

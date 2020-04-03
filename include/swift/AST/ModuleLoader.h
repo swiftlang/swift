@@ -39,6 +39,7 @@ namespace swift {
 struct AutoDiffConfig;
 // SWIFT_ENABLE_TENSORFLOW END
 class AbstractFunctionDecl;
+struct AutoDiffConfig;
 class ClangImporterOptions;
 class ClassDecl;
 class FileUnit;
@@ -156,7 +157,6 @@ public:
                  unsigned previousGeneration,
                  llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) = 0;
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Load derivative function configurations for the given
   /// AbstractFunctionDecl.
   ///
@@ -173,7 +173,6 @@ public:
   virtual void loadDerivativeFunctionConfigurations(
       AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
       llvm::SetVector<AutoDiffConfig> &results) {};
-  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }

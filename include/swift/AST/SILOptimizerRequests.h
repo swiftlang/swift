@@ -18,6 +18,7 @@
 #define SWIFT_SILOPTIMIZER_REQUESTS_H
 
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
 
 namespace swift {
@@ -50,8 +51,8 @@ llvm::hash_code hash_value(const SILPipelineExecutionDescriptor &desc);
 /// Executes a SIL pipeline plan on a SIL module.
 class ExecuteSILPipelineRequest
     : public SimpleRequest<ExecuteSILPipelineRequest,
-                           bool(SILPipelineExecutionDescriptor),
-                           CacheKind::Uncached> {
+                           evaluator::SideEffect(SILPipelineExecutionDescriptor),
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -59,8 +60,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                SILPipelineExecutionDescriptor desc) const;
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, SILPipelineExecutionDescriptor desc) const;
 };
 
 void simple_display(llvm::raw_ostream &out,

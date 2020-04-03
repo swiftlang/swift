@@ -1168,25 +1168,21 @@ void Remangler::mangleThinFunctionType(Node *node) {
   mangleChildNodes(node); // argument tuple, result type
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void Remangler::mangleDifferentiableFunctionType(Node *node) {
   Buffer << "XF";
   mangleChildNodes(node); // argument tuple, result type
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void Remangler::mangleEscapingDifferentiableFunctionType(Node *node) {
   Buffer << "XG";
   mangleChildNodes(node); // argument tuple, result type
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void Remangler::mangleLinearFunctionType(Node *node) {
   Buffer << "XH";
   mangleChildNodes(node); // argument tuple, result type
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void Remangler::mangleEscapingLinearFunctionType(Node *node) {
   Buffer << "XI";
   mangleChildNodes(node); // argument tuple, result type
@@ -1282,7 +1278,6 @@ void Remangler::mangleImplYield(Node *node) {
   mangleChildNodes(node); // impl convention, type
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void Remangler::mangleImplDifferentiable(Node *node) {
   // TODO(TF-750): Check if this code path actually triggers and add a test.
   Buffer << 'd';
@@ -1292,7 +1287,6 @@ void Remangler::mangleImplLinear(Node *node) {
   // TODO(TF-750): Check if this code path actually triggers and add a test.
   Buffer << 'l';
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 void Remangler::mangleImplEscaping(Node *node) {
   // The old mangler does not encode escaping.

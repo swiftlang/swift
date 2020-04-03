@@ -20,6 +20,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
+
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
 public protocol Differentiable {

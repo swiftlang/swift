@@ -114,9 +114,7 @@ public:
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
   IGNORED_ATTR(OriginallyDefinedIn)
-  // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(NoDerivative)
-  // SWIFT_ENABLE_TENSORFLOW END
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -163,7 +161,7 @@ public:
       // An indirect case should have a payload.
       if (!caseDecl->hasAssociatedValues())
         diagnose(attr->getLocation(), diag::indirect_case_without_payload,
-                 caseDecl->getName());
+                 caseDecl->getBaseIdentifier());
       // If the enum is already indirect, its cases don't need to be.
       else if (caseDecl->getParentEnum()->getAttrs()
                  .hasAttribute<IndirectAttr>())
@@ -254,8 +252,8 @@ public:
 
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDerivativeAttr(DerivativeAttr *attr);
-  // SWIFT_ENABLE_TENSORFLOW
   void visitTransposeAttr(TransposeAttr *attr);
+  // SWIFT_ENABLE_TENSORFLOW
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW END
 };
@@ -484,7 +482,7 @@ void AttributeChecker::visitIBSegueActionAttr(IBSegueActionAttr *attr) {
   // explicit selector.
   if (!FD->getAttrs().hasAttribute<ObjCAttr>() ||
       !FD->getAttrs().getAttribute<ObjCAttr>()->hasName()) {
-    auto newSwiftBaseName = replacingPrefix(FD->getBaseName().getIdentifier());
+    auto newSwiftBaseName = replacingPrefix(FD->getBaseIdentifier());
     auto argumentNames = FD->getFullName().getArgumentNames();
     DeclName newSwiftName(Ctx, newSwiftBaseName, argumentNames);
 
@@ -1567,9 +1565,9 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
   }
 
   // Reject attempts to define builtin operators.
-  if (isBuiltinOperator(FD->getName().str(), attr)) {
+  if (isBuiltinOperator(FD->getBaseIdentifier().str(), attr)) {
     diagnose(D->getStartLoc(), diag::redefining_builtin_operator,
-             attr->getAttrName(), FD->getName().str());
+             attr->getAttrName(), FD->getBaseIdentifier().str());
     attr->setInvalid();
     return;
   }
@@ -2399,7 +2397,7 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
   }
 }
 
-llvm::Expected<bool>
+bool
 TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
                                          TypeEraserAttr *attr,
                                          ProtocolDecl *protocol) const {
@@ -2647,7 +2645,7 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 }
 
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
-  auto dc = D->getInnermostDeclContext();
+  auto dc = D->getDeclContext();
 
   // Figure out which nominal declaration this custom attribute refers to.
   auto nominal = evaluateOrDefault(
@@ -3101,7 +3099,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   }
 }
 
-llvm::Expected<ValueDecl *>
+ValueDecl *
 DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
                                          ValueDecl *VD) const {
   // Dynamic replacements must be explicit.
@@ -3602,6 +3600,105 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   return originalType;
 }
 
+// Computes the original function type corresponding to the given transpose
+// function type. Used for `@transpose` attribute type-checking.
+static AnyFunctionType *
+getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
+                                 IndexSubset *linearParamIndices,
+                                 bool wrtSelf) {
+  unsigned transposeParamsIndex = 0;
+
+  // Get the transpose function's parameters and result type.
+  auto transposeParams = transposeFnType->getParams();
+  auto transposeResult = transposeFnType->getResult();
+  bool isCurried = transposeResult->is<AnyFunctionType>();
+  if (isCurried) {
+    auto methodType = transposeResult->castTo<AnyFunctionType>();
+    transposeParams = methodType->getParams();
+    transposeResult = methodType->getResult();
+  }
+
+  // Get the original function's result type.
+  // The original result type is always equal to the type of the last
+  // parameter of the transpose function type.
+  auto originalResult = transposeParams.back().getPlainType();
+
+  // Get transposed result types.
+  // The transpose function result type may be a singular type or a tuple type.
+  SmallVector<TupleTypeElt, 4> transposeResultTypes;
+  if (auto transposeResultTupleType = transposeResult->getAs<TupleType>()) {
+    transposeResultTypes.append(transposeResultTupleType->getElements().begin(),
+                                transposeResultTupleType->getElements().end());
+  } else {
+    transposeResultTypes.push_back(transposeResult);
+  }
+
+  // Get the `Self` type, if the transpose function type is curried.
+  // - If `self` is a linearity parameter, use the first transpose result type.
+  // - Otherwise, use the first transpose parameter type.
+  unsigned transposeResultTypesIndex = 0;
+  Type selfType;
+  if (isCurried && wrtSelf) {
+    selfType = transposeResultTypes.front().getType();
+    transposeResultTypesIndex++;
+  } else if (isCurried) {
+    selfType = transposeFnType->getParams().front().getPlainType();
+  }
+
+  // Get the original function's parameters.
+  SmallVector<AnyFunctionType::Param, 8> originalParams;
+  // The number of original parameters is equal to the sum of:
+  // - The number of original non-transposed parameters.
+  //   - This is the number of transpose parameters minus one. All transpose
+  //     parameters come from the original function, except the last parameter
+  //     (the transposed original result).
+  // - The number of original transposed parameters.
+  //   - This is the number of linearity parameters.
+  unsigned originalParameterCount =
+      transposeParams.size() - 1 + linearParamIndices->getNumIndices();
+  // Iterate over all original parameter indices.
+  for (auto i : range(originalParameterCount)) {
+    // Skip `self` parameter if `self` is a linearity parameter.
+    // The `self` is handled specially later to form a curried function type.
+    bool isSelfParameterAndWrtSelf =
+        wrtSelf && i == linearParamIndices->getCapacity() - 1;
+    if (isSelfParameterAndWrtSelf)
+      continue;
+    // If `i` is a linearity parameter index, the next original parameter is
+    // the next transpose result.
+    if (linearParamIndices->contains(i)) {
+      auto resultType =
+          transposeResultTypes[transposeResultTypesIndex++].getType();
+      originalParams.push_back(AnyFunctionType::Param(resultType));
+    }
+    // Otherwise, the next original parameter is the next transpose parameter.
+    else {
+      originalParams.push_back(transposeParams[transposeParamsIndex++]);
+    }
+  }
+
+  // Compute the original function type.
+  AnyFunctionType *originalType;
+  // If the transpose type is curried, the original function type is:
+  // `(Self) -> (<original parameters>) -> <original result>`.
+  if (isCurried) {
+    assert(selfType && "`Self` type should be resolved");
+    originalType = makeFunctionType(originalParams, originalResult, nullptr);
+    originalType =
+        makeFunctionType(AnyFunctionType::Param(selfType), originalType,
+                         transposeFnType->getOptGenericSignature());
+  }
+  // Otherwise, the original function type is simply:
+  // `(<original parameters>) -> <original result>`.
+  else {
+    originalType = makeFunctionType(originalParams, originalResult,
+                                    transposeFnType->getOptGenericSignature());
+  }
+  return originalType;
+}
+
+
+
 /// Given a `@differentiable` attribute, attempts to resolve the original
 /// `AbstractFunctionDecl` for which it is registered, using the declaration
 /// on which it is actually declared. On error, emits diagnostic and returns
@@ -3811,30 +3908,24 @@ bool resolveDifferentiableAttrDifferentiabilityParameters(
 
 /// Checks whether differentiable programming is enabled for the given
 /// differentiation-related attribute. Returns true on error.
-bool checkIfDifferentiableProgrammingEnabled(
-    ASTContext &ctx, DeclAttribute *attr) {
+bool checkIfDifferentiableProgrammingEnabled(ASTContext &ctx,
+                                             DeclAttribute *attr,
+                                             DeclContext *DC) {
   auto &diags = ctx.Diags;
-  // The experimental differentiable programming flag must be enabled.
-  if (!ctx.LangOpts.EnableExperimentalDifferentiableProgramming) {
-    diags
-        .diagnose(attr->getLocation(),
-                  diag::experimental_differentiable_programming_disabled)
-        .highlight(attr->getRangeWithAt());
-    return true;
-  }
+  auto *SF = DC->getParentSourceFile();
+  assert(SF && "Source file not found");
   // The `Differentiable` protocol must be available.
   // If unavailable, the `_Differentiation` module should be imported.
-  if (!ctx.getProtocol(KnownProtocolKind::Differentiable)) {
-    diags
-        .diagnose(attr->getLocation(), diag::attr_used_without_required_module,
-                  attr, ctx.Id_Differentiation)
-        .highlight(attr->getRangeWithAt());
-    return true;
-  }
-  return false;
+  if (isDifferentiableProgrammingEnabled(*SF))
+    return false;
+  diags
+      .diagnose(attr->getLocation(), diag::attr_used_without_required_module,
+                attr, ctx.Id_Differentiation)
+      .highlight(attr->getRangeWithAt());
+  return true;
 }
 
-llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
+IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
     Evaluator &evaluator, DifferentiableAttr *attr) const {
   // Skip type-checking for implicit `@differentiable` attributes. We currently
   // assume that all implicit `@differentiable` attributes are valid.
@@ -3850,7 +3941,7 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
   auto &diags = ctx.Diags;
   // `@differentiable` attribute requires experimental differentiable
   // programming to be enabled.
-  if (checkIfDifferentiableProgrammingEnabled(ctx, attr))
+  if (checkIfDifferentiableProgrammingEnabled(ctx, attr, D->getDeclContext()))
     return nullptr;
 
   // Resolve the original `AbstractFunctionDecl`.
@@ -3973,6 +4064,10 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
       return nullptr;
     }
     getterDecl->getAttrs().add(newAttr);
+    // Register derivative function configuration.
+    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+    getterDecl->addDerivativeFunctionConfiguration(
+        {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
     return resolvedDiffParamIndices;
   }
   // Reject duplicate `@differentiable` attributes.
@@ -4012,7 +4107,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   auto &diags = Ctx.Diags;
   // `@derivative` attribute requires experimental differentiable programming
   // to be enabled.
-  if (checkIfDifferentiableProgrammingEnabled(Ctx, attr))
+  if (checkIfDifferentiableProgrammingEnabled(Ctx, attr, D->getDeclContext()))
     return true;
   auto *derivative = cast<FuncDecl>(D);
   auto lookupConformance =
@@ -4345,13 +4440,11 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     return true;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   // Register derivative function configuration.
   auto *resultIndices = IndexSubset::get(Ctx, 1, {0});
   originalAFD->addDerivativeFunctionConfiguration(
       {resolvedDiffParamIndices, resultIndices,
        derivative->getGenericSignature()});
-  // SWIFT_ENABLE_TENSORFLOW END
 
   return false;
 }
@@ -4361,7 +4454,6 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
     attr->setInvalid();
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 /// Returns true if the given type's `TangentVector` is equal to itself in the
 /// given module.
 static bool tangentVectorEqualsSelf(Type type, DeclContext *DC) {
@@ -4376,7 +4468,7 @@ static bool tangentVectorEqualsSelf(Type type, DeclContext *DC) {
   return type->getCanonicalType() == tanType->getCanonicalType();
 };
 
-// SWIFT_ENABLE_TENSORFLOW
+
 // Computes the linearity parameter indices from the given parsed linearity
 // parameters for the given transpose function. On error, emits diagnostics and
 // returns `nullptr`.
@@ -4468,7 +4560,6 @@ computeLinearityParameters(ArrayRef<ParsedAutoDiffParameter> parsedLinearParams,
   return IndexSubset::get(ctx, parameterBits);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 // Checks if the given linearity parameter types are valid for the given
 // original function in the given derivative generic environment and module
 // context. Returns true on error.
@@ -4505,104 +4596,6 @@ static bool checkLinearityParameters(
     }
   }
   return false;
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-// Computes the original function type corresponding to the given transpose
-// function type. Used for `@transpose` attribute type-checking.
-static AnyFunctionType *
-getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
-                                 IndexSubset *linearParamIndices,
-                                 bool wrtSelf) {
-  unsigned transposeParamsIndex = 0;
-
-  // Get the transpose function's parameters and result type.
-  auto transposeParams = transposeFnType->getParams();
-  auto transposeResult = transposeFnType->getResult();
-  bool isCurried = transposeResult->is<AnyFunctionType>();
-  if (isCurried) {
-    auto methodType = transposeResult->castTo<AnyFunctionType>();
-    transposeParams = methodType->getParams();
-    transposeResult = methodType->getResult();
-  }
-
-  // Get the original function's result type.
-  // The original result type is always equal to the type of the last
-  // parameter of the transpose function type.
-  auto originalResult = transposeParams.back().getPlainType();
-
-  // Get transposed result types.
-  // The transpose function result type may be a singular type or a tuple type.
-  SmallVector<TupleTypeElt, 4> transposeResultTypes;
-  if (auto transposeResultTupleType = transposeResult->getAs<TupleType>()) {
-    transposeResultTypes.append(transposeResultTupleType->getElements().begin(),
-                                transposeResultTupleType->getElements().end());
-  } else {
-    transposeResultTypes.push_back(transposeResult);
-  }
-
-  // Get the `Self` type, if the transpose function type is curried.
-  // - If `self` is a linearity parameter, use the first transpose result type.
-  // - Otherwise, use the first transpose parameter type.
-  unsigned transposeResultTypesIndex = 0;
-  Type selfType;
-  if (isCurried && wrtSelf) {
-    selfType = transposeResultTypes.front().getType();
-    transposeResultTypesIndex++;
-  } else if (isCurried) {
-    selfType = transposeFnType->getParams().front().getPlainType();
-  }
-
-  // Get the original function's parameters.
-  SmallVector<AnyFunctionType::Param, 8> originalParams;
-  // The number of original parameters is equal to the sum of:
-  // - The number of original non-transposed parameters.
-  //   - This is the number of transpose parameters minus one. All transpose
-  //     parameters come from the original function, except the last parameter
-  //     (the transposed original result).
-  // - The number of original transposed parameters.
-  //   - This is the number of linearity parameters.
-  unsigned originalParameterCount =
-      transposeParams.size() - 1 + linearParamIndices->getNumIndices();
-  // Iterate over all original parameter indices.
-  for (auto i : range(originalParameterCount)) {
-    // Skip `self` parameter if `self` is a linearity parameter.
-    // The `self` is handled specially later to form a curried function type.
-    bool isSelfParameterAndWrtSelf =
-        wrtSelf && i == linearParamIndices->getCapacity() - 1;
-    if (isSelfParameterAndWrtSelf)
-      continue;
-    // If `i` is a linearity parameter index, the next original parameter is
-    // the next transpose result.
-    if (linearParamIndices->contains(i)) {
-      auto resultType =
-          transposeResultTypes[transposeResultTypesIndex++].getType();
-      originalParams.push_back(AnyFunctionType::Param(resultType));
-    }
-    // Otherwise, the next original parameter is the next transpose parameter.
-    else {
-      originalParams.push_back(transposeParams[transposeParamsIndex++]);
-    }
-  }
-
-  // Compute the original function type.
-  AnyFunctionType *originalType;
-  // If the transpose type is curried, the original function type is:
-  // `(Self) -> (<original parameters>) -> <original result>`.
-  if (isCurried) {
-    assert(selfType && "`Self` type should be resolved");
-    originalType = makeFunctionType(originalParams, originalResult, nullptr);
-    originalType =
-        makeFunctionType(AnyFunctionType::Param(selfType), originalType,
-                         transposeFnType->getOptGenericSignature());
-  }
-  // Otherwise, the original function type is simply:
-  // `(<original parameters>) -> <original result>`.
-  else {
-    originalType = makeFunctionType(originalParams, originalResult,
-                                    transposeFnType->getOptGenericSignature());
-  }
-  return originalType;
 }
 
 // Given a transpose function type where `self` is a linearity parameter,
@@ -4823,6 +4816,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   attr->setParameterIndices(linearParamIndices);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 static bool
 compilerEvaluableAllowedInExtensionDecl(ExtensionDecl *extensionDecl) {
   auto extendedTypeKind = extensionDecl->getExtendedType()->getKind();
@@ -4888,3 +4882,4 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   // checked, and it's not type checked yet, so we check these rules later in
   // TypeChecker::checkFunctionBodyCompilerEvaluable().
 }
+// SWIFT_ENABLE_TENSORFLOW END

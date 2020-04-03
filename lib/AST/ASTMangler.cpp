@@ -1519,7 +1519,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   if (!fn->isNoEscape())
     OpArgs.push_back('e');
 
-  // SWIFT_ENABLE_TENSORFLOW
+  // Differentiability kind.
   switch (fn->getExtInfo().getDifferentiabilityKind()) {
   case DifferentiabilityKind::NonDifferentiable:
     break;
@@ -2131,7 +2131,6 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
-    // SWIFT_ENABLE_TENSORFLOW
     if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Normal) {
       if (fn->isNoEscape())
         return appendOperator("XF");

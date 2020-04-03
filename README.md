@@ -37,7 +37,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11.3](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11.4](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document for the current required version.
 
@@ -45,10 +45,17 @@ You will also need [CMake](https://cmake.org), [Ninja](https://ninja-build.org),
 
 **[Homebrew](https://brew.sh/)**
 
-```shell
-brew install cmake ninja
-brew cask install java # required for Bazel
-```
+    brew install cmake ninja
+    
+You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle)
+from the root of this repository's working directory to install all of these
+dependencies:
+
+    brew bundle
+
+**[MacPorts](https://macports.org)**
+
+    sudo port install cmake ninja
 
 Additionally, [Bazel](https://www.bazel.build) is required to build with TensorFlow support. Instructions to download Bazel directly can be found [below](#bazel). You can find instructions for installing CMake, and Ninja directly [below](#build-dependencies) as well.
 
@@ -333,7 +340,7 @@ particular the section on [lit.py](docs/Testing.md#using-litpy).
 
 ### CMake
 [CMake](https://cmake.org) is the core infrastructure used to configure builds of
-Swift and its companion projects; at least version 3.4.3 is required.
+Swift and its companion projects; at least version 3.16.5 is required.
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded

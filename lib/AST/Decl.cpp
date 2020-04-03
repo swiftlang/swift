@@ -771,7 +771,7 @@ bool Decl::hasUnderscoredNaming() const {
   }
 
   if (!VD->getBaseName().isSpecial() &&
-      VD->getBaseName().getIdentifier().str().startswith("_")) {
+      VD->getBaseIdentifier().str().startswith("_")) {
     return true;
   }
 
@@ -1405,7 +1405,7 @@ createExtensionGenericParams(ASTContext &ctx,
   return toParams;
 }
 
-llvm::Expected<GenericParamList *>
+GenericParamList *
 GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) const {
   if (auto *ext = dyn_cast<ExtensionDecl>(value)) {
     // Create the generic parameter list for the extension by cloning the
@@ -1888,6 +1888,17 @@ bool Pattern::isNeverDefaultInitializable() const {
   return result;
 }
 
+bool PatternBindingDecl::isDefaultInitializableViaPropertyWrapper(unsigned i) const {
+  if (auto singleVar = getSingleVar()) {
+    if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo(0)) {
+      if (wrapperInfo.defaultInit)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   const auto entry = getPatternList()[i];
 
@@ -1897,14 +1908,14 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
 
   // If the outermost attached property wrapper vends an `init()`, use that
   // for default initialization.
+  if (isDefaultInitializableViaPropertyWrapper(i))
+    return true;
+
+  // If one of the attached wrappers is missing a wrappedValue
+  // initializer, cannot default-initialize.
   if (auto singleVar = getSingleVar()) {
     if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo(0)) {
-      if (wrapperInfo.defaultInit)
-        return true;
-
-      // If one of the attached wrappers is missing an initialValue
-      // initializer, cannot default-initialize.
-      if (!singleVar->allAttachedPropertyWrappersHaveInitialValueInit())
+      if (!singleVar->allAttachedPropertyWrappersHaveWrappedValueInit())
         return false;
     }
   }
@@ -3189,7 +3200,7 @@ bool ValueDecl::shouldHideFromEditor() const {
 
   // '$__' names are reserved by compiler internal.
   if (!getBaseName().isSpecial() &&
-      getBaseName().getIdentifier().str().startswith("$__"))
+      getBaseIdentifier().str().startswith("$__"))
     return true;
 
   return false;
@@ -3608,8 +3619,8 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
       return result;
   }
 
-  if (int result = type1->getBaseName().getIdentifier().str().compare(
-                                  type2->getBaseName().getIdentifier().str()))
+  if (int result = type1->getBaseIdentifier().str().compare(
+                                  type2->getBaseIdentifier().str()))
     return result;
 
   // Error case: two type declarations that cannot be distinguished.
@@ -3807,79 +3818,6 @@ NominalTypeDecl::getStoredPropertiesAndMissingMemberPlaceholders() const {
 
 bool NominalTypeDecl::isOptionalDecl() const {
   return this == getASTContext().getOptionalDecl();
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
-  auto isEffectiveMemberwiseInitializer = [&](ConstructorDecl *ctorDecl) {
-    // Check for `nullptr`.
-    if (!ctorDecl)
-      return false;
-    // Return true if `ctorDecl` is marked as a memberwise initializer.
-    if (ctorDecl->isMemberwiseInitializer())
-      return true;
-    // Get all stored properties, excluding `let` properties with initial
-    // values.
-    SmallVector<VarDecl *, 8> storedProperties;
-    for (auto *vd : getStoredProperties()) {
-      if (vd->isLet() && vd->hasInitialValue())
-        continue;
-      storedProperties.push_back(vd);
-    }
-    // Return false if constructor does not have interface type set. It is not
-    // possible to determine whether it is a memberwise initializer.
-    if (!ctorDecl->hasInterfaceType())
-      return false;
-    auto ctorType =
-        ctorDecl->getMethodInterfaceType()->getAs<AnyFunctionType>();
-    // Return false if constructor does not have a valid method interface type.
-    if (!ctorType)
-      return false;
-    // Return false if stored property/initializer parameter count do not match.
-    if (storedProperties.size() != ctorType->getNumParams())
-      return false;
-    // Return true if all stored property types/names match initializer
-    // parameter types/labels.
-    return llvm::all_of(
-        llvm::zip(storedProperties, ctorType->getParams()),
-        [&](std::tuple<VarDecl *, AnyFunctionType::Param> pair) {
-          auto *storedProp = std::get<0>(pair);
-          auto param = std::get<1>(pair);
-          return storedProp->getInterfaceType()->isEqual(
-                     param.getPlainType()) &&
-                 storedProp->getName() == param.getLabel();
-        });
-  };
-
-  ConstructorDecl *memberwiseInitDecl = nullptr;
-  auto ctorDecls = lookupDirect(DeclBaseName::createConstructor());
-  for (auto decl : ctorDecls) {
-    auto ctorDecl = dyn_cast<ConstructorDecl>(decl);
-    if (!isEffectiveMemberwiseInitializer(ctorDecl))
-      continue;
-    assert(!memberwiseInitDecl && "Memberwise initializer already found");
-    memberwiseInitDecl = ctorDecl;
-  }
-  return memberwiseInitDecl;
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-void NominalTypeDecl::addFixedLayoutAttr() {
-  auto &C = getASTContext();
-  // If nominal already has `@_fixed_layout`, return.
-  if (getAttrs().hasAttribute<FixedLayoutAttr>())
-    return;
-  auto access = getEffectiveAccess();
-  // If nominal does not have at least internal access, return.
-  if (access < AccessLevel::Internal)
-    return;
-  // If nominal is internal, it should have the `@usableFromInline` attribute.
-  if (access == AccessLevel::Internal &&
-      !getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    getAttrs().add(new (C) UsableFromInlineAttr(/*Implicit*/ true));
-  }
-  // Add `@_fixed_layout` to the nominal.
-  getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
 }
 
 Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {
@@ -4165,6 +4103,14 @@ ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() const {
       ctx.evaluator, SynthesizeMemberwiseInitRequest{mutableThis}, nullptr);
 }
 
+ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ResolveEffectiveMemberwiseInitRequest{mutableThis},
+                           nullptr);
+}
+
 bool NominalTypeDecl::hasDefaultInitializer() const {
   // Currently only structs and classes can have default initializers.
   if (!isa<StructDecl>(this) && !isa<ClassDecl>(this))
@@ -4223,7 +4169,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 
   if (auto actionToTake = action) {
     (void)evaluateOrDefault(Context.evaluator,
-        ResolveImplicitMemberRequest{this, actionToTake.getValue()}, false);
+        ResolveImplicitMemberRequest{this, actionToTake.getValue()}, {});
   }
 }
 
@@ -4301,7 +4247,7 @@ synthesizeEmptyFunctionBody(AbstractFunctionDecl *afd, void *context) {
            /*isTypeChecked=*/true };
 }
 
-llvm::Expected<DestructorDecl *>
+DestructorDecl *
 GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   auto &ctx = CD->getASTContext();
   auto *DD = new (ctx) DestructorDecl(CD->getLoc(), CD);
@@ -4366,8 +4312,9 @@ AncestryOptions ClassDecl::checkAncestry() const {
                            AncestryFlags()));
 }
         
-llvm::Expected<AncestryFlags>
-ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator, ClassDecl *value) const {
+AncestryFlags
+ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator,
+                                    ClassDecl *value) const {
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
 
   AncestryOptions result;
@@ -5120,8 +5067,10 @@ void ProtocolDecl::computeKnownProtocolKind() const {
   auto module = getModuleContext();
   if (module != module->getASTContext().getStdlibModule() &&
       !module->getName().is("Foundation") &&
+      !module->getName().is("_Differentiation") &&
       // SWIFT_ENABLE_TENSORFLOW
       !module->getName().is("TensorFlow")) {
+      // SWIFT_ENABLE_TENSORFLOW END
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -5134,6 +5083,57 @@ void ProtocolDecl::computeKnownProtocolKind() const {
       .Default(1);
 
   const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = value;
+}
+
+Optional<KnownDerivableProtocolKind>
+    ProtocolDecl::getKnownDerivableProtocolKind() const {
+  const auto knownKind = getKnownProtocolKind();
+  if (!knownKind)
+      return None;
+
+  switch (*knownKind) {
+  case KnownProtocolKind::RawRepresentable:
+    return KnownDerivableProtocolKind::RawRepresentable;
+  case KnownProtocolKind::OptionSet:
+    return KnownDerivableProtocolKind::OptionSet;
+  case KnownProtocolKind::CaseIterable:
+    return KnownDerivableProtocolKind::CaseIterable;
+  case KnownProtocolKind::Comparable:
+    return KnownDerivableProtocolKind::Comparable;
+  case KnownProtocolKind::Equatable:
+    return KnownDerivableProtocolKind::Equatable;
+  case KnownProtocolKind::Hashable:
+    return KnownDerivableProtocolKind::Hashable;
+  case KnownProtocolKind::BridgedNSError:
+    return KnownDerivableProtocolKind::BridgedNSError;
+  case KnownProtocolKind::CodingKey:
+    return KnownDerivableProtocolKind::CodingKey;
+  case KnownProtocolKind::Encodable:
+    return KnownDerivableProtocolKind::Encodable;
+  case KnownProtocolKind::Decodable:
+    return KnownDerivableProtocolKind::Decodable;
+  case KnownProtocolKind::AdditiveArithmetic:
+    return KnownDerivableProtocolKind::AdditiveArithmetic;
+  case KnownProtocolKind::Differentiable:
+    return KnownDerivableProtocolKind::Differentiable;
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::PointwiseMultiplicative:
+    return KnownDerivableProtocolKind::PointwiseMultiplicative;
+  case KnownProtocolKind::ElementaryFunctions:
+    return KnownDerivableProtocolKind::ElementaryFunctions;
+  case KnownProtocolKind::KeyPathIterable:
+    return KnownDerivableProtocolKind::KeyPathIterable;
+  case KnownProtocolKind::TensorArrayProtocol:
+    return KnownDerivableProtocolKind::TensorArrayProtocol;
+  case KnownProtocolKind::TensorGroup:
+    return KnownDerivableProtocolKind::TensorGroup;
+  case KnownProtocolKind::VectorProtocol:
+    return KnownDerivableProtocolKind::VectorProtocol;
+  case KnownProtocolKind::EuclideanDifferentiable:
+    return KnownDerivableProtocolKind::EuclideanDifferentiable;
+  // SWIFT_ENABLE_TENSORFLOW END
+  default: return None;
+  }
 }
 
 bool ProtocolDecl::hasCircularInheritedProtocols() const {
@@ -5915,7 +5915,7 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
 
 /// Whether all of the attached property wrappers have an init(wrappedValue:)
 /// initializer.
-bool VarDecl::allAttachedPropertyWrappersHaveInitialValueInit() const {
+bool VarDecl::allAttachedPropertyWrappersHaveWrappedValueInit() const {
   for (unsigned i : indices(getAttachedPropertyWrappers())) {
     if (!getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit)
       return false;
@@ -6020,7 +6020,7 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
 
   // If all property wrappers have a wrappedValue initializer, the property
   // wrapper will be initialized that way.
-  return allAttachedPropertyWrappersHaveInitialValueInit();
+  return allAttachedPropertyWrappersHaveWrappedValueInit();
 }
 
 bool VarDecl::isInnermostPropertyWrapperInitUsesEscapingAutoClosure() const {
@@ -6920,7 +6920,7 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
     return destructor->getObjCSelector();
   } else if (auto func = dyn_cast<FuncDecl>(this)) {
     // Otherwise cast this to be able to access getName()
-    baseNameStr = func->getName().str();
+    baseNameStr = func->getBaseIdentifier().str();
   } else if (isa<ConstructorDecl>(this)) {
     baseNameStr = "init";
   } else {
@@ -7428,7 +7428,8 @@ SelfAccessKind FuncDecl::getSelfAccessKind() const {
 }
 
 bool FuncDecl::isCallAsFunctionMethod() const {
-  return getName() == getASTContext().Id_callAsFunction && isInstanceMember();
+  return getBaseIdentifier() == getASTContext().Id_callAsFunction &&
+         isInstanceMember();
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
@@ -7588,7 +7589,7 @@ LiteralExpr *EnumElementDecl::getRawValueExpr() const {
   (void)evaluateOrDefault(
       getASTContext().evaluator,
       EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Interface},
-      true);
+      {});
   return RawValueExpr;
 }
 
@@ -7598,7 +7599,7 @@ LiteralExpr *EnumElementDecl::getStructuralRawValueExpr() const {
   (void)evaluateOrDefault(
       getASTContext().evaluator,
       EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Structural},
-      true);
+      {});
   return RawValueExpr;
 }
 
@@ -7925,7 +7926,7 @@ PrecedenceGroupDecl *InfixOperatorDecl::getPrecedenceGroup() const {
 }
 
 bool FuncDecl::isDeferBody() const {
-  return getName() == getASTContext().getIdentifier("$defer");
+  return getBaseIdentifier() == getASTContext().getIdentifier("$defer");
 }
 
 bool FuncDecl::isPotentialIBActionTarget() const {

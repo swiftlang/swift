@@ -532,7 +532,6 @@ namespace {
     RValue visitDefaultArgumentExpr(DefaultArgumentExpr *E, SGFContext C);
     RValue visitErrorExpr(ErrorExpr *E, SGFContext C);
 
-    // SWIFT_ENABLE_TENSORFLOW
     RValue visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E,
                                            SGFContext C);
     RValue visitLinearFunctionExpr(LinearFunctionExpr *E, SGFContext C);
@@ -542,7 +541,6 @@ namespace {
         LinearFunctionExtractOriginalExpr *E, SGFContext C);
     RValue visitLinearToDifferentiableFunctionExpr(
         LinearToDifferentiableFunctionExpr *E, SGFContext C);
-    // SWIFT_ENABLE_TENSORFLOW END
   };
 } // end anonymous namespace
 
@@ -5442,7 +5440,6 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
   llvm_unreachable("unevaluated_instance expression can never be evaluated");
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 RValue RValueEmitter::visitDifferentiableFunctionExpr(
     DifferentiableFunctionExpr *E, SGFContext C) {
   auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
@@ -5487,7 +5484,6 @@ RValue RValueEmitter::visitLinearToDifferentiableFunctionExpr(
   // TODO: Implement this.
   llvm_unreachable("Unsupported!");
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
   // This implementation is not very robust; if TapExpr were to ever become

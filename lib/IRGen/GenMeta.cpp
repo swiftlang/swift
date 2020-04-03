@@ -1741,7 +1741,12 @@ namespace {
         auto underlyingConformance = conformance
           .subst(O->getUnderlyingInterfaceType(),
                  *O->getUnderlyingTypeSubstitutions());
-        
+
+        // Skip protocols without Witness tables, e.g. @objc protocols.
+        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(
+                underlyingConformance.getRequirement()))
+          continue;
+
         auto witnessTableRef = IGM.emitWitnessTableRefString(
                                           underlyingType, underlyingConformance,
                                           contextSig,
@@ -4634,9 +4639,9 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Encodable:
   case KnownProtocolKind::Decodable:
   case KnownProtocolKind::StringInterpolationProtocol:
+  case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::Differentiable:
   // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::PointwiseMultiplicative:
   case KnownProtocolKind::ElementaryFunctions:
   case KnownProtocolKind::KeyPathIterable:
@@ -4645,6 +4650,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::VectorProtocol:
   case KnownProtocolKind::EuclideanDifferentiable:
   case KnownProtocolKind::Expression:
+  // SWIFT_ENABLE_TENSORFLOW END
     return SpecialProtocol::None;
   }
 

@@ -1047,7 +1047,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       // as members of the enum case decl. Walk them manually here so that they
       // end up as child nodes of enum case.
       for (auto *EnumElemD : EnumCaseD->getElements()) {
-        if (EnumElemD->getName().empty())
+        if (EnumElemD->getBaseIdentifier().empty())
           continue;
         SyntaxStructureNode SN;
         setDecl(SN, EnumElemD);
@@ -1060,7 +1060,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
           SN.NameRange = charSourceRangeFromSourceRange(SM, NameRange);
         } else {
           SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
-                                         EnumElemD->getName().getLength());
+                                         EnumElemD->getBaseIdentifier()
+                                           .getLength());
         }
 
         if (auto *E = EnumElemD->getRawValueUnchecked()) {

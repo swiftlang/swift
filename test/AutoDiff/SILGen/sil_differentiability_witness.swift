@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-differentiable-programming %s | %target-sil-opt -enable-experimental-differentiable-programming | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %target-sil-opt | %FileCheck %s
 
 // Test SIL differentiability witness SIL generation.
 

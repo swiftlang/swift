@@ -276,11 +276,11 @@ public:
 
 } // end anonymous namespace
 
-llvm::Expected<bool> ExecuteSILPipelineRequest::evaluate(
+evaluator::SideEffect ExecuteSILPipelineRequest::evaluate(
     Evaluator &evaluator, SILPipelineExecutionDescriptor desc) const {
   SILPassManager PM(desc.SM, desc.IsMandatory, desc.IRMod);
   PM.executePassPipelinePlan(desc.Plan);
-  return false;
+  return std::make_tuple<>();
 }
 
 void swift::executePassPipelinePlan(SILModule *SM,

@@ -130,9 +130,6 @@ def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
   HelpText<"Automatically import declared cross-import overlays.">;
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
-
-def enable_educational_notes : Flag<["-"], "enable-educational-notes">,
-  HelpText<"Show educational notes, if available.">;
   
 def enable_experimental_diagnostic_formatting :
   Flag<["-"], "enable-experimental-diagnostic-formatting">,
@@ -606,6 +603,10 @@ def external_pass_pipeline_filename : Separate<["-"], "external-pass-pipeline-fi
 
 def index_system_modules : Flag<["-"], "index-system-modules">,
   HelpText<"Emit index data for imported serialized swift system modules">;
+
+def index_ignore_stdlib :
+  Flag<["-"], "index-ignore-stdlib">,
+  HelpText<"Avoid emitting index data for the standard library.">;
 
 def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,

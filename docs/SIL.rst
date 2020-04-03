@@ -5836,6 +5836,55 @@ In lowered SIL, an explicit extractee type may be provided. This is currently
 used by the LoadableByAddress transformation, which rewrites function types.
 
 
+linear_function
+```````````````
+::
+
+  sil-instruction ::= 'linear_function'
+                      sil-linear-function-parameter-indices
+                      sil-value ':' sil-type
+                      sil-linear-function-transpose-function-clause?
+
+  sil-linear-function-parameter-indices ::=
+      '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
+  sil-linear-transpose-function-clause ::=
+      with_transpose sil-value ':' sil-type
+
+  linear_function [parameters 0] %0 : $(T) -> T with_transpose %1 : $(T) -> T
+
+Bundles a function with its transpose function into a
+``@differentiable(linear)`` function.
+
+``[parameters ...]`` specifies parameter indices that the original function is
+linear with respect to.
+
+A ``with_transpose`` clause specifies the transpose function associated
+with the original function. When a ``with_transpose`` clause is not specified,
+the mandatory differentiation transform  will add a ``with_transpose`` clause to
+the instruction.
+
+In raw SIL, the ``with_transpose`` clause is optional. In canonical SIL,
+the ``with_transpose`` clause is mandatory.
+
+
+linear_function_extract
+```````````````````````
+::
+
+  sil-instruction ::= 'linear_function_extract'
+                      '[' sil-linear-function-extractee ']'
+                      sil-value ':' sil-type
+
+  sil-linear-function-extractee ::= 'original' | 'transpose'
+
+  linear_function_extract [original] %0 : $@differentiable(linear) (T) -> T
+  linear_function_extract [transpose] %0 : $@differentiable(linear) (T) -> T
+
+Extracts the original function or a transpose function from the given
+``@differentiable(linear)`` function. The extractee is one of the following:
+``[original]`` or ``[transpose]``.
+
+
 differentiability_witness_function
 ``````````````````````````````````
 ::
@@ -5868,58 +5917,6 @@ The remaining components identify the SIL differentiability witness:
 - Witness generic parameter clause (optional). When parsing SIL, the parsed
   witness generic parameter clause is combined with the original function's
   generic signature to form the full witness generic signature.
-
-.. SWIFT_ENABLE_TENSORFLOW
-
-linear_function
-```````````````
-::
-
-  sil-instruction ::= 'linear_function'
-                      sil-linear-function-parameter-indices
-                      sil-value ':' sil-type
-                      sil-linear-function-transpose-function-clause?
-
-  sil-linear-function-parameter-indices ::=
-      '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
-  sil-linear-transpose-function-clause ::=
-      with_transpose sil-value ':' sil-type
-
-  linear_function [parameters 0] %0 : $(T) -> T with_transpose %1 : $(T) -> T
-
-Bundles a function with its transpose function into a
-``@differentiable(linear)`` function.
-
-``[parameters ...]`` specifies parameter indices that the original function is
-linear with respect to.
-
-A ``with_transpose`` clause specifies the transpose function associated
-with the original function. When a ``with_transpose`` clause is not specified,
-the mandatory differentiation transform  will add a ``with_transpose`` clause to
-the instruction.
-
-In raw SIL, it is optional to provide a transpose function ``with`` clause.
-In canonical SIL, a ``with`` clause is mandatory.
-
-
-linear_function_extract
-```````````````````````
-::
-
-  sil-instruction ::= 'linear_function_extract'
-                      '[' sil-linear-function-extractee ']'
-                      sil-value ':' sil-type
-
-  sil-linear-function-extractee ::= 'original' | 'transpose'
-
-  linear_function_extract [original] %0 : $@differentiable(linear) (T) -> T
-  linear_function_extract [transpose] %0 : $@differentiable(linear) (T) -> T
-
-Extracts the original function or a transpose function from the given
-``@differentiable(linear)`` function. The extractee is either ``[original]`` or
-``[transpose]``.
-
-.. SWIFT_ENABLE_TENSORFLOW END
 
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~

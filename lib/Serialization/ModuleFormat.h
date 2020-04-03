@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 549; // differentiable_function, differentiable_function_extract
+const uint16_t SWIFTMODULE_VERSION_MINOR = 551; // derivative function configurations
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1931,9 +1931,9 @@ namespace index_block {
     /// produce Objective-C methods.
     OBJC_METHODS,
 
-    // SWIFT_ENABLE_TENSORFLOW
+    /// The derivative function configuration table, which maps original
+    /// function declaration names to derivative function configurations.
     DERIVATIVE_FUNCTION_CONFIGURATIONS,
-    // SWIFT_ENABLE_TENSORFLOW END
 
     ENTRY_POINT,
     LOCAL_DECL_CONTEXT_OFFSETS,
@@ -1999,13 +1999,11 @@ namespace index_block {
     BCBlob  // map from member DeclBaseNames to offsets of DECL_MEMBERS records
   >;
 
-  // SWIFT_ENABLE_TENSORFLOW
   using DerivativeFunctionConfigTableLayout = BCRecordLayout<
     DERIVATIVE_FUNCTION_CONFIGURATIONS,  // record ID
     BCVBR<16>,     // table offset within the blob (see below)
     BCBlob         // map from original declaration names to derivative configs
   >;
-  // SWIFT_ENABLE_TENSORFLOW END
 
   using EntryPointLayout = BCRecordLayout<
     ENTRY_POINT,

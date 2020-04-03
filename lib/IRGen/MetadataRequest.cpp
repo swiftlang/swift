@@ -1231,7 +1231,6 @@ namespace {
         break;
       }
 
-      // SWIFT_ENABLE_TENSORFLOW
       FunctionMetadataDifferentiabilityKind metadataDifferentiabilityKind;
       switch (type->getDifferentiabilityKind()) {
       case DifferentiabilityKind::NonDifferentiable:
@@ -1253,7 +1252,6 @@ namespace {
                           .withConvention(metadataConvention)
                           .withThrows(type->throws())
                           .withParameterFlags(hasFlags)
-                          // SWIFT_ENABLE_TENSORFLOW
                           .withEscaping(isEscaping)
                           .withDifferentiabilityKind(
                               metadataDifferentiabilityKind);

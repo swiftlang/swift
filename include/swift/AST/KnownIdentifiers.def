@@ -133,37 +133,6 @@ IDENTIFIER(withKeywordArguments)
 IDENTIFIER(wrapped)
 IDENTIFIER(wrappedValue)
 IDENTIFIER(wrapperValue)
-// SWIFT_ENABLE_TENSORFLOW
-IDENTIFIER(differential)
-IDENTIFIER(pullback)
-
-// SWIFT_ENABLE_TENSORFLOW
-IDENTIFIER(TensorFlow)
-// KeyPathIterable
-IDENTIFIER(AllKeyPaths)
-IDENTIFIER(allKeyPaths)
-IDENTIFIER(recursivelyAllKeyPaths)
-IDENTIFIER(allWritableKeyPaths)
-IDENTIFIER(recursivelyAllWritableKeyPaths)
-// TensorArrayProtocol
-IDENTIFIER_(unpackTensorHandles)
-IDENTIFIER_(tensorHandleCount)
-// TensorGroup
-IDENTIFIER_(typeList)
-// AdditiveArithmetic, PointwiseMultiplicative, VectorProtocol
-IDENTIFIER(zero)
-IDENTIFIER(one)
-IDENTIFIER(reciprocal)
-IDENTIFIER(VectorSpaceScalar)
-IDENTIFIER(adding)
-IDENTIFIER(subtracting)
-IDENTIFIER(scaled)
-IDENTIFIER(by)
-IDENTIFIER(scale)
-IDENTIFIER(x)
-// Differentiable
-IDENTIFIER(move)
-IDENTIFIER(differentiableVectorView)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")
@@ -235,9 +204,42 @@ IDENTIFIER_(nsError)
 IDENTIFIER(OSLogMessage)
 
 // Differentiable programming
+IDENTIFIER(along)
+IDENTIFIER(differential)
+IDENTIFIER(direction)
+IDENTIFIER(move)
+IDENTIFIER(pullback)
 IDENTIFIER(TangentVector)
+IDENTIFIER(zero)
+
+// SWIFT_ENABLE_TENSORFLOW
+IDENTIFIER(TensorFlow)
 // Module that supports #quote(...) literals.
 IDENTIFIER(Quote)
+// KeyPathIterable
+IDENTIFIER(AllKeyPaths)
+IDENTIFIER(allKeyPaths)
+IDENTIFIER(recursivelyAllKeyPaths)
+IDENTIFIER(allWritableKeyPaths)
+IDENTIFIER(recursivelyAllWritableKeyPaths)
+// TensorArrayProtocol
+IDENTIFIER_(unpackTensorHandles)
+IDENTIFIER_(tensorHandleCount)
+// TensorGroup
+IDENTIFIER_(typeList)
+// AdditiveArithmetic, PointwiseMultiplicative, VectorProtocol
+IDENTIFIER(one)
+IDENTIFIER(reciprocal)
+IDENTIFIER(VectorSpaceScalar)
+IDENTIFIER(adding)
+IDENTIFIER(subtracting)
+IDENTIFIER(scaled)
+IDENTIFIER(by)
+IDENTIFIER(scale)
+IDENTIFIER(x)
+// Differentiable
+IDENTIFIER(differentiableVectorView)
+// SWIFT_ENABLE_TENSORFLOW END
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

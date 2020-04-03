@@ -1075,12 +1075,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::OBJC_METHODS:
         ObjCMethods = readObjCMethodTable(scratch, blobData);
         break;
-      // SWIFT_ENABLE_TENSORFLOW
       case index_block::DERIVATIVE_FUNCTION_CONFIGURATIONS:
         DerivativeFunctionConfigurations =
             readDerivativeFunctionConfigTable(scratch, blobData);
         break;
-      // SWIFT_ENABLE_TENSORFLOW END
       case index_block::ENTRY_POINT:
         assert(blobData.empty());
         setEntryPointClassID(scratch.front());
@@ -2471,7 +2469,6 @@ void ModuleFile::loadObjCMethods(
   }
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void ModuleFile::loadDerivativeFunctionConfigurations(
     AbstractFunctionDecl *originalAFD,
     llvm::SetVector<AutoDiffConfig> &results) {
@@ -2499,7 +2496,6 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
     results.insert({parameterIndices, resultIndices, derivativeGenSig});
   }
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 TinyPtrVector<ValueDecl *>
 ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
@@ -2695,6 +2691,17 @@ void ModuleFile::getTopLevelDecls(
       continue;
     }
     results.push_back(declOrError.get());
+  }
+}
+
+void ModuleFile::getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) {
+  PrettyStackTraceModuleFile stackEntry(*this);
+  if (!OperatorDecls)
+    return;
+
+  for (auto entry : OperatorDecls->data()) {
+    for (auto item : entry)
+      results.push_back(cast<OperatorDecl>(getDecl(item.second)));
   }
 }
 

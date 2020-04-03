@@ -19,9 +19,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
-// SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/TypeCheckRequests.h"
-// SWIFT_ENABLE_TENSORFLOW END
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
@@ -188,7 +186,6 @@ getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
-                          // SWIFT_ENABLE_TENSORFLOW
                           GenericSignature Sig,
                           bool Rethrows = false) {
   assert(GenericParams && "Missing generic parameters");
@@ -219,7 +216,6 @@ getBuiltinGenericFunction(Identifier Id,
                                StaticSpellingKind::None,
                                /*FuncLoc=*/SourceLoc(),
                                Name, /*NameLoc=*/SourceLoc(),
-                               // SWIFT_ENABLE_TENSORFLOW
                                /*Throws=*/ Rethrows, /*ThrowsLoc=*/SourceLoc(),
                                GenericParams,
                                paramList,
@@ -227,11 +223,9 @@ getBuiltinGenericFunction(Identifier Id,
 
   func->setImplicit();
   func->setAccess(AccessLevel::Public);
-  // SWIFT_ENABLE_TENSORFLOW
   func->setGenericSignature(Sig);
   if (Rethrows)
     func->getAttrs().add(new (Context) RethrowsAttr(/*ThrowsLoc*/ SourceLoc()));
-  // SWIFT_ENABLE_TENSORFLOW END
 
   return func;
 }
@@ -458,25 +452,21 @@ namespace {
     GenericParamList *TheGenericParamList;
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
+    bool Rethrows = false;
 
-    // SWIFT_ENABLE_TENSORFLOW
     // Accumulate params and requirements here, so that we can make the
     // appropriate `AbstractGenericSignatureRequest` when `build()` is called.
-    bool Rethrows = false;
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> addedRequirements;
-    // SWIFT_ENABLE_TENSORFLOW END
 
   public:
     BuiltinFunctionBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
         : Context(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams);
-      // SWIFT_ENABLE_TENSORFLOW
       for (auto gp : TheGenericParamList->getParams()) {
         genericParamTypes.push_back(
             gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
       }
-      // SWIFT_ENABLE_TENSORFLOW END
     }
 
     template <class G>
@@ -492,7 +482,6 @@ namespace {
       InterfaceResult = generator.build(*this);
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
     template <class G>
     void addConformanceRequirement(const G &generator, ProtocolDecl *proto) {
       Requirement req(RequirementKind::Conformance,
@@ -504,21 +493,16 @@ namespace {
     void setRethrows(bool rethrows = true) {
       Rethrows = rethrows;
     }
-    // SWIFT_ENABLE_TENSORFLOW END
 
     FuncDecl *build(Identifier name) {
-      // SWIFT_ENABLE_TENSORFLOW
       auto GenericSig = evaluateOrDefault(
         Context.evaluator,
         AbstractGenericSignatureRequest{
           nullptr, std::move(genericParamTypes), std::move(addedRequirements)},
         nullptr);
-      // SWIFT_ENABLE_TENSORFLOW END
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
-                                       TheGenericParamList,
-                                       // SWIFT_ENABLE_TENSORFLOW
-                                       GenericSig);
+                                       TheGenericParamList, GenericSig);
     }
 
     // Don't use these generator classes directly; call the make{...}
@@ -991,7 +975,6 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 static ValueDecl *getAutoDiffApplyDerivativeFunction(
     ASTContext &Context, Identifier Id, AutoDiffDerivativeFunctionKind kind,
     unsigned arity, bool throws) {
@@ -1279,6 +1262,8 @@ static ValueDecl *getLinearFunctionConstructor(
   builder.setResult(resultGen);
   return builder.build(Id);
 }
+
+
 
 static ValueDecl *getGlobalStringTablePointer(ASTContext &Context,
                                               Identifier Id) {
@@ -2096,7 +2081,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
     return getAllocWithTailElemsOperation(Context, Id, NumTailTypes);
   }
-  // SWIFT_ENABLE_TENSORFLOW
   if (OperationName.startswith("applyDerivative_")) {
     AutoDiffDerivativeFunctionKind kind;
     unsigned arity;
@@ -2400,7 +2384,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::UnsafeGuaranteedEnd:
     return getUnsafeGuaranteedEnd(Context, Id);
 
-  // SWIFT_ENABLE_TENSORFLOW
   case BuiltinValueKind::ApplyDerivative:
   case BuiltinValueKind::ApplyTranspose:
   case BuiltinValueKind::DifferentiableFunction:

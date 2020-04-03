@@ -876,11 +876,9 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::GlobalValueInst:
   case SILInstructionKind::DifferentiableFunctionInst:
-  case SILInstructionKind::DifferentiableFunctionExtractInst:
-  // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::LinearFunctionInst:
+  case SILInstructionKind::DifferentiableFunctionExtractInst:
   case SILInstructionKind::LinearFunctionExtractInst:
-  // SWIFT_ENABLE_TENSORFLOW END
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \

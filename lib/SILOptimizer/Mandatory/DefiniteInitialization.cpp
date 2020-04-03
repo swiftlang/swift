@@ -1203,11 +1203,12 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     } else if (FD && FD->isOperator()) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::mutating_method_called_on_immutable_value,
-               FD->getName(), /*operator*/ 1, StringRef(PropertyName));
+               FD->getBaseIdentifier(), /*operator*/ 1,
+               StringRef(PropertyName));
     } else if (FD && isSelfParameter) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::mutating_method_called_on_immutable_value,
-               FD->getName(), /*method*/ 0, StringRef(PropertyName));
+               FD->getBaseIdentifier(), /*method*/ 0, StringRef(PropertyName));
     } else if (isAssignment) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::assignment_to_immutable_value, StringRef(PropertyName));
@@ -1590,7 +1591,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     if (auto accessor = dyn_cast<AccessorDecl>(Method))
       Name = accessor->getStorage()->getBaseName();
     else
-      Name = Method->getName();
+      Name = Method->getBaseIdentifier();
 
     // If this is a use of self before super.init was called, emit a diagnostic
     // about *that* instead of about individual properties not being

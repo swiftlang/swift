@@ -1,7 +1,20 @@
 // RUN: rm -rf %t ; mkdir -p %t
-// RUN: %target-build-swift %s -o %t/a.out -swift-version 4 && %target-run %t/a.out
+// RUN: %target-build-swift %s -o %t/a.out -swift-version 4
 
-// REQUIRES: executable_test
+// The actual XCTest overlay is not maintained in this repository -- it is
+// distributed in Xcode (libXCTestSwiftSupport.dylib), along with
+// XCTest.framework itself.
+//
+// The codebase here builds the obsolete /usr/lib/swift/libswiftXCTest.dylib
+// that currently ships in the OS. There is no expectation that that library is
+// usable for anything; it only exists to maintain a superficial level of binary
+// compatibility with existing apps that happen to link to it by mistake.
+//
+// Accordingly, this test is now a build-only test. The code here is only
+// compiled, it is never run.
+//
+// rdar://problem/55270944
+
 // REQUIRES: objc_interop
 
 // FIXME: Add a feature for "platforms that support XCTest".

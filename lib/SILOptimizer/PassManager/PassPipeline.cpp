@@ -359,6 +359,9 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   }
 
   P.addPerformanceConstantPropagation();
+  // Remove redundant arguments right before CSE and DCE, so that CSE and DCE
+  // can cleanup redundant and dead instructions.
+  P.addRedundantPhiElimination();
   P.addCSE();
   P.addDCE();
 

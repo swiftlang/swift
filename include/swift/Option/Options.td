@@ -372,6 +372,9 @@ def no_color_diagnostics : Flag<["-"], "no-color-diagnostics">,
 def debug_diagnostic_names : Flag<["-"], "debug-diagnostic-names">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
   HelpText<"Include diagnostic names when printing">;
+def print_educational_notes : Flag<["-"], "print-educational-notes">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Include educational notes in printed diagnostic output, if available">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
@@ -495,20 +498,25 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
 // Experimental feature options
-def enable_experimental_differentiable_programming : Flag<["-"], "enable-experimental-differentiable-programming">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
-  HelpText<"Enable experimental differentiable programming features">;
 
 // SWIFT_ENABLE_TENSORFLOW
-def enable_experimental_cross_file_derivative_registration : Flag<["-"], "enable-experimental-cross-file-derivative-registration">,
+// TODO(TF-1097): Remove this flag and always enable cross-file derivative registration.
+def enable_experimental_cross_file_derivative_registration :
+  Flag<["-"], "enable-experimental-cross-file-derivative-registration">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental cross-file derivative registration">;
 
 // NOTE: This flag will be removed when JVP/differential generation is robust.
-def enable_experimental_forward_mode_differentiation : Flag<["-"], "enable-experimental-forward-mode-differentiation">,
+def enable_experimental_forward_mode_differentiation :
+  Flag<["-"], "enable-experimental-forward-mode-differentiation">,
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental forward mode differentiation">;
 // SWIFT_ENABLE_TENSORFLOW END
+
+def enable_experimental_additive_arithmetic_derivation :
+  Flag<["-"], "enable-experimental-additive-arithmetic-derivation">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental 'AdditiveArithmetic' derived conformances">;
 
 def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
@@ -1034,6 +1042,16 @@ def disable_astscope_lookup : Flag<["-"], "disable-astscope-lookup">,
 def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
   Flags<[FrontendOption]>,
   HelpText<"Disable parser lookup & use ast scope lookup only (experimental)">;
+
+def enable_request_based_incremental_dependencies : Flag<["-"],
+  "enable-request-based-incremental-dependencies">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable request-based name tracking">;
+
+def disable_request_based_incremental_dependencies : Flag<["-"],
+  "disable-request-based-incremental-dependencies">,
+  Flags<[FrontendOption]>,
+  HelpText<"Disable request-based name tracking">;
 
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,

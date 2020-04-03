@@ -181,33 +181,53 @@ enum class ImplFunctionRepresentation {
   Closure
 };
 
+enum class ImplFunctionDifferentiabilityKind {
+  NonDifferentiable,
+  Normal,
+  Linear
+};
+
 class ImplFunctionTypeFlags {
   unsigned Rep : 3;
   unsigned Pseudogeneric : 1;
   unsigned Escaping : 1;
+  unsigned DifferentiabilityKind : 2;
 
 public:
-  ImplFunctionTypeFlags() : Rep(0), Pseudogeneric(0), Escaping(0) {}
+  ImplFunctionTypeFlags()
+      : Rep(0), Pseudogeneric(0), Escaping(0), DifferentiabilityKind(0) {}
 
-  ImplFunctionTypeFlags(ImplFunctionRepresentation rep,
-                        bool pseudogeneric, bool noescape)
-      : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape) {}
+  ImplFunctionTypeFlags(ImplFunctionRepresentation rep, bool pseudogeneric,
+                        bool noescape,
+                        ImplFunctionDifferentiabilityKind diffKind)
+      : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape),
+        DifferentiabilityKind(unsigned(diffKind)) {}
 
   ImplFunctionTypeFlags
   withRepresentation(ImplFunctionRepresentation rep) const {
-    return ImplFunctionTypeFlags(rep, Pseudogeneric, Escaping);
+    return ImplFunctionTypeFlags(
+        rep, Pseudogeneric, Escaping,
+        ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
 
   ImplFunctionTypeFlags
   withEscaping() const {
-    return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep),
-                                 Pseudogeneric, true);
+    return ImplFunctionTypeFlags(
+        ImplFunctionRepresentation(Rep), Pseudogeneric, true,
+        ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
   
   ImplFunctionTypeFlags
   withPseudogeneric() const {
-    return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep),
-                                 true, Escaping);
+    return ImplFunctionTypeFlags(
+        ImplFunctionRepresentation(Rep), true, Escaping,
+        ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
+  }
+
+  ImplFunctionTypeFlags
+  withDifferentiabilityKind(ImplFunctionDifferentiabilityKind diffKind) const {
+    return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep), Pseudogeneric,
+                                 Escaping, diffKind);
   }
 
   ImplFunctionRepresentation getRepresentation() const {
@@ -217,6 +237,10 @@ public:
   bool isEscaping() const { return Escaping; }
 
   bool isPseudogeneric() const { return Pseudogeneric; }
+
+  ImplFunctionDifferentiabilityKind getDifferentiabilityKind() const {
+    return ImplFunctionDifferentiabilityKind(DifferentiabilityKind);
+  }
 };
 
 #if SWIFT_OBJC_INTEROP
@@ -494,12 +518,10 @@ class TypeDecoder {
     case NodeKind::NoEscapeFunctionType:
     case NodeKind::AutoClosureType:
     case NodeKind::EscapingAutoClosureType:
-    // SWIFT_ENABLE_TENSORFLOW
     case NodeKind::DifferentiableFunctionType:
     case NodeKind::EscapingDifferentiableFunctionType:
     case NodeKind::LinearFunctionType:
     case NodeKind::EscapingLinearFunctionType:
-    // SWIFT_ENABLE_TENSORFLOW END
     case NodeKind::FunctionType: {
       if (Node->getNumChildren() < 2)
         return BuiltType();
@@ -513,6 +535,15 @@ class TypeDecoder {
           flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
       } else if (Node->getKind() == NodeKind::ThinFunctionType) {
         flags = flags.withConvention(FunctionMetadataConvention::Thin);
+      } else if (Node->getKind() == NodeKind::DifferentiableFunctionType ||
+               Node->getKind() ==
+                   NodeKind::EscapingDifferentiableFunctionType) {
+        flags = flags.withDifferentiabilityKind(
+            FunctionMetadataDifferentiabilityKind::Normal);
+      } else if (Node->getKind() == NodeKind::LinearFunctionType ||
+                 Node->getKind() == NodeKind::EscapingLinearFunctionType) {
+        flags = flags.withDifferentiabilityKind(
+            FunctionMetadataDifferentiabilityKind::Linear);
       }
       // SWIFT_ENABLE_TENSORFLOW
       else if (Node->getKind() == NodeKind::DifferentiableFunctionType ||
@@ -545,7 +576,6 @@ class TypeDecoder {
                           Node->getKind() == NodeKind::FunctionType ||
                           Node->getKind() == NodeKind::EscapingAutoClosureType ||
                           Node->getKind() == NodeKind::EscapingObjCBlock ||
-                          // SWIFT_ENABLE_TENSORFLOW
                           Node->getKind() ==
                               NodeKind::EscapingDifferentiableFunctionType ||
                           Node->getKind() ==
@@ -587,6 +617,14 @@ class TypeDecoder {
             flags =
               flags.withRepresentation(ImplFunctionRepresentation::Block);
           }
+        } else if (child->getKind() == NodeKind::ImplDifferentiable) {
+          flags = flags.withDifferentiabilityKind(
+              ImplFunctionDifferentiabilityKind::Normal);
+        } else if (child->getKind() == NodeKind::ImplLinear) {
+          flags = flags.withDifferentiabilityKind(
+              ImplFunctionDifferentiabilityKind::Linear);
+        } else if (child->getKind() == NodeKind::ImplEscaping) {
+          flags = flags.withEscaping();
         } else if (child->getKind() == NodeKind::ImplEscaping) {
           flags = flags.withEscaping();
         } else if (child->getKind() == NodeKind::ImplParameter) {

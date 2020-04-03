@@ -54,67 +54,65 @@ Type DerivedConformance::getProtocolType() const {
 bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
                                                     NominalTypeDecl *Nominal,
                                                     ProtocolDecl *Protocol) {
-  // Only known protocols can be derived.
-  auto knownProtocol = Protocol->getKnownProtocolKind();
-  if (!knownProtocol)
+  const auto derivableKind = Protocol->getKnownDerivableProtocolKind();
+  if (!derivableKind)
     return false;
 
-  if (*knownProtocol == KnownProtocolKind::Hashable) {
+  // When the necessary requirements are met, the conformance to OptionSet
+  // is serendipitously derived via memberwise initializer synthesis.
+  if (*derivableKind == KnownDerivableProtocolKind::OptionSet) {
+    return false;
+  }
+
+  if (*derivableKind == KnownDerivableProtocolKind::Hashable) {
     // We can always complete a partial Hashable implementation, and we can
     // synthesize a full Hashable implementation for structs and enums with
     // Hashable components.
     return canDeriveHashable(Nominal);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
+  if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::PointwiseMultiplicative)
-    return canDerivePointwiseMultiplicative(Nominal, DC);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::ElementaryFunctions)
-    return canDeriveElementaryFunctions(Nominal, DC);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::KeyPathIterable)
-    return canDeriveKeyPathIterable(Nominal);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::TensorArrayProtocol)
-    return canDeriveTensorArrayProtocol(Nominal, DC);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::TensorGroup)
-    return canDeriveTensorGroup(Nominal, DC);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::VectorProtocol)
-    return canDeriveVectorProtocol(Nominal, DC);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::Differentiable)
+  if (*derivableKind == KnownDerivableProtocolKind::Differentiable)
     return canDeriveDifferentiable(Nominal, DC);
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::EuclideanDifferentiable)
+  if (*derivableKind == KnownDerivableProtocolKind::PointwiseMultiplicative)
+    return canDerivePointwiseMultiplicative(Nominal, DC);
+
+  if (*derivableKind == KnownDerivableProtocolKind::ElementaryFunctions)
+    return canDeriveElementaryFunctions(Nominal, DC);
+
+  if (*derivableKind == KnownDerivableProtocolKind::KeyPathIterable)
+    return canDeriveKeyPathIterable(Nominal);
+
+  if (*derivableKind == KnownDerivableProtocolKind::TensorArrayProtocol)
+    return canDeriveTensorArrayProtocol(Nominal, DC);
+
+  if (*derivableKind == KnownDerivableProtocolKind::TensorGroup)
+    return canDeriveTensorGroup(Nominal, DC);
+
+  if (*derivableKind == KnownDerivableProtocolKind::VectorProtocol)
+    return canDeriveVectorProtocol(Nominal, DC);
+
+  if (*derivableKind == KnownDerivableProtocolKind::EuclideanDifferentiable)
     return canDeriveEuclideanDifferentiable(Nominal, DC);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
-    switch (*knownProtocol) {
+    switch (*derivableKind) {
         // The presence of a raw type is an explicit declaration that
         // the compiler should derive a RawRepresentable conformance.
-      case KnownProtocolKind::RawRepresentable:
+      case KnownDerivableProtocolKind::RawRepresentable:
         return canDeriveRawRepresentable(DC, Nominal);
 
         // Enums without associated values can implicitly derive Equatable
         // conformance.
-      case KnownProtocolKind::Equatable:
+      case KnownDerivableProtocolKind::Equatable:
         return canDeriveEquatable(DC, Nominal);
       
-      case KnownProtocolKind::Comparable:
+      case KnownDerivableProtocolKind::Comparable:
         return !enumDecl->hasPotentiallyUnavailableCaseValue()
             && canDeriveComparable(DC, enumDecl); 
 
@@ -122,18 +120,18 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         // a CaseIterable conformance.
         //
         // FIXME: Lift the availability restriction.
-      case KnownProtocolKind::CaseIterable:
+      case KnownDerivableProtocolKind::CaseIterable:
         return !enumDecl->hasPotentiallyUnavailableCaseValue()
             && enumDecl->hasOnlyCasesWithoutAssociatedValues();
 
         // @objc enums can explicitly derive their _BridgedNSError conformance.
-      case KnownProtocolKind::BridgedNSError:
+      case KnownDerivableProtocolKind::BridgedNSError:
         return enumDecl->isObjC() && enumDecl->hasCases()
             && enumDecl->hasOnlyCasesWithoutAssociatedValues();
 
         // Enums without associated values and enums with a raw type of String
         // or Int can explicitly derive CodingKey conformance.
-      case KnownProtocolKind::CodingKey: {
+      case KnownDerivableProtocolKind::CodingKey: {
         Type rawType = enumDecl->getRawType();
         if (rawType) {
           auto parentDC = enumDecl->getDeclContext();
@@ -155,8 +153,8 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     // Structs and classes can explicitly derive Encodable and Decodable
     // conformance (explicitly meaning we can synthesize an implementation if
     // a type conforms manually).
-    if (*knownProtocol == KnownProtocolKind::Encodable ||
-        *knownProtocol == KnownProtocolKind::Decodable) {
+    if (*derivableKind == KnownDerivableProtocolKind::Encodable ||
+        *derivableKind == KnownDerivableProtocolKind::Decodable) {
       // FIXME: This is not actually correct. We cannot promise to always
       // provide a witness here for all structs and classes. Unfortunately,
       // figuring out whether this is actually possible requires much more
@@ -170,8 +168,8 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
 
     // Structs can explicitly derive Equatable conformance.
     if (isa<StructDecl>(Nominal)) {
-      switch (*knownProtocol) {
-        case KnownProtocolKind::Equatable:
+      switch (*derivableKind) {
+        case KnownDerivableProtocolKind::Equatable:
           return canDeriveEquatable(DC, Nominal);
         default:
           return false;
@@ -267,7 +265,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_intValue))
       return getRequirement(KnownProtocolKind::CodingKey);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // AdditiveArithmetic.zero
     if (name.isSimpleName(ctx.Id_zero))
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
@@ -277,35 +274,30 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_differentiableVectorView))
       return getRequirement(KnownProtocolKind::EuclideanDifferentiable);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // PointwiseMultiplicative.one
     if (name.isSimpleName(ctx.Id_one))
       return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // PointwiseMultiplicative.reciprocal
     if (name.isSimpleName(ctx.Id_reciprocal))
       return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // KeyPathIterable.allKeyPaths
     if (name.isSimpleName(ctx.Id_allKeyPaths))
       return getRequirement(KnownProtocolKind::KeyPathIterable);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // TensorArrayProtocol._tensorHandleCount
     if (name.isSimpleName(ctx.Id_tensorHandleCount))
       return getRequirement(KnownProtocolKind::TensorArrayProtocol);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // TensorArrayProtocol._typeList
     if (name.isSimpleName(ctx.Id_typeList) && !requirement->isStatic())
       return getRequirement(KnownProtocolKind::TensorArrayProtocol);
 
-    // SWIFT_ENABLE_TENSORFLOW
     // TensorGroup._typeList
     if (name.isSimpleName(ctx.Id_typeList))
       return getRequirement(KnownProtocolKind::TensorGroup);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     return nullptr;
   }
@@ -317,6 +309,20 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     
     if (func->isOperator() && name.getBaseName() == "==")
       return getRequirement(KnownProtocolKind::Equatable);
+
+    // AdditiveArithmetic.+
+    // AdditiveArithmetic.-
+    if (func->isOperator() && name.getArgumentNames().size() == 2 &&
+        (name.getBaseName() == "+" || name.getBaseName() == "-")) {
+      return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+    }
+
+    // Differentiable.move(along:)
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_move) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_along)
+        return getRequirement(KnownProtocolKind::Differentiable);
+    }
 
     // Encodable.encode(to: Encoder)
     if (name.isCompoundName() && name.getBaseName() == ctx.Id_encode) {
@@ -468,20 +474,19 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_AllCases))
       return getRequirement(KnownProtocolKind::CaseIterable);
 
-    // SWIFT_ENABLE_TENSORFLOW
-    // KeyPathIterable.AllKeyPaths
-    if (name.isSimpleName(ctx.Id_AllKeyPaths))
-      return getRequirement(KnownProtocolKind::KeyPathIterable);
-
-    // SWIFT_ENABLE_TENSORFLOW
     // Differentiable.TangentVector
     if (name.isSimpleName(ctx.Id_TangentVector))
       return getRequirement(KnownProtocolKind::Differentiable);
 
     // SWIFT_ENABLE_TENSORFLOW
+    // KeyPathIterable.AllKeyPaths
+    if (name.isSimpleName(ctx.Id_AllKeyPaths))
+      return getRequirement(KnownProtocolKind::KeyPathIterable);
+
     // VectorProtocol.VectorSpaceScalar
     if (name.isSimpleName(ctx.Id_VectorSpaceScalar))
       return getRequirement(KnownProtocolKind::VectorProtocol);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     return nullptr;
   }

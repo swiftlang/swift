@@ -1548,7 +1548,7 @@ public:
 
 }
 
-llvm::Expected<FunctionBuilderBodyPreCheck>
+FunctionBuilderBodyPreCheck
 PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
                                          AnyFunctionRef fn) const {
   return PreCheckFunctionBuilderApplication(fn, false).run();

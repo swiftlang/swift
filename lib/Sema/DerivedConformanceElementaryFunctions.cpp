@@ -45,26 +45,6 @@ static StringRef getElementaryFunctionName(ElementaryFunction op) {
   }
 }
 
-// Return the protocol requirement with the specified name.
-// TODO: Move function to shared place for use with other derived conformances.
-static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
-  auto lookup = proto->lookupDirect(name);
-  llvm::erase_if(lookup, [](ValueDecl *v) {
-    return !isa<ProtocolDecl>(v->getDeclContext()) ||
-           !v->isProtocolRequirement();
-  });
-  assert(lookup.size() == 1 && "Ambiguous protocol requirement");
-  return lookup.front();
-}
-
-// Return true if given nominal type has a `let` stored with an initial value.
-// TODO: Move function to shared place for use with other derived conformances.
-static bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
-  return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
-    return v->isLet() && v->hasInitialValue();
-  });
-}
-
 // Return the `ElementaryFunction` protocol requirement corresponding to the
 // given elementary function.
 static ValueDecl *getElementaryFunctionRequirement(
@@ -300,8 +280,6 @@ DerivedConformance::deriveElementaryFunctions(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  // Create memberwise initializer for nominal type if it doesn't already exist.
-  getOrCreateEffectiveMemberwiseInitializer(Context, Nominal);
 #define ELEMENTARY_FUNCTION_UNARY(ID, NAME)                                    \
   if (requirement->getBaseName() == Context.getIdentifier(NAME))            \
     return deriveElementaryFunction(*this, ID);

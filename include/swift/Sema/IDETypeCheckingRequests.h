@@ -64,7 +64,7 @@ struct DeclApplicabilityOwner {
 class IsDeclApplicableRequest:
     public SimpleRequest<IsDeclApplicableRequest,
                          bool(DeclApplicabilityOwner),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -72,8 +72,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                DeclApplicabilityOwner Owner) const;
+  bool evaluate(Evaluator &evaluator, DeclApplicabilityOwner Owner) const;
 
 public:
   // Caching
@@ -162,7 +161,7 @@ struct TypeRelationCheckInput {
 class TypeRelationCheckRequest:
     public SimpleRequest<TypeRelationCheckRequest,
                          bool(TypeRelationCheckInput),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -170,8 +169,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<bool> evaluate(Evaluator &evaluator,
-                                TypeRelationCheckInput Owner) const;
+  bool evaluate(Evaluator &evaluator, TypeRelationCheckInput Owner) const;
 
 public:
   // Caching
@@ -186,7 +184,7 @@ public:
 class RootAndResultTypeOfKeypathDynamicMemberRequest:
     public SimpleRequest<RootAndResultTypeOfKeypathDynamicMemberRequest,
                          TypePair(SubscriptDecl*),
-                         CacheKind::Cached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -194,7 +192,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<TypePair> evaluate(Evaluator &evaluator, SubscriptDecl* SD) const;
+  TypePair evaluate(Evaluator &evaluator, SubscriptDecl* SD) const;
 
 public:
   // Caching
@@ -206,7 +204,7 @@ public:
 class RootTypeOfKeypathDynamicMemberRequest:
     public SimpleRequest<RootTypeOfKeypathDynamicMemberRequest,
                          Type(SubscriptDecl*),
-                         /*Cached in the request above*/CacheKind::Uncached> {
+                         /*Cached in the request above*/RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -214,7 +212,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<Type> evaluate(Evaluator &evaluator, SubscriptDecl* SD) const {
+  Type evaluate(Evaluator &evaluator, SubscriptDecl* SD) const {
     return evaluateOrDefault(SD->getASTContext().evaluator,
       RootAndResultTypeOfKeypathDynamicMemberRequest{SD}, TypePair()).
         FirstTy;
