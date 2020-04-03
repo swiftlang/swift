@@ -1781,7 +1781,7 @@ public:
 ///  The insertion point of the last statement of an active clause in an #if
 ///  must be the lookup parent
 /// of any following scopes. But the active clause may not be the last clause.
-/// In sort, this is another case where the lookup parent cannot follow the same
+/// In short, this is another case where the lookup parent cannot follow the same
 /// nesting as the source order. IfConfigUseScope implements this twist. It
 /// follows the IfConfig, wraps all subsequent scopes, and redirects the lookup.
 class LookupParentDiversionScope final : public ASTScopeImpl {
