@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 2587,
+  key.length: 2744,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -1613,6 +1613,73 @@
               key.bodylength: 0
             }
           ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.setter_accessibility: source.lang.swift.accessibility.internal,
+      key.name: "var_with_didset",
+      key.offset: 2588,
+      key.length: 57,
+      key.nameoffset: 2592,
+      key.namelength: 15,
+      key.bodyoffset: 2614,
+      key.bodylength: 30
+    },
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "print",
+      key.offset: 2626,
+      key.length: 15,
+      key.nameoffset: 2626,
+      key.namelength: 5,
+      key.bodyoffset: 2632,
+      key.bodylength: 8
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "MyProtocol",
+      key.offset: 2665,
+      key.length: 71,
+      key.runtime_name: "_TtP4main10MyProtocol_",
+      key.nameoffset: 2674,
+      key.namelength: 10,
+      key.bodyoffset: 2704,
+      key.bodylength: 31,
+      key.inheritedtypes: [
+        {
+          key.name: "NSObjectProtocol"
+        }
+      ],
+      key.attributes: [
+        {
+          key.offset: 2659,
+          key.length: 5,
+          key.attribute: source.decl.attribute.objc
+        }
+      ],
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.typeref,
+          key.offset: 2686,
+          key.length: 16
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "thing",
+          key.offset: 2709,
+          key.length: 25,
+          key.typename: "NSObject",
+          key.nameoffset: 2713,
+          key.namelength: 5,
+          key.bodyoffset: 2730,
+          key.bodylength: 3
         }
       ]
     }
