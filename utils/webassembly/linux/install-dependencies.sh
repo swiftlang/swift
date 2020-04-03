@@ -17,12 +17,9 @@ cd $SWIFT_PATH
 
 ./utils/update-checkout --clone --scheme wasm --skip-repository swift
 
-# Install wasmtime
+# Install wasmer
 
-sudo mkdir /opt/wasmtime && cd /opt/wasmtime
-wget -O - "https://github.com/bytecodealliance/wasmtime/releases/download/v0.8.0/wasmtime-v0.8.0-x86_64-linux.tar.xz" | \
-  sudo tar Jx --strip-components 1
-sudo ln -sf /opt/wasmtime/* /usr/local/bin
+curl https://get.wasmer.io -sSfL | sh
 
 cd $SOURCE_PATH
 
