@@ -506,7 +506,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E; 
   }
 
-  Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
+  Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) {
+    if (E->getUnderlyingValue()) {
+      if (auto *newValue = doIt(E->getUnderlyingValue()))
+        E->setUnderlyingValue(newValue);
+      else
+        return nullptr;
+    }
+    return E;
+  }
 
   Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *E) { return E; }
 

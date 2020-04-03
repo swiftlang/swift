@@ -4021,11 +4021,14 @@ public:
 /// subexpressions of that AST node.
 class OpaqueValueExpr : public Expr {
   SourceRange Range;
+  Expr *UnderlyingValue;
 
 public:
   explicit OpaqueValueExpr(SourceRange Range, Type Ty,
-                           bool isPlaceholder = false)
-      : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Range(Range) {
+                           bool isPlaceholder = false,
+                           Expr *underlyingValue = nullptr)
+      : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty),
+        Range(Range), UnderlyingValue(underlyingValue) {
     Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
   }
 
@@ -4036,6 +4039,14 @@ public:
 
   void setIsPlaceholder(bool value) {
     Bits.OpaqueValueExpr.IsPlaceholder = value;
+  }
+
+  Expr *getUnderlyingValue() const {
+    return UnderlyingValue;
+  }
+
+  void setUnderlyingValue(Expr *value) {
+    UnderlyingValue = value;
   }
 
   SourceRange getSourceRange() const { return Range; }

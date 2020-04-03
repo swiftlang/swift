@@ -2498,6 +2498,10 @@ public:
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {
     printCommon(E, "opaque_value_expr") << " @ " << (void*)E;
+    if (auto *underlyingValue = E->getUnderlyingValue()) {
+      OS << '\n';
+      printRec(underlyingValue);
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
