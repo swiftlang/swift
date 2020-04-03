@@ -1015,6 +1015,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
   SILBuilder B(preheader->getTerminator());
   auto *initialLoad = B.createLoad(preheader->getTerminator()->getLoc(), addr,
                                    LoadOwnershipQualifier::Unqualified);
+  LLVM_DEBUG(llvm::dbgs() << "Creating preload " << *initialLoad);
 
   SILSSAUpdater ssaUpdater;
   ssaUpdater.Initialize(initialLoad->getType());
@@ -1047,6 +1048,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
       currentVal = SILValue();
     }
     if (auto *SI = isStoreToAddr(I, addr)) {
+      LLVM_DEBUG(llvm::dbgs() << "Deleting reloaded store " << *SI);
       currentVal = SI->getSrc();
       toDelete.push_back(SI);
     } else if (auto *LI = isLoadFromAddr(I, addr)) {
@@ -1056,6 +1058,8 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
         currentVal = ssaUpdater.GetValueInMiddleOfBlock(block);
       SILValue projectedValue = projectLoadValue(LI->getOperand(), addr,
                                                  currentVal, LI);
+      LLVM_DEBUG(llvm::dbgs() << "Replacing stored load " << *LI << " with "
+                 << projectedValue);
       LI->replaceAllUsesWith(projectedValue);
       toDelete.push_back(LI);
     }
@@ -1068,8 +1072,11 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
         assert(succ->getSinglePredecessorBlock() &&
                "should have split critical edges");
         SILBuilder B(succ->begin());
-        B.createStore(loc.getValue(), ssaUpdater.GetValueInMiddleOfBlock(succ),
-                      addr, StoreOwnershipQualifier::Unqualified);
+        auto *SI = B.createStore(loc.getValue(),
+                                 ssaUpdater.GetValueInMiddleOfBlock(succ),
+                                 addr, StoreOwnershipQualifier::Unqualified);
+        (void)SI;
+        LLVM_DEBUG(llvm::dbgs() << "Creating loop-exit store " << *SI);
       }
     }
   }
