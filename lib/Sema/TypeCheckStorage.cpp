@@ -2438,10 +2438,16 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   }
 
   Expr *originalInitialValue = nullptr;
-  if (Expr *init = parentPBD->getInit(patternNumber)) {
-    pbd->setInit(0, init);
+  Expr *initializer = nullptr;
+  OpaqueValueExpr *opaqueValue = nullptr;
+
+  if ((initializer = parentPBD->getInit(patternNumber))) {
+    pbd->setInit(0, initializer);
     pbd->setInitializerChecked(0);
-    originalInitialValue = findOriginalPropertyWrapperInitialValue(var, init);
+    opaqueValue = findWrappedValuePlaceholder(var, initializer);
+    if (opaqueValue) {
+      originalInitialValue = opaqueValue->getUnderlyingValue();
+    }
   } else if (!parentPBD->isInitialized(patternNumber) &&
              wrapperInfo.defaultInit) {
     // FIXME: Record this expression somewhere so that DI can perform the
@@ -2461,30 +2467,31 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
     storageVar = synthesizePropertyWrapperStorageWrapperProperty(
         ctx, var, storageInterfaceType, wrapperInfo.projectedValueVar);
   }
-  
-  // Get the property wrapper information.
-  if (!var->allAttachedPropertyWrappersHaveWrappedValueInit() &&
-      !originalInitialValue) {
+
+  // If this property can't be initialized out-of-line, we're done.
+  if ((!var->allAttachedPropertyWrappersHaveWrappedValueInit() &&
+       !originalInitialValue) || var->isStatic()) {
     return PropertyWrapperBackingPropertyInfo(
         backingVar, storageVar, nullptr, nullptr, nullptr);
   }
 
   // Form the initialization of the backing property from a value of the
   // original property's type.
-  Type origValueInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
-  Type origValueType =
-    var->getDeclContext()->mapTypeIntoContext(origValueInterfaceType);
-  OpaqueValueExpr *origValue =
-      new (ctx) OpaqueValueExpr(var->getSourceRange(), origValueType,
-                                /*isPlaceholder=*/true);
-  Expr *initializer = buildPropertyWrapperWrappedValueCall(
-      var, storageType, origValue,
-      /*ignoreAttributeArgs=*/!originalInitialValue);
-  typeCheckSynthesizedWrapperInitializer(
-      pbd, backingVar, parentPBD, initializer);
-  
+  if (!initializer) {
+    Type origValueInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
+    Type origValueType =
+      var->getDeclContext()->mapTypeIntoContext(origValueInterfaceType);
+    opaqueValue =
+        new (ctx) OpaqueValueExpr(var->getSourceRange(), origValueType,
+                                  /*isPlaceholder=*/true);
+    initializer = buildPropertyWrapperWrappedValueCall(
+        var, storageType, opaqueValue, /*ignoreAttributeArgs=*/true);
+    typeCheckSynthesizedWrapperInitializer(
+        pbd, backingVar, parentPBD, initializer);
+  }
+
   return PropertyWrapperBackingPropertyInfo(
-      backingVar, storageVar, originalInitialValue, initializer, origValue);
+      backingVar, storageVar, originalInitialValue, initializer, opaqueValue);
 }
 
 /// Given a storage declaration in a protocol, set it up with the right

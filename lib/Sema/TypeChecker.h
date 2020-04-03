@@ -1481,14 +1481,15 @@ bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
 /// (which will produce the original property type). If not specified, defaults to the maximum.
 Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
                              Optional<unsigned> limit = None);
-  
+
 /// Build a call to the init(wrappedValue:) initializers of the property
-/// wrappers, filling in the given \c value as the original value.
-Expr *buildPropertyWrapperWrappedValueCall(VarDecl *var,
-                                           Type backingStorageType,
-                                           Expr *value,
-                                           bool ignoreAttributeArgs);
-  
+/// wrappers, filling in the given \c value as the original value. Optionally
+/// pass a callback that will get invoked with the innermost init(wrappedValue:)
+/// call.
+Expr *buildPropertyWrapperWrappedValueCall(
+    VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+    llvm::function_ref<void(ApplyExpr *)> callback = [](ApplyExpr *) {});
+
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {
   /// The keyword is never required.

@@ -191,11 +191,11 @@ void simple_display(
     const PropertyWrapperBackingPropertyInfo &backingInfo);
 
 /// Given the initializer for the given property with an attached property
-/// wrapper, dig out the original initialization expression.
+/// wrapper, dig out the placeholder for the original initialization expression.
 ///
 /// Cannot just dig out the getOriginalInit() value because this function checks
 /// types, etc. Erroneous code won't return a result from here.
-Expr *findOriginalPropertyWrapperInitialValue(VarDecl *var, Expr *init);
+OpaqueValueExpr *findWrappedValuePlaceholder(VarDecl *var, Expr *init);
 
 } // end namespace swift
 

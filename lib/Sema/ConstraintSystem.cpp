@@ -4182,9 +4182,11 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   Expr *backingInitializer;
   if (Expr *initializer = expression.expression) {
     // Form init(wrappedValue:) call(s).
-    Expr *wrappedInitializer =
-        buildPropertyWrapperWrappedValueCall(
-            singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
+    Expr *wrappedInitializer = buildPropertyWrapperWrappedValueCall(
+        singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false,
+        [&](ApplyExpr *innermostInit) {
+          expression.innermostWrappedValueInit = innermostInit;
+        });
     if (!wrappedInitializer)
       return;
 
