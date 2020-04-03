@@ -14,6 +14,18 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
   Differentiable.swift
   DifferentialOperators.swift
   DifferentiationUtilities.swift
+  ArrayDifferentiation.swift
+
+  GYB_SOURCES
+    tgmathDerivatives.swift.gyb
+    SIMDVectorTypesDerivatives.swift.gyb
+    FloatingPointTypesDerivatives.swift.gyb    
+
+  SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_FREEBSD Glibc
+  SWIFT_MODULE_DEPENDS_CYGWIN Glibc
+  SWIFT_MODULE_DEPENDS_HAIKU Glibc
+  SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
