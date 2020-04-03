@@ -2385,12 +2385,8 @@ public:
         }
       }
 
-      if (afd->isBodyTypeChecked()) {
-        // FIXME: We don't actually need captures here anymore, but this happens
-        // to be the place where they get computed. Move this somewhere else.
-        TypeChecker::computeCaptures(afd);
+      if (afd->isBodyTypeChecked())
         return true;
-      }
 
       // Don't walk into a body that has not yet been type checked. This should
       // only occur for top-level code.

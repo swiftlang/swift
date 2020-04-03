@@ -1688,6 +1688,7 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   auto res = TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
   TypeChecker::checkFunctionErrorHandling(AFD);
+  TypeChecker::computeCaptures(AFD);
   return res;
 }
 
