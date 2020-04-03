@@ -142,7 +142,7 @@
 // IOS_SIMPLE-DAG: -L {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)iphonesimulator}}
 // IOS_SIMPLE-DAG: -lSystem
 // IOS_SIMPLE-DAG: -arch x86_64
-// IOS_SIMPLE-DAG: -platform_version ios-sim 7.1.{{[0-9]+}} 0.0.0
+// IOS_SIMPLE-DAG: -platform_version ios-simulator 7.1.{{[0-9]+}} 0.0.0
 // IOS_SIMPLE: -o linker
 
 
@@ -154,7 +154,7 @@
 // tvOS_SIMPLE-DAG: -L {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)appletvsimulator}}
 // tvOS_SIMPLE-DAG: -lSystem
 // tvOS_SIMPLE-DAG: -arch x86_64
-// tvOS_SIMPLE-DAG: -platform_version tvos-sim 9.0.{{[0-9]+}} 0.0.0
+// tvOS_SIMPLE-DAG: -platform_version tvos-simulator 9.0.{{[0-9]+}} 0.0.0
 // tvOS_SIMPLE: -o linker
 
 
@@ -166,7 +166,7 @@
 // watchOS_SIMPLE-DAG: -L {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)watchsimulator}}
 // watchOS_SIMPLE-DAG: -lSystem
 // watchOS_SIMPLE-DAG: -arch i386
-// watchOS_SIMPLE-DAG: -platform_version watchos-sim 2.0.{{[0-9]+}} 0.0.0
+// watchOS_SIMPLE-DAG: -platform_version watchos-simulator 2.0.{{[0-9]+}} 0.0.0
 // watchOS_SIMPLE: -o linker
 
 

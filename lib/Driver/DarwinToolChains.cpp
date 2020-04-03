@@ -525,7 +525,7 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
     // Compute the name of the platform for the linker.
     const char *platformName;
     if (tripleIsMacCatalystEnvironment(triple)) {
-      platformName = "mac catalyst";
+      platformName = "mac-catalyst";
     } else {
       switch (getDarwinPlatformKind(triple)) {
       case DarwinPlatformKind::MacOS:
@@ -535,19 +535,19 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
         platformName = "ios";
         break;
       case DarwinPlatformKind::IPhoneOSSimulator:
-        platformName = "ios-sim";
+        platformName = "ios-simulator";
         break;
       case DarwinPlatformKind::TvOS:
         platformName = "tvos";
         break;
       case DarwinPlatformKind::TvOSSimulator:
-        platformName = "tvos-sim";
+        platformName = "tvos-simulator";
         break;
       case DarwinPlatformKind::WatchOS:
         platformName = "watchos";
         break;
       case DarwinPlatformKind::WatchOSSimulator:
-        platformName = "watchos-sim";
+        platformName = "watchos-simulator";
         break;
       }
     }
