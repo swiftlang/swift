@@ -227,6 +227,12 @@ struct AutoDiffConfig {
   SWIFT_DEBUG_DUMP;
 };
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
+                                     const SILAutoDiffIndices &indices) {
+  indices.print(s);
+  return s;
+}
+
 /// A semantic function result type: either a formal function result type or
 /// an `inout` parameter type. Used in derivative function type calculation.
 struct AutoDiffSemanticFunctionResultType {

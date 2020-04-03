@@ -74,3 +74,7 @@ void SILDifferentiabilityWitness::convertToDefinition(SILFunction *jvp,
 SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
   return std::make_pair(getOriginalFunction()->getName(), getConfig());
 }
+
+SILAutoDiffIndices SILDifferentiabilityWitness::getSILAutoDiffIndices() const {
+  return getConfig().getSILAutoDiffIndices();
+}
