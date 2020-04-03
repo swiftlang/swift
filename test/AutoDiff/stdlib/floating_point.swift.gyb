@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swiftgyb-forward-mode-differentiation
+// -*- swift -*-
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
@@ -7,6 +8,7 @@
   typealias TestLiteralType = Double
 #endif
 
+import _Differentiation
 import StdlibUnittest
 
 var FloatingPointDerivativeTests = TestSuite("FloatingPointDerivatives")

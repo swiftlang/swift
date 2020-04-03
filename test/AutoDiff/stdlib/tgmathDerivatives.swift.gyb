@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swiftgyb-forward-mode-differentiation
+// -*- swift -*-
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
@@ -18,6 +19,7 @@
 #endif
 
 import StdlibUnittest
+import _Differentiation
 
 let DerivativeTests = TestSuite("TGMath")
 

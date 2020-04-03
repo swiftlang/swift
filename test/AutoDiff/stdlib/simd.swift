@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+import _Differentiation
 import StdlibUnittest
 #if os(macOS)
 import Darwin.C

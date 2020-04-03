@@ -174,6 +174,9 @@ extension SIMD
   }
 }
 
+// FIXME(TF-1103): Derivative registration does not yet support
+// `@_alwaysEmitIntoClient` original functions.
+/*
 extension SIMD
   where Self : Differentiable,
         TangentVector : SIMD,
@@ -186,6 +189,7 @@ extension SIMD
     return (sum(), { v in Self(repeating: Scalar(v)) })
   }
 }
+*/
 
 extension SIMD
   where Self : Differentiable,
