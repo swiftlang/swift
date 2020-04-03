@@ -1,4 +1,4 @@
-# This source file is part of the Swift.org open source project
+2 This source file is part of the Swift.org open source project
 #
 # Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
@@ -40,7 +40,7 @@ BUILD_VARIANT = 'Debug'
 CMAKE_GENERATOR = 'Ninja'
 
 COMPILER_VENDOR = 'none'
-SWIFT_USER_VISIBLE_VERSION = CompilerVersion('5.2.1')
+SWIFT_USER_VISIBLE_VERSION = CompilerVersion('5.2.2')
 CLANG_USER_VISIBLE_VERSION = CompilerVersion('7.0.0')
 SWIFT_ANALYZE_CODE_COVERAGE = 'false'
 
