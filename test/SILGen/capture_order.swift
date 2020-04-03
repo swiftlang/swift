@@ -47,6 +47,7 @@ public func captureBeforeDefUnownedVar(obj: AnyObject) -> () -> AnyObject? {
   }
   let closure = getter
   unowned var unownedObj: AnyObject = obj // expected-note{{captured value declared here}}
+  // expected-warning@-1 {{variable 'unownedObj' was never mutated; consider changing to 'let' constant}}
   return closure
 }
 

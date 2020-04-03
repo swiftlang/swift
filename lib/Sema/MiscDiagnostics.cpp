@@ -2250,13 +2250,10 @@ class VarDeclUsageChecker : public ASTWalker {
 
   /// This is a mapping from an OpaqueValue to the expression that initialized
   /// it.
-  llvm::SmallDenseMap<OpaqueValueExpr*, Expr*> OpaqueValueMap;
+  llvm::SmallDenseMap<OpaqueValueExpr *, Expr *> OpaqueValueMap;
 
-  /// The getter associated with a setter function declaration.
-  const VarDecl *AssociatedGetter = nullptr;
-
-  /// The first reference to the associated getter.
-  const Expr *AssociatedGetterRefExpr = nullptr;
+  /// The first reference to the given property.
+  llvm::SmallDenseMap<VarDecl *, Expr *> AssociatedGetterRefExpr;
 
   /// This is a mapping from VarDecls to the if/while/guard statement that they
   /// occur in, when they are in a pattern in a StmtCondition.
@@ -2272,36 +2269,8 @@ class VarDeclUsageChecker : public ASTWalker {
   void operator=(const VarDeclUsageChecker &) = delete;
 
 public:
-  VarDeclUsageChecker(AbstractFunctionDecl *AFD)
-    : Diags(AFD->getASTContext().Diags) {
-    // If this AFD is a setter, track the parameter and the getter for
-    // the containing property so if newValue isn't used but the getter is used
-    // an error can be reported.
-    if (auto FD = dyn_cast<AccessorDecl>(AFD)) {
-      if (FD->getAccessorKind() == AccessorKind::Set) {
-        if (auto getter = dyn_cast<VarDecl>(FD->getStorage())) {
-          auto arguments = FD->getParameters();
-          VarDecls[arguments->get(0)] = RK_Defined;
-          AssociatedGetter = getter;
-        }
-      }
-    }
-  }
-
   VarDeclUsageChecker(DiagnosticEngine &Diags) : Diags(Diags) {}
 
-  VarDeclUsageChecker(VarDecl *vd) : Diags(vd->getASTContext().Diags) {
-    // Track a specific VarDecl
-    VarDecls[vd] = RK_Defined;
-    if (auto *childVd = vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
-      VarDecls[childVd] = RK_Defined;
-    }
-  }
-
-  void suppressDiagnostics() {
-    sawError = true; // set this flag so that no diagnostics will be emitted on delete.
-  }
-    
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
   ~VarDeclUsageChecker() override;
@@ -2404,23 +2373,31 @@ public:
       return false;
 
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-      // If this is a nested function with a capture list, mark any captured
-      // variables.
-      if (afd->isBodyTypeChecked()) {
-        TypeChecker::computeCaptures(afd);
-        for (const auto &capture : afd->getCaptureInfo().getCaptures())
-          addMark(capture.getDecl(), RK_Read|RK_Written);
-      } else {
-        // If the body hasn't been type checked yet, be super-conservative and
-        // mark all variables as used.  This can be improved later, e.g. by
-        // walking the untype-checked body to look for things that could
-        // possibly be used.
-        VarDecls.clear();
+      // If this AFD is a setter, track the parameter and the getter for
+      // the containing property so if newValue isn't used but the getter is used
+      // an error can be reported.
+      if (auto FD = dyn_cast<AccessorDecl>(afd)) {
+        if (FD->getAccessorKind() == AccessorKind::Set) {
+          if (isa<VarDecl>(FD->getStorage())) {
+            auto arguments = FD->getParameters();
+            VarDecls[arguments->get(0)] = RK_Defined;
+          }
+        }
       }
-      
-      // Don't walk into it though, it may not even be type checked yet.
+
+      if (afd->isBodyTypeChecked()) {
+        // FIXME: We don't actually need captures here anymore, but this happens
+        // to be the place where they get computed. Move this somewhere else.
+        TypeChecker::computeCaptures(afd);
+        return true;
+      }
+
+      // Don't walk into a body that has not yet been type checked. This should
+      // only occur for top-level code.
+      VarDecls.clear();
       return false;
     }
+
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       // If this is a TopLevelCodeDecl, scan for global variables
       auto *body = TLCD->getBody();
@@ -2682,9 +2659,11 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     if (auto param = dyn_cast<ParamDecl>(var)) {
       auto FD = dyn_cast<AccessorDecl>(param->getDeclContext());
       if (FD && FD->getAccessorKind() == AccessorKind::Set) {
-        auto getter = dyn_cast<VarDecl>(FD->getStorage());
-        if ((access & RK_Read) == 0 && AssociatedGetter == getter) {
-          if (auto DRE = AssociatedGetterRefExpr) {
+        auto VD = dyn_cast<VarDecl>(FD->getStorage());
+        if ((access & RK_Read) == 0) {
+          auto found = AssociatedGetterRefExpr.find(VD);
+          if (found != AssociatedGetterRefExpr.end()) {
+            auto *DRE = found->second;
             Diags.diagnose(DRE->getLoc(), diag::unused_setter_parameter,
                            var->getName());
             Diags.diagnose(DRE->getLoc(), diag::fixit_for_unused_setter_parameter,
@@ -3028,16 +3007,14 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
 
     // If the Expression is a read of a getter, track for diagnostics
     if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-      if (AssociatedGetter == VD && AssociatedGetterRefExpr == nullptr)
-        AssociatedGetterRefExpr = DRE;
+      AssociatedGetterRefExpr.insert(std::make_pair(VD, DRE));
     }
   }
   // If the Expression is a member reference, see if it is a read of the getter
   // to track for diagnostics.
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
     if (auto VD = dyn_cast<VarDecl>(MRE->getMember().getDecl())) {
-      if (AssociatedGetter == VD && AssociatedGetterRefExpr == nullptr)
-        AssociatedGetterRefExpr = MRE;
+      AssociatedGetterRefExpr.insert(std::make_pair(VD, MRE));
       markBaseOfStorageUse(MRE->getBase(), MRE->getMember(), RK_Read);
       return { false, E };
     }
@@ -3124,18 +3101,22 @@ performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
 }
 
 /// Perform diagnostics for func/init/deinit declarations.
-void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD,
-                                               BraceStmt *body) {
-  assert(body && "Need a body to check");
-  
+void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   // Don't produce these diagnostics for implicitly generated code.
   if (AFD->getLoc().isInvalid() || AFD->isImplicit() || AFD->isInvalid())
     return;
   
   // Check for unused variables, as well as variables that are could be
-  // declared as constants.
-  body->walk(VarDeclUsageChecker(AFD));
-  
+  // declared as constants. Skip local functions though, since they will
+  // be checked as part of their parent function or TopLevelCodeDecl.
+  if (!AFD->getDeclContext()->isLocalContext()) {
+    auto &ctx = AFD->getDeclContext()->getASTContext();
+    VarDeclUsageChecker checker(ctx.Diags);
+    AFD->walk(checker);
+  }
+
+  auto *body = AFD->getBody();
+
   // If the function has an opaque return type, check the return expressions
   // to determine the underlying type.
   if (auto opaqueResultTy = AFD->getOpaqueResultTypeDecl()) {

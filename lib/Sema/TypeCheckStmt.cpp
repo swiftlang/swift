@@ -1972,12 +1972,13 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  // If nothing went wrong yet, perform extra checking.
-  if (!hadError && endTypeCheckLoc.isInvalid())
-    performAbstractFuncDeclDiagnostics(AFD, body);
-
   // Wire up the function body now.
   AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+
+  // If nothing went wrong yet, perform extra checking.
+  if (!hadError && endTypeCheckLoc.isInvalid())
+    performAbstractFuncDeclDiagnostics(AFD);
+
   return hadError;
 }
 
