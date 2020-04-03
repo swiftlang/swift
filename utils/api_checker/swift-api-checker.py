@@ -115,7 +115,8 @@ class DumpConfig:
         if self.platform == 'macosx':
             # We need this input search path for CreateML
             self.inputs.extend([self.sdk + '/usr/lib/swift/'])
-        self.frameworks = []
+        # This is where XCTest is
+        self.frameworks = [self.sdk + '/../../Library/Frameworks/']
         if self.platform.startswith('iosmac'):
             # Catalyst modules need this extra framework dir
             iOSSupport = self.sdk + \
