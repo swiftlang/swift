@@ -101,6 +101,15 @@
 // INFERRED_NAMED_DARWIN tests above: 'libLINKER.dylib'.
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 
+// Check reading the SDKSettings.json from an SDK
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15 %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.4.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4 %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_UNVERSIONED %s
+
+// MACOS_10_15: -platform_version macos 10.9.0 10.15.0
+// MACOS_10_15_4: -platform_version macos 10.9.0 10.15.4
+// MACOS_UNVERSIONED: -platform_version macos 10.9.0 0.0.0
+
 // There are more RUN lines further down in the file.
 
 // CHECK: swift
