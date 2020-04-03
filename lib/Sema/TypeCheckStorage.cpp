@@ -751,6 +751,11 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   bool isMemberLValue = isLValue;
   auto propertyWrapperMutability =
       [&](Decl *decl) -> Optional<std::pair<bool, bool>> {
+    // If we're not accessing via a property wrapper, we don't need to adjust
+    // the mutability.
+    if (target != TargetImpl::Wrapper && target != TargetImpl::WrapperStorage)
+      return None;
+
     auto var = dyn_cast<VarDecl>(decl);
     if (!var)
       return None;
