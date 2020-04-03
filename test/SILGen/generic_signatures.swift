@@ -140,3 +140,24 @@ extension Class.NestedClass {
   // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures5ClassC06NestedC0C3foo3argyx_tAA9WhereableRz3FooAA7FooablePQz5AssocAaHPRtzrlF : $@convention(method) <T where T : Fooable, T : Whereable, T.Assoc == T.Foo> (@in_guaranteed T, @guaranteed Class<T>.NestedClass) -> ()
   func foo(arg: T) where T: Whereable, T.Foo == T.Assoc { }
 }
+
+// CHECK_LABEL: sil hidden [ossa] @$s18generic_signatures1SVACyxGycfC : $@convention(method) <A where A : P, A.Assoc == S<A>> (@thin S<A>.Type) -> S<A>
+struct S<A: P> where A.Assoc == S<A> {}
+
+// Recursive superclass constraints
+
+// CHECK_LABEL: sil hidden [ossa] @$s18generic_signatures6BottomCACyxq_q0_Gycfc : $@convention(method) <T, U, R where T : Bottom<Top, Top, Top>, U : Bottom<Top, Top, Top>, R : Bottom<Top, Top, Top>> (@owned Bottom<T, U, R>) -> @owned Bottom<T, U, R>
+class Bottom<T: Bottom<Top, Top, Top>,
+              U: Bottom<Top, Top, Top>,
+              R: Bottom<Top, Top, Top>> {}
+
+class Top: Bottom<Top, Top, Top> {}
+
+class GenericClass<T> {}
+
+// CHECK_LABEL: sil hidden [ossa] @$s18generic_signatures17RecSuperclassReqCCACyxGycfc : $@convention(method) <T where T : GenericClass<T>> (@owned RecSuperclassReqC<T>) -> @owned RecSuperclassReqC<T>
+class RecSuperclassReqC<T: GenericClass<T>> {}
+// CHECK_LABEL: sil hidden [ossa] @$s18generic_signatures17RecSuperclassReqSVACyxGycfC : $@convention(method) <T where T : GenericClass<T>> (@thin RecSuperclassReqS<T>.Type) -> RecSuperclassReqS<T>
+struct RecSuperclassReqS<T: GenericClass<T>> {}
+// CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures17recSuperclassReqFyyxmAA12GenericClassCyxGRbzlF : $@convention(thin) <T where T : GenericClass<T>> (@thick T.Type) -> ()
+func recSuperclassReqF<T: GenericClass<T>>(_: T.Type) {}

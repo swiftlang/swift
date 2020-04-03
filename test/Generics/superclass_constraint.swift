@@ -43,9 +43,134 @@ func f10<T : GB<A>>(_: T) where T : GA<A> {}
 // expected-warning@-1{{redundant superclass constraint 'T' : 'GA<A>'}}
 // expected-note@-2{{superclass constraint 'T' : 'GB<A>' written here}}
 
-func f11<T : GA<T>>(_: T) { } // expected-error{{superclass constraint 'T' : 'GA<T>' is recursive}}
-func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { } // expected-error{{superclass constraint 'U' : 'GB<T>' is recursive}} // expected-error{{superclass constraint 'T' : 'GA<U>' is recursive}}
-func f13<T : U, U : GA<T>>(_: T, _: U) { } // expected-error{{type 'T' constrained to non-protocol, non-class type 'U'}}
+func f11<T : U, U : GA<T>>(_: T, _: U) { } // expected-error{{type 'T' constrained to non-protocol, non-class type 'U'}}
+
+/* Recursive superclass requirements on nominals and functions */
+
+// Recursive generic signature validation.
+class Top {}
+class Bottom<T : Bottom<Top>> {}
+// expected-error@-1 {{'Bottom' requires that 'Top' inherit from 'Bottom<Top>'}}
+// expected-note@-2 {{requirement specified as 'T' : 'Bottom<Top>' [with T = Top]}}
+
+class Bottom2<T: Bottom2<Top2>> {}
+class Top2: Bottom2<Top2> {} // OK
+
+class Bottom3<T: Bottom3<Top3, Top3, Top3>,
+              U: Bottom3<Top3, Top3, Top3>,
+              R: Bottom3<Top3, Top3, Top3>> {}
+class Top3: Bottom3<Top3, Top3, Top3> {} // OK
+
+// FIXME: Figure out how to work around resursive archetypes.
+class FBoundedFIXME<T : FBoundedFIXME<T>> {}
+// expected-error@-1 {{'FBoundedFIXME' requires that 'T' inherit from 'FBoundedFIXME<T>'}}
+// expected-note@-2 {{requirement specified as 'T' : 'FBoundedFIXME<T>' [with T = T]}}
+
+class GenericClass<T> {}
+
+class RecSuperclassReqC<T: GenericClass<T>> {}
+// expected-note@-1 {{requirement specified as 'T' : 'GenericClass<T>' [with T = GenericClass<Never>]}}
+// expected-note@-2 {{requirement specified as 'T' : 'GenericClass<T>' [with T = T]}}
+struct RecSuperclassReqS<T: GenericClass<T>> {}
+// expected-note@-1 {{requirement specified as 'T' : 'GenericClass<T>' [with T = GenericClass<Never>]}}
+// expected-note@-2 {{requirement specified as 'T' : 'GenericClass<T>' [with T = Never]}}
+enum RecSuperclassReqE<T: GenericClass<T>> {}
+// expected-note@-1 {{requirement specified as 'T' : 'GenericClass<T>' [with T = GenericClass<Never>]}}
+typealias RecSuperclassReqT1<T: GenericClass<T>> = T
+// expected-note@-1 {{requirement specified as 'T' : 'GenericClass<T>' [with T = GenericClass<Never>]}}
+
+// FIXME: Figure out how to work around resursive archetypes.
+typealias RecSuperclassReqT2<T: GenericClass<T>> = RecSuperclassReqC<T>
+// expected-error@-1 {{'RecSuperclassReqC' requires that 'T' inherit from 'GenericClass<T>'}}
+
+func recSuperclassReqF1<T: GenericClass<T>>(_: T.Type) {}
+// expected-note@-1 {{where 'T' = 'Top', 'GenericClass<T>' = 'GenericClass<Top>'}}
+func recSuperclassReqF2<T: GenericClass<U>, U: GenericClass<T>>(_: T.Type, _: U.Type) {}
+// expected-note@-1 {{where 'T' = 'X', 'GenericClass<U>' = 'GenericClass<GenericClass<X>>'}}
+func recSuperclassReqF3<T: GA<U>, U: GB<T>>(_: T.Type, _: U.Type) {}
+// expected-note@-1 {{where 'U' = 'GA_Sub', 'GB<T>' = 'GB<GB_Sub>'}}
+
+_ = RecSuperclassReqC<GenericClass<Never>>()
+// expected-error@-1 {{'RecSuperclassReqC' requires that 'GenericClass<Never>' inherit from 'GenericClass<GenericClass<Never>>'}}
+_ = RecSuperclassReqS<GenericClass<Never>>()
+// expected-error@-1 {{'RecSuperclassReqS' requires that 'GenericClass<Never>' inherit from 'GenericClass<GenericClass<Never>>'}}
+_ = RecSuperclassReqS<Never>()
+// expected-error@-1 {{'RecSuperclassReqS' requires that 'Never' inherit from 'GenericClass<Never>'}}
+_ = RecSuperclassReqE<GenericClass<Never>>.self
+// expected-error@-1 {{'RecSuperclassReqE' requires that 'GenericClass<Never>' inherit from 'GenericClass<GenericClass<Never>>'}}
+_ = RecSuperclassReqT1<GenericClass<Never>>.self
+// expected-error@-1 {{'RecSuperclassReqT1' requires that 'GenericClass<Never>' inherit from 'GenericClass<GenericClass<Never>>'}}
+
+class DerivedCRTP: GenericClass<DerivedCRTP> {}
+
+_ = RecSuperclassReqC<DerivedCRTP>.self
+_ = RecSuperclassReqS<DerivedCRTP>.self
+_ = RecSuperclassReqE<DerivedCRTP>.self
+_ = RecSuperclassReqT1<DerivedCRTP>.self
+
+// Test functions
+do {
+  class X: GenericClass<Y> {}
+  class Y: GenericClass<X> {}
+
+  class GA_Sub: GA<GB_Sub> {}
+  class GB_Sub: GB<GA_Sub> {}
+  class GB_CRTP: GB<GB_CRTP> {}
+
+  recSuperclassReqF1(Top.self)
+  // expected-error@-1 {{global function 'recSuperclassReqF1' requires that 'Top' inherit from 'GenericClass<Top>'}}
+  recSuperclassReqF2(X.self, GenericClass<X>.self)
+  // expected-error@-1 {{global function 'recSuperclassReqF2' requires that 'X' inherit from 'GenericClass<GenericClass<X>>'}}
+  recSuperclassReqF3(GB_Sub.self, GA_Sub.self)
+  // expected-error@-1 {{global function 'recSuperclassReqF3' requires that 'GA_Sub' inherit from 'GB<GB_Sub>'}}
+
+  recSuperclassReqF1(DerivedCRTP.self)
+  recSuperclassReqF2(X.self, Y.self)
+  recSuperclassReqF2(Y.self, X.self)
+  recSuperclassReqF2(DerivedCRTP.self, DerivedCRTP.self)
+  recSuperclassReqF3(GA_Sub.self, GB_Sub.self)
+  recSuperclassReqF3(GB_CRTP.self, GB_CRTP.self)
+}
+
+/* Recursive superclass requirements in protocols */
+
+protocol RecSuperclassReqP1: GenericClass<Self> {}
+protocol RecSuperclassReqP2: GenericClass<Self> {
+  associatedtype A: RecSuperclassReqP2 // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+}
+protocol RecSuperclassReqP3: GenericClass<Self.A> {
+  // FIXME: Infinite recursion.
+  associatedtype A//: RecSuperclassReqP3
+}
+protocol RecSuperclassReqP4 {
+  associatedtype A: GenericClass<A> // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+}
+
+class InvalidConformanceToP1: GenericClass<Never>, RecSuperclassReqP1 {}
+// expected-error@-1 {{'RecSuperclassReqP1' requires that 'InvalidConformanceToP1' inherit from 'GenericClass<InvalidConformanceToP1>'}}
+// expected-note@-2 {{requirement specified as 'Self' : 'GenericClass<Self>' [with Self = InvalidConformanceToP1]}}
+class InvalidConformanceToP3: GenericClass<Never>, RecSuperclassReqP3 {
+// expected-error@-1 {{'RecSuperclassReqP3' requires that 'InvalidConformanceToP3' inherit from 'GenericClass<InvalidConformanceToP3.A>' (aka 'GenericClass<Bool>')}}
+// expected-note@-2 {{requirement specified as 'Self' : 'GenericClass<Self.A>' [with Self = InvalidConformanceToP3]}}
+  typealias A = Bool
+}
+
+class ConformanceToP1: GenericClass<ConformanceToP1>, RecSuperclassReqP1 {}
+
+// FIXME: False-negative.
+class ConformanceToP2: GenericClass<ConformanceToP2>, RecSuperclassReqP2 {
+// expected-error@-1 {{type 'ConformanceToP2' does not conform to protocol 'RecSuperclassReqP2'}}
+  typealias A = ConformanceToP2 // expected-note {{possibly intended match 'ConformanceToP2.A' (aka 'ConformanceToP2') does not inherit from 'GenericClass<τ_0_0.A>'}}
+}
+class ConformanceToP3: GenericClass<ConformanceToP3>, RecSuperclassReqP3 {
+  typealias A = ConformanceToP3
+}
+// FIXME: False-negative. This bug impacts any associated type declarations
+// that have a superclass bound containing dependent member types (see
+// swift::checkTypeWitness).
+struct ConformanceToP4: RecSuperclassReqP4 { // expected-error {{type 'ConformanceToP4' does not conform to protocol 'RecSuperclassReqP4'}}
+  typealias A = DerivedCRTP // expected-note {{possibly intended match 'ConformanceToP4.A' (aka 'DerivedCRTP') does not inherit from 'GenericClass<τ_0_0.A>'}}
+}
 
 // rdar://problem/24730536
 // Superclass constraints can be used to resolve nested types to concrete types.

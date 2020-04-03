@@ -277,10 +277,8 @@ extension HasMutableProperty {
 // Some pathological examples -- just make sure they don't crash.
 
 protocol RecursiveSelf : Generic<Self> {}
-// expected-error@-1 {{superclass constraint 'Self' : 'Generic<Self>' is recursive}}
 
 protocol RecursiveAssociatedType : Generic<Self.X> {
-  // expected-error@-1 {{superclass constraint 'Self' : 'Generic<Self.X>' is recursive}}
   associatedtype X
 }
 

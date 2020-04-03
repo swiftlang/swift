@@ -5349,43 +5349,15 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   };
 
   /// Check whether the given type references the archetype.
-  auto isRecursiveConcreteType = [&](EquivalenceClass *equivClass,
-                                     bool isSuperclass) {
+  auto isRecursiveConcreteType = [&](EquivalenceClass *equivClass) {
     SmallPtrSet<EquivalenceClass *, 4> visited;
     SmallVector<EquivalenceClass *, 4> stack;
     stack.push_back(equivClass);
     visited.insert(equivClass);
 
-    // Check whether the specific type introduces recursion.
-    auto checkTypeRecursion = [&](Type type) {
-      if (!type->hasTypeParameter()) return false;
-
-      return type.findIf([&](Type type) {
-        if (type->isTypeParameter()) {
-          if (auto referencedEquivClass =
-                resolveEquivalenceClass(
-                                    type,
-                                    ArchetypeResolutionKind::AlreadyKnown)) {
-            if (referencedEquivClass == equivClass) return true;
-
-            if (visited.insert(referencedEquivClass).second)
-              stack.push_back(referencedEquivClass);
-          }
-        }
-
-        return false;
-      });
-    };
-
     while (!stack.empty()) {
       auto currentEquivClass = stack.back();
       stack.pop_back();
-
-      // If we're checking superclasses, do so now.
-      if (isSuperclass && currentEquivClass->superclass &&
-          checkTypeRecursion(currentEquivClass->superclass)) {
-        return true;
-      }
 
       // Otherwise, look for the equivalence classes referenced by
       // same-type constraints.
@@ -5407,7 +5379,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   for (auto &equivClass : Impl->EquivalenceClasses) {
     if (equivClass.concreteType) {
       // Check for recursive same-type bindings.
-      if (isRecursiveConcreteType(&equivClass, /*isSuperclass=*/false)) {
+      if (isRecursiveConcreteType(&equivClass)) {
         if (auto constraint =
               equivClass.findAnyConcreteConstraintAsWritten()) {
           Impl->HadAnyError = true;
@@ -5424,23 +5396,8 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
       }
     }
 
-    // Check for recursive superclass bindings.
-    if (equivClass.superclass) {
-      if (isRecursiveConcreteType(&equivClass, /*isSuperclass=*/true)) {
-        if (auto source = equivClass.findAnySuperclassConstraintAsWritten()) {
-          Impl->HadAnyError = true;
-
-          Diags.diagnose(source->source->getLoc(),
-                         diag::recursive_superclass_constraint,
-                         source->getSubjectDependentType(genericParams),
-                         equivClass.superclass);
-        }
-
-        equivClass.recursiveSuperclassType = true;
-      } else {
-        checkSuperclassConstraints(genericParams, &equivClass);
-      }
-    }
+    if (equivClass.superclass)
+      checkSuperclassConstraints(genericParams, &equivClass);
 
     checkConformanceConstraints(genericParams, &equivClass);
     checkLayoutConstraints(genericParams, &equivClass);

@@ -49,10 +49,8 @@ typealias OptionalInt = Optional<Int>
 var uniontest1 : (Int) -> Optional<Int> = OptionalInt.element
 var uniontest2 : Optional<Int> = OptionalInt.none
 var uniontest3 = OptionalInt(1)
-
-// FIXME: Stuff that should work, but doesn't yet.
-// var uniontest4 : OptInt = .none
-// var uniontest5 : OptInt = .Some(1)
+var uniontest4 : OptionalInt = .none
+var uniontest5 : OptionalInt = .element(1)
 
 func formattedTest<T : MyFormattedPrintable>(_ a: T) {
   myPrintf("%v", a)
@@ -224,25 +222,6 @@ struct X4 : P, Q {
 struct X5<T, U> where T: P, T: Q, T.AssocP == T.AssocQ { } // expected-note{{requirement specified as 'T.AssocP' == 'T.AssocQ' [with T = X4]}}
 
 var y: X5<X4, Int> // expected-error{{'X5' requires the types 'X4.AssocP' (aka 'Int') and 'X4.AssocQ' (aka 'String') be equivalent}}
-
-// Recursive generic signature validation.
-class Top {}
-class Bottom<T : Bottom<Top>> {}
-// expected-error@-1 {{'Bottom' requires that 'Top' inherit from 'Bottom<Top>'}}
-// expected-note@-2 {{requirement specified as 'T' : 'Bottom<Top>' [with T = Top]}}
-
-class Bottom2<T: Bottom2<Top2>> {}
-class Top2: Bottom2<Top2> {} // OK
-
-class Bottom3<T: Bottom3<Top3, Top3, Top3>,
-              U: Bottom3<Top3, Top3, Top3>,
-              R: Bottom3<Top3, Top3, Top3>> {}
-class Top3: Bottom3<Top3, Top3, Top3> {} // OK
-
-// FIXME: Unlock recursive superclass constraints.
-class ProtoSuperclass<T> {}
-protocol Proto: ProtoSuperclass<Self> {} // expected-error {{superclass constraint 'Self' : 'ProtoSuperclass<Self>' is recursive}}
-func recursiveSuperclassFunc<T: ProtoSuperclass<T>>(t: T) {} // expected-error {{superclass constraint 'T' : 'ProtoSuperclass<T>' is recursive}}
 
 // Invalid inheritance clause
 
