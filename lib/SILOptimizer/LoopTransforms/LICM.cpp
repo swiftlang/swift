@@ -103,12 +103,22 @@ static LoadInst *isLoadFromAddr(SILInstruction *I, SILValue addr) {
 /// Returns true if all instructions in \p SideEffectInsts which may alias with
 /// \p addr are either loads or stores from \p addr.
 static bool isOnlyLoadedAndStored(AliasAnalysis *AA, InstSet &SideEffectInsts,
+                                  ArrayRef<LoadInst *> Loads,
+                                  ArrayRef<StoreInst *> Stores,
                                   SILValue addr) {
   for (auto *I : SideEffectInsts) {
     if (AA->mayReadOrWriteMemory(I, addr) &&
         !isStoreToAddr(I, addr) && !isLoadFromAddr(I, addr)) {
       return false;
     }
+  }
+  for (auto *LI : Loads) {
+    if (AA->mayReadFromMemory(LI, addr) && !isLoadFromAddr(LI, addr))
+      return false;
+  }
+  for (auto *SI : Stores) {
+    if (AA->mayWriteToMemory(SI, addr) && !isStoreToAddr(SI, addr))
+      return false;
   }
   return true;
 }
@@ -869,7 +879,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
   for (StoreInst *SI : Stores) {
     SILValue addr = SI->getDest();
     if (isLoopInvariant(addr, Loop) &&
-        isOnlyLoadedAndStored(AA, sideEffects, addr)) {
+        isOnlyLoadedAndStored(AA, sideEffects, Loads, Stores, addr)) {
       LoadAndStoreAddrs.insert(addr);
     }
   }
