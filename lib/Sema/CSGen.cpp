@@ -2342,15 +2342,17 @@ namespace {
 
         Type openedType = CS.openUnboundGenericType(type, locator);
 
+        auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();
         // Determine the subpattern type. It will be convertible to the
         // ascribed type.
-        Type subPatternType =
-            getTypeForPattern(
-               cast<TypedPattern>(pattern)->getSubPattern(), locator,
-               Type(), bindPatternVarsOneWay);
+        Type subPatternType = getTypeForPattern(
+            subPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+            Type(), bindPatternVarsOneWay);
+
         CS.addConstraint(
             ConstraintKind::Conversion, subPatternType, openedType,
-          locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+            locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
         return setType(openedType);
       }
 
@@ -2385,11 +2387,11 @@ namespace {
           if (!externalEltTypes.empty())
             externalEltType = externalEltTypes[i].getPlainType();
 
+          auto *eltPattern = tupleElt.getPattern();
           Type eltTy = getTypeForPattern(
-              tupleElt.getPattern(),
-              locator,
-              externalEltType,
-              bindPatternVarsOneWay);
+              eltPattern,
+              locator.withPathElement(LocatorPathElt::PatternMatch(eltPattern)),
+              externalEltType, bindPatternVarsOneWay);
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
         }
 
@@ -2410,9 +2412,11 @@ namespace {
           externalPatternType = objVar;
         }
 
+        auto *subPattern = cast<OptionalSomePattern>(pattern)->getSubPattern();
         // The subpattern must have optional type.
         Type subPatternType = getTypeForPattern(
-            cast<OptionalSomePattern>(pattern)->getSubPattern(), locator,
+            subPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             externalPatternType, bindPatternVarsOneWay);
 
         return setType(OptionalType::get(subPatternType));
