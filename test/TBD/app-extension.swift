@@ -10,6 +10,7 @@
 // NOTEXTENSIONSAFE: not_app_extension_safe
 
 // RUN: %target-swift-frontend -target-variant x86_64-apple-ios13.0-macabi -typecheck %s -application-extension -emit-tbd -emit-tbd-path %t/target-variant.tbd
-// RUN: %FileCheck %s --check-prefix ZIPPERED < %t/target-variant.tbd
+// RUN: %FileCheck %s --check-prefix MACABI < %t/target-variant.tbd
 
-// ZIPPERED: platform: zippered
+// MACABI: targets: [ {{.*}}macos{{.*}}maccatalyst{{.*}} ]
+
