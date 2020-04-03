@@ -2286,8 +2286,30 @@ namespace {
       case PatternKind::Named: {
         auto var = cast<NamedPattern>(pattern)->getDecl();
 
-        Type varType = CS.createTypeVariable(
-            CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
+        Type varType;
+
+        // If we have a type from an initializer expression, and that
+        // expression does not produce an InOut type, use it.  This
+        // will avoid exponential typecheck behavior in the case of
+        // tuples, nested arrays, and dictionary literals.
+        //
+        // FIXME: This should be handled in the solver, not here.
+        //
+        // Otherwise, create a new type variable.
+        bool assumedInitializerType = false;
+        if (!var->hasNonPatternBindingInit() &&
+            !var->hasAttachedPropertyWrapper()) {
+          if (auto boundExpr = locator.trySimplifyToExpr()) {
+            if (!boundExpr->isSemanticallyInOutExpr()) {
+              varType = CS.getType(boundExpr)->getRValueType();
+              assumedInitializerType = true;
+            }
+          }
+        }
+
+        if (!assumedInitializerType)
+          varType = CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                          TVO_CanBindToNoEscape);
 
         // When we are supposed to bind pattern variables, create a fresh
         // type variable and a one-way constraint to assign it to either the
@@ -2308,7 +2330,19 @@ namespace {
           ROK = OA->get();
         switch (optionalityOf(ROK)) {
         case ReferenceOwnershipOptionality::Required:
+          if (assumedInitializerType) {
+            // Already Optional<T>
+            if (varType->getOptionalObjectType())
+              break;
+
+            // Create a fresh type variable to handle overloaded expressions.
+            if (varType->is<TypeVariableType>())
+              varType = CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                              TVO_CanBindToNoEscape);
+          }
+
           varType = TypeChecker::getOptionalType(var->getLoc(), varType);
+
           if (oneWayVarType) {
             oneWayVarType =
                 TypeChecker::getOptionalType(var->getLoc(), oneWayVarType);
