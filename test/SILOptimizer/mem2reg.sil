@@ -492,3 +492,96 @@ bb3:
   %11 = tuple ()
   return %11 : $()
 }
+
+// CHECK-LABEL: sil @single_block_with_access
+// CHECK: bb0
+// CHECK: [[IL:%.*]] = integer_literal
+// CHECK: [[X:%.*]] = struct $Int ([[IL]]
+// CHECK: return [[X]]
+// CHECK-LABEL: end sil function 'single_block_with_access'
+sil @single_block_with_access : $@convention(thin) () -> Int {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 0          // user: %2
+  %2 = struct $Int (%1 : $Builtin.Int64)          // user: %4
+  %3 = alloc_stack $Int                           // users: %8, %5, %4
+  store %2 to %3 : $*Int                          // id: %4
+  %5 = begin_access [read] [dynamic] [no_nested_conflict] %3 : $*Int // users: %6, %7
+  %6 = load %5 : $*Int                            // user: %9
+  end_access %5 : $*Int                           // id: %7
+  dealloc_stack %3 : $*Int                        // id: %8
+  return %6 : $Int                                // id: %9
+}
+
+// CHECK-LABEL: sil @multi_block_with_access
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: begin_access
+
+// CHECK: bb0(%0 : $Bool):
+// CHECK: [[IL:%.*]] = integer_literal
+// CHECK-NEXT: [[X:%.*]] = struct $Int ([[IL]]
+// CHECK-NEXT: [[COND:%.*]] = struct_extract %0
+// CHECK-NEXT: cond_br [[COND]]
+
+// CHECK: bb2:
+// CHECK-NEXT: [[IL2:%.*]] = integer_literal
+// CHECK-NEXT: [[XVAL:%.*]] = struct_extract [[X]]
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: [[ADD1:%.*]] = builtin "sadd_with_overflow_Int64"([[XVAL]] : {{.*}}, [[IL2]]
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: cond_fail
+// CHECK-NEXT: br
+
+// CHECK: bb3:
+// CHECK-NEXT: [[XVAL2:%.*]] = struct_extract [[X]]
+// CHECK-NEXT: [[IL3:%.*]] = integer_literal
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: [[ADD2:%.*]] = builtin "sadd_with_overflow_Int64"([[XVAL2]] : {{.*}}, [[IL3]]
+// CHECK-NEXT: [[SUM_VAL:%.*]] = tuple_extract [[ADD2]]
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: cond_fail
+// CHECK-NEXT: [[OUT:%.*]] = struct $Int ([[SUM_VAL]]
+// CHECK-NEXT: return [[OUT]]
+
+// CHECK: } // end sil function 'multi_block_with_access'
+sil @multi_block_with_access : $@convention(thin) (Bool) -> Int {
+bb0(%0 : $Bool):
+  %2 = integer_literal $Builtin.Int64, 0          // user: %3
+  %3 = struct $Int (%2 : $Builtin.Int64)          // user: %5
+  %4 = alloc_stack $Int                           // users: %26, %10, %22, %5
+  store %3 to %4 : $*Int                          // id: %5
+  %6 = struct_extract %0 : $Bool, #Bool._value    // user: %7
+  cond_br %6, bb2, bb1                            // id: %7
+
+bb1:                                              // Preds: bb0
+  br bb3                                          // id: %8
+
+bb2:                                              // Preds: bb0
+  %9 = integer_literal $Builtin.Int64, 1          // user: %14
+  %10 = begin_access [modify] [static] [no_nested_conflict] %4 : $*Int // users: %20, %19, %11
+  %11 = struct_element_addr %10 : $*Int, #Int._value // user: %12
+  %12 = load %11 : $*Builtin.Int64                // user: %14
+  %13 = integer_literal $Builtin.Int1, -1         // user: %14
+  %14 = builtin "sadd_with_overflow_Int64"(%12 : $Builtin.Int64, %9 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // users: %16, %15
+  %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 0 // user: %18
+  %16 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 1 // user: %17
+  cond_fail %16 : $Builtin.Int1, "arithmetic overflow" // id: %17
+  %18 = struct $Int (%15 : $Builtin.Int64)        // user: %19
+  store %18 to %10 : $*Int                        // id: %19
+  end_access %10 : $*Int                          // id: %20
+  br bb3                                          // id: %21
+
+bb3:                                              // Preds: bb1 bb2
+  %22 = begin_access [read] [static] [no_nested_conflict] %4 : $*Int // users: %25, %23
+  %23 = struct_element_addr %22 : $*Int, #Int._value // user: %24
+  %24 = load %23 : $*Builtin.Int64                // user: %29
+  end_access %22 : $*Int                          // id: %25
+  dealloc_stack %4 : $*Int                        // id: %26
+  %27 = integer_literal $Builtin.Int64, 2         // user: %29
+  %28 = integer_literal $Builtin.Int1, -1         // user: %29
+  %29 = builtin "sadd_with_overflow_Int64"(%24 : $Builtin.Int64, %27 : $Builtin.Int64, %28 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // users: %31, %30
+  %30 = tuple_extract %29 : $(Builtin.Int64, Builtin.Int1), 0 // user: %33
+  %31 = tuple_extract %29 : $(Builtin.Int64, Builtin.Int1), 1 // user: %32
+  cond_fail %31 : $Builtin.Int1, "arithmetic overflow" // id: %32
+  %33 = struct $Int (%30 : $Builtin.Int64)        // user: %34
+  return %33 : $Int                               // id: %34
+}

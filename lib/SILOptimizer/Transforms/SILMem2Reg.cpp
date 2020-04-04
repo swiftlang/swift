@@ -156,7 +156,7 @@ class MemoryToRegisters {
   SILBuilder B;
 
   /// Check if the AllocStackInst \p ASI is only written into.
-  bool isWriteOnlyAllocation(AllocStackInst *ASI);
+  bool isWriteOnlyAllocation(SingleValueInstruction *addr);
 
   /// Promote all of the AllocStacks in a single basic block in one
   /// linear scan. Note: This function deletes all of the users of the
@@ -227,7 +227,7 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock,
 /// Returns true if \p I is a dead struct_element_addr or tuple_element_addr.
 static bool isDeadAddrProjection(SILInstruction *I) {
   if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
-      !isa<TupleElementAddrInst>(I))
+      !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I))
     return false;
 
   // Recursively search for uses which are dead themselves.
@@ -241,8 +241,8 @@ static bool isDeadAddrProjection(SILInstruction *I) {
 
 /// Returns true if this AllocStacks is captured.
 /// Sets \p inSingleBlock to true if all uses of \p ASI are in a single block.
-static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
-  
+static bool isCaptured(SingleValueInstruction *ASI, bool &inSingleBlock) {
+
   SILBasicBlock *singleBlock = ASI->getParent();
   
   // For all users of the AllocStack instruction.
@@ -262,9 +262,10 @@ static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
       if (SI->getDest() == ASI)
         continue;
 
-    // Deallocation is also okay, as are DebugValueAddr. We will turn
-    // the latter into DebugValue.
-    if (isa<DeallocStackInst>(II) || isa<DebugValueAddrInst>(II))
+    // Deallocation is also okay, as are EndAccess and DebugValueAddr. We will
+    // turn the latter into DebugValue.
+    if (isa<DeallocStackInst>(II) || isa<DebugValueAddrInst>(II) ||
+        isa<EndAccessInst>(II))
       continue;
 
     // Destroys of loadable types can be rewritten as releases, so
@@ -272,6 +273,13 @@ static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
     if (auto *DAI = dyn_cast<DestroyAddrInst>(II))
       if (DAI->getOperand()->getType().isLoadable(*DAI->getFunction()))
         continue;
+
+    // Begin access is OK if it isn't captured.
+    if (auto *beginAccess = dyn_cast<BeginAccessInst>(II)) {
+      if (isCaptured(beginAccess, inSingleBlock))
+        return true;
+      continue;
+    }
 
     // Other instructions are assumed to capture the AllocStack.
     LLVM_DEBUG(llvm::dbgs() << "*** AllocStack is captured by: " << *II);
@@ -284,9 +292,9 @@ static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
 }
 
 /// Returns true if the AllocStack is only stored into.
-bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
+bool MemoryToRegisters::isWriteOnlyAllocation(SingleValueInstruction *addr) {
   // For all users of the AllocStack:
-  for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
+  for (auto UI = addr->use_begin(), E = addr->use_end(); UI != E; ++UI) {
     SILInstruction *II = UI->getUser();
 
     // It is okay to store into this AllocStack.
@@ -300,11 +308,16 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
 
     // If we haven't already promoted the AllocStack, we may see
     // DebugValueAddr uses.
-    if (isa<DebugValueAddrInst>(II))
+    if (isa<DebugValueAddrInst>(II) || isDeadAddrProjection(II) ||
+        isa<EndAccessInst>(II))
       continue;
 
-    if (isDeadAddrProjection(II))
-      continue;
+    // Begin access is OK if it is write only.
+    if (auto *beginAccess = dyn_cast<BeginAccessInst>(II)) {
+      if (isWriteOnlyAllocation(beginAccess))
+        continue;
+      return false;
+    }
 
     // Can't do anything else with it.
     LLVM_DEBUG(llvm::dbgs() << "*** AllocStack has non-write use: " << *II);
@@ -343,7 +356,7 @@ static bool isLoadFromStack(SILInstruction *I, AllocStackInst *ASI) {
   ValueBase *op = I->getOperand(0);
   while (op != ASI) {
     if (!isa<UncheckedAddrCastInst>(op) && !isa<StructElementAddrInst>(op) &&
-        !isa<TupleElementAddrInst>(op))
+        !isa<TupleElementAddrInst>(op) && !isa<BeginAccessInst>(op))
       return false;
     
     op = cast<SingleValueInstruction>(op)->getOperand(0);
@@ -358,7 +371,7 @@ static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) 
     return;
   }
   if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
-      !isa<TupleElementAddrInst>(I))
+      !isa<TupleElementAddrInst>(I) && !isa<BeginAccessInst>(I))
     return;
   
   // Recursively search for other loads in the instruction's uses.
@@ -375,9 +388,13 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
 
   while (op != ASI) {
     assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
-           isa<TupleElementAddrInst>(op));
+           isa<TupleElementAddrInst>(op) || isa<BeginAccessInst>(op));
     auto *Inst = cast<SingleValueInstruction>(op);
-    projections.push_back(Projection(Inst));
+
+    // We don't want to project these instructions but we do want to follow
+    // their operand.
+    if (!isa<BeginAccessInst>(op))
+      projections.push_back(Projection(Inst));
     op = Inst->getOperand(0);
   }
 
@@ -421,11 +438,17 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
 
   while (op != ASI && op->use_empty()) {
     assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
-           isa<TupleElementAddrInst>(op));
+           isa<TupleElementAddrInst>(op) || isa<BeginAccessInst>(op));
     auto *Inst = cast<SingleValueInstruction>(op);
-    SILValue next = Inst->getOperand(0);
-    Inst->eraseFromParent();
-    op = next;
+    op = Inst->getOperand(0);
+    if (Inst->use_empty())
+      Inst->eraseFromParent();
+    if (auto singleUse = Inst->getSingleUse()) {
+      if (isa<EndAccessInst>(singleUse->getUser())) {
+        singleUse->getUser()->eraseFromParent();
+        Inst->eraseFromParent();
+      }
+    }
   }
 }
 
@@ -596,10 +619,10 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
   SILValue RunningVal = SILValue();
 
   // For all instructions in the block.
-  for (auto BBI = BB->begin(), E = BB->end(); BBI != E;) {
-    SILInstruction *Inst = &*BBI;
-    ++BBI;
-
+  SmallVector<SILInstruction *, 64> allInstInBlock;
+  for (auto &i : *BB)
+    allInstInBlock.push_back(&i);
+  for (auto *Inst : allInstInBlock) {
     // Remove instructions that we are loading from. Replace the loaded value
     // with our running value.
     if (isLoadFromStack(Inst, ASI)) {
@@ -665,7 +688,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     SILNode *Node = Inst;
     while (isa<StructElementAddrInst>(Node) ||
            isa<TupleElementAddrInst>(Node) ||
-           isa<UncheckedAddrCastInst>(Node)) {
+           isa<UncheckedAddrCastInst>(Node) || isa<BeginAccessInst>(Node)) {
       auto *I = cast<SingleValueInstruction>(Node);
       if (!I->use_empty()) break;
       Node = I->getOperand(0);
