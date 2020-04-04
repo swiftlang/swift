@@ -563,6 +563,29 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     bool isUnexpectedFixitsSeen =
         expected.Fixits.size() < FoundDiagnostic.FixIts.size();
 
+    auto makeActualFixitsPhrase =
+        [&](ArrayRef<DiagnosticInfo::FixIt> actualFixits,
+            std::string &actualFixitsStr) -> std::string {
+      actualFixitsStr = renderFixits(actualFixits, InputFile);
+
+      std::string str("actual fix-it");
+      if (actualFixits.size() >= 2) {
+        str += "s";
+      }
+      str += " seen: ";
+      str += actualFixitsStr;
+      return str;
+    };
+
+    auto emitFixItsError = [&](const char *location, const std::string &message,
+                               const char *replStartLoc, const char *replEndLoc,
+                               const std::string &replStr) {
+      llvm::SMFixIt fix(llvm::SMRange(SMLoc::getFromPointer(replStartLoc),
+                                      SMLoc::getFromPointer(replEndLoc)),
+                        replStr);
+      addError(location, message, fix);
+    };
+
     // If we have any expected fixits that didn't get matched, then they are
     // wrong.  Replace the failed fixit with what actually happened.
 
@@ -584,14 +607,12 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
           replStartLoc--;
         }
       } else {
-        actualFixits = renderFixits(FoundDiagnostic.FixIts, InputFile);
-        message += "; actual fix-it seen: " + actualFixits;
+        message +=
+            "; " + makeActualFixitsPhrase(FoundDiagnostic.FixIts, actualFixits);
       }
 
-      llvm::SMFixIt fix(llvm::SMRange(SMLoc::getFromPointer(replStartLoc),
-                                      SMLoc::getFromPointer(replEndLoc)),
-                        actualFixits);
-      addError(missedFixitLoc, message, fix);
+      emitFixItsError(missedFixitLoc, message, replStartLoc, replEndLoc,
+                      actualFixits);
     } else if (expected.noExtraFixitsMayAppear && isUnexpectedFixitsSeen) {
       // If unexpected fixit were produced, add a fixit to add them in.
 
@@ -601,9 +622,6 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       const char *noneStartLoc =
           expected.ExpectedEnd -
           (fixitExpectationNoneString.size() + 4) /* length of '{{none}}' */;
-
-      std::string actualFixits =
-          renderFixits(FoundDiagnostic.FixIts, InputFile);
 
       const char *replStartLoc = nullptr, *replEndLoc = nullptr;
       std::string message;
@@ -617,16 +635,16 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         replEndLoc = expected.Fixits.back().EndLoc;
       }
 
-      message += "; actual fix-it seen: " + actualFixits;
+      std::string actualFixits;
+      message +=
+          "; " + makeActualFixitsPhrase(FoundDiagnostic.FixIts, actualFixits);
 
       if (replStartLoc == replEndLoc) {
         actualFixits += " ";
       }
 
-      llvm::SMFixIt fix(llvm::SMRange(SMLoc::getFromPointer(replStartLoc),
-                                      SMLoc::getFromPointer(replEndLoc)),
-                        actualFixits);
-      addError(noneStartLoc, message, fix);
+      emitFixItsError(noneStartLoc, message, replStartLoc, replEndLoc,
+                      actualFixits);
     }
 
     // Actually remove the diagnostic from the list, so we don't match it
