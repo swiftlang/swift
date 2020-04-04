@@ -4,17 +4,17 @@
 import StdlibUnittest
 import Atomics
 
-let suite = TestSuite("AtomicRepresentable")
+let suite = TestSuite("AtomicRawRepresentable")
 defer { runAllTests() }
 
-enum State: Int, AtomicRepresentable {
+enum State: Int, AtomicProtocol {
   case starting
   case running
   case stopped
 }
 
 
-suite.test("AtomicRepresentable.load") {
+suite.test("load") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
@@ -23,7 +23,7 @@ suite.test("AtomicRepresentable.load") {
   expectEqual(v.load(ordering: .relaxed), State.starting)
 }
 
-suite.test("AtomicRepresentable.store") {
+suite.test("store") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
@@ -34,7 +34,7 @@ suite.test("AtomicRepresentable.store") {
   expectEqual(State.running, v.load(ordering: .relaxed))
 }
 
-suite.test("AtomicRepresentable.exchange") {
+suite.test("exchange") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
@@ -47,7 +47,7 @@ suite.test("AtomicRepresentable.exchange") {
   expectEqual(State.stopped, v.load(ordering: .relaxed))
 }
 
-suite.test("AtomicRepresentable.compareExchange") {
+suite.test("compareExchange") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }

@@ -14,7 +14,6 @@ add_swift_target_library(swiftAtomics ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   AtomicInteger.swift
   AtomicMemoryOrderings.swift
   AtomicProtocol.swift
-  AtomicRepresentable.swift
   NullableAtomic.swift
   UnsafeAtomicLazyReference.swift
 
