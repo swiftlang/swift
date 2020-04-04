@@ -49,7 +49,7 @@ public struct UnsafeAtomic<Value: AtomicProtocol> {
   }
 
   @inlinable
-  public static func create(initialValue: Value) -> Self {
+  public static func create(initialValue: __owned Value) -> Self {
     let ptr = UnsafeMutablePointer<Value.AtomicStorage>.allocate(capacity: 1)
     ptr.initialize(to: Value.atomicStorage(for: initialValue))
     return Self(at: ptr)
@@ -85,7 +85,7 @@ extension UnsafeAtomic {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func store(
-    _ desired: Value,
+    _ desired: __owned Value,
     ordering: AtomicStoreOrdering
   ) {
     Value.atomicStore(desired, at: _ptr, ordering: ordering)
@@ -100,7 +100,7 @@ extension UnsafeAtomic {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func exchange(
-    _ desired: Value,
+    _ desired: __owned Value,
     ordering: AtomicUpdateOrdering
   ) -> Value {
     Value.atomicExchange(desired, at: _ptr, ordering: ordering)
@@ -133,7 +133,7 @@ extension UnsafeAtomic {
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
     expected: Value,
-    desired: Value,
+    desired: __owned Value,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Value) {
     Value.atomicCompareExchange(
@@ -174,7 +174,7 @@ extension UnsafeAtomic {
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
     expected: Value,
-    desired: Value,
+    desired: __owned Value,
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Value) {

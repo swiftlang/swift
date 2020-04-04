@@ -54,7 +54,7 @@ public protocol AtomicProtocol {
   ///
   /// - Parameter value: The value to convert.
   /// - Returns: The atomic storage representation of `value`.
-  static func atomicStorage(for value: Self) -> AtomicStorage
+  static func atomicStorage(for value: __owned Self) -> AtomicStorage
 
   /// Deinitialize atomic storage at the specified memory location.
   ///
@@ -90,7 +90,7 @@ public protocol AtomicProtocol {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   @_semantics("has_constant_evaluable_arguments")
   static func atomicStore(
-    _ desired: Self,
+    _ desired: __owned Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicStoreOrdering
   )
@@ -105,7 +105,7 @@ public protocol AtomicProtocol {
   /// - Returns: The original value.
   @_semantics("has_constant_evaluable_arguments")
   static func atomicExchange(
-    _ desired: Self,
+    _ desired: __owned Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self
@@ -138,7 +138,7 @@ public protocol AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   static func atomicCompareExchange(
     expected: Self,
-    desired: Self,
+    desired: __owned Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self)
@@ -175,7 +175,7 @@ public protocol AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   static func atomicCompareExchange(
     expected: Self,
-    desired: Self,
+    desired: __owned Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
@@ -185,7 +185,7 @@ public protocol AtomicProtocol {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AtomicProtocol where AtomicStorage == Self {
   @inlinable
-  public static func atomicStorage(for value: Self) -> AtomicStorage {
+  public static func atomicStorage(for value: __owned Self) -> AtomicStorage {
     return value
   }
 
@@ -204,7 +204,7 @@ extension AtomicProtocol where
   AtomicStorage == RawValue.AtomicStorage
 {
   @inlinable
-  public static func atomicStorage(for value: Self) -> RawValue.AtomicStorage {
+  public static func atomicStorage(for value: __owned Self) -> RawValue.AtomicStorage {
     return RawValue.atomicStorage(for: value.rawValue)
   }
 
@@ -228,7 +228,7 @@ extension AtomicProtocol where
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
-    _ desired: Self,
+    _ desired: __owned Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicStoreOrdering
   ) {
@@ -241,7 +241,7 @@ extension AtomicProtocol where
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
-    _ desired: Self,
+    _ desired: __owned Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self {
@@ -256,7 +256,7 @@ extension AtomicProtocol where
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
     expected: Self,
-    desired: Self,
+    desired: __owned Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self) {
@@ -272,7 +272,7 @@ extension AtomicProtocol where
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
     expected: Self,
-    desired: Self,
+    desired: __owned Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
