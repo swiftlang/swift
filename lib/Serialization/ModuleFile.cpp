@@ -1340,6 +1340,9 @@ static bool areCompatibleArchitectures(const llvm::Triple &moduleTarget,
 
 static bool areCompatibleOSs(const llvm::Triple &moduleTarget,
                              const llvm::Triple &ctxTarget) {
+  if (moduleTarget.getEnvironment() != ctxTarget.getEnvironment())
+    return false;
+
   if (moduleTarget.getOS() == ctxTarget.getOS())
     return true;
 
