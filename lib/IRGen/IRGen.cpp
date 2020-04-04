@@ -960,9 +960,8 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
   if (!targetMachine) return nullptr;
 
   // Create the IR emitter.
-  IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
-                  ModuleName, PSPs.OutputFilename,
-                  PSPs.MainInputFilenameForDebugInfo,
+  IRGenModule IGM(irgen, std::move(targetMachine), SF, LLVMContext, ModuleName,
+                  PSPs.OutputFilename, PSPs.MainInputFilenameForDebugInfo,
                   PrivateDiscriminator);
 
   initLLVMModule(IGM, *SILMod->getSwiftModule());
