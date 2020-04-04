@@ -34,6 +34,9 @@ struct ExpectedFixIt {
 } // end namespace swift
 
 namespace {
+
+static constexpr StringLiteral fixitExpectationNoneString("none");
+
 struct ExpectedDiagnosticInfo {
   // This specifies the full range of the "expected-foo {{}}" specifier.
   const char *ExpectedStart, *ExpectedEnd = nullptr;
@@ -457,11 +460,11 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       ExtraChecks = ExtraChecks.substr(EndLoc+2).ltrim();
       
       // Special case for specifying no fixits should appear.
-      if (FixItStr == "none") {
+      if (FixItStr == fixitExpectationNoneString) {
         Expected.noExtraFixitsMayAppear = true;
         continue;
       }
-        
+
       // Parse the pieces of the fix-it.
       size_t MinusLoc = FixItStr.find('-');
       if (MinusLoc == StringRef::npos) {
@@ -595,7 +598,9 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       assert(!FoundDiagnostic.FixIts.empty() &&
              "some fix-its should be produced here");
 
-      const char *noneStartLoc = expected.ExpectedEnd - 8; // {{none}} length
+      const char *noneStartLoc =
+          expected.ExpectedEnd -
+          (fixitExpectationNoneString.size() + 4) /* length of '{{none}}' */;
 
       std::string actualFixits =
           renderFixits(FoundDiagnostic.FixIts, InputFile);
