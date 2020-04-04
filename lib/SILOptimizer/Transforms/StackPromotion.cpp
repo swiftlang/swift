@@ -217,11 +217,6 @@ bool StackPromotion::tryPromoteToObject(
   DominanceInfo *domInfo =
       PM->getAnalysis<DominanceAnalysis>()->get(allocRef->getFunction());
   auto *classDecl = allocRef->getType().getClassOrBoundGenericClass();
-  if (!classDecl || !classDecl->getDestructor()->isImplicit() ||
-      (classDecl->getAsGenericContext() &&
-       classDecl->getAsGenericContext()->isGeneric()))
-    return false;
-
   SmallVector<VarDecl *, 8> props;
   for (auto *prop : classDecl->getStoredProperties()) {
     props.push_back(prop);
@@ -229,10 +224,12 @@ bool StackPromotion::tryPromoteToObject(
 
   SmallVector<Operand *, 24> uses;
   getOrderedNonDebugUses(allocRef, domInfo, uses);
-
+  // Reverse the properties so we can pop_back a property that matches the next
+  // initializer.
   std::reverse(props.begin(), props.end());
   SmallVector<RefElementAddrInst *, 8> propertyInitializers;
   for (auto *use : uses) {
+    // Assume properties are initialized in order.
     auto propRef = dyn_cast<RefElementAddrInst>(use->getUser());
     if (!propRef)
       return false;
@@ -246,21 +243,24 @@ bool StackPromotion::tryPromoteToObject(
     if (props.empty())
       break;
   }
-
+  // Bail if we haven't found all the properties.
   if (!props.empty())
     return false;
 
+  // Collect the dead stores and values of the class class property initializers.
   SmallVector<StoreInst *, 8> deadStores;
   SmallVector<SILValue, 8> elements;
   for (auto *init : propertyInitializers) {
     SmallVector<Operand *, 6> refElementUses;
     getOrderedNonDebugUses(init, domInfo, refElementUses);
     auto frontUser = refElementUses.front()->getUser();
+    // Look through begin_access uses.
     if (auto *beginAccess = dyn_cast<BeginAccessInst>(frontUser)) {
       SmallVector<Operand *, 4> beginAccessUses;
       getOrderedNonDebugUses(beginAccess, domInfo, beginAccessUses);
       frontUser = beginAccessUses.front()->getUser();
     }
+    // If the first use isn't a store, bail.
     if (auto *store = dyn_cast<StoreInst>(frontUser)) {
       elements.push_back(store->getSrc());
       deadStores.push_back(store);
@@ -269,6 +269,7 @@ bool StackPromotion::tryPromoteToObject(
     }
   }
 
+  // Keep track of the last element so we know where to insert the tuple.
   SILInstruction *lastElement = nullptr;
   for (auto first = elements.rbegin(); first != elements.rend(); ++first) {
     auto inst = first->getDefiningInstruction();
@@ -289,10 +290,15 @@ bool StackPromotion::tryPromoteToObject(
   // after all element instructions.
   SILBuilder builder(std::next(lastElement->getIterator()));
   SILValue storedProps;
+  // If there is only one element, we can't make a tuple so, just use that
+  // element.
   if (elements.size() == 1)
     storedProps = elements[0];
   else
+    // Otherwise, use a tuple to hold the stored properties.
     storedProps = builder.createTuple(lastElement->getLoc(), elements);
+  // Make an alloc_stack so that we can replace ref_element_addr instructions
+  // with tuple_element_addr instructions.
   auto storedPropsAddr =
       builder.createAllocStack(lastElement->getLoc(), storedProps->getType());
   auto refInitStore =
@@ -300,7 +306,8 @@ bool StackPromotion::tryPromoteToObject(
                           storeInitQualifier(storedProps));
 
   // Find the first use of the alloc_ref that isn't a ref_element_addr and
-  // record where that element is.
+  // record where that use is. We use that as an upper bound for were we have to
+  // stop replacing uses of the class reference.
   SmallVector<Operand *, 8> users(allocRef->use_begin(), allocRef->use_end());
   SILInstruction *firstUnknownUse = nullptr;
   for (auto *use : users) {
@@ -324,19 +331,25 @@ bool StackPromotion::tryPromoteToObject(
       continue;
 
     if (auto ref = dyn_cast<RefElementAddrInst>(user)) {
+      // If this instruction is dead, remove it and continue. We do this so that
+      // we can be sure endUse will be correct.
       if (ref->use_empty()) {
         ref->eraseFromParent();
         continue;
       }
 
+      // Make sure all uses come before the first unknown use.
       for (auto *use : ref->getUses()) {
         if (firstUnknownUse &&
             domInfo->dominates(firstUnknownUse, use->getUser()))
           continue;
+        // Then update endUse so that we put the final copy in the right place.
         if (!endUse || domInfo->dominates(endUse, use->getUser()))
           endUse = use->getUser();
       }
 
+      // Either replace ref with a tuple_element_addr or the alloc_stack if
+      // there's only one element.
       if (isa<TupleInst>(storedProps)) {
         auto index = std::distance(
             classDecl->getStoredProperties().begin(),
@@ -352,20 +365,22 @@ bool StackPromotion::tryPromoteToObject(
     }
   }
 
-  // Create the copy_to_ref after the last instruction we've added. If none are
-  // added put it directly after the tuple instruction. With LLVM optimization
-  // enabled, this will still be a performance win in most (all?) cases.
-  if (endUse) {
-    builder.setInsertionPoint(std::next(endUse->getIterator()));
-  } else {
-    builder.setInsertionPoint(std::next(refInitStore->getIterator()));
-  }
+  // If there aren't any unknown uses, we will remove the alloc_ref so don't
+  // bother copying the storage into it.
   if (firstUnknownUse) {
-    // TODO: This needs to happen after the last _use_ of _any_ of the tuple
-    // instructions. builder.setInsertionPoint(firstUnknownUse);
+    // Copy the property storage to the alloc_ref after the last instruction
+    // we've added. If none are added put it directly after the tuple
+    // instruction. With LLVM optimization enabled, this will still be a
+    // performance win in most (all?) cases.
+    if (endUse) {
+      builder.setInsertionPoint(std::next(endUse->getIterator()));
+    } else {
+      builder.setInsertionPoint(std::next(refInitStore->getIterator()));
+    }
     copyTupleToRef(storedProps, allocRef, builder);
   }
 
+  // Make sure we destroy/dealloc the property storage.
   for (SILInstruction *frontierInst : frontier) {
     SILBuilder deallocBuilder(frontierInst);
     deallocBuilder.createDestroyAddr(storedPropsAddr->getLoc(),
@@ -374,19 +389,22 @@ bool StackPromotion::tryPromoteToObject(
                                       storedPropsAddr);
   }
 
+  // Cleanup the stores that are now dead.
   for (auto *store : deadStores) {
     store->eraseFromParent();
   }
 
-  llvm::errs() << "Promoted to object in stack. Function: "
-               << storedProps->getFunction()->getName() << "\n";
-
+  // If we don't have any unknown uses there's no reason for the class so still
+  // exist so, remove it.
   if (!firstUnknownUse) {
     eraseUsesOfValue(allocRef);
     allocRef->eraseFromParent();
+    // Return true so that we don't try to promote this alloc_ref to stack.
     return true;
   }
 
+  // We were succesful in optimizing this alloc_ref but return false so that
+  // StackPromotion will still try to promote this alloc_ref to stack.
   return false;
 }
 
