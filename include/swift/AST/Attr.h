@@ -1111,15 +1111,57 @@ public:
 /// The \c @_typeEraser(TypeEraserType) attribute.
 class TypeEraserAttr final : public DeclAttribute {
   TypeLoc TypeEraserLoc;
-public:
-  TypeEraserAttr(SourceLoc atLoc, SourceRange range, TypeLoc typeEraserLoc)
+  LazyMemberLoader *Resolver;
+  uint64_t ResolverContextData;
+
+  friend class ResolveTypeEraserTypeRequest;
+
+  TypeEraserAttr(SourceLoc atLoc, SourceRange range, TypeLoc typeEraserLoc,
+                 LazyMemberLoader *Resolver, uint64_t Data)
       : DeclAttribute(DAK_TypeEraser, atLoc, range, /*Implicit=*/false),
-        TypeEraserLoc(typeEraserLoc) {}
+        TypeEraserLoc(typeEraserLoc),
+        Resolver(Resolver), ResolverContextData(Data) {}
 
-  const TypeLoc &getTypeEraserLoc() const { return TypeEraserLoc; }
-  TypeLoc &getTypeEraserLoc() { return TypeEraserLoc; }
+public:
+  static TypeEraserAttr *create(ASTContext &ctx,
+                                SourceLoc atLoc, SourceRange range,
+                                TypeLoc typeEraserLoc);
 
+  static TypeEraserAttr *create(ASTContext &ctx,
+                                LazyMemberLoader *Resolver,
+                                uint64_t Data);
+
+  /// Retrieve the parsed type repr for this attribute, if it
+  /// was parsed. Else returns \c nullptr.
+  TypeRepr *getParsedTypeEraserTypeRepr() const {
+    return TypeEraserLoc.getTypeRepr();
+  }
+
+  /// Retrieve the parsed location for this attribute, if it was parsed.
+  SourceLoc getLoc() const {
+    return TypeEraserLoc.getLoc();
+  }
+
+  /// Retrieve the resolved type of this attribute if it has been resolved by a
+  /// successful call to \c getResolvedType(). Otherwise,
+  /// returns \c Type()
+  ///
+  /// This entrypoint is only suitable for syntactic clients like the
+  /// AST printer. Semantic clients should use \c getResolvedType() instead.
+  Type getTypeWithoutResolving() const {
+    return TypeEraserLoc.getType();
+  }
+
+  /// Returns \c true if the type eraser type has a valid implementation of the
+  /// erasing initializer for the given protocol.
   bool hasViableTypeEraserInit(ProtocolDecl *protocol) const;
+
+  /// Resolves the type of this attribute.
+  ///
+  /// This entrypoint is suitable for semantic clients like the
+  /// expression checker. Syntactic clients should use
+  /// \c getTypeWithoutResolving() instead.
+  Type getResolvedType(const ProtocolDecl *PD) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_TypeEraser;

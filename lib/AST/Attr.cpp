@@ -1006,11 +1006,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@_typeEraser");
     Printer << "(";
     Printer.callPrintNamePre(PrintNameContext::Attribute);
-    auto typeLoc = cast<TypeEraserAttr>(this)->getTypeEraserLoc();
-    if (auto type = typeLoc.getType())
-      type->print(Printer, Options);
+    auto *attr = cast<TypeEraserAttr>(this);
+    if (auto *repr = attr->getParsedTypeEraserTypeRepr())
+      repr->print(Printer, Options);
     else
-      typeLoc.getTypeRepr()->print(Printer, Options);
+      attr->getTypeWithoutResolving()->print(Printer, Options);
     Printer.printNamePost(PrintNameContext::Attribute);
     Printer << ")";
     break;
@@ -1381,12 +1381,34 @@ SourceLoc DynamicReplacementAttr::getRParenLoc() const {
   return getTrailingLocations()[1];
 }
 
+TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,
+                                       SourceLoc atLoc, SourceRange range,
+                                       TypeLoc typeEraserLoc) {
+  return new (ctx) TypeEraserAttr(atLoc, range, typeEraserLoc, nullptr, 0);
+}
+
+TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,
+                                       LazyMemberLoader *Resolver,
+                                       uint64_t Data) {
+  return new (ctx) TypeEraserAttr(SourceLoc(), SourceRange(),
+                                  TypeLoc(), Resolver, Data);
+}
+
 bool
 TypeEraserAttr::hasViableTypeEraserInit(ProtocolDecl *protocol) const {
   return evaluateOrDefault(protocol->getASTContext().evaluator,
                            TypeEraserHasViableInitRequest{
                                const_cast<TypeEraserAttr *>(this), protocol},
                            false);
+}
+
+Type TypeEraserAttr::getResolvedType(const ProtocolDecl *PD) const {
+  auto &ctx = PD->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ResolveTypeEraserTypeRequest{
+                               const_cast<ProtocolDecl *>(PD),
+                               const_cast<TypeEraserAttr *>(this)},
+                           ErrorType::get(ctx));
 }
 
 AvailableAttr *
