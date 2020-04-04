@@ -103,12 +103,22 @@ static LoadInst *isLoadFromAddr(SILInstruction *I, SILValue addr) {
 /// Returns true if all instructions in \p SideEffectInsts which may alias with
 /// \p addr are either loads or stores from \p addr.
 static bool isOnlyLoadedAndStored(AliasAnalysis *AA, InstSet &SideEffectInsts,
+                                  ArrayRef<LoadInst *> Loads,
+                                  ArrayRef<StoreInst *> Stores,
                                   SILValue addr) {
   for (auto *I : SideEffectInsts) {
     if (AA->mayReadOrWriteMemory(I, addr) &&
         !isStoreToAddr(I, addr) && !isLoadFromAddr(I, addr)) {
       return false;
     }
+  }
+  for (auto *LI : Loads) {
+    if (AA->mayReadFromMemory(LI, addr) && !isLoadFromAddr(LI, addr))
+      return false;
+  }
+  for (auto *SI : Stores) {
+    if (AA->mayWriteToMemory(SI, addr) && !isStoreToAddr(SI, addr))
+      return false;
   }
   return true;
 }
@@ -869,7 +879,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
   for (StoreInst *SI : Stores) {
     SILValue addr = SI->getDest();
     if (isLoopInvariant(addr, Loop) &&
-        isOnlyLoadedAndStored(AA, sideEffects, addr)) {
+        isOnlyLoadedAndStored(AA, sideEffects, Loads, Stores, addr)) {
       LoadAndStoreAddrs.insert(addr);
     }
   }
@@ -1015,6 +1025,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
   SILBuilder B(preheader->getTerminator());
   auto *initialLoad = B.createLoad(preheader->getTerminator()->getLoc(), addr,
                                    LoadOwnershipQualifier::Unqualified);
+  LLVM_DEBUG(llvm::dbgs() << "Creating preload " << *initialLoad);
 
   SILSSAUpdater ssaUpdater;
   ssaUpdater.Initialize(initialLoad->getType());
@@ -1047,6 +1058,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
       currentVal = SILValue();
     }
     if (auto *SI = isStoreToAddr(I, addr)) {
+      LLVM_DEBUG(llvm::dbgs() << "Deleting reloaded store " << *SI);
       currentVal = SI->getSrc();
       toDelete.push_back(SI);
     } else if (auto *LI = isLoadFromAddr(I, addr)) {
@@ -1056,6 +1068,8 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
         currentVal = ssaUpdater.GetValueInMiddleOfBlock(block);
       SILValue projectedValue = projectLoadValue(LI->getOperand(), addr,
                                                  currentVal, LI);
+      LLVM_DEBUG(llvm::dbgs() << "Replacing stored load " << *LI << " with "
+                 << projectedValue);
       LI->replaceAllUsesWith(projectedValue);
       toDelete.push_back(LI);
     }
@@ -1068,8 +1082,11 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
         assert(succ->getSinglePredecessorBlock() &&
                "should have split critical edges");
         SILBuilder B(succ->begin());
-        B.createStore(loc.getValue(), ssaUpdater.GetValueInMiddleOfBlock(succ),
-                      addr, StoreOwnershipQualifier::Unqualified);
+        auto *SI = B.createStore(loc.getValue(),
+                                 ssaUpdater.GetValueInMiddleOfBlock(succ),
+                                 addr, StoreOwnershipQualifier::Unqualified);
+        (void)SI;
+        LLVM_DEBUG(llvm::dbgs() << "Creating loop-exit store " << *SI);
       }
     }
   }

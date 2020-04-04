@@ -61,7 +61,8 @@ public:
   ///
   /// \return true on error
   static bool emit(DiagnosticEngine &diags, SourceFile *SF,
-                   const DependencyTracker &depTracker, StringRef outputPath);
+                   const DependencyTracker &depTracker,
+                   StringRef outputPath);
 
   /// Emit the dependencies.
   static void emit(SourceFile *SF, const DependencyTracker &depTracker,
@@ -254,7 +255,7 @@ ProvidesEmitter::emitTopLevelNames() const {
   for (const Decl *D : SF->getTopLevelDecls())
     emitTopLevelDecl(D, cpd);
   for (auto *operatorFunction : cpd.memberOperatorDecls)
-    out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
+    out << "- \"" << escape(operatorFunction->getBaseIdentifier()) << "\"\n";
   return cpd;
 }
 
@@ -488,12 +489,12 @@ void DependsEmitter::emit(const SourceFile *SF,
 }
 
 void DependsEmitter::emit() const {
-  const ReferencedNameTracker *const tracker = SF->getReferencedNameTracker();
-  assert(tracker && "Cannot emit reference dependencies without a tracker");
+  const auto *nameTracker = SF->getConfiguredReferencedNameTracker();
+  assert(nameTracker && "Cannot emit reference dependencies without a tracker");
 
-  emitTopLevelNames(tracker);
+  emitTopLevelNames(nameTracker);
 
-  auto &memberLookupTable = tracker->getUsedMembers();
+  auto &memberLookupTable = nameTracker->getUsedMembers();
   std::vector<MemberTableEntryTy> sortedMembers{
     memberLookupTable.begin(), memberLookupTable.end()
   };
@@ -519,7 +520,7 @@ void DependsEmitter::emit() const {
 
   emitMembers(sortedMembers);
   emitNominalTypes(sortedMembers);
-  emitDynamicLookup(tracker);
+  emitDynamicLookup(nameTracker);
   emitExternal(depTracker);
 }
 

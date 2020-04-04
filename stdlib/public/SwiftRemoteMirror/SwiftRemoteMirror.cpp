@@ -270,6 +270,16 @@ swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 
+char *
+swift_reflection_copyDemangledNameForTypeRef(
+  SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef) {
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+
+  Demangle::Demangler Dem;
+  auto Name = nodeToString(TR->getDemangling(Dem));
+  return strdup(Name.c_str());
+}
+
 swift_typeref_t
 swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
                                           unsigned Index) {
@@ -314,12 +324,6 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
       return SWIFT_TUPLE;
     case RecordKind::Struct:
       return SWIFT_STRUCT;
-    case RecordKind::NoPayloadEnum:
-      return SWIFT_NO_PAYLOAD_ENUM;
-    case RecordKind::SinglePayloadEnum:
-      return SWIFT_SINGLE_PAYLOAD_ENUM;
-    case RecordKind::MultiPayloadEnum:
-      return SWIFT_MULTI_PAYLOAD_ENUM;
     case RecordKind::ThickFunction:
       return SWIFT_THICK_FUNCTION;
     case RecordKind::OpaqueExistential:
@@ -334,6 +338,17 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
       return SWIFT_CLASS_INSTANCE;
     case RecordKind::ClosureContext:
       return SWIFT_CLOSURE_CONTEXT;
+    }
+  }
+  case TypeInfoKind::Enum: {
+    auto &EnumTI = cast<EnumTypeInfo>(TI);
+    switch (EnumTI.getEnumKind()) {
+    case EnumKind::NoPayloadEnum:
+      return SWIFT_NO_PAYLOAD_ENUM;
+    case EnumKind::SinglePayloadEnum:
+      return SWIFT_SINGLE_PAYLOAD_ENUM;
+    case EnumKind::MultiPayloadEnum:
+      return SWIFT_MULTI_PAYLOAD_ENUM;
     }
   }
   case TypeInfoKind::Reference: {
@@ -362,8 +377,11 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
   }
 
   unsigned NumFields = 0;
-  if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI))
+  if (auto *RecordTI = dyn_cast<EnumTypeInfo>(TI)) {
+    NumFields = RecordTI->getNumCases();
+  } else if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
     NumFields = RecordTI->getNumFields();
+  }
 
   return {
     getTypeInfoKind(*TI),
@@ -375,14 +393,20 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
 }
 
 static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
-  auto *RecordTI = cast<RecordTypeInfo>(TI);
-  auto &FieldInfo = RecordTI->getFields()[Index];
+  const FieldInfo *FieldInfo;
+  if (auto *EnumTI = dyn_cast<EnumTypeInfo>(TI)) {
+    FieldInfo = &(EnumTI->getCases()[Index]);
+  } else if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
+    FieldInfo = &(RecordTI->getFields()[Index]);
+  } else {
+    assert(false && "convertChild(TI): TI must be record or enum typeinfo");
+  }
 
   return {
-    FieldInfo.Name.c_str(),
-    FieldInfo.Offset,
-    getTypeInfoKind(FieldInfo.TI),
-    reinterpret_cast<swift_typeref_t>(FieldInfo.TR),
+    FieldInfo->Name.c_str(),
+    FieldInfo->Offset,
+    getTypeInfoKind(FieldInfo->TI),
+    reinterpret_cast<swift_typeref_t>(FieldInfo->TR),
   };
 }
 
@@ -469,30 +493,16 @@ int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
   auto Context = ContextRef->nativeContext;
   auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
   auto RemoteEnumAddress = RemoteAddress(EnumAddress);
-  return Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex);
-}
-
-int swift_reflection_getEnumCaseTypeRef(SwiftReflectionContextRef ContextRef,
-                                        swift_typeref_t EnumTypeRef,
-                                        int CaseIndex,
-                                        char **CaseName,
-                                        swift_typeref_t *PayloadTypeRef) {
-  *PayloadTypeRef = 0;
-  *CaseName = nullptr;
-  auto Context = ContextRef->nativeContext;
-  auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
-  const TypeRef *PayloadTR = nullptr;
-  std::string Name;
-  auto success = Context->getEnumCaseTypeRef(EnumTR, CaseIndex,
-                                             Name, &PayloadTR);
-  if (success) {
-    *PayloadTypeRef = reinterpret_cast<swift_typeref_t>(PayloadTR);
-    // FIXME: Is there a better way to return a string here?
-    // Just returning Case.Name.c_str() doesn't work as the backing data gets
-    // released at the end of this function.
-    *CaseName = strdup(Name.c_str());
+  if (!Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex)) {
+    return false;
   }
-  return success;
+  auto TI = Context->getTypeInfo(EnumTR);
+  auto *RecordTI = dyn_cast<EnumTypeInfo>(TI);
+  assert(RecordTI != nullptr);
+  if (static_cast<size_t>(*CaseIndex) >= RecordTI->getNumCases()) {
+    return false;
+  }
+  return true;
 }
 
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
@@ -517,6 +527,12 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
     std::string MangledName = mangleNode(TR->getDemangling(Dem));
     fprintf(stdout, "Mangled name: %s%s\n", MANGLING_PREFIX_STR,
             MangledName.c_str());
+
+    char *DemangledName =
+      swift_reflection_copyDemangledNameForTypeRef(ContextRef, OpaqueTypeRef);
+    fprintf(stdout, "Demangled name: %s\n", DemangledName);
+    free(DemangledName);
+
 #ifndef NDEBUG
     assert(mangleNode(TR->getDemangling(Dem)) == MangledName &&
            "round-trip diff");

@@ -3272,6 +3272,11 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
                              toType->getCalleeConvention());
 }
 
+static ManagedValue createDifferentiableFunctionThunk(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue fn,
+    AbstractionPattern inputOrigType, CanAnyFunctionType inputSubstType,
+    AbstractionPattern outputOrigType, CanAnyFunctionType outputSubstType);
+
 /// Create a reabstraction thunk.
 static ManagedValue createThunk(SILGenFunction &SGF,
                                 SILLocation loc,
@@ -3297,6 +3302,14 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   
   auto expectedType = substExpectedType
     ->getUnsubstitutedType(SGF.SGM.M);
+
+  assert(sourceType->isDifferentiable() == expectedType->isDifferentiable() &&
+         "thunks can't change differentiability");
+  if (sourceType->isDifferentiable()) {
+    return createDifferentiableFunctionThunk(SGF, loc, fn, inputOrigType,
+                                             inputSubstType, outputOrigType,
+                                             outputSubstType);
+  }
 
   // We can't do bridging here.
   assert(expectedType->getLanguage() ==
@@ -3355,6 +3368,104 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   assert(substExpectedType->isNoEscape());
   return SGF.B.createConvertEscapeToNoEscape(
       loc, thunkedFn, SILType::getPrimitiveObjectType(substExpectedType));
+}
+
+/// Create a reabstraction thunk for a @differentiable function.
+static ManagedValue createDifferentiableFunctionThunk(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue fn,
+    AbstractionPattern inputOrigType, CanAnyFunctionType inputSubstType,
+    AbstractionPattern outputOrigType, CanAnyFunctionType outputSubstType) {
+  // Applies a thunk to all the components by extracting them, applying thunks
+  // to all of them, and then putting them back together.
+  auto sourceType = fn.getType().castTo<SILFunctionType>();
+
+  auto withoutDifferentiablePattern =
+      [](AbstractionPattern pattern) -> AbstractionPattern {
+    auto patternType = pattern.getAs<AnyFunctionType>();
+    // If pattern does not store an `AnyFunctionType`, return original pattern.
+    // This logic handles opaque abstraction patterns.
+    if (!patternType)
+      return pattern;
+    pattern.rewriteType(
+        pattern.getGenericSignature(),
+        patternType->getWithoutDifferentiability()->getCanonicalType());
+    return pattern;
+  };
+
+  auto inputOrigTypeNotDiff = withoutDifferentiablePattern(inputOrigType);
+  CanAnyFunctionType inputSubstTypeNotDiff(
+      inputSubstType->getWithoutDifferentiability());
+  auto outputOrigTypeNotDiff = withoutDifferentiablePattern(outputOrigType);
+  CanAnyFunctionType outputSubstTypeNotDiff(
+      outputSubstType->getWithoutDifferentiability());
+  auto &expectedTLNotDiff =
+      SGF.getTypeLowering(outputOrigTypeNotDiff, outputSubstTypeNotDiff);
+  // `differentiable_function_extract` takes `@guaranteed` values.
+  auto borrowedFnValue = fn.borrow(SGF, loc);
+  SILValue original = SGF.B.createDifferentiableFunctionExtractOriginal(
+      loc, borrowedFnValue.getValue());
+  original = SGF.B.emitCopyValueOperation(loc, original);
+  auto managedOriginal = SGF.emitManagedRValueWithCleanup(original);
+
+  ManagedValue originalThunk = createThunk(
+      SGF, loc, managedOriginal, inputOrigTypeNotDiff, inputSubstTypeNotDiff,
+      outputOrigTypeNotDiff, outputSubstTypeNotDiff, expectedTLNotDiff);
+
+  auto numUncurriedParams = inputSubstType->getNumParams();
+  if (auto *resultFnType =
+          inputSubstType->getResult()->getAs<AnyFunctionType>()) {
+    numUncurriedParams += resultFnType->getNumParams();
+  }
+  llvm::SmallBitVector parameterBits(numUncurriedParams);
+  for (auto i : range(inputSubstType->getNumParams()))
+    if (!inputSubstType->getParams()[i].isNoDerivative())
+      parameterBits.set(i);
+  auto *parameterIndices = IndexSubset::get(SGF.getASTContext(), parameterBits);
+
+  auto getDerivativeFnTy =
+      [&](CanAnyFunctionType fnTy,
+          AutoDiffDerivativeFunctionKind kind) -> CanAnyFunctionType {
+    auto assocTy = fnTy->getAutoDiffDerivativeFunctionType(
+        parameterIndices, kind,
+        LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+    return cast<AnyFunctionType>(assocTy->getCanonicalType());
+  };
+  auto getDerivativeFnPattern =
+      [&](AbstractionPattern pattern,
+          AutoDiffDerivativeFunctionKind kind) -> AbstractionPattern {
+    return pattern.getAutoDiffDerivativeFunctionType(
+        parameterIndices, kind,
+        LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+  };
+  auto createDerivativeFnThunk =
+      [&](AutoDiffDerivativeFunctionKind kind) -> ManagedValue {
+    auto derivativeFnInputOrigType =
+        getDerivativeFnPattern(inputOrigTypeNotDiff, kind);
+    auto derivativeFnInputSubstType =
+        getDerivativeFnTy(inputSubstTypeNotDiff, kind);
+    auto derivativeFnOutputOrigType =
+        getDerivativeFnPattern(outputOrigTypeNotDiff, kind);
+    auto derivativeFnOutputSubstType =
+        getDerivativeFnTy(outputSubstTypeNotDiff, kind);
+    auto &derivativeFnExpectedTL = SGF.getTypeLowering(
+        derivativeFnOutputOrigType, derivativeFnOutputSubstType);
+    SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
+        loc, kind, borrowedFnValue.getValue());
+    derivativeFn = SGF.B.emitCopyValueOperation(loc, derivativeFn);
+    auto managedDerivativeFn = SGF.emitManagedRValueWithCleanup(derivativeFn);
+    return createThunk(SGF, loc, managedDerivativeFn, derivativeFnInputOrigType,
+                       derivativeFnInputSubstType, derivativeFnOutputOrigType,
+                       derivativeFnOutputSubstType, derivativeFnExpectedTL);
+  };
+
+  auto jvpThunk = createDerivativeFnThunk(AutoDiffDerivativeFunctionKind::JVP);
+  auto vjpThunk = createDerivativeFnThunk(AutoDiffDerivativeFunctionKind::VJP);
+
+  SILValue convertedBundle = SGF.B.createDifferentiableFunction(
+      loc, sourceType->getDifferentiabilityParameterIndices(),
+      originalThunk.forward(SGF),
+      std::make_pair(jvpThunk.forward(SGF), vjpThunk.forward(SGF)));
+  return SGF.emitManagedRValueWithCleanup(convertedBundle);
 }
 
 static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
@@ -3794,7 +3905,6 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   return getThunkedResult();
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     SILFunction *customDerivativeFn, SILFunction *originalFn,
     const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind) {

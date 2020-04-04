@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-differentiable-programming %s -emit-module -parse-as-library -o %t
+// RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
 // RUN: llvm-bcanalyzer %t/differentiable_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -enable-experimental-differentiable-programming -disable-sil-linking -enable-sil-verify-all %t/differentiable_attr.swiftmodule -o - | %FileCheck %s
+// RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/differentiable_attr.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
 
@@ -40,7 +40,7 @@ func vjpSimple(x: Float) -> (Float, (Float) -> Float) {
 // CHECK-NEXT: func testWrtClause(x: Float, y: Float) -> Float
 @differentiable(wrt: x)
 func testWrtClause(x: Float, y: Float) -> Float {
-  return x + y
+  return x
 }
 
 struct InstanceMethod : Differentiable {
@@ -48,7 +48,7 @@ struct InstanceMethod : Differentiable {
   // CHECK-NEXT: func testWrtClause(x: Float, y: Float) -> Float
   @differentiable(wrt: (self, y))
   func testWrtClause(x: Float, y: Float) -> Float {
-    return x + y
+    return x
   }
 
   struct TangentVector: Differentiable, AdditiveArithmetic {

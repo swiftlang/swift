@@ -136,8 +136,8 @@ SourceFile::~SourceFile() = default;
 class swift::SourceLookupCache {
   /// A lookup map for value decls. When declarations are added they are added
   /// under all variants of the name they can be found under.
-  class DeclMap {
-    llvm::DenseMap<DeclName, TinyPtrVector<ValueDecl*>> Members;
+  class ValueDeclMap {
+    llvm::DenseMap<DeclName, TinyPtrVector<ValueDecl *>> Members;
 
   public:
     void add(ValueDecl *VD) {
@@ -156,9 +156,14 @@ class swift::SourceLookupCache {
     }
   };
 
-  DeclMap TopLevelValues;
-  DeclMap ClassMembers;
+  ValueDeclMap TopLevelValues;
+  ValueDeclMap ClassMembers;
   bool MemberCachePopulated = false;
+
+  template<typename T>
+  using OperatorMap = llvm::DenseMap<Identifier, TinyPtrVector<T *>>;
+  OperatorMap<OperatorDecl> Operators;
+  OperatorMap<PrecedenceGroupDecl> PrecedenceGroups;
 
   template<typename Range>
   void addToUnqualifiedLookupCache(Range decls, bool onlyOperators);
@@ -175,7 +180,28 @@ public:
   
   void lookupValue(DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result);
-  
+
+  /// Retrieves all the operator decls. The order of the results is not
+  /// guaranteed to be meaningful.
+  void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results);
+
+  /// Retrieves all the precedence groups. The order of the results is not
+  /// guaranteed to be meaningful.
+  void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl *> &results);
+
+  /// Look up an operator declaration.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  /// \param fixity The fixity of the operator (infix, prefix or postfix).
+  void lookupOperator(Identifier name, OperatorFixity fixity,
+                      TinyPtrVector<OperatorDecl *> &results);
+
+  /// Look up a precedence group.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  void lookupPrecedenceGroup(Identifier name,
+                             TinyPtrVector<PrecedenceGroupDecl *> &results);
+
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind);
@@ -224,6 +250,12 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
       if (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations())
         addToUnqualifiedLookupCache(ED->getMembers(), true);
     }
+
+    if (auto *OD = dyn_cast<OperatorDecl>(D))
+      Operators[OD->getName()].push_back(OD);
+
+    if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
+      PrecedenceGroups[PG->getName()].push_back(PG);
   }
 }
 
@@ -298,6 +330,39 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   Result.reserve(I->second.size());
   for (ValueDecl *Elt : I->second)
     Result.push_back(Elt);
+}
+
+void SourceLookupCache::getPrecedenceGroups(
+    SmallVectorImpl<PrecedenceGroupDecl *> &results) {
+  for (auto &groups : PrecedenceGroups)
+    results.append(groups.second.begin(), groups.second.end());
+}
+
+void SourceLookupCache::getOperatorDecls(
+    SmallVectorImpl<OperatorDecl *> &results) {
+  for (auto &ops : Operators)
+    results.append(ops.second.begin(), ops.second.end());
+}
+
+void SourceLookupCache::lookupOperator(Identifier name, OperatorFixity fixity,
+                                       TinyPtrVector<OperatorDecl *> &results) {
+  auto ops = Operators.find(name);
+  if (ops == Operators.end())
+    return;
+
+  for (auto *op : ops->second)
+    if (op->getFixity() == fixity)
+      results.push_back(op);
+}
+
+void SourceLookupCache::lookupPrecedenceGroup(
+    Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) {
+  auto groups = PrecedenceGroups.find(name);
+  if (groups == PrecedenceGroups.end())
+    return;
+
+  for (auto *group : groups->second)
+    results.push_back(group);
 }
 
 void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
@@ -680,18 +745,36 @@ void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   Results.append(decls.begin(), decls.end());
 }
 
+void ModuleDecl::getOperatorDecls(
+    SmallVectorImpl<OperatorDecl *> &results) const {
+  // For a parsed module, we can check the source cache on the module rather
+  // than doing an O(N) search over the source files.
+  if (isParsedModule(this)) {
+    getSourceLookupCache().getOperatorDecls(results);
+    return;
+  }
+  FORWARD(getOperatorDecls, (results));
+}
+
+void SourceFile::getOperatorDecls(
+       SmallVectorImpl<OperatorDecl*> &results) const {
+  getCache().getOperatorDecls(results);
+}
+
 void ModuleDecl::getPrecedenceGroups(
-       SmallVectorImpl<PrecedenceGroupDecl*> &Results) const {
-  FORWARD(getPrecedenceGroups, (Results));
+       SmallVectorImpl<PrecedenceGroupDecl*> &results) const {
+  // For a parsed module, we can check the source cache on the module rather
+  // than doing an O(N) search over the source files.
+  if (isParsedModule(this)) {
+    getSourceLookupCache().getPrecedenceGroups(results);
+    return;
+  }
+  FORWARD(getPrecedenceGroups, (results));
 }
 
 void SourceFile::getPrecedenceGroups(
-       SmallVectorImpl<PrecedenceGroupDecl*> &Results) const {
-  for (auto pair : PrecedenceGroups) {
-    if (pair.second.getPointer() && pair.second.getInt()) {
-      Results.push_back(pair.second.getPointer());
-    }
-  }
+       SmallVectorImpl<PrecedenceGroupDecl*> &results) const {
+  getCache().getPrecedenceGroups(results);
 }
 
 void SourceFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
@@ -827,7 +910,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
       ProtocolConformanceRef::forInvalid());
 }
 
-llvm::Expected<ProtocolConformanceRef>
+ProtocolConformanceRef
 LookupConformanceInModuleRequest::evaluate(
     Evaluator &evaluator, LookupConformanceDescriptor desc) const {
   auto *mod = desc.Mod;
@@ -944,9 +1027,6 @@ LookupConformanceInModuleRequest::evaluate(
 
 namespace {
   template <typename T>
-  using OperatorMap = SourceFile::OperatorMap<T>;
-
-  template <typename T>
   struct OperatorLookup {
     // Don't fold this into the static_assert: this would trigger an MSVC bug
     // that causes the assertion to fail.
@@ -956,7 +1036,6 @@ namespace {
 
   template <>
   struct OperatorLookup<PrefixOperatorDecl> {
-    constexpr static auto map_ptr = &SourceFile::PrefixOperators;
     static PrefixOperatorDecl *lookup(Evaluator &eval,
                                       const OperatorLookupDescriptor &desc) {
       // We can return the first prefix operator. All prefix operators of the
@@ -969,7 +1048,6 @@ namespace {
 
   template <>
   struct OperatorLookup<InfixOperatorDecl> {
-    constexpr static auto map_ptr = &SourceFile::InfixOperators;
     static InfixOperatorDecl *lookup(Evaluator &eval,
                                      const OperatorLookupDescriptor &desc) {
       // Return the first result if it exists.
@@ -981,7 +1059,6 @@ namespace {
 
   template <>
   struct OperatorLookup<PostfixOperatorDecl> {
-    constexpr static auto map_ptr = &SourceFile::PostfixOperators;
     static PostfixOperatorDecl *lookup(Evaluator &eval,
                                        const OperatorLookupDescriptor &desc) {
       // We can return the first postfix operator. All postfix operators of the
@@ -994,7 +1071,6 @@ namespace {
 
   template <>
   struct OperatorLookup<PrecedenceGroupDecl> {
-    constexpr static auto map_ptr = &SourceFile::PrecedenceGroups;
     static PrecedenceGroupDecl *lookup(Evaluator &eval,
                                        const OperatorLookupDescriptor &desc) {
       // Return the first result if it exists.
@@ -1089,6 +1165,10 @@ static Optional<OP_DECL *>
 lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
                           Identifier Name, bool includePrivate,
                           bool isCascading) {
+  auto &eval = File.getASTContext().evaluator;
+  auto desc = OperatorLookupDescriptor::forFile(const_cast<FileUnit *>(&File),
+                                                Name, isCascading,
+                                                /*diagLoc*/ SourceLoc());
   switch (File.getKind()) {
   case FileUnitKind::Builtin:
     // The Builtin module declares no operators.
@@ -1097,23 +1177,16 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
     break;
   case FileUnitKind::SerializedAST:
   case FileUnitKind::ClangModule:
-  case FileUnitKind::DWARFModule: {
-    auto &eval = File.getASTContext().evaluator;
-    auto desc = OperatorLookupDescriptor::forFile(const_cast<FileUnit *>(&File),
-                                                  Name, isCascading,
-                                                  /*diagLoc*/ SourceLoc());
+  case FileUnitKind::DWARFModule:
     return OperatorLookup<OP_DECL>::lookup(eval, desc);
-  }
   }
 
   auto &SF = cast<SourceFile>(File);
-  assert(SF.ASTStage >= SourceFile::NameBound);
+  assert(SF.ASTStage >= SourceFile::ImportsResolved);
 
-  // Look for an operator declaration in the current module.
-  const auto OP_MAP = OperatorLookup<OP_DECL>::map_ptr;
-  auto found = (SF.*OP_MAP).find(Name);
-  if (found != (SF.*OP_MAP).end() && (includePrivate || found->second.getInt()))
-    return found->second.getPointer();
+  // Check if the decl exists on the file.
+  if (auto *op = OperatorLookup<OP_DECL>::lookup(eval, desc))
+    return op;
 
   // Look for imported operator decls.
   // Record whether they come from re-exported modules.
@@ -1141,22 +1214,14 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
       importedOperators[op] |= isExported;
   }
 
-  typename OperatorMap<OP_DECL *>::mapped_type result = { nullptr, true };
-  
+  llvm::PointerIntPair<OP_DECL *, 1, /*isPrivate*/ bool> result = {nullptr,
+                                                                   true};
+
   if (!importedOperators.empty()) {
     auto start = checkOperatorConflicts(SF, Loc, importedOperators);
     if (start == importedOperators.end())
       return None;
     result = { start->first, start->second };
-  }
-
-  if (includePrivate) {
-    // Cache the mapping so we don't need to troll imports next time.
-    // It's not safe to cache the non-private results because we didn't search
-    // private imports there, but in most non-private cases the result will
-    // be cached in the final lookup.
-    auto &mutableOpMap = const_cast<OperatorMap<OP_DECL *> &>(SF.*OP_MAP);
-    mutableOpMap[Name] = result;
   }
 
   if (includePrivate || result.getInt())
@@ -1185,7 +1250,7 @@ lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
 }
 
 template <typename OperatorType>
-llvm::Expected<OperatorType *> LookupOperatorRequest<OperatorType>::evaluate(
+OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
     Evaluator &evaluator, OperatorLookupDescriptor desc) const {
   auto *file = desc.fileOrModule.get<FileUnit *>();
   auto result =
@@ -1207,6 +1272,32 @@ llvm::Expected<OperatorType *> LookupOperatorRequest<OperatorType>::evaluate(
   return result.hasValue() ? result.getValue() : nullptr;
 }
 
+template <typename OperatorType>
+void LookupOperatorRequest<OperatorType>::writeDependencySink(
+    Evaluator &evaluator, ReferencedNameTracker &reqTracker,
+    OperatorType *o) const {
+  auto &desc = std::get<0>(this->getStorage());
+  auto *FU = desc.fileOrModule.template get<FileUnit *>();
+  auto shouldRegisterDependencyEdge = [&FU](OperatorType *o) -> bool {
+    if (!o)
+      return true;
+
+    auto *topLevelContext = o->getDeclContext()->getModuleScopeContext();
+    return topLevelContext != FU;
+  };
+
+  // FIXME(Evaluator Incremental Dependencies): This is all needlessly complex.
+  // For one, it does not take into account the fact that precedence groups can
+  // be shadowed, and so should be registered regardless of their defining
+  // module. Second, lookups for operators within the file define a valid named
+  // dependency just as much as lookups outside of the current source file.
+  if (!shouldRegisterDependencyEdge(o)) {
+    return;
+  }
+
+  reqTracker.addTopLevelName(desc.name, desc.isCascading);
+}
+
 #define LOOKUP_OPERATOR(Kind)                                                  \
   Kind##Decl *ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) {       \
     auto result =                                                              \
@@ -1214,9 +1305,12 @@ llvm::Expected<OperatorType *> LookupOperatorRequest<OperatorType>::evaluate(
                                               /*isCascading*/ false);          \
     return result ? *result : nullptr;                                         \
   }                                                                            \
-  template llvm::Expected<Kind##Decl *>                                        \
+  template Kind##Decl *                                                        \
   LookupOperatorRequest<Kind##Decl>::evaluate(Evaluator &e,                    \
-                                              OperatorLookupDescriptor d) const;
+                                              OperatorLookupDescriptor) const; \
+  template                                                                     \
+  void LookupOperatorRequest<Kind##Decl>::writeDependencySink(                 \
+           Evaluator &, ReferencedNameTracker &, Kind##Decl *) const;          \
 
 LOOKUP_OPERATOR(PrefixOperator)
 LOOKUP_OPERATOR(InfixOperator)
@@ -1224,73 +1318,58 @@ LOOKUP_OPERATOR(PostfixOperator)
 LOOKUP_OPERATOR(PrecedenceGroup)
 #undef LOOKUP_OPERATOR
 
-llvm::Expected<TinyPtrVector<OperatorDecl *>>
+TinyPtrVector<OperatorDecl *>
 DirectOperatorLookupRequest::evaluate(Evaluator &evaluator,
                                       OperatorLookupDescriptor descriptor,
                                       OperatorFixity fixity) const {
-  // Query each file.
-  // TODO: Module-level caching.
+  // For a parsed module, we can check the source cache on the module rather
+  // than doing an O(N) search over the source files.
   TinyPtrVector<OperatorDecl *> results;
+  if (auto module = descriptor.getModule()) {
+    if (isParsedModule(module)) {
+      module->getSourceLookupCache().lookupOperator(descriptor.name, fixity,
+                                                    results);
+      return results;
+    }
+  }
+
+  // Otherwise query each file.
   for (auto *file : descriptor.getFiles())
     file->lookupOperatorDirect(descriptor.name, fixity, results);
 
-  return std::move(results);
+  return results;
 }
 
 void SourceFile::lookupOperatorDirect(
     Identifier name, OperatorFixity fixity,
     TinyPtrVector<OperatorDecl *> &results) const {
-  OperatorDecl *op = nullptr;
-  switch (fixity) {
-  case OperatorFixity::Infix: {
-    auto result = InfixOperators.find(name);
-    if (result != InfixOperators.end())
-      op = result->second.getPointer();
-    break;
-  }
-  case OperatorFixity::Postfix: {
-    auto result = PostfixOperators.find(name);
-    if (result != PostfixOperators.end())
-      op = result->second.getPointer();
-    break;
-  }
-  case OperatorFixity::Prefix: {
-    auto result = PrefixOperators.find(name);
-    if (result != PrefixOperators.end())
-      op = result->second.getPointer();
-    break;
-  }
-  }
-
-  // We currently can use the operator maps to cache lookup results from other
-  // modules. Make sure we only return results from the source file.
-  if (op && op->getDeclContext()->getParentSourceFile() == this)
-    results.push_back(op);
+  getCache().lookupOperator(name, fixity, results);
 }
 
-llvm::Expected<TinyPtrVector<PrecedenceGroupDecl *>>
+TinyPtrVector<PrecedenceGroupDecl *>
 DirectPrecedenceGroupLookupRequest::evaluate(
     Evaluator &evaluator, OperatorLookupDescriptor descriptor) const {
-  // Query each file.
-  // TODO: Module-level caching.
+  // For a parsed module, we can check the source cache on the module rather
+  // than doing an O(N) search over the source files.
   TinyPtrVector<PrecedenceGroupDecl *> results;
+  if (auto module = descriptor.getModule()) {
+    if (isParsedModule(module)) {
+      module->getSourceLookupCache().lookupPrecedenceGroup(descriptor.name,
+                                                           results);
+      return results;
+    }
+  }
+
+  // Otherwise query each file.
   for (auto *file : descriptor.getFiles())
     file->lookupPrecedenceGroupDirect(descriptor.name, results);
 
-  return std::move(results);
+  return results;
 }
 
 void SourceFile::lookupPrecedenceGroupDirect(
     Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) const {
-  auto result = PrecedenceGroups.find(name);
-  if (result == PrecedenceGroups.end())
-    return;
-
-  // We currently can use the operator maps to cache lookup results from other
-  // modules. Make sure we only return results from the source file.
-  auto *group = result->second.getPointer();
-  if (group->getDeclContext()->getParentSourceFile() == this)
-    results.push_back(group);
+  getCache().lookupPrecedenceGroup(name, results);
 }
 
 void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
@@ -1301,14 +1380,14 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 void
 SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modules,
                                ModuleDecl::ImportFilter filter) const {
-  // FIXME: Ideally we should assert that the file has been name bound before
-  // calling this function. However unfortunately that can cause issues for
-  // overlays which can depend on a Clang submodule for the underlying framework
-  // they are overlaying, which causes us to attempt to load the overlay again.
-  // We need to find a way to ensure that an overlay dependency with the same
-  // name as the overlay always loads the underlying Clang module. We currently
-  // handle this for a direct import from the overlay, but not when it happens
-  // through other imports.
+  // FIXME: Ideally we should assert that the file has had its imports resolved
+  // before calling this function. However unfortunately that can cause issues
+  // for overlays which can depend on a Clang submodule for the underlying
+  // framework they are overlaying, which causes us to attempt to load the
+  // overlay again. We need to find a way to ensure that an overlay dependency
+  // with the same name as the overlay always loads the underlying Clang module.
+  // We currently handle this for a direct import from the overlay, but not when
+  // it happens through other imports.
   assert(filter && "no imports requested?");
   for (auto desc : Imports) {
     ModuleDecl::ImportFilter requiredFilter;
@@ -2049,7 +2128,7 @@ ArrayRef<Identifier> Decl::getSPIGroups() const {
                            ArrayRef<Identifier>());
 }
 
-llvm::Expected<llvm::ArrayRef<Identifier>>
+llvm::ArrayRef<Identifier>
 SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
   // Applies only to public ValueDecls and ExtensionDecls.
   if (auto vd = dyn_cast<ValueDecl>(decl))
@@ -2068,9 +2147,10 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
 
     // Then in the extended nominal type.
     if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
-      auto extended = extension->getExtendedNominal();
-      auto extSPIs = extended->getSPIGroups();
-      if (!extSPIs.empty()) return extSPIs;
+      if (auto extended = extension->getExtendedNominal()) {
+        auto extSPIs = extended->getSPIGroups();
+        if (!extSPIs.empty()) return extSPIs;
+      }
     }
 
     // And finally in the parent context.
@@ -2105,10 +2185,15 @@ SourceFile::getModuleShadowedBySeparatelyImportedOverlay(const ModuleDecl *overl
       }
     }
   }
-  auto i = separatelyImportedOverlaysReversed.find(overlay);
-  return i != separatelyImportedOverlaysReversed.end()
-    ? std::get<1>(*i)
-    : nullptr;
+
+  ModuleDecl *underlying = const_cast<ModuleDecl *>(overlay);
+  while (underlying->getNameStr().startswith("_")) {
+    auto next = separatelyImportedOverlaysReversed.find(underlying);
+    if (next == separatelyImportedOverlaysReversed.end())
+      return nullptr;
+    underlying = std::get<1>(*next);
+  }
+  return underlying;
 };
 
 void ModuleDecl::clearLookupCache() {
@@ -2509,7 +2594,18 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
 
 void SourceFile::createReferencedNameTracker() {
   assert(!ReferencedNames && "This file already has a name tracker.");
+  assert(!RequestReferencedNames && "This file already has a name tracker.");
   ReferencedNames.emplace(ReferencedNameTracker());
+  RequestReferencedNames.emplace(ReferencedNameTracker());
+}
+
+const ReferencedNameTracker *
+SourceFile::getConfiguredReferencedNameTracker() const {
+  if (getASTContext().LangOpts.EnableRequestBasedIncrementalDependencies) {
+    return getRequestBasedReferencedNameTracker();
+  } else {
+    return getLegacyReferencedNameTracker();
+  }
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {

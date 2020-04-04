@@ -326,6 +326,15 @@ var array: [String] = {
             "two"]
 }()
 #endif
+#if os(iOS)
+var source: String? {
+    if true {
+        if otherCondition {
+            return "true"
+        }
+    }
+}
+#endif
 
 
 // Comments should not affect switch case indentations.

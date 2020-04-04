@@ -17,6 +17,7 @@
 #define SWIFT_PARSE_REQUESTS_H
 
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
 
 namespace swift {
@@ -42,7 +43,7 @@ void simple_display(llvm::raw_ostream &out, const FingerprintAndMembers &value);
 class ParseMembersRequest
     : public SimpleRequest<ParseMembersRequest,
                            FingerprintAndMembers(IterableDeclContext *),
-                           CacheKind::Cached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -62,7 +63,7 @@ public:
 class ParseAbstractFunctionBodyRequest :
     public SimpleRequest<ParseAbstractFunctionBodyRequest,
                          BraceStmt *(AbstractFunctionDecl *),
-                         CacheKind::SeparatelyCached>
+                         RequestFlags::SeparatelyCached>
 {
 public:
   using SimpleRequest::SimpleRequest;
@@ -82,9 +83,9 @@ public:
 
 /// Parse the top-level decls of a SourceFile.
 class ParseSourceFileRequest
-    : public SimpleRequest<ParseSourceFileRequest,
-                           ArrayRef<Decl *>(SourceFile *),
-                           CacheKind::SeparatelyCached> {
+    : public SimpleRequest<
+          ParseSourceFileRequest, ArrayRef<Decl *>(SourceFile *),
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -99,6 +100,9 @@ public:
   bool isCached() const { return true; }
   Optional<ArrayRef<Decl *>> getCachedResult() const;
   void cacheResult(ArrayRef<Decl *> decls) const;
+
+public:
+  evaluator::DependencySource readDependencySource(Evaluator &) const;
 };
 
 void simple_display(llvm::raw_ostream &out,
@@ -107,7 +111,7 @@ void simple_display(llvm::raw_ostream &out,
 class CodeCompletionSecondPassRequest
     : public SimpleRequest<CodeCompletionSecondPassRequest,
                            bool(SourceFile *, CodeCompletionCallbacksFactory *),
-                           CacheKind::Uncached> {
+                           RequestFlags::Uncached|RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -117,6 +121,9 @@ private:
   // Evaluation.
   bool evaluate(Evaluator &evaluator, SourceFile *SF,
                 CodeCompletionCallbacksFactory *Factory) const;
+
+public:
+  evaluator::DependencySource readDependencySource(Evaluator &) const;
 };
 
 /// The zone number for the parser.

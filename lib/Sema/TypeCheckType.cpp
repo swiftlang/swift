@@ -1865,6 +1865,11 @@ namespace {
     Type resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
                                  unsigned ordinal,
                                  TypeResolutionOptions options);
+
+    /// Returns true if the given type conforms to `Differentiable` in the
+    /// module of `DC`. If `tangentVectorEqualsSelf` is true, returns true iff
+    /// the given type additionally satisfies `Self == Self.TangentVector`.
+    bool isDifferentiable(Type type, bool tangentVectorEqualsSelf = false);
   };
 } // end anonymous namespace
 
@@ -2256,16 +2261,20 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         }
       }
 
-      if (attrs.has(TAK_differentiable) &&
-          !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-        diagnoseInvalid(repr, attrs.getLoc(TAK_differentiable),
-                        diag::experimental_differentiable_programming_disabled);
-      }
-
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
       if (attrs.has(TAK_differentiable)) {
-        diffKind = attrs.linear ? DifferentiabilityKind::Linear
-                                : DifferentiabilityKind::Normal;
+        auto *SF = DC->getParentSourceFile();
+        if (SF && isDifferentiableProgrammingEnabled(*SF)) {
+          diffKind = attrs.linear ? DifferentiabilityKind::Linear
+                                  : DifferentiabilityKind::Normal;
+        } else {
+          diagnoseInvalid(
+              repr, attrs.getLoc(TAK_differentiable),
+              diag::
+                  differentiable_programming_attr_used_without_required_module,
+              TypeAttributes::getAttrName(TAK_differentiable),
+              Context.Id_Differentiation);
+        }
       }
 
       // Resolve the function type directly with these attributes.
@@ -2304,16 +2313,20 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         }
       }
 
-      if (attrs.has(TAK_differentiable) &&
-          !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-        diagnoseInvalid(repr, attrs.getLoc(TAK_differentiable),
-                        diag::experimental_differentiable_programming_disabled);
-      }
-
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
       if (attrs.has(TAK_differentiable)) {
-        diffKind = attrs.linear ? DifferentiabilityKind::Linear
-                                : DifferentiabilityKind::Normal;
+        auto *SF = DC->getParentSourceFile();
+        if (SF && isDifferentiableProgrammingEnabled(*SF)) {
+          diffKind = attrs.linear ? DifferentiabilityKind::Linear
+                                  : DifferentiabilityKind::Normal;
+        } else {
+          diagnoseInvalid(
+              repr, attrs.getLoc(TAK_differentiable),
+              diag::
+                  differentiable_programming_attr_used_without_required_module,
+              TypeAttributes::getAttrName(TAK_differentiable),
+              Context.Id_Differentiation);
+        }
       }
 
       ty = resolveASTFunctionType(fnRepr, options, rep, /*noescape=*/false,
@@ -2435,9 +2448,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   if (attrs.has(TAK_noDerivative)) {
-    if (!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-      diagnose(attrs.getLoc(TAK_noDerivative),
-               diag::experimental_differentiable_programming_disabled);
+    auto *SF = DC->getParentSourceFile();
+    if (SF && !isDifferentiableProgrammingEnabled(*SF)) {
+      diagnose(
+          attrs.getLoc(TAK_noDerivative),
+          diag::differentiable_programming_attr_used_without_required_module,
+          TypeAttributes::getAttrName(TAK_noDerivative),
+          Context.Id_Differentiation);
     } else if (!isParam) {
       // @noDerivative is only valid on parameters.
       diagnose(attrs.getLoc(TAK_noDerivative),
@@ -2572,7 +2589,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(eltTypeRepr)) {
       if (attrTypeRepr->getAttrs().has(TAK_noDerivative)) {
         if (diffKind == DifferentiabilityKind::NonDifferentiable &&
-            Context.LangOpts.EnableExperimentalDifferentiableProgramming)
+            isDifferentiableProgrammingEnabled(*DC->getParentSourceFile()))
           diagnose(eltTypeRepr->getLoc(),
                    diag::attr_only_on_parameters_of_differentiable,
                    "@noDerivative")
@@ -2586,6 +2603,39 @@ bool TypeResolver::resolveASTFunctionTypeParams(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
         noDerivative);
     elements.emplace_back(ty, Identifier(), paramFlags);
+  }
+
+  // All non-`@noDerivative` parameters of `@differentiable` and
+  // `@differentiable(linear)` function types must be differentiable.
+  if (diffKind != DifferentiabilityKind::NonDifferentiable &&
+      resolution.getStage() != TypeResolutionStage::Structural) {
+    bool isLinear = diffKind == DifferentiabilityKind::Linear;
+    // Emit `@noDerivative` fixit only if there is at least one valid
+    // differentiability/linearity parameter. Otherwise, adding `@noDerivative`
+    // produces an ill-formed function type.
+    auto hasValidDifferentiabilityParam =
+        llvm::find_if(elements, [&](AnyFunctionType::Param param) {
+          if (param.isNoDerivative())
+            return false;
+          return isDifferentiable(param.getPlainType(),
+                                  /*tangentVectorEqualsSelf*/ isLinear);
+        }) != elements.end();
+    for (unsigned i = 0, end = inputRepr->getNumElements(); i != end; ++i) {
+      auto *eltTypeRepr = inputRepr->getElementType(i);
+      auto param = elements[i];
+      if (param.isNoDerivative())
+        continue;
+      auto paramType = param.getPlainType();
+      if (isDifferentiable(paramType, /*tangentVectorEqualsSelf*/ isLinear))
+        continue;
+      auto paramTypeString = paramType->getString();
+      auto diagnostic =
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::differentiable_function_type_invalid_parameter,
+                   paramTypeString, isLinear, hasValidDifferentiabilityParam);
+      if (hasValidDifferentiabilityParam)
+        diagnostic.fixItInsert(eltTypeRepr->getLoc(), "@noDerivative ");
+    }
   }
 
   return false;
@@ -2720,8 +2770,35 @@ Type TypeResolver::resolveASTFunctionType(
   case AnyFunctionType::Representation::Swift:
     break;
   }
-  
+
+  // `@differentiable` and `@differentiable(linear)` function types must return
+  // a differentiable type.
+  if (extInfo.isDifferentiable() &&
+      resolution.getStage() != TypeResolutionStage::Structural) {
+    bool isLinear = diffKind == DifferentiabilityKind::Linear;
+    if (!isDifferentiable(outputTy, /*tangentVectorEqualsSelf*/ isLinear)) {
+      diagnose(repr->getResultTypeRepr()->getLoc(),
+               diag::differentiable_function_type_invalid_result,
+               outputTy->getString(), isLinear)
+          .highlight(repr->getResultTypeRepr()->getSourceRange());
+    }
+  }
+
   return fnTy;
+}
+
+bool TypeResolver::isDifferentiable(Type type, bool tangentVectorEqualsSelf) {
+  if (resolution.getStage() != TypeResolutionStage::Contextual)
+    type = DC->mapTypeIntoContext(type);
+  auto tanSpace = type->getAutoDiffTangentSpace(
+      LookUpConformanceInModule(DC->getParentModule()));
+  if (!tanSpace)
+    return false;
+  // If no `Self == Self.TangentVector` requirement, return true.
+  if (!tangentVectorEqualsSelf)
+    return true;
+  // Otherwise, return true if `Self == Self.TangentVector`.
+  return type->getCanonicalType() == tanSpace->getCanonicalType();
 }
 
 Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,

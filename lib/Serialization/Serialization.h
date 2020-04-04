@@ -256,6 +256,23 @@ public:
       SmallVector<std::pair<const NominalTypeDecl *, DeclID>, 4>;
   using ExtensionTable = llvm::MapVector<Identifier, ExtensionTableData>;
 
+  using DerivativeFunctionConfigTableData =
+      llvm::SmallVector<std::pair<std::string, GenericSignatureID>, 4>;
+  // In-memory representation of what will eventually be an on-disk hash table
+  // mapping original declaration USRs to derivative function configurations.
+  using DerivativeFunctionConfigTable =
+      llvm::MapVector<Identifier, DerivativeFunctionConfigTableData>;
+  // Uniqued mapping from original declarations USRs to derivative function
+  // configurations.
+  // Note: this exists because `GenericSignature` can be used as a `DenseMap`
+  // key, while `GenericSignatureID` cannot
+  // (`DenseMapInfo<GenericSignatureID>::getEmptyKey()` crashes). To work
+  // around this, a `UniquedDerivativeFunctionConfigTable` is first
+  // constructed, and then converted to a `DerivativeFunctionConfigTableData`.
+  using UniquedDerivativeFunctionConfigTable = llvm::MapVector<
+      Identifier,
+      llvm::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
+
 private:
   /// A map from identifiers to methods and properties with the given name.
   ///

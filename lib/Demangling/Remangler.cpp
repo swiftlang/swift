@@ -1221,6 +1221,26 @@ void Remangler::mangleFunctionType(Node *node) {
   Buffer << 'c';
 }
 
+void Remangler::mangleDifferentiableFunctionType(Node *node) {
+  mangleFunctionSignature(node);
+  Buffer << "XF";
+}
+
+void Remangler::mangleEscapingDifferentiableFunctionType(Node *node) {
+  mangleFunctionSignature(node);
+  Buffer << "XG";
+}
+
+void Remangler::mangleLinearFunctionType(Node *node) {
+  mangleFunctionSignature(node);
+  Buffer << "XH";
+}
+
+void Remangler::mangleEscapingLinearFunctionType(Node *node) {
+  mangleFunctionSignature(node);
+  Buffer << "XI";
+}
+
 void Remangler::mangleGenericProtocolWitnessTable(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "WG";
@@ -1378,6 +1398,14 @@ void Remangler::mangleIVarDestroyer(Node *node) {
   Buffer << "fE";
 }
 
+void Remangler::mangleImplDifferentiable(Node *node) {
+  Buffer << 'd';
+}
+
+void Remangler::mangleImplLinear(Node *node) {
+  Buffer << 'l';
+}
+
 void Remangler::mangleImplEscaping(Node *node) {
   Buffer << 'e';
 }
@@ -1459,6 +1487,12 @@ void Remangler::mangleImplFunctionType(Node *node) {
   Buffer << PseudoGeneric;
   for (NodePointer Child : *node) {
     switch (Child->getKind()) {
+      case Node::Kind::ImplDifferentiable:
+        Buffer << 'd';
+        break;
+      case Node::Kind::ImplLinear:
+        Buffer << 'l';
+        break;
       case Node::Kind::ImplEscaping:
         Buffer << 'e';
         break;

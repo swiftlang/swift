@@ -593,6 +593,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCodeComplete);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    // Default to sort by name.
+    Opts.RequestOptions.insert(Opts.RequestOptions.begin(), "sort.byname=1");
     addCodeCompleteOptions(Req, Opts);
     break;
 

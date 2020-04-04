@@ -2058,13 +2058,8 @@ TypeChecker::typeCheckExpression(
 
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
-  // FIXME: Look through LoadExpr. This is an egregious hack due to the
-  // way typeCheckExprIndependently works.
-  Expr *contextualTypeExpr = expr;
-  if (auto loadExpr = dyn_cast_or_null<LoadExpr>(contextualTypeExpr))
-    contextualTypeExpr = loadExpr->getSubExpr();
   cs.setContextualType(
-      contextualTypeExpr,
+      expr,
       target.getExprContextualTypeLoc(),
       target.getExprContextualTypePurpose());
 
@@ -3834,7 +3829,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
           if (!FD->getResultInterfaceType()->isVoid()) {
             diags.diagnose(diagLoc, diag::downcast_to_unrelated_fixit,
-                           FD->getName())
+                           FD->getBaseIdentifier())
                 .fixItInsertAfter(fromExpr->getEndLoc(), "()");
           }
         }
@@ -4197,7 +4192,7 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   return nullptr;
 }
 
-llvm::Expected<bool>
+bool
 IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
                                        DeclContext *dc) const {
   auto options = defaultMemberLookupOptions;
@@ -4269,7 +4264,7 @@ static bool checkForDynamicAttribute(CanType ty,
   return false;
 }
 
-llvm::Expected<bool>
+bool
 HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
                                                  CanType ty) const {
   return checkForDynamicAttribute<DynamicMemberLookupAttr>(ty, [](Type type) {
@@ -4277,7 +4272,7 @@ HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
   });
 }
 
-llvm::Expected<bool>
+bool
 HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
                                              CanType ty) const {
   return checkForDynamicAttribute<DynamicCallableAttr>(ty, [](Type type) {

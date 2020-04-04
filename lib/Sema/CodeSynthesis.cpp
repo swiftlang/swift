@@ -41,20 +41,49 @@ const bool IsImplicit = true;
 
 Expr *swift::buildSelfReference(VarDecl *selfDecl,
                                 SelfAccessorKind selfAccessorKind,
-                                bool isLValue,
-                                ASTContext &ctx) {
+                                bool isLValue, Type convertTy) {
+  auto &ctx = selfDecl->getASTContext();
+  auto selfTy = selfDecl->getType();
+
   switch (selfAccessorKind) {
   case SelfAccessorKind::Peer:
+    assert(!convertTy || convertTy->isEqual(selfTy));
     return new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(), IsImplicit,
                                  AccessSemantics::Ordinary,
-                                 isLValue
-                                  ? LValueType::get(selfDecl->getType())
-                                  : selfDecl->getType());
+                                 isLValue ? LValueType::get(selfTy) : selfTy);
 
-  case SelfAccessorKind::Super:
+  case SelfAccessorKind::Super: {
     assert(!isLValue);
-    return new (ctx) SuperRefExpr(selfDecl, SourceLoc(), IsImplicit,
-                                  selfDecl->getType()->getSuperclass());
+
+    // Get the superclass type of self, looking through a metatype if needed.
+    auto isMetatype = false;
+    if (auto *metaTy = selfTy->getAs<MetatypeType>()) {
+      isMetatype = true;
+      selfTy = metaTy->getInstanceType();
+    }
+    selfTy = selfTy->getSuperclass();
+    if (isMetatype)
+      selfTy = MetatypeType::get(selfTy);
+
+    auto *superRef =
+        new (ctx) SuperRefExpr(selfDecl, SourceLoc(), IsImplicit, selfTy);
+
+    // If no conversion type was specified, or we're already at that type, we're
+    // done.
+    if (!convertTy || convertTy->isEqual(selfTy))
+      return superRef;
+
+    // Insert the appropriate expr to handle the upcast.
+    if (isMetatype) {
+      assert(convertTy->castTo<MetatypeType>()
+                 ->getInstanceType()
+                 ->isExactSuperclassOf(selfTy->getMetatypeInstanceType()));
+      return new (ctx) MetatypeConversionExpr(superRef, convertTy);
+    } else {
+      assert(convertTy->isExactSuperclassOf(selfTy));
+      return new (ctx) DerivedToBaseExpr(superRef, convertTy);
+    }
+  }
   }
   llvm_unreachable("bad self access kind");
 }
@@ -537,7 +566,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   // Reference to super.init.
   auto *selfDecl = ctor->getImplicitSelfDecl();
   auto *superRef = buildSelfReference(selfDecl, SelfAccessorKind::Super,
-                                      /*isLValue=*/false, ctx);
+                                      /*isLValue=*/false);
 
   SubstitutionMap subs;
   if (auto *genericEnv = fn->getGenericEnvironment())
@@ -795,7 +824,7 @@ static void diagnoseMissingRequiredInitializer(
                      diag::required_initializer_here);
 }
 
-llvm::Expected<bool> AreAllStoredPropertiesDefaultInitableRequest::evaluate(
+bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *decl) const {
   assert(!decl->hasClangNode());
 
@@ -849,7 +878,7 @@ static bool areAllStoredPropertiesDefaultInitializable(Evaluator &eval,
       eval, AreAllStoredPropertiesDefaultInitableRequest{decl}, false);
 }
 
-llvm::Expected<bool>
+bool
 HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
                                               NominalTypeDecl *decl) const {
   assert(!decl->hasClangNode());
@@ -1015,7 +1044,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   }
 }
 
-llvm::Expected<bool>
+bool
 InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
                                                 ClassDecl *decl) const {
   // Check if we parsed the @_inheritsConvenienceInitializers attribute.
@@ -1085,7 +1114,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   (void)decl->getDefaultInitializer();
 }
 
-llvm::Expected<bool>
+evaluator::SideEffect
 ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *target,
                                        ImplicitMemberAction action) const {
@@ -1162,10 +1191,10 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   }
     break;
   }
-  return true;
+  return std::make_tuple<>();
 }
 
-llvm::Expected<bool>
+bool
 HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                    StructDecl *decl) const {
   if (!shouldAttemptInitializerSynthesis(decl))
@@ -1190,7 +1219,7 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-llvm::Expected<ConstructorDecl *>
+ConstructorDecl *
 SynthesizeMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                           NominalTypeDecl *decl) const {
   // Create the implicit memberwise constructor.
@@ -1201,7 +1230,7 @@ SynthesizeMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   return ctor;
 }
 
-llvm::Expected<ConstructorDecl *>
+ConstructorDecl *
 ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                                 NominalTypeDecl *decl) const {
   // Compute the access level for the memberwise initializer. The minimum of:
@@ -1288,7 +1317,7 @@ ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   return memberwiseInitDecl;
 }
 
-llvm::Expected<bool>
+bool
 HasDefaultInitRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *decl) const {
   assert(isa<StructDecl>(decl) || isa<ClassDecl>(decl));
@@ -1328,7 +1357,7 @@ synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
            /*isTypeChecked=*/true };
 }
 
-llvm::Expected<ConstructorDecl *>
+ConstructorDecl *
 SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
@@ -1368,4 +1397,22 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
     return v->isLet() && v->hasInitialValue();
   });
+}
+
+void swift::addFixedLayoutAttr(NominalTypeDecl *nominal) {
+  auto &C = nominal->getASTContext();
+  // If nominal already has `@_fixed_layout`, return.
+  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
+    return;
+  auto access = nominal->getEffectiveAccess();
+  // If nominal does not have at least internal access, return.
+  if (access < AccessLevel::Internal)
+    return;
+  // If nominal is internal, it should have the `@usableFromInline` attribute.
+  if (access == AccessLevel::Internal &&
+      !nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    nominal->getAttrs().add(new (C) UsableFromInlineAttr(/*Implicit*/ true));
+  }
+  // Add `@_fixed_layout` to the nominal.
+  nominal->getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
 }

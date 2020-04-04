@@ -587,7 +587,14 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         ensureKeyPathComponentIsAlive(*component);
       }
     }
-
+    // Check differentiability witness entries.
+    for (auto &dw : Module->getDifferentiabilityWitnessList()) {
+      ensureAlive(dw.getOriginalFunction());
+      if (dw.getJVP())
+        ensureAlive(dw.getJVP());
+      if (dw.getVJP())
+        ensureAlive(dw.getVJP());
+    }
   }
 
   /// Removes all dead methods from vtables and witness tables.

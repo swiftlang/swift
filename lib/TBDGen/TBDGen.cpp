@@ -56,19 +56,8 @@ using namespace llvm::yaml;
 using StringSet = llvm::StringSet<>;
 using SymbolKind = llvm::MachO::SymbolKind;
 
-static constexpr StringLiteral ObjC2ClassNamePrefix = "_OBJC_CLASS_$_";
-static constexpr StringLiteral ObjC2MetaClassNamePrefix = "_OBJC_METACLASS_$_";
-
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
-}
-
-// If a symbol is implied, we don't need to emit it explictly into the tbd file.
-// e.g. When a symbol is in the `objc-classes` section in a tbd file, a additional
-// symbol with `_OBJC_CLASS_$_` is implied.
-static bool isSymbolImplied(StringRef name) {
-  return name.startswith(ObjC2ClassNamePrefix) ||
-    name.startswith(ObjC2MetaClassNamePrefix);
 }
 
 void TBDGenVisitor::addSymbolInternal(StringRef name,
@@ -76,8 +65,7 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
                                       bool isLinkerDirective) {
   if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
     return;
-  if (!isSymbolImplied(name))
-    Symbols.addSymbol(kind, name, Targets);
+  Symbols.addSymbol(kind, name, Targets);
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(name).second;
     (void)isNewValue;
@@ -494,22 +482,113 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
       }
     };
 
-    rootConformance->forEachValueWitness(
-        [&](ValueDecl *valueReq, Witness witness) {
-          auto witnessDecl = witness.getDecl();
-          if (isa<AbstractFunctionDecl>(valueReq)) {
-            addSymbolIfNecessary(valueReq, witnessDecl);
-          } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
-            auto witnessStorage = cast<AbstractStorageDecl>(witnessDecl);
-            storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
-              auto witnessAccessor =
-                witnessStorage->getSynthesizedAccessor(
-                  reqtAccessor->getAccessorKind());
-              addSymbolIfNecessary(reqtAccessor, witnessAccessor);
-            });
-          }
-        });
+    rootConformance->forEachValueWitness([&](ValueDecl *valueReq,
+                                             Witness witness) {
+      auto witnessDecl = witness.getDecl();
+      if (isa<AbstractFunctionDecl>(valueReq)) {
+        addSymbolIfNecessary(valueReq, witnessDecl);
+      } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
+        if (auto witnessStorage = dyn_cast<AbstractStorageDecl>(witnessDecl)) {
+          storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
+            auto witnessAccessor = witnessStorage->getSynthesizedAccessor(
+                reqtAccessor->getAccessorKind());
+            addSymbolIfNecessary(reqtAccessor, witnessAccessor);
+          });
+        } else if (isa<EnumElementDecl>(witnessDecl)) {
+          addSymbolIfNecessary(valueReq, witnessDecl);
+        }
+      }
+    });
   }
+}
+
+void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
+                                                 AutoDiffConfig config,
+                                                 AutoDiffLinearMapKind kind) {
+  auto &ctx = original->getASTContext();
+  auto declRef =
+      SILDeclRef(original).asForeign(requiresForeignEntryPoint(original));
+
+  if (!declRef.isSerialized())
+    return;
+  // Linear maps are public only when the original function is serialized.
+  if (!declRef.isSerialized())
+    return;
+  // Differential functions are emitted only when forward-mode is enabled.
+  if (kind == AutoDiffLinearMapKind::Differential &&
+      !ctx.LangOpts.EnableExperimentalForwardModeDifferentiation)
+    return;
+  auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+      config.parameterIndices,
+      original->getInterfaceType()->castTo<AnyFunctionType>());
+  Mangle::ASTMangler mangler;
+  AutoDiffConfig silConfig{loweredParamIndices, config.resultIndices,
+                           config.derivativeGenericSignature};
+  std::string linearMapName =
+      mangler.mangleAutoDiffLinearMapHelper(declRef.mangle(), kind, silConfig);
+  addSymbol(linearMapName);
+}
+
+void TBDGenVisitor::addAutoDiffDerivativeFunction(
+    AbstractFunctionDecl *original, IndexSubset *parameterIndices,
+    GenericSignature derivativeGenericSignature,
+    AutoDiffDerivativeFunctionKind kind) {
+  auto *assocFnId = AutoDiffDerivativeFunctionIdentifier::get(
+      kind, parameterIndices, derivativeGenericSignature,
+      original->getASTContext());
+  auto declRef =
+      SILDeclRef(original).asForeign(requiresForeignEntryPoint(original));
+  addSymbol(declRef.asAutoDiffDerivativeFunction(assocFnId));
+}
+
+void TBDGenVisitor::addDifferentiabilityWitness(
+    AbstractFunctionDecl *original, IndexSubset *astParameterIndices,
+    IndexSubset *resultIndices, GenericSignature derivativeGenericSignature) {
+  bool foreign = requiresForeignEntryPoint(original);
+  auto declRef = SILDeclRef(original).asForeign(foreign);
+
+  // Skip symbol emission for original functions that do not have public
+  // linkage. Exclude original functions that require a foreign entry point with
+  // `public_external` linkage.
+  auto originalLinkage = declRef.getLinkage(ForDefinition);
+  if (foreign)
+    originalLinkage = stripExternalFromLinkage(originalLinkage);
+  if (originalLinkage != SILLinkage::Public)
+    return;
+
+  auto *silParamIndices = autodiff::getLoweredParameterIndices(
+      astParameterIndices,
+      original->getInterfaceType()->castTo<AnyFunctionType>());
+
+  auto originalMangledName = declRef.mangle();
+  AutoDiffConfig config{silParamIndices, resultIndices,
+                        derivativeGenericSignature};
+  SILDifferentiabilityWitnessKey key(originalMangledName, config);
+
+  Mangle::ASTMangler mangler;
+  auto mangledName = mangler.mangleSILDifferentiabilityWitnessKey(key);
+  addSymbol(mangledName);
+}
+
+void TBDGenVisitor::addDerivativeConfiguration(AbstractFunctionDecl *original,
+                                               AutoDiffConfig config) {
+  auto inserted = AddedDerivatives.insert({original, config});
+  if (!inserted.second)
+    return;
+
+  addAutoDiffLinearMapFunction(original, config,
+                               AutoDiffLinearMapKind::Differential);
+  addAutoDiffLinearMapFunction(original, config,
+                               AutoDiffLinearMapKind::Pullback);
+  addAutoDiffDerivativeFunction(original, config.parameterIndices,
+                                config.derivativeGenericSignature,
+                                AutoDiffDerivativeFunctionKind::JVP);
+  addAutoDiffDerivativeFunction(original, config.parameterIndices,
+                                config.derivativeGenericSignature,
+                                AutoDiffDerivativeFunctionKind::VJP);
+  addDifferentiabilityWitness(original, config.parameterIndices,
+                              config.resultIndices,
+                              config.derivativeGenericSignature);
 }
 
 /// Determine whether dynamic replacement should be emitted for the allocator or
@@ -575,6 +654,22 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
+  // Add derivative function symbols.
+  for (const auto *differentiableAttr :
+       AFD->getAttrs().getAttributes<DifferentiableAttr>())
+    addDerivativeConfiguration(
+        AFD,
+        AutoDiffConfig(differentiableAttr->getParameterIndices(),
+                       IndexSubset::get(AFD->getASTContext(), 1, {0}),
+                       differentiableAttr->getDerivativeGenericSignature()));
+  for (const auto *derivativeAttr :
+       AFD->getAttrs().getAttributes<DerivativeAttr>())
+    addDerivativeConfiguration(
+        derivativeAttr->getOriginalFunction(),
+        AutoDiffConfig(derivativeAttr->getParameterIndices(),
+                       IndexSubset::get(AFD->getASTContext(), 1, {0}),
+                       AFD->getGenericSignature()));
+
   visitDefaultArguments(AFD, AFD->getParameters());
 }
 
@@ -627,6 +722,15 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   ASD->visitEmittedAccessors([&](AccessorDecl *accessor) {
     visitFuncDecl(accessor);
   });
+
+  // Add derivative function symbols.
+  for (const auto *differentiableAttr :
+       ASD->getAttrs().getAttributes<DifferentiableAttr>())
+    addDerivativeConfiguration(
+        ASD->getAccessor(AccessorKind::Get),
+        AutoDiffConfig(differentiableAttr->getParameterIndices(),
+                       IndexSubset::get(ASD->getASTContext(), 1, {0}),
+                       differentiableAttr->getDerivativeGenericSignature()));
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
@@ -986,7 +1090,7 @@ static bool hasLinkerDirective(Decl *D) {
   return !getAllMovedPlatformVersions(D).empty();
 }
 
-llvm::Expected<TBDFileAndSymbols>
+TBDFileAndSymbols
 GenerateTBDRequest::evaluate(Evaluator &evaluator,
                              TBDGenDescriptor desc) const {
   auto *M = desc.getParentModule();

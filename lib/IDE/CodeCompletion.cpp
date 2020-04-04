@@ -781,12 +781,9 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D,
     // If this is an underscored cross-import overlay, map it to its underlying
     // module instead.
     if (SF) {
-      while (MD->getNameStr().startswith("_")) {
-        auto *Underlying = SF->getModuleShadowedBySeparatelyImportedOverlay(MD);
-        if (!Underlying)
-          break;
+      auto *Underlying = SF->getModuleShadowedBySeparatelyImportedOverlay(MD);
+      if (Underlying)
         MD = Underlying;
-      }
     }
     CurrentModule = MD;
   }
@@ -1850,7 +1847,7 @@ public:
         return SemanticContextKind::ExpressionSpecific;
       return SemanticContextKind::CurrentNominal;
 
-    case DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal:
+    case DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal:
     case DeclVisibilityKind::MemberOfSuper:
       return SemanticContextKind::Super;
 
@@ -1894,6 +1891,9 @@ public:
             D, dynamicLookupInfo.getKeyPathDynamicMember().originalVisibility,
             {});
       }
+
+    case DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal:
+      llvm_unreachable("should not see this kind");
     }
     llvm_unreachable("unhandled kind");
   }
@@ -2180,7 +2180,7 @@ public:
         VD->shouldHideFromEditor())
       return;
 
-    Identifier Name = VD->getName();
+    const Identifier Name = VD->getName();
     assert(!Name.empty() && "name should not be empty");
 
     CommandWordsPairs Pairs;
@@ -2579,11 +2579,11 @@ public:
 
   void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason,
                      DynamicLookupInfo dynamicLookupInfo) {
-    if (FD->getName().empty())
+    if (FD->getBaseIdentifier().empty())
       return;
     foundFunction(FD);
 
-    Identifier Name = FD->getName();
+    const Identifier Name = FD->getBaseIdentifier();
     assert(!Name.empty() && "name should not be empty");
 
     Type FunctionType = getTypeOfMember(FD, dynamicLookupInfo);
@@ -2947,7 +2947,7 @@ public:
     setAssociatedDecl(EED, Builder);
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
-    addValueBaseName(Builder, EED->getName());
+    addValueBaseName(Builder, EED->getBaseIdentifier());
 
     // Enum element is of function type; (Self.type) -> Self or
     // (Self.Type) -> (Args...) -> Self.
@@ -3055,6 +3055,10 @@ public:
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
+    assert(Reason !=
+             DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal &&
+           "Including derived requirement in non-override lookup");
+
     if (D->shouldHideFromEditor())
       return;
 
@@ -3331,7 +3335,8 @@ public:
     if (isIUO) {
       if (Type Unwrapped = ExprType->getOptionalObjectType()) {
         lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                 IncludeInstanceMembers);
+                                 IncludeInstanceMembers,
+                                 /*includeDerivedRequirements*/false);
         return true;
       }
       assert(IsUnwrappedOptional && "IUOs should be optional if not bound/forced");
@@ -3351,7 +3356,8 @@ public:
           CodeCompletionResult::MaxNumBytesToErase) {
         if (!tryTupleExprCompletions(Unwrapped)) {
           lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                   IncludeInstanceMembers);
+                                   IncludeInstanceMembers,
+                                   /*includeDerivedRequirements*/false);
         }
       }
       return true;
@@ -3421,59 +3427,14 @@ public:
     tryUnwrappedCompletions(ExprType, isIUO);
 
     lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
-                             IncludeInstanceMembers);
+                             IncludeInstanceMembers,
+                             /*includeDerivedRequirements*/false);
   }
 
-  template <typename T>
-  void collectOperatorsFromMap(SourceFile::OperatorMap<T> &map,
-                               bool includePrivate,
-                               std::vector<OperatorDecl *> &results) {
-    for (auto &pair : map) {
-      if (pair.second.getPointer() &&
-          (pair.second.getInt() || includePrivate)) {
-        results.push_back(pair.second.getPointer());
-      }
-    }
-  }
-
-  void collectOperatorsFrom(SourceFile *SF,
-                            std::vector<OperatorDecl *> &results) {
-    bool includePrivate = CurrDeclContext->getParentSourceFile() == SF;
-    collectOperatorsFromMap(SF->PrefixOperators, includePrivate, results);
-    collectOperatorsFromMap(SF->PostfixOperators, includePrivate, results);
-    collectOperatorsFromMap(SF->InfixOperators, includePrivate, results);
-  }
-
-  void collectOperatorsFrom(LoadedFile *F,
-                            std::vector<OperatorDecl *> &results) {
-    SmallVector<Decl *, 64> topLevelDecls;
-    F->getTopLevelDecls(topLevelDecls);
-    for (auto D : topLevelDecls) {
-      if (auto op = dyn_cast<OperatorDecl>(D))
-        results.push_back(op);
-    }
-  }
-
-  std::vector<OperatorDecl *> collectOperators() {
-    std::vector<OperatorDecl *> results;
+  void collectOperators(SmallVectorImpl<OperatorDecl *> &results) {
     assert(CurrDeclContext);
-    for (auto import : namelookup::getAllImports(CurrDeclContext)) {
-      for (auto fileUnit : import.second->getFiles()) {
-        switch (fileUnit->getKind()) {
-        case FileUnitKind::Builtin:
-        case FileUnitKind::ClangModule:
-        case FileUnitKind::DWARFModule:
-          continue;
-        case FileUnitKind::Source:
-          collectOperatorsFrom(cast<SourceFile>(fileUnit), results);
-          break;
-        case FileUnitKind::SerializedAST:
-          collectOperatorsFrom(cast<LoadedFile>(fileUnit), results);
-          break;
-        }
-      }
-    }
-    return results;
+    for (auto import : namelookup::getAllImports(CurrDeclContext))
+      import.second->getOperatorDecls(results);
   }
 
   void addPostfixBang(Type resultType) {
@@ -3621,7 +3582,8 @@ public:
 
     Expr *foldedExpr = typeCheckLeadingSequence(LHS, leadingSequence);
 
-    std::vector<OperatorDecl *> operators = collectOperators();
+    SmallVector<OperatorDecl *, 16> operators;
+    collectOperators(operators);
     // FIXME: this always chooses the first operator with the given name.
     llvm::DenseSet<Identifier> seenPostfixOperators;
     llvm::DenseSet<Identifier> seenInfixOperators;
@@ -3941,7 +3903,8 @@ public:
     llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
     llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
     lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
-                             /*includeInstanceMembers=*/false);
+                             /*includeInstanceMembers=*/false,
+                             /*includeDerivedRequirements*/false);
   }
 
   void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
@@ -4002,7 +3965,8 @@ public:
     NeedLeadingDot = !HaveDot;
     lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType),
                              CurrDeclContext,
-                             IncludeInstanceMembers);
+                             IncludeInstanceMembers,
+                             /*includeDerivedRequirements*/false);
     if (BaseType->isAnyExistentialType()) {
       addKeyword("Protocol", MetatypeType::get(BaseType));
       addKeyword("Type", ExistentialMetatypeType::get(BaseType));
@@ -4035,7 +3999,8 @@ public:
     this->BaseType = selfTy;
     NeedLeadingDot = false;
     lookupVisibleMemberDecls(*this, MetatypeType::get(selfTy),
-                             CurrDeclContext, IncludeInstanceMembers);
+                             CurrDeclContext, IncludeInstanceMembers,
+                             /*includeDerivedRequirements*/false);
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
@@ -4301,7 +4266,7 @@ public:
   Type getOpaqueResultType(const ValueDecl *VD, DeclVisibilityKind Reason,
                            DynamicLookupInfo dynamicLookupInfo) {
     if (Reason !=
-        DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal)
+        DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal)
       return nullptr;
 
     auto currTy = CurrDeclContext->getDeclaredTypeInContext();
@@ -4517,12 +4482,18 @@ public:
     bool needRequired = false;
     auto C = CurrDeclContext->getSelfClassDecl();
     if (C && !isKeywordSpecified("required")) {
-      if (Reason ==
-            DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal &&
-          !C->isFinal())
-        needRequired = true;
-      else if (Reason == DeclVisibilityKind::MemberOfSuper && CD->isRequired())
-        needRequired = true;
+      switch (Reason) {
+      case DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal:
+      case DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal:
+        if (!C->isFinal())
+          needRequired = true;
+        break;
+      case DeclVisibilityKind::MemberOfSuper:
+        if (CD->isRequired())
+          needRequired = true;
+        break;
+      default: break;
+      }
     }
 
     llvm::SmallString<256> DeclStr;
@@ -4642,7 +4613,7 @@ public:
           continue;
         addTypeAlias(
             ATD,
-            DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal,
+            DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal,
             {});
       }
     }
@@ -4660,7 +4631,8 @@ public:
       // Look for overridable static members too.
       Type Meta = MetatypeType::get(CurrTy);
       lookupVisibleMemberDecls(*this, Meta, CurrDeclContext,
-                               /*includeInstanceMembers=*/true);
+                               /*includeInstanceMembers=*/true,
+                               /*includeDerivedRequirements*/true);
       addDesignatedInitializers(NTD);
       addAssociatedTypes(NTD);
     }

@@ -465,7 +465,7 @@ class YieldOnceCheck : public SILFunctionTransform {
           diagnose(astCtx, enumCaseLoc, diag::case_doesnt_yield, OptionSome);
         } else {
           diagnose(astCtx, enumCaseLoc, diag::named_case_doesnt_yield,
-                   enumElemDecl.get()->getName());
+                   enumElemDecl.get()->getBaseIdentifier());
         }
         return;
       }

@@ -16,6 +16,7 @@ add_swift_host_library(swiftFrontend STATIC
 add_dependencies(swiftFrontend
   SwiftOptions)
 target_link_libraries(swiftFrontend PRIVATE
+  swiftAST
   swiftSIL
   swiftMigrator
   swiftOption

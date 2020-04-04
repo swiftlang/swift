@@ -293,6 +293,17 @@ void CompilerInstance::setupStatsReporter() {
   Stats = std::move(Reporter);
 }
 
+void CompilerInstance::setupDiagnosticVerifierIfNeeded() {
+  auto &diagOpts = Invocation.getDiagnosticOptions();
+  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
+    DiagVerifier = std::make_unique<DiagnosticVerifier>(
+        SourceMgr, InputSourceCodeBufferIDs,
+        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
+        diagOpts.VerifyIgnoreUnknown);
+    addDiagnosticConsumer(DiagVerifier.get());
+  }
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
@@ -337,6 +348,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     return true;
 
   setupStatsReporter();
+  setupDiagnosticVerifierIfNeeded();
 
   return false;
 }
@@ -409,9 +421,6 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
   if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
     Diagnostics.setPrintDiagnosticNames(true);
-  }
-  if (Invocation.getDiagnosticOptions().EnableEducationalNotes) {
-    Diagnostics.setUseEducationalNotes(true);
   }
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
@@ -755,7 +764,7 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
 }
 
 void CompilerInstance::performParseAndResolveImportsOnly() {
-  performSemaUpTo(SourceFile::NameBound);
+  performSemaUpTo(SourceFile::ImportsResolved);
 }
 
 void CompilerInstance::performSema() {
@@ -929,12 +938,12 @@ void CompilerInstance::parseAndCheckTypesUpTo(
     auto *SF = dyn_cast<SourceFile>(File);
     if (!SF)
       return true;
-    return SF->ASTStage >= SourceFile::NameBound;
+    return SF->ASTStage >= SourceFile::ImportsResolved;
   }) && "some files have not yet had their imports resolved");
   MainModule->setHasResolvedImports();
 
   forEachFileToTypeCheck([&](SourceFile &SF) {
-    if (limitStage == SourceFile::NameBound) {
+    if (limitStage == SourceFile::ImportsResolved) {
       bindExtensions(SF);
       return;
     }
@@ -954,8 +963,8 @@ void CompilerInstance::parseAndCheckTypesUpTo(
     }
   });
 
-  // If the limiting AST stage is name binding, we're done.
-  if (limitStage <= SourceFile::NameBound) {
+  // If the limiting AST stage is import resolution, we're done.
+  if (limitStage <= SourceFile::ImportsResolved) {
     return;
   }
 
@@ -970,8 +979,8 @@ void CompilerInstance::parseLibraryFile(
       SourceFileKind::Library, implicitImports.kind, BufferID);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
-  // Name binding will lazily trigger parsing of the file.
-  performNameBinding(*NextInput);
+  // Import resolution will lazily trigger parsing of the file.
+  performImportResolution(*NextInput);
 }
 
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
@@ -1000,7 +1009,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
 
 void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     SourceFile::ASTStage_t LimitStage) {
-  assert(LimitStage >= SourceFile::NameBound);
+  assert(LimitStage >= SourceFile::ImportsResolved);
   FrontendStatsTracer tracer(getStatsReporter(),
                              "parse-and-typecheck-main-file");
   bool mainIsPrimary =
@@ -1013,13 +1022,13 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
   Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
 
-  // For a primary, perform type checking if needed. Otherwise, just do name
-  // binding.
+  // For a primary, perform type checking if needed. Otherwise, just do import
+  // resolution.
   if (mainIsPrimary && LimitStage >= SourceFile::TypeChecked) {
     performTypeChecking(MainFile);
   } else {
     assert(!TheSILModule && "Should perform type checking for SIL");
-    performNameBinding(MainFile);
+    performImportResolution(MainFile);
   }
 
   // Parse the SIL decls if needed.

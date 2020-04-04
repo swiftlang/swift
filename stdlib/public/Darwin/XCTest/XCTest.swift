@@ -2,13 +2,24 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+// The actual XCTest overlay is not maintained in this repository -- it is
+// distributed in Xcode (libXCTestSwiftSupport.dylib), along with
+// XCTest.framework itself.
+//
+// The codebase here builds the obsolete /usr/lib/swift/libswiftXCTest.dylib
+// that currently ships in the OS. There is no expectation that that library is
+// usable for anything; it only exists to maintain a superficial level of binary
+// compatibility with existing apps that happen to link to it by mistake.
+//
+// rdar://problem/55270944
 
 @_exported import XCTest // Clang module
 

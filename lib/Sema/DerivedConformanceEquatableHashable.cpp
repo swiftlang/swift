@@ -785,8 +785,8 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
                                                        payloadVars);
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                           SourceLoc(), DeclNameLoc(),
-                                          DeclNameRef(elt->getName()), elt,
-                                          payloadPattern);
+                                          DeclNameRef(elt->getBaseIdentifier()),
+                                          elt, payloadPattern);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);

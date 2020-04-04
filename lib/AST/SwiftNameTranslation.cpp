@@ -49,7 +49,7 @@ getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
         return anonTypedef->getIdentifier()->getName();
   }
 
-  return VD->getBaseName().getIdentifier().str();
+  return VD->getBaseIdentifier().str();
 }
 
 std::string swift::objc_translation::
@@ -90,7 +90,7 @@ printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
   }
   OS << getNameForObjC(EL->getDeclContext()->getSelfEnumDecl());
   if (PreferredName.empty())
-    ElemName = EL->getName().str();
+    ElemName = EL->getBaseIdentifier().str();
   else
     ElemName = PreferredName.str();
 

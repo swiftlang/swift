@@ -1,0 +1,35 @@
+sil_register_sources(
+  AbstractionPattern.cpp
+  Bridging.cpp
+  Linker.cpp
+  Notifications.cpp
+  OperandOwnership.cpp
+  SIL.cpp
+  SILArgument.cpp
+  SILBasicBlock.cpp
+  SILBuilder.cpp
+  SILConstants.cpp
+  SILCoverageMap.cpp
+  SILDebugScope.cpp
+  SILDeclRef.cpp
+  SILDefaultWitnessTable.cpp
+  SILDifferentiabilityWitness.cpp
+  SILFunction.cpp
+  SILFunctionBuilder.cpp
+  SILFunctionType.cpp
+  SILGlobalVariable.cpp
+  SILInstruction.cpp
+  SILInstructions.cpp
+  SILLocation.cpp
+  SILModule.cpp
+  SILPrinter.cpp
+  SILProfiler.cpp
+  SILSuccessor.cpp
+  SILType.cpp
+  SILUndef.cpp
+  SILVTable.cpp
+  SILValue.cpp
+  SILWitnessTable.cpp
+  TypeLowering.cpp
+  ValueOwnership.cpp
+)

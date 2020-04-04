@@ -653,6 +653,34 @@ struct ObservedObject<ObjectType : AnyObject > {
   }
 }
 
+// SR-12443: Crash on property with wrapper override that adds observer.
+@propertyWrapper
+struct BasicIntWrapper {
+  var wrappedValue: Int
+}
+
+class Someclass {
+  @BasicIntWrapper var property: Int = 0
+}
+
+class Somesubclass : Someclass {
+  override var property: Int {
+    // Make sure we don't interact with the property wrapper, we just delegate
+    // to the superclass' accessors.
+    // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers12SomesubclassC0A0Sivs : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
+    // CHECK: bb0([[NEW:%.+]] : $Int, {{%.+}} : @guaranteed $Somesubclass):
+    // CHECK:   [[GETTER:%.+]] = function_ref @$s17property_wrappers9SomeclassC0A0Sivg : $@convention(method) (@guaranteed Someclass) -> Int
+    // CHECK:   [[OLD:%.+]] = apply [[GETTER]]({{%.+}}) : $@convention(method) (@guaranteed Someclass) -> Int
+    // CHECK:   [[SETTER:%.+]] = function_ref @$s17property_wrappers9SomeclassC0A0Sivs : $@convention(method) (Int, @guaranteed Someclass) -> ()
+    // CHECK:   apply [[SETTER]]([[NEW]], {{%.+}}) : $@convention(method) (Int, @guaranteed Someclass) -> ()
+    // CHECK:   [[DIDSET:%.+]] = function_ref @$s17property_wrappers12SomesubclassC0A0SivW : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
+    // CHECK:   apply [[DIDSET]]([[OLD]], {{%.+}}) : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
+    didSet {
+      print("Subclass")
+    }
+  }
+}
+
 // rdar://problem/58986940 - composition of wrappers with autoclosure
 @propertyWrapper
 struct Once<Value> {

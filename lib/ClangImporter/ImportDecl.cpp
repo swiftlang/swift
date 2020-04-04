@@ -3202,7 +3202,7 @@ namespace {
           // context.
           if (errorWrapper) {
             auto enumeratorValue = cast<ValueDecl>(enumeratorDecl);
-            auto name = enumeratorValue->getBaseName().getIdentifier();
+            auto name = enumeratorValue->getBaseIdentifier();
             auto alias = importEnumCaseAlias(name,
                                              constant,
                                              enumeratorValue,
@@ -3918,6 +3918,12 @@ namespace {
                               /*IsCaptureList*/false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, dc);
+      if (decl->getType().isConstQualified()) {
+        // Note that in C++ there are ways to change the values of const
+        // members, so we don't use WriteImplKind::Immutable storage.
+        assert(result->supportsMutation());
+        result->overwriteSetterAccess(AccessLevel::Private);
+      }
       result->setIsObjC(false);
       result->setIsDynamic(false);
       result->setInterfaceType(type);

@@ -80,6 +80,7 @@ Assumptions:
   * [`operator[]`](#operator-square-brackets)
   * [`operator()`](#operator-parentheses)
   * [Literal operators](#literal-operators)
+  * [Exceptions](#exceptions)
   * [Atomics](#atomics)
   * [Importing non-const pointer as extra return values](#importing-non-const-pointer-as-extra-return-values)
 - [Enhancing C++ API mapping into Swift with bridging](#enhancing-c-api-mapping-into-swift-with-bridging)
@@ -932,16 +933,19 @@ value types, move-only, or non-movable.
 
 If C++ classes are imported in Swift as structs, there seems to be no reasonable
 way to map exceptions thrown from special member functions to an error that can
-be handled in Swift. Special member functions will be used to implement value
-witnesses, which are called by the compiler implicitly.  Therefore, either such
-exceptions have to be mapped to fatal errors, or calls to such special member
+be handled in Swift.
+
+While it is possible to [propagate C++ exceptions](#exceptions) thrown by normal
+member functions to Swift code, special member functions are different as they
+used used to implement value witnesses, which are called by the compiler
+implicitly. Therefore, either such exceptions have to be mapped to fatal errors
+(as we do for other unhandled C++ exceptions), or calls to such special member
 functions must be prevented statically.
 
 Preventing such calls statically seems difficult. Also, in practice, special
 member functions throw mostly due to out-of-memory conditions, which is
-considered unrecoverable in Swift. Therefore, the practical solutions are to
-either map exceptions from special member functions to fatal errors, or compile
-C++ code with `-fno-exceptions`.
+considered unrecoverable in Swift. Therefore, the practical solution is to
+map exceptions from special member functions to fatal errors.
 
 If the user must use a C++ class with throwing special member functions from
 Swift, a reasonable workaround would be to write a wrapper that exposes these
@@ -2856,6 +2860,109 @@ This mapping rule would handle the call operator of `std::function`,
 ## Literal operators
 
 TODO
+
+## Exceptions
+
+### Background
+
+C++ unfortunately has the opposite default to Swift where exception throwing is
+concerned. Any C++ function that is not explicitly marked `noexcept` must be
+assumed to be potentially throwing, even though many such functions don't throw
+in practice.
+
+If we imported all of these functions into Swift as `throws` functions, the code
+calling them would be littered with `try!`s. Requiring all imported functions (and
+everything they call transitively) to be marked `noexcept` also seems excessively
+burdensome and is not idiomatic C++.
+
+### Baseline functionality: Import functions as non-throwing, terminate on uncaught C++ exceptions
+
+In the first iteration of C++ interop, we will import all C++ functions as
+non-throwing Swift functions. If a C++ function called from Swift throws an
+exception that is not caught within the C++ code, the program will terminate.
+
+This approach is similar to that taken by the [Python interop
+library](https://github.com/pvieito/PythonKit/blob/master/PythonKit/Python.swift),
+which also terminates the program by default if a Python exception is raised and
+not caught within the Python code.
+
+If exceptions thrown in C++ need to be handled in Swift, this can be done by
+writing a C++ wrapper that catches the exception and returns a corresponding
+error object.
+
+### Extended functionality: Optionally propagate exceptions to Swift
+
+If we find that developers routinely need to handle C++ exceptions in Swift,
+writing C++ wrappers as described above will obviously not be a satisfactory
+solution. In this case, we will add an option to propagate C++ exceptions as
+Swift exceptions; this will be backward compatible with the baseline approach
+described above.
+
+We again take inspiration from Python interop. There, appending `.throwing` to
+the function name calls a variant of the function that propagates the Python
+exception to Swift.
+
+It isn't really practical to do something exactly analogous in C++ interop. We
+could import each function twice and identify the throwing version by a name
+suffix or a dummy parameter. However, this solution would bloat the interface of
+imported classes, and it would not be universal: Name suffixes can't be used
+with constructors or operators; a dummy parameter could be used with most
+constructors, but still doesn't work for default constructors or operators.
+
+Instead, we propose extending Swift with a `throws!` marker. A function marked
+with `throws!` can potentially throw exceptions, but the function does not need
+to be called with `try`. If the function _is_ called with `try`, exceptions are
+handled as they would be for a normal throwing function. If the function is not
+called with `try` and the function raises an exception, the program is
+terminated. These semantics are close to C++ exception handling semantics.
+
+All C++ functions that are not marked `noexcept` would be imported as `throws!`
+functions; `noexcept` functions would be imported as non-throwing functions.
+
+This brief sketch obviously leaves many questions unanswered on the detailed
+semantics that a `throws!` feature would have, for example whether user-written
+Swift code should be allowed to use `throws!` -- see also [this forum
+discussion](https://forums.swift.org/t/handling-c-exceptions/34823). Before we
+take any steps towards implementing C++ exception proagation, we will submit a
+formal Swift Evolution proposal for the `throws!` feature.
+
+The other question to answer is how we would map the C++ exception to a
+corresponding Swift object implementing `Error`. In theory, C++ allows
+objects of any copy-initializable type to be thrown. In practice, most
+user-defined C++ exceptions derive from `std::exception`, so it would be natural
+to propagate C++ exceptions as the Swift-imported equivalent of
+`std::exception` and make that type implement `Error`. We could add a separate
+fallback error type (e.g. `CxxUnknownException`) for the case where the
+exception does not derive from `std::exception`.
+
+As `std::exception` is a polymorphic type, the details of how `std::exception`
+will be represented in Swift will need to wait until we have finalized how
+polymorphism is handled (see also the section on [virtual member
+functions](#virtual-member-functions)).
+
+### Implementation
+
+Many common C++ ABIs allow the default behavior (terminate the program if a
+C++ exception is thrown) to be implemented at zero cost. In particular, it is not
+necessary to wrap every C++ function in a synthesized try-catch block.
+
+For example, the Itanium C++ ABI defines a so-called personality routine that is
+called for each stack frame as the stack is being unwound. The idea is that
+different languages can have different personality routines, so that different
+languages can co-exist on the stack and can each define their own stack frame
+cleanup logic.
+
+The stack unwinding infrastructure finds the correct personality routine by
+consulting a so-called unwind table, which maps program counter ranges to
+personality routines.
+
+We would define unwind table entries covering all Swift code that does not
+attempt to handle C++ exceptions and have these entries map to a personality
+routine that simply terminates the program.
+
+If exception support is turned off in the C++ compiler by passing `-Xcc
+-fno-exceptions` to `swiftc`, we assume that the C++ code never throws
+exceptions and will not emit any unwind table entries for Swift code.
 
 ## Atomics
 

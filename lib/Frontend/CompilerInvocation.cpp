@@ -402,6 +402,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   
   Opts.DisableParserLookup |= Args.hasArg(OPT_disable_parser_lookup);
+  Opts.EnableRequestBasedIncrementalDependencies =
+      Args.hasFlag(OPT_enable_request_based_incremental_dependencies,
+                   OPT_disable_request_based_incremental_dependencies,
+                   Opts.EnableRequestBasedIncrementalDependencies);
   Opts.EnableASTScopeLookup =
       Args.hasFlag(options::OPT_enable_astscope_lookup,
                    options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
@@ -444,13 +448,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
-
-  if (Args.hasArg(OPT_enable_experimental_differentiable_programming)) {
-    Opts.EnableExperimentalDifferentiableProgramming = true;
-    // Differentiable programming implies `AdditiveArithmetic` derived
-    // conformances.
-    Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
-  }
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
@@ -821,7 +818,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
-  Opts.EnableEducationalNotes |= Args.hasArg(OPT_enable_educational_notes);
+  Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
   Opts.EnableExperimentalFormatting |=
       Args.hasArg(OPT_enable_experimental_diagnostic_formatting);
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
@@ -1288,6 +1285,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                                OPT_disable_type_layouts)) {
     Opts.UseTypeLayoutValueHandling
       = A->getOption().matches(OPT_enable_type_layouts);
+  } else if (Opts.OptMode == OptimizationMode::NoOptimization) {
+    // Disable type layouts at Onone except if explictly requested.
+    Opts.UseTypeLayoutValueHandling = false;
   }
 
   Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);

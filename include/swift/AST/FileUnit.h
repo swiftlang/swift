@@ -196,6 +196,13 @@ public:
               SmallVectorImpl<Decl*> &Results,
               llvm::function_ref<bool(DeclAttributes)> matchAttributes) const;
 
+  /// Finds all operator decls in this file.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  virtual void
+  getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const {}
+
   /// Finds all precedence group decls in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.

@@ -2354,6 +2354,34 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E) {
+    printCommon(E, "differentiable_function") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitLinearFunctionExpr(LinearFunctionExpr *E) {
+    printCommon(E, "linear_function") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitDifferentiableFunctionExtractOriginalExpr(
+      DifferentiableFunctionExtractOriginalExpr *E) {
+    printCommon(E, "differentiable_function_extract_original") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitLinearFunctionExtractOriginalExpr(
+      LinearFunctionExtractOriginalExpr *E) {
+    printCommon(E, "linear_function_extract_original") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitLinearToDifferentiableFunctionExpr(
+      LinearToDifferentiableFunctionExpr *E) {
+    printCommon(E, "linear_to_differentiable_function") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 
   void visitInOutExpr(InOutExpr *E) {
     printCommon(E, "inout_expr") << '\n';
@@ -2585,7 +2613,7 @@ public:
   }
   void visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
     printCommon(E, "enum_is_case_expr") << ' ' <<
-      E->getEnumElement()->getName() << "\n";
+      E->getEnumElement()->getBaseIdentifier() << "\n";
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

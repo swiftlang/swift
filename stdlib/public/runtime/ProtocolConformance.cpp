@@ -665,6 +665,137 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   return nullptr;
 }
 
+static MetadataState
+tryGetCompleteMetadataNonblocking(const Metadata *metadata) {
+  return swift_checkMetadataState(
+             MetadataRequest(MetadataState::Complete, /*isNonBlocking*/ true),
+             metadata)
+      .State;
+}
+
+template <typename HandleObjc>
+bool isSwiftClassMetadataSubclass(const ClassMetadata *subclass,
+                                  const ClassMetadata *superclass,
+                                  HandleObjc handleObjc) {
+  assert(subclass);
+  assert(superclass);
+
+  MetadataState subclassState = tryGetCompleteMetadataNonblocking(subclass);
+
+  do {
+    if (subclassState == MetadataState::Complete) {
+      // The subclass metadata is complete.  That means not just that its
+      // Superclass field is valid, but that the Superclass field of the
+      // referenced class metadata is valid, and the Superclass field of the
+      // class metadata referenced there, and so on transitively.
+      //
+      // Scan the superclass chains in the ClassMetadata looking for a match.
+      while ((subclass = subclass->Superclass)) {
+        if (subclass == superclass)
+          return true;
+      }
+      return false;
+    }
+    if (subclassState == MetadataState::NonTransitiveComplete) {
+      // The subclass metadata is complete, but, unlike above, not transitively.
+      // Its Superclass field is valid, so just read that field to get to the
+      // superclass to proceed to the next step.
+      subclass = subclass->Superclass;
+      if (subclass->isPureObjC()) {
+        return handleObjc(subclass, superclass);
+      }
+      subclassState = tryGetCompleteMetadataNonblocking(subclass);
+    } else {
+      // The subclass metadata is either LayoutComplete or Abstract, so the
+      // Superclass field is not valid.  To get to the superclass, make the
+      // expensive call to getSuperclassMetadata which demangles the superclass
+      // name from the nominal type descriptor to get the metadata for the
+      // superclass.
+      MetadataRequest request(MetadataState::Complete,
+                              /*non-blocking*/ true);
+      auto response = getSuperclassMetadata(request, subclass);
+      auto newMetadata = response.Value;
+      if (auto newSubclass = dyn_cast<ClassMetadata>(newMetadata)) {
+        subclass = newSubclass;
+        subclassState = response.State;
+      } else {
+        return handleObjc(newMetadata, superclass);
+      }
+    }
+    if (subclass == superclass)
+      return true;
+  } while (subclass);
+  return false;
+}
+
+// Whether the provided `subclass` is metadata for a subclass* of the superclass
+// whose metadata is specified.
+//
+// The function is robust against incomplete metadata for both subclass and
+// superclass.  In the worst case, each intervening class between subclass and
+// superclass is demangled.  Besides that slow path, there are a number of fast
+// paths:
+// - both classes are ObjC: swift_dynamicCastMetatype
+// - Complete subclass metadata: loop over Superclass fields
+// - NonTransitiveComplete: read the Superclass field once
+//
+// * A non-strict subclass; that is, given a class X, isSubclass(X.self, X.self)
+//   is true.
+static bool isSubclass(const Metadata *subclass, const Metadata *superclass) {
+  assert(subclass);
+  assert(superclass);
+  assert(subclass->isAnyClass());
+  assert(superclass->isAnyClass());
+
+  if (subclass == superclass)
+    return true;
+  if (!isa<ClassMetadata>(subclass)) {
+    if (!isa<ClassMetadata>(superclass)) {
+      // Only ClassMetadata can be incomplete; when the class metadata is not
+      // ClassMetadata, just use swift_dynamicCastMetatype.
+      return swift_dynamicCastMetatype(subclass, superclass);
+    } else {
+      // subclass is ObjC, but superclass is not; since it is not possible for
+      // any ObjC class to be a subclass of any Swift class, this subclass is
+      // not a subclass of this superclass.
+      return false;
+    }
+  }
+  const ClassMetadata *swiftSubclass = cast<ClassMetadata>(subclass);
+  if (auto *objcSuperclass = dyn_cast<ObjCClassWrapperMetadata>(superclass)) {
+    // Walk up swiftSubclass's ancestors until we get to an ObjC class, then
+    // kick over to swift_dynamicCastMetatype.
+    return isSwiftClassMetadataSubclass(
+        swiftSubclass, objcSuperclass->Class,
+        [](const Metadata *intermediate, const Metadata *superclass) {
+          // Intermediate is an ObjC class, and superclass is an ObjC class;
+          // as above, just use swift_dynamicCastMetatype.
+          return swift_dynamicCastMetatype(intermediate, superclass);
+        });
+    return false;
+  }
+  if (isa<ForeignClassMetadata>(superclass)) {
+    // superclass is foreign, but subclass is not (if it were, the above
+    // !isa<ClassMetadata> condition would have been entered).  Since it is not
+    // possible for any Swift class to be a subclass of any foreign superclass,
+    // this subclass is not a subclass of this superclass.
+    return false;
+  }
+  auto swiftSuperclass = cast<ClassMetadata>(superclass);
+  return isSwiftClassMetadataSubclass(swiftSubclass, swiftSuperclass,
+                                      [](const Metadata *, const Metadata *) {
+                                        // Because (1) no ObjC classes inherit
+                                        // from Swift classes and (2)
+                                        // `superclass` is not ObjC, if some
+                                        // ancestor of `subclass` is ObjC, then
+                                        // `subclass` cannot descend from
+                                        // `superclass` (otherwise at some point
+                                        // some ObjC class would have to inherit
+                                        // from a Swift class).
+                                        return false;
+                                      });
+}
+
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
                       SmallVectorImpl<const void *> &extraArguments,
@@ -738,11 +869,8 @@ bool swift::_checkGenericRequirements(
                                    substGenericParam, substWitnessTable).getMetadata();
       if (!baseType) return true;
 
-      // Check whether it's dynamically castable, which works as a superclass
-      // check.
-      // FIXME: We should be explicitly checking the superclass, so we
-      // don't require the subject type to be complete.
-      if (!swift_dynamicCastMetatype(subjectType, baseType)) return true;
+      if (!isSubclass(subjectType, baseType))
+        return true;
 
       continue;
     }

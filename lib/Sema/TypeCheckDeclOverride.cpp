@@ -1453,6 +1453,7 @@ namespace  {
     UNINTERESTING_ATTR(Differentiable)
     UNINTERESTING_ATTR(Derivative)
     UNINTERESTING_ATTR(Transpose)
+    UNINTERESTING_ATTR(NoDerivative)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
@@ -1704,7 +1705,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
           diag::override_with_stored_property_warn :
           diag::override_with_stored_property;
       diags.diagnose(overrideASD, diagID,
-                     overrideASD->getBaseName().getIdentifier());
+                     overrideASD->getBaseIdentifier());
       diags.diagnose(baseASD, diag::property_override_here);
       if (!downgradeToWarning)
         return true;
@@ -1721,7 +1722,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     if (overrideASD->getWriteImpl() == WriteImplKind::InheritedWithObservers
         && !baseIsSettable) {
       diags.diagnose(overrideASD, diag::observing_readonly_property,
-                     overrideASD->getBaseName().getIdentifier());
+                     overrideASD->getBaseIdentifier());
       diags.diagnose(baseASD, diag::property_override_here);
       return true;
     }
@@ -1731,7 +1732,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // setter but override the getter, and that would be surprising at best.
     if (baseIsSettable && !overrideASD->isSettable(override->getDeclContext())) {
       diags.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
-                     overrideASD->getBaseName().getIdentifier());
+                     overrideASD->getBaseIdentifier());
       diags.diagnose(baseASD, diag::property_override_here);
       return true;
     }
@@ -1967,7 +1968,7 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
   return overriddenAssocTypes;
 }
 
-llvm::Expected<llvm::TinyPtrVector<ValueDecl *>>
+llvm::TinyPtrVector<ValueDecl *>
 OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // Value to return in error cases
   auto noResults = llvm::TinyPtrVector<ValueDecl *>();
@@ -2082,9 +2083,8 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
                                          OverrideCheckingAttempt::PerfectMatch);
 }
 
-llvm::Expected<bool>
-IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
-                                         ValueDecl *decl) const {
+bool IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
+                                              ValueDecl *decl) const {
   auto base = decl->getOverriddenDecl();
   if (!base)
     return false;

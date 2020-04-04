@@ -36,6 +36,7 @@ class DependencyCollector;
 namespace swift {
 
 class AbstractFunctionDecl;
+struct AutoDiffConfig;
 class ClangImporterOptions;
 class ClassDecl;
 class FileUnit;
@@ -152,6 +153,23 @@ public:
                  bool isInstanceMethod,
                  unsigned previousGeneration,
                  llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) = 0;
+
+  /// Load derivative function configurations for the given
+  /// AbstractFunctionDecl.
+  ///
+  /// \param originalAFD The declaration whose derivative function
+  /// configurations should be loaded.
+  ///
+  /// \param previousGeneration The previous generation number. The AST already
+  /// contains derivative function configurations loaded from any generation up
+  /// to and including this one.
+  ///
+  /// \param results The result list of derivative function configurations.
+  /// This list will be extended with any methods found in subsequent
+  /// generations.
+  virtual void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
+      llvm::SetVector<AutoDiffConfig> &results) {};
 
   /// Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }

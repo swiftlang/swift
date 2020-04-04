@@ -184,6 +184,10 @@ public:
                  unsigned previousGeneration,
                  llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) override;
 
+  virtual void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
+      llvm::SetVector<AutoDiffConfig> &results) override;
+
   virtual void verifyAllModules() override;
 };
 
@@ -379,6 +383,9 @@ public:
   getTopLevelDeclsWhereAttributesMatch(
       SmallVectorImpl<Decl*> &Results,
       llvm::function_ref<bool(DeclAttributes)> matchAttributes) const override;
+
+  virtual void
+  getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const override;
 
   virtual void
   getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const override;

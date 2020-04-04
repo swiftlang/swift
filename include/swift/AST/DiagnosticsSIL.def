@@ -445,6 +445,36 @@ ERROR(not_constant_evaluable, none, "not constant evaluable", ())
 ERROR(constexpr_imported_func_not_onone, none, "imported constant evaluable "
       "function '%0' must be annotated '@_optimize(none)'", (StringRef))
 
+// Differentiation transform diagnostics
+ERROR(autodiff_internal_swift_not_imported,none,
+      "Automatic differentiation internal error: the Swift module is not "
+      "imported", ())
+ERROR(autodiff_differentiation_module_not_imported,none,
+      "Automatic differentiation requires the '_Differentiation' module to be "
+      "imported", ())
+ERROR(autodiff_conversion_to_linear_function_not_supported,none,
+      "conversion to '@differentiable(linear)' function type is not yet "
+      "supported", ())
+ERROR(autodiff_function_not_differentiable_error,none,
+      "function is not differentiable", ())
+ERROR(autodiff_expression_not_differentiable_error,none,
+      "expression is not differentiable", ())
+NOTE(autodiff_expression_not_differentiable_note,none,
+     "expression is not differentiable", ())
+NOTE(autodiff_when_differentiating_function_call,none,
+     "when differentiating this function call", ())
+NOTE(autodiff_when_differentiating_function_definition,none,
+     "when differentiating this function definition", ())
+NOTE(autodiff_implicitly_inherited_differentiable_attr_here,none,
+     "differentiability required by the corresponding protocol requirement "
+     "here", ())
+NOTE(autodiff_jvp_control_flow_not_supported,none,
+     "forward-mode differentiation does not yet support control flow", ())
+NOTE(autodiff_control_flow_not_supported,none,
+     "cannot differentiate unsupported control flow", ())
+NOTE(autodiff_missing_return,none,
+     "missing return for differentiation", ())
+
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
       "use 'withUnsafePointer' or 'withUnsafeBytes' unless you're implementing "

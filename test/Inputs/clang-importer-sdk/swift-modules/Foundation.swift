@@ -238,7 +238,7 @@ public func _convertNSErrorToError(_ error: NSError?) -> Error {
 }
 
 public func _convertErrorToNSError(_ x: Error) -> NSError {
-  return unsafeDowncast(_bridgeErrorToNSError(x), to: NSError.self)
+  return x as NSError
 }
 
 extension _SwiftNewtypeWrapper where Self.RawValue == Error {

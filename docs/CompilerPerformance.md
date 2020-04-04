@@ -570,7 +570,7 @@ compilers on hand while you're working.
     Total Execution Time: 0.0876 seconds (0.0877 wall clock)
 
      ---User Time---   --System Time--   --User+System--   ---Wall Time---  --- Name ---
-     0.0241 ( 53.9%)   0.0394 ( 92.0%)   0.0635 ( 72.5%)   0.0635 ( 72.5%)  Name binding
+     0.0241 ( 53.9%)   0.0394 ( 92.0%)   0.0635 ( 72.5%)   0.0635 ( 72.5%)  Import resolution
      0.0170 ( 38.0%)   0.0025 (  5.8%)   0.0195 ( 22.3%)   0.0195 ( 22.2%)  Type checking / Semantic analysis
      0.0013 (  3.0%)   0.0004 (  0.8%)   0.0017 (  1.9%)   0.0017 (  1.9%)  LLVM output
      0.0010 (  2.3%)   0.0003 (  0.7%)   0.0013 (  1.5%)   0.0013 (  1.5%)  SILGen

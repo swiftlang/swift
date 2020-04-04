@@ -116,7 +116,7 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 int
 swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object);
 
-/// Returns whether the given address is within an image added to this
+/// Returns whether the given address is associated with an image added to this
 /// library. Images must be added using swift_reflection_addImage, not
 /// swift_reflection_addReflectionInfo, for this function to work
 /// properly. If addReflectionInfo is used, the return value will always
@@ -148,6 +148,16 @@ swift_typeref_t
 swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
                                            const char *MangledName,
                                            uint64_t Length);
+
+/// Returns the demangled name for a typeref, or NULL if the name couldn't be
+/// created.
+///
+/// The returned string is heap allocated and the caller must free() it when
+/// done.
+SWIFT_REMOTE_MIRROR_LINKAGE
+char *
+swift_reflection_copyDemangledNameForTypeRef(
+  SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef);
 
 /// Returns a structure describing the layout of a value of a typeref.
 /// For classes, this returns the reference value itself.
@@ -231,6 +241,8 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
 ///
 /// Takes the address and typeref for an enum and determines the
 /// index of the currently-selected case within the enum.
+/// You can use this index with `swift_reflection_childOfTypeRef`
+/// to get detailed information about the specific case.
 ///
 /// Returns true if the enum case could be successfully determined.
 /// In particular, note that this code may fail for valid in-memory data
@@ -240,21 +252,6 @@ int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
                                       swift_addr_t EnumAddress,
                                       swift_typeref_t EnumTypeRef,
                                       int *CaseIndex);
-
-/// Finds information about a particular enum case.
-///
-/// Given an enum typeref and index of a case, returns:
-/// * Typeref of the associated payload or zero if there is no payload
-/// * Name of the case if known.
-///
-/// The Name points to a freshly-allocated C string on the heap.  You
-/// are responsible for freeing the string when you are finished.
-SWIFT_REMOTE_MIRROR_LINKAGE
-int swift_reflection_getEnumCaseTypeRef(SwiftReflectionContextRef ContextRef,
-                                        swift_typeref_t EnumTypeRef,
-                                        int CaseIndex,
-                                        char **CaseName,
-                                        swift_typeref_t *PayloadTypeRef);
 
 /// Dump a brief description of the typeref as a tree to stderr.
 SWIFT_REMOTE_MIRROR_LINKAGE

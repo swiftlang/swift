@@ -423,7 +423,7 @@ Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
 
 /// Validate the given type.
 ///
-/// Type validation performs name binding, checking of generic arguments,
+/// Type validation performs name lookup, checking of generic arguments,
 /// and so on to determine whether the given type is well-formed and can
 /// be used as a type.
 ///
@@ -935,9 +935,7 @@ void checkPatternBindingCaptures(IterableDeclContext *DC);
 
 /// Change the context of closures in the given initializer
 /// expression to the given context.
-///
-/// \returns true if any closures were found
-bool contextualizeInitializer(Initializer *DC, Expr *init);
+void contextualizeInitializer(Initializer *DC, Expr *init);
 void contextualizeTopLevelCode(TopLevelCodeDecl *TLCD);
 
 /// Retrieve the default type for the given protocol.
@@ -1486,7 +1484,7 @@ Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
   
 /// Build a call to the init(wrappedValue:) initializers of the property
 /// wrappers, filling in the given \c value as the original value.
-Expr *buildPropertyWrapperInitialValueCall(VarDecl *var,
+Expr *buildPropertyWrapperWrappedValueCall(VarDecl *var,
                                            Type backingStorageType,
                                            Expr *value,
                                            bool ignoreAttributeArgs);
@@ -1521,6 +1519,12 @@ bool isMemberOperator(FuncDecl *decl, Type type);
 
 /// Complain if @objc or dynamic is used without importing Foundation.
 void diagnoseAttrsRequiringFoundation(SourceFile &SF);
+
+/// Returns `true` iff differentiable programming is enabled.
+bool isDifferentiableProgrammingEnabled(SourceFile &SF);
+
+/// Returns `true` iff `AdditiveArithmetic` derived conformances are enabled.
+bool isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF);
 
 /// Diagnose any Objective-C method overrides that aren't reflected
 /// as overrides in Swift.

@@ -204,7 +204,10 @@ IDENTIFIER_(nsError)
 IDENTIFIER(OSLogMessage)
 
 // Differentiable programming
+IDENTIFIER(along)
 IDENTIFIER(differential)
+IDENTIFIER(direction)
+IDENTIFIER(move)
 IDENTIFIER(pullback)
 IDENTIFIER(TangentVector)
 IDENTIFIER(zero)
