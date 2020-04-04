@@ -2286,8 +2286,30 @@ namespace {
       case PatternKind::Named: {
         auto var = cast<NamedPattern>(pattern)->getDecl();
 
-        Type varType = CS.createTypeVariable(
-            CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
+        Type varType;
+
+        // If we have a type from an initializer expression, and that
+        // expression does not produce an InOut type, use it.  This
+        // will avoid exponential typecheck behavior in the case of
+        // tuples, nested arrays, and dictionary literals.
+        //
+        // FIXME: This should be handled in the solver, not here.
+        //
+        // Otherwise, create a new type variable.
+        bool assumedInitializerType = false;
+        if (!var->hasNonPatternBindingInit() &&
+            !var->hasAttachedPropertyWrapper()) {
+          if (auto boundExpr = locator.trySimplifyToExpr()) {
+            if (!boundExpr->isSemanticallyInOutExpr()) {
+              varType = CS.getType(boundExpr)->getRValueType();
+              assumedInitializerType = true;
+            }
+          }
+        }
+
+        if (!assumedInitializerType)
+          varType = CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                          TVO_CanBindToNoEscape);
 
         // When we are supposed to bind pattern variables, create a fresh
         // type variable and a one-way constraint to assign it to either the
@@ -2308,7 +2330,19 @@ namespace {
           ROK = OA->get();
         switch (optionalityOf(ROK)) {
         case ReferenceOwnershipOptionality::Required:
+          if (assumedInitializerType) {
+            // Already Optional<T>
+            if (varType->getOptionalObjectType())
+              break;
+
+            // Create a fresh type variable to handle overloaded expressions.
+            if (varType->is<TypeVariableType>())
+              varType = CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                              TVO_CanBindToNoEscape);
+          }
+
           varType = TypeChecker::getOptionalType(var->getLoc(), varType);
+
           if (oneWayVarType) {
             oneWayVarType =
                 TypeChecker::getOptionalType(var->getLoc(), oneWayVarType);
@@ -2342,15 +2376,17 @@ namespace {
 
         Type openedType = CS.openUnboundGenericType(type, locator);
 
+        auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();
         // Determine the subpattern type. It will be convertible to the
         // ascribed type.
-        Type subPatternType =
-            getTypeForPattern(
-               cast<TypedPattern>(pattern)->getSubPattern(), locator,
-               Type(), bindPatternVarsOneWay);
+        Type subPatternType = getTypeForPattern(
+            subPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+            Type(), bindPatternVarsOneWay);
+
         CS.addConstraint(
             ConstraintKind::Conversion, subPatternType, openedType,
-          locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+            locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
         return setType(openedType);
       }
 
@@ -2385,11 +2421,11 @@ namespace {
           if (!externalEltTypes.empty())
             externalEltType = externalEltTypes[i].getPlainType();
 
+          auto *eltPattern = tupleElt.getPattern();
           Type eltTy = getTypeForPattern(
-              tupleElt.getPattern(),
-              locator,
-              externalEltType,
-              bindPatternVarsOneWay);
+              eltPattern,
+              locator.withPathElement(LocatorPathElt::PatternMatch(eltPattern)),
+              externalEltType, bindPatternVarsOneWay);
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
         }
 
@@ -2410,9 +2446,11 @@ namespace {
           externalPatternType = objVar;
         }
 
+        auto *subPattern = cast<OptionalSomePattern>(pattern)->getSubPattern();
         // The subpattern must have optional type.
         Type subPatternType = getTypeForPattern(
-            cast<OptionalSomePattern>(pattern)->getSubPattern(), locator,
+            subPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             externalPatternType, bindPatternVarsOneWay);
 
         return setType(OptionalType::get(subPatternType));
