@@ -306,11 +306,6 @@ static void typeCheckDelayedFunctions(SourceFile &SF) {
   } while (currentFunctionIdx < SF.DelayedFunctions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size());
 
-
-  for (AbstractFunctionDecl *FD : llvm::reverse(SF.DelayedFunctions)) {
-    TypeChecker::computeCaptures(FD);
-  }
-
   SF.DelayedFunctions.clear();
 }
 

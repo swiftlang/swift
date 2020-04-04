@@ -15,6 +15,7 @@ func invalid_semi() {
 
 func nested1(_ x: Int) {
   var y : Int
+  // expected-warning@-1 {{variable 'y' was never mutated; consider changing to 'let' constant}}
   
   func nested2(_ z: Int) -> Int {
     return x+y+z
