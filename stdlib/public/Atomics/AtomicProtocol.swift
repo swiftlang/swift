@@ -19,26 +19,26 @@ public protocol AtomicProtocol {
   static func atomicStorage(for value: Self) -> AtomicStorage
 
   static func deinitializeAtomicStorage(
-    at address: UnsafeMutablePointer<AtomicStorage>
+    at pointer: UnsafeMutablePointer<AtomicStorage>
   )
 
   @_semantics("has_constant_evaluable_arguments")
   static func atomicLoad(
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicLoadOrdering
   ) -> Self
 
   @_semantics("has_constant_evaluable_arguments")
   static func atomicStore(
     _ desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicStoreOrdering
   )
 
   @_semantics("has_constant_evaluable_arguments")
   static func atomicExchange(
     _ desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self
 
@@ -46,7 +46,7 @@ public protocol AtomicProtocol {
   static func atomicCompareExchange(
     expected: Self,
     desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self)
 
@@ -54,7 +54,7 @@ public protocol AtomicProtocol {
   static func atomicCompareExchange(
     expected: Self,
     desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self)
@@ -69,9 +69,9 @@ extension AtomicProtocol where AtomicStorage == Self {
 
   @inlinable
   public static func deinitializeAtomicStorage(
-    at address: UnsafeMutablePointer<AtomicStorage>
+    at pointer: UnsafeMutablePointer<AtomicStorage>
   ) {
-    address.deinitialize(count: 1)
+    pointer.deinitialize(count: 1)
   }
 }
 
@@ -88,18 +88,18 @@ extension AtomicProtocol where
 
   @inlinable
   public static func deinitializeAtomicStorage(
-    at address: UnsafeMutablePointer<AtomicStorage>
+    at pointer: UnsafeMutablePointer<AtomicStorage>
   ) {
-    address.deinitialize(count: 1)
+    pointer.deinitialize(count: 1)
   }
 
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicLoad(
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicLoadOrdering
   ) -> Self {
-    let raw = RawValue.atomicLoad(at: address, ordering: ordering)
+    let raw = RawValue.atomicLoad(at: pointer, ordering: ordering)
     return Self(rawValue: raw)!
   }
 
@@ -107,12 +107,12 @@ extension AtomicProtocol where
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
     _ desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicStoreOrdering
   ) {
     RawValue.atomicStore(
       desired.rawValue,
-      at: address,
+      at: pointer,
       ordering: ordering)
   }
 
@@ -120,12 +120,12 @@ extension AtomicProtocol where
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
     _ desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self {
     let raw = RawValue.atomicExchange(
       desired.rawValue,
-      at: address,
+      at: pointer,
       ordering: ordering)
     return Self(rawValue: raw)!
   }
@@ -135,13 +135,13 @@ extension AtomicProtocol where
   public static func atomicCompareExchange(
     expected: Self,
     desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self) {
     let (exchanged, raw) = RawValue.atomicCompareExchange(
       expected: expected.rawValue,
       desired: desired.rawValue,
-      at: address,
+      at: pointer,
       ordering: ordering)
     return (exchanged, Self(rawValue: raw)!)
   }
@@ -151,14 +151,14 @@ extension AtomicProtocol where
   public static func atomicCompareExchange(
     expected: Self,
     desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self) {
     let (exchanged, raw) = RawValue.atomicCompareExchange(
       expected: expected.rawValue,
       desired: desired.rawValue,
-      at: address,
+      at: pointer,
       ordering: ordering,
       failureOrdering: failureOrdering)
     return (exchanged, Self(rawValue: raw)!)

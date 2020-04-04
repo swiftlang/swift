@@ -99,14 +99,14 @@ extension ${swiftType}: AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicLoad(
-    at address: UnsafeMutablePointer<${swiftType}>,
+    at pointer: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicLoadOrdering
   ) -> ${swiftType} {
     switch ordering {
 %   for (swiftOrder, llvmOrder) in loadOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       return ${swiftType}(Builtin.atomicload_${llvmOrder}_${builtinType}(
-          address._rawValue))
+          pointer._rawValue))
 %   end
     }
   }
@@ -117,14 +117,14 @@ extension ${swiftType}: AtomicProtocol {
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
     _ desired: ${swiftType},
-    at address: UnsafeMutablePointer<${swiftType}>,
+    at pointer: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicStoreOrdering
   ) {
     switch ordering {
 %   for (swiftOrder, llvmOrder) in storeOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       Builtin.atomicstore_${llvmOrder}_${builtinType}(
-        address._rawValue,
+        pointer._rawValue,
         desired.${getter})
 %   end
     }
@@ -138,14 +138,14 @@ extension ${swiftType}: AtomicProtocol {
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
     _ desired: ${swiftType},
-    at address: UnsafeMutablePointer<${swiftType}>,
+    at pointer: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicUpdateOrdering
   ) -> ${swiftType} {
     switch ordering {
 %   for (swiftOrder, llvmOrder, _) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       return ${swiftType}(Builtin.atomicrmw_xchg_${llvmOrder}_${builtinType}(
-          address._rawValue, desired.${getter}))
+          pointer._rawValue, desired.${getter}))
 %   end
     }
   }
@@ -170,14 +170,14 @@ extension ${swiftType}: AtomicProtocol {
   public static func atomicCompareExchange(
     expected: ${swiftType},
     desired: ${swiftType},
-    at address: UnsafeMutablePointer<${swiftType}>,
+    at pointer: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: ${swiftType}) {
     switch ordering {
 %   for (swiftOrder, llvmOrder, failureOrder) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       let (oldValue, won) = Builtin.cmpxchg_${llvmOrder}_${failureOrder}_${builtinType}(
-        address._rawValue, expected.${getter}, desired.${getter})
+        pointer._rawValue, expected.${getter}, desired.${getter})
       return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
 %   end
     }
@@ -221,7 +221,7 @@ extension ${swiftType}: AtomicProtocol {
   public static func atomicCompareExchange(
     expected: ${swiftType},
     desired: ${swiftType},
-    at address: UnsafeMutablePointer<${swiftType}>,
+    at pointer: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: ${swiftType}) {
@@ -230,13 +230,13 @@ extension ${swiftType}: AtomicProtocol {
 %   for (swiftFailure, llvmFailure) in loadOrderings():
     case (.${swiftSuccess}, .${swiftFailure}):
       let (oldValue, won) = Builtin.cmpxchg_${llvmOrders(llvmSuccess, llvmFailure)}_${builtinType}(
-        address._rawValue, expected.${getter}, desired.${getter})
+        pointer._rawValue, expected.${getter}, desired.${getter})
       return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
 %   end
 % end
     default:
       let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_${builtinType}(
-        address._rawValue, expected.${getter}, desired.${getter})
+        pointer._rawValue, expected.${getter}, desired.${getter})
       return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
     }
   }
@@ -260,14 +260,14 @@ extension ${swiftType}: AtomicInteger {
   @discardableResult
   public static func atomicLoadThen${name}(
     ${label} operand: Self${defaultValue},
-    at address: UnsafeMutablePointer<Self>,
+    at pointer: UnsafeMutablePointer<Self>,
     ordering: AtomicUpdateOrdering
   ) -> Self {
     switch ordering {
     % for (swiftOrder, llvmOrder, _) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       return Self(Builtin.atomicrmw_${llvmop}_${llvmOrder}_${builtinType}(
-        address._rawValue, operand.${getter}))
+        pointer._rawValue, operand.${getter}))
     % end
     }
   }

@@ -118,9 +118,9 @@ extension ${swiftType}: AtomicProtocol {
 
   @inlinable
   public static func deinitializeAtomicStorage(
-    at address: UnsafeMutablePointer<AtomicStorage>
+    at pointer: UnsafeMutablePointer<AtomicStorage>
   ) {
-    address.deinitialize(count: 1)
+    pointer.deinitialize(count: 1)
   }
 
   /// Atomically loads and returns the current value,
@@ -128,7 +128,7 @@ extension ${swiftType}: AtomicProtocol {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicLoad(
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicLoadOrdering
   ) -> Self {
     let raw: Builtin.${builtinType}
@@ -136,7 +136,7 @@ extension ${swiftType}: AtomicProtocol {
 %   for (swiftOrder, llvmOrder) in loadOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       raw = Builtin.atomicload_${llvmOrder}_${builtinType}(
-        address._atomicRawValue)
+        pointer._atomicRawValue)
 %   end
     }
     return Self(_atomicRawValue: raw)
@@ -148,14 +148,14 @@ extension ${swiftType}: AtomicProtocol {
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
     _ desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicStoreOrdering
   ) {
     switch ordering {
 %   for (swiftOrder, llvmOrder) in storeOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       Builtin.atomicstore_${llvmOrder}_${builtinType}(
-        address._rawValue,
+        pointer._rawValue,
         desired._atomicRawValue)
 %   end
     }
@@ -169,7 +169,7 @@ extension ${swiftType}: AtomicProtocol {
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
     _ desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self {
     let rawResult: Builtin.${builtinType}
@@ -177,7 +177,7 @@ extension ${swiftType}: AtomicProtocol {
 %   for (swiftOrder, llvmOrder, _) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       rawResult = Builtin.atomicrmw_xchg_${llvmOrder}_${builtinType}(
-        address._rawValue,
+        pointer._rawValue,
         desired._atomicRawValue)
 %   end
     }
@@ -204,7 +204,7 @@ extension ${swiftType}: AtomicProtocol {
   public static func atomicCompareExchange(
     expected: Self,
     desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self) {
     let old: Builtin.${builtinType}
@@ -213,7 +213,7 @@ extension ${swiftType}: AtomicProtocol {
 %   for (swiftOrder, llvmOrder, failureOrder) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       (old, won) = Builtin.cmpxchg_${llvmOrder}_${failureOrder}_${builtinType}(
-        address._rawValue,
+        pointer._rawValue,
         expected._atomicRawValue,
         desired._atomicRawValue)
 %   end
@@ -261,7 +261,7 @@ extension ${swiftType}: AtomicProtocol {
   public static func atomicCompareExchange(
     expected: Self,
     desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self) {
@@ -272,14 +272,14 @@ extension ${swiftType}: AtomicProtocol {
 %   for (swiftFailure, llvmFailure) in loadOrderings():
     case (.${swiftSuccess}, .${swiftFailure}):
       (old, won) = Builtin.cmpxchg_${llvmOrders(llvmSuccess, llvmFailure)}_${builtinType}(
-        address._rawValue,
+        pointer._rawValue,
         expected._atomicRawValue,
         desired._atomicRawValue)
 %   end
 % end
     default:
       (old, won) = Builtin.cmpxchg_seqcst_seqcst_${builtinType}(
-        address._rawValue,
+        pointer._rawValue,
         expected._atomicRawValue,
         desired._atomicRawValue)
     }
@@ -346,9 +346,9 @@ extension ${swiftType}: NullableAtomic {
 
   @inlinable
   public static func deinitializeNullableAtomicStorage(
-    at address: UnsafeMutablePointer<NullableAtomicStorage>
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>
   ) {
-    address.deinitialize(count: 1)
+    pointer.deinitialize(count: 1)
   }
 
   /// Atomically loads and returns the current value,
@@ -356,7 +356,7 @@ extension ${swiftType}: NullableAtomic {
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalLoad(
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicLoadOrdering
   ) -> Self? {
     let raw: Builtin.${builtinType}
@@ -364,7 +364,7 @@ extension ${swiftType}: NullableAtomic {
 %   for (swiftOrder, llvmOrder) in loadOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       raw = Builtin.atomicload_${llvmOrder}_${builtinType}(
-        address._rawValue)
+        pointer._rawValue)
 %   end
     }
     return ${swiftType}(_atomicOptionalRawValue: raw)
@@ -376,14 +376,14 @@ extension ${swiftType}: NullableAtomic {
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalStore(
     _ desired: Self?,
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicStoreOrdering
   ) {
     switch ordering {
 %   for (swiftOrder, llvmOrder) in storeOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       Builtin.atomicstore_${llvmOrder}_${builtinType}(
-        address._rawValue,
+        pointer._rawValue,
         Self._atomicOptionalRawValue(for: desired))
 %   end
     }
@@ -397,7 +397,7 @@ extension ${swiftType}: NullableAtomic {
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalExchange(
     _ desired: Self?,
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self? {
     let rawResult: Builtin.${builtinType}
@@ -405,7 +405,7 @@ extension ${swiftType}: NullableAtomic {
 %   for (swiftOrder, llvmOrder, _) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       rawResult = Builtin.atomicrmw_xchg_${llvmOrder}_${builtinType}(
-        address._rawValue,
+        pointer._rawValue,
         Self._atomicOptionalRawValue(for: desired))
 %   end
     }
@@ -432,7 +432,7 @@ extension ${swiftType}: NullableAtomic {
   public static func atomicOptionalCompareExchange(
     expected: Self?,
     desired: Self?,
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self?) {
     let old: Builtin.${builtinType}
@@ -441,7 +441,7 @@ extension ${swiftType}: NullableAtomic {
 %   for (swiftOrder, llvmOrder, failureOrder) in rmwOrderings():
     ${caseStatementForOrdering(swiftOrder)}:
       (old, won) = Builtin.cmpxchg_${llvmOrder}_${failureOrder}_${builtinType}(
-        address._rawValue,
+        pointer._rawValue,
         Self._atomicOptionalRawValue(for: expected),
         Self._atomicOptionalRawValue(for: desired))
 %   end
@@ -489,7 +489,7 @@ extension ${swiftType}: NullableAtomic {
   public static func atomicOptionalCompareExchange(
     expected: Self?,
     desired: Self?,
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self?) {
@@ -500,14 +500,14 @@ extension ${swiftType}: NullableAtomic {
 %   for (swiftFailure, llvmFailure) in loadOrderings():
     case (.${swiftSuccess}, .${swiftFailure}):
       (old, won) = Builtin.cmpxchg_${llvmOrders(llvmSuccess, llvmFailure)}_${builtinType}(
-        address._rawValue,
+        pointer._rawValue,
         Self._atomicOptionalRawValue(for: expected),
         Self._atomicOptionalRawValue(for: desired))
 %   end
 % end
     default:
       (old, won) = Builtin.cmpxchg_seqcst_seqcst_${builtinType}(
-        address._rawValue,
+        pointer._rawValue,
         Self._atomicOptionalRawValue(for: expected),
         Self._atomicOptionalRawValue(for: desired))
     }

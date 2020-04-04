@@ -19,26 +19,26 @@ public protocol NullableAtomic: AtomicProtocol {
   static func nullableAtomicStorage(for value: Self?) -> NullableAtomicStorage
 
   static func deinitializeNullableAtomicStorage(
-    at address: UnsafeMutablePointer<NullableAtomicStorage>
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>
   )
 
   @_semantics("has_constant_evaluable_arguments")
   static func atomicOptionalLoad(
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicLoadOrdering
   ) -> Self?
 
   @_semantics("has_constant_evaluable_arguments")
   static func atomicOptionalStore(
     _ desired: Self?,
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicStoreOrdering
   )
 
   @_semantics("has_constant_evaluable_arguments")
   static func atomicOptionalExchange(
     _ desired: Self?,
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self?
 
@@ -46,7 +46,7 @@ public protocol NullableAtomic: AtomicProtocol {
   static func atomicOptionalCompareExchange(
     expected: Self?,
     desired: Self?,
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self?)
 
@@ -54,7 +54,7 @@ public protocol NullableAtomic: AtomicProtocol {
   static func atomicOptionalCompareExchange(
     expected: Self?,
     desired: Self?,
-    at address: UnsafeMutablePointer<NullableAtomicStorage>,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self?)
@@ -71,9 +71,9 @@ extension NullableAtomic where NullableAtomicStorage == Self? {
 
   @inlinable
   public static func deinitializeNullableAtomicStorage(
-    at address: UnsafeMutablePointer<Self?>
+    at pointer: UnsafeMutablePointer<Self?>
   ) {
-    address.deinitialize(count: 1)
+    pointer.deinitialize(count: 1)
   }
 }
 
@@ -88,38 +88,38 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
 
   @_transparent @_alwaysEmitIntoClient
   public static func deinitializeAtomicStorage(
-    at address: UnsafeMutablePointer<AtomicStorage>
+    at pointer: UnsafeMutablePointer<AtomicStorage>
   ) {
-    Wrapped.deinitializeNullableAtomicStorage(at: address)
+    Wrapped.deinitializeNullableAtomicStorage(at: pointer)
   }
 
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicLoad(
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicLoadOrdering
   ) -> Self {
-    Wrapped.atomicOptionalLoad(at: address, ordering: ordering)
+    Wrapped.atomicOptionalLoad(at: pointer, ordering: ordering)
   }
 
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
     _ desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicStoreOrdering
   ) {
-    Wrapped.atomicOptionalStore(desired, at: address, ordering: ordering)
+    Wrapped.atomicOptionalStore(desired, at: pointer, ordering: ordering)
   }
 
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
     _ desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self {
-    Wrapped.atomicOptionalExchange(desired, at: address, ordering: ordering)
+    Wrapped.atomicOptionalExchange(desired, at: pointer, ordering: ordering)
   }
 
   @_semantics("has_constant_evaluable_arguments")
@@ -127,13 +127,13 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
   public static func atomicCompareExchange(
     expected: Self,
     desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self) {
     Wrapped.atomicOptionalCompareExchange(
       expected: expected,
       desired: desired,
-      at: address,
+      at: pointer,
       ordering: ordering)
   }
 
@@ -142,14 +142,14 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
   public static func atomicCompareExchange(
     expected: Self,
     desired: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self) {
     Wrapped.atomicOptionalCompareExchange(
       expected: expected,
       desired: desired,
-      at: address,
+      at: pointer,
       ordering: ordering,
       failureOrdering: failureOrdering)
   }

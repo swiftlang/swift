@@ -43,9 +43,9 @@ public struct UnsafeAtomic<Value: AtomicProtocol> {
 
   @_transparent // Debug performance
   public init(
-    @_nonEphemeral at address: UnsafeMutablePointer<Value.AtomicStorage>
+    @_nonEphemeral at pointer: UnsafeMutablePointer<Value.AtomicStorage>
   ) {
-    self._ptr = address
+    self._ptr = pointer
   }
 
   @inlinable

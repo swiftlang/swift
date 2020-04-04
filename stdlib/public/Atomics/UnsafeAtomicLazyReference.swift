@@ -24,8 +24,8 @@ public struct UnsafeAtomicLazyReference<Instance: AnyObject> {
   internal let _ptr: UnsafeMutablePointer<AtomicStorage>
 
   @_transparent // Debug performance
-  public init(@_nonEphemeral at address: UnsafeMutablePointer<AtomicStorage>) {
-    self._ptr = address
+  public init(@_nonEphemeral at pointer: UnsafeMutablePointer<AtomicStorage>) {
+    self._ptr = pointer
   }
 }
 

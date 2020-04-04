@@ -17,35 +17,35 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   @_semantics("has_constant_evaluable_arguments")
   static func atomicLoadThenWrappingIncrement(
     by operand: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self
 
   @_semantics("has_constant_evaluable_arguments")
   static func atomicLoadThenWrappingDecrement(
     by operand: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self
 
   @_semantics("has_constant_evaluable_arguments")
   static func atomicLoadThenBitwiseAnd(
     with operand: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self
 
   @_semantics("has_constant_evaluable_arguments")
   static func atomicLoadThenBitwiseOr(
     with operand: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self
 
   @_semantics("has_constant_evaluable_arguments")
   static func atomicLoadThenBitwiseXor(
     with operand: Self,
-    at address: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self
 }
