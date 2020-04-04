@@ -1981,13 +1981,57 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
   SourceLoc catchLoc = consumeToken(tok::kw_catch);
 
   SmallVector<VarDecl*, 4> boundDecls;
-
   ParserStatus status;
-  GuardedPattern pattern;
-  parseGuardedPattern(*this, pattern, status, boundDecls,
-                      GuardedPatternContext::Catch, /* isFirst */ true);
-  if (status.hasCodeCompletion()) {
-    return makeParserCodeCompletionResult<CatchStmt>();
+  Optional<MutableArrayRef<VarDecl *>> caseBodyDecls;
+  SmallVector<CaseLabelItem, 1> caseLabelItems;
+
+  {
+    SyntaxParsingContext ListContext(SyntaxContext, SyntaxKind::CatchItemList);
+    bool isFirst = true;
+    while (true) {
+      SyntaxParsingContext ItemContext(SyntaxContext, SyntaxKind::CatchItem);
+      GuardedPattern PatternResult;
+      parseGuardedPattern(*this, PatternResult, status, boundDecls,
+                          GuardedPatternContext::Catch, isFirst);
+      if (status.hasCodeCompletion()) {
+        return makeParserCodeCompletionResult<CaseStmt>();
+      }
+      caseLabelItems.emplace_back(PatternResult.ThePattern,
+                                  PatternResult.WhereLoc, PatternResult.Guard);
+      isFirst = false;
+      if (!consumeIf(tok::comma))
+        break;
+    }
+
+    // Grab the first case label item pattern and use it to initialize the case
+    // body var decls.
+    SmallVector<VarDecl *, 4> tmp;
+    caseLabelItems.front().getPattern()->collectVariables(tmp);
+    auto Result = Context.AllocateUninitialized<VarDecl *>(tmp.size());
+    for (unsigned i : indices(tmp)) {
+      auto *vOld = tmp[i];
+      auto *vNew = new (Context) VarDecl(
+          /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
+          vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
+      vNew->setHasNonPatternBindingInit();
+      vNew->setImplicit();
+      Result[i] = vNew;
+    }
+    caseBodyDecls.emplace(Result);
+  }
+
+  // Add a scope so that the parser can find our body bound decls if it emits
+  // optimized accesses.
+  Optional<Scope> BodyScope;
+  if (caseBodyDecls) {
+    BodyScope.emplace(this, ScopeKind::CatchVars);
+    for (auto *v : *caseBodyDecls) {
+      setLocalDiscriminator(v);
+      // If we had any bad redefinitions, we already diagnosed them against the
+      // first case label item.
+      if (v->hasName())
+        addToScope(v, false /*diagnoseRedefinitions*/);
+    }
   }
 
   auto bodyResult = parseBraceItemList(diag::expected_lbrace_after_catch);
