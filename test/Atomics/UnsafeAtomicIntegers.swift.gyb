@@ -160,9 +160,10 @@ suite.test("UnsafeAtomic<${type}>.compareExchange.${order}") {
 }
 % end
 
-% for order in rmwOrderings:
-%   for failorder in loadOrderings:
-suite.test("UnsafeAtomic<${type}>.compareExchange.${order}.${failorder}") {
+% for operation in ["compareExchange", "weakCompareExchange"]:
+%   for order in rmwOrderings:
+%     for failorder in loadOrderings:
+suite.test("UnsafeAtomic<${type}>.${operation}.${order}.${failorder}") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
@@ -170,7 +171,7 @@ suite.test("UnsafeAtomic<${type}>.compareExchange.${order}.${failorder}") {
   let v = UnsafeAtomic<${type}>.create(initialValue: 0)
   defer { v.destroy() }
 
-  var (exchanged, original) = v.compareExchange(
+  var (exchanged, original) = v.${operation}(
     expected: 0,
     desired: 1,
     ordering: .${order},
@@ -179,7 +180,7 @@ suite.test("UnsafeAtomic<${type}>.compareExchange.${order}.${failorder}") {
   expectEqual(original, 0)
   expectEqual(v.load(ordering: .relaxed), 1)
 
-  (exchanged, original) = v.compareExchange(
+  (exchanged, original) = v.${operation}(
     expected: 0,
     desired: 2,
     ordering: .${order},
@@ -188,7 +189,7 @@ suite.test("UnsafeAtomic<${type}>.compareExchange.${order}.${failorder}") {
   expectEqual(original, 1)
   expectEqual(v.load(ordering: .relaxed), 1)
 
-  (exchanged, original) = v.compareExchange(
+  (exchanged, original) = v.${operation}(
     expected: 1,
     desired: 2,
     ordering: .${order},

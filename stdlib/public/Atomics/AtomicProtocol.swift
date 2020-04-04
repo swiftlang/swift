@@ -180,6 +180,48 @@ public protocol AtomicProtocol {
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self)
+
+  /// Perform an atomic weak compare and exchange operation on the value
+  /// referenced by `pointer`, applying the specified success/failure memory
+  /// orderings. This compare-exchange variant is allowed to spuriously fail; it
+  /// is designed to be called in a loop until it indicates a successful
+  /// exchange has happened.
+  ///
+  /// This operation performs the following algorithm as a single atomic
+  /// transaction:
+  ///
+  /// ```
+  /// atomic(self) { currentValue in
+  ///   let original = currentValue
+  ///   guard original == expected else { return (false, original) }
+  ///   currentValue = desired
+  ///   return (true, original)
+  /// }
+  /// ```
+  ///
+  /// (In this weak form, transient conditions may cause the `original ==
+  /// expected` check to sometimes return false when the two values are in fact
+  /// the same.)
+  ///
+  /// The `ordering` argument specifies the memory ordering to use when the
+  /// operation manages to update the current value, while `failureOrdering`
+  /// will be used when the operation leaves the value intact.
+  ///
+  /// - Parameter expected: The expected current value.
+  /// - Parameter desired: The desired new value.
+  /// - Parameter pointer: A memory location previously initialized with a value
+  ///   returned by `atomicStorage(for:)`.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
+  ///   the exchange was successful, and `original` is the original value.
+  @_semantics("has_constant_evaluable_arguments")
+  static func atomicWeakCompareExchange(
+    expected: Self,
+    desired: __owned Self,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: Self)
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -278,6 +320,24 @@ extension AtomicProtocol where
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self) {
     let (exchanged, raw) = RawValue.atomicCompareExchange(
+      expected: expected.rawValue,
+      desired: desired.rawValue,
+      at: pointer,
+      ordering: ordering,
+      failureOrdering: failureOrdering)
+    return (exchanged, Self(rawValue: raw)!)
+  }
+
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicWeakCompareExchange(
+    expected: Self,
+    desired: __owned Self,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: Self) {
+    let (exchanged, raw) = RawValue.atomicWeakCompareExchange(
       expected: expected.rawValue,
       desired: desired.rawValue,
       at: pointer,

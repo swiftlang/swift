@@ -231,6 +231,38 @@ extension ${swiftType}: AtomicProtocol {
       Bool(_builtinBooleanLiteral: won),
       Self(_atomicRawValue: old))
   }
+
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicWeakCompareExchange(
+    expected: Self,
+    desired: Self,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: Self) {
+    let old: Builtin.${builtinType}
+    let won: Builtin.Int1
+    switch (ordering, failureOrdering) {
+% for (swiftSuccess, llvmSuccess, _) in rmwOrderings():
+%   for (swiftFailure, llvmFailure) in loadOrderings():
+    case (.${swiftSuccess}, .${swiftFailure}):
+      (old, won) = Builtin.cmpxchg_${llvmOrders(llvmSuccess, llvmFailure)}_weak_${builtinType}(
+        pointer._rawValue,
+        expected._atomicRawValue,
+        desired._atomicRawValue)
+%   end
+% end
+    default:
+      (old, won) = Builtin.cmpxchg_seqcst_seqcst_weak_${builtinType}(
+        pointer._rawValue,
+        expected._atomicRawValue,
+        desired._atomicRawValue)
+    }
+    return (
+      Bool(_builtinBooleanLiteral: won),
+      Self(_atomicRawValue: old))
+  }
 }
 % end
 
@@ -395,6 +427,38 @@ extension ${swiftType}: NullableAtomic {
 % end
     default:
       (old, won) = Builtin.cmpxchg_seqcst_seqcst_${builtinType}(
+        pointer._rawValue,
+        Self._atomicOptionalRawValue(for: expected),
+        Self._atomicOptionalRawValue(for: desired))
+    }
+    return (
+      Bool(_builtinBooleanLiteral: won),
+      Self(_atomicOptionalRawValue: old))
+  }
+
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicOptionalWeakCompareExchange(
+    expected: Self?,
+    desired: Self?,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: Self?) {
+    let old: Builtin.${builtinType}
+    let won: Builtin.Int1
+    switch (ordering, failureOrdering) {
+% for (swiftSuccess, llvmSuccess, _) in rmwOrderings():
+%   for (swiftFailure, llvmFailure) in loadOrderings():
+    case (.${swiftSuccess}, .${swiftFailure}):
+      (old, won) = Builtin.cmpxchg_${llvmOrders(llvmSuccess, llvmFailure)}_weak_${builtinType}(
+        pointer._rawValue,
+        Self._atomicOptionalRawValue(for: expected),
+        Self._atomicOptionalRawValue(for: desired))
+%   end
+% end
+    default:
+      (old, won) = Builtin.cmpxchg_seqcst_seqcst_weak_${builtinType}(
         pointer._rawValue,
         Self._atomicOptionalRawValue(for: expected),
         Self._atomicOptionalRawValue(for: desired))

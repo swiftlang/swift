@@ -184,6 +184,31 @@ extension ${swiftType}: AtomicProtocol {
       return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
     }
   }
+
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicWeakCompareExchange(
+    expected: ${swiftType},
+    desired: ${swiftType},
+    at pointer: UnsafeMutablePointer<${swiftType}>,
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: ${swiftType}) {
+    switch (ordering, failureOrdering) {
+% for (swiftSuccess, llvmSuccess, _) in rmwOrderings():
+%   for (swiftFailure, llvmFailure) in loadOrderings():
+    case (.${swiftSuccess}, .${swiftFailure}):
+      let (oldValue, won) = Builtin.cmpxchg_${llvmOrders(llvmSuccess, llvmFailure)}_weak_${builtinType}(
+        pointer._rawValue, expected.${getter}, desired.${getter})
+      return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
+%   end
+% end
+    default:
+      let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_weak_${builtinType}(
+        pointer._rawValue, expected.${getter}, desired.${getter})
+      return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
+    }
+  }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)

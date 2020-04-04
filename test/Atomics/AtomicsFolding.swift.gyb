@@ -329,25 +329,27 @@ public func compareExchange_${label}_sequential(
 // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
 
 % end
+
+% for (operation, modifier) in [("compareExchange", ""), ("weakCompareExchange", "_weak")]:
 // -----------------------------------------------------------------------------
 // FIXME: There are 15 valid combinations of success/failure orderings;
 // here we're only testing 6 of them.
 
-% for (label, type, builtin) in all_types:
-// SECTIONING-LABEL: // compareExchange2_${label}_relaxed_relaxed(_:_:_:)
+%   for (label, type, builtin) in all_types:
+// SECTIONING-LABEL: // compareExchange2_${label}_relaxed_relaxed${modifier}(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public func compareExchange2_${label}_relaxed_relaxed(
+public func compareExchange2_${label}_relaxed_relaxed${modifier}(
   _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
-  // CHECK: builtin "cmpxchg_monotonic_monotonic_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[^m][a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[a-z0-9_]*}}_${builtin}"
-  return value.compareExchange(
+  // CHECK: builtin "cmpxchg_monotonic_monotonic${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[^m][a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  return value.${operation}(
     expected: expected,
     desired: desired,
     ordering: .relaxed,
@@ -355,20 +357,20 @@ public func compareExchange2_${label}_relaxed_relaxed(
 }
 // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
 
-// SECTIONING-LABEL: // compareExchange2_${label}_acquiring_relaxed(_:_:_:)
+// SECTIONING-LABEL: // compareExchange2_${label}_acquiring_relaxed${modifier}(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public func compareExchange2_${label}_acquiring_relaxed(
+public func compareExchange2_${label}_acquiring_relaxed${modifier}(
   _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
-  // CHECK: builtin "cmpxchg_acquire_monotonic_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[^m][a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[a-z0-9_]*}}_${builtin}"
-  return value.compareExchange(
+  // CHECK: builtin "cmpxchg_acquire_monotonic${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[^m][a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  return value.${operation}(
     expected: expected,
     desired: desired,
     ordering: .acquiring,
@@ -376,20 +378,20 @@ public func compareExchange2_${label}_acquiring_relaxed(
 }
 // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
 
-// SECTIONING-LABEL: // compareExchange2_${label}_acquiring_acquiring(_:_:_:)
+// SECTIONING-LABEL: // compareExchange2_${label}_acquiring_acquiring${modifier}(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public func compareExchange2_${label}_acquiring_acquiring(
+public func compareExchange2_${label}_acquiring_acquiring${modifier}(
   _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
-  // CHECK: builtin "cmpxchg_acquire_acquire_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[^a][a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[a-z0-9_]*}}_${builtin}"
-  return value.compareExchange(
+  // CHECK: builtin "cmpxchg_acquire_acquire${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[^a][a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  return value.${operation}(
     expected: expected,
     desired: desired,
     ordering: .acquiring,
@@ -397,20 +399,20 @@ public func compareExchange2_${label}_acquiring_acquiring(
 }
 // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
 
-// SECTIONING-LABEL: // compareExchange2_${label}_sequential_acquiring(_:_:_:)
+// SECTIONING-LABEL: // compareExchange2_${label}_sequential_acquiring${modifier}(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public func compareExchange2_${label}_sequential_acquiring(
+public func compareExchange2_${label}_sequential_acquiring${modifier}(
   _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
 ) -> (exchanged: Bool, original: ${type})  {
-  // CHECK: builtin "cmpxchg_seqcst_acquire_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[^a][a-z0-9_]*}}_${builtin}"
-  return value.compareExchange(
+  // CHECK: builtin "cmpxchg_seqcst_acquire${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[^a][a-z0-9_]*}}${modifier}_${builtin}"
+  return value.${operation}(
     expected: expected,
     desired: desired,
     ordering: .sequentiallyConsistent,
@@ -419,9 +421,9 @@ public func compareExchange2_${label}_sequential_acquiring(
 // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
 
 
-// SECTIONING-LABEL: // compareExchange2_${label}_releasing_acquiring(_:_:_:)
+// SECTIONING-LABEL: // compareExchange2_${label}_releasing_acquiring${modifier}(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public func compareExchange2_${label}_releasing_acquiring(
+public func compareExchange2_${label}_releasing_acquiring${modifier}(
   _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
@@ -430,13 +432,13 @@ public func compareExchange2_${label}_releasing_acquiring(
   // support arbitrary failure orderings yet, so internally we promote success
   // orderings to be at least as strong as the failure ordering.
 
-  // CHECK: builtin "cmpxchg_acqrel_acquire_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[^a][a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[a-z0-9_]*}}_${builtin}"
-  return value.compareExchange(
+  // CHECK: builtin "cmpxchg_acqrel_acquire${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[^a][a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  return value.${operation}(
     expected: expected,
     desired: desired,
     ordering: .releasing,
@@ -444,9 +446,9 @@ public func compareExchange2_${label}_releasing_acquiring(
 }
 // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
 
-// SECTIONING-LABEL: // compareExchange2_${label}_relaxed_sequential(_:_:_:)
+// SECTIONING-LABEL: // compareExchange2_${label}_relaxed_sequential${modifier}(_:_:_:)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public func compareExchange2_${label}_relaxed_sequential(
+public func compareExchange2_${label}_relaxed_sequential${modifier}(
   _ value: UnsafeAtomic<${type}>,
   _ expected: ${type},
   _ desired: ${type}
@@ -455,13 +457,13 @@ public func compareExchange2_${label}_relaxed_sequential(
   // support arbitrary failure orderings yet, so internally we promote success
   // orderings to be at least as strong as the failure ordering.
 
-  // CHECK: builtin "cmpxchg_seqcst_seqcst_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[a-z0-9_]*}}_${builtin}"
-  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[^s][a-z0-9_]*}}_${builtin}"
-  return value.compareExchange(
+  // CHECK: builtin "cmpxchg_seqcst_seqcst${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_monotonic_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acquire_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_release_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_acqrel_{{[a-z0-9_]*}}${modifier}_${builtin}"
+  // EXCLUSIONS-NOT: builtin "cmpxchg_seqcst_{{[^s][a-z0-9_]*}}${modifier}_${builtin}"
+  return value.${operation}(
     expected: expected,
     desired: desired,
     ordering: .relaxed,
@@ -469,6 +471,7 @@ public func compareExchange2_${label}_relaxed_sequential(
 }
 // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
 
+%   end
 % end
 // -----------------------------------------------------------------------------
 

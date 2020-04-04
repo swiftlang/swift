@@ -60,6 +60,15 @@ public protocol NullableAtomic: AtomicProtocol {
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self?)
+
+  @_semantics("has_constant_evaluable_arguments")
+  static func atomicOptionalWeakCompareExchange(
+    expected: Self?,
+    desired: __owned Self?,
+    at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: Self?)
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -149,6 +158,23 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self) {
     Wrapped.atomicOptionalCompareExchange(
+      expected: expected,
+      desired: desired,
+      at: pointer,
+      ordering: ordering,
+      failureOrdering: failureOrdering)
+  }
+
+  @_semantics("has_constant_evaluable_arguments")
+  @_transparent @_alwaysEmitIntoClient
+  public static func atomicWeakCompareExchange(
+    expected: Self,
+    desired: __owned Self,
+    at pointer: UnsafeMutablePointer<AtomicStorage>,
+    ordering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: Self) {
+    Wrapped.atomicOptionalWeakCompareExchange(
       expected: expected,
       desired: desired,
       at: pointer,
