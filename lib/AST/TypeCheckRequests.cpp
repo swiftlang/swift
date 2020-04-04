@@ -1372,6 +1372,23 @@ void LookupAllConformancesInContextRequest::writeDependencySink(
 }
 
 //----------------------------------------------------------------------------//
+// ResolveTypeEraserTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Type> ResolveTypeEraserTypeRequest::getCachedResult() const {
+  auto ty = std::get<1>(getStorage())->TypeEraserLoc.getType();
+  if (ty.isNull()) {
+    return None;
+  }
+  return ty;
+}
+
+void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
+  assert(value && "Resolved type erasure type to null type!");
+  std::get<1>(getStorage())->TypeEraserLoc.setType(value);
+}
+
+//----------------------------------------------------------------------------//
 // TypeCheckSourceFileRequest computation.
 //----------------------------------------------------------------------------//
 
