@@ -64,8 +64,11 @@ public struct UnsafeAtomic<Value: AtomicProtocol> {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeAtomic {
-  /// Atomically loads and returns the current value,
-  /// with the specified memory ordering.
+  /// Atomically loads and returns the current value, applying the specified
+  /// memory ordering.
+  ///
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The current value.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func load(
@@ -74,8 +77,11 @@ extension UnsafeAtomic {
     Value.atomicLoad(at: _ptr, ordering: ordering)
   }
 
-  /// Atomically sets the current value to `desired`,
-  /// with the specified memory ordering.
+  /// Atomically sets the current value to `desired`, applying the specified
+  /// memory ordering.
+  ///
+  /// - Parameter desired: The desired new value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func store(
@@ -85,9 +91,11 @@ extension UnsafeAtomic {
     Value.atomicStore(desired, at: _ptr, ordering: ordering)
   }
 
-  /// Atomically sets the current value to `desired` and returns the previous
-  /// value, with the specified memory ordering.
+  /// Atomically sets the current value to `desired` and returns the original
+  /// value, applying the specified memory ordering.
   ///
+  /// - Parameter desired: The desired new value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
@@ -98,21 +106,29 @@ extension UnsafeAtomic {
     Value.atomicExchange(desired, at: _ptr, ordering: ordering)
   }
 
-  /// Perform an atomic compare and exchange operation with
-  /// the specified memory ordering.
+  /// Perform an atomic compare and exchange operation on the current value,
+  /// applying the specified memory ordering.
   ///
-  /// This operation is equivalent to the following pseudocode:
+  /// This operation performs the following algorithm as a single atomic
+  /// transaction:
   ///
   /// ```
-  /// atomic(self, ordering: ordering) { value in
-  ///   guard value == expected else { return (false, value) }
-  ///   value = desired
-  ///   return (true, expected)
+  /// atomic(self) { currentValue in
+  ///   let original = currentValue
+  ///   guard original == expected else { return (false, original) }
+  ///   currentValue = desired
+  ///   return (true, original)
   /// }
   /// ```
   ///
   /// This method implements a "strong" compare and exchange operation
   /// that does not permit spurious failures.
+  ///
+  /// - Parameter expected: The expected current value.
+  /// - Parameter desired: The desired new value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
+  ///   the exchange was successful, and `original` is the original value.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
@@ -127,10 +143,11 @@ extension UnsafeAtomic {
       ordering: ordering)
   }
 
-  /// Perform an atomic compare and exchange operation with the specified
-  /// success/failure memory orderings.
+  /// Perform an atomic compare and exchange operation on the current value,
+  /// applying the specified success/failure memory orderings.
   ///
-  /// This operation is equivalent to the following pseudocode:
+  /// This operation performs the following algorithm as a single atomic
+  /// transaction:
   ///
   /// ```
   /// atomic(self) { currentValue in
@@ -144,6 +161,15 @@ extension UnsafeAtomic {
   /// The `ordering` argument specifies the memory ordering to use when the
   /// operation manages to update the current value, while `failureOrdering`
   /// will be used when the operation leaves the value intact.
+  ///
+  /// This method implements a "strong" compare and exchange operation
+  /// that does not permit spurious failures.
+  ///
+  /// - Parameter expected: The expected current value.
+  /// - Parameter desired: The desired new value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
+  ///   the exchange was successful, and `original` is the original value.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
@@ -172,6 +198,9 @@ extension UnsafeAtomic where Value: AtomicInteger {
   /// `${op}` operator does on `Int` values.
   ///
   % end
+  /// - Parameter operand: An integer value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The original value before the operation.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func loadThen${name}(
@@ -194,6 +223,8 @@ extension UnsafeAtomic where Value: AtomicInteger {
   /// `${op}` operator does on `Int` values.
   ///
   % end
+  /// - Parameter operand: An integer value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The new value after the operation.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
@@ -213,6 +244,9 @@ extension UnsafeAtomic where Value: AtomicInteger {
   ///
   /// Note: This operation silently wraps around on overflow, like the
   /// `&+=` operator does on `Int` values.
+  ///
+  /// - Parameter operand: The value to add to the current value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func wrappingIncrement(
@@ -230,6 +264,9 @@ extension UnsafeAtomic where Value: AtomicInteger {
   ///
   /// Note: This operation silently wraps around on overflow, like the
   /// `&-=` operator does on `Int` values.
+  ///
+  /// - Parameter operand: The value to subtract from the current value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public func wrappingDecrement(

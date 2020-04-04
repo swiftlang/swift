@@ -14,6 +14,18 @@ import Swift
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
+  /// Perform an atomic wrapping increment operation on the value referenced by
+  /// `pointer` and return the original value, applying the specified memory
+  /// ordering.
+  ///
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `&+=` operator does on integer values.
+  ///
+  /// - Parameter operand: The value to add to the current value.
+  /// - Parameter pointer: A memory location previously initialized with a value
+  ///   returned by `atomicStorage(for:)`.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The original value before the operation.
   @_semantics("has_constant_evaluable_arguments")
   static func atomicLoadThenWrappingIncrement(
     by operand: Self,
@@ -21,6 +33,18 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
     ordering: AtomicUpdateOrdering
   ) -> Self
 
+  /// Perform an atomic wrapping decrement operation on the value referenced by
+  /// `pointer` and return the original value, applying the specified memory
+  /// ordering.
+  ///
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `&-=` operator does on integer values.
+  ///
+  /// - Parameter operand: The value to subtract from the current value.
+  /// - Parameter pointer: A memory location previously initialized with a value
+  ///   returned by `atomicStorage(for:)`.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The original value before the operation.
   @_semantics("has_constant_evaluable_arguments")
   static func atomicLoadThenWrappingDecrement(
     by operand: Self,
@@ -28,6 +52,15 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
     ordering: AtomicUpdateOrdering
   ) -> Self
 
+  /// Perform an atomic bitwise AND operation on the value referenced by
+  /// `pointer` and return the original value, applying the specified memory
+  /// ordering.
+  ///
+  /// - Parameter operand: An integer value.
+  /// - Parameter pointer: A memory location previously initialized with a value
+  ///   returned by `atomicStorage(for:)`.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The original value before the operation.
   @_semantics("has_constant_evaluable_arguments")
   static func atomicLoadThenBitwiseAnd(
     with operand: Self,
@@ -35,6 +68,15 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
     ordering: AtomicUpdateOrdering
   ) -> Self
 
+  /// Perform an atomic bitwise OR operation on the value referenced by
+  /// `pointer` and return the original value, applying the specified memory
+  /// ordering.
+  ///
+  /// - Parameter operand: An integer value.
+  /// - Parameter pointer: A memory location previously initialized with a value
+  ///   returned by `atomicStorage(for:)`.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The original value before the operation.
   @_semantics("has_constant_evaluable_arguments")
   static func atomicLoadThenBitwiseOr(
     with operand: Self,
@@ -42,6 +84,15 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
     ordering: AtomicUpdateOrdering
   ) -> Self
 
+  /// Perform an atomic bitwise XOR operation on the value referenced by
+  /// `pointer` and return the original value, applying the specified memory
+  /// ordering.
+  ///
+  /// - Parameter operand: An integer value.
+  /// - Parameter pointer: A memory location previously initialized with a value
+  ///   returned by `atomicStorage(for:)`.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The original value before the operation.
   @_semantics("has_constant_evaluable_arguments")
   static func atomicLoadThenBitwiseXor(
     with operand: Self,

@@ -94,8 +94,6 @@ import Swift
 extension ${swiftType}: AtomicProtocol {
   public typealias AtomicStorage = ${swiftType}
 
-  /// Atomically loads and returns the current value,
-  /// with the specified memory ordering.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicLoad(
@@ -111,8 +109,6 @@ extension ${swiftType}: AtomicProtocol {
     }
   }
 
-  /// Atomically sets the current value to `desired`,
-  /// with the specified memory ordering.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
@@ -130,10 +126,6 @@ extension ${swiftType}: AtomicProtocol {
     }
   }
 
-  /// Atomically sets the current value to `desired` and returns the previous
-  /// value, with the specified memory ordering.
-  ///
-  /// - Returns: The original value.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
@@ -150,21 +142,6 @@ extension ${swiftType}: AtomicProtocol {
     }
   }
 
-  /// Perform an atomic compare and exchange operation with
-  /// the specified memory ordering.
-  ///
-  /// This operation is equivalent to the following pseudocode:
-  ///
-  /// ```
-  /// atomic(self, ordering: ordering) { value in
-  ///   guard value == expected else { return (false, value) }
-  ///   value = desired
-  ///   return (true, expected)
-  /// }
-  /// ```
-  ///
-  /// This method implements a "strong" compare and exchange operation
-  /// that does not permit spurious failures.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
@@ -183,39 +160,6 @@ extension ${swiftType}: AtomicProtocol {
     }
   }
 
-  /// Perform an atomic compare and exchange operation with the specified
-  /// success/failure memory orderings.
-  ///
-  /// This operation is equivalent to the following pseudocode:
-  ///
-  /// ```
-  /// atomic(self) { currentValue in
-  ///   let original = currentValue
-  ///   guard original == expected else { return (false, original) }
-  ///   currentValue = desired
-  ///   return (true, original)
-  /// }
-  /// ```
-  ///
-  /// The `ordering` argument specifies the memory ordering to use when the
-  /// operation manages to update the current value, while `failureOrdering`
-  /// will be used when the operation leaves the value intact.
-  ///
-  /// The `failureOrdering` argument currently isn't allowed to introduce a
-  /// synchronization constraint that isn't also guaranteed by `ordering`.
-  /// (This limitation may be lifted in the future.) For example:
-  ///
-  /// ```
-  /// // OK
-  /// ptr._atomicCompareExchangeWord(
-  ///   expected: 1, desired: 2,
-  ///   ordering: .acquiringAndReleasing, failureOrdering: .relaxed)
-  ///
-  /// // Not supported:
-  /// ptr._atomicCompareExchangeWord(
-  ///   expected: 3, desired: 0,
-  ///   ordering: .releasing, failureOrdering: .acquiring)
-  /// ```
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
@@ -246,15 +190,6 @@ extension ${swiftType}: AtomicProtocol {
 extension ${swiftType}: AtomicInteger {
   % for (name, llvmop, op, label, doc) in integerOperations:
   % defaultValue = " = 1" if label <> "" else ""
-  /// Perform an atomic ${doc} operation and return the original value, with
-  /// the specified memory ordering.
-  ///
-  % if "Wrapping" in name:
-  /// Note: This operation silently wraps around on overflow, like the
-  /// `${op}` operator does on `Int` values.
-  ///
-  % end
-  /// - Returns: The original value before the operation.
   @_semantics("has_constant_evaluable_arguments")
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
