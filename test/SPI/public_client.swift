@@ -29,9 +29,9 @@ SPIEnum().spiMethod() // expected-error {{use of unresolved identifier}}
 
 var ps = PublicStruct()
 let _ = PublicStruct(alt_init: 1) // expected-error {{argument passed to call that takes no arguments}}
-ps.spiMethod() // expected-error {{'spiMethod' is inaccessible due to 'internal' protection level}} // TODO SPI specific diagnostics and suggest SPI to import
-ps.spiVar = "write" // expected-error {{'spiVar' is inaccessible due to 'internal' protection level}}
-print(ps.spiVar) // expected-error {{'spiVar' is inaccessible due to 'internal' protection level}}
+ps.spiMethod() // expected-error {{'spiMethod' is inaccessible due to '@_spi' protection level}} // TODO SPI specific diagnostics and suggest SPI to import
+ps.spiVar = "write" // expected-error {{'spiVar' is inaccessible due to '@_spi' protection level}}
+print(ps.spiVar) // expected-error {{'spiVar' is inaccessible due to '@_spi' protection level}}
 
 otherApiFunc() // expected-error {{use of unresolved identifier}}
 

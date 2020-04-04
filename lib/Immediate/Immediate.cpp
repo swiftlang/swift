@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "swift-immediate"
 #include "swift/Immediate/Immediate.h"
 #include "ImmediateImpl.h"
 
@@ -31,7 +30,8 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
-#include "llvm/ExecutionEngine/MCJIT.h"
+#include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/LLVMContext.h"
@@ -39,6 +39,8 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Support/Path.h"
+
+#define DEBUG_TYPE "swift-immediate"
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -246,10 +248,10 @@ int swift::RunImmediately(CompilerInstance &CI,
   const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
-  auto ModuleOwner = performIRGeneration(
+  auto ModuleCtx = std::make_unique<llvm::LLVMContext>();
+  auto Module = performIRGeneration(
       IRGenOpts, swiftModule, std::move(SM), swiftModule->getName().str(),
-      PSPs, getGlobalLLVMContext(), ArrayRef<std::string>());
-  auto *Module = ModuleOwner.get();
+      PSPs, *ModuleCtx, ArrayRef<std::string>());
 
   if (Context.hadError())
     return -1;
@@ -288,7 +290,6 @@ int swift::RunImmediately(CompilerInstance &CI,
 
   (*emplaceProcessArgs)(argBuf.data(), CmdLine.size());
 
-  SmallVector<llvm::Function*, 8> InitFns;
   if (autolinkImportedModules(swiftModule, IRGenOpts))
     return -1;
 
@@ -297,41 +298,80 @@ int swift::RunImmediately(CompilerInstance &CI,
   PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
 
   // Build the ExecutionEngine.
-  llvm::EngineBuilder builder(std::move(ModuleOwner));
-  std::string ErrorMsg;
   llvm::TargetOptions TargetOpt;
   std::string CPU;
   std::string Triple;
   std::vector<std::string> Features;
   std::tie(TargetOpt, CPU, Features, Triple)
     = getIRTargetOptions(IRGenOpts, swiftModule->getASTContext());
-  builder.setRelocationModel(llvm::Reloc::PIC_);
-  builder.setTargetOptions(TargetOpt);
-  builder.setMCPU(CPU);
-  builder.setMAttrs(Features);
-  builder.setErrorStr(&ErrorMsg);
-  builder.setEngineKind(llvm::EngineKind::JIT);
-  llvm::ExecutionEngine *EE = builder.create();
-  if (!EE) {
-    llvm::errs() << "Error loading JIT: " << ErrorMsg;
-    return -1;
+
+  std::unique_ptr<llvm::orc::LLJIT> JIT;
+
+  {
+    auto JITOrErr =
+      llvm::orc::LLJITBuilder()
+        .setJITTargetMachineBuilder(
+            llvm::orc::JITTargetMachineBuilder(llvm::Triple(Triple))
+              .setRelocationModel(llvm::Reloc::PIC_)
+              .setOptions(std::move(TargetOpt))
+              .setCPU(std::move(CPU))
+              .addFeatures(Features)
+              .setCodeGenOptLevel(llvm::CodeGenOpt::Default))
+        .create();
+
+    if (!JITOrErr) {
+      llvm::logAllUnhandledErrors(JITOrErr.takeError(), llvm::errs(), "");
+      return -1;
+    } else
+      JIT = std::move(*JITOrErr);
+  }
+
+  {
+    // Get a generator for the process symbols and attach it to the main
+    // JITDylib.
+    if (auto G = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(Module->getDataLayout().getGlobalPrefix()))
+      JIT->getMainJITDylib().addGenerator(std::move(*G));
+    else {
+      logAllUnhandledErrors(G.takeError(), llvm::errs(), "");
+      return -1;
+    }
   }
 
   LLVM_DEBUG(llvm::dbgs() << "Module to be executed:\n";
              Module->dump());
 
-  EE->finalizeObject();
-  
-  // Run the generated program.
-  for (auto InitFn : InitFns) {
-    LLVM_DEBUG(llvm::dbgs() << "Running initialization function "
-                            << InitFn->getName() << '\n');
-    EE->runFunctionAsMain(InitFn, CmdLine, nullptr);
+  {
+    auto TSM = llvm::orc::ThreadSafeModule(std::move(Module), std::move(ModuleCtx));
+    if (auto Err = JIT->addIRModule(std::move(TSM))) {
+      llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
+      return -1;
+    }
   }
 
+  using MainFnTy = int(*)(int, char*[]);
+
   LLVM_DEBUG(llvm::dbgs() << "Running static constructors\n");
-  EE->runStaticConstructorsDestructors(false);
+  if (auto Err = JIT->runConstructors()) {
+    llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
+    return -1;
+  }
+
+  MainFnTy JITMain = nullptr;
+  if (auto MainFnOrErr = JIT->lookup("main"))
+    JITMain = llvm::jitTargetAddressToFunction<MainFnTy>(MainFnOrErr->getAddress());
+  else {
+    logAllUnhandledErrors(MainFnOrErr.takeError(), llvm::errs(), "");
+    return -1;
+  }
+
   LLVM_DEBUG(llvm::dbgs() << "Running main\n");
-  llvm::Function *EntryFn = Module->getFunction("main");
-  return EE->runFunctionAsMain(EntryFn, CmdLine, nullptr);
+  int Result = llvm::orc::runAsMain(JITMain, CmdLine);
+
+  LLVM_DEBUG(llvm::dbgs() << "Running static destructors\n");
+  if (auto Err = JIT->runDestructors()) {
+    logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
+    return -1;
+  }
+
+  return Result;
 }

@@ -474,54 +474,6 @@ bb1(%1 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
-// CHECK-LABEL: Function: 'owned_argument_overuse_condbr1'
-// CHECK-NEXT: Found over consume?!
-// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: User:   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
-// CHECK-NEXT: Block: bb0
-//
-// CHECK-LABEL: Function: 'owned_argument_overuse_condbr1'
-// CHECK-NEXT: Error! Found a leak due to a consuming post-dominance failure!
-// CHECK-NEXT: Value: %0 = argument of bb0
-// CHECK-NEXT: Post Dominating Failure Blocks:
-// CHECK-NEXT: bb2
-//
-// CHECK-LABEL: Function: 'owned_argument_overuse_condbr1'
-// CHECK-NEXT: Error! Found a leaked owned value that was never consumed.
-// CHECK-NEXT: Value: %3 = argument of bb1 : $Builtin.NativeObject
-// CHECK-NOT: Function: 'owned_argument_overuse_condbr1'
-sil [ossa] @owned_argument_overuse_condbr1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $Builtin.NativeObject):
-  destroy_value %0 : $Builtin.NativeObject
-  cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
-
-bb1(%1 : @owned $Builtin.NativeObject):
-  br bb2
-
-bb2:
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// CHECK-LABEL: Function: 'owned_argument_overuse_condbr2'
-// CHECK-NEXT: Found over consume?!
-// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK-NEXT: User:   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
-// CHECK-NEXT: Block: bb0
-sil [ossa] @owned_argument_overuse_condbr2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $Builtin.NativeObject):
-  destroy_value %0 : $Builtin.NativeObject
-  cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
-
-bb1(%1 : @owned $Builtin.NativeObject):
-  destroy_value %1 : $Builtin.NativeObject
-  br bb2
-
-bb2:
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 /////////////////////////////////////////
 // Movable Guaranteed Scope Test Cases //
 /////////////////////////////////////////

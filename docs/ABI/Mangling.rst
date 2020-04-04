@@ -517,6 +517,10 @@ Types
   FUNCTION-KIND ::= 'C'                      // C function pointer type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
+  FUNCTION-KIND ::= 'F'                      // @differentiable function type
+  FUNCTION-KIND ::= 'G'                      // @differentiable function type (escaping)
+  FUNCTION-KIND ::= 'H'                      // @differentiable(linear) function type
+  FUNCTION-KIND ::= 'I'                      // @differentiable(linear) function type (escaping)
 
   function-signature ::= params-type params-type throws? // results and parameters
 
@@ -583,13 +587,19 @@ mangled in to disambiguate.
 ::
 
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
-  impl-function-type ::= type* generic-signature 'I' PSEUDO-GENERIC? FUNC-ATTRIBUTES '_'
+  impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= CALLEE-ESCAPE? CALLEE-CONVENTION FUNC-REPRESENTATION? PARAM-CONVENTION* RESULT-CONVENTION* ('z' RESULT-CONVENTION)
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? PARAM-CONVENTION* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION)?
 
+  PATTERN-SUBS ::= 's'                       // has pattern substitutions
+  INVOCATION-SUB ::= 'I'                     // has invocation substitutions
   PSEUDO-GENERIC ::= 'P'
 
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
+
+  DIFFERENTIABILITY-KIND ::= DIFFERENTIABLE | LINEAR
+  DIFFERENTIABLE ::= 'd'                     // @differentiable
+  LINEAR ::= 'l'                             // @differentiable(linear)
 
   CALLEE-CONVENTION ::= 'y'                  // @callee_unowned
   CALLEE-CONVENTION ::= 'g'                  // @callee_guaranteed
@@ -602,6 +612,9 @@ mangled in to disambiguate.
   FUNC-REPRESENTATION ::= 'J'                // ObjC method
   FUNC-REPRESENTATION ::= 'K'                // closure
   FUNC-REPRESENTATION ::= 'W'                // protocol witness
+
+  COROUTINE-KIND ::= 'A'                     // yield-once coroutine
+  COROUTINE-KIND ::= 'G'                     // yield-many coroutine
 
   PARAM-CONVENTION ::= 'i'                   // indirect in
   PARAM-CONVENTION ::= 'c'                   // indirect in constant

@@ -701,7 +701,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     std::string swiftVer;
     Optional<StringRef> swiftVerValStr = Req.getString(KeySwiftVersion);
     if (swiftVerValStr.hasValue()) {
-      swiftVer = swiftVerValStr.getValue();
+      swiftVer = swiftVerValStr.getValue().str();
     } else {
       Optional<int64_t> swiftVerVal = Req.getOptionalInt64(KeySwiftVersion);
       if (swiftVerVal.hasValue())
@@ -833,7 +833,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
         err = createErrorRequestInvalid("missing 'key.name'");
         return true;
       }
-      CCInfo.Name = *Name;
+      CCInfo.Name = (*Name).str();
 
       sourcekitd_uid_t Kind = dict.getUID(KeyKind);
       if (!Kind) {
@@ -1271,7 +1271,7 @@ static sourcekitd_response_t indexSource(StringRef Filename,
 }
 
 void SKIndexingConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 bool SKIndexingConsumer::startDependency(UIdent Kind,
@@ -1573,15 +1573,19 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
   // while GenericParams is empty.
   if (!Info.GenericRequirements.empty()) {
     auto ReqArray = Elem.setArray(KeyGenericRequirements);
+
     for (auto &Req : Info.GenericRequirements) {
       auto ReqElem = ReqArray.appendDictionary();
       ReqElem.set(KeyDescription, Req);
     }
   }
+
+  if (!Info.RequiredBystanders.empty())
+    Elem.set(KeyRequiredBystanders, Info.RequiredBystanders);
 }
 
 void SKDocConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 bool SKDocConsumer::handleSourceText(StringRef Text) {
@@ -1952,7 +1956,7 @@ codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
 }
 
 void SKCodeCompletionConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 void SKCodeCompletionConsumer::setCompletionKind(UIdent kind) {
@@ -2132,7 +2136,7 @@ codeCompleteUpdate(StringRef name, int64_t offset,
 }
 
 void SKGroupedCodeCompletionConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 bool SKGroupedCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
@@ -2248,7 +2252,7 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
     }
 
     void failed(StringRef ErrDescription) override {
-      ErrorDescription = ErrDescription;
+      ErrorDescription = ErrDescription.str();
     }
 
     bool isError() const { return ErrorDescription.hasValue(); }
@@ -2301,7 +2305,7 @@ conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
     }
 
     void failed(StringRef ErrDescription) override {
-      ErrorDescription = ErrDescription;
+      ErrorDescription = ErrDescription.str();
     }
 
     bool isError() const { return ErrorDescription.hasValue(); }

@@ -20,9 +20,11 @@ struct Outer {
 
 struct GenericOuter<T> {
   typealias Alias<T> = Int
+  typealias AliasWhere = Int where T == GenericOuter<Never>
 
   struct Inner {
     typealias Alias<T> = Int
+    typealias AliasWhere = Int where T: Equatable
   }
 }
 
@@ -32,6 +34,7 @@ protocol Proto {
 
 extension Proto {
   typealias OtherAlias<T> = Int
+  typealias OtherAliasWhere = Int where Self == Conforms
 }
 
 extension GenericOuter where T : Proto {
@@ -90,16 +93,22 @@ do {
 // CHECK-TYPE: Outer.Inner.Alias<String>
 
 // DEMANGLE-TYPE: $s17generic_typealias12GenericOuterV5AliasaySi_SSGD
+// DEMANGLE-TYPE: $s17generic_typealias12GenericOuterV10AliasWhereayACys5NeverOG_GD
 // DEMANGLE-TYPE: $s17generic_typealias12GenericOuterV5InnerV5AliasaySi__SSGD
+// DEMANGLE-TYPE: $s17generic_typealias12GenericOuterV5InnerV10AliasWhereaySi__GD
 
 // CHECK-TYPE: GenericOuter<Int>.Alias<String>
+// CHECK-TYPE: GenericOuter<GenericOuter<Never>>.AliasWhere
 // CHECK-TYPE: GenericOuter<Int>.Inner.Alias<String>
+// CHECK-TYPE: GenericOuter<Int>.Inner.AliasWhere
 
 // DEMANGLE-TYPE: $s17generic_typealias5ProtoP5AliasayAA8ConformsV_SSGD
 // DEMANGLE-TYPE: $s17generic_typealias5ProtoPAAE10OtherAliasayAA8ConformsV_SSGD
+// DEMANGLE-TYPE: $s17generic_typealias5ProtoPAAE15OtherAliasWhereayAA8ConformsV_GD
 
 // CHECK-TYPE: Conforms.Alias<String>
 // CHECK-TYPE: Conforms.OtherAlias<String>
+// CHECK-TYPE: Conforms.OtherAliasWhere
 
 // DEMANGLE-TYPE: $s17generic_typealias5ProtoP5Aliasayx_SSGD
 // DEMANGLE-TYPE: $s17generic_typealias5ProtoPAAE10OtherAliasayx_SSGD
@@ -116,16 +125,22 @@ do {
 // DEMANGLE-DECL: $s17generic_typealias5OuterV5Aliasa
 // DEMANGLE-DECL: $s17generic_typealias5OuterV5InnerV5Aliasa
 // DEMANGLE-DECL: $s17generic_typealias12GenericOuterV5Aliasa
+// DEMANGLE-DECL: $s17generic_typealias12GenericOuterV10AliasWherea
 // DEMANGLE-DECL: $s17generic_typealias12GenericOuterV5InnerV5Aliasa
+// DEMANGLE-DECL: $s17generic_typealias12GenericOuterV5InnerV10AliasWherea
 // DEMANGLE-DECL: $s17generic_typealias5ProtoP5Aliasa
 // DEMANGLE-DECL: $s17generic_typealias5ProtoPAAE10OtherAliasa
+// DEMANGLE-DECL: $s17generic_typealias5ProtoPAAE15OtherAliasWherea
 // DEMANGLE-DECL: $s17generic_typealias12GenericOuterVA2A5ProtoRzlE16ConditionalAliasa
 
 // CHECK-DECL: generic_typealias.(file).Alias
 // CHECK-DECL: generic_typealias.(file).Outer.Alias
 // CHECK-DECL: generic_typealias.(file).Outer.Inner.Alias
 // CHECK-DECL: generic_typealias.(file).GenericOuter.Alias
+// CHECK-DECL: generic_typealias.(file).GenericOuter.AliasWhere
 // CHECK-DECL: generic_typealias.(file).GenericOuter.Inner.Alias
+// CHECK-DECL: generic_typealias.(file).GenericOuter.Inner.AliasWhere
 // CHECK-DECL: generic_typealias.(file).Proto.Alias
 // CHECK-DECL: generic_typealias.(file).Proto extension.OtherAlias
+// CHECK-DECL: generic_typealias.(file).Proto extension.OtherAliasWhere
 // CHECK-DECL: generic_typealias.(file).GenericOuter extension.ConditionalAlias

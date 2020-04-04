@@ -268,7 +268,7 @@ CoarseGrainedDependencyGraphImpl::loadFromBuffer(const void *node,
     });
 
     if (iter == provides.end())
-      provides.push_back({name, kind});
+      provides.push_back({name.str(), kind});
     else
       iter->kindMask |= kind;
 
@@ -276,7 +276,8 @@ CoarseGrainedDependencyGraphImpl::loadFromBuffer(const void *node,
   };
 
   auto interfaceHashCallback = [this, node](StringRef hash) -> LoadResult {
-    auto insertResult = InterfaceHashes.insert(std::make_pair(node, hash));
+    auto insertResult =
+        InterfaceHashes.insert(std::make_pair(node, hash.str()));
 
     if (insertResult.second) {
       // Treat a newly-added hash as up-to-date. This includes the initial
@@ -286,7 +287,7 @@ CoarseGrainedDependencyGraphImpl::loadFromBuffer(const void *node,
 
     auto iter = insertResult.first;
     if (hash != iter->second) {
-      iter->second = hash;
+      iter->second = hash.str();
       return LoadResult::AffectsDownstream;
     }
 

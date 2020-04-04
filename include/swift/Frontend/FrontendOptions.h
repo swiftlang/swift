@@ -82,6 +82,9 @@ public:
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
+  /// If indexing system modules, don't index the stdlib.
+  bool IndexIgnoreStdlib = false;
+
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
@@ -262,6 +265,13 @@ public:
 
   /// Should we lock .swiftinterface while generating .swiftmodule from it?
   bool DisableInterfaceFileLock = false;
+
+  /// Should we enable the dependency verifier for all primary files known to this frontend?
+  bool EnableIncrementalDependencyVerifier = false;
+
+  /// The directory path we should use when print #include for the bridging header.
+  /// By default, we include ImplicitObjCHeaderPath directly.
+  llvm::Optional<std::string> BridgingHeaderDirForPrint;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

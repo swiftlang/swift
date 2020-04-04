@@ -47,6 +47,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/Basic/CharInfo.h"
 #include "swift/Basic/Statistic.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Lookup.h"
 
@@ -3201,7 +3202,7 @@ namespace {
           // context.
           if (errorWrapper) {
             auto enumeratorValue = cast<ValueDecl>(enumeratorDecl);
-            auto name = enumeratorValue->getBaseName().getIdentifier();
+            auto name = enumeratorValue->getBaseIdentifier();
             auto alias = importEnumCaseAlias(name,
                                              constant,
                                              enumeratorValue,
@@ -3917,6 +3918,12 @@ namespace {
                               /*IsCaptureList*/false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, dc);
+      if (decl->getType().isConstQualified()) {
+        // Note that in C++ there are ways to change the values of const
+        // members, so we don't use WriteImplKind::Immutable storage.
+        assert(result->supportsMutation());
+        result->overwriteSetterAccess(AccessLevel::Private);
+      }
       result->setIsObjC(false);
       result->setIsDynamic(false);
       result->setInterfaceType(type);
@@ -7679,7 +7686,7 @@ void ClangImporter::Implementation::importAttributes(
   // Ban CFRelease|CFRetain|CFAutorelease(CFTypeRef) as well as custom ones
   // such as CGColorRelease(CGColorRef).
   if (auto FD = dyn_cast<clang::FunctionDecl>(ClangDecl)) {
-    if (FD->getNumParams() == 1 &&
+    if (FD->getNumParams() == 1 && FD->getDeclName().isIdentifier() &&
          (FD->getName().endswith("Release") ||
           FD->getName().endswith("Retain") ||
           FD->getName().endswith("Autorelease")) &&
@@ -7729,6 +7736,17 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
                                               bool &TypedefIsSuperfluous,
                                               bool &HadForwardDeclaration) {
   assert(ClangDecl);
+
+  // Private and protected C++ class members should never be used, so we skip
+  // them entirely (instead of importing them with a corresponding Swift access
+  // level) to remove clutter from the module interface.
+  //
+  // We omit protected members in addition to private members because Swift
+  // structs can't inherit from C++ classes, so there's effectively no way to
+  // access them.
+  clang::AccessSpecifier access = ClangDecl->getAccess();
+  if (access == clang::AS_protected || access == clang::AS_private)
+    return nullptr;
 
   bool SkippedOverTypedef = false;
   Decl *Result = nullptr;

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
-import _SwiftFoundationOverlayShims
+@_implementationOnly import _SwiftFoundationOverlayShims
 
 // We don't check for NSCopying here for performance reasons. We would
 // just crash anyway, and NSMutableDictionary will still do that when

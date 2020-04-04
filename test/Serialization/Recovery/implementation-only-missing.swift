@@ -15,6 +15,10 @@
 // RUN: %target-swift-frontend -typecheck -DCLIENT_APP -primary-file %s -I %t -index-system-modules -index-store-path %t
 // RUN: %target-swift-frontend -emit-sil -DCLIENT_APP -primary-file %s -I %t -module-name client
 
+//// Printing the public module should not crash when checking for overrides of
+//// methods from the private module.
+// RUN: %target-swift-ide-test -print-module -module-to-print=public_lib -source-filename=x -skip-overrides -I %t
+
 #if PRIVATE_LIB
 
 @propertyWrapper
@@ -38,11 +42,15 @@ public protocol HiddenProtocol {
   associatedtype Value
 }
 
+public protocol HiddenProtocolWithOverride {
+  func hiddenOverride()
+}
+
 #elseif PUBLIC_LIB
 
 @_implementationOnly import private_lib
 
-struct LibProtocolContraint { }
+struct LibProtocolConstraint { }
 
 protocol LibProtocolTABound { }
 struct LibProtocolTA: LibProtocolTABound { }
@@ -52,13 +60,13 @@ protocol LibProtocol {
 
   func hiddenRequirement<A>(
       param: HiddenGenStruct<A>
-  ) where A.Value == LibProtocolContraint
+  ) where A.Value == LibProtocolConstraint
 }
 
 extension LibProtocol where TA == LibProtocolTA {
   func hiddenRequirement<A>(
       param: HiddenGenStruct<A>
-  ) where A.Value == LibProtocolContraint { }
+  ) where A.Value == LibProtocolConstraint { }
 }
 
 public struct PublicStruct: LibProtocol {
@@ -68,6 +76,10 @@ public struct PublicStruct: LibProtocol {
 
   @IoiPropertyWrapper("some text")
   public var wrappedVar: String
+}
+
+struct StructWithOverride: HiddenProtocolWithOverride {
+  func hiddenOverride() {}
 }
 
 #elseif CLIENT_APP

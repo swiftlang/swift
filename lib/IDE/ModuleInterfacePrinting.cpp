@@ -159,7 +159,7 @@ static void printTypeNameToString(Type Ty, std::string &Text) {
   SmallString<128> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
   Ty->print(OS);
-  Text = OS.str();
+  Text = std::string(OS.str());
 }
 
 bool swift::ide::
@@ -238,6 +238,295 @@ swift::ide::findGroupNameForUSR(ModuleDecl *M, StringRef USR) {
   return None;
 }
 
+/// Prints a single decl using the \p Printer and \p Options provided.
+///
+/// \returns Whether the given decl was printed.
+static bool printModuleInterfaceDecl(Decl *D,
+                                     ASTPrinter &Printer,
+                                     PrintOptions &Options,
+                                     bool PrintSynthesizedExtensions) {
+  if (!Options.shouldPrint(D)) {
+    Printer.callAvoidPrintDeclPost(D);
+    return false;
+  }
+  if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+    // Clang extensions (categories) are always printed in source order.
+    // Swift extensions are printed with their associated type unless it's
+    // a cross-module extension.
+    if (!extensionHasClangNode(Ext)) {
+      auto ExtendedNominal = Ext->getExtendedNominal();
+      if (Ext->getModuleContext() == ExtendedNominal->getModuleContext())
+        return false;
+    }
+  }
+  std::unique_ptr<SynthesizedExtensionAnalyzer> pAnalyzer;
+  if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
+    if (PrintSynthesizedExtensions) {
+      pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options));
+      Options.BracketOptions = {
+        NTD, true, true,
+        !pAnalyzer->hasMergeGroup(
+          SynthesizedExtensionAnalyzer::MergeGroupKind::MergeableWithTypeDef
+        )
+      };
+    }
+  }
+  if (D->print(Printer, Options)) {
+    if (Options.BracketOptions.shouldCloseNominal(D))
+      Printer << "\n";
+    Options.BracketOptions = BracketOptions();
+    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
+      std::queue<NominalTypeDecl *> SubDecls{{NTD}};
+
+      while (!SubDecls.empty()) {
+        auto NTD = SubDecls.front();
+        SubDecls.pop();
+
+        // Add sub-types of NTD.
+        for (auto Sub : NTD->getMembers())
+          if (auto N = dyn_cast<NominalTypeDecl>(Sub))
+            SubDecls.push(N);
+
+        // Print Ext and add sub-types of Ext.
+        for (auto Ext : NTD->getExtensions()) {
+          if (!PrintSynthesizedExtensions) {
+            if (!Options.shouldPrint(Ext)) {
+              Printer.callAvoidPrintDeclPost(Ext);
+              continue;
+            }
+            if (extensionHasClangNode(Ext))
+              continue; // will be printed in its source location, see above.
+            Printer << "\n";
+            Ext->print(Printer, Options);
+            Printer << "\n";
+          }
+          for (auto Sub : Ext->getMembers())
+            if (auto N = dyn_cast<NominalTypeDecl>(Sub))
+              SubDecls.push(N);
+        }
+        if (!PrintSynthesizedExtensions)
+          continue;
+
+        bool IsTopLevelDecl = D == NTD;
+
+        // If printed Decl is the top-level, merge the constraint-free extensions
+        // into the main body.
+        if (IsTopLevelDecl) {
+          // Print the part that should be merged with the type decl.
+          pAnalyzer->forEachExtensionMergeGroup(
+            SynthesizedExtensionAnalyzer::MergeGroupKind::MergeableWithTypeDef,
+            [&](ArrayRef<ExtensionInfo> Decls) {
+              for (auto ET : Decls) {
+                Options.BracketOptions = {
+                  ET.Ext, false, Decls.back().Ext == ET.Ext, true
+                };
+                if (ET.IsSynthesized)
+                  Options.initForSynthesizedExtension(NTD);
+                ET.Ext->print(Printer, Options);
+                if (ET.IsSynthesized)
+                  Options.clearSynthesizedExtension();
+                if (Options.BracketOptions.shouldCloseExtension(ET.Ext))
+                  Printer << "\n";
+              }
+            });
+        }
+
+        // If the printed Decl is not the top-level one, reset analyzer.
+        if (!IsTopLevelDecl)
+          pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options));
+
+        // Print the rest as synthesized extensions.
+        pAnalyzer->forEachExtensionMergeGroup(
+          // For top-level decls, only constraint extensions need to be
+          // printed, since the rest are merged into the main body.
+          IsTopLevelDecl
+          ? SynthesizedExtensionAnalyzer::MergeGroupKind::UnmergeableWithTypeDef
+          : SynthesizedExtensionAnalyzer::MergeGroupKind::All,
+          [&](ArrayRef<ExtensionInfo> Decls) {
+            // Whether we've started the extension merge group in printing.
+            bool Opened = false;
+            for (auto ET : Decls) {
+              Options.BracketOptions = {
+                ET.Ext, !Opened, Decls.back().Ext == ET.Ext, true
+              };
+              if (Options.BracketOptions.shouldOpenExtension(ET.Ext))
+                Printer << "\n";
+              if (ET.IsSynthesized) {
+                if (ET.EnablingExt)
+                  Options.initForSynthesizedExtension(ET.EnablingExt);
+                else
+                  Options.initForSynthesizedExtension(NTD);
+              }
+              // Set opened if we actually printed this extension.
+              Opened |= ET.Ext->print(Printer, Options);
+              if (ET.IsSynthesized)
+                Options.clearSynthesizedExtension();
+              if (Options.BracketOptions.shouldCloseExtension(ET.Ext))
+                Printer << "\n";
+            }
+          });
+        Options.BracketOptions = BracketOptions();
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+/// Sorts import declarations for display.
+static bool compareImports(ImportDecl *LHS, ImportDecl *RHS) {
+  auto LHSPath = LHS->getFullAccessPath();
+  auto RHSPath = RHS->getFullAccessPath();
+  for (unsigned i: range(std::min(LHSPath.size(), RHSPath.size()))) {
+    if (int Ret = LHSPath[i].Item.str().compare(RHSPath[i].Item.str()))
+      return Ret < 0;
+  }
+  return false;
+};
+
+/// Sorts Swift declarations for display.
+static bool compareSwiftDecls(Decl *LHS, Decl *RHS) {
+  auto *LHSValue = dyn_cast<ValueDecl>(LHS);
+  auto *RHSValue = dyn_cast<ValueDecl>(RHS);
+
+  if (LHSValue && RHSValue) {
+    auto LHSName = LHSValue->getBaseName();
+    auto RHSName = RHSValue->getBaseName();
+    if (int Ret = LHSName.compare(RHSName))
+      return Ret < 0;
+    // FIXME: not sufficient to establish a total order for overloaded decls.
+  }
+  return LHS->getKind() < RHS->getKind();
+};
+
+static std::pair<ArrayRef<Decl*>, ArrayRef<Decl*>>
+getDeclsFromOverlay(ModuleDecl *Overlay, ModuleDecl *Underlying,
+                    SmallVectorImpl<Decl *> &Decls, AccessLevel AccessFilter) {
+  Overlay->getDisplayDecls(Decls);
+
+  // Collector the imports of the underlying module so we can filter them out.
+  SmallPtrSet<ModuleDecl *, 8> PrevImported;
+  SmallVector<Decl*, 1> UnderlyingDecls;
+  Underlying->getDisplayDecls(UnderlyingDecls);
+  for (auto *D: UnderlyingDecls) {
+    if (auto *ID = dyn_cast<ImportDecl>(D))
+      PrevImported.insert(ID->getModule());
+  }
+
+  // Filter out inaccessible decls and any imports of, or shared with the
+  // underlying module.
+  auto NewEnd = std::partition(Decls.begin(), Decls.end(), [&](Decl *D) {
+    if (auto *ID = dyn_cast<ImportDecl>(D)) {
+      // Ignore imports of the underlying module, or any cross-import
+      // that would map back to it.
+      if (ID->getModule() == Underlying ||
+          Underlying->isUnderlyingModuleOfCrossImportOverlay(ID->getModule()))
+        return false;
+      // Ignore an imports of modules also imported by the underlying module.
+      if (PrevImported.find(ID->getModule()) != PrevImported.end())
+        return false;
+    }
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (AccessFilter > AccessLevel::Private &&
+          VD->getFormalAccess() < AccessFilter)
+        return false;
+    }
+    return true;
+  });
+  if (NewEnd != Decls.end())
+    Decls.erase(NewEnd, Decls.end());
+
+  // Separate out the import declarations and sort
+  MutableArrayRef<Decl*> Imports, Remainder;
+  auto ImportsEnd = std::partition(Decls.begin(), Decls.end(), [](Decl *D) {
+    return isa<ImportDecl>(D);
+  });
+  if (ImportsEnd != Decls.begin()) {
+    Imports = {Decls.begin(), ImportsEnd};
+    Remainder = {ImportsEnd, Decls.end()};
+    std::sort(Imports.begin(), Imports.end(), [](Decl *LHS, Decl *RHS) {
+      return compareImports(cast<ImportDecl>(LHS), cast<ImportDecl>(RHS));
+    });
+  } else {
+    Remainder = Decls;
+  }
+  std::sort(Remainder.begin(), Remainder.end(), compareSwiftDecls);
+  return {Imports, Remainder};
+}
+
+static void printCrossImportOverlays(ModuleDecl *Underlying, ASTContext &Ctx,
+                                     ASTPrinter &Printer,
+                                     PrintOptions Options,
+                                     bool PrintSynthesizedExtensions) {
+  // If we end up printing decls from any cross-import overlay modules, make
+  // sure we map any qualifying module references to the underlying module.
+  Options.mapModuleToUnderlying = [&](const ModuleDecl *M) {
+    if (Underlying->isUnderlyingModuleOfCrossImportOverlay(M))
+      return const_cast<const ModuleDecl*>(Underlying);
+    return M;
+  };
+
+  SmallVector<Decl *, 1> OverlayDecls;
+  SmallVector<Identifier, 1> Bystanders;
+
+  auto PrintDecl = [&](Decl *D) {
+    return printModuleInterfaceDecl(D, Printer, Options,
+                                    PrintSynthesizedExtensions);
+  };
+
+  SmallVector<ModuleDecl *, 1> OverlayModules;
+  Underlying->findDeclaredCrossImportOverlaysTransitive(OverlayModules);
+  std::sort(OverlayModules.begin(), OverlayModules.end(),
+            [](ModuleDecl *LHS, ModuleDecl *RHS) {
+    return LHS->getNameStr() < RHS->getNameStr();
+  });
+
+  for (auto *Overlay: OverlayModules) {
+    OverlayDecls.clear();
+    auto DeclLists = getDeclsFromOverlay(Overlay, Underlying, OverlayDecls,
+                                         Options.AccessFilter);
+
+    // Ignore overlays without any decls
+    if (OverlayDecls.empty())
+      continue;
+
+    Bystanders.clear();
+    Underlying->getAllBystandersForCrossImportOverlay(Overlay, Bystanders);
+    assert(!Bystanders.empty() && "Overlay with no bystanders?");
+    std::sort(Bystanders.begin(), Bystanders.end(),
+              [](Identifier LHS, Identifier RHS) {
+      return LHS.str() < RHS.str();
+    });
+
+    std::string BystanderList;
+    for (size_t I: range(Bystanders.size())) {
+      if (I == Bystanders.size() - 1) {
+        if (I != 0)
+          BystanderList += " and ";
+      } else if (I != 0) {
+        BystanderList += ", ";
+      }
+      BystanderList += Bystanders[I].str();
+    }
+
+    Printer << "\n// MARK: - " << BystanderList << " Additions\n\n";
+    for (auto *Import : DeclLists.first)
+      PrintDecl(Import);
+    Printer << "\n";
+
+    std::string PerDeclComment = "// Available when " + BystanderList;
+    PerDeclComment += Bystanders.size() == 1 ? " is" : " are";
+    PerDeclComment += " imported with " + Underlying->getNameStr().str();
+
+    for (auto *D : DeclLists.second) {
+      // FIXME: only print this comment if the decl is actually printed.
+      Printer << PerDeclComment << "\n";
+      if (PrintDecl(D))
+        Printer << "\n";
+    }
+  }
+}
+
 void swift::ide::printSubmoduleInterface(
        ModuleDecl *M,
        ArrayRef<StringRef> FullModuleName,
@@ -246,18 +535,17 @@ void swift::ide::printSubmoduleInterface(
        ASTPrinter &Printer,
        const PrintOptions &Options,
        const bool PrintSynthesizedExtensions) {
+  auto &SwiftContext = M->getASTContext();
+  auto &Importer =
+      static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
+
   auto AdjustedOptions = Options;
   adjustPrintOptions(AdjustedOptions);
 
   SmallVector<Decl *, 1> Decls;
   M->getDisplayDecls(Decls);
 
-  auto &SwiftContext = M->getASTContext();
-  auto &Importer =
-      static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
-
   const clang::Module *InterestingClangModule = nullptr;
-
   SmallVector<ImportDecl *, 1> ImportDecls;
   llvm::DenseSet<const clang::Module *> ClangModulesForImports;
   SmallVector<Decl *, 1> SwiftDecls;
@@ -429,9 +717,8 @@ void swift::ide::printSubmoduleInterface(
     ImportDecls.push_back(createImportDecl(M->getASTContext(), M, SM, {}));
   }
 
+  // Sort imported clang declarations in source order *within a submodule*.
   auto &ClangSourceManager = Importer.getClangASTContext().getSourceManager();
-
-  // Sort imported declarations in source order *within a submodule*.
   for (auto &P : ClangDecls) {
     std::stable_sort(P.second.begin(), P.second.end(),
                      [&](std::pair<Decl *, clang::SourceLocation> LHS,
@@ -442,39 +729,12 @@ void swift::ide::printSubmoduleInterface(
   }
 
   // Sort Swift declarations so that we print them in a consistent order.
-  std::sort(ImportDecls.begin(), ImportDecls.end(),
-            [](ImportDecl *LHS, ImportDecl *RHS) -> bool {
-    auto LHSPath = LHS->getFullAccessPath();
-    auto RHSPath = RHS->getFullAccessPath();
-    for (unsigned i = 0, e = std::min(LHSPath.size(), RHSPath.size()); i != e;
-         i++) {
-      if (int Ret = LHSPath[i].Item.str().compare(RHSPath[i].Item.str()))
-        return Ret < 0;
-    }
-    return false;
-  });
+  std::sort(ImportDecls.begin(), ImportDecls.end(), compareImports);
 
   // If the group name is specified, we sort them according to their source order,
   // which is the order preserved by getTopLevelDecls.
-  if (GroupNames.empty()) {
-    std::stable_sort(SwiftDecls.begin(), SwiftDecls.end(),
-      [&](Decl *LHS, Decl *RHS) -> bool {
-        auto *LHSValue = dyn_cast<ValueDecl>(LHS);
-        auto *RHSValue = dyn_cast<ValueDecl>(RHS);
-
-        if (LHSValue && RHSValue) {
-          auto LHSName = LHSValue->getBaseName();
-          auto RHSName = RHSValue->getBaseName();
-          if (int Ret = LHSName.compare(RHSName))
-            return Ret < 0;
-          // FIXME: this is not sufficient to establish a total order for overloaded
-          // decls.
-          return LHS->getKind() < RHS->getKind();
-        }
-
-        return LHS->getKind() < RHS->getKind();
-      });
-  }
+  if (GroupNames.empty())
+    std::stable_sort(SwiftDecls.begin(), SwiftDecls.end(), compareSwiftDecls);
 
   ASTPrinter *PrinterToUse = &Printer;
 
@@ -482,136 +742,9 @@ void swift::ide::printSubmoduleInterface(
   if (Options.PrintRegularClangComments)
     PrinterToUse = &RegularCommentPrinter;
 
-  auto PrintDecl = [&](Decl *D) -> bool {
-    ASTPrinter &Printer = *PrinterToUse;
-    if (!AdjustedOptions.shouldPrint(D)) {
-      Printer.callAvoidPrintDeclPost(D);
-      return false;
-    }
-    if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
-      // Clang extensions (categories) are always printed in source order.
-      // Swift extensions are printed with their associated type unless it's
-      // a cross-module extension.
-      if (!extensionHasClangNode(Ext)) {
-        auto ExtendedNominal = Ext->getExtendedNominal();
-        if (Ext->getModuleContext() == ExtendedNominal->getModuleContext())
-          return false;
-      }
-    }
-    std::unique_ptr<SynthesizedExtensionAnalyzer> pAnalyzer;
-    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-      if (PrintSynthesizedExtensions) {
-        pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, AdjustedOptions));
-        AdjustedOptions.BracketOptions = {NTD, true, true,
-          !pAnalyzer->hasMergeGroup(SynthesizedExtensionAnalyzer::
-                                    MergeGroupKind::MergeableWithTypeDef)};
-      }
-    }
-    if (D->print(Printer, AdjustedOptions)) {
-      if (AdjustedOptions.BracketOptions.shouldCloseNominal(D))
-        Printer << "\n";
-      AdjustedOptions.BracketOptions = BracketOptions();
-      if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-        std::queue<NominalTypeDecl *> SubDecls{{NTD}};
-
-        while (!SubDecls.empty()) {
-          auto NTD = SubDecls.front();
-          SubDecls.pop();
-
-          // Add sub-types of NTD.
-          for (auto Sub : NTD->getMembers())
-            if (auto N = dyn_cast<NominalTypeDecl>(Sub))
-              SubDecls.push(N);
-
-          // Print Ext and add sub-types of Ext.
-          for (auto Ext : NTD->getExtensions()) {
-            if (!PrintSynthesizedExtensions) {
-              if (!AdjustedOptions.shouldPrint(Ext)) {
-                Printer.callAvoidPrintDeclPost(Ext);
-                continue;
-              }
-              if (extensionHasClangNode(Ext))
-                continue; // will be printed in its source location, see above.
-              Printer << "\n";
-              Ext->print(Printer, AdjustedOptions);
-              Printer << "\n";
-            }
-            for (auto Sub : Ext->getMembers())
-              if (auto N = dyn_cast<NominalTypeDecl>(Sub))
-                SubDecls.push(N);
-          }
-          if (!PrintSynthesizedExtensions)
-            continue;
-
-          bool IsTopLevelDecl = D == NTD;
-
-          // If printed Decl is the top-level, merge the constraint-free extensions
-          // into the main body.
-          if (IsTopLevelDecl) {
-          // Print the part that should be merged with the type decl.
-          pAnalyzer->forEachExtensionMergeGroup(
-              SynthesizedExtensionAnalyzer::MergeGroupKind::
-                  MergeableWithTypeDef,
-              [&](ArrayRef<ExtensionInfo> Decls) {
-                for (auto ET : Decls) {
-                  AdjustedOptions.BracketOptions = {
-                      ET.Ext, false, Decls.back().Ext == ET.Ext, true};
-                  if (ET.IsSynthesized)
-                    AdjustedOptions.initForSynthesizedExtension(NTD);
-                  ET.Ext->print(Printer, AdjustedOptions);
-                  if (ET.IsSynthesized)
-                    AdjustedOptions.clearSynthesizedExtension();
-                  if (AdjustedOptions.BracketOptions.shouldCloseExtension(
-                          ET.Ext))
-                    Printer << "\n";
-                }
-              });
-          }
-
-          // If the printed Decl is not the top-level one, reset analyzer.
-          if (!IsTopLevelDecl)
-            pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, AdjustedOptions));
-
-          // Print the rest as synthesized extensions.
-          pAnalyzer->forEachExtensionMergeGroup(
-              // For top-level decls, only constraint extensions need to be
-              // printed, since the rest are merged into the main body.
-              IsTopLevelDecl ? SynthesizedExtensionAnalyzer::MergeGroupKind::
-                                   UnmergeableWithTypeDef
-                             :
-                             // For sub-decls, all extensions should be printed.
-                  SynthesizedExtensionAnalyzer::MergeGroupKind::All,
-              [&](ArrayRef<ExtensionInfo> Decls) {
-                // Whether we've started the extension merge group in printing.
-                bool Opened = false;
-                for (auto ET : Decls) {
-                  AdjustedOptions.BracketOptions = { ET.Ext, !Opened,
-                    Decls.back().Ext == ET.Ext, true};
-                  if (AdjustedOptions.BracketOptions.shouldOpenExtension(
-                          ET.Ext))
-                    Printer << "\n";
-                  if (ET.IsSynthesized) {
-                    if (ET.EnablingExt)
-                      AdjustedOptions.initForSynthesizedExtension(
-                          ET.EnablingExt);
-                    else
-                      AdjustedOptions.initForSynthesizedExtension(NTD);
-                  }
-                  // Set opened if we actually printed this extension.
-                  Opened |= ET.Ext->print(Printer, AdjustedOptions);
-                  if (ET.IsSynthesized)
-                    AdjustedOptions.clearSynthesizedExtension();
-                  if (AdjustedOptions.BracketOptions.shouldCloseExtension(
-                          ET.Ext))
-                    Printer << "\n";
-                }
-              });
-          AdjustedOptions.BracketOptions = BracketOptions();
-        }
-      }
-      return true;
-    }
-    return false;
+  auto PrintDecl = [&](Decl *D) {
+    return printModuleInterfaceDecl(D, *PrinterToUse, AdjustedOptions,
+                                    PrintSynthesizedExtensions);
   };
 
   // Imports from the stdlib are internal details that don't need to be exposed.
@@ -645,6 +778,14 @@ void swift::ide::printSubmoduleInterface(
     for (auto *D : SwiftDecls) {
       if (PrintDecl(D))
         Printer << "\n";
+    }
+
+    // If we're printing the entire target module (not specific sub-groups),
+    // also print the decls from any underscored Swift cross-import overlays it
+    // is the underlying module of, transitively.
+    if (GroupNames.empty()) {
+      printCrossImportOverlays(M, SwiftContext, *PrinterToUse, AdjustedOptions,
+                               PrintSynthesizedExtensions);
     }
   }
 }

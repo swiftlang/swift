@@ -242,6 +242,7 @@ public:
                                 SGFContext C = SGFContext()) &&;
   ManagedValue getAsSingleValue(SILGenFunction &SGF,
                                 AbstractionPattern origFormalType,
+                                SILType loweredResultTy,
                                 SGFContext C = SGFContext()) &&;
 
   ManagedValue getConverted(SILGenFunction &SGF, const Conversion &conversion,

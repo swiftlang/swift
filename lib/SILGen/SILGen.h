@@ -131,6 +131,9 @@ public:
 
   ASTContext &getASTContext() { return M.getASTContext(); }
 
+  llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>
+    MagicFileStringsByFilePath;
+
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
   
@@ -168,7 +171,65 @@ public:
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
   bool hasNonTrivialIVars(ClassDecl *cd);
-  
+
+  /// Given an original function and a user-specified custom derivative
+  /// function, get or create a derivative thunk with the expected derivative
+  /// function type computed from the original function.
+  ///
+  /// To achieve the expected derivative type, the thunk may perform
+  /// self-reordering, reabstraction, or both.
+  ///
+  /// Self-reordering is done for canonicalizing the types of derivative
+  /// functions for instance methods wrt `self`. We want users to define
+  /// derivatives with the following AST function types:
+  ///
+  /// JVP:
+  /// - Takes `Self` as first parameter.
+  /// - Returns differential taking `Self.Tan` as first parameter.
+  ///
+  ///     (Self) -> (T, ...) -> (R, (Self.Tan, T.Tan, ...) -> R.Tan)
+  ///
+  /// VJP:
+  /// - Takes `Self` as first parameter.
+  /// - Returns pullback returning `Self.Tan` as first result.
+  ///
+  ///     (Self) -> (T, ...) -> (R, (R.Tan) -> (Self.Tan, T.Tan, ...))
+  ///
+  /// However, the curried `Self` parameter in the AST JVP/VJP function types
+  /// becomes the *last* parameter in the flattened parameter list of their
+  /// lowered SIL function types.
+  ///
+  /// JVP:
+  /// - Takes `Self` as *last* parameter.
+  /// - Returns differential taking `Self.Tan` as *first* parameter.
+  ///
+  ///     $(T, ..., Self) -> (R, (Self.Tan, T.Tan, ...) -> R.Tan)
+  ///
+  /// VJP:
+  /// - Takes `Self` as *last* parameter.
+  /// - Returns pullback returning `Self.Tan` as *first* result.
+  ///
+  ///     $(T, ..., Self) -> (R, (R.Tan) -> (Self.Tan, T.Tan, ...))
+  ///
+  /// This leads to a parameter ordering inconsistency, and would require the
+  /// differentiation transform to handle "wrt `self` instance method
+  /// derivatives" specially. However, canonicalization during SILGen makes the
+  /// parameter ordering uniform for "instance method derivatives wrt self" and
+  /// simplifies the transform rules.
+  ///
+  /// If `self` must be reordered, reorder it so that it appears as:
+  /// - The last parameter in the returned differential.
+  /// - The last result in the returned pullback.
+  SILFunction *getOrCreateCustomDerivativeThunk(
+      SILFunction *customDerivativeFn, SILFunction *originalFn,
+      const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind);
+
+  /// Get or create a derivative function vtable entry thunk for the given
+  /// SILDeclRef and derivative function type.
+  SILFunction *
+  getOrCreateAutoDiffClassMethodThunk(SILDeclRef derivativeFnRef,
+                                      CanSILFunctionType derivativeFnTy);
+
   /// Determine whether we need to emit an ivar destroyer for the given class.
   /// An ivar destroyer is needed if a superclass of this class may define a
   /// failing designated initializer.
@@ -242,9 +303,6 @@ public:
   /// Emits default argument generators for the given parameter list.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                 ParameterList *paramList);
-
-  /// Emits the curry thunk between two uncurry levels of a function.
-  void emitCurryThunk(SILDeclRef thunk);
   
   /// Emits a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
@@ -341,6 +399,20 @@ public:
                               CanType baseTy,
                               DeclContext *useDC,
                               bool forPropertyDescriptor);
+
+  /// Emit all differentiability witnesses for the given function, visiting its
+  /// `@differentiable` and `@derivative` attributes.
+  void emitDifferentiabilityWitnessesForFunction(SILDeclRef constant,
+                                                 SILFunction *F);
+
+  /// Emit the differentiability witness for the given original function
+  /// declaration and SIL function, autodiff configuration, and JVP and VJP
+  /// functions (null if undefined).
+  void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
+                                    SILFunction *originalFunction,
+                                    const AutoDiffConfig &config,
+                                    SILFunction *jvp, SILFunction *vjp,
+                                    const DeclAttribute *diffAttr);
 
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();

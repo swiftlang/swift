@@ -59,7 +59,7 @@ class HasBlockImpl: HasBlock {
 // CHECK: bb0(%0 : $@thick GlobalProperty.Type):
 // CHECK:   [[GA:%.*]] = global_addr @constCGlobal : $*Optional<CFString>
 // CHECK:   [[STR:%.*]] = load [copy] [[GA]] : $*Optional<CFString>            
-// CHECK: switch_enum [[STR]] : $Optional<CFString>, case #Optional.some!enumelt.1: [[SOMEBB:bb.*]], case #Optional.none!enumelt: bb{{.*}}
+// CHECK: switch_enum [[STR]] : $Optional<CFString>, case #Optional.some!enumelt: [[SOMEBB:bb.*]], case #Optional.none!enumelt: bb{{.*}}
 // CHECK:   [[SOMEBB]]([[R:%.*]] : @owned $CFString):
 // CHECK:   return [[R]] : $CFString
 // CHECK_LABEL: } // end sil function '$s25access_marker_verify_objc14GlobalPropertyC14globalCFStringSo0H3RefavgZ'

@@ -78,7 +78,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_ImportedModules:
   case file_types::TY_TBD:
   case file_types::TY_ModuleTrace:
-  case file_types::TY_OptRecord:
+  case file_types::TY_YAMLOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_SwiftOverlayFile:
@@ -102,6 +102,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_Nothing:
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
+  case file_types::TY_BitstreamOptRecord:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -146,7 +147,8 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
   case file_types::TY_ModuleTrace:
-  case file_types::TY_OptRecord:
+  case file_types::TY_YAMLOptRecord:
+  case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
     return false;
@@ -195,7 +197,8 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
   case file_types::TY_ModuleTrace:
-  case file_types::TY_OptRecord:
+  case file_types::TY_YAMLOptRecord:
+  case file_types::TY_BitstreamOptRecord:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");

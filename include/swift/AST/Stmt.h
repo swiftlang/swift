@@ -321,6 +321,7 @@ class alignas(8) PoundAvailableInfo final :
   friend TrailingObjects;
 
   SourceLoc PoundLoc;
+  SourceLoc LParenLoc;
   SourceLoc RParenLoc;
 
   // The number of queries tail allocated after this object.
@@ -338,10 +339,10 @@ class alignas(8) PoundAvailableInfo final :
   /// This is filled in by Sema.
   VersionRange VariantAvailableRange;
 
-  PoundAvailableInfo(SourceLoc PoundLoc, ArrayRef<AvailabilitySpec *> queries,
-                     SourceLoc RParenLoc)
-   : PoundLoc(PoundLoc), RParenLoc(RParenLoc), NumQueries(queries.size()),
-     AvailableRange(VersionRange::empty()),
+  PoundAvailableInfo(SourceLoc PoundLoc, SourceLoc LParenLoc,
+                     ArrayRef<AvailabilitySpec *> queries, SourceLoc RParenLoc)
+   : PoundLoc(PoundLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+     NumQueries(queries.size()), AvailableRange(VersionRange::empty()),
      VariantAvailableRange(VersionRange::empty()) {
     std::uninitialized_copy(queries.begin(), queries.end(),
                             getTrailingObjects<AvailabilitySpec *>());
@@ -349,6 +350,7 @@ class alignas(8) PoundAvailableInfo final :
   
 public:
   static PoundAvailableInfo *create(ASTContext &ctx, SourceLoc PoundLoc,
+                                    SourceLoc LParenLoc,
                                     ArrayRef<AvailabilitySpec *> queries,
                                     SourceLoc RParenLoc);
   
@@ -357,6 +359,9 @@ public:
                               NumQueries);
   }
   
+  SourceLoc getLParenLoc() const { return LParenLoc; }
+  SourceLoc getRParenLoc() const { return RParenLoc; }
+
   SourceLoc getStartLoc() const { return PoundLoc; }
   SourceLoc getEndLoc() const;
   SourceLoc getLoc() const { return PoundLoc; }
@@ -771,6 +776,7 @@ public:
 
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(WhileLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
+  SourceLoc getWhileLoc() const { return WhileLoc; }
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
@@ -792,9 +798,10 @@ public:
                   getDefaultImplicitFlag(implicit, RepeatLoc),
                   LabelInfo),
       RepeatLoc(RepeatLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
-  
+
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(RepeatLoc); }
   SourceLoc getEndLoc() const;
+  SourceLoc getRepeatLoc() const { return RepeatLoc; }
   
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
@@ -819,6 +826,7 @@ class ForEachStmt : public LabeledStmt {
   Pattern *Pat;
   SourceLoc InLoc;
   Expr *Sequence;
+  SourceLoc WhereLoc;
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
 
@@ -831,12 +839,12 @@ class ForEachStmt : public LabeledStmt {
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, Pattern *Pat,
-              SourceLoc InLoc, Expr *Sequence, Expr *WhereExpr, BraceStmt *Body,
-              Optional<bool> implicit = None)
+              SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
+              Expr *WhereExpr, BraceStmt *Body, Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                   LabelInfo),
       ForLoc(ForLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
-      WhereExpr(WhereExpr), Body(Body) {
+      WhereLoc(WhereLoc), WhereExpr(WhereExpr), Body(Body) {
     setPattern(Pat);
   }
 
@@ -864,6 +872,9 @@ public:
 
   /// getInLoc - Retrieve the location of the 'in' keyword.
   SourceLoc getInLoc() const { return InLoc; }
+
+  /// getWhereLoc - Retrieve the location of the 'where' keyword.
+  SourceLoc getWhereLoc() const { return WhereLoc; }
   
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.

@@ -39,8 +39,8 @@ protected:
   bool OptimizeProtocolNames = true;
 
   /// If enabled, use Objective-C runtime names when mangling @objc Swift
-  /// protocols.
-  bool UseObjCProtocolNames = false;
+  /// protocols and classes.
+  bool UseObjCRuntimeNames = false;
 
   /// If enabled, non-canonical types are allowed and type alias types get a
   /// special mangling.
@@ -80,7 +80,6 @@ public:
     DynamicThunk,
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
-    DirectMethodReferenceThunk,
   };
 
   ASTMangler(bool DWARFMangling = false)
@@ -98,14 +97,14 @@ public:
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
                                   SymbolKind SKind);
 
-  std::string mangleEntity(const ValueDecl *decl, bool isCurried,
+  std::string mangleEntity(const ValueDecl *decl,
                            SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleDestructorEntity(const DestructorDecl *decl,
                                      bool isDeallocating, SymbolKind SKind);
 
   std::string mangleConstructorEntity(const ConstructorDecl *ctor,
-                                      bool isAllocating, bool isCurried,
+                                      bool isAllocating,
                                       SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleIVarInitDestroyEntity(const ClassDecl *decl,
@@ -153,6 +152,25 @@ public:
                                              Type FromType, Type ToType,
                                              Type SelfType,
                                              ModuleDecl *Module);
+
+  /// Mangle the derivative function (JVP/VJP) for the given:
+  /// - Mangled original function name.
+  /// - Derivative function kind.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string
+  mangleAutoDiffDerivativeFunctionHelper(StringRef name,
+                                         AutoDiffDerivativeFunctionKind kind,
+                                         AutoDiffConfig config);
+
+  /// Mangle the linear map (differential/pullback) for the given:
+  /// - Mangled original function name.
+  /// - Linear map kind.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string mangleAutoDiffLinearMapHelper(StringRef name,
+                                            AutoDiffLinearMapKind kind,
+                                            AutoDiffConfig config);
 
   /// Mangle a SIL differentiability witness key:
   /// - Mangled original function name.
@@ -352,6 +370,9 @@ protected:
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
   void appendProtocolConformanceRef(const RootProtocolConformance *conformance);
+  void appendAnyProtocolConformance(CanGenericSignature genericSig,
+                                    CanType conformingType,
+                                    ProtocolConformanceRef conformance);
   void appendConcreteProtocolConformance(
                                         const ProtocolConformance *conformance);
   void appendDependentProtocolConformance(const ConformanceAccessPath &path);

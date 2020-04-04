@@ -579,6 +579,68 @@ class SR_4206_DerivedGeneric_6<T>: SR_4206_BaseConcrete_6 {
   override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{overridden method 'foo' has generic signature <T, T where T : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_2>; expected generic signature to be <T, T where T : SR_4206_Protocol_2>}}
 }
 
+// Contextual where clauses on non-generic members
+
+class SR_4206_Base_7<T> {
+  func foo1() where T: SR_4206_Protocol_1 {} // expected-note {{overridden declaration is here}}
+  func foo2() where T: SR_4206_Protocol_1 {}
+}
+
+class SR_4206_Derived_7<T>: SR_4206_Base_7<T> {
+  override func foo1() where T: SR_4206_Protocol_2 {} // expected-error {{overridden method 'foo1' has generic signature <T where T : SR_4206_Protocol_2> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_1>; expected generic signature to be <T where τ_0_0 : SR_4206_Protocol_1>}}
+
+  override func foo2() {} // OK
+}
+
+// Subclass with new constraint on inherited generic param
+
+class SR_4206_Base_8<T> {
+  func foo() where T: SR_4206_Protocol_1 {}
+}
+class SR_4206_Derived_8<T: SR_4206_Protocol_2, U>: SR_4206_Base_8<T> {
+  // Because the generic signature of foo() is the same either way,
+  // it may seem confusing that placing an additional constraint on the
+  // generic parameter declaration directly has a different effect on
+  // overridability in contrast to placing the constraint on foo().
+  // The former (unlike the latter) is accepted because the constraint
+  // in question only affects the ability to initialize an instance of the
+  // subclass — not the visibility of the override itself relative to an
+  // existing instance.
+  override func foo() where T: SR_4206_Protocol_1 {} // OK
+}
+
+// Same-type to conformance visibility reabstraction
+
+class SR_4206_Base_9<T> {
+  func foo() where T == Int {}
+}
+class SR_4206_Derived_9<T>: SR_4206_Base_9<T> {
+  override func foo() where T: FixedWidthInteger {} // OK
+}
+
+// Override with constraint on a non-inherited generic param
+
+class SR_4206_Base_10<T> {
+  func foo() where T: SR_4206_Protocol_1 {} // expected-note {{overridden declaration is here}}
+}
+class SR_4206_Derived_10<T, U>: SR_4206_Base_10<T> {
+  override func foo() where U: SR_4206_Protocol_1 {} // expected-error {{overridden method 'foo' has generic signature <T, U where U : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_1>; expected generic signature to be <T, U where τ_0_0 : SR_4206_Protocol_1>}}
+}
+
+// Override with return type specialization
+
+class SR_4206_Base_11<T> {
+  // The fact that the return type matches the substitution
+  // for T must hold across overrides.
+  func foo() -> T where T: FixedWidthInteger { fatalError() } // expected-note {{potential overridden instance method 'foo()' here}}
+}
+class SR_4206_Derived_11: SR_4206_Base_11<Int> {
+  override func foo() -> Int { return .zero } // OK
+}
+class SR_4206_Derived2_11: SR_4206_Base_11<Bool> {
+  override func foo() -> Int { return .zero } // expected-error {{method does not override any method from its superclass}}
+}
+
 // Misc //
 
 protocol SR_4206_Key {}

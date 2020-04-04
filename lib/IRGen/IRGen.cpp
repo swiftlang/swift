@@ -18,6 +18,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/IRGenRequests.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
@@ -39,6 +40,7 @@
 #include "swift/Subsystems.h"
 #include "../Serialization/ModuleFormat.h"
 #include "clang/Basic/TargetInfo.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -659,6 +661,75 @@ bool swift::performLLVM(const IRGenOptions &Opts,
   return false;
 }
 
+static void setPointerAuthOptions(PointerAuthOptions &opts,
+                                  const clang::PointerAuthOptions &clangOpts){
+  // Intentionally do a slice-assignment to copy over the clang options.
+  static_cast<clang::PointerAuthOptions&>(opts) = clangOpts;
+
+  assert(clangOpts.FunctionPointers);
+  if (clangOpts.FunctionPointers.getKind() != PointerAuthSchema::Kind::ARM8_3)
+    return;
+
+  using Discrimination = PointerAuthSchema::Discrimination;
+
+  // A key suitable for code pointers that might be used anywhere in the ABI.
+  auto codeKey = clangOpts.FunctionPointers.getARM8_3Key();
+
+  // A key suitable for data pointers that might be used anywhere in the ABI.
+  // Using a data key for data pointers and vice-versa is important for
+  // ABI future-proofing.
+  auto dataKey = PointerAuthSchema::ARM8_3Key::ASDA;
+
+  // A key suitable for code pointers that are only used in private
+  // situations.  Do not use this key for any sort of signature that
+  // might end up on a global constant initializer.
+  auto nonABICodeKey = PointerAuthSchema::ARM8_3Key::ASIB;
+
+  // If you change anything here, be sure to update <ptrauth.h>.
+  opts.SwiftFunctionPointers =
+    PointerAuthSchema(codeKey, /*address*/ false, Discrimination::Type);
+  opts.KeyPaths =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.ValueWitnesses =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.ProtocolWitnesses =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.ProtocolAssociatedTypeAccessFunctions =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.ProtocolAssociatedTypeWitnessTableAccessFunctions =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.SwiftClassMethods =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.SwiftClassMethodPointers =
+    PointerAuthSchema(codeKey, /*address*/ false, Discrimination::Decl);
+  opts.HeapDestructors =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+
+  // Partial-apply captures are not ABI and can use a more aggressive key.
+  opts.PartialApplyCapture =
+    PointerAuthSchema(nonABICodeKey, /*address*/ true, Discrimination::Decl);
+
+  opts.TypeDescriptors =
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+  opts.TypeDescriptorsAsArguments =
+    PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);
+
+  opts.SwiftDynamicReplacements =
+    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.SwiftDynamicReplacementKeys =
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
+  // Coroutine resumption functions are never stored globally in the ABI,
+  // so we can do some things that aren't normally okay to do.  However,
+  // we can't use ASIB because that would break ARM64 interoperation.
+  // The address used in the discrimination is not the address where the
+  // function pointer is signed, but the address of the coroutine buffer.
+  opts.YieldManyResumeFunctions =
+      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
+  opts.YieldOnceResumeFunctions =
+      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
+}
+
 std::unique_ptr<llvm::TargetMachine>
 swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
   CodeGenOpt::Level OptLevel = Opts.shouldOptimize()
@@ -681,6 +752,18 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
         features.AddFeature(feature);
       }
     targetFeatures = features.getString();
+  }
+
+  // Set up pointer-authentication.
+  if (auto loader = Ctx.getClangModuleLoader()) {
+    auto &clangInstance = loader->getClangInstance();
+    if (clangInstance.getLangOpts().PointerAuthCalls) {
+      // FIXME: This is gross. This needs to be done in the Frontend
+      // after the module loaders are set up, and where these options are
+      // formally not const.
+      setPointerAuthOptions(const_cast<IRGenOptions &>(Opts).PointerAuth,
+                            clangInstance.getCodeGenOpts().PointerAuth);
+    }
   }
 
   std::string Error;
@@ -853,20 +936,9 @@ void swift::irgen::deleteIRGenModule(
 /// IRGenModule.
 static void runIRGenPreparePasses(SILModule &Module,
                                   irgen::IRGenModule &IRModule) {
-  SILPassManager PM(&Module, &IRModule, "irgen", /*isMandatoryPipeline=*/ true);
-  bool largeLoadable = Module.getOptions().EnableLargeLoadableTypes;
-#define PASS(ID, Tag, Name)
-#define IRGEN_PASS(ID, Tag, Name)                                              \
-  if (swift::PassKind::ID == swift::PassKind::LoadableByAddress) {             \
-    if (largeLoadable) {                                                       \
-      PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());          \
-    }                                                                          \
-  } else {                                                                     \
-    PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());            \
-  }
-#include "swift/SILOptimizer/PassManager/Passes.def"
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getIRGenPreparePassPipeline(Module.getOptions()));
+  auto &opts = Module.getOptions();
+  auto plan = SILPassPipelinePlan::getIRGenPreparePassPipeline(opts);
+  executePassPipelinePlan(&Module, plan, /*isMandatory*/ true, &IRModule);
 }
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output file.
@@ -888,16 +960,15 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
   if (!targetMachine) return nullptr;
 
   // Create the IR emitter.
-  IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
-                  ModuleName, PSPs.OutputFilename,
-                  PSPs.MainInputFilenameForDebugInfo,
+  IRGenModule IGM(irgen, std::move(targetMachine), SF, LLVMContext, ModuleName,
+                  PSPs.OutputFilename, PSPs.MainInputFilenameForDebugInfo,
                   PrivateDiscriminator);
 
   initLLVMModule(IGM, *SILMod->getSwiftModule());
 
   // Run SIL level IRGen preparation passes.
   runIRGenPreparePasses(*SILMod, IGM);
-  
+
   {
     FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
 
@@ -1282,25 +1353,36 @@ static void performParallelIRGeneration(
 }
 
 std::unique_ptr<llvm::Module> swift::performIRGeneration(
-    const IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
-    StringRef ModuleName, const PrimarySpecificPaths &PSPs,
-    llvm::LLVMContext &LLVMContext,
+    const IRGenOptions &Opts, swift::ModuleDecl *M,
+    std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
+    const PrimarySpecificPaths &PSPs, llvm::LLVMContext &LLVMContext,
     ArrayRef<std::string> parallelOutputFilenames,
-    llvm::GlobalVariable **outModuleHash,
-    llvm::StringSet<> *LinkerDirectives) {
-  if (SILMod->getOptions().shouldPerformIRGenerationInParallel() &&
-      !parallelOutputFilenames.empty()) {
-    auto NumThreads = SILMod->getOptions().NumThreads;
-    ::performParallelIRGeneration(Opts, M, std::move(SILMod), ModuleName,
-                                  NumThreads, parallelOutputFilenames,
-                                  LinkerDirectives);
+    llvm::GlobalVariable **outModuleHash, llvm::StringSet<> *LinkerDirectives) {
+  auto desc = IRGenDescriptor::forWholeModule(
+      Opts, M, std::move(SILMod), ModuleName, PSPs, LLVMContext,
+      parallelOutputFilenames, outModuleHash, LinkerDirectives);
+  return llvm::cantFail(
+      M->getASTContext().evaluator(IRGenWholeModuleRequest{desc}));
+}
+
+std::unique_ptr<llvm::Module>
+IRGenWholeModuleRequest::evaluate(Evaluator &evaluator,
+                                  IRGenDescriptor desc) const {
+  auto *M = desc.Ctx.get<ModuleDecl *>();
+  if (desc.SILMod->getOptions().shouldPerformIRGenerationInParallel() &&
+      !desc.parallelOutputFilenames.empty()) {
+    const auto NumThreads = desc.SILMod->getOptions().NumThreads;
+    ::performParallelIRGeneration(
+        desc.Opts, M, std::unique_ptr<SILModule>(desc.SILMod), desc.ModuleName,
+        NumThreads, desc.parallelOutputFilenames, desc.LinkerDirectives);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.
     return nullptr;
   }
-  return ::performIRGeneration(Opts, M, std::move(SILMod), ModuleName, PSPs,
-                               "", LLVMContext, nullptr,
-                               outModuleHash, LinkerDirectives);
+  return ::performIRGeneration(
+      desc.Opts, M, std::unique_ptr<SILModule>(desc.SILMod), desc.ModuleName,
+      desc.PSPs, "", desc.LLVMContext, nullptr, desc.outModuleHash,
+      desc.LinkerDirectives);
 }
 
 std::unique_ptr<llvm::Module> swift::
@@ -1311,10 +1393,21 @@ performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
                     llvm::LLVMContext &LLVMContext,
                     llvm::GlobalVariable **outModuleHash,
                     llvm::StringSet<> *LinkerDirectives) {
-  return ::performIRGeneration(Opts, SF.getParentModule(), std::move(SILMod),
-                               ModuleName, PSPs, PrivateDiscriminator,
-                               LLVMContext, &SF,
-                               outModuleHash, LinkerDirectives);
+  auto desc = IRGenDescriptor::forFile(Opts, SF, std::move(SILMod), ModuleName,
+                                       PSPs, PrivateDiscriminator, LLVMContext,
+                                       outModuleHash, LinkerDirectives);
+  return llvm::cantFail(
+      SF.getASTContext().evaluator(IRGenSourceFileRequest{desc}));
+}
+
+std::unique_ptr<llvm::Module>
+IRGenSourceFileRequest::evaluate(Evaluator &evaluator,
+                                 IRGenDescriptor desc) const {
+  auto *SF = desc.Ctx.get<SourceFile *>();
+  return ::performIRGeneration(
+      desc.Opts, SF->getParentModule(), std::unique_ptr<SILModule>(desc.SILMod),
+      desc.ModuleName, desc.PSPs, desc.PrivateDiscriminator, desc.LLVMContext,
+      SF, desc.outModuleHash, desc.LinkerDirectives);
 }
 
 void

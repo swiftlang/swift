@@ -74,25 +74,25 @@ bb2(%39 : @owned $Error):
 // CHECK: dealloc_stack [[STACK]]
 // CHECK: unreachable
 
-sil @forEachBody2 : $@convention(thin) (@in_guaranteed @callee_guaranteed <A> in () -> @out A for <Int>) -> @error Error
+sil @forEachBody2 : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error
 
-sil hidden [ossa] @nonTrivialForEachLoopUnrollTest : $@convention(thin) (@owned @callee_guaranteed <A> in () -> @out A for <Int>, @owned @callee_guaranteed <A> in () -> @out A for <Int>) -> () {
-bb0(%0: @owned $@callee_guaranteed <A> in () -> @out A for <Int>, %1: @owned $@callee_guaranteed <A> in () -> @out A for <Int>):
+sil hidden [ossa] @nonTrivialForEachLoopUnrollTest : $@convention(thin) (@owned @callee_guaranteed @substituted <A> () -> @out A for <Int>, @owned @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> () {
+bb0(%0: @owned $@callee_guaranteed @substituted <A> () -> @out A for <Int>, %1: @owned $@callee_guaranteed @substituted <A> () -> @out A for <Int>):
   %2 = integer_literal $Builtin.Word, 2
   %3 = function_ref @_allocateUninitializedArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
   %4 = apply %3<() -> Int>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
   (%5, %6) = destructure_tuple %4 : $(Array<()->Int>, Builtin.RawPointer)
-  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*@callee_guaranteed <A> in () -> @out A for <Int>
-  store %0 to [init] %7 : $*@callee_guaranteed <A> in () -> @out A for <Int>
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*@callee_guaranteed @substituted <A> () -> @out A for <Int>
+  store %0 to [init] %7 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>
   %12 = integer_literal $Builtin.Word, 1
-  %13 = index_addr %7 : $*@callee_guaranteed <A> in () -> @out A for <Int>, %12 : $Builtin.Word
-  store %1 to [init] %13 : $*@callee_guaranteed <A> in () -> @out A for <Int>
+  %13 = index_addr %7 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>, %12 : $Builtin.Word
+  store %1 to [init] %13 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>
   %21 = begin_borrow %5 : $Array<()->Int>
   %22 = alloc_stack $Array<()->Int>
   %23 = store_borrow %21 to %22 : $*Array<()->Int>
-  %24 = function_ref @forEachBody2 : $@convention(thin) (@in_guaranteed @callee_guaranteed <A> in () -> @out A for <Int>) -> @error Error
-  %25 = convert_function %24 : $@convention(thin) (@in_guaranteed @callee_guaranteed <A> in () -> @out A for <Int>) -> @error Error to $@convention(thin) @noescape (@in_guaranteed @callee_guaranteed <A> in () -> @out A for <Int>) -> @error Error
-  %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed @callee_guaranteed <A> in () -> @out A for <Int>) -> @error Error to $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed <A> in () -> @out A for <Int>) -> @error Error
+  %24 = function_ref @forEachBody2 : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error
+  %25 = convert_function %24 : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error to $@convention(thin) @noescape (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error
+  %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error to $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error
   // A stub for Sequence.forEach(_:)
   %30 = function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
   try_apply %30<[() -> Int]>(%26, %22) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
@@ -109,16 +109,16 @@ bb2(%39 : @owned $Error):
 }
 // CHECK-LABEL: nonTrivialForEachLoopUnrollTest
 // CHECK: [[ELEM1:%[0-9]+]] = copy_value %0
-// CHECK-NEXT: store %0 to [init] %{{.*}} : $*@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <Int>
+// CHECK-NEXT: store %0 to [init] %{{.*}} : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
 // CHECK: [[ELEM2:%[0-9]+]] = copy_value %1
-// CHECK-NEXT: store %1 to [init] %{{.*}} : $*@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <Int>
+// CHECK-NEXT: store %1 to [init] %{{.*}} : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
 // CHECK: [[BODYCLOSURE:%[0-9]+]] = thin_to_thick_function
 // CHECK-NOT: forEach
-// CHECK: [[STACK:%[0-9]+]] = alloc_stack $@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <Int>
+// CHECK: [[STACK:%[0-9]+]] = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
 // CHECK: [[ELEM1BORROW:%[0-9]+]] = begin_borrow [[ELEM1]]
 // CHECK: store_borrow [[ELEM1BORROW]] to [[STACK]]
 // CHECK: end_borrow [[ELEM1BORROW]]
-// CHECK: try_apply [[BODYCLOSURE]]([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <Int>) -> @error Error, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+// CHECK: try_apply [[BODYCLOSURE]]([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>) -> @error Error, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
 
 // CHECK: [[ERROR]]([[ERRPARAM:%[0-9]+]] : @owned $Error):
 // CHECK: br [[ERROR3:bb[0-9]+]]([[ERRPARAM]] : $Error)
@@ -127,7 +127,7 @@ bb2(%39 : @owned $Error):
 // CHECK: [[ELEM2BORROW:%[0-9]+]] = begin_borrow [[ELEM2]]
 // CHECK: store_borrow [[ELEM2BORROW]] to [[STACK]]
 // CHECK: end_borrow [[ELEM2BORROW]]
-// CHECK: try_apply [[BODYCLOSURE]]([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <Int>) -> @error Error, normal [[NORMAL2:bb[0-9]+]], error [[ERROR2:bb[0-9]+]]
+// CHECK: try_apply [[BODYCLOSURE]]([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>) -> @error Error, normal [[NORMAL2:bb[0-9]+]], error [[ERROR2:bb[0-9]+]]
 
 // CHECK: [[ERROR2]]([[ERRPARAM2:%[0-9]+]] : @owned $Error):
 // CHECK: br [[ERROR3:bb[0-9]+]]([[ERRPARAM2]] : $Error)

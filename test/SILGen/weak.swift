@@ -30,7 +30,7 @@ func test0(c c: C) {
 // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PBC]]
 // CHECK-NEXT: [[TMP:%.*]] = load [copy] [[READ]] : $*C
 // CHECK-NEXT: end_access [[READ]]
-// CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt.1, [[TMP]] : $C
+// CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt, [[TMP]] : $C
 // CHECK-NEXT: store_weak [[OPTVAL]] to [initialization] [[PBX]] : $*@sil_weak Optional<C>
 // CHECK-NEXT: destroy_value [[OPTVAL]] : $Optional<C>
 
@@ -39,7 +39,7 @@ func test0(c c: C) {
 // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PBC]]
 // CHECK-NEXT: [[TMP:%.*]] = load [copy] [[READ]] : $*C
 // CHECK-NEXT:  end_access [[READ]]
-// CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt.1, [[TMP]] : $C
+// CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt, [[TMP]] : $C
 
 //   Drill to a.x
 // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBA]]

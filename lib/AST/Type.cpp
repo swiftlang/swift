@@ -1493,10 +1493,23 @@ bool TypeBase::isCallableNominalType(DeclContext *dc) {
 }
 
 bool TypeBase::hasDynamicMemberLookupAttribute() {
+  if (!mayHaveMembers())
+    return false;
+
   auto canTy = getCanonicalType();
   auto &ctx = canTy->getASTContext();
   return evaluateOrDefault(
       ctx.evaluator, HasDynamicMemberLookupAttributeRequest{canTy}, false);
+}
+
+bool TypeBase::hasDynamicCallableAttribute() {
+  if (!mayHaveMembers())
+    return false;
+
+  auto canTy = getCanonicalType();
+  auto &ctx = canTy->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, HasDynamicCallableAttributeRequest{canTy}, false);
 }
 
 Type TypeBase::getSuperclass(bool useArchetypes) {
@@ -1769,21 +1782,48 @@ public:
     if (auto substFunc = dyn_cast<SILFunctionType>(subst)) {
       if (func->getExtInfo() != substFunc->getExtInfo())
         return CanType();
-      
+
+      if (func->getInvocationGenericSignature()
+          || substFunc->getInvocationGenericSignature()) {
+        auto sig = func->getInvocationGenericSignature();
+        if (sig != substFunc->getInvocationGenericSignature())
+          return CanType();
+
+        auto origSubs = func->getPatternSubstitutions();
+        auto substSubs = substFunc->getPatternSubstitutions();
+
+        if ((bool) origSubs != (bool) substSubs)
+          return CanType();
+
+        for (unsigned i : indices(origSubs.getReplacementTypes())) {
+          auto origType =
+            origSubs.getReplacementTypes()[i]->getCanonicalType(sig);
+          auto substType =
+            substSubs.getReplacementTypes()[i]->getCanonicalType(sig);
+
+          auto newType = visit(origType, substType, nullptr, {});
+
+          if (!newType)
+            return CanType();
+
+          // We can test SILFunctionTypes for bindability, but we can't
+          // transform them.
+          assert(newType == substType
+                 && "cannot transform SILFunctionTypes");
+        }
+      }
+
       // Compare substituted function types.
-      if (func->getSubstGenericSignature()
-          || substFunc->getSubstGenericSignature()) {
-        if (func->getSubstGenericSignature()
-              != substFunc->getSubstGenericSignature())
+      if (func->getPatternGenericSignature()
+          || substFunc->getPatternGenericSignature()) {
+        if (func->getPatternGenericSignature()
+              != substFunc->getPatternGenericSignature())
           return CanType();
         
-        auto sig = func->getSubstGenericSignature();
+        auto sig = func->getPatternGenericSignature();
         
-        auto origSubs = func->getSubstitutions();
-        auto substSubs = substFunc->getSubstitutions();
-        
-        if (!origSubs || !substSubs)
-          return CanType();
+        auto origSubs = func->getPatternSubstitutions();
+        auto substSubs = substFunc->getPatternSubstitutions();
         
         for (unsigned i : indices(origSubs.getReplacementTypes())) {
           auto origType =
@@ -2360,7 +2400,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   if (wasOptional && !result.isRepresentableAsOptional())
     return failure();
-
+  
   // If our nominal type has type arguments, make sure they are
   // representable as well. Because type arguments are not actually
   // translated separately, whether they are trivially representable
@@ -2406,6 +2446,16 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       case ForeignRepresentableKind::BridgedError:
         break;
       }
+    }
+    
+    // Specialize the conformance we were given for the type we're testing.
+    if (result.getKind() == ForeignRepresentableKind::Bridged
+        && !result.getConformance()->getType()->isEqual(type)) {
+      auto specialized = type->getASTContext()
+        .getSpecializedConformance(type, result.getConformance(),
+             boundGenericType->getContextSubstitutionMap(dc->getParentModule(),
+                                                 boundGenericType->getDecl()));
+      result = ForeignRepresentationInfo::forBridged(specialized);
     }
   }
 
@@ -3655,10 +3705,17 @@ static Type substType(Type derivedType,
     }
     
     if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
-      if (auto subs = silFnTy->getSubstitutions()) {
+      if (silFnTy->isPolymorphic())
+        return None;
+      if (auto subs = silFnTy->getInvocationSubstitutions()) {
         auto newSubs = subs.subst(substitutions, lookupConformances, options);
-        return silFnTy->withSubstitutions(newSubs);
+        return silFnTy->withInvocationSubstitutions(newSubs);
       }
+      if (auto subs = silFnTy->getPatternSubstitutions()) {
+        auto newSubs = subs.subst(substitutions, lookupConformances, options);
+        return silFnTy->withPatternSubstitutions(newSubs);
+      }
+      return None;
     }
 
     // Special-case TypeAliasType; we need to substitute conformances.
@@ -3961,14 +4018,15 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
       isa<SubscriptDecl>(member)) {
     auto *innerDC = member->getInnermostDeclContext();
     if (innerDC->isInnermostContextGeneric()) {
-      auto sig = innerDC->getGenericSignatureOfContext();
-      for (auto param : sig->getInnermostGenericParams()) {
-        auto *genericParam = param->getCanonicalType()
-            ->castTo<GenericTypeParamType>();
-        substitutions[genericParam] =
-          (genericEnv
-           ? genericEnv->mapTypeIntoContext(param)
-           : param);
+      if (auto sig = innerDC->getGenericSignatureOfContext()) {
+        for (auto param : sig->getInnermostGenericParams()) {
+          auto *genericParam = param->getCanonicalType()
+              ->castTo<GenericTypeParamType>();
+          substitutions[genericParam] =
+            (genericEnv
+             ? genericEnv->mapTypeIntoContext(param)
+             : param);
+        }
       }
     }
   }
@@ -4180,13 +4238,13 @@ case TypeKind::Id:
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
-    
-    if (auto subs = fnTy->getSubstitutions()) {
+
+    auto updateSubs = [&](SubstitutionMap &subs) -> bool {
       // This interface isn't suitable for updating the substitution map in a
       // substituted SILFunctionType.
       // TODO(SILFunctionType): Is it suitable for any SILFunctionType??
       SmallVector<Type, 4> newReplacements;
-      for (Type type : fnTy->getSubstitutions().getReplacementTypes()) {
+      for (Type type : subs.getReplacementTypes()) {
         auto transformed = type.transformRec(fn);
         assert((type->isEqual(transformed)
                 || (type->hasTypeParameter() && transformed->hasTypeParameter()))
@@ -4195,12 +4253,29 @@ case TypeKind::Id:
         if (!type->isEqual(transformed))
           changed = true;
       }
-      
+
       if (changed) {
-        auto newSubs = SubstitutionMap::get(fnTy->getSubstitutions().getGenericSignature(),
-                                            newReplacements,
-                                            fnTy->getSubstitutions().getConformances());
-        return fnTy->withSubstitutions(newSubs);
+        subs = SubstitutionMap::get(subs.getGenericSignature(),
+                                    newReplacements,
+                                    subs.getConformances());
+      }
+
+      return changed;
+    };
+
+    if (fnTy->isPolymorphic())
+      return fnTy;
+
+    if (auto subs = fnTy->getInvocationSubstitutions()) {
+      if (updateSubs(subs)) {
+        return fnTy->withInvocationSubstitutions(subs);
+      }
+      return fnTy;
+    }
+
+    if (auto subs = fnTy->getPatternSubstitutions()) {
+      if (updateSubs(subs)) {
+        return fnTy->withPatternSubstitutions(subs);
       }
       return fnTy;
     }
@@ -4233,7 +4308,7 @@ case TypeKind::Id:
     if (!changed) return *this;
 
     return SILFunctionType::get(
-        fnTy->getSubstGenericSignature(),
+        fnTy->getInvocationGenericSignature(),
         fnTy->getExtInfo(),
         fnTy->getCoroutineKind(),
         fnTy->getCalleeConvention(),
@@ -4242,7 +4317,7 @@ case TypeKind::Id:
         transInterfaceResults,
         transErrorResult,
         SubstitutionMap(),
-        /*genericSigIsImplied*/ false,
+        SubstitutionMap(),
         Ptr->getASTContext(),
         fnTy->getWitnessMethodConformanceOrInvalid());
   }
@@ -4938,6 +5013,22 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
   return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
 
+AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
+  SmallVector<Param, 8> newParams;
+  for (auto &param : getParams()) {
+    Param newParam(param.getPlainType(), param.getLabel(),
+                   param.getParameterFlags().withNoDerivative(false));
+    newParams.push_back(newParam);
+  }
+  auto nonDiffExtInfo = getExtInfo()
+      .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
+  if (isa<FunctionType>(this))
+    return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
+  assert(isa<GenericFunctionType>(this));
+  return GenericFunctionType::get(getOptGenericSignature(), newParams,
+                                  getResult(), nonDiffExtInfo);
+}
+
 Optional<TangentSpace>
 TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   assert(lookupConformance);
@@ -4975,7 +5066,8 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   // `TangentVector` associated type.
   auto *differentiableProtocol =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  assert(differentiableProtocol && "`Differentiable` protocol not found");
+  if (!differentiableProtocol)
+    return cache(None);
   auto associatedTypeLookup =
       differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
   assert(associatedTypeLookup.size() == 1);
@@ -5168,15 +5260,58 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
 }
 
 CanSILFunctionType
-SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
-  return SILFunctionType::get(getSubstGenericSignature(),
+SILFunctionType::withInvocationSubstitutions(SubstitutionMap subs) const {
+  subs = subs.getCanonical();
+  if (subs == getInvocationSubstitutions())
+    return CanSILFunctionType(const_cast<SILFunctionType*>(this));
+
+  assert(!subs || CanGenericSignature(subs.getGenericSignature())
+                    == getInvocationGenericSignature());
+  return SILFunctionType::get(getInvocationGenericSignature(),
                           getExtInfo(), getCoroutineKind(),
                           getCalleeConvention(),
                           getParameters(), getYields(), getResults(),
                           getOptionalErrorResult(),
-                          subs.getCanonical(), isGenericSignatureImplied(),
+                          getPatternSubstitutions(), subs,
                           const_cast<SILFunctionType*>(this)->getASTContext(),
                           getWitnessMethodConformanceOrInvalid());
+}
+
+CanSILFunctionType
+SILFunctionType::withPatternSubstitutions(SubstitutionMap subs) const {
+  subs = subs.getCanonical();
+  if (subs == getPatternSubstitutions())
+    return CanSILFunctionType(const_cast<SILFunctionType*>(this));
+
+  assert(!subs || CanGenericSignature(subs.getGenericSignature())
+                    == getPatternGenericSignature());
+  return SILFunctionType::get(getInvocationGenericSignature(),
+                          getExtInfo(), getCoroutineKind(),
+                          getCalleeConvention(),
+                          getParameters(), getYields(), getResults(),
+                          getOptionalErrorResult(),
+                          subs, getInvocationSubstitutions(),
+                          const_cast<SILFunctionType*>(this)->getASTContext(),
+                          getWitnessMethodConformanceOrInvalid());
+}
+
+CanSILFunctionType
+SILFunctionType::withPatternSpecialization(CanGenericSignature sig,
+                                           SubstitutionMap subs,
+                                           ProtocolConformanceRef
+                                             witnessConformance) const {
+  assert(!hasInvocationSubstitutions());
+  subs = subs.getCanonical();
+  assert(!subs || CanGenericSignature(subs.getGenericSignature())
+                    == getSubstGenericSignature());
+  return SILFunctionType::get(sig,
+                          getExtInfo(), getCoroutineKind(),
+                          getCalleeConvention(),
+                          getParameters(), getYields(), getResults(),
+                          getOptionalErrorResult(),
+                          subs, SubstitutionMap(),
+                          const_cast<SILFunctionType*>(this)->getASTContext(),
+                          witnessConformance);
 }
 
 SourceLoc swift::extractNearestSourceLoc(Type ty) {

@@ -35,7 +35,7 @@ extension ClassWithBlockProperty : ProtocolWithBlockProperty {}
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[FN:%.*]] = function_ref @$sSo22ClassWithBlockPropertyC09dependentC0ySSSgcSgvM
 // CHECK-NEXT: ([[YIELD_ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[FN]]([[SELF]])
-// CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Optional<@callee_guaranteed <τ_0_0> in (@in_guaranteed τ_0_0) -> () for <Optional<String>>>
+// CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <Optional<String>>>
 // CHECK-NEXT: [[IN_FUNCTION:%.*]] = load [take] [[YIELD_ADDR]]
 // CHECK:    {{^}}bb3([[OUT_FUNCTION:%.*]] :
 // CHECK-NEXT: store [[OUT_FUNCTION]] to [init] [[TEMP]] :
@@ -56,11 +56,11 @@ class HasDynamicStoredProperty : ProtocolWithIntProperty {
 }
 
 // CHECK-LABEL: sil shared [ossa] @$s11modify_objc24HasDynamicStoredPropertyC1xSivM : $@yield_once @convention(method) (@guaranteed HasDynamicStoredProperty) -> @yields @inout Int
-// CHECK: objc_method %0 : $HasDynamicStoredProperty, #HasDynamicStoredProperty.x!getter.1.foreign
+// CHECK: objc_method %0 : $HasDynamicStoredProperty, #HasDynamicStoredProperty.x!getter.foreign
 // CHECK: yield
-// CHECK: objc_method %0 : $HasDynamicStoredProperty, #HasDynamicStoredProperty.x!setter.1.foreign
+// CHECK: objc_method %0 : $HasDynamicStoredProperty, #HasDynamicStoredProperty.x!setter.foreign
 // CHECK: return
-// CHECK: objc_method %0 : $HasDynamicStoredProperty, #HasDynamicStoredProperty.x!setter.1.foreign
+// CHECK: objc_method %0 : $HasDynamicStoredProperty, #HasDynamicStoredProperty.x!setter.foreign
 // CHECK: unwind
 
 // TESTING-LABEL: sil shared [serialized] [ossa] @$s11modify_objc24HasDynamicStoredPropertyC1xSivM : $@yield_once @convention(method) (@guaranteed HasDynamicStoredProperty) -> @yields @inout Int
@@ -70,11 +70,11 @@ class HasDynamicComputedProperty : ProtocolWithIntProperty {
 }
 
 // CHECK-LABEL: sil shared [ossa] @$s11modify_objc26HasDynamicComputedPropertyC1xSivM : $@yield_once @convention(method) (@guaranteed HasDynamicComputedProperty) -> @yields @inout Int
-// CHECK: objc_method %0 : $HasDynamicComputedProperty, #HasDynamicComputedProperty.x!getter.1.foreign
+// CHECK: objc_method %0 : $HasDynamicComputedProperty, #HasDynamicComputedProperty.x!getter.foreign
 // CHECK: yield
-// CHECK: objc_method %0 : $HasDynamicComputedProperty, #HasDynamicComputedProperty.x!setter.1.foreign
+// CHECK: objc_method %0 : $HasDynamicComputedProperty, #HasDynamicComputedProperty.x!setter.foreign
 // CHECK: return
-// CHECK: objc_method %0 : $HasDynamicComputedProperty, #HasDynamicComputedProperty.x!setter.1.foreign
+// CHECK: objc_method %0 : $HasDynamicComputedProperty, #HasDynamicComputedProperty.x!setter.foreign
 // CHECK: unwind
 
 // TESTING-LABEL: sil shared [serialized] [ossa] @$s11modify_objc26HasDynamicComputedPropertyC1xSivM : $@yield_once @convention(method) (@guaranteed HasDynamicComputedProperty) -> @yields @inout Int

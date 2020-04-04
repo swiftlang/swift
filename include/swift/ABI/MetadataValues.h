@@ -19,6 +19,7 @@
 #ifndef SWIFT_ABI_METADATAVALUES_H
 #define SWIFT_ABI_METADATAVALUES_H
 
+#include "swift/ABI/KeyPath.h"
 #include "swift/AST/Ownership.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/FlagSet.h"
@@ -264,7 +265,16 @@ enum class ClassFlags : uint32_t {
   UsesSwiftRefcounting = 0x2,
 
   /// Has this class a custom name, specified with the @objc attribute?
-  HasCustomObjCName = 0x4
+  HasCustomObjCName = 0x4,
+
+  /// Whether this metadata is a specialization of a generic metadata pattern
+  /// which was created during compilation.
+  IsStaticSpecialization = 0x8,
+
+  /// Whether this metadata is a specialization of a generic metadata pattern
+  /// which was created during compilation and made to be canonical by
+  /// modifying the metadata accessor.
+  IsCanonicalStaticSpecialization = 0x10,
 };
 inline bool operator&(ClassFlags a, ClassFlags b) {
   return (uint32_t(a) & uint32_t(b)) != 0;
@@ -294,6 +304,8 @@ private:
     KindMask = 0x0F,                // 16 kinds should be enough for anybody
     IsInstanceMask = 0x10,
     IsDynamicMask = 0x20,
+    ExtraDiscriminatorShift = 16,
+    ExtraDiscriminatorMask = 0xFFFF0000,
   };
 
   int_type Value;
@@ -320,6 +332,13 @@ public:
     return copy;
   }
 
+  MethodDescriptorFlags withExtraDiscriminator(uint16_t value) const {
+    auto copy = *this;
+    copy.Value = (copy.Value & ~ExtraDiscriminatorMask)
+               | (int_type(value) << ExtraDiscriminatorShift);
+    return copy;
+  }
+
   Kind getKind() const { return Kind(Value & KindMask); }
 
   /// Is the method marked 'dynamic'?
@@ -329,6 +348,10 @@ public:
   ///
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
+
+  uint16_t getExtraDiscriminator() const {
+    return (Value >> ExtraDiscriminatorShift);
+  }
 
   int_type getIntValue() const { return Value; }
 };
@@ -516,6 +539,8 @@ private:
   enum : int_type {
     KindMask = 0x0F,                // 16 kinds should be enough for anybody
     IsInstanceMask = 0x10,
+    ExtraDiscriminatorShift = 16,
+    ExtraDiscriminatorMask = 0xFFFF0000,
   };
 
   int_type Value;
@@ -533,12 +558,27 @@ public:
     return copy;
   }
 
+  ProtocolRequirementFlags withExtraDiscriminator(uint16_t value) const {
+    auto copy = *this;
+    copy.Value = (copy.Value & ~ExtraDiscriminatorMask)
+               | (int_type(value) << ExtraDiscriminatorShift);
+    return copy;
+  }
+
   Kind getKind() const { return Kind(Value & KindMask); }
 
   /// Is the method an instance member?
   ///
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
+
+  bool isSignedWithAddress() const {
+    return getKind() != Kind::BaseProtocol;
+  }
+
+  uint16_t getExtraDiscriminator() const {
+    return (Value >> ExtraDiscriminatorShift);
+  }
 
   int_type getIntValue() const { return Value; }
 
@@ -733,6 +773,14 @@ enum class FunctionMetadataConvention: uint8_t {
   CFunctionPointer = 3,
 };
 
+/// Differentiability kind for function type metadata.
+/// Duplicates `DifferentiabilityKind` in AutoDiff.h.
+enum class FunctionMetadataDifferentiabilityKind: uint8_t {
+  NonDifferentiable = 0b00,
+  Normal = 0b01,
+  Linear = 0b11
+};
+
 /// Flags in a function type metadata record.
 template <typename int_type>
 class TargetFunctionTypeFlags {
@@ -746,6 +794,8 @@ class TargetFunctionTypeFlags {
     ThrowsMask        = 0x01000000U,
     ParamFlagsMask    = 0x02000000U,
     EscapingMask      = 0x04000000U,
+    DifferentiableMask  = 0x08000000U,
+    LinearMask          = 0x10000000U
   };
   int_type Data;
   
@@ -768,6 +818,16 @@ public:
   withThrows(bool throws) const {
     return TargetFunctionTypeFlags<int_type>((Data & ~ThrowsMask) |
                                              (throws ? ThrowsMask : 0));
+  }
+
+  constexpr TargetFunctionTypeFlags<int_type> withDifferentiabilityKind(
+      FunctionMetadataDifferentiabilityKind differentiability) const {
+    return TargetFunctionTypeFlags<int_type>(
+        (Data & ~DifferentiableMask & ~LinearMask) |
+        (differentiability == FunctionMetadataDifferentiabilityKind::Normal
+             ? DifferentiableMask : 0) |
+        (differentiability == FunctionMetadataDifferentiabilityKind::Linear
+             ? LinearMask : 0));
   }
 
   constexpr TargetFunctionTypeFlags<int_type>
@@ -798,6 +858,19 @@ public:
 
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }
 
+  bool isDifferentiable() const {
+    return getDifferentiabilityKind() >=
+        FunctionMetadataDifferentiabilityKind::Normal;
+  }
+
+  FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
+    if (bool(Data & DifferentiableMask))
+      return FunctionMetadataDifferentiabilityKind::Normal;
+    if (bool(Data & LinearMask))
+      return FunctionMetadataDifferentiabilityKind::Linear;
+    return FunctionMetadataDifferentiabilityKind::NonDifferentiable;
+  }
+
   int_type getIntValue() const {
     return Data;
   }
@@ -818,9 +891,10 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 template <typename int_type>
 class TargetParameterTypeFlags {
   enum : int_type {
-    ValueOwnershipMask = 0x7F,
-    VariadicMask       = 0x80,
-    AutoClosureMask    = 0x100,
+    ValueOwnershipMask    = 0x7F,
+    VariadicMask          = 0x80,
+    AutoClosureMask       = 0x100,
+    NoDerivativeMask      = 0x200
   };
   int_type Data;
 
@@ -850,6 +924,7 @@ public:
   bool isNone() const { return Data == 0; }
   bool isVariadic() const { return Data & VariadicMask; }
   bool isAutoClosure() const { return Data & AutoClosureMask; }
+  bool isNoDerivative() const { return Data & NoDerivativeMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);
@@ -1027,6 +1102,68 @@ static inline EnumLayoutFlags getLayoutAlgorithm(EnumLayoutFlags flags) {
 }
 static inline bool isValueWitnessTableMutable(EnumLayoutFlags flags) {
   return uintptr_t(flags) & uintptr_t(EnumLayoutFlags::IsVWTMutable);
+}
+
+namespace SpecialPointerAuthDiscriminators {
+  // All of these values are the stable string hash of the corresponding
+  // variable name:
+  //   (computeStableStringHash % 65535 + 1)
+
+  /// HeapMetadataHeader::destroy
+  const uint16_t HeapDestructor = 0xbbbf;
+
+  /// Type descriptor data pointers.
+  const uint16_t TypeDescriptor = 0xae86;
+
+  /// Runtime function variables exported by the runtime.
+  const uint16_t RuntimeFunctionEntry = 0x625b;
+
+  /// Value witness functions.
+  const uint16_t InitializeBufferWithCopyOfBuffer = 0xda4a;
+  const uint16_t Destroy = 0x04f8;
+  const uint16_t InitializeWithCopy = 0xe3ba;
+  const uint16_t AssignWithCopy = 0x8751;
+  const uint16_t InitializeWithTake = 0x48d8;
+  const uint16_t AssignWithTake = 0xefda;
+  const uint16_t DestroyArray = 0x2398;
+  const uint16_t InitializeArrayWithCopy = 0xa05c;
+  const uint16_t InitializeArrayWithTakeFrontToBack = 0x1c3e;
+  const uint16_t InitializeArrayWithTakeBackToFront = 0x8dd3;
+  const uint16_t StoreExtraInhabitant = 0x79c5;
+  const uint16_t GetExtraInhabitantIndex = 0x2ca8;
+  const uint16_t GetEnumTag = 0xa3b5;
+  const uint16_t DestructiveProjectEnumData = 0x041d;
+  const uint16_t DestructiveInjectEnumTag = 0xb2e4;
+  const uint16_t GetEnumTagSinglePayload = 0x60f0;
+  const uint16_t StoreEnumTagSinglePayload = 0xa0d1;
+
+  /// KeyPath metadata functions.
+  const uint16_t KeyPathDestroy = _SwiftKeyPath_ptrauth_ArgumentDestroy;
+  const uint16_t KeyPathCopy = _SwiftKeyPath_ptrauth_ArgumentCopy;
+  const uint16_t KeyPathEquals = _SwiftKeyPath_ptrauth_ArgumentEquals;
+  const uint16_t KeyPathHash = _SwiftKeyPath_ptrauth_ArgumentHash;
+  const uint16_t KeyPathGetter = _SwiftKeyPath_ptrauth_Getter;
+  const uint16_t KeyPathNonmutatingSetter = _SwiftKeyPath_ptrauth_NonmutatingSetter;
+  const uint16_t KeyPathMutatingSetter = _SwiftKeyPath_ptrauth_MutatingSetter;
+  const uint16_t KeyPathGetLayout = _SwiftKeyPath_ptrauth_ArgumentLayout;
+  const uint16_t KeyPathInitializer = _SwiftKeyPath_ptrauth_ArgumentInit;
+  const uint16_t KeyPathMetadataAccessor = _SwiftKeyPath_ptrauth_MetadataAccessor;
+
+  /// ObjC bridging entry points.
+  const uint16_t ObjectiveCTypeDiscriminator = 0x31c3; // = 12739
+  const uint16_t bridgeToObjectiveCDiscriminator = 0xbca0; // = 48288
+  const uint16_t forceBridgeFromObjectiveCDiscriminator = 0x22fb; // = 8955
+  const uint16_t conditionallyBridgeFromObjectiveCDiscriminator = 0x9a9b; // = 39579
+
+  /// Dynamic replacement pointers.
+  const uint16_t DynamicReplacementScope = 0x48F0; // = 18672
+  const uint16_t DynamicReplacementKey = 0x2C7D; // = 11389
+
+  /// Resume functions for yield-once coroutines that yield a single
+  /// opaque borrowed/inout value.  These aren't actually hard-coded, but
+  /// they're important enough to be worth writing in one place.
+  const uint16_t OpaqueReadResumeFunction = 56769;
+  const uint16_t OpaqueModifyResumeFunction = 3909;
 }
 
 /// The number of arguments that will be passed directly to a generic

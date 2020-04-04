@@ -35,7 +35,9 @@ IDENTIFIER(buildBlock)
 IDENTIFIER(buildDo)
 IDENTIFIER(buildEither)
 IDENTIFIER(buildExpression)
+IDENTIFIER(buildFinalResult)
 IDENTIFIER(buildIf)
+IDENTIFIER(buildOptional)
 IDENTIFIER(callAsFunction)
 IDENTIFIER(Change)
 IDENTIFIER_WITH_NAME(code_, "_code")
@@ -202,7 +204,13 @@ IDENTIFIER_(nsError)
 IDENTIFIER(OSLogMessage)
 
 // Differentiable programming
+IDENTIFIER(along)
+IDENTIFIER(differential)
+IDENTIFIER(direction)
+IDENTIFIER(move)
+IDENTIFIER(pullback)
 IDENTIFIER(TangentVector)
+IDENTIFIER(zero)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

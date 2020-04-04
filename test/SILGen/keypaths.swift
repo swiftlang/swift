@@ -77,7 +77,7 @@ func computedProperties<T: P>(_: T) {
   // CHECK: keypath $ReferenceWritableKeyPath<C<T>, S<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $S<τ_0_0>, 
-  // CHECK-SAME:   id #C.nonfinal!getter.1 : <T> (C<T>) -> () -> S<T>,
+  // CHECK-SAME:   id #C.nonfinal!getter : <T> (C<T>) -> () -> S<T>,
   // CHECK-SAME:   getter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
   // CHECK-SAME:   setter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
@@ -86,7 +86,7 @@ func computedProperties<T: P>(_: T) {
   // CHECK: keypath $KeyPath<C<T>, S<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: gettable_property $S<τ_0_0>,
-  // CHECK-SAME:   id #C.computed!getter.1 : <T> (C<T>) -> () -> S<T>,
+  // CHECK-SAME:   id #C.computed!getter : <T> (C<T>) -> () -> S<T>,
   // CHECK-SAME:   getter @$s8keypaths1CC8computedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>
   // CHECK-SAME: ) <T>
   _ = \C<T>.computed
@@ -94,7 +94,7 @@ func computedProperties<T: P>(_: T) {
   // CHECK: keypath $ReferenceWritableKeyPath<C<T>, S<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $S<τ_0_0>, 
-  // CHECK-SAME:   id #C.observed!getter.1 : <T> (C<T>) -> () -> S<T>,
+  // CHECK-SAME:   id #C.observed!getter : <T> (C<T>) -> () -> S<T>,
   // CHECK-SAME:   getter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
   // CHECK-SAME:   setter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
@@ -111,8 +111,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $() -> (), 
   // CHECK-SAME:   id ##C.reabstracted,
-  // CHECK-SAME:   getter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <()>,
-  // CHECK-SAME:   setter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <()>, @in_guaranteed C<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>,
+  // CHECK-SAME:   setter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>, @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \C<T>.reabstracted
 
@@ -140,22 +140,22 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME:  root $S<τ_0_0>;
   // CHECK-SAME:  settable_property $() -> (),
   // CHECK-SAME:    id ##S.reabstracted,
-  // CHECK-SAME:    getter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <()>,
-  // CHECK-SAME:    setter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <()>, @inout S<τ_0_0>) -> ()
+  // CHECK-SAME:    getter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>,
+  // CHECK-SAME:    setter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>, @inout S<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \S<T>.reabstracted
 
   // CHECK: keypath $KeyPath<T, Int>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $τ_0_0;
   // CHECK-SAME: gettable_property $Int, 
-  // CHECK-SAME:   id #P.x!getter.1 : <Self where Self : P> (Self) -> () -> Int,
+  // CHECK-SAME:   id #P.x!getter : <Self where Self : P> (Self) -> () -> Int,
   // CHECK-SAME:   getter @$s8keypaths1PP1xSivpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Int
   // CHECK-SAME: ) <T>
   _ = \T.x
   // CHECK: keypath $WritableKeyPath<T, String>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $τ_0_0;
   // CHECK-SAME: settable_property $String,
-  // CHECK-SAME:   id #P.y!getter.1 : <Self where Self : P> (Self) -> () -> String,
+  // CHECK-SAME:   id #P.y!getter : <Self where Self : P> (Self) -> () -> String,
   // CHECK-SAME:   getter @$s8keypaths1PP1ySSvpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out String,
   // CHECK-SAME:   setter @$s8keypaths1PP1ySSvpAaBRzlxTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed String, @inout τ_0_0) -> ()
   // CHECK-SAME: ) <T>
@@ -244,10 +244,10 @@ final class FinalStorageQualified {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}keyPathForStorageQualified
 func keyPathForStorageQualified() {
   // CHECK: = keypath $ReferenceWritableKeyPath<StorageQualified, Optional<StorageQualified>>,
-  // CHECK-SAME: settable_property $Optional<StorageQualified>, id #StorageQualified.tooWeak!getter.1
+  // CHECK-SAME: settable_property $Optional<StorageQualified>, id #StorageQualified.tooWeak!getter
   _ = \StorageQualified.tooWeak
   // CHECK: = keypath $ReferenceWritableKeyPath<StorageQualified, StorageQualified>,
-  // CHECK-SAME: settable_property $StorageQualified, id #StorageQualified.disowned!getter.1
+  // CHECK-SAME: settable_property $StorageQualified, id #StorageQualified.disowned!getter
   _ = \StorageQualified.disowned
 
   // CHECK: = keypath $ReferenceWritableKeyPath<FinalStorageQualified, Optional<StorageQualified>>,

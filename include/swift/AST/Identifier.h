@@ -83,7 +83,9 @@ public:
   const char *get() const { return Pointer; }
   
   StringRef str() const { return Pointer; }
-  
+
+  explicit operator std::string() const { return std::string(Pointer); }
+
   unsigned getLength() const {
     assert(Pointer != nullptr && "Tried getting length of empty identifier");
     return ::strlen(Pointer);
@@ -165,6 +167,10 @@ public:
   ///
   /// Null identifiers come after all other identifiers.
   int compare(Identifier other) const;
+
+  friend llvm::hash_code hash_value(Identifier ident) {
+    return llvm::hash_value(ident.getAsOpaquePointer());
+  }
 
   bool operator==(Identifier RHS) const { return Pointer == RHS.Pointer; }
   bool operator!=(Identifier RHS) const { return !(*this==RHS); }

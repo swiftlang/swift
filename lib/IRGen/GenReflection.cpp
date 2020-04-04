@@ -693,7 +693,7 @@ private:
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
-      auto name = value->getBaseName().getIdentifier().str();
+      auto name = value->getBaseIdentifier().str();
       auto fieldName = IGM.getAddrOfFieldName(name);
       B.addRelativeAddress(fieldName);
     } else {
@@ -827,13 +827,13 @@ static bool
 deploymentTargetHasRemoteMirrorZeroSizedTypeDescriptorBug(IRGenModule &IGM) {
   auto target = IGM.Context.LangOpts.Target;
   
-  if (target.isMacOSX() && target.isMacOSXVersionLT(10, 16, 0)) {
+  if (target.isMacOSX() && target.isMacOSXVersionLT(10, 15, 4)) {
     return true;
   }
-  if (target.isiOS() && target.isOSVersionLT(14)) { // includes tvOS
+  if (target.isiOS() && target.isOSVersionLT(13, 4)) { // includes tvOS
     return true;
   }
-  if (target.isWatchOS() && target.isOSVersionLT(7)) {
+  if (target.isWatchOS() && target.isOSVersionLT(6, 2)) {
     return true;
   }
   
@@ -1156,7 +1156,7 @@ public:
     B.addInt32(Layout.getBindings().size());
 
     auto sig =
-        OrigCalleeType->getSubstGenericSignature().getCanonicalSignature();
+      OrigCalleeType->getInvocationGenericSignature().getCanonicalSignature();
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
@@ -1204,7 +1204,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     OS << "__TEXT,__swift5_" << LongName << ", regular, no_dead_strip";
     break;
   }
-  return OS.str();
+  return std::string(OS.str());
 }
 
 const char *IRGenModule::getFieldTypeMetadataSectionName() {

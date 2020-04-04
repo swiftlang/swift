@@ -1,1 +1,6 @@
-module ClangLibrary { header "clang_library.h" }
+module ClangLibrary {
+  header "clang_library.h"
+  module Submodule {
+    header "clang_library_submodule.h"
+  }
+}

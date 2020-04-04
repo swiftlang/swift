@@ -454,9 +454,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       if (!Result.isNull()) {
         // NOTE: this is a 'virtual' brace statement which does not have
         //       explicit '{' or '}', so the start and end locations should be
-        //       the same as those of the result node
+        //       the same as those of the result node, plus any junk consumed
+        //       afterwards
         auto Brace = BraceStmt::create(Context, Result.getStartLoc(),
-                                       Result, Result.getEndLoc());
+                                       Result, PreviousLoc, /*Implicit=*/true);
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
 
@@ -1269,7 +1270,8 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
                          diag::avail_query_expected_rparen, LParenLoc))
     Status.setIsParseError();
 
-  auto *result = PoundAvailableInfo::create(Context, PoundLoc, Specs,RParenLoc);
+  auto *result = PoundAvailableInfo::create(Context, PoundLoc, LParenLoc, Specs,
+                                            RParenLoc);
   return makeParserResult(Status, result);
 }
 
@@ -2132,10 +2134,11 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
 
   // Parse the 'where' expression if present.
   ParserResult<Expr> Where;
+  SourceLoc WhereLoc;
   if (Tok.is(tok::kw_where)) {
     SyntaxParsingContext WhereClauseCtxt(SyntaxContext,
                                          SyntaxKind::WhereClause);
-    consumeToken();
+    WhereLoc = consumeToken();
     Where = parseExprBasic(diag::expected_foreach_where_expr);
     if (Where.isNull())
       Where = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
@@ -2153,7 +2156,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   return makeParserResult(
       Status,
       new (Context) ForEachStmt(LabelInfo, ForLoc, pattern.get(), InLoc,
-                                Container.get(), Where.getPtrOrNull(),
+                                Container.get(), WhereLoc, Where.getPtrOrNull(),
                                 Body.get()));
 }
 

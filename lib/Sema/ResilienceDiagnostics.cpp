@@ -127,9 +127,10 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (D->getDeclContext()->isLocalContext())
     return false;
 
-  // Public declarations are OK.
+  // Public non-SPI declarations are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
-                              TreatUsableFromInlineAsPublic).isPublic())
+                              TreatUsableFromInlineAsPublic).isPublic() &&
+      !D->isSPI())
     return false;
 
   auto &Context = DC->getASTContext();
@@ -183,11 +184,6 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   auto diagID = diag::resilience_decl_unavailable;
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::resilience_decl_unavailable_warn;
-
-  // If SPI, don't mention the access level.
-  const SourceFile *SF = DC->getParentSourceFile();
-  if (SF && SF->isImportedAsSPI(D))
-    diagID = diag::resilience_decl_unavailable_spi;
 
   Context.Diags.diagnose(
            loc, diagID,

@@ -498,8 +498,8 @@ entry(%x : $Int):
   %ba = project_box %b : ${ var Int }, 0
   // CHECK: store [[X]] to [[PB]]
   store %x to %ba : $*Int
-  // CHECK: [[E:%.*]] = enum $IndirectCase, #IndirectCase.X!enumelt.1, [[BOX]] : ${ var Int }
-  %e = enum $IndirectCase, #IndirectCase.X!enumelt.1, %b : ${ var Int }
+  // CHECK: [[E:%.*]] = enum $IndirectCase, #IndirectCase.X!enumelt, [[BOX]] : ${ var Int }
+  %e = enum $IndirectCase, #IndirectCase.X!enumelt, %b : ${ var Int }
   // CHECK: return [[E]]
   return %e : $IndirectCase
 }
@@ -931,9 +931,9 @@ sil @recursive_struct_destroy_with_enum_init : $@convention(thin) (@owned K) -> 
 bb0(%arg : $K):
   %0 = alloc_stack $SWithOpt
   %1 = struct_element_addr %0 : $*SWithOpt, #SWithOpt.k
-  %2 = init_enum_data_addr %1 : $*Optional<K>, #Optional.some!enumelt.1
+  %2 = init_enum_data_addr %1 : $*Optional<K>, #Optional.some!enumelt
   store %arg to %2 : $*K
-  inject_enum_addr %1 : $*Optional<K>, #Optional.some!enumelt.1
+  inject_enum_addr %1 : $*Optional<K>, #Optional.some!enumelt
   %4 = load %0 : $*SWithOpt
   dealloc_stack %0 : $*SWithOpt
   return %4 : $SWithOpt
@@ -951,9 +951,9 @@ sil @promote_init_enum_data_addr : $@convention(thin) (@in Int) -> Int {
 bb0(%0 : $*Int):
   %1 = alloc_stack $Optional<Int>
   %2 = load %0 : $*Int
-  %3 = init_enum_data_addr %1 : $*Optional<Int>, #Optional.some!enumelt.1
+  %3 = init_enum_data_addr %1 : $*Optional<Int>, #Optional.some!enumelt
   store %2 to %3 : $*Int
-  inject_enum_addr %1 : $*Optional<Int>, #Optional.some!enumelt.1
+  inject_enum_addr %1 : $*Optional<Int>, #Optional.some!enumelt
   %4 = load %3 : $*Int
   dealloc_stack %1 : $*Optional<Int>
   return %4 : $Int

@@ -103,6 +103,7 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
                 stdout=subprocess.PIPE,
                 stderr=open("/dev/null", "w"),
                 env=e,
+                universal_newlines=True,
             )
             results = [x for x in p.communicate()[0].split("\n") if len(x) > 0]
             return [
@@ -136,7 +137,9 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
             results.append(result_3)
             results.append(single_iter)
 
-        return DTraceResult(test_name, int(not foundInstability), results)
+        return DTraceResult(
+            test_name, int(not foundInstability), results, self.csv_output
+        )
 
 
 SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))

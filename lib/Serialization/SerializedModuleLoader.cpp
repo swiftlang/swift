@@ -23,6 +23,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Debug.h"
@@ -46,11 +47,17 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
 
   // FIXME: We used to use "major architecture" names for these files---the
   // names checked in "#if arch(...)". Fall back to that name in the one case
-  // where it's different from what Swift 4.2 supported: 32-bit ARM platforms.
+  // where it's different from what Swift 4.2 supported:
+  // - 32-bit ARM platforms (formerly "arm")
+  // - arm64e (formerly shared with "arm64")
   // We should be able to drop this once there's an Xcode that supports the
   // new names.
   if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm)
     body("arm");
+  else if (Ctx.LangOpts.Target.getSubArch() ==
+           llvm::Triple::SubArchType::AArch64SubArch_E) {
+    body("arm64");
+  }
 }
 
 enum class SearchPathKind {
@@ -433,7 +440,7 @@ std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
   result += '.';
   result += file_types::getExtension(fileTy);
 
-  return result.str();
+  return std::string(result.str());
 }
 
 bool
@@ -986,6 +993,17 @@ void SerializedModuleLoaderBase::loadObjCMethods(
   }
 }
 
+void SerializedModuleLoaderBase::loadDerivativeFunctionConfigurations(
+    AbstractFunctionDecl *originalAFD, unsigned int previousGeneration,
+    llvm::SetVector<AutoDiffConfig> &results) {
+  for (auto &modulePair : LoadedModuleFiles) {
+    if (modulePair.second <= previousGeneration)
+      continue;
+    modulePair.first->loadDerivativeFunctionConfigurations(originalAFD,
+                                                           results);
+  }
+}
+
 std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID,
     const SerializedModuleBaseName &BaseName,
@@ -1077,14 +1095,17 @@ SerializedASTFile::lookupNestedType(Identifier name,
   return File.lookupNestedType(name, parent);
 }
 
-OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,
-                                                DeclKind fixity) const {
-  return File.lookupOperator(name, fixity);
+void SerializedASTFile::lookupOperatorDirect(
+    Identifier name, OperatorFixity fixity,
+    TinyPtrVector<OperatorDecl *> &results) const {
+  if (auto *op = File.lookupOperator(name, fixity))
+    results.push_back(op);
 }
 
-PrecedenceGroupDecl *
-SerializedASTFile::lookupPrecedenceGroup(Identifier name) const {
-  return File.lookupPrecedenceGroup(name);
+void SerializedASTFile::lookupPrecedenceGroupDirect(
+    Identifier name, TinyPtrVector<PrecedenceGroupDecl *> &results) const {
+  if (auto *group = File.lookupPrecedenceGroup(name))
+    results.push_back(group);
 }
 
 void SerializedASTFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
@@ -1161,6 +1182,11 @@ void SerializedASTFile::getTopLevelDeclsWhereAttributesMatch(
               SmallVectorImpl<Decl*> &results,
               llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
   File.getTopLevelDecls(results, matchAttributes);
+}
+
+void SerializedASTFile::getOperatorDecls(
+    SmallVectorImpl<OperatorDecl *> &results) const {
+  File.getOperatorDecls(results);
 }
 
 void SerializedASTFile::getPrecedenceGroups(

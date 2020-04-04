@@ -243,17 +243,16 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
               decls.end());
 }
 
-llvm::Expected<QualifiedLookupResult> LookupInModuleRequest::evaluate(
+QualifiedLookupResult
+LookupInModuleRequest::evaluate(
     Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
     NLKind lookupKind, ResolutionKind resolutionKind,
     const DeclContext *moduleScopeContext) const {
   assert(moduleScopeContext->isModuleScopeContext());
 
-  auto &ctx = moduleOrFile->getASTContext();
-  FrontendStatsTracer tracer(ctx.Stats, "lookup-in-module");
-
   QualifiedLookupResult decls;
-  LookupByName lookup(ctx, resolutionKind, name, lookupKind);
+  LookupByName lookup(moduleOrFile->getASTContext(), resolutionKind,
+                      name, lookupKind);
   lookup.lookupInModule(decls, moduleOrFile, {}, moduleScopeContext);
   return decls;
 }

@@ -31,7 +31,6 @@ namespace swift {
   class InFlightDiagnostic;
   class Stmt;
   class TopLevelCodeDecl;
-  class TypeChecker;
   class ValueDecl;
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
@@ -41,8 +40,7 @@ void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
 /// Emit diagnostics for a given statement.
 void performStmtDiagnostics(ASTContext &ctx, const Stmt *S);
 
-void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD,
-                                        BraceStmt *body);
+void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD);
 
 /// Perform diagnostics on the top level code declaration.
 void performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD);

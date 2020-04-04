@@ -35,17 +35,12 @@ func partialApplyEnumCases(_ x: S, y: C) {
   _ = PartialApplyEnumPayload<S, C>.autoclosure
 }
 
-// CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$s17enum_curry_thunks23PartialApplyEnumPayloadO4leftyACyxq_GxcAEmr0_lFTc : $@convention(thin) <T, U> (@thin PartialApplyEnumPayload<T, U>.Type) -> @owned @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (@in_guaranteed τ_0_0) -> @out PartialApplyEnumPayload<τ_0_1, τ_0_2> for <T, T, U> {
-// CHECK-LABEL: sil shared [transparent] [ossa] @$s17enum_curry_thunks23PartialApplyEnumPayloadO4leftyACyxq_GxcAEmr0_lF : $@convention(method) <T, U> (@in T, @thin PartialApplyEnumPayload<T, U>.Type) -> @out PartialApplyEnumPayload<T, U> {
+// CHECK-LABEL: sil private [ossa] @$s17enum_curry_thunks21partialApplyEnumCases_1yyAA1SV_AA1CVtFAA07PartialeF7PayloadOyAeGGAEcAJmcfu_AjEcfu0_ : $@convention(thin) (S, @thin PartialApplyEnumPayload<S, C>.Type) -> @owned PartialApplyEnumPayload<S, C> {
 
-// CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$s17enum_curry_thunks23PartialApplyEnumPayloadO4bothyACyxq_Gx_q_tcAEmr0_lFTc : $@convention(thin) <T, U> (@thin PartialApplyEnumPayload<T, U>.Type) -> @owned @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3> in (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out PartialApplyEnumPayload<τ_0_2, τ_0_3> for <T, U, T, U> {
-// CHECK-LABEL: sil shared [transparent] [ossa] @$s17enum_curry_thunks23PartialApplyEnumPayloadO4bothyACyxq_Gx_q_tcAEmr0_lF : $@convention(method) <T, U> (@in T, @in U, @thin PartialApplyEnumPayload<T, U>.Type) -> @out PartialApplyEnumPayload<T, U> {
+// CHECK-LABEL: sil private [ossa] @$s17enum_curry_thunks21partialApplyEnumCases_1yyAA1SV_AA1CVtFAA07PartialeF7PayloadOyAeGGAE_AGtcAJmcfu1_AjE_AGtcfu2_ : $@convention(thin) (S, C, @thin PartialApplyEnumPayload<S, C>.Type) -> @owned PartialApplyEnumPayload<S, C> {
 
-// CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$s17enum_curry_thunks23PartialApplyEnumPayloadO13leftWithLabelyACyxq_Gx_tcAEmr0_lFTc : $@convention(thin) <T, U> (@thin PartialApplyEnumPayload<T, U>.Type) -> @owned @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2> in (@in_guaranteed τ_0_0) -> @out PartialApplyEnumPayload<τ_0_1, τ_0_2> for <T, T, U> {
-// CHECK-LABEL: sil shared [transparent] [ossa] @$s17enum_curry_thunks23PartialApplyEnumPayloadO13leftWithLabelyACyxq_Gx_tcAEmr0_lF : $@convention(method) <T, U> (@in T, @thin PartialApplyEnumPayload<T, U>.Type) -> @out PartialApplyEnumPayload<T, U> {
+// CHECK-LABEL: sil private [ossa] @$s17enum_curry_thunks21partialApplyEnumCases_1yyAA1SV_AA1CVtFAA07PartialeF7PayloadOyAeGGAEcAJmcfu3_AjEcfu4_ : $@convention(thin) (S, @thin PartialApplyEnumPayload<S, C>.Type) -> @owned PartialApplyEnumPayload<S, C> {
 
-// CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$s17enum_curry_thunks23PartialApplyEnumPayloadO14tupleWithLabelyACyxq_Gx_q_t_tcAEmr0_lFTc : $@convention(thin) <T, U> (@thin PartialApplyEnumPayload<T, U>.Type) -> @owned @callee_guaranteed <τ_0_0, τ_0_1, τ_0_2, τ_0_3> in (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out PartialApplyEnumPayload<τ_0_2, τ_0_3> for <T, U, T, U> {
-// CHECK-LABEL: sil shared [transparent] [ossa] @$s17enum_curry_thunks23PartialApplyEnumPayloadO14tupleWithLabelyACyxq_Gx_q_t_tcAEmr0_lF : $@convention(method) <T, U> (@in T, @in U, @thin PartialApplyEnumPayload<T, U>.Type) -> @out PartialApplyEnumPayload<T, U> {
+// CHECK-LABEL: sil private [ossa] @$s17enum_curry_thunks21partialApplyEnumCases_1yyAA1SV_AA1CVtFAA07PartialeF7PayloadOyAeGGAE_AGt_tcAJmcfu5_AjE_AGt_tcfu6_ : $@convention(thin) (S, C, @thin PartialApplyEnumPayload<S, C>.Type) -> @owned PartialApplyEnumPayload<S, C> {
 
-// CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$s17enum_curry_thunks23PartialApplyEnumPayloadO11autoclosureyACyxq_GyyXAcAEmr0_lFTc : $@convention(thin) <T, U> (@thin PartialApplyEnumPayload<T, U>.Type) -> @owned @callee_guaranteed <τ_0_0, τ_0_1> in (@guaranteed @callee_guaranteed () -> ()) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1> for <T, U> {
-// CHECK-LABEL: sil shared [transparent] [ossa] @$s17enum_curry_thunks23PartialApplyEnumPayloadO11autoclosureyACyxq_GyyXAcAEmr0_lF : $@convention(method) <T, U> (@owned @callee_guaranteed () -> (), @thin PartialApplyEnumPayload<T, U>.Type) -> @out PartialApplyEnumPayload<T, U> {
+// CHECK-LABEL: sil private [ossa] @$s17enum_curry_thunks21partialApplyEnumCases_1yyAA1SV_AA1CVtFAA07PartialeF7PayloadOyAeGGyyXAcAJmcfu7_AJyyXAcfu8_ : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @thin PartialApplyEnumPayload<S, C>.Type) -> @owned PartialApplyEnumPayload<S, C> {

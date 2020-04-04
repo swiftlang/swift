@@ -30,6 +30,11 @@ print(c.spiVar)
 
 let s = SPIStruct()
 s.spiMethod()
+s.spiInherit()
+s.spiDontInherit() // expected-error {{'spiDontInherit' is inaccessible due to '@_spi' protection level}}
+s.spiExtensionHidden()
+s.spiExtension()
+s.spiExtensionInherited()
 s.spiVar = "write"
 print(s.spiVar)
 
@@ -45,10 +50,13 @@ print(ps.spiVar)
 otherApiFunc() // expected-error {{use of unresolved identifier}}
 
 public func publicUseOfSPI(param: SPIClass) -> SPIClass {} // expected-error 2{{cannot use class 'SPIClass' here; it is an SPI imported from 'SPIHelper'}}
+// expected-error@-1 {{function cannot be declared public because its parameter uses an '@_spi' type}}
 public func publicUseOfSPI2() -> [SPIClass] {} // expected-error {{cannot use class 'SPIClass' here; it is an SPI imported from 'SPIHelper'}}
+// expected-error@-1 {{function cannot be declared public because its result uses an '@_spi' type}}
 
 @inlinable
-func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' is imported as SPI; it cannot be referenced from an '@inlinable' function}}
-  spiFunc() // expected-error {{global function 'spiFunc()' is imported as SPI; it cannot be referenced from an '@inlinable' function}}
-  _ = SPIClass() // expected-error {{class 'SPIClass' is imported as SPI; it cannot be referenced from an '@inlinable' function}}
+func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' is '@_spi' and cannot be referenced from an '@inlinable' function}}
+  spiFunc() // expected-error {{global function 'spiFunc()' is '@_spi' and cannot be referenced from an '@inlinable' function}}
+  _ = SPIClass() // expected-error {{class 'SPIClass' is '@_spi' and cannot be referenced from an '@inlinable' function}}
+  _ = [SPIClass]() // expected-error {{class 'SPIClass' is '@_spi' and cannot be referenced from an '@inlinable' function}}
 }

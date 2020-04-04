@@ -400,6 +400,9 @@ public:
   }
 
   bool writeExtension(const ExtensionDecl *ED) {
+    if (printer.isEmptyExtensionDecl(ED))
+      return true;
+
     bool allRequirementsSatisfied = true;
 
     const ClassDecl *CD = ED->getSelfClassDecl();
@@ -440,7 +443,7 @@ public:
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
                                        ED->getAllElements().end(),
                                        [](const EnumElementDecl *elem) {
-        return elem->getName().str() == "Domain";
+        return elem->getBaseIdentifier().str() == "Domain";
       });
       if (!hasDomainCase) {
         os << "static NSString * _Nonnull const " << getNameForObjC(ED)

@@ -1,5 +1,6 @@
 
 include(AddSwift)
+include(SwiftSource)
 
 # Add a universal binary target created from the output of the given
 # set of targets by running 'lipo'.
@@ -801,26 +802,18 @@ function(_add_swift_target_library_single target name)
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
     if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
       if(${SWIFTLIB_SINGLE_SDK} MATCHES "(I|TV|WATCH)OS")
-        # The two branches of this if statement accomplish the same end result
-        # We are simply accounting for the fact that on CMake < 3.16
-        # using a generator expression to
-        # specify a LINKER: argument does not work,
+        # Please note that using a generator expression to fit
+        # this in a single target_link_options does not work
+        # (at least in CMake 3.15 and 3.16),
         # since that seems not to allow the LINKER: prefix to be
         # evaluated (i.e. it will be added as-is to the linker parameters)
-        if(CMAKE_VERSION VERSION_LESS 3.16)
-          target_link_options(${target} PRIVATE
-            "LINKER:-bitcode_bundle"
-            "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+        target_link_options(${target} PRIVATE
+          "LINKER:-bitcode_bundle"
+          "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
 
-          if(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
-            target_link_options(${target} PRIVATE
-              "LINKER:-bitcode_hide_symbols")
-          endif()
-        else()
+        if(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
           target_link_options(${target} PRIVATE
-            "LINKER:-bitcode_bundle"
-            $<$<BOOL:SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS>:"LINKER:-bitcode_hide_symbols">
-            "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+            "LINKER:-bitcode_hide_symbols")
         endif()
       endif()
     endif()

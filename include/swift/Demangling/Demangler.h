@@ -516,7 +516,7 @@ protected:
   NodePointer popAnyProtocolConformanceList();
   NodePointer demangleRetroactiveConformance();
   NodePointer demangleInitializer();
-  NodePointer demangleImplParamConvention();
+  NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
   NodePointer demangleImplFunctionType();
   NodePointer demangleMetatype();

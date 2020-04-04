@@ -1179,7 +1179,14 @@ public:
           }
         }
       }
-
+      // Adding an enum case is source-breaking.
+      if (!Ctx.checkingABI()) {
+        if (auto *Var = dyn_cast<SDKNodeDeclVar>(Right)) {
+          if (Var->getDeclKind() == DeclKind::EnumElement) {
+            Var->emitDiag(Var->getLoc(), diag::enum_case_added);
+          }
+        }
+      }
       return;
     case NodeMatchReason::Removed:
       assert(!Right);

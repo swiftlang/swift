@@ -728,6 +728,7 @@ public:
   }
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV) {
+    assert(!LV->getType().isAddress());
     return insert(new (getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV));
   }
@@ -2162,6 +2163,46 @@ public:
   //===--------------------------------------------------------------------===//
   // Differentiable programming instructions
   //===--------------------------------------------------------------------===//
+
+  DifferentiableFunctionInst *createDifferentiableFunction(
+      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
+    return insert(DifferentiableFunctionInst::create(
+        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
+  }
+
+  LinearFunctionInst *createLinearFunction(
+      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      Optional<SILValue> TransposeFunction = None) {
+    return insert(LinearFunctionInst::create(
+        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        OriginalFunction, TransposeFunction, hasOwnership()));
+  }
+
+  /// Note: explicit extractee type may be specified only in lowered SIL.
+  DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
+      SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
+      SILValue Function, Optional<SILType> ExtracteeType = None) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc), Extractee, Function,
+        ExtracteeType));
+  }
+
+  DifferentiableFunctionExtractInst *
+  createDifferentiableFunctionExtractOriginal(SILLocation Loc,
+                                              SILValue TheFunction) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc),
+        NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
+  }
+
+  LinearFunctionExtractInst *createLinearFunctionExtract(
+      SILLocation Loc, LinearDifferentiableFunctionTypeComponent Extractee,
+      SILValue TheFunction) {
+    return insert(new (getModule()) LinearFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
+  }
 
   /// Note: explicit function type may be specified only in lowered SIL.
   DifferentiabilityWitnessFunctionInst *createDifferentiabilityWitnessFunction(

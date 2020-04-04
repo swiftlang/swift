@@ -137,8 +137,9 @@ static bool swiftCodeCompleteImpl(
 
         SwiftConsumer.setContext(&CI.getASTContext(), &CI.getInvocation(),
                                  &CompletionContext);
-        performCodeCompletionSecondPass(CI.getPersistentParserState(),
-                                        *callbacksFactory);
+
+        auto SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
         SwiftConsumer.clearContext();
       });
 }
@@ -181,7 +182,8 @@ void SwiftLangSupport::codeComplete(
       SKConsumer.setCompletionKind(kind);
 
     bool hasRequiredType = info.completionContext->typeContextKind == TypeContextKind::Required;
-    CodeCompletionContext::sortCompletionResults(Results);
+    if (CCOpts.sortByName)
+      CodeCompletionContext::sortCompletionResults(Results);
     // FIXME: this adhoc filtering should be configurable like it is in the
     // codeCompleteOpen path.
     for (auto *Result : Results) {
@@ -1087,7 +1089,7 @@ static void transformAndForwardResults(
     });
 
     auto *inputBuf = session->getBuffer();
-    std::string str = inputBuf->getBuffer().slice(0, offset);
+    std::string str = inputBuf->getBuffer().slice(0, offset).str();
     {
       llvm::raw_string_ostream OSS(str);
       SwiftToSourceKitCompletionAdapter::getResultSourceText(

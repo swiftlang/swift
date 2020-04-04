@@ -100,7 +100,7 @@ sil [ossa] @protocol_extension_with_constrained_associated_type : $@convention(m
 bb0(%0 : $*I, %1 : $*Self):
   %2 = alloc_stack $I                             // users: %3, %6, %7, %9
   copy_addr %0 to [initialization] %2 : $*I     // id: %3
-  %4 = witness_method $I, #FooProto.value!getter.1 : $@convention(witness_method: FooProto) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@in_guaranteed τ_0_0) -> @out τ_0_0.Assoc // user: %6
+  %4 = witness_method $I, #FooProto.value!getter : $@convention(witness_method: FooProto) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@in_guaranteed τ_0_0) -> @out τ_0_0.Assoc // user: %6
   %5 = alloc_stack $Self.Assoc                    // users: %6, %8
   %6 = apply %4<I>(%5, %2) : $@convention(witness_method: FooProto) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@in_guaranteed τ_0_0) -> @out τ_0_0.Assoc
   destroy_addr %2 : $*I                         // id: %7

@@ -504,6 +504,9 @@ ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
 ERROR(expected_sil_tuple_index,none,
       "expected tuple element index", ())
+ERROR(invalid_index_subset,none,
+      "invalid index subset; expected '[SU]+' where 'S' represents set indices "
+      "and 'U' represents unset indices", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -828,6 +831,14 @@ ERROR(sil_function_subst_expected_l_angle,none,
       "expected '<' to begin SIL function type substitution list after 'for'", ())
 ERROR(sil_function_subst_expected_r_angle,none,
       "expected '>' to end SIL function type substitution list after 'for <...'", ())
+ERROR(sil_function_subst_expected_generics,none,
+      "expected '<' to begin substituted parameter list after '@substituted'", ())
+ERROR(sil_function_subst_expected_function,none,
+      "expected function type after '@substituted'", ())
+ERROR(sil_function_subst_expected_subs,none,
+      "expected 'for' to begin substitutions after '@substituted' function type", ())
+ERROR(sil_function_subs_without_generics,none,
+      "unexpected 'for' to begin substitutions after non-generic function type", ())
 
 // Opaque types
 ERROR(opaque_mid_composition,none,
@@ -1571,24 +1582,14 @@ ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
 // differentiable
-// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
-ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
-      "expected a %0 function name", (StringRef))
 ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to", ())
-// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_expected_label,none,
-      "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
-      "or 'vjp:'", ())
+      "expected 'wrt:' or 'where' in '@differentiable' attribute", ())
 ERROR(attr_differentiable_unexpected_argument,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
-// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
-WARNING(attr_differentiable_jvp_vjp_deprecated_warning,none,
-        "'jvp:' and 'vjp:' arguments in '@differentiable' attribute are "
-        "deprecated; use '@derivative' attribute for derivative registration "
-        "instead", ())
 
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,
@@ -1617,6 +1618,20 @@ ERROR(sil_autodiff_expected_parameter_index,PointsToFirstBadToken,
       "expected the index of a parameter to differentiate with respect to", ())
 ERROR(sil_autodiff_expected_result_index,PointsToFirstBadToken,
       "expected the index of a result to differentiate from", ())
+ERROR(sil_inst_autodiff_operand_list_expected_lbrace,PointsToFirstBadToken,
+      "expected '{' to start a derivative function list", ())
+ERROR(sil_inst_autodiff_operand_list_expected_comma,PointsToFirstBadToken,
+      "expected ',' between operands in a derivative function list", ())
+ERROR(sil_inst_autodiff_operand_list_expected_rbrace,PointsToFirstBadToken,
+      "expected '}' to start a derivative function list", ())
+ERROR(sil_inst_autodiff_expected_differentiable_extractee_kind,PointsToFirstBadToken,
+      "expected an extractee kind attribute, which can be one of '[original]', "
+      "'[jvp]', and '[vjp]'", ())
+ERROR(sil_inst_autodiff_expected_linear_extractee_kind,PointsToFirstBadToken,
+      "expected an extractee kind attribute, which can be one of '[original]' "
+      "and '[transpose]'", ())
+ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
+      "expected an operand of a function type", ())
 ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBadToken,
       "expected a differentiability witness kind, which can be one of '[jvp]', "
       "'[vjp]', or '[transpose]'", ())
@@ -1650,10 +1665,6 @@ ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
-ERROR(where_without_generic_params,none,
-      "'where' clause cannot be attached to "
-      "%select{a non-generic|a protocol|an associated type}0 "
-      "declaration", (unsigned))
 ERROR(where_inside_brackets,none,
         "'where' clause next to generic parameters is obsolete, "
         "must be written following the declaration's type", ())

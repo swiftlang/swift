@@ -5,6 +5,8 @@ sil_stage canonical
 import Builtin
 import Swift
 
+sil @unknown : $@convention(thin) () -> ()
+
 sil @read_from_param : $@convention(thin) (@inout Int64, Int64) -> Int64 {
 bb0(%0 : $*Int64, %1 : $Int64):
   debug_value %1 : $Int64
@@ -112,6 +114,193 @@ bb0(%0 : $Int64, %1 : $*Int64):
 bb1:
   %21 = apply %9() : $@convention(thin) () -> @owned X
   strong_release %21 : $X
+  cond_br undef, bb1, bb2
+
+bb2:
+  %15 = tuple ()
+  return %15 : $()
+}
+
+sil [global_init] @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+
+// CHECK-LABEL: sil @licm_global_init
+// CHECK:   apply
+// CHECK: bb1:
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'licm_global_init'
+sil @licm_global_init : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  cond_br undef, bb1, bb2
+
+bb2:
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK-LABEL: sil @dont_licm_ginit_prehead_not_pdom
+// CHECK-NOT: apply
+// CHECK: bb1:
+// CHECK:   apply
+// CHECK: bb2:
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'dont_licm_ginit_prehead_not_pdom'
+sil @dont_licm_ginit_prehead_not_pdom : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  cond_br undef, bb1, bb2
+
+bb2:
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK-LABEL: sil @licm_ginit_complex_cfg
+// CHECK-NOT: apply
+// CHECK: bb0:
+// CHECK:   apply
+// CHECK: bb1:
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'licm_ginit_complex_cfg'
+sil @licm_ginit_complex_cfg : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+ 
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  cond_br undef, bb1, bb5
+
+bb5:
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK-LABEL: sil @dont_licm_ginit_apply_not_pdom
+// CHECK-NOT: apply
+// CHECK: bb2:
+// CHECK:   apply
+// CHECK: bb3:
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'dont_licm_ginit_apply_not_pdom'
+sil @dont_licm_ginit_apply_not_pdom : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+ 
+bb2:
+  %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  cond_br undef, bb1, bb5
+
+bb5:
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK-LABEL: sil @dont_licm_ginit_dependency1
+// CHECK: bb0:
+// CHECK:   [[I:%[0-9]+]] = function_ref @$s4test10testGlobalSivau
+// CHECK: bb2:
+// CHECK:   [[U:%[0-9]+]] = function_ref @unknown
+// CHECK:   apply [[U]]
+// CHECK: bb4:
+// CHECK:   apply [[I]]
+// CHECK: bb5:
+// CHECK: } // end sil function 'dont_licm_ginit_dependency1'
+sil @dont_licm_ginit_dependency1 : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+ 
+bb2:
+  %f = function_ref @unknown : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  cond_br undef, bb1, bb5
+
+bb5:
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK-LABEL: sil @dont_licm_ginit_dependency2
+// CHECK: bb0:
+// CHECK-DAG: [[I:%[0-9]+]] = function_ref @$s4test10testGlobalSivau
+// CHECK-DAG: [[U:%[0-9]+]] = function_ref @unknown
+// CHECK: bb1:
+// CHECK:   apply [[U]]
+// CHECK:   apply [[I]]
+// CHECK: bb2:
+// CHECK: } // end sil function 'dont_licm_ginit_dependency2'
+sil @dont_licm_ginit_dependency2 : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %f = function_ref @unknown : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  cond_br undef, bb1, bb2
+
+bb2:
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK-LABEL: sil @licm_ginit_no_dependency
+// CHECK: bb0:
+// CHECK-DAG: [[I:%[0-9]+]] = function_ref @$s4test10testGlobalSivau
+// CHECK-DAG: [[U:%[0-9]+]] = function_ref @unknown
+// CHECK-DAG: apply [[I]]
+// CHECK: bb1:
+// CHECK:   apply [[U]]
+// CHECK: bb2:
+// CHECK: } // end sil function 'licm_ginit_no_dependency'
+sil @licm_ginit_no_dependency : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  %f = function_ref @unknown : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
   cond_br undef, bb1, bb2
 
 bb2:

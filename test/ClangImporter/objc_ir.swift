@@ -87,7 +87,7 @@ func propertyAccess(b b: B) {
 // CHECK-LABEL: define hidden swiftcc %TSo1BC* @"$s7objc_ir8downcast1aSo1BCSo1AC_tF"(
 func downcast(a a: A) -> B {
   // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
-  // CHECK: [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[CLASS]])
+  // CHECK: [[T0:%.*]] = call %objc_class* @{{.*}}(%objc_class* [[CLASS]])
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
   // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]], {{.*}}) [[NOUNWIND:#[0-9]+]]
   return a as! B
@@ -351,7 +351,7 @@ func testConstrGenericCompatibilityAliasMangling(constr_generic_obj: SwiftConstr
 
 // CHECK-LABEL: s7objc_ir22testBlocksWithGenerics3hbaypSo13HasBlockArrayC_tF
 func testBlocksWithGenerics(hba: HasBlockArray) -> Any {
-  // CHECK: {{call swiftcc.*sSo13HasBlockArrayC05blockC0SayyyXBGyFTcTO}}
+  // CHECK: s7objc_ir22testBlocksWithGenerics3hbaypSo13HasBlockArrayC_tFSayyyXBGycAEcfu_AFycfu0_TA
   let _ = hba.blockPointerType()
   return hba.blockArray
 }

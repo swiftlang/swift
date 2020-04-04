@@ -531,6 +531,16 @@ namespace {
     RValue visitTapExpr(TapExpr *E, SGFContext C);
     RValue visitDefaultArgumentExpr(DefaultArgumentExpr *E, SGFContext C);
     RValue visitErrorExpr(ErrorExpr *E, SGFContext C);
+
+    RValue visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E,
+                                           SGFContext C);
+    RValue visitLinearFunctionExpr(LinearFunctionExpr *E, SGFContext C);
+    RValue visitDifferentiableFunctionExtractOriginalExpr(
+        DifferentiableFunctionExtractOriginalExpr *E, SGFContext C);
+    RValue visitLinearFunctionExtractOriginalExpr(
+        LinearFunctionExtractOriginalExpr *E, SGFContext C);
+    RValue visitLinearToDifferentiableFunctionExpr(
+        LinearToDifferentiableFunctionExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -907,12 +917,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // If the referenced decl isn't a VarDecl, it should be a constant of some
   // sort.
   SILDeclRef silDeclRef(decl);
-  if (silDeclRef.getParameterListCount() == 2) {
-    // Unqualified reference to an instance method from a static context,
-    // without applying 'self'.
-    silDeclRef = silDeclRef.asCurried();
-  }
-
+  assert(silDeclRef.getParameterListCount() == 1);
   ManagedValue result = emitClosureValue(loc, silDeclRef, refType,
                                          declRef.getSubstitutions());
   return RValue(*this, loc, refType, result);
@@ -1575,7 +1580,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   }
 
   // Produce a reference to the C-compatible entry point for the function.
-  SILDeclRef constant(loc, /*curried*/ false, /*foreign*/ true);
+  SILDeclRef constant(loc, /*foreign*/ true);
   SILConstantInfo constantInfo =
       SGF.getConstantInfo(SGF.getTypeExpansionContext(), constant);
 
@@ -2402,9 +2407,32 @@ RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   return visit(E->getClosureBody(), C);
 }
 
+static OpaqueValueExpr *opaqueValueExprToSubstituteForAutoClosure(
+    const AbstractClosureExpr *e) {
+  // When we find an autoclosure that just calls an opaque closure,
+  // this is a case where we've created the opaque closure as a
+  // stand-in for the autoclosure itself. Such an opaque closure is
+  // created when we have a property wrapper's 'init(wrappedValue:)'
+  // taking an autoclosure argument.
+  if (auto ace = dyn_cast<AutoClosureExpr>(e)) {
+    if (auto ce = dyn_cast<CallExpr>(ace->getSingleExpressionBody())) {
+      if (auto ove = dyn_cast<OpaqueValueExpr>(ce->getFn())) {
+        if (!ace->isImplicit() || !ove->isImplicit() || !ove->isPlaceholder())
+          return nullptr;
+
+        if (ace->getType()->isEqual(ove->getType()))
+          return ove;
+      }
+    }
+  }
+  return nullptr;
+}
 
 RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
                                                SGFContext C) {
+  if (auto ove = opaqueValueExprToSubstituteForAutoClosure(e))
+    return visitOpaqueValueExpr(ove, C);
+
   // Emit the closure body.
   SGF.SGM.emitClosure(e);
 
@@ -2715,7 +2743,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, {}, result, None,
-      SubstitutionMap(), false,
+      SubstitutionMap(), SubstitutionMap(),
       SGM.getASTContext());
   }();
   
@@ -2864,7 +2892,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, {}, {}, None,
-      SubstitutionMap(), false,
+      SubstitutionMap(), SubstitutionMap(),
       SGM.getASTContext());
   }();
   
@@ -3046,7 +3074,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None,
-      SubstitutionMap(), false,
+      SubstitutionMap(), SubstitutionMap(),
       C);
     
     // Mangle the name of the thunk to see if we already created it.
@@ -3220,7 +3248,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None,
-      SubstitutionMap(), false, C);
+      SubstitutionMap(), SubstitutionMap(), C);
     
     // Mangle the name of the thunk to see if we already created it.
     SmallString<64> nameBuf;
@@ -5410,6 +5438,51 @@ RValue RValueEmitter::visitForeignObjectConversionExpr(
 RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
                                                    SGFContext C) {
   llvm_unreachable("unevaluated_instance expression can never be evaluated");
+}
+
+RValue RValueEmitter::visitDifferentiableFunctionExpr(
+    DifferentiableFunctionExpr *E, SGFContext C) {
+  auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
+  auto *diffFunc = SGF.B.createDifferentiableFunction(
+      E, destTy->getDifferentiabilityParameterIndices(), origFunc.forward(SGF));
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
+}
+
+RValue RValueEmitter::visitLinearFunctionExpr(
+    LinearFunctionExpr *E, SGFContext C) {
+  auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
+  auto *diffFunc = SGF.B.createLinearFunction(
+      E, destTy->getDifferentiabilityParameterIndices(), origFunc.forward(SGF));
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
+}
+
+RValue RValueEmitter::visitDifferentiableFunctionExtractOriginalExpr(
+    DifferentiableFunctionExtractOriginalExpr *E, SGFContext C) {
+  auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto borrowedDiffFunc = diffFunc.borrow(SGF, E);
+  auto *borrowedOrigFunc = SGF.B.createDifferentiableFunctionExtractOriginal(
+      E, borrowedDiffFunc.getValue());
+  auto ownedOrigFunc = SGF.B.emitCopyValueOperation(E, borrowedOrigFunc);
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(ownedOrigFunc));
+}
+
+RValue RValueEmitter::visitLinearFunctionExtractOriginalExpr(
+    LinearFunctionExtractOriginalExpr *E, SGFContext C) {
+  auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto borrowedDiffFunc = diffFunc.borrow(SGF, E);
+  auto *borrowedOrigFunc = SGF.B.createLinearFunctionExtract(
+      E, LinearDifferentiableFunctionTypeComponent::Original,
+      borrowedDiffFunc.getValue());
+  auto ownedOrigFunc = SGF.B.emitCopyValueOperation(E, borrowedOrigFunc);
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(ownedOrigFunc));
+}
+
+RValue RValueEmitter::visitLinearToDifferentiableFunctionExpr(
+    LinearToDifferentiableFunctionExpr *E, SGFContext C) {
+  // TODO: Implement this.
+  llvm_unreachable("Unsupported!");
 }
 
 RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {

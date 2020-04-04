@@ -58,7 +58,7 @@ void FixitApplyDiagnosticConsumer::handleDiagnostic(
       continue;
 
     // Ignore pre-applied equivalents.
-    Replacement R { Offset, Length, Text };
+    Replacement R{Offset, Length, Text.str()};
     if (Replacements.count(R)) {
       continue;
     } else {

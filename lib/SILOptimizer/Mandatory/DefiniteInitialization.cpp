@@ -1203,11 +1203,12 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     } else if (FD && FD->isOperator()) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::mutating_method_called_on_immutable_value,
-               FD->getName(), /*operator*/ 1, StringRef(PropertyName));
+               FD->getBaseIdentifier(), /*operator*/ 1,
+               StringRef(PropertyName));
     } else if (FD && isSelfParameter) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::mutating_method_called_on_immutable_value,
-               FD->getName(), /*method*/ 0, StringRef(PropertyName));
+               FD->getBaseIdentifier(), /*method*/ 0, StringRef(PropertyName));
     } else if (isAssignment) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::assignment_to_immutable_value, StringRef(PropertyName));
@@ -1355,7 +1356,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 /// it a 'return' use of self.
 ///
 ///   %3 = load %2 : $*Enum
-///   %4 = enum $Optional<Enum>, #Optional.Some!enumelt.1, %3 : $Enum
+///   %4 = enum $Optional<Enum>, #Optional.Some!enumelt, %3 : $Enum
 ///   br bb2(%4 : $Optional<Enum>)                    // id: %5
 /// bb1:
 ///   %6 = enum $Optional<Enum>, #Optional.None!enumelt // user: %7
@@ -1590,7 +1591,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     if (auto accessor = dyn_cast<AccessorDecl>(Method))
       Name = accessor->getStorage()->getBaseName();
     else
-      Name = Method->getName();
+      Name = Method->getBaseIdentifier();
 
     // If this is a use of self before super.init was called, emit a diagnostic
     // about *that* instead of about individual properties not being
@@ -2111,7 +2112,7 @@ static Identifier getBinaryFunction(StringRef Name, SILType IntSILTy,
   auto IntTy = IntSILTy.castTo<BuiltinIntegerType>();
   unsigned NumBits = IntTy->getWidth().getFixedWidth();
   // Name is something like: add_Int64
-  std::string NameStr = Name;
+  std::string NameStr(Name);
   NameStr += "_Int" + llvm::utostr(NumBits);
 
   return C.getIdentifier(NameStr);

@@ -709,7 +709,6 @@ func test() {
 func unusedExpressionResults() {
   // Unused l-value
   _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
-  // expected-error@-1 {{expression resolves to an unused variable}}
 
   // <rdar://problem/20749592> Conditional Optional binding hides compiler error
   let optionalc:C? = nil
@@ -791,9 +790,8 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok
-  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'ClosedRange<Int>'}}
-  // expected-error@-2 {{cannot convert value of type 'ClosedRange<Int>' to expected argument type 'Int'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'ClosedRange<Int>'}}
+  // expected-error@-1 {{referencing operator function '...' on 'Comparable' requires that 'ClosedRange<Int>' conform to 'Comparable'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
   
   

@@ -21,6 +21,44 @@
 
 using namespace swift;
 
+/// Determine which kind of array semantics function this is.
+ArrayCallKind swift::getArraySemanticsKind(SILFunction *f) {
+  ArrayCallKind Kind = ArrayCallKind::kNone;
+
+  for (auto &Attrs : f->getSemanticsAttrs()) {
+    auto Tmp =
+        llvm::StringSwitch<ArrayCallKind>(Attrs)
+            .Case("array.props.isNativeTypeChecked",
+                  ArrayCallKind::kArrayPropsIsNativeTypeChecked)
+            .StartsWith("array.init", ArrayCallKind::kArrayInit)
+            .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
+            .Case("array.uninitialized_intrinsic", ArrayCallKind::kArrayUninitializedIntrinsic)
+            .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
+            .Case("array.check_index", ArrayCallKind::kCheckIndex)
+            .Case("array.get_count", ArrayCallKind::kGetCount)
+            .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
+            .Case("array.get_element", ArrayCallKind::kGetElement)
+            .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
+            .Case("array.get_element_address",
+                  ArrayCallKind::kGetElementAddress)
+            .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
+            .Case("array.reserve_capacity_for_append",
+                  ArrayCallKind::kReserveCapacityForAppend)
+            .Case("array.withUnsafeMutableBufferPointer",
+                  ArrayCallKind::kWithUnsafeMutableBufferPointer)
+            .Case("array.append_contentsOf", ArrayCallKind::kAppendContentsOf)
+            .Case("array.append_element", ArrayCallKind::kAppendElement)
+            .Default(ArrayCallKind::kNone);
+    if (Tmp != ArrayCallKind::kNone) {
+      assert(Kind == ArrayCallKind::kNone && "Multiple array semantic "
+                                             "strings?!");
+      Kind = Tmp;
+    }
+  }
+
+  return Kind;
+}
+
 static ParameterConvention
 getSelfParameterConvention(ApplyInst *SemanticsCall) {
   FunctionRefInst *FRI = cast<FunctionRefInst>(SemanticsCall->getCallee());
@@ -161,40 +199,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
   auto F = cast<FunctionRefInst>(SemanticsCall->getCallee())
                ->getInitiallyReferencedFunction();
 
-  ArrayCallKind Kind = ArrayCallKind::kNone;
-
-  for (auto &Attrs : F->getSemanticsAttrs()) {
-    auto Tmp =
-        llvm::StringSwitch<ArrayCallKind>(Attrs)
-            .Case("array.props.isNativeTypeChecked",
-                  ArrayCallKind::kArrayPropsIsNativeTypeChecked)
-            .StartsWith("array.init", ArrayCallKind::kArrayInit)
-            .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
-            .Case("array.uninitialized_intrinsic", ArrayCallKind::kArrayUninitializedIntrinsic)
-            .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
-            .Case("array.check_index", ArrayCallKind::kCheckIndex)
-            .Case("array.get_count", ArrayCallKind::kGetCount)
-            .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
-            .Case("array.get_element", ArrayCallKind::kGetElement)
-            .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
-            .Case("array.get_element_address",
-                  ArrayCallKind::kGetElementAddress)
-            .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
-            .Case("array.reserve_capacity_for_append",
-                  ArrayCallKind::kReserveCapacityForAppend)
-            .Case("array.withUnsafeMutableBufferPointer",
-                  ArrayCallKind::kWithUnsafeMutableBufferPointer)
-            .Case("array.append_contentsOf", ArrayCallKind::kAppendContentsOf)
-            .Case("array.append_element", ArrayCallKind::kAppendElement)
-            .Default(ArrayCallKind::kNone);
-    if (Tmp != ArrayCallKind::kNone) {
-      assert(Kind == ArrayCallKind::kNone && "Multiple array semantic "
-                                             "strings?!");
-      Kind = Tmp;
-    }
-  }
-
-  return Kind;
+  return getArraySemanticsKind(F);
 }
 
 bool swift::ArraySemanticsCall::hasSelf() const {

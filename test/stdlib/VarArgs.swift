@@ -6,7 +6,7 @@ import Swift
 #if _runtime(_ObjC)
   import Darwin
   import CoreGraphics
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
   import Glibc
   typealias CGFloat = Double
 #elseif os(Windows)

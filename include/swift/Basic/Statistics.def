@@ -130,10 +130,8 @@ FRONTEND_STATISTIC(AST, NumLocalTypeDecls)
 /// Number of Objective-C declarations in the AST context.
 FRONTEND_STATISTIC(AST, NumObjCMethods)
 
-/// Number of infix, postfix, and prefix operators in the AST context.
-FRONTEND_STATISTIC(AST, NumInfixOperators)
-FRONTEND_STATISTIC(AST, NumPostfixOperators)
-FRONTEND_STATISTIC(AST, NumPrefixOperators)
+/// Number of operators in the AST context.
+FRONTEND_STATISTIC(AST, NumOperators)
 
 /// Number of precedence groups in the AST context.
 FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
@@ -280,11 +278,19 @@ FRONTEND_STATISTIC(SILModule, NumSILGenWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILGenDefaultWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILGenGlobalVariables)
 
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(SILOptimizer, NAME)
+#include "swift/AST/SILOptimizerTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 FRONTEND_STATISTIC(SILModule, NumSILOptFunctions)
 FRONTEND_STATISTIC(SILModule, NumSILOptVtables)
 FRONTEND_STATISTIC(SILModule, NumSILOptWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILOptDefaultWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILOptGlobalVariables)
+
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(IRGen, NAME)
+#include "swift/AST/IRGenTypeIDZone.def"
+#undef SWIFT_REQUEST
 
 /// The next 10 statistics count kinds of LLVM entities produced
 /// during the IRGen phase: globals, functions, aliases, ifuncs,

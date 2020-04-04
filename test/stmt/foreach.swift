@@ -220,3 +220,12 @@ extension Int : P { }
 func testRepeated(ri: RepeatedSequence<Int>) {
   for x in ri { _ = x }
 }
+
+// SR-12398: Poor pattern matching diagnostic: "for-in loop requires '[Int]' to conform to 'Sequence'"
+func sr_12398(arr1: [Int], arr2: [(a: Int, b: String)]) {
+  for (x, y) in arr1 {}
+  // expected-error@-1 {{tuple pattern cannot match values of non-tuple type 'Int'}}
+
+  for (x, y, _) in arr2 {}
+  // expected-error@-1 {{pattern cannot match values of type '(a: Int, b: String)'}}
+}

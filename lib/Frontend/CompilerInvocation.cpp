@@ -56,33 +56,27 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::sys::path::remove_filename(DiagnosticDocsPath); // Remove /bin
   llvm::sys::path::append(DiagnosticDocsPath, "share", "doc", "swift",
                           "diagnostics");
-  DiagnosticOpts.DiagnosticDocumentationPath = DiagnosticDocsPath.str();
+  DiagnosticOpts.DiagnosticDocumentationPath = std::string(DiagnosticDocsPath.str());
 }
 
-/// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
-/// the default value of <resource-dir>/<platform>/prebuilt-modules.
-/// @note This should be called once, after search path options and frontend
-///       options have been parsed.
-static void setDefaultPrebuiltCacheIfNecessary(
-  FrontendOptions &frontendOpts, const SearchPathOptions &searchPathOpts,
-  const llvm::Triple &triple) {
+void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
 
-  if (!frontendOpts.PrebuiltModuleCachePath.empty())
+  if (!FrontendOpts.PrebuiltModuleCachePath.empty())
     return;
-  if (searchPathOpts.RuntimeResourcePath.empty())
+  if (SearchPathOpts.RuntimeResourcePath.empty())
     return;
 
-  SmallString<64> defaultPrebuiltPath{searchPathOpts.RuntimeResourcePath};
+  SmallString<64> defaultPrebuiltPath{SearchPathOpts.RuntimeResourcePath};
   StringRef platform;
-  if (tripleIsMacCatalystEnvironment(triple)) {
+  if (tripleIsMacCatalystEnvironment(LangOpts.Target)) {
     // The prebuilt cache for macCatalyst is the same as the one for macOS, not iOS
     // or a separate location of its own.
     platform = "macosx";
   } else {
-    platform = getPlatformNameForTriple(triple);
+    platform = getPlatformNameForTriple(LangOpts.Target);
   }
   llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
-  frontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
+  FrontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -95,7 +89,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
 
   llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.clear();
-  SearchPathOpts.RuntimeLibraryPaths.push_back(LibPath.str());
+  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(LibPath.str()));
   if (Triple.isOSDarwin())
     SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
 
@@ -109,14 +103,14 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
 
   if (!Triple.isOSDarwin())
     llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
-  SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+  SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
 
   if (!SearchPathOpts.SDKPath.empty()) {
     if (tripleIsMacCatalystEnvironment(Triple)) {
       LibPath = SearchPathOpts.SDKPath;
       llvm::sys::path::append(LibPath, "System", "iOSSupport");
       llvm::sys::path::append(LibPath, "usr", "lib", "swift");
-      SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+      SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
     }
 
     LibPath = SearchPathOpts.SDKPath;
@@ -125,7 +119,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
       llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
       llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
     }
-    SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
 }
 
@@ -178,7 +172,7 @@ setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
-  SearchPathOpts.RuntimeResourcePath = Path;
+  SearchPathOpts.RuntimeResourcePath = Path.str();
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
@@ -408,6 +402,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   
   Opts.DisableParserLookup |= Args.hasArg(OPT_disable_parser_lookup);
+  Opts.EnableRequestBasedIncrementalDependencies =
+      Args.hasFlag(OPT_enable_request_based_incremental_dependencies,
+                   OPT_disable_request_based_incremental_dependencies,
+                   Opts.EnableRequestBasedIncrementalDependencies);
   Opts.EnableASTScopeLookup =
       Args.hasFlag(options::OPT_enable_astscope_lookup,
                    options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
@@ -448,8 +446,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_fine_grained_dependency_include_intrafile))
     Opts.FineGrainedDependenciesIncludeIntrafileOnes = true;
 
-  if (Args.hasArg(OPT_enable_experimental_differentiable_programming))
-    Opts.EnableExperimentalDifferentiableProgramming = true;
+  if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
+    Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
@@ -564,6 +562,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
+
+  Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
   Opts.UseDarwinPreStableABIBit =
     (Target.isMacOSX() && Target.isMacOSXVersionLT(10, 14, 4)) ||
@@ -708,9 +708,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     // Provide a working directory to Clang as well if there are any -Xcc
     // options, in case some of them are search-related. But do it at the
     // beginning, so that an explicit -Xcc -working-directory will win.
-    Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(), {
-      "-working-directory", workingDirectory
-    });
+    Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(),
+                          {"-working-directory", workingDirectory.str()});
   }
 
   Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
@@ -753,10 +752,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   auto resolveSearchPath =
       [workingDirectory](StringRef searchPath) -> std::string {
     if (workingDirectory.empty() || path::is_absolute(searchPath))
-      return searchPath;
+      return searchPath.str();
     SmallString<64> fullPath{workingDirectory};
     path::append(fullPath, searchPath);
-    return fullPath.str();
+    return std::string(fullPath.str());
   };
 
   for (const Arg *A : Args.filtered(OPT_I)) {
@@ -795,7 +794,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   // Assumes exactly one of setMainExecutablePath() or setRuntimeIncludePath() 
   // is called before setTargetTriple() and parseArgs().
   // TODO: improve the handling of RuntimeIncludePath.
-
+  
   return false;
 }
 
@@ -819,8 +818,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
-  Opts.EnableDescriptiveDiagnostics |=
-      Args.hasArg(OPT_enable_descriptive_diagnostics);
+  Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
+  Opts.EnableExperimentalFormatting |=
+      Args.hasArg(OPT_enable_experimental_diagnostic_formatting);
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
     Opts.DiagnosticDocumentationPath = A->getValue();
   }
@@ -999,6 +999,20 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
 
+  if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_EQ)) {
+    llvm::Expected<llvm::remarks::Format> formatOrErr =
+        llvm::remarks::parseFormat(A->getValue());
+    if (llvm::Error err = formatOrErr.takeError()) {
+      Diags.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
+                     toString(std::move(err)));
+      return true;
+    }
+    Opts.OptRecordFormat = *formatOrErr;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_passes))
+    Opts.OptRecordPasses = A->getValue();
+
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
 
@@ -1150,7 +1164,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     // TODO: Should we support -fdebug-compilation-dir?
     llvm::SmallString<256> cwd;
     llvm::sys::fs::current_path(cwd);
-    Opts.DebugCompilationDir = cwd.str();
+    Opts.DebugCompilationDir = std::string(cwd.str());
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
@@ -1190,7 +1204,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
     StringRef Opt = A->getValue();
     if (Opt.startswith("-D") || Opt.startswith("-U"))
-      Opts.ClangDefines.push_back(Opt);
+      Opts.ClangDefines.push_back(Opt.str());
   }
 
   for (const Arg *A : Args.filtered(OPT_l, OPT_framework)) {
@@ -1234,7 +1248,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.FunctionSections = Args.hasArg(OPT_function_sections);
 
   if (Args.hasArg(OPT_autolink_force_load))
-    Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
+    Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name).str();
 
   Opts.ModuleName = FrontendOpts.ModuleName;
 
@@ -1243,6 +1257,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_disable_debugger_shadow_copies))
     Opts.DisableDebuggerShadowCopies = true;
+
+  if (Args.hasArg(OPT_disable_concrete_type_metadata_mangled_name_accessors))
+    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
 
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
@@ -1268,6 +1285,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                                OPT_disable_type_layouts)) {
     Opts.UseTypeLayoutValueHandling
       = A->getOption().matches(OPT_enable_type_layouts);
+  } else if (Opts.OptMode == OptimizationMode::NoOptimization) {
+    // Disable type layouts at Onone except if explictly requested.
+    Opts.UseTypeLayoutValueHandling = false;
   }
 
   Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
@@ -1474,8 +1494,8 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
       llvm::SmallString<128> authoredDataPath(basePath);
       llvm::sys::path::append(authoredDataPath, getScriptFileName("overlay", langVer));
       // Add authored list first to take higher priority.
-      Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
-      Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
+      Opts.APIDigesterDataStorePaths.push_back(std::string(authoredDataPath.str()));
+      Opts.APIDigesterDataStorePaths.push_back(std::string(dataPath.str()));
     }
   }
 
@@ -1582,8 +1602,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
-  setDefaultPrebuiltCacheIfNecessary(FrontendOpts, SearchPathOpts,
-                                     LangOpts.Target);
+  setDefaultPrebuiltCacheIfNecessary();
 
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
@@ -1604,12 +1623,12 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
   LangOpts.EffectiveLanguageVersion = info.compatibilityVersion;
   setTargetTriple(info.targetTriple);
   if (!extendedInfo.getSDKPath().empty())
-    setSDKPath(extendedInfo.getSDKPath());
+    setSDKPath(extendedInfo.getSDKPath().str());
 
   auto &extraClangArgs = getClangImporterOptions().ExtraArgs;
-  extraClangArgs.insert(extraClangArgs.end(),
-                        extendedInfo.getExtraClangImporterOptions().begin(),
-                        extendedInfo.getExtraClangImporterOptions().end());
+  for (StringRef Arg : extendedInfo.getExtraClangImporterOptions())
+    extraClangArgs.push_back(Arg.str());
+
   return info.status;
 }
 

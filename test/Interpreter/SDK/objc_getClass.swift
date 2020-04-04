@@ -261,6 +261,12 @@ testSuite.test("NotPresent") {
   expectNil(NSClassFromString("\u{1}badnews"));
   expectNil(NSClassFromString("$s\u{1}badnews"));
   expectNil(NSClassFromString("_T\u{1}badnews"));
+
+  // Correct mangled names with additional text afterwards should not resolve.
+  expectNil(NSClassFromString("_TtC4main20MangledSwiftSubclass_"))
+  expectNil(NSClassFromString("_TtC4main22MangledSwiftSuperclassXYZ"))
+  expectNil(NSClassFromString("_TtC4main19MangledObjCSubclass123"))
+  expectNil(NSClassFromString("_TtC4main21MangledObjCSuperclasswhee"))
 }
 
 runAllTests()

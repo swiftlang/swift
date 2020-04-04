@@ -172,7 +172,7 @@ sil_vtable C2 {}
 // -- computed, get-only, identified by (indirected) function pointer, no args
 // CHECK-SAME: <i32 0x0200_0002>,
 // CHECK-SAME: @{{got.|__imp_}}k_id
-// CHECK-SAME: void (%TSi*, %T8keypaths1SV*)* @k_get
+// CHECK-SAME: void (%TSi*, %T8keypaths1SV*)* {{.*}}@k_get{{.*}}
 
 // -- %l: computed
 // CHECK: [[KP_L:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
@@ -185,7 +185,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x0240_0000>,
 // CHECK-SAME: @"$s8keypaths1CCMn"
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_get
-// CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_set
+// CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_set{{.*}}
 
 // -- %m: computed
 // CHECK: [[KP_M:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
@@ -197,8 +197,8 @@ sil_vtable C2 {}
 // -- computed, settable, nonmutating, identified by property offset, no args
 // CHECK-SAME: <i32 0x02e0_0000>,
 // CHECK-SAME: [[WORD]]
-// CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* @m_get
-// CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* @m_set
+// CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* {{.*}}@m_get
+// CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* {{.*}}@m_set{{.*}}
 
 // -- %m2: reabstracted
 // Note: the contents here aren't interesting. The test triggered infinite
@@ -337,9 +337,9 @@ entry:
   %h = keypath $KeyPath<C, Int>, (root $C; stored_property #C.z : $S; stored_property #S.x : $Int)
 
   %k = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @k_id : $@convention(thin) () -> (), getter @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int)
-  %l = keypath $KeyPath<C, Int>, (root $C; settable_property $Int, id #C.w!getter.1, getter @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
-  %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed <A> in () -> @out A for <()>, setter @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed <A> in () -> @out A for <()>, @inout S) -> ())
-  %m2 = keypath $KeyPath<C2, () -> ()>, (root $C2; settable_property $() -> (), id ##C2.reabstracted, getter @m2_get : $@convention(thin) (@in_guaranteed C2) -> @out @callee_guaranteed <A> in () -> @out A for <()>, setter @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed <A> in () -> @out A for <()>, @inout C2) -> ())
+  %l = keypath $KeyPath<C, Int>, (root $C; settable_property $Int, id #C.w!getter, getter @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
+  %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed @substituted <A> () -> @out A for <()>, setter @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <()>, @inout S) -> ())
+  %m2 = keypath $KeyPath<C2, () -> ()>, (root $C2; settable_property $() -> (), id ##C2.reabstracted, getter @m2_get : $@convention(thin) (@in_guaranteed C2) -> @out @callee_guaranteed @substituted <A> () -> @out A for <()>, setter @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <()>, @inout C2) -> ())
 
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_T0]] to i8*), i8* undef)
   %t0 = keypath $KeyPath<T, Int>, (root $T; stored_property #T.a : $(Int, String); tuple_element #0 : $Int)
@@ -366,18 +366,18 @@ bb0(%0 : $*Int, %1 : $*C):
   unreachable
 }
 
-sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed <A> in () -> @out A for <()> {
-bb0(%0 : $*@callee_guaranteed <A> in () -> @out A for <()>, %1 : $*S):
+sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed @substituted <A> () -> @out A for <()> {
+bb0(%0 : $*@callee_guaranteed @substituted <A> () -> @out A for <()>, %1 : $*S):
   unreachable
 }
 
-sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed <A> in () -> @out A for <()>, @inout S) -> () {
-bb0(%0 : $*@callee_guaranteed <A> in () -> @out A for <()>, %1 : $*S):
+sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <()>, @inout S) -> () {
+bb0(%0 : $*@callee_guaranteed @substituted <A> () -> @out A for <()>, %1 : $*S):
   unreachable
 }
 
-sil @m2_get : $@convention(thin) (@in_guaranteed C2) -> @out @callee_guaranteed <A> in () -> @out A for <()>
-sil @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed <A> in () -> @out A for <()>, @inout C2) -> ()
+sil @m2_get : $@convention(thin) (@in_guaranteed C2) -> @out @callee_guaranteed @substituted <A> () -> @out A for <()>
+sil @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <()>, @inout C2) -> ()
 
 struct Gen<T, U> {
   var x: T

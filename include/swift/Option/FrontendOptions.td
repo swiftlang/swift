@@ -130,9 +130,10 @@ def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
   HelpText<"Automatically import declared cross-import overlays.">;
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
-
-def enable_descriptive_diagnostics : Flag<["-"], "enable-descriptive-diagnostics">,
-  HelpText<"Show descriptive diagnostic information, if available.">;
+  
+def enable_experimental_diagnostic_formatting :
+  Flag<["-"], "enable-experimental-diagnostic-formatting">,
+  HelpText<"Enable experimental diagnostic formatting features.">;
   
 def diagnostic_documentation_path
   : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
@@ -506,6 +507,10 @@ def disable_debugger_shadow_copies : Flag<["-"], "disable-debugger-shadow-copies
            "This option is only useful for testing the compiler.">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def disable_concrete_type_metadata_mangled_name_accessors : Flag<["-"], "disable-concrete-type-metadata-mangled-name-accessors">,
+  HelpText<"Disable concrete type metadata access by mangled name">,
+  Flags<[FrontendOption, HelpHidden]>;
+  
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
 
@@ -544,6 +549,9 @@ def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
 
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
+  
+def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
+  HelpText<"Verify all SubstitutionMaps on construction">;
 
 def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
   HelpText<"Do not eliminate functions in Mandatory Inlining/SILCombine dead "
@@ -592,6 +600,10 @@ def external_pass_pipeline_filename : Separate<["-"], "external-pass-pipeline-fi
 
 def index_system_modules : Flag<["-"], "index-system-modules">,
   HelpText<"Emit index data for imported serialized swift system modules">;
+
+def index_ignore_stdlib :
+  Flag<["-"], "index-ignore-stdlib">,
+  HelpText<"Avoid emitting index data for the standard library.">;
 
 def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
@@ -683,4 +695,8 @@ def disable_type_layouts : Flag<["-"], "disable-type-layout">,
 
 def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
   HelpText<"Don't lock interface file when building module">;
+
+def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
+    HelpText<"Directory for bridging header to be printed in compatibility header">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

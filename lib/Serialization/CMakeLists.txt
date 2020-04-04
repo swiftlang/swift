@@ -12,5 +12,6 @@ add_swift_host_library(swiftSerialization STATIC
     BitstreamReader
   )
 target_link_libraries(swiftSerialization PRIVATE
-  swiftClangImporter)
+  swiftClangImporter
+  swiftSIL)
 

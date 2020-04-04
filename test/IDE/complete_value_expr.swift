@@ -200,6 +200,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_1 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE_CALL_RESULT | %FileCheck %s -check-prefix=COMPLETE_CALL_RESULT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-keywords=false -code-completion-token=BROKEN_CONFORMANCE | %FileCheck %s -check-prefix=BROKEN_CONFORMANCE
 
 // Test code completion of expressions that produce a value.
 
@@ -768,7 +769,7 @@ func testInsideFunctionCall4() {
 func testInsideFunctionCall5() {
   FooStruct().instanceFunc2(42, #^INSIDE_FUNCTION_CALL_5^#
 // INSIDE_FUNCTION_CALL_5: Begin completions
-// INSIDE_FUNCTION_CALL_5-DAG: Keyword/ExprSpecific:               b: [#Argument name#]; name=b:
+// INSIDE_FUNCTION_CALL_5-DAG: Pattern/ExprSpecific: {#b: &Double#}[#inout Double#];
 // INSIDE_FUNCTION_CALL_5: End completions
 }
 
@@ -1433,8 +1434,8 @@ func testInterpolatedString1() {
 }
 
 // FOO_OBJECT_DOT1: Begin completions
-// FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal:      lazyInstanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      lazyInstanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      instanceVar[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceFunc0()[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
@@ -2184,4 +2185,20 @@ func testWrapSuccess(promise: Int, seal: Resolver<Void>) {
   // COMPLETE_CALL_RESULT: Begin completions
   // COMPLETE_CALL_RESULT: Pattern/CurrModule:                 ({#Void#}, {#Bool#})[#Void#]; name=(Void, Bool)
   // COMPLETE_CALL_RESULT: End completions
+}
+
+protocol BrokenConformanceP {
+  static func staticFunc()
+  func instanceFunc()
+}
+extension BrokenConformanceP {
+  static func staticFuncExtension() {}
+}
+struct BrokenConformanceS: BrokenConformanceP {
+}
+func testBrokenConformance(arg: BrokenConformanceS) {
+  arg.#^BROKEN_CONFORMANCE^#
+  // BROKEN_CONFORMANCE: Begin completions, 1 items
+  // BROKEN_CONFORMANCE: Decl[InstanceMethod]/Super: instanceFunc()[#Void#];
+  // BROKEN_CONFORMANCE: End completions
 }

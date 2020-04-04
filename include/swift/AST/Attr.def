@@ -541,8 +541,9 @@ DECL_ATTR(derivative, Derivative,
   97)
 
 DECL_ATTR(_spi, SPIAccessControl,
-  OnFunc | OnExtension | OnGenericType | OnVar | OnSubscript | OnConstructor |
-  OnImport | AllowMultipleAttributes | UserInaccessible |
+  OnAbstractFunction | OnExtension | OnGenericType | OnVar | OnSubscript |
+  OnImport | OnAccessor | OnEnumElement |
+  AllowMultipleAttributes | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   98)
 
@@ -550,6 +551,11 @@ DECL_ATTR(transpose, Transpose,
   OnFunc | LongAttribute | AllowMultipleAttributes |
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   99)
+
+SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
+  OnAbstractFunction | OnVar | OnSubscript |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  100)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

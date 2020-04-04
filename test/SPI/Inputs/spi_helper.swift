@@ -14,7 +14,29 @@ func internalFunc() {}
   @_spi(HelperSPI) public init() { print("SPIStruct.init") }
   @_spi(HelperSPI) public func spiMethod() { print("SPIStruct.spiMethod") }
   @_spi(HelperSPI) public var spiVar = "text"
-  //@_spi(HelperSPI) public subscript(index: Int) -> String { return spiVar } // TODO SPI support for subscripts
+
+  @_spi(HelperSPI) public var spiComputedVar: Int {
+    get { return 42 }
+    set {}
+  }
+
+  @_spi(HelperSPI) public var spiComputedVarInherit: Int {
+    @_spi(HelperSPI) get { return 42 }
+    @_spi(HelperSPI) set {}
+  }
+  @_spi(HelperSPI) public subscript(index: Int) -> String { return spiVar }
+
+  public func spiInherit() {}
+  @_spi(DifferentSPI) public func spiDontInherit() {}
+}
+
+public extension SPIStruct {
+  func spiExtensionHidden() {}
+  @_spi(HelperSPI) func spiExtension() {}
+}
+
+@_spi(HelperSPI) public extension SPIStruct {
+  func spiExtensionInherited() {}
 }
 
 @_spi(HelperSPI) public class SPIClass {

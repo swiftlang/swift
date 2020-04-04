@@ -146,8 +146,6 @@ protected:
       SILFunction *ParentF,
       llvm::DenseMap<SILFunction *, ApplyInst *> &ParentFuncs);
 
-  void placeInitializers(SILFunction *InitF, ArrayRef<ApplyInst *> Calls);
-
   /// Update UnhandledOnceCallee and InitializerCount by going through all
   /// "once" calls.
   void collectOnceCall(BuiltinInst *AI);
@@ -275,6 +273,25 @@ void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
     InitializerCount[Callee]++;
 }
 
+static bool isPotentialStore(SILInstruction *inst) {
+  switch (inst->getKind()) {
+    case SILInstructionKind::LoadInst:
+      return false;
+    case SILInstructionKind::PointerToAddressInst:
+    case SILInstructionKind::StructElementAddrInst:
+    case SILInstructionKind::TupleElementAddrInst:
+      for (Operand *op : cast<SingleValueInstruction>(inst)->getUses()) {
+        if (isPotentialStore(op->getUser()))
+          return true;
+      }
+      return false;
+    case SILInstructionKind::BeginAccessInst:
+      return cast<BeginAccessInst>(inst)->getAccessKind() != SILAccessKind::Read;
+    default:
+      return true;
+  }
+}
+
 /// return true if this block is inside a loop.
 bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
   SILFunction *F = CurBB->getParent();
@@ -292,147 +309,6 @@ bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
   return LoopBlocks.count(CurBB);
 }
 
-/// Returns true if the block \p BB is terminated with a cond_br based on an
-/// availability check.
-static bool isAvailabilityCheck(SILBasicBlock *BB) {
-  auto *CBR = dyn_cast<CondBranchInst>(BB->getTerminator());
-  if (!CBR)
-    return false;
-  
-  auto *AI = dyn_cast<ApplyInst>(CBR->getCondition());
-  if (!AI)
-    return false;
-
-  SILFunction *F = AI->getReferencedFunctionOrNull();
-  if (!F || !F->hasSemanticsAttrs())
-    return false;
-
-  return F->hasSemanticsAttrThatStartsWith("availability");
-}
-
-/// Returns true if there are any availability checks along the dominator tree
-/// from \p From to \p To.
-static bool isAvailabilityCheckOnDomPath(SILBasicBlock *From, SILBasicBlock *To,
-                                         DominanceInfo *DT) {
-  if (From == To)
-    return false;
-
-  auto *Node = DT->getNode(To)->getIDom();
-  for (;;) {
-    SILBasicBlock *BB = Node->getBlock();
-    if (isAvailabilityCheck(BB))
-      return true;
-    if (BB == From)
-      return false;
-    Node = Node->getIDom();
-    assert(Node && "Should have hit To-block");
-  }
-}
-
-ApplyInst *SILGlobalOpt::getHoistedApplyForInitializer(
-    ApplyInst *AI, DominanceInfo *DT, SILFunction *InitF, SILFunction *ParentF,
-    llvm::DenseMap<SILFunction *, ApplyInst *> &ParentFuncs) {
-  auto PFI = ParentFuncs.find(ParentF);
-  if (PFI == ParentFuncs.end()) {
-    ParentFuncs[ParentF] = AI;
-
-    // It's the first time we found a call to InitF in this function, so we
-    // try to hoist it out of any loop.
-    return AI;
-  }
-
-  // Found a replacement for this init call. Ensure the replacement dominates
-  // the original call site.
-  ApplyInst *CommonAI = PFI->second;
-  assert(cast<FunctionRefInst>(CommonAI->getCallee())
-                 ->getReferencedFunctionOrNull() == InitF &&
-         "ill-formed global init call");
-  SILBasicBlock *DomBB =
-      DT->findNearestCommonDominator(AI->getParent(), CommonAI->getParent());
-
-  // We must not move initializers around availability-checks.
-  if (isAvailabilityCheckOnDomPath(DomBB, CommonAI->getParent(), DT))
-    return nullptr;
-
-  ApplyInst *Result = nullptr;
-  if (DomBB != CommonAI->getParent()) {
-    CommonAI->moveBefore(&*DomBB->begin());
-    placeFuncRef(CommonAI, DT);
-
-    // Try to hoist the existing AI again if we move it to another block,
-    // e.g. from a loop exit into the loop.
-    Result = CommonAI;
-  }
-
-  AI->replaceAllUsesWith(CommonAI);
-  AI->eraseFromParent();
-  HasChanged = true;
-  return Result;
-}
-
-/// Optimize placement of initializer calls given a list of calls to the
-/// same initializer. All original initialization points must be dominated by
-/// the final initialization calls.
-///
-/// The current heuristic hoists all initialization points within a function to
-/// a single dominating call in the outer loop preheader.
-void SILGlobalOpt::placeInitializers(SILFunction *InitF,
-                                     ArrayRef<ApplyInst *> Calls) {
-  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: calls to "
-             << Demangle::demangleSymbolAsString(InitF->getName())
-             << " : " << Calls.size() << "\n");
-  // Map each initializer-containing function to its final initializer call.
-  llvm::DenseMap<SILFunction *, ApplyInst *> ParentFuncs;
-  for (auto *AI : Calls) {
-    assert(AI->getNumArguments() == 0 && "ill-formed global init call");
-    assert(
-        cast<FunctionRefInst>(AI->getCallee())->getReferencedFunctionOrNull() ==
-            InitF &&
-        "wrong init call");
-    SILFunction *ParentF = AI->getFunction();
-    DominanceInfo *DT = DA->get(ParentF);
-    ApplyInst *HoistAI =
-        getHoistedApplyForInitializer(AI, DT, InitF, ParentF, ParentFuncs);
-
-    // If we were unable to find anything, just go onto the next apply.
-    if (!HoistAI) {
-      continue;
-    }
-
-    // Otherwise, move this call to the outermost loop preheader.
-    SILBasicBlock *BB = HoistAI->getParent();
-    typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
-    DomTreeNode *Node = DT->getNode(BB);
-    while (Node) {
-      SILBasicBlock *DomParentBB = Node->getBlock();
-      if (isAvailabilityCheck(DomParentBB)) {
-        LLVM_DEBUG(llvm::dbgs() << "  don't hoist above availability check "
-                                   "at bb"
-                                << DomParentBB->getDebugID() << "\n");
-        break;
-      }
-      BB = DomParentBB;
-      if (!isInLoop(BB))
-        break;
-      Node = Node->getIDom();
-    }
-
-    if (BB == HoistAI->getParent()) {
-      // BB is either unreachable or not in a loop.
-      LLVM_DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *HoistAI
-                              << "  in " << HoistAI->getFunction()->getName()
-                              << "\n");
-      continue;
-    }
-
-    LLVM_DEBUG(llvm::dbgs() << "  hoisting: " << *HoistAI << "  in "
-                       << HoistAI->getFunction()->getName() << "\n");
-    HoistAI->moveBefore(&*BB->begin());
-    placeFuncRef(HoistAI, DT);
-    HasChanged = true;
-  }
-}
-
 bool SILGlobalOpt::isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG,
                                                    SILFunction *globalAddrF) {
   if (SILG->isLet())
@@ -440,15 +316,17 @@ bool SILGlobalOpt::isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG,
 
   // If we should skip this, it is probably because there are multiple stores.
   // Return false if there are multiple stores or no stores.
-  if (GlobalVarSkipProcessing.count(SILG) || !GlobalVarStore.count(SILG) ||
-      // Check if there is more than one use the global addr function. If there
-      // is only one use, it must be the use that we are trying to optimize, so
-      // that is OK. If there is more than one use, one of the other uses may
-      // have a store attached to it which means there may be more than one
-      // assignment, so return false.
-      (GlobalInitCallMap.count(globalAddrF) &&
-       GlobalInitCallMap[globalAddrF].size() != 1))
+  if (GlobalVarSkipProcessing.count(SILG) || !GlobalVarStore.count(SILG))
     return false;
+
+  if (GlobalInitCallMap.count(globalAddrF)) {
+    for (ApplyInst *initCall : GlobalInitCallMap[globalAddrF]) {
+      for (auto *Op : getNonDebugUses(initCall)) {
+        if (isPotentialStore(Op->getUser()))
+          return false;
+      }
+    }
+  }
 
   // Otherwise, return true if this can't be used externally (false, otherwise).
   return !isPossiblyUsedExternally(SILG->getLinkage(),
@@ -727,23 +605,6 @@ bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
   return true;
 }
 
-static bool isPotentialStore(SILInstruction *inst) {
-  switch (inst->getKind()) {
-    case SILInstructionKind::LoadInst:
-      return false;
-    case SILInstructionKind::StructElementAddrInst:
-    case SILInstructionKind::TupleElementAddrInst:
-    case SILInstructionKind::BeginAccessInst:
-      for (Operand *op : cast<SingleValueInstruction>(inst)->getUses()) {
-        if (isPotentialStore(op->getUser()))
-          return true;
-      }
-      return false;
-    default:
-      return true;
-  }
-}
-
 /// If this is a read from a global let variable, map it.
 void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   auto *SILG = GAI->getReferencedGlobal();
@@ -919,10 +780,6 @@ bool SILGlobalOpt::run() {
       changed |= optimizeInitializer(InitCalls.first, InitCalls.second);
     }
   } while (changed);
-
-  for (auto &InitCalls : GlobalInitCallMap) {
-    placeInitializers(InitCalls.first, InitCalls.second);
-  }
 
   // This is similiar to optimizeInitializer, but it's for globals which are
   // initialized in the "main" function and not by an initializer function.

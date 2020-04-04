@@ -112,7 +112,7 @@ struct MultipleInitialValues<Value> {
 struct InitialValueFailable<Value> {
   var wrappedValue: Value
 
-  init?(wrappedValue initialValue: Value) { // expected-error{{'init(wrappedValue:)' cannot be failable}}
+  init?(wrappedValue initialValue: Value) { // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}}
     return nil
   }
 }
@@ -121,7 +121,7 @@ struct InitialValueFailable<Value> {
 struct InitialValueFailableIUO<Value> {
   var wrappedValue: Value
 
-  init!(wrappedValue initialValue: Value) {  // expected-error{{'init(wrappedValue:)' cannot be failable}}
+  init!(wrappedValue initialValue: Value) {  // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}}
     return nil
   }
 }
@@ -1877,6 +1877,46 @@ open class OpenPropertyWrapperWithPublicInit {
   public init(wrappedValue: String) { // Okay
     self.wrappedValue = wrappedValue
   }
-  
+
   open var wrappedValue: String = "Hello, world"
 }
+
+// SR-11654
+
+struct SR_11654_S {}
+
+class SR_11654_C {
+  @Foo var property: SR_11654_S?
+}
+
+func sr_11654_generic_func<T>(_ argument: T?) -> T? {
+  return argument
+}
+
+let sr_11654_c = SR_11654_C()
+_ = sr_11654_generic_func(sr_11654_c.property) // Okay
+
+// rdar://problem/59471019 - property wrapper initializer requires empty parens
+// for default init
+@propertyWrapper
+struct DefaultableIntWrapper {
+  var wrappedValue: Int
+
+  init() {
+    self.wrappedValue = 0
+  }
+}
+
+struct TestDefaultableIntWrapper {
+  @DefaultableIntWrapper var x
+  @DefaultableIntWrapper() var y
+  @DefaultableIntWrapper var z: Int
+
+  mutating func test() {
+    x = y
+    y = z
+  }
+}
+
+
+

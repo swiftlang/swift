@@ -25,8 +25,6 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/Parser.h"
-#include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "swift/Syntax/SyntaxArena.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -107,48 +105,6 @@ SILParserState::SILParserState(SILModule *M)
 
 SILParserState::~SILParserState() = default;
 
-void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
-  out << "With parser at source location: ";
-  P.Tok.getLoc().print(out, P.Context.SourceMgr);
-  out << '\n';
-}
-
-void swift::parseIntoSourceFile(SourceFile &SF, unsigned int BufferID,
-                                PersistentParserState *PersistentState,
-                                bool DelayBodyParsing) {
-  std::shared_ptr<SyntaxTreeCreator> STreeCreator;
-  if (SF.shouldBuildSyntaxTree()) {
-    STreeCreator = std::make_shared<SyntaxTreeCreator>(
-        SF.getASTContext().SourceMgr, BufferID,
-        SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
-  }
-
-  // Not supported right now.
-  if (SF.Kind == SourceFileKind::REPL)
-    DelayBodyParsing = false;
-  if (SF.hasInterfaceHash())
-    DelayBodyParsing = false;
-  if (SF.shouldCollectToken())
-    DelayBodyParsing = false;
-  if (SF.shouldBuildSyntaxTree())
-    DelayBodyParsing = false;
-
-  FrontendStatsTracer tracer(SF.getASTContext().Stats,
-                             "Parsing");
-  Parser P(BufferID, SF, /*SIL*/ nullptr, PersistentState, STreeCreator,
-           DelayBodyParsing);
-  PrettyStackTraceParser StackTrace(P);
-
-  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(P.CurrentTokenHash,
-                                                 SF.getInterfaceHashPtr());
-  P.parseTopLevel();
-
-  if (STreeCreator) {
-    auto rawNode = P.finalizeSyntaxTree();
-    STreeCreator->acceptSyntaxRoot(rawNode, SF);
-  }
-}
-
 void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
   auto bufferID = SF.getBufferID();
   assert(bufferID);
@@ -157,7 +113,7 @@ void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
                              "Parsing SIL");
   Parser parser(*bufferID, SF, sil->Impl.get(),
                 /*persistentParserState*/ nullptr,
-                /*syntaxTreeCreator*/ nullptr, /*delayBodyParsing*/ false);
+                /*syntaxTreeCreator*/ nullptr);
   PrettyStackTraceParser StackTrace(parser);
   parser.parseTopLevelSIL();
 }
@@ -954,7 +910,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  IsExactSelfClass_t *isExactSelfClass,
                                  SILFunction **dynamicallyReplacedFunction,
                                  Identifier *objCReplacementFor,
-                                 bool *isGlobalInit,
+                                 SILFunction::Purpose *specialPurpose,
                                  Inline_t *inlineStrategy,
                                  OptimizationMode *optimizationMode,
                                  bool *isLet,
@@ -999,8 +955,10 @@ static bool parseDeclSILOptional(bool *isTransparent,
     else if (isWithoutActuallyEscapingThunk
              && SP.P.Tok.getText() == "without_actually_escaping")
       *isWithoutActuallyEscapingThunk = true;
-    else if (isGlobalInit && SP.P.Tok.getText() == "global_init")
-      *isGlobalInit = true;
+    else if (specialPurpose && SP.P.Tok.getText() == "global_init")
+      *specialPurpose = SILFunction::Purpose::GlobalInit;
+    else if (specialPurpose && SP.P.Tok.getText() == "lazy_getter")
+      *specialPurpose = SILFunction::Purpose::LazyPropertyGetter;
     else if (isWeakImported && SP.P.Tok.getText() == "weak_imported") {
       if (M.getASTContext().LangOpts.Target.isOSBinFormatCOFF())
         SP.P.diagnose(SP.P.Tok, diag::attr_unsupported_on_target,
@@ -1082,7 +1040,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
   
       // Drop the double quotes.
       StringRef rawString = SP.P.Tok.getText().drop_front().drop_back();
-      Semantics->push_back(rawString);
+      Semantics->push_back(rawString.str());
       SP.P.consumeToken(tok::string_literal);
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
@@ -1135,7 +1093,6 @@ static bool parseDeclSILOptional(bool *isTransparent,
 bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
                                        GenericEnvironment *GenericEnv,
                                        DeclContext *DC) {
-  // Do some type checking / name binding for the parsed type.
   if (GenericEnv == nullptr)
     GenericEnv = ContextGenericEnv;
 
@@ -1266,6 +1223,10 @@ bool SILParser::parseSILType(SILType &Result,
           auto env = handleSILGenericParams(generics, SF);
           fnType->setGenericEnvironment(env);
         }
+        if (auto generics = fnType->getPatternGenericParams()) {
+          auto env = handleSILGenericParams(generics, SF);
+          fnType->setPatternGenericEnvironment(env);
+        }
       }
       if (auto boxType = dyn_cast<SILBoxTypeRepr>(T)) {
         if (auto generics = boxType->getGenericParams()) {
@@ -1281,9 +1242,8 @@ bool SILParser::parseSILType(SILType &Result,
 
   // Save the top-level function generic environment if there was one.
   if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get()))
-    if (!fnType->areGenericParamsImplied())
-      if (auto env = fnType->getGenericEnvironment())
-        ParsedGenericEnv = env;
+    if (auto env = fnType->getGenericEnvironment())
+      ParsedGenericEnv = env;
   
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc);
@@ -1379,9 +1339,8 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 }
 
 ///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
-///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)?
-///                      ('.' sil-decl-lang)?
-///  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
+///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)?
+///                      ('.' sil-decl-autodiff)?
 ///  sil-decl-subref ::= '!' sil-decl-lang
 ///  sil-decl-subref-part ::= 'getter'
 ///  sil-decl-subref-part ::= 'setter'
@@ -1390,33 +1349,34 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 ///  sil-decl-subref-part ::= 'enumelt'
 ///  sil-decl-subref-part ::= 'destroyer'
 ///  sil-decl-subref-part ::= 'globalaccessor'
-///  sil-decl-uncurry-level ::= [0-9]+
 ///  sil-decl-lang ::= 'foreign'
+///  sil-decl-autodiff ::= sil-decl-autodiff-kind '.' sil-decl-autodiff-indices
+///  sil-decl-autodiff-kind ::= 'jvp'
+///  sil-decl-autodiff-kind ::= 'vjp'
+///  sil-decl-autodiff-indices ::= [SU]+
 bool SILParser::parseSILDeclRef(SILDeclRef &Result,
                                 SmallVectorImpl<ValueDecl *> &values) {
   ValueDecl *VD;
   if (parseSILDottedPath(VD, values))
     return true;
 
-  // Initialize Kind, uncurryLevel and IsObjC.
+  // Initialize SILDeclRef components.
   SILDeclRef::Kind Kind = SILDeclRef::Kind::Func;
-  unsigned uncurryLevel = 0;
   bool IsObjC = false;
+  AutoDiffDerivativeFunctionIdentifier *DerivativeId = nullptr;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
-    Result = SILDeclRef(VD, Kind, /*isCurried=*/false, IsObjC);
-    if (uncurryLevel < Result.getParameterListCount() - 1)
-      Result = Result.asCurried();
+    Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
     return false;
   }
 
-  // Handle sil-constant-kind-and-uncurry-level.
-  // ParseState indicates the value we just handled.
-  // 1 means we just handled Kind, 2 means we just handled uncurryLevel.
-  // We accept func|getter|setter|...|foreign or an integer when ParseState is
-  // 0; accept foreign or an integer when ParseState is 1; accept foreign when
-  // ParseState is 2.
+  // Handle SILDeclRef components. ParseState tracks the last parsed component.
+  //
+  // When ParseState is 0, accept kind (`func|getter|setter|...`) and set
+  // ParseState to 1.
+  //
+  // Always accept `foreign` and derivative function identifier.
   unsigned ParseState = 0;
   Identifier Id;
   do {
@@ -1485,21 +1445,47 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (Id.str() == "foreign") {
         IsObjC = true;
         break;
-      } else
+      } else if (Id.str() == "jvp" || Id.str() == "vjp") {
+        IndexSubset *parameterIndices = nullptr;
+        GenericSignature derivativeGenSig;
+        // Parse derivative function kind.
+        AutoDiffDerivativeFunctionKind derivativeKind(Id.str());
+        if (!P.consumeIf(tok::period)) {
+          P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ".");
+          return true;
+        }
+        // Parse parameter indices.
+        parameterIndices =
+            IndexSubset::getFromString(SILMod.getASTContext(), P.Tok.getText());
+        if (!parameterIndices) {
+          P.diagnose(P.Tok, diag::invalid_index_subset);
+          return true;
+        }
+        P.consumeToken();
+        // Parse derivative generic signature (optional).
+        if (P.Tok.is(tok::oper_binary_unspaced) && P.Tok.getText() == ".<") {
+          P.consumeStartingCharacterOfCurrentToken(tok::period);
+          // Create a new scope to avoid type redefinition errors.
+          Scope genericsScope(&P, ScopeKind::Generics);
+          auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
+          assert(genericParams);
+          auto *derivativeGenEnv = handleSILGenericParams(genericParams, &P.SF);
+          derivativeGenSig = derivativeGenEnv->getGenericSignature();
+        }
+        DerivativeId = AutoDiffDerivativeFunctionIdentifier::get(
+            derivativeKind, parameterIndices, derivativeGenSig,
+            SILMod.getASTContext());
         break;
-    } else if (ParseState < 2 && P.Tok.is(tok::integer_literal)) {
-      parseIntegerLiteral(P.Tok.getText(), 0, uncurryLevel);
-      P.consumeToken(tok::integer_literal);
-      ParseState = 2;
+      } else {
+        break;
+      }
     } else
       break;
 
   } while (P.consumeIf(tok::period));
 
   // Construct SILDeclRef.
-  Result = SILDeclRef(VD, Kind, /*isCurried=*/false, IsObjC);
-  if (uncurryLevel < Result.getParameterListCount() - 1)
-    Result = Result.asCurried();
+  Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
   return false;
 }
 
@@ -1635,6 +1621,7 @@ bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args,
     SourceLoc LParenLoc = P.consumeToken(tok::l_paren);
     SourceLoc RParenLoc;
 
+    bool HasError = false;
     if (P.parseList(tok::r_paren, LParenLoc, RParenLoc,
                     /*AllowSepAfterLast=*/false,
                     diag::sil_basicblock_arg_rparen,
@@ -1642,11 +1629,13 @@ bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args,
                     [&]() -> ParserStatus {
                       SILValue Arg;
                       SourceLoc ArgLoc;
-                      if (parseTypedValueRef(Arg, ArgLoc, B))
+                      if (parseTypedValueRef(Arg, ArgLoc, B)) {
+                        HasError = true;
                         return makeParserError();
+                      }
                       Args.push_back(Arg);
                       return makeParserSuccess();
-                    }).isError())
+                    }).isError() || HasError)
       return true;
   }
   return false;
@@ -2114,6 +2103,12 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
 
         genericEnv = handleSILGenericParams(generics, &P.SF);
         fnType->setGenericEnvironment(genericEnv);
+      }
+      if (auto generics = fnType->getPatternGenericParams()) {
+        assert(!Ty.wasValidated() && Ty.getType().isNull());
+
+        genericEnv = handleSILGenericParams(generics, &P.SF);
+        fnType->setPatternGenericEnvironment(genericEnv);
       }
     }
 
@@ -5026,6 +5021,144 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                                  blockType, subMap);
       break;
     }
+    case SILInstructionKind::DifferentiableFunctionInst: {
+      // e.g. differentiable_function [parameters 0 1 2] %0 : $T
+      //
+      // e.g. differentiable_function [parameters 0 1 2] %0 : $T with_derivative
+      //      {%1 : $T, %2 : $T}
+      //       ^~ jvp   ^~ vjp
+      // Parse `[parameters <integer_literal>...]`.
+      SmallVector<unsigned, 8> parameterIndices;
+      if (parseIndexList(P, "parameters", parameterIndices,
+                         diag::sil_autodiff_expected_parameter_index))
+        return true;
+      // Parse the original function value.
+      SILValue original;
+      SourceLoc originalOperandLoc;
+      if (parseTypedValueRef(original, originalOperandLoc, B))
+        return true;
+      auto fnType = original->getType().getAs<SILFunctionType>();
+      if (!fnType) {
+        P.diagnose(originalOperandLoc,
+                   diag::sil_inst_autodiff_expected_function_type_operand);
+        return true;
+      }
+      Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
+      // Parse an optional operand list
+      //   `with_derivative { <operand> , <operand> }`.
+      if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_derivative") {
+        P.consumeToken(tok::identifier);
+        // Parse derivative function values as an operand list.
+        // FIXME(rxwei): Change this to *not* require a type signature once
+        // we can infer derivative function types.
+        derivativeFunctions = std::make_pair(SILValue(), SILValue());
+        if (P.parseToken(
+                tok::l_brace,
+                diag::sil_inst_autodiff_operand_list_expected_lbrace) ||
+            parseTypedValueRef(derivativeFunctions->first, B) ||
+            P.parseToken(tok::comma,
+                         diag::sil_inst_autodiff_operand_list_expected_comma) ||
+            parseTypedValueRef(derivativeFunctions->second, B) ||
+            P.parseToken(tok::r_brace,
+                         diag::sil_inst_autodiff_operand_list_expected_rbrace))
+          return true;
+      }
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      auto *parameterIndicesSubset = IndexSubset::get(
+          P.Context, fnType->getNumParameters(), parameterIndices);
+      ResultVal = B.createDifferentiableFunction(
+          InstLoc, parameterIndicesSubset, original, derivativeFunctions);
+      break;
+    }
+    case SILInstructionKind::LinearFunctionInst: {
+      // e.g. linear_function [parameters 0 1 2] %0 : $T
+      // e.g. linear_function [parameters 0 1 2] %0 : $T with_transpose %1 : $T
+      // Parse `[parameters <integer_literal>...]`.
+      SmallVector<unsigned, 8> parameterIndices;
+      if (parseIndexList(P, "parameters", parameterIndices,
+                         diag::sil_autodiff_expected_parameter_index))
+        return true;
+      // Parse the original function value.
+      SILValue original;
+      SourceLoc originalOperandLoc;
+      if (parseTypedValueRef(original, originalOperandLoc, B))
+        return true;
+      auto fnType = original->getType().getAs<SILFunctionType>();
+      if (!fnType) {
+        P.diagnose(originalOperandLoc,
+                   diag::sil_inst_autodiff_expected_function_type_operand);
+        return true;
+      }
+      // Parse an optional transpose function.
+      Optional<SILValue> transpose = None;
+      if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_transpose") {
+        P.consumeToken(tok::identifier);
+        transpose = SILValue();
+        if (parseTypedValueRef(*transpose, B))
+          return true;
+      }
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      auto *parameterIndicesSubset = IndexSubset::get(
+          P.Context, fnType->getNumParameters(), parameterIndices);
+      ResultVal = B.createLinearFunction(
+          InstLoc, parameterIndicesSubset, original, transpose);
+      break;
+    }
+    case SILInstructionKind::DifferentiableFunctionExtractInst: {
+      // Parse the rest of the instruction: an extractee, a differentiable
+      // function operand, an optional explicit extractee type, and a debug
+      // location.
+      NormalDifferentiableFunctionTypeComponent extractee;
+      StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
+      SILValue functionOperand;
+      SourceLoc lastLoc;
+      if (P.parseToken(
+              tok::l_square,
+              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
+          parseSILIdentifierSwitch(
+              extractee, extracteeNames,
+              diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
+          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "extractee kind"))
+        return true;
+      if (parseTypedValueRef(functionOperand, B))
+        return true;
+      // Parse an optional explicit extractee type.
+      Optional<SILType> extracteeType = None;
+      if (P.consumeIf(tok::kw_as)) {
+        extracteeType = SILType();
+        if (parseSILType(*extracteeType))
+          return true;
+      }
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createDifferentiableFunctionExtract(
+          InstLoc, extractee, functionOperand, extracteeType);
+      break;
+    }
+    case SILInstructionKind::LinearFunctionExtractInst: {
+      // Parse the rest of the instruction: an extractee, a linear function
+      // operand, and a debug location.
+      LinearDifferentiableFunctionTypeComponent extractee;
+      StringRef extracteeNames[2] = {"original", "transpose"};
+      SILValue functionOperand;
+      SourceLoc lastLoc;
+      if (P.parseToken(tok::l_square,
+              diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
+          parseSILIdentifierSwitch(extractee, extracteeNames,
+              diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
+          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "extractee kind"))
+        return true;
+      if (parseTypedValueRef(functionOperand, B) ||
+          parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createLinearFunctionExtract(
+          InstLoc, extractee, functionOperand);
+      break;
+    }
     case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
       // e.g. differentiability_witness_function
       //      [jvp] [parameters 0 1] [results 0] <T where T: Differentiable>
@@ -5497,7 +5630,8 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
   IsThunk_t isThunk = IsNotThunk;
-  bool isGlobalInit = false, isWeakImported = false;
+  SILFunction::Purpose specialPurpose = SILFunction::Purpose::None;
+  bool isWeakImported = false;
   AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
   bool isWithoutActuallyEscapingThunk = false;
   Inline_t inlineStrategy = InlineDefault;
@@ -5512,8 +5646,9 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
       parseDeclSILOptional(
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
           &isThunk, &isDynamic, &isExactSelfClass, &DynamicallyReplacedFunction,
-          &objCReplacementFor, &isGlobalInit, &inlineStrategy, &optimizationMode, nullptr,
-          &isWeakImported, &availability, &isWithoutActuallyEscapingThunk, &Semantics,
+          &objCReplacementFor, &specialPurpose, &inlineStrategy,
+          &optimizationMode, nullptr, &isWeakImported, &availability,
+          &isWithoutActuallyEscapingThunk, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -5547,7 +5682,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
         DynamicallyReplacedFunction);
     if (!objCReplacementFor.empty())
       FunctionState.F->setObjCReplacement(objCReplacementFor);
-    FunctionState.F->setGlobalInit(isGlobalInit);
+    FunctionState.F->setSpecialPurpose(specialPurpose);
     FunctionState.F->setAlwaysWeakImported(isWeakImported);
     FunctionState.F->setAvailabilityForLinkage(availability);
     FunctionState.F->setWithoutActuallyEscapingThunk(

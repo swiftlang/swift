@@ -23,6 +23,7 @@
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Object/COFF.h"
 
+#include "swift/ABI/Enum.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
@@ -540,7 +541,7 @@ public:
   }
   
   /// Returns true if the address falls within a registered image.
-  bool ownsAddress(RemoteAddress Address) {
+  bool ownsAddressRaw(RemoteAddress Address) {
     for (auto Range : imageRanges) {
       auto Start = std::get<0>(Range);
       auto End = std::get<1>(Range);
@@ -548,7 +549,27 @@ public:
           && Address.getAddressData() < End.getAddressData())
         return true;
     }
-  
+
+    return false;
+  }
+
+  /// Returns true if the address is known to the reflection context.
+  /// Currently, that means that either the address falls within a registered
+  /// image, or the address points to a Metadata whose type context descriptor
+  /// is within a registered image.
+  bool ownsAddress(RemoteAddress Address) {
+    if (ownsAddressRaw(Address))
+      return true;
+
+    // This is usually called on a Metadata address which might have been
+    // on the heap. Try reading it and looking up its type context descriptor
+    // instead.
+    if (auto Metadata = readMetadata(Address.getAddressData()))
+      if (auto DescriptorAddress =
+          super::readAddressOfNominalTypeDescriptor(Metadata, true))
+        if (ownsAddressRaw(RemoteAddress(DescriptorAddress)))
+          return true;
+
     return false;
   }
   
@@ -710,9 +731,41 @@ public:
     }
   }
 
+  /// Projects the value of an enum.
+  ///
+  /// Takes the address and typeref for an enum and determines the
+  /// index of the currently-selected case within the enum.
+  /// You can use this index with `swift_reflection_childOfTypeRef`
+  /// to get detailed information about the specific case.
+  ///
+  /// Returns true if the enum case could be successfully determined.  In
+  /// particular, note that this code may return false for valid in-memory data
+  /// if the compiler used a strategy we do not yet understand.
+  bool projectEnumValue(RemoteAddress EnumAddress,
+                        const TypeRef *EnumTR,
+                        int *CaseIndex) {
+    // Get the TypeInfo and sanity-check it
+    if (EnumTR == nullptr) {
+      return false;
+    }
+    auto TI = getTypeInfo(EnumTR);
+    if (TI == nullptr) {
+      return false;
+    }
+    auto EnumTI = dyn_cast<const EnumTypeInfo>(TI);
+    if (EnumTI == nullptr){
+      return false;
+    }
+    return EnumTI->projectEnumValue(getReader(), EnumAddress, CaseIndex);
+  }
+
   /// Return a description of the layout of a value with the given type.
   const TypeInfo *getTypeInfo(const TypeRef *TR) {
-    return getBuilder().getTypeConverter().getTypeInfo(TR);
+    if (TR == nullptr) {
+      return nullptr;
+    } else {
+      return getBuilder().getTypeConverter().getTypeInfo(TR);
+    }
   }
 
 private:

@@ -78,6 +78,9 @@ source code and up to 70 GB of disk space for the build artifacts with full
 debugging. Depending on your machine, a clean build can take a few minutes to
 several hours. Naturally, incremental builds are much faster.
 
+Once you are able to build things successfully and have a compile-test-debug
+loop going, check out the [development tips](docs/DevelopmentTips.md) for
+better productivity while working on the compiler.
 
 ### System Requirements
 
@@ -88,7 +91,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11.3](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11.4](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -99,6 +102,12 @@ which can be installed via a package manager:
 **[Homebrew](https://brew.sh/)**
 
     brew install cmake ninja
+    
+You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle)
+from the root of this repository's working directory to install all of these
+dependencies:
+
+    brew bundle
 
 **[MacPorts](https://macports.org)**
 
@@ -356,7 +365,7 @@ expressed today.
 
 ### CMake
 [CMake](https://cmake.org) is the core infrastructure used to configure builds of
-Swift and its companion projects; at least version 3.4.3 is required.
+Swift and its companion projects; at least version 3.16.5 is required.
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded

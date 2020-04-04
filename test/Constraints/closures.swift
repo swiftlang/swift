@@ -273,7 +273,6 @@ func verify_NotAC_to_AC_failure(_ arg: () -> ()) {
 // SR-1069 - Error diagnostic refers to wrong argument
 class SR1069_W<T> {
   func append<Key: AnyObject>(value: T, forKey key: Key) where Key: Hashable {}
-  // expected-note@-1 {{where 'Key' = 'Object?'}}
 }
 class SR1069_C<T> { let w: SR1069_W<(AnyObject, T) -> ()> = SR1069_W() }
 struct S<T> {
@@ -281,9 +280,10 @@ struct S<T> {
 
   func subscribe<Object: AnyObject>(object: Object?, method: (Object, T) -> ()) where Object: Hashable {
     let wrappedMethod = { (object: AnyObject, value: T) in }
-    // expected-error @+2 {{instance method 'append(value:forKey:)' requires that 'Object?' be a class type}}
-    // expected-note @+1 {{wrapped type 'Object' satisfies this requirement}}
     cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }
+    // expected-error@-1 {{value of optional type 'Object?' must be unwrapped to a value of type 'Object'}}
+    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
 }
 
@@ -456,7 +456,13 @@ extension Collection {
   }
 }
 func fn_r28909024(n: Int) {
-  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}} expected-note {{did you mean to add a return type?}}
+  // FIXME(diagnostics): Unfortunately there is no easy way to fix this diagnostic issue at the moment
+  // because the problem is related to ordering of the bindings - we'd attempt to bind result of the expression
+  // to contextual type of `Void` which prevents solver from discovering correct types for range - 0..<10
+  // (since both arguments are literal they are ranked lower than contextual type).
+  //
+  // Good diagnostic for this is - `unexpected non-void return value in void function`
+  return (0..<10).r28909024 { // expected-error {{type of expression is ambiguous without more context}}
     _ in true
   }
 }
@@ -915,14 +921,6 @@ func test_trailing_closure_with_defaulted_last() {
   func foo<T>(fn: () -> T, value: Int = 0) {}
   foo { 42 } // Ok
   foo(fn: { 42 }) // Ok
-
-  func bar<T>(type: T.Type, fn: T, a: Int = 0) {}
-  bar(type: (() -> Int).self) { 42 }
-  bar(type: (() -> Int).self, fn: { 42 })
-
-  func baz(fn: () -> Int, a: Int = 0, b: Int = 0, c: Int = 0) {}
-  baz { 42 }
-  baz(fn: { 42 })
 }
 
 // Test that even in multi-statement closure case we still pick up `(Action) -> Void` over `Optional<(Action) -> Void>`.
@@ -992,3 +990,29 @@ func rdar_59741308() {
     }
   }
 }
+
+func r60074136() {
+  func takesClosure(_ closure: ((Int) -> Void) -> Void) {}
+
+  takesClosure { ((Int) -> Void) -> Void in // expected-warning {{unnamed parameters must be written with the empty name '_'}}
+  }
+}
+
+func rdar52204414() {
+  let _: () -> Void = { return 42 }
+  // expected-error@-1 {{cannot convert value of type 'Int' to closure result type 'Void'}}
+  let _ = { () -> Void in return 42 }
+  // expected-error@-1 {{declared closure result 'Int' is incompatible with contextual type 'Void'}}
+}
+
+// SR-12291 - trailing closure is used as an argument to the last (positionally) parameter
+func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {}
+func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {}
+
+overloaded_with_default { 0 } // Ok (could be ambiguous if trailing was allowed to match `a:` in first overload)
+
+func overloaded_with_default_and_autoclosure<T>(_ a: @autoclosure () -> T, b: Int = 0) {}
+func overloaded_with_default_and_autoclosure<T>(b: Int = 0, c: @escaping () -> T?) {}
+
+overloaded_with_default_and_autoclosure { 42 } // Ok
+overloaded_with_default_and_autoclosure(42) // Ok

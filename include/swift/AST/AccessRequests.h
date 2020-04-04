@@ -33,7 +33,7 @@ class ValueDecl;
 class AccessLevelRequest :
     public SimpleRequest<AccessLevelRequest,
                          AccessLevel(ValueDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -41,8 +41,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<AccessLevel> evaluate(Evaluator &evaluator,
-                                       ValueDecl *decl) const;
+  AccessLevel evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Separate caching.
@@ -57,7 +56,7 @@ public:
 class SetterAccessLevelRequest :
     public SimpleRequest<SetterAccessLevelRequest,
                          AccessLevel(AbstractStorageDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -65,8 +64,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<AccessLevel>
-  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+  AccessLevel evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
   // Separate caching.
@@ -81,15 +79,14 @@ using DefaultAndMax = std::pair<AccessLevel, AccessLevel>;
 class DefaultAndMaxAccessLevelRequest :
     public SimpleRequest<DefaultAndMaxAccessLevelRequest,
                          DefaultAndMax(ExtensionDecl *),
-                         CacheKind::SeparatelyCached> {
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<DefaultAndMax>
-  evaluate(Evaluator &evaluator, ExtensionDecl *decl) const;
+  DefaultAndMax evaluate(Evaluator &evaluator, ExtensionDecl *decl) const;
 
 public:
   // Separate caching.

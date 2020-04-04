@@ -29,26 +29,26 @@ import resilient_protocol
 // CHECK-SAME:   @"$s19protocol_resilience17ResilientProtocolMp"
 
 // Protocol requirements
-// CHECK-SAME:   %swift.protocol_requirement { i32 8, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 {{(1797193736)|(8)}}, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 {{(-1947336697)|(7)}}, i32 0 },
 
-// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 {{(-48627695)|(17)}}, i32 0 },
 
-// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 {{(-1745420271)|(17)}}, i32 0 },
 
-// CHECK-SAME:   %swift.protocol_requirement { i32 17,
+// CHECK-SAME:   %swift.protocol_requirement { i32 {{(-544407535)|(17)}},
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultC to [[INT]]),
 // CHECK-SAME:   },
 
-// CHECK-SAME:   %swift.protocol_requirement { i32 17,
+// CHECK-SAME:   %swift.protocol_requirement { i32 {{(1717370897)|(17)}},
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultD to [[INT]]),
 // CHECK-SAME:   },
 
-// CHECK-SAME:   %swift.protocol_requirement { i32 1,
+// CHECK-SAME:   %swift.protocol_requirement { i32 {{(297926657)|(1)}},
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultE to [[INT]]),
 // CHECK-SAME:   },
 
-// CHECK-SAME:   %swift.protocol_requirement { i32 1,
+// CHECK-SAME:   %swift.protocol_requirement { i32 {{(351797249)|(1)}},
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultF to [[INT]]),
 // CHECK-SAME:   }
 // CHECK-SAME: }
@@ -165,8 +165,8 @@ bb0(%0 : $*Self):
   // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 5
   // CHECK-NEXT: [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
   // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.opaque*, %swift.type*, i8**)*
-  // CHECK-NEXT: call swiftcc void [[WITNESS]](%swift.opaque* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
-  %fn2 = witness_method $Self, #ResilientProtocol.defaultC!1 : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  // CHECK: call swiftcc void [[WITNESS]](%swift.opaque* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
+  %fn2 = witness_method $Self, #ResilientProtocol.defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
   %ignore2 = apply %fn2<Self>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
   // Make sure we can partially apply a static reference to a default
@@ -206,8 +206,8 @@ bb0(%0 : $@thick Self.Type):
   // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 8
   // CHECK-NEXT: [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
   // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.type*, %swift.type*, i8**)*
-  // CHECK-NEXT: call swiftcc void [[WITNESS]](%swift.type*  swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
-  %fn2 = witness_method $Self, #ResilientProtocol.defaultF!1 : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+  // CHECK: call swiftcc void [[WITNESS]](%swift.type*  swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
+  %fn2 = witness_method $Self, #ResilientProtocol.defaultF : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
   %ignore2 = apply %fn2<Self>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
 
   // Make sure we can partially apply a static reference to a default
@@ -246,10 +246,10 @@ sil_default_witness_table ResilientProtocol {
   no_default
   no_default
   no_default
-  method #ResilientProtocol.defaultC!1: @defaultC
-  method #ResilientProtocol.defaultD!1: @defaultD
-  method #ResilientProtocol.defaultE!1: @defaultE
-  method #ResilientProtocol.defaultF!1: @defaultF
+  method #ResilientProtocol.defaultC: @defaultC
+  method #ResilientProtocol.defaultD: @defaultD
+  method #ResilientProtocol.defaultE: @defaultE
+  method #ResilientProtocol.defaultF: @defaultF
 }
 
 public struct ResilientConformingType : OtherResilientProtocol {}
@@ -312,12 +312,12 @@ sil_witness_table ConformingStruct : ResilientProtocol module protocol_resilienc
   associated_type_protocol (T: OtherResilientProtocol): ResilientConformingType: OtherResilientProtocol module protocol_resilience
 
   associated_type T: ResilientConformingType
-  method #ResilientProtocol.noDefaultA!1: @noDefaultA
-  method #ResilientProtocol.noDefaultB!1: @noDefaultB
-  method #ResilientProtocol.defaultC!1: @defaultC
-  method #ResilientProtocol.defaultD!1: @defaultD
-  method #ResilientProtocol.defaultE!1: @defaultE
-  method #ResilientProtocol.defaultF!1: @defaultF
+  method #ResilientProtocol.noDefaultA: @noDefaultA
+  method #ResilientProtocol.noDefaultB: @noDefaultB
+  method #ResilientProtocol.defaultC: @defaultC
+  method #ResilientProtocol.defaultD: @defaultD
+  method #ResilientProtocol.defaultE: @defaultE
+  method #ResilientProtocol.defaultF: @defaultF
 }
 
 
@@ -470,6 +470,6 @@ bb0(%0 : $*ConformsWithRequirements):
 
 sil_witness_table ConformsWithRequirements : ProtocolWithRequirements module protocol_resilience {
   associated_type T: Int
-  method #ProtocolWithRequirements.first!1: @firstWitness
-  method #ProtocolWithRequirements.second!1: @secondWitness
+  method #ProtocolWithRequirements.first: @firstWitness
+  method #ProtocolWithRequirements.second: @secondWitness
 }

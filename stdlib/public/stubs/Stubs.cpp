@@ -41,7 +41,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
+#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__) || defined(__OpenBSD__)
 #include <sstream>
 #include <cmath>
 #elif defined(__ANDROID__)
@@ -357,7 +357,7 @@ static bool swift_stringIsSignalingNaN(const char *nptr) {
   return strcasecmp(nptr, "snan") == 0;
 }
 
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
+#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__) || defined(__OpenBSD__)
 // Cygwin does not support uselocale(), but we can use the locale feature 
 // in stringstream object.
 template <typename T>

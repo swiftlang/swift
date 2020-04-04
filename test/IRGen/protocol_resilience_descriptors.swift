@@ -22,7 +22,7 @@
 // CHECK-DEFINITION-SAME: @"default associated conformance2T218resilient_protocol29ProtocolWithAssocTypeDefaultsP_AB014OtherResilientD0"
 
 // Associated type default + flags
-// CHECK-DEFINITION-SAME: [[INT]] add
+// CHECK-DEFINITION-SAME: getelementptr
 // CHECK-DEFINITION-SAME: @"default assoc type _____y2T1_____QzG 18resilient_protocol7WrapperV AA29ProtocolWithAssocTypeDefaultsP"
 // CHECK-DEFINITION-SAME: [[INT]] 1
 

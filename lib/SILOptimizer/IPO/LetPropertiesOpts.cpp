@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,11 +16,101 @@
 // if this pass can prove that it has analyzed all assignments of an initial
 // value to this property and all those assignments assign the same value
 // to this property.
-//===----------------------------------------------------------------------===//
+//
+// FIXME:
+//
+// This pass makes assumptions about the visibility of a type's memory
+// based on the visibility of its properties. This is the wrong way to think
+// about memory visibility.
+//
+// This pass wants assume that the contents of a property is known based on
+// whether the property is declared as a 'let' and the visibility of the
+// initializers that access the property. For example:
+//
+// public struct X<T> {
+//   public let hidden: T
+//
+//   init(t: T) { self.hidden = t }
+// }
+//
+// The pass currently assumes that `X` only takes on values that are
+// assigned by the invocations of `X.init`, which is only visible in `X`s
+// module. This is wrong if the layout of `Impl` is exposed to other
+// modules. A struct's memory may be initialized by any module with
+// access to the struct's layout.
+// 
+// In fact, this assumption is wrong even if the struct, and it's let
+// property cannot be accessed externally by name. In this next example,
+// external modules cannot access `Impl` or `Impl.hidden` by name, but
+// can still access the memory because the layout is exposed via a public type
+// that contains it.
+// 
+// ```
+// internal struct Impl<T> {
+//   let hidden: T
+// 
+//   init(t: T) { self.hidden = t }
+// }
+// 
+// public struct Wrapper<T> {
+//   var impl: Impl<T>
+//   
+//   public var property: T {
+//     get {
+//       return impl.hidden
+//     }
+//   }
+// }
+// ```
+// 
+// As long as `Wrapper`s layout is exposed to other modules, the contents of
+// `Wrapper`, `Impl`, and `hidden' can all be initialized in another
+// module. This following code is legal if Wrapper's home module is *not*
+// built with library evolution (or if Wrapper is declared `@frozen`).
+// 
+// func inExternalModule(buffer: UnsafeRawPointer) -> Wrapper<Int64> {
+//   return buffer.load(as: Wrapper<Int64>.self)
+// }
+// 
+// If library evolution is enabled and a `public` struct is not declared
+// `@frozen` then external modules cannot assume its layout, and therefore
+// cannot initialize the struct memory. In that case, it is possible to optimize
+// `X.hidden` and `Impl.hidden` as if the properties are only initialized inside
+// their home module.
+// 
+// The right way to view a type's memory visibility is to consider whether
+// external modules have access to the layout of the type. If not, then the
+// property can still be optimized As long as a struct is never enclosed in a
+// public effectively-`@frozen` type. However, finding all places where a struct
+// is explicitly created is still insufficient. Instead, the optimization needs
+// to find all uses of enclosing types and determine if every use has a known
+// constant initialization, or is simply copied from another value. If an
+// escaping unsafe pointer to any enclosing type is created, then the
+// optimization is not valid.
+// 
+// When viewed this way, the fact that a property is declared 'let' is mostly
+// irrelevant to this optimization--it can be expanded to handle non-'let'
+// properties. The more salient feature is whether the propery has a public
+// setter.
+//
+// For now, this optimization only recognizes class properties because class
+// properties are only accessibly via a ref_element_addr instruction. This is a
+// side effect of the fact that accessing a class property requires a "formal
+// access". This means that begin_access marker must be emitted directly on the
+// address produced by a ref_element_addr. Struct properties are not handled, as
+// explained above, because they can be indirectly accessed via addresses of
+// outer types.
+//
+// Note: Propagating the initialized constants of non-addressable aggregate
+// values (formation of 'struct's and 'tuple's) is a significantly different
+// problem. It can be done better in a separate constant-propagation pass that
+// propagates partial-constants into call arguments and out of returned values.
+// ===---------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "let-properties-opt"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLinkage.h"
@@ -52,9 +142,9 @@ struct InitSequence {
 /// TODO: Don't occupy any storage for such let properties with constant
 /// initializers.
 ///
-/// Note: Storage from a let property can only be removed if this
-/// property can never be referenced from another module.
-
+/// Note: Storage from a 'let' property can only be removed if this property if
+/// the type is resilient (not fixed-layout) and the property cannot be read
+/// from another module.
 class LetPropertiesOpt {
   SILModule *Module;
 
@@ -87,8 +177,8 @@ public:
 
 protected:
   bool isConstantLetProperty(VarDecl *Property);
-  void collectPropertyAccess(SILInstruction *I, VarDecl *Property, bool NonRemovable);
-  void collectStructPropertiesAccess(StructInst *SI, bool NonRemovable);
+  void collectPropertyAccess(SingleValueInstruction *I, VarDecl *Property,
+                             bool NonRemovable);
   void optimizeLetPropertyAccess(VarDecl *SILG, const InitSequence &Init);
   bool analyzeInitValue(SILInstruction *I, VarDecl *Prop);
 };
@@ -203,44 +293,25 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
     };
 
     // Look for any instructions accessing let properties.
-    if (isa<RefElementAddrInst>(Load) || isa<StructElementAddrInst>(Load) ||
-        isa<BeginAccessInst>(Load) || isa<BeginBorrowInst>(Load)) {
-      auto proj = cast<SingleValueInstruction>(Load);
+    auto *proj = cast<RefElementAddrInst>(Load);
 
-      // Copy the initializer into the function
-      // Replace the access to a let property by the value
-      // computed by this initializer.
-      SILValue clonedInit = cloneInitAt(proj);
-      for (auto UI = proj->use_begin(), E = proj->use_end(); UI != E;) {
-        auto *User = UI->getUser();
-        ++UI;
+    // Copy the initializer into the function
+    // Replace the access to a let property by the value
+    // computed by this initializer.
+    SILValue clonedInit = cloneInitAt(proj);
+    for (auto UI = proj->use_begin(), E = proj->use_end(); UI != E;) {
+      auto *User = UI->getUser();
+      ++UI;
 
-        // A nested begin_access will be mapped as a separate "Load".
-        if (isa<BeginAccessInst>(User) || isa<BeginBorrowInst>(User))
-          continue;
+      if (!canReplaceLoadSequence(User))
+        continue;
 
-        if (!canReplaceLoadSequence(User))
-          continue;
-
-        replaceLoadSequence(User, clonedInit);
-        eraseUsesOfInstruction(User);
-        User->eraseFromParent();
-        ++NumReplaced;
-      }
-      ChangedFunctions.insert(F);
-    } else if (auto proj = dyn_cast<StructExtractInst>(Load)) {
-      // Copy the initializer into the function
-      // Replace the access to a let property by the value
-      // computed by this initializer.
-      SILValue clonedInit = cloneInitAt(proj);
-      proj->replaceAllUsesWith(clonedInit);
-      LLVM_DEBUG(llvm::dbgs() << "Access to " << *Property <<" was replaced:\n";
-            clonedInit->dumpInContext());
-
-      proj->eraseFromParent();
+      replaceLoadSequence(User, clonedInit);
+      eraseUsesOfInstruction(User);
+      User->eraseFromParent();
       ++NumReplaced;
-      ChangedFunctions.insert(F);
     }
+    ChangedFunctions.insert(F);
   }
 
   LLVM_DEBUG(llvm::dbgs() << "Access to " << *Property << " was replaced "
@@ -378,11 +449,9 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
 }
 
 static bool isProjectionOfProperty(SILValue addr, VarDecl *Property) {
+  addr = stripAccessMarkers(addr);
   if (auto *REA = dyn_cast<RefElementAddrInst>(addr)) {
     return REA->getField() == Property;
-  }
-  if (auto *SEA = dyn_cast<StructElementAddrInst>(addr)) {
-    return SEA->getField() == Property;
   }
   return false;
 }
@@ -391,19 +460,19 @@ static bool isProjectionOfProperty(SILValue addr, VarDecl *Property) {
 bool
 LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
   SILValue value;
-  if (auto SI = dyn_cast<StructInst>(I)) {
-    value = SI->getFieldValue(Property);
-  } else if (auto SI = dyn_cast<StoreInst>(I)) {
-    auto Dest = stripAddressAccess(SI->getDest());
-
-    assert(isProjectionOfProperty(stripAddressAccess(SI->getDest()), Property)
-           && "Store instruction should store into a proper let property");
-    (void) Dest;
+  SILValue dest;
+  if (auto SI = dyn_cast<StoreInst>(I)) {
+    dest = stripAccessMarkers(SI->getDest());
     value = SI->getSrc();
   } else if (auto *copyAddr = dyn_cast<CopyAddrInst>(I)) {
+    dest = stripAccessMarkers(copyAddr->getDest());
     value = copyAddr->getSrc();
+  } else {
+    return false;
   }
-
+  assert(isProjectionOfProperty(dest, Property)
+         && "Store instruction should store into a proper let property");
+  (void)dest;
   // Check if it's just a copy from another instance of the struct.
   if (auto *LI = dyn_cast<LoadInst>(value)) {
     SILValue addr = LI->getOperand();
@@ -431,61 +500,6 @@ LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
   }
 }
 
-// Analyze the 'struct' instruction and check if it initializes
-// any let properties by statically known constant initializers.
-void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
-                                                     bool NonRemovable) {
-  auto structDecl = SI->getStructDecl();
-  // Check if this struct has any let properties.
-
-  // Bail, if this struct is known to contain nothing interesting.
-  if (SkipTypeProcessing.count(structDecl))
-    return;
-
-  // Get the set of let properties defined by this struct.
-  if (!NominalTypeLetProperties.count(structDecl)) {
-    // Compute the let properties of this struct.
-    SmallVector<VarDecl *, 4> LetProps;
-
-    for (auto Prop : structDecl->getStoredProperties()) {
-      if (!isConstantLetProperty(Prop))
-        continue;
-      LetProps.push_back(Prop);
-    }
-
-    if (LetProps.empty()) {
-      // No interesting let properties in this struct.
-      SkipTypeProcessing.insert(structDecl);
-      return;
-    }
-
-    NominalTypeLetProperties[structDecl] = LetProps;
-    LLVM_DEBUG(llvm::dbgs() << "Computed set of let properties for struct '"
-                            << structDecl->getName() << "'\n");
-  }
-
-  auto &Props = NominalTypeLetProperties[structDecl];
-
-  LLVM_DEBUG(llvm::dbgs() << "Found a struct instruction initializing some "
-                             "let properties: ";
-             SI->dumpInContext());
-  // Figure out the initializing sequence for each
-  // of the properties.
-  for (auto Prop : Props) {
-    if (SkipProcessing.count(Prop))
-      continue;
-    SILValue PropValue = SI->getOperandForField(Prop)->get();
-    LLVM_DEBUG(llvm::dbgs() << "Check the value of property '" << *Prop
-                            << "' :" << PropValue << "\n");
-    if (!analyzeInitValue(SI, Prop)) {
-      SkipProcessing.insert(Prop);
-      LLVM_DEBUG(llvm::dbgs() << "The value of a let property '" << *Prop
-                              << "' is not statically known\n");
-    }
-    (void) PropValue;
-  }
-}
-
 /// Check if I is a sequence of projections followed by a load.
 /// Since it is supposed to be a load from a let property with
 /// statically known constant initializer, only struct_element_addr
@@ -494,7 +508,8 @@ static bool isValidPropertyLoad(SILInstruction *I) {
   if (isa<LoadInst>(I))
     return true;
 
-  if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I)) {
+  if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I)
+      || isa<BeginAccessInst>(I)) {
     auto projection = cast<SingleValueInstruction>(I);
     for (auto Use : getNonDebugUses(projection)) {
       if (isIncidentalUse(Use->getUser()))
@@ -510,7 +525,7 @@ static bool isValidPropertyLoad(SILInstruction *I) {
 
 
 /// Remember where this property is accessed.
-void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
+void LetPropertiesOpt::collectPropertyAccess(SingleValueInstruction *I,
                                              VarDecl *Property,
                                              bool NonRemovable) {
   if (!isConstantLetProperty(Property))
@@ -520,23 +535,24 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
                           << *Property << "':\n";
              llvm::dbgs() << "The instructions are:\n"; I->dumpInContext());
 
-  if (isa<RefElementAddrInst>(I) || isa<StructElementAddrInst>(I) ||
-      isa<BeginAccessInst>(I) || isa<CopyAddrInst>(I) ||
-      isa<BeginBorrowInst>(I)) {
+  // Ignore the possibility of duplicate worklist entries. They cannot effect
+  // the SkipProcessing result, and we don't expect any exponential path
+  // explosion because none of the instructions have multiple address operands.
+  SmallVector<SingleValueInstruction *, 8> worklist = {I};
+  while (!worklist.empty()) {
     // Check if there is a store to this property.
-    auto projection = cast<SingleValueInstruction>(I);
+    auto *projection = worklist.pop_back_val();
     for (auto Use : getNonDebugUses(projection)) {
       auto *User = Use->getUser();
-      if (isIncidentalUse(User))
+      if (isIncidentalUse(User)) {
         continue;
-
-      // Each begin_access is analyzed as a separate property access. Do not
-      // consider a begin_access a use of the current projection.
-      if (isa<BeginAccessInst>(User) || isa<BeginBorrowInst>(I))
+      }
+      if (auto *bai = dyn_cast<BeginAccessInst>(User)) {
+        worklist.push_back(bai);
         continue;
-
+      }
       if (auto *copyAddr = dyn_cast<CopyAddrInst>(User)) {
-        if (copyAddr->getSrc() != projection ||
+        if (copyAddr->getDest() != projection ||
             !analyzeInitValue(copyAddr, Property)) {
           SkipProcessing.insert(Property);
           return;
@@ -583,25 +599,10 @@ void LetPropertiesOpt::run(SILModuleTransform *T) {
     bool NonRemovable = !F.shouldOptimize();
 
     for (auto &BB : F) {
-      for (auto &I : BB)
-        // Look for any instructions accessing let properties.
-        // It includes referencing this specific property (both reads and
-        // stores), as well as implicit stores by means of e.g.
-        // a struct instruction.
-        if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
-          if (auto *REAI =
-                  dyn_cast<RefElementAddrInst>(stripAddressAccess(BAI))) {
-            collectPropertyAccess(BAI, REAI->getField(), NonRemovable);
-          }
-        } else if (auto *REAI = dyn_cast<RefElementAddrInst>(&I)) {
+      for (auto &I : BB) {
+        if (auto *REAI = dyn_cast<RefElementAddrInst>(&I))
           collectPropertyAccess(REAI, REAI->getField(), NonRemovable);
-        } else if (auto *SEI = dyn_cast<StructExtractInst>(&I)) {
-          collectPropertyAccess(SEI, SEI->getField(), NonRemovable);
-        }  else if (auto *SEAI = dyn_cast<StructElementAddrInst>(&I)) {
-          collectPropertyAccess(SEAI, SEAI->getField(), NonRemovable);
-        } else if (auto *SI = dyn_cast<StructInst>(&I)) {
-          collectStructPropertiesAccess(SI, NonRemovable);
-        }
+      }
     }
   }
 

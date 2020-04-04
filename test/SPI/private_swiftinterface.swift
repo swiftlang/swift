@@ -8,6 +8,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-HELPER %s < %t/SPIHelper.swiftinterface
 // CHECK-HELPER-NOT: HelperSPI
 // CHECK-HELPER-NOT: @_spi
+// RUN: %target-swift-frontend -emit-module %t/SPIHelper.swiftinterface -emit-module-path %t/SPIHelper-from-public-swiftinterface.swiftmodule -swift-version 5 -module-name SPIHelper -enable-library-evolution
 
 /// Test the textual interfaces generated from this test.
 // RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/main.swiftinterface -emit-private-module-interface-path %t/main.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
@@ -34,9 +35,12 @@ public func foo() {}
 // CHECK-PUBLIC-NOT: localSPIFunc()
 
 // SPI declarations
-@_spi(MySPI) public class SPIClassLocal {}
+@_spi(MySPI) public class SPIClassLocal {
 // CHECK-PRIVATE: @_spi(MySPI) public class SPIClassLocal
 // CHECK-PUBLIC-NOT: class SPIClassLocal
+
+  public init() {}
+}
 
 @_spi(MySPI) public extension SPIClassLocal {
 // CHECK-PRIVATE: @_spi(MySPI) extension SPIClassLocal
@@ -46,9 +50,19 @@ public func foo() {}
   // CHECK-PRIVATE: @_spi(MySPI) public func extensionMethod
   // CHECK-PUBLIC-NOT: func extensionMethod
 
-  func internalExtensionMethod() {}
+  internal func internalExtensionMethod() {}
   // CHECK-PRIVATE-NOT: internalExtensionMethod
   // CHECK-PUBLIC-NOT: internalExtensionMethod
+
+  func inheritedSPIExtensionMethod() {}
+  // CHECK-PRIVATE: inheritedSPIExtensionMethod
+  // CHECK-PUBLIC-NOT: inheritedSPIExtensionMethod
+}
+
+public extension SPIClassLocal {
+  internal func internalExtensionMethode1() {}
+  // CHECK-PRIVATE-NOT: internalExtensionMethod1
+  // CHECK-PUBLIC-NOT: internalExtensionMethod1
 }
 
 class InternalClassLocal {}

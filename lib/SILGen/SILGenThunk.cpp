@@ -88,152 +88,6 @@ SILGenFunction::emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
   return ManagedValue::forUnmanaged(B.createFunctionRefFor(loc, F));
 }
 
-static std::pair<ManagedValue, SILDeclRef>
-getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
-                       ManagedValue selfArg, SubstitutionMap curriedSubs) {
-  auto *vd = thunk.getDecl();
-
-  // Reference the next uncurrying level of the function.
-  SILDeclRef next = SILDeclRef(vd, thunk.kind);
-  assert(!next.isCurried);
-
-  auto constantInfo =
-      SGF.SGM.Types.getConstantInfo(SGF.getTypeExpansionContext(), next);
-
-  // If the function is natively foreign, reference its foreign entry point.
-  if (requiresForeignToNativeThunk(vd))
-    return {ManagedValue::forUnmanaged(SGF.emitGlobalFunctionRef(loc, next)),
-            next};
-
-  // If the thunk is a curry thunk for a direct method reference, we are
-  // doing a direct dispatch (eg, a fragile 'super.foo()' call).
-  if (thunk.isDirectReference)
-    return {ManagedValue::forUnmanaged(SGF.emitGlobalFunctionRef(loc, next)),
-            next};
-
-  if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
-    if (getMethodDispatch(func) == MethodDispatch::Class) {
-      // Use the dynamic thunk if dynamic.
-      if (vd->isObjCDynamic()) {
-        return {SGF.emitDynamicMethodRef(loc, next, constantInfo.SILFnType),
-                next};
-      }
-
-      auto methodTy = SGF.SGM.Types.getConstantOverrideType(
-          SGF.getTypeExpansionContext(), next);
-      SILValue result =
-          SGF.emitClassMethodRef(loc, selfArg.getValue(), next, methodTy);
-      return {ManagedValue::forUnmanaged(result),
-              next.getOverriddenVTableEntry()};
-    }
-
-    // If the fully-uncurried reference is to a generic method, look up the
-    // witness.
-    if (constantInfo.SILFnType->getRepresentation()
-          == SILFunctionTypeRepresentation::WitnessMethod) {
-      auto protocol = func->getDeclContext()->getSelfProtocolDecl();
-      auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
-      auto substSelfType = origSelfType.subst(curriedSubs)->getCanonicalType();
-      auto conformance = curriedSubs.lookupConformance(origSelfType, protocol);
-      auto result = SGF.B.createWitnessMethod(loc, substSelfType, conformance,
-                                              next, constantInfo.getSILType());
-      return {ManagedValue::forUnmanaged(result), next};
-    }
-  }
-
-  // Otherwise, emit a direct call.
-  return {ManagedValue::forUnmanaged(SGF.emitGlobalFunctionRef(loc, next)),
-          next};
-}
-
-void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
-  assert(thunk.isCurried);
-
-  auto *vd = thunk.getDecl();
-
-  if (auto *fd = dyn_cast<AbstractFunctionDecl>(vd)) {
-    assert(!SGM.M.Types.hasLoweredLocalCaptures(SILDeclRef(fd)) &&
-           "methods cannot have captures");
-    (void) fd;
-  }
-
-  SILLocation loc(vd);
-  Scope S(*this, vd);
-
-  auto thunkInfo = SGM.Types.getConstantInfo(getTypeExpansionContext(), thunk);
-  auto thunkFnTy = thunkInfo.SILFnType;
-  SILFunctionConventions fromConv(thunkFnTy, SGM.M);
-
-  auto selfTy = fromConv.getSILType(thunkFnTy->getSelfParameter());
-  selfTy = F.mapTypeIntoContext(selfTy);
-  ManagedValue selfArg = B.createInputFunctionArgument(selfTy, loc);
-
-  // Forward substitutions.
-  auto subs = F.getForwardingSubstitutionMap();
-
-  auto toFnAndRef = getNextUncurryLevelRef(*this, loc, thunk, selfArg, subs);
-  ManagedValue toFn = toFnAndRef.first;
-  SILDeclRef calleeRef = toFnAndRef.second;
-
-  SILType resultTy = fromConv.getSingleSILResultType();
-  resultTy = F.mapTypeIntoContext(resultTy);
-
-  // Partially apply the next uncurry level and return the result closure.
-  selfArg = selfArg.ensurePlusOne(*this, loc);
-  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
-  ManagedValue toClosure =
-      B.createPartialApply(loc, toFn, subs, {selfArg},
-                           calleeConvention);
-  if (resultTy != toClosure.getType()) {
-    CanSILFunctionType resultFnTy = resultTy.castTo<SILFunctionType>();
-    CanSILFunctionType closureFnTy = toClosure.getType().castTo<SILFunctionType>();
-    if (resultFnTy->isABICompatibleWith(closureFnTy, F).isCompatible()) {
-      toClosure = B.createConvertFunction(loc, toClosure, resultTy);
-    } else {
-      // Compute the partially-applied abstraction pattern for the callee:
-      // just grab the pattern for the curried fn ref and "call" it.
-      assert(!calleeRef.isCurried);
-      calleeRef.isCurried = true;
-      auto appliedFnPattern =
-          SGM.Types.getConstantInfo(getTypeExpansionContext(), calleeRef)
-              .FormalPattern.getFunctionResultType();
-
-      auto appliedThunkPattern =
-        thunkInfo.FormalPattern.getFunctionResultType();
-
-      // The formal type should be the same for the callee and the thunk.
-      auto formalType = thunkInfo.FormalType;
-      if (auto genericSubstType = dyn_cast<GenericFunctionType>(formalType)) {
-        formalType = genericSubstType.substGenericArgs(subs);
-      }
-      formalType = cast<AnyFunctionType>(formalType.getResult());
-
-      toClosure =
-        emitTransformedValue(loc, toClosure,
-                             appliedFnPattern, formalType,
-                             appliedThunkPattern, formalType);
-    }
-  }
-  toClosure = S.popPreservingValue(toClosure);
-  B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(loc), toClosure);
-}
-
-void SILGenModule::emitCurryThunk(SILDeclRef constant) {
-  assert(constant.isCurried);
-
-  // Thunks are always emitted by need, so don't need delayed emission.
-  SILFunction *f = getFunction(constant, ForDefinition);
-  f->setThunk(IsThunk);
-  f->setBare(IsBare);
-
-  auto *fd = constant.getDecl();
-  preEmitFunction(constant, fd, f, fd);
-  PrettyStackTraceSILFunction X("silgen emitCurryThunk", f);
-
-  SILGenFunction(*this, *f, SwiftModule).emitCurryThunk(constant);
-  postEmitFunction(constant, f);
-}
-
 void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(!thunk.isForeign && "foreign-to-native thunks only");
@@ -280,9 +134,7 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
   
   // If the constant is a thunk we haven't emitted yet, emit it.
   if (!SGM.hasFunction(constant)) {
-    if (constant.isCurried) {
-      SGM.emitCurryThunk(constant);
-    } else if (constant.isForeignToNativeThunk()) {
+    if (constant.isForeignToNativeThunk()) {
       SGM.emitForeignToNativeThunk(constant);
     } else if (constant.isNativeToForeignThunk()) {
       SGM.emitNativeToForeignThunk(constant);
@@ -333,4 +185,49 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   return builder.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, IsSerializable,
       ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
+}
+
+SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
+    SILDeclRef derivativeFnDeclRef, CanSILFunctionType constantTy) {
+  auto *derivativeId = derivativeFnDeclRef.derivativeFunctionIdentifier;
+  assert(derivativeId);
+  auto *derivativeFnDecl = derivativeFnDeclRef.getDecl();
+
+  SILGenFunctionBuilder builder(*this);
+  auto originalFnDeclRef = derivativeFnDeclRef.asAutoDiffOriginalFunction();
+  // TODO(TF-685): Use principled thunk mangling.
+  // Do not simply reuse reabstraction thunk mangling.
+  auto name = derivativeFnDeclRef.mangle() + "_vtable_entry_thunk";
+  auto *thunk = builder.getOrCreateFunction(
+      derivativeFnDecl, name, originalFnDeclRef.getLinkage(ForDefinition),
+      constantTy, IsBare, IsTransparent, derivativeFnDeclRef.isSerialized(),
+      IsNotDynamic, ProfileCounter(), IsThunk);
+  if (!thunk->empty())
+    return thunk;
+
+  if (auto genSig = constantTy->getSubstGenericSignature())
+    thunk->setGenericEnvironment(genSig->getGenericEnvironment());
+  SILGenFunction SGF(*this, *thunk, SwiftModule);
+  SmallVector<ManagedValue, 4> params;
+  auto loc = derivativeFnDeclRef.getAsRegularLocation();
+  SGF.collectThunkParams(loc, params);
+
+  auto originalFn = SGF.emitGlobalFunctionRef(loc, originalFnDeclRef);
+  auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+      derivativeId->getParameterIndices(),
+      derivativeFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
+  auto diffFn =
+      SGF.B.createDifferentiableFunction(loc, loweredParamIndices, originalFn);
+  auto derivativeFn = SGF.B.createDifferentiableFunctionExtract(
+      loc, NormalDifferentiableFunctionTypeComponent(derivativeId->getKind()),
+      diffFn);
+  auto derivativeFnSILTy = SILType::getPrimitiveObjectType(constantTy);
+  SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
+                                thunk->getArguments().end());
+  auto apply =
+      SGF.emitApplyWithRethrow(loc, derivativeFn, derivativeFnSILTy,
+                               SGF.getForwardingSubstitutionMap(), args);
+  SGF.B.createReturn(loc, apply);
+
+  return thunk;
 }

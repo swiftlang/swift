@@ -1049,6 +1049,11 @@ public:
     if (refcounting) *refcounting = Refcounting;
     return getNumStoredProtocols() == 0;
   }
+  
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override {
+    return index == 0;
+  }
 
   const LoadableTypeInfo &
   getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const {

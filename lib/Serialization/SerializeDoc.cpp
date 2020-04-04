@@ -64,7 +64,7 @@ class YamlGroupInputParser {
       if (!ParentName.empty()) {
         CombinedName = (llvm::Twine(ParentName) + Separator + GroupName).str();
       } else {
-        CombinedName = GroupName;
+        CombinedName = GroupName.str();
       }
 
       for (llvm::yaml::Node &Entry : *Value) {
@@ -75,7 +75,7 @@ class YamlGroupInputParser {
           GroupNameAndFileName.append(CombinedName);
           GroupNameAndFileName.append(Separator);
           GroupNameAndFileName.append(llvm::sys::path::stem(FileName));
-          Map[FileName] = GroupNameAndFileName.str();
+          Map[FileName] = std::string(GroupNameAndFileName.str());
         } else if (Entry.getType() == llvm::yaml::Node::NodeKind::NK_Mapping) {
           if (parseRoot(Map, &Entry, CombinedName))
             return true;

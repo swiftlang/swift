@@ -9,6 +9,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 import simd
 import ObjCClasses

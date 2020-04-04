@@ -27,7 +27,6 @@
 namespace swift {
 
 class LookupResult;
-class TypeChecker;
 
 /// A summary of how to fix a typo.  Note that this intentionally doesn't
 /// carry a candidate declaration because we should be able to apply a typo

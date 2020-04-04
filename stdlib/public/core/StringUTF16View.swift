@@ -146,8 +146,7 @@ extension String.UTF16View: BidirectionalCollection {
     // For a BMP scalar (1-3 UTF-8 code units), advance past it. For a non-BMP
     // scalar, use a transcoded offset first.
 
-    // TODO: do the ugly if non-transcoded make sure to scalar align thing...
-    // Also, can we just jump ahead 4 is transcoded is 1?
+    // TODO: If transcoded is 1, can we just skip ahead 4?
 
     let idx = _utf16AlignNativeIndex(idx)
     let len = _guts.fastUTF8ScalarLength(startingAt: idx._encodedOffset)
@@ -509,11 +508,14 @@ extension String.Index {
 }
 
 // Breadcrumb-aware acceleration
-extension String.UTF16View {
-  // A simple heuristic we can always tweak later. Not needed for correctness
-  @inlinable @inline(__always)
-  internal var _shortHeuristic: Int { return 32 }
+extension _StringGuts {
+  @inline(__always)
+  fileprivate func _useBreadcrumbs(forEncodedOffset offset: Int) -> Bool {
+    return hasBreadcrumbs && offset >= _StringBreadcrumbs.breadcrumbStride
+  }
+}
 
+extension String.UTF16View {
   @usableFromInline
   @_effects(releasenone)
   internal func _nativeGetOffset(for idx: Index) -> Int {
@@ -526,7 +528,10 @@ extension String.UTF16View {
     }
 
     let idx = _utf16AlignNativeIndex(idx)
-    if idx._encodedOffset < _shortHeuristic || !_guts.hasBreadcrumbs {
+
+    guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
+      // TODO: Generic _distance is still very slow. We should be able to
+      // skip over ASCII substrings quickly
       return _distance(from: startIndex, to: idx)
     }
 
@@ -548,7 +553,7 @@ extension String.UTF16View {
 
     if _guts.isASCII { return Index(_encodedOffset: offset) }
 
-    if offset < _shortHeuristic || !_guts.hasBreadcrumbs {
+    guard _guts._useBreadcrumbs(forEncodedOffset: offset) else {
       return _index(startIndex, offsetBy: offset)
     }
 

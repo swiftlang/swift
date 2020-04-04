@@ -136,6 +136,13 @@ int main(int argc, char **argv) {
     printf("Kind:%u Size:%u Alignment:%u Stride:%u NumFields:%u\n",
            TypeInfo.Kind, TypeInfo.Size, TypeInfo.Alignment, TypeInfo.Stride,
            TypeInfo.NumFields);
+    char *Name = swift_reflection_interop_copyDemangledNameForTypeRef(Context, Type);
+    if (Name) {
+      printf("Demangled name: %s\n", Name);
+      free(Name);
+    } else {
+      printf("Could not get name.\n");
+    }
   } else {
     printf("Unknown typeref!\n");
   }

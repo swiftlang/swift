@@ -75,6 +75,13 @@ public:
     return true;
   }
   
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override {
+    // Refcounting functions are no-ops when passed a null pointer, which is the
+    // first extra inhabitant.
+    return index == 0;
+  }
+  
   IsaEncoding getIsaEncoding(ResilienceExpansion expansion) const {
     switch (asDerived().getReferenceCounting()) {
     // We can access the isa of pure Swift heap objects directly.

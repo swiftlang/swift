@@ -31,6 +31,7 @@
 #include "swift/Sema/IDETypeChecking.h"
 
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -374,7 +375,9 @@ struct SwiftASTManager::Implementation {
       std::shared_ptr<GlobalConfig> Config,
       std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath)
       : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
-        RuntimeResourcePath(RuntimeResourcePath) {}
+        RuntimeResourcePath(RuntimeResourcePath),
+        SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
+  }
 
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs;
   std::shared_ptr<GlobalConfig> Config;
@@ -383,6 +386,7 @@ struct SwiftASTManager::Implementation {
   SourceManager SourceMgr;
   Cache<ASTKey, ASTProducerRef> ASTCache{ "sourcekit.swift.ASTCache" };
   llvm::sys::Mutex CacheMtx;
+  std::time_t SessionTimestamp;
 
   WorkQueue ASTBuildQueue{ WorkQueue::Dequeuing::Serial,
                            "sourcekit.swift.ASTBuilding" };
@@ -461,7 +465,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
   llvm::SmallString<64> Err;
   llvm::raw_svector_ostream OS(Err);
   OS << "'" << PrimaryFile << "' is not part of the input files";
-  Error = OS.str();
+  Error = std::string(OS.str());
   return replacementInputsAndOutputs;
 }
 
@@ -501,7 +505,7 @@ bool SwiftASTManager::initCompilerInvocation(
   Diags.removeConsumer(DiagConsumer);
 
   if (HadError) {
-    Error = ErrOS.str();
+    Error = std::string(ErrOS.str());
     return true;
   }
 
@@ -547,6 +551,18 @@ bool SwiftASTManager::initCompilerInvocation(
   // those with a location in the primary file, and everything else).
   if (Impl.Config->shouldOptimizeForIDE())
     FrontendOpts.IgnoreSwiftSourceInfo = true;
+
+  // To save the time for module validation, consider the lifetime of ASTManager
+  // as a single build session.
+  // NOTE: 'SessionTimestamp - 1' because clang compares it with '<=' that may
+  //       cause unnecessary validations if they happens within one second from
+  //       the SourceKit startup.
+  ImporterOpts.ExtraArgs.push_back("-fbuild-session-timestamp=" +
+                                   std::to_string(Impl.SessionTimestamp - 1));
+  ImporterOpts.ExtraArgs.push_back("-fmodules-validate-once-per-build-session");
+
+  auto &SearchPathOpts = Invocation.getSearchPathOptions();
+  SearchPathOpts.DisableModulesValidateSystemDependencies = true;
 
   // Disable expensive SIL options to reduce time spent in SILGen.
   disableExpensiveSILOptions(Invocation.getSILOptions());
@@ -683,7 +699,7 @@ static FileContent getFileContentFromSnap(ImmutableTextSnapshotRef Snap,
                                           bool IsPrimary, StringRef FilePath) {
   auto Buf = llvm::MemoryBuffer::getMemBufferCopy(
       Snap->getBuffer()->getText(), FilePath);
-  return FileContent(Snap, FilePath, std::move(Buf), IsPrimary,
+  return FileContent(Snap, FilePath.str(), std::move(Buf), IsPrimary,
                      Snap->getStamp());
 }
 
@@ -699,8 +715,8 @@ FileContent SwiftASTManager::Implementation::getFileContent(
   // FIXME: Is there a way to get timestamp and buffer for a file atomically ?
   auto Stamp = getBufferStamp(FilePath, FileSystem);
   auto Buffer = getMemoryBuffer(FilePath, FileSystem, Error);
-  return FileContent(nullptr, UnresolvedPath, std::move(Buffer), IsPrimary,
-                     Stamp);
+  return FileContent(nullptr, UnresolvedPath.str(), std::move(Buffer),
+                     IsPrimary, Stamp);
 }
 
 BufferStamp SwiftASTManager::Implementation::getBufferStamp(
@@ -903,7 +919,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     // getModuleFilename() (by returning an empty path). Note that such modules
     // may be heterogeneous.
     {
-      std::string Path = Mod->getModuleFilename();
+      std::string Path = Mod->getModuleFilename().str();
       if (Path.empty() || Path == TopMod->getModuleFilename())
         continue; // this is a submodule.
       Filenames.push_back(std::move(Path));

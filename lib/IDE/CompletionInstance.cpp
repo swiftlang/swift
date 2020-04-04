@@ -176,20 +176,16 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     return false;
 
   auto &CI = *CachedCI;
+  auto *oldSF = CI.getCodeCompletionFile().get();
 
-  if (!CI.hasPersistentParserState())
-    return false;
-  auto &oldState = CI.getPersistentParserState();
-  if (!oldState.hasCodeCompletionDelayedDeclState())
-    return false;
+  auto *oldState = oldSF->getDelayedParserState();
+  assert(oldState->hasCodeCompletionDelayedDeclState());
+  auto &oldInfo = oldState->getCodeCompletionDelayedDeclState();
 
   auto &SM = CI.getSourceMgr();
   if (SM.getIdentifierForBuffer(SM.getCodeCompletionBufferID()) !=
       completionBuffer->getBufferIdentifier())
     return false;
-
-  auto &oldInfo = oldState.getCodeCompletionDelayedDeclState();
-  auto *oldSF = oldInfo.ParentContext->getParentSourceFile();
 
   // Parse the new buffer into temporary SourceFile.
   SourceManager tmpSM;
@@ -203,23 +199,24 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   DiagnosticEngine tmpDiags(tmpSM);
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
+  registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
   ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
-  PersistentParserState newState;
   SourceFile *tmpSF =
       new (*tmpCtx) SourceFile(*tmpM, oldSF->Kind, tmpBufferID,
                                SourceFile::ImplicitModuleImportKind::None);
   tmpSF->enableInterfaceHash();
   // Ensure all non-function-body tokens are hashed into the interface hash
   tmpCtx->LangOpts.EnableTypeFingerprints = false;
-  parseIntoSourceFile(*tmpSF, tmpBufferID, &newState);
+
   // Couldn't find any completion token?
-  if (!newState.hasCodeCompletionDelayedDeclState())
+  auto *newState = tmpSF->getDelayedParserState();
+  if (!newState->hasCodeCompletionDelayedDeclState())
     return false;
 
-  auto &newInfo = newState.getCodeCompletionDelayedDeclState();
+  auto &newInfo = newState->getCodeCompletionDelayedDeclState();
   unsigned newBufferID;
 
   switch (newInfo.Kind) {
@@ -273,7 +270,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
 
     // Construct dummy scopes. We don't need to restore the original scope
     // because they are probably not 'isResolvable()' anyway.
-    auto &SI = oldState.getScopeInfo();
+    auto &SI = oldState->getScopeInfo();
     assert(SI.getCurrentScope() == nullptr);
     Scope Top(SI, ScopeKind::TopLevel);
     Scope Body(SI, ScopeKind::FunctionBody);
@@ -282,7 +279,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     oldInfo.StartOffset = newInfo.StartOffset;
     oldInfo.EndOffset = newInfo.EndOffset;
     oldInfo.PrevOffset = newInfo.PrevOffset;
-    oldState.restoreCodeCompletionDelayedDeclState(oldInfo);
+    oldState->restoreCodeCompletionDelayedDeclState(oldInfo);
 
     auto *AFD = cast<AbstractFunctionDecl>(DC);
     if (AFD->isBodySkipped())
@@ -324,14 +321,22 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     CompilerInstance::addAdditionalInitialImportsTo(newSF, implicitImport);
     newSF->enableInterfaceHash();
 
-    // Re-parse the whole file. Still re-use imported modules.
-    (void)oldState.takeCodeCompletionDelayedDeclState();
-    parseIntoSourceFile(*newSF, newBufferID, &oldState);
-    performNameBinding(*newSF);
+    // Tell the compiler instance we've replaced the code completion file.
+    CI.setCodeCompletionFile(newSF);
+
+    // Re-process the whole file (parsing will be lazily triggered). Still
+    // re-use imported modules.
+    performImportResolution(*newSF);
     bindExtensions(*newSF);
 
-    assert(oldState.hasCodeCompletionDelayedDeclState() &&
-           oldState.getCodeCompletionDelayedDeclState().Kind == newInfo.Kind);
+#ifndef NDEBUG
+    const auto *reparsedState = newSF->getDelayedParserState();
+    assert(reparsedState->hasCodeCompletionDelayedDeclState() &&
+           "Didn't find completion token?");
+
+    auto &reparsedInfo = reparsedState->getCodeCompletionDelayedDeclState();
+    assert(reparsedInfo.Kind == newInfo.Kind);
+#endif
     break;
   }
   }
@@ -360,27 +365,42 @@ bool CompletionInstance::performNewOperation(
     llvm::function_ref<void(CompilerInstance &)> Callback) {
 
   auto TheInstance = std::make_unique<CompilerInstance>();
-  auto &CI = *TheInstance;
-  if (DiagC)
-    CI.addDiagnosticConsumer(DiagC);
+  {
+    auto &CI = *TheInstance;
+    if (DiagC)
+      CI.addDiagnosticConsumer(DiagC);
 
-  if (FileSystem != llvm::vfs::getRealFileSystem())
-    CI.getSourceMgr().setFileSystem(FileSystem);
+    SWIFT_DEFER {
+      if (DiagC)
+        CI.removeDiagnosticConsumer(DiagC);
+    };
 
-  Invocation.setCodeCompletionPoint(completionBuffer, Offset);
+    if (FileSystem != llvm::vfs::getRealFileSystem())
+      CI.getSourceMgr().setFileSystem(FileSystem);
 
-  if (CI.setup(Invocation)) {
-    Error = "failed to setup compiler instance";
-    return false;
-  }
-  registerIDERequestFunctions(CI.getASTContext().evaluator);
+    Invocation.setCodeCompletionPoint(completionBuffer, Offset);
 
-  CI.performParseAndResolveImportsOnly();
-  if (CI.hasPersistentParserState())
+    if (CI.setup(Invocation)) {
+      Error = "failed to setup compiler instance";
+      return false;
+    }
+    registerIDERequestFunctions(CI.getASTContext().evaluator);
+
+    CI.performParseAndResolveImportsOnly();
+
+    // If we didn't create a source file for completion, bail. This can happen
+    // if for example we fail to load the stdlib.
+    auto completionFile = CI.getCodeCompletionFile();
+    if (!completionFile)
+      return true;
+
+    // If we didn't find a code completion token, bail.
+    auto *state = completionFile.get()->getDelayedParserState();
+    if (!state->hasCodeCompletionDelayedDeclState())
+      return true;
+
     Callback(CI);
-
-  if (DiagC)
-    CI.removeDiagnosticConsumer(DiagC);
+  }
 
   if (ArgsHash.hasValue()) {
     CachedCI = std::move(TheInstance);

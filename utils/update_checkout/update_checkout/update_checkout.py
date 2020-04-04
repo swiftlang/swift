@@ -450,9 +450,9 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""
+By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM
 repositories.
-
-By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
+""")
     parser.add_argument(
         "--clone",
         help="Obtain Sources for Swift and Related Projects",

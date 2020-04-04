@@ -76,7 +76,7 @@ bb0(%0 : $*B, %1 : $Optional<P>):
 // CHECK-NEXT: store i8** [[TMPTAB]], i8*** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call [[WEAK]]* @swift_unknownObjectWeakAssign([[WEAK]]* returned [[T0]], [[UNKNOWN]]* [[TMPOBJ]])
-// CHECK: call void @"$s4weak1P_pSgWOe"
+// CHECK: call void @swift_unknownObjectRelease
 
 sil @test_weak_alloc_stack : $@convention(thin) (Optional<P>) -> () {
 bb0(%0 : $Optional<P>):

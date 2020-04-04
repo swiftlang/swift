@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
 // RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer -sil-deadfuncelim  %s | %FileCheck --check-prefix=CHECK-DEADFUNCELIM %s
-// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s -o %t.sil && %target-swift-frontend -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN %s
+// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s -o %t.sil && %target-swift-frontend -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN --check-prefix=CHECK-IRGEN-%target-cpu %s
 // RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer -sil-inline-generics=true -inline %s | %FileCheck --check-prefix=CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE %s
 
 sil_stage canonical
@@ -74,7 +74,7 @@ public func nonvoidReturn<T>(t: T) -> Int64
 // G.getContainer(A.Elt) -> A
 sil @$s16eager_specialize1GV12getContaineryx3EltQzF : $@convention(method) <Container where Container : HasElt> (@in Container.Elt, G<Container>) -> @out Container {
 bb0(%0 : $*Container, %1 : $*Container.Elt, %2 : $G<Container>):
-  %4 = witness_method $Container, #HasElt.init!allocator.1 : $@convention(witness_method: HasElt) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0
+  %4 = witness_method $Container, #HasElt.init!allocator : $@convention(witness_method: HasElt) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0
   %5 = metatype $@thick Container.Type
   %6 = apply %4<Container>(%0, %1, %5) : $@convention(witness_method: HasElt) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0
   %7 = tuple ()
@@ -137,7 +137,7 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 // static != infix<A where ...> (A, A) -> Bool
 sil public_external [serialized] @$ss2neoiySbx_xts9EquatableRzlFZ : $@convention(thin) <T where T : Equatable> (@in T, @in T) -> Bool {
 bb0(%0 : $*T, %1 : $*T):
-  %4 = witness_method $T, #Equatable."=="!1 : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+  %4 = witness_method $T, #Equatable."==" : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
   %5 = metatype $@thick T.Type
   %6 = apply %4<T>(%0, %1, %5) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
   %7 = struct_extract %6 : $Bool, #Bool._value
@@ -154,7 +154,7 @@ bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   %5 = function_ref @$ss2neoiySbx_xts9EquatableRzlFZ : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
   %6 = alloc_stack $T
   copy_addr %2 to [initialization] %6 : $*T
-  %8 = witness_method $T, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1 : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.IntLiteral, @thick τ_0_0.Type) -> @out τ_0_0
+  %8 = witness_method $T, #_ExpressibleByBuiltinIntegerLiteral.init!allocator : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.IntLiteral, @thick τ_0_0.Type) -> @out τ_0_0
   %9 = metatype $@thick T.Type
   %10 = integer_literal $Builtin.IntLiteral, 0
   %11 = alloc_stack $T
@@ -175,7 +175,7 @@ bb1:
   throw %24 : $Error
 
 bb2:
-  %18 = witness_method $T, #BinaryInteger."/"!1 : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+  %18 = witness_method $T, #BinaryInteger."/" : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
   %19 = apply %18<T>(%0, %1, %2, %9) : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
   %20 = tuple ()
   return %20 : $()
@@ -209,7 +209,7 @@ bb2:
 // CHECK:   throw %{{.*}} : $Error
 
 // CHECK: bb4:
-// CHECK:   %{{.*}} = witness_method $T, #BinaryInteger."/"!1 : {{.*}} : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   %{{.*}} = witness_method $T, #BinaryInteger."/" : {{.*}} : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   apply %{{.*}}<T>({{.*}}) : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   br bb5
 
@@ -727,7 +727,9 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 // CHECK-IRGEN-NEXT:   %5 = getelementptr inbounds i8*, i8** %S.valueWitnesses
 // CHECK-IRGEN-NEXT:   %6 = load i8*, i8** %5
 // CHECK-IRGEN-NEXT:   %initializeWithCopy = {{.*}}
-// CHECK-IRGEN-NEXT:   %7 = call {{.*}} %initializeWithCopy
+// CHECK-IRGEN-arm64e-NEXT:   ptrtoint i8** %5 to i64
+// CHECK-IRGEN-arm64e-NEXT:   call i64 @llvm.ptrauth.blend.i64
+// CHECK-IRGEN-NEXT:   call {{.*}} %initializeWithCopy
 // CHECK-IRGEN-NEXT:   ret void
 // CHECK-IRGEN-NEXT: }
 
@@ -816,7 +818,7 @@ bb0(%0 : $*T, %1 : $@thick ClassUsingThrowingP.Type):
 // static ClassUsingThrowingP.g<A>(_:)
 sil [_specialize exported: false, kind: full, where T == Int64] @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1gys5Int64VxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (Int64, @error Error) {
 bb0(%0 : $*T, %1 : $@thick ClassUsingThrowingP.Type):
-  %5 = witness_method $T, #ThrowingP.action!1 : <Self where Self : ThrowingP> (Self) -> () throws -> Int64 : $@convention(witness_method: ThrowingP) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error Error)
+  %5 = witness_method $T, #ThrowingP.action : <Self where Self : ThrowingP> (Self) -> () throws -> Int64 : $@convention(witness_method: ThrowingP) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error Error)
   try_apply %5<T>(%0) : $@convention(witness_method: ThrowingP) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error Error), normal bb1, error bb2
 
 bb1(%7 : $Int64):                                 // Preds: bb0
@@ -850,13 +852,13 @@ bb0(%0 : $*T):
 }
 
 sil_vtable ClassUsingThrowingP {
-  #ClassUsingThrowingP.init!allocator.1: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$s34eager_specialize_throwing_function19ClassUsingThrowingPCACycfC	// ClassUsingThrowingP.__allocating_init()
-  #ClassUsingThrowingP.init!initializer.1: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$s34eager_specialize_throwing_function19ClassUsingThrowingPCACycfc	// ClassUsingThrowingP.init()
-  #ClassUsingThrowingP.deinit!deallocator.1: @$s34eager_specialize_throwing_function19ClassUsingThrowingPCfD	// ClassUsingThrowingP.__deallocating_deinit
+  #ClassUsingThrowingP.init!allocator: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$s34eager_specialize_throwing_function19ClassUsingThrowingPCACycfC	// ClassUsingThrowingP.__allocating_init()
+  #ClassUsingThrowingP.init!initializer: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$s34eager_specialize_throwing_function19ClassUsingThrowingPCACycfc	// ClassUsingThrowingP.init()
+  #ClassUsingThrowingP.deinit!deallocator: @$s34eager_specialize_throwing_function19ClassUsingThrowingPCfD	// ClassUsingThrowingP.__deallocating_deinit
 }
 
 sil_witness_table hidden Int64: ThrowingP module eager_specialize_throwing_function {
-  method #ThrowingP.action!1: <Self where Self : ThrowingP> (Self) -> () throws -> Int64 : @$ss5Int64V34eager_specialize_throwing_function9ThrowingPA2cDP6actionAByKFTW	// protocol witness for ThrowingP.action() in conformance Int64
+  method #ThrowingP.action: <Self where Self : ThrowingP> (Self) -> () throws -> Int64 : @$ss5Int64V34eager_specialize_throwing_function9ThrowingPA2cDP6actionAByKFTW	// protocol witness for ThrowingP.action() in conformance Int64
 }
 
 sil_default_witness_table hidden ThrowingP {

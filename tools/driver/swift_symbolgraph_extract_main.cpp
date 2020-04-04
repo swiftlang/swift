@@ -39,6 +39,10 @@ FrameworkSearchPaths("F", llvm::cl::desc("Add a directory to the framework searc
                      llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
+SystemFrameworkSearchPaths("Fsystem", llvm::cl::desc("Add directory to system framework search path"), llvm::cl::ZeroOrMore,
+                     llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
 LibrarySearchPaths("L", llvm::cl::desc("Add a directory to the library search paths"), llvm::cl::ZeroOrMore,
                    llvm::cl::cat(Category));
 
@@ -63,12 +67,22 @@ SwiftVersion("swift-version", llvm::cl::desc("Interpret input according to a spe
 static llvm::cl::opt<bool>
 PrettyPrint("pretty-print", llvm::cl::desc("Pretty-print the resulting Symbol Graph JSON"), llvm::cl::cat(Category));
 
+static llvm::cl::opt<bool>
+SkipSynthesizedMembers("skip-synthesized-members",
+                       llvm::cl::desc("Skip members inherited through classes or default implementations"),
+                       llvm::cl::cat(Category));
+
 static llvm::cl::opt<std::string>
 MinimumAccessLevel("minimum-access-level", llvm::cl::desc("Include symbols with this access level or more"), llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
 Xcc("Xcc", llvm::cl::desc("Pass the following command-line flag to Clang"),
          llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+ResourceDir("resource-dir",
+            llvm::cl::desc("Override the directory that holds the compiler resource files"),
+            llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 OutputDir("output-dir", llvm::cl::desc("Symbol Graph JSON Output Directory (Required)"), llvm::cl::cat(Category));
@@ -127,6 +141,9 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   Invocation.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(Argv0, MainAddr));
   Invocation.setModuleName("swift_symbolgraph_extract");
+  if (!options::ResourceDir.empty()) {
+    Invocation.setRuntimeResourcePath(options::ResourceDir);
+  }
   Invocation.setSDKPath(options::SDK);
   Invocation.setTargetTriple(options::Target);
 
@@ -137,6 +154,9 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths;
   for (const auto &Path : options::FrameworkSearchPaths) {
     FrameworkSearchPaths.push_back({ Path, /*isSystem*/ false});
+  }
+  for (const auto &Path : options::SystemFrameworkSearchPaths) {
+    FrameworkSearchPaths.push_back({ Path, /*isSystem*/ true });
   }
   Invocation.setFrameworkSearchPaths(FrameworkSearchPaths);
   Invocation.getSearchPathOptions().LibrarySearchPaths = options::LibrarySearchPaths;
@@ -149,6 +169,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
 
   Invocation.setClangModuleCachePath(options::ModuleCachePath);
   Invocation.getClangImporterOptions().ModuleCachePath = options::ModuleCachePath;
+  Invocation.setDefaultPrebuiltCacheIfNecessary();
 
   if (!options::SwiftVersion.empty()) {
     using version::Version;
@@ -171,6 +192,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
     llvm::Triple(options::Target),
     options::PrettyPrint,
     AccessLevel::Public,
+    !options::SkipSynthesizedMembers,
   };
 
   if (!options::MinimumAccessLevel.empty()) {

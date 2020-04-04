@@ -79,6 +79,9 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
 }
 
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
+  if (PAI->getFunction()->hasOwnership())
+    return nullptr;
+
   // partial_apply without any substitutions or arguments is just a
   // thin_to_thick_function.
   if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0)) {
@@ -1234,6 +1237,9 @@ FullApplySite SILCombiner::rewriteApplyCallee(FullApplySite apply,
 }
 
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
+  if (AI->getFunction()->hasOwnership())
+    return nullptr;
+
   Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
@@ -1313,6 +1319,9 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 }
 
 SILInstruction *SILCombiner::visitBeginApplyInst(BeginApplyInst *BAI) {
+  if (BAI->getFunction()->hasOwnership())
+    return nullptr;
+
   if (tryOptimizeInoutKeypath(BAI))
     return nullptr;
   return nullptr;
@@ -1368,6 +1377,9 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
 }
 
 SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
+  if (AI->getFunction()->hasOwnership())
+    return nullptr;
+
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
   if (isa<PartialApplyInst>(AI->getCallee()))

@@ -22,6 +22,7 @@
 #include "GenClass.h"
 #include "GenDecl.h"
 #include "GenMeta.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
@@ -362,12 +363,11 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
     isTrivial &= ti.isPOD(ResilienceExpansion::Minimal);
   }
   
-  llvm::Constant *destroy;
+  llvm::Constant *destroy = nullptr;
   llvm::Constant *copy;
   if (isTrivial) {
     // We can use prefab witnesses for handling trivial copying and destruction.
     // A null destructor witness signals that the payload is trivial.
-    destroy = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     copy = IGM.getCopyKeyPathTrivialIndicesFn();
   } else {
     // Generate a destructor for this set of indices.
@@ -500,12 +500,23 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
                                       genericEnv, requirements,
                                       !component.getSubscriptIndices().empty());
   
-  auto witnesses = llvm::ConstantStruct::getAnon({destroy, copy, equals, hash});
-  return new llvm::GlobalVariable(IGM.Module, witnesses->getType(),
-                                  /*constant*/ true,
-                                  llvm::GlobalValue::PrivateLinkage,
-                                  witnesses,
-                                  "keypath_witnesses");
+  ConstantInitBuilder builder(IGM);
+  ConstantStructBuilder fields = builder.beginStruct();
+  auto schemaKeyPath = IGM.getOptions().PointerAuth.KeyPaths;
+  if (destroy)
+    fields.addSignedPointer(destroy, schemaKeyPath,
+                            PointerAuthEntity::Special::KeyPathDestroy);
+  else
+    fields.addNullPointer(IGM.FunctionPtrTy);
+  fields.addSignedPointer(copy, schemaKeyPath,
+                          PointerAuthEntity::Special::KeyPathCopy);
+  fields.addSignedPointer(equals, schemaKeyPath,
+                          PointerAuthEntity::Special::KeyPathEquals);
+  fields.addSignedPointer(hash, schemaKeyPath,
+                          PointerAuthEntity::Special::KeyPathHash);
+  return fields.finishAndCreateGlobal(
+      "keypath_witnesses", IGM.getPointerAlignment(), /*constant*/ true,
+      llvm::GlobalVariable::PrivateLinkage);
 }
 
 /// Information about each index operand for a key path pattern that is used
@@ -885,9 +896,10 @@ emitKeyPathComponent(IRGenModule &IGM,
   
     // Encode the settability.
     bool settable = kind == KeyPathPatternComponent::Kind::SettableProperty;
+    bool mutating = settable && component.isComputedSettablePropertyMutating();
     KeyPathComponentHeader::ComputedPropertyKind componentKind;
     if (settable) {
-      componentKind = component.isComputedSettablePropertyMutating()
+      componentKind = mutating
         ? KeyPathComponentHeader::SettableMutating
         : KeyPathComponentHeader::SettableNonmutating;
     } else {
@@ -902,6 +914,7 @@ emitKeyPathComponent(IRGenModule &IGM,
     switch (id.getKind()) {
     case KeyPathPatternComponent::ComputedPropertyId::Function: {
       idKind = KeyPathComponentHeader::Pointer;
+      // FIXME: Does this need to be signed?
       auto idRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
         LinkEntity::forSILFunction(id.getFunction(), false));
       
@@ -979,8 +992,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         auto methodProto = cast<ProtocolDecl>(dc);
         auto &protoInfo = IGM.getProtocolInfo(methodProto,
                                               ProtocolInfoKind::Full);
-        auto index = protoInfo.getFunctionIndex(
-                             cast<AbstractFunctionDecl>(declRef.getDecl()));
+        auto index = protoInfo.getFunctionIndex(declRef);
         idValue = llvm::ConstantInt::get(IGM.SizeTy, -index.getValue());
         idResolution = KeyPathComponentHeader::Resolved;
       }

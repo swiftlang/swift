@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -module-name A -swift-version 5 -primary-file %s -emit-ir | %FileCheck %s
 
+// The arm64e test is in ptrauth-dynamic_replaceable.sil.
+// UNSUPPORTED: CPU=arm64e
 // REQUIRES: objc_interop
 
 // No 32bit for now.

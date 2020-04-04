@@ -90,7 +90,7 @@ public func subclassgeneric_concrete() {
 // linux-android-NEXT: [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
 // windows-msvc-NEXT: [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
 
-// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
+// CHECK:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s32conditional_conformance_subclass4IsP2VAA0E0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
 // CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @swift_getWitnessTable

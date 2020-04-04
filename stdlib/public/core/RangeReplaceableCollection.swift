@@ -952,7 +952,7 @@ extension RangeReplaceableCollection {
   /// concatenate the elements of an integer array and a `Range<Int>` instance.
   ///
   ///     let numbers = [1, 2, 3, 4]
-  ///     let moreNumbers = numbers + 5...10
+  ///     let moreNumbers = numbers + (5...10)
   ///     print(moreNumbers)
   ///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
   ///
@@ -981,7 +981,7 @@ extension RangeReplaceableCollection {
   /// concatenate the elements of a `Range<Int>` instance and an integer array.
   ///
   ///     let numbers = [7, 8, 9, 10]
-  ///     let moreNumbers = 1...6 + numbers
+  ///     let moreNumbers = (1...6) + numbers
   ///     print(moreNumbers)
   ///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
   ///

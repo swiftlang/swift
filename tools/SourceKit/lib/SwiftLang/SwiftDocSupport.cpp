@@ -65,6 +65,7 @@ struct TextEntity {
   const Decl *Dcl = nullptr;
   TypeOrExtensionDecl SynthesizeTarget;
   const Decl *DefaultImplementationOf = nullptr;
+  ModuleDecl *UnderlyingModIfFromOverlay = nullptr;
   StringRef Argument;
   TextRange Range;
   unsigned LocOffset = 0;
@@ -274,7 +275,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
     if (GP->getDecl()->isImplicit())
       continue;
     DocGenericParam Param;
-    Param.Name = GP->getName().str();
+    Param.Name = std::string(GP->getName());
     Info.GenericParams.push_back(Param);
   }
 
@@ -303,7 +304,8 @@ static bool initDocEntityInfo(const Decl *D,
                               TypeOrExtensionDecl SynthesizedTarget,
                               const Decl *DefaultImplementationOf, bool IsRef,
                               bool IsSynthesizedExtension, DocEntityInfo &Info,
-                              StringRef Arg = StringRef()) {
+                              StringRef Arg = StringRef(),
+                              ModuleDecl *ModIfFromOverlay = nullptr){
   if (!IsRef && D->isImplicit())
     return true;
   if (!D || isa<ParamDecl>(D) ||
@@ -409,6 +411,15 @@ static bool initDocEntityInfo(const Decl *D,
         SwiftLangSupport::printFullyAnnotatedGenericReq(Sig, OS);
       }
     }
+
+    if (ModIfFromOverlay) {
+      ModuleDecl *MD = D->getModuleContext();
+      SmallVector<Identifier, 1> Bystanders;
+      ModIfFromOverlay->getAllBystandersForCrossImportOverlay(MD, Bystanders);
+      std::transform(Bystanders.begin(), Bystanders.end(),
+                     std::back_inserter(Info.RequiredBystanders),
+                     [](Identifier Bystander){ return Bystander.str().str(); });
+    }
   }
 
   switch(D->getDeclContext()->getContextKind()) {
@@ -446,7 +457,8 @@ static bool initDocEntityInfo(const TextEntity &Entity,
   if (initDocEntityInfo(Entity.Dcl, Entity.SynthesizeTarget,
                         Entity.DefaultImplementationOf,
                         /*IsRef=*/false, Entity.IsSynthesizedExtension,
-                        Info, Entity.Argument))
+                        Info, Entity.Argument,
+                        Entity.UnderlyingModIfFromOverlay))
     return true;
   Info.Offset = Entity.Range.Offset;
   Info.Length = Entity.Range.Length;
@@ -959,9 +971,19 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   AnnotatingPrinter Printer(OS);
   printModuleInterface(M, None, TraversalOptions, Printer, Options,
                        true);
-  Info.Text = OS.str();
+  Info.Text = std::string(OS.str());
   Info.TopEntities = std::move(Printer.TopEntities);
   Info.References = std::move(Printer.References);
+
+  // Add a reference to the main module on any entities from cross-import
+  // overlay modules (used to determine their bystanders later).
+  for (auto &Entity: Info.TopEntities) {
+    auto *EntityMod = Entity.Dcl->getModuleContext();
+    if (!EntityMod || EntityMod == M)
+      continue;
+    if (M->isUnderlyingModuleOfCrossImportOverlay(EntityMod))
+      Entity.UnderlyingModIfFromOverlay = M;
+  }
   return false;
 }
 
@@ -978,7 +1000,6 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
 
   ASTContext &Ctx = CI.getASTContext();
   registerIDERequestFunctions(Ctx.evaluator);
-  (void)createTypeChecker(Ctx);
 
   SourceTextInfo IFaceInfo;
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))
@@ -1080,7 +1101,7 @@ static bool getSourceTextInfo(CompilerInstance &CI,
   Walker.walk(*CI.getMainModule());
 
   CharSourceRange FullRange = SM.getRangeForBuffer(BufID);
-  Info.Text = SM.extractText(FullRange);
+  Info.Text = SM.extractText(FullRange).str();
   Info.TopEntities = std::move(Walker.TopEntities);
   Info.References = std::move(Walker.References);
   return false;
@@ -1105,9 +1126,6 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   ASTContext &Ctx = CI.getASTContext();
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
   CI.performSema();
-
-  // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(Ctx);
 
   SourceTextInfo SourceInfo;
   if (getSourceTextInfo(CI, SourceInfo))
@@ -1168,8 +1186,8 @@ public:
                          R.StartLine, R.StartColumn, R.EndLine, R.EndColumn,
                          R.ArgIndex
                        }; });
-      return {Start.first, Start.second, End.first, End.second, R.Text,
-        std::move(SubRanges)};
+      return {Start.first, Start.second, End.first,
+              End.second,  R.Text.str(), std::move(SubRanges)};
     });
     unsigned End = AllEdits.size();
     StartEnds.emplace_back(Start, End);
@@ -1456,11 +1474,8 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
     return;
   }
 
-  ASTContext &Ctx = CI.getASTContext();
-  // Setup a typechecker for protocol conformance resolving.
-  (void)createTypeChecker(Ctx);
-
   // Load standard library so that Clang importer can use it.
+  ASTContext &Ctx = CI.getASTContext();
   auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
   if (!Stdlib) {
     Error = "Cannot load stdlib.";

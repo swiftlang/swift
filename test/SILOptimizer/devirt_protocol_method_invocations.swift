@@ -277,7 +277,7 @@ extension Optional : ReabstractedP {
 // CHECK-LABEL: sil hidden [noinline] @$s34devirt_protocol_method_invocations23testReabstractedWitnessyyAA0F1P_pF : $@convention(thin) (@in_guaranteed ReabstractedP) -> () {
 // CHECK: bb0(%0 : $*ReabstractedP):
 // CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*ReabstractedP to $*@opened([[ID:.*]]) ReabstractedP
-// CHECK: [[WM:%.*]] = witness_method $@opened([[ID]]) ReabstractedP, #ReabstractedP.f!1 : <Self where Self : ReabstractedP> (Self) -> () -> (), [[OPEN]] : $*@opened([[ID]]) ReabstractedP : $@convention(witness_method: ReabstractedP) <τ_0_0 where τ_0_0 : ReabstractedP> (@in_guaranteed τ_0_0) -> ()
+// CHECK: [[WM:%.*]] = witness_method $@opened([[ID]]) ReabstractedP, #ReabstractedP.f : <Self where Self : ReabstractedP> (Self) -> () -> (), [[OPEN]] : $*@opened([[ID]]) ReabstractedP : $@convention(witness_method: ReabstractedP) <τ_0_0 where τ_0_0 : ReabstractedP> (@in_guaranteed τ_0_0) -> ()
 // CHECK: apply [[WM]]<@opened([[ID]]) ReabstractedP>([[OPEN]]) : $@convention(witness_method: ReabstractedP) <τ_0_0 where τ_0_0 : ReabstractedP> (@in_guaranteed τ_0_0) -> ()
 // CHECK-LABEL: } // end sil function '$s34devirt_protocol_method_invocations23testReabstractedWitnessyyAA0F1P_pF'
 @inline(never)

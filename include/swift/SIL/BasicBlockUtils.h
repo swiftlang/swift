@@ -71,13 +71,22 @@ public:
   DeadEndBlocks(const SILFunction *F) : F(F) {}
 
   /// Returns true if \p BB is a dead-end block.
-  bool isDeadEnd(SILBasicBlock *BB) {
+  bool isDeadEnd(const SILBasicBlock *block) {
     if (!isComputed) {
       // Lazily compute the dataflow.
       compute();
       isComputed = true;
     }
-    return ReachableBlocks.count(BB) == 0;
+    return ReachableBlocks.count(block) == 0;
+  }
+
+  bool empty() {
+    if (!isComputed) {
+      // Lazily compute the dataflow.
+      compute();
+      isComputed = true;
+    }
+    return ReachableBlocks.empty();
   }
 };
 

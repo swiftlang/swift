@@ -736,9 +736,12 @@ void EagerSpecializerTransform::run() {
 
   // Process functions in any order.
   for (auto &F : *getModule()) {
-    if (!F.shouldOptimize()) {
+    // TODO: we should support ownership here but first we'll have to support
+    // ownership in GenericFuncSpecializer.
+    if (!F.shouldOptimize() || F.hasOwnership()) {
       LLVM_DEBUG(dbgs() << "  Cannot specialize function " << F.getName()
-                        << " marked to be excluded from optimizations.\n");
+                        << " because it has ownership or is marked to be "
+                           "excluded from optimizations.\n");
       continue;
     }
     // Only specialize functions in their home module.

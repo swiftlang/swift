@@ -69,9 +69,17 @@ public:
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   const TBDGenOptions &Opts;
-  Decl* TopLevelDecl = nullptr;
+
+  /// A set of original function and derivative configuration pairs for which
+  /// derivative symbols have been emitted.
+  ///
+  /// Used to deduplicate derivative symbol emission for `@differentiable` and
+  /// `@derivative` attributes.
+  llvm::DenseSet<std::pair<AbstractFunctionDecl *, AutoDiffConfig>>
+      AddedDerivatives;
 
 private:
+  std::vector<Decl*> DeclStack;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     previousInstallNameMap;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
@@ -98,6 +106,34 @@ private:
   void addAssociatedConformanceDescriptor(AssociatedConformance conformance);
   void addBaseConformanceDescriptor(BaseConformance conformance);
 
+  /// Adds the symbol for the linear map function of the given kind associated
+  /// with the given original function and derivative function configuration.
+  void addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
+                                    AutoDiffConfig config,
+                                    AutoDiffLinearMapKind kind);
+
+  /// Adds the symbol for the autodiff function of the given kind associated
+  /// with the given original function, parameter indices, and derivative
+  /// generic signature.
+  void
+  addAutoDiffDerivativeFunction(AbstractFunctionDecl *original,
+                                IndexSubset *parameterIndices,
+                                GenericSignature derivativeGenericSignature,
+                                AutoDiffDerivativeFunctionKind kind);
+
+  /// Adds the symbol for the differentiability witness associated with the
+  /// given original function, AST parameter indices, result indices, and
+  /// derivative generic signature.
+  void addDifferentiabilityWitness(AbstractFunctionDecl *original,
+                                   IndexSubset *astParameterIndices,
+                                   IndexSubset *resultIndices,
+                                   GenericSignature derivativeGenericSignature);
+
+  /// Adds symbols associated with the given original function and
+  /// derivative function configuration.
+  void addDerivativeConfiguration(AbstractFunctionDecl *original,
+                                  AutoDiffConfig config);
+
 public:
   TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,
                 llvm::MachO::TargetList targets, StringSet *stringSymbols,
@@ -108,7 +144,7 @@ public:
         DataLayout(dataLayout), UniversalLinkInfo(universalLinkInfo),
         SwiftModule(swiftModule), Opts(opts),
         previousInstallNameMap(parsePreviousModuleInstallNameMap())  {}
-
+  ~TBDGenVisitor() { assert(DeclStack.empty()); }
   void addMainIfNecessary(FileUnit *file) {
     // HACK: 'main' is a special symbol that's always emitted in SILGen if
     //       the file has an entry point. Since it doesn't show up in the
@@ -152,6 +188,8 @@ public:
   void visitEnumElementDecl(EnumElementDecl *EED);
 
   void visitDecl(Decl *D) {}
+
+  void visit(Decl *D);
 };
 } // end namespace tbdgen
 } // end namespace swift

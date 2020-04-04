@@ -46,6 +46,7 @@
 #include "GenFunc.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -1112,8 +1113,7 @@ namespace {
     void visitConformances(DeclContext *dc) {
       llvm::SmallSetVector<ProtocolDecl *, 2> protocols;
       for (auto conformance : dc->getLocalConformances(
-                                ConformanceLookupKind::OnlyExplicit,
-                                nullptr)) {
+                                ConformanceLookupKind::OnlyExplicit)) {
         ProtocolDecl *proto = conformance->getProtocol();
         getObjCProtocols(proto, protocols);
       }
@@ -1377,9 +1377,12 @@ namespace {
       if (hasUpdater) {
         //   Class _Nullable (*metadataUpdateCallback)(Class _Nonnull cls,
         //                                             void * _Nullable arg);
-        b.add(IGM.getAddrOfObjCMetadataUpdateFunction(
+        auto *impl = IGM.getAddrOfObjCMetadataUpdateFunction(
                 TheEntity.get<ClassDecl *>(),
-                NotForDefinition));
+                NotForDefinition);
+        const auto &schema =
+          IGM.getOptions().PointerAuth.ObjCMethodListFunctionPointers;
+        b.addSignedPointer(impl, schema, PointerAuthEntity());
       }
 
       // };
@@ -2347,7 +2350,10 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
 
     // If the Objective-C runtime is new enough, we can just use the update
     // pattern unconditionally.
-    if (Context.LangOpts.doesTargetSupportObjCMetadataUpdateCallback())
+    auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(Context);
+    if (deploymentAvailability.isContainedIn(
+          Context.getObjCMetadataUpdateCallbackAvailability()))
       return ClassMetadataStrategy::Update;
 
     // Otherwise, check if we have legacy type info for backward deployment.
@@ -2438,7 +2444,11 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                       IGF.IGM.getPointerAlignment());
   auto fnPtr = IGF.emitInvariantLoad(slot);
 
-  return FunctionPointer(fnPtr, signature);
+  auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
+  auto authInfo =
+    PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
+
+  return FunctionPointer(fnPtr, authInfo, signature);
 }
 
 FunctionPointer

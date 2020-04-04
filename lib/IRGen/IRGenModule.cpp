@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/DiagnosticsIRGen.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -49,9 +50,11 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 
+#include "Callee.h"
 #include "ConformanceDescription.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
+#include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "GenType.h"
 #include "IRGenModule.h"
@@ -140,6 +143,52 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   ClangCodeGen->Initialize(ClangContext);
   return ClangCodeGen;
 }
+
+#ifndef NDEBUG
+static ValueDecl *lookupSimple(ModuleDecl *module, ArrayRef<StringRef> declPath) {
+  DeclContext *dc = module;
+  for (;; declPath = declPath.drop_front()) {
+    SmallVector<ValueDecl*, 1> results;
+    module->lookupMember(results, dc, module->getASTContext().getIdentifier(declPath.front()), Identifier());
+    if (results.size() != 1) return nullptr;
+    if (declPath.size() == 1) return results.front();
+    dc = dyn_cast<DeclContext>(results.front());
+    if (!dc) return nullptr;
+  }
+}
+
+static void checkPointerAuthWitnessDiscriminator(IRGenModule &IGM, ArrayRef<StringRef> declPath, uint16_t expected) {
+  auto &schema = IGM.getOptions().PointerAuth.ProtocolWitnesses;
+  if (!schema.isEnabled()) return;
+
+  auto decl = lookupSimple(IGM.getSwiftModule(), declPath);
+  assert(decl && "decl not found");
+  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, SILDeclRef(decl));
+  assert(discriminator->getZExtValue() == expected && "discriminator value doesn't match");
+}
+
+static void checkPointerAuthAssociatedTypeDiscriminator(IRGenModule &IGM, ArrayRef<StringRef> declPath, uint16_t expected) {
+  auto &schema = IGM.getOptions().PointerAuth.ProtocolAssociatedTypeAccessFunctions;
+  if (!schema.isEnabled()) return;
+
+  auto decl = dyn_cast_or_null<AssociatedTypeDecl>(lookupSimple(IGM.getSwiftModule(), declPath));
+  assert(decl && "decl not found");
+  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, AssociatedType(decl));
+  assert(discriminator->getZExtValue() == expected && "discriminator value doesn't match");
+}
+
+static void sanityCheckStdlib(IRGenModule &IGM) {
+  if (!IGM.getSwiftModule()->isStdlibModule()) return;
+
+  // Only run the sanity check when we're building the real stdlib.
+  if (!lookupSimple(IGM.getSwiftModule(), { "String" })) return;
+
+  checkPointerAuthAssociatedTypeDiscriminator(IGM, { "_ObjectiveCBridgeable", "_ObjectiveCType" }, SpecialPointerAuthDiscriminators::ObjectiveCTypeDiscriminator);
+  checkPointerAuthWitnessDiscriminator(IGM, { "_ObjectiveCBridgeable", "_bridgeToObjectiveC" }, SpecialPointerAuthDiscriminators::bridgeToObjectiveCDiscriminator);
+  checkPointerAuthWitnessDiscriminator(IGM, { "_ObjectiveCBridgeable", "_forceBridgeFromObjectiveC" }, SpecialPointerAuthDiscriminators::forceBridgeFromObjectiveCDiscriminator);
+  checkPointerAuthWitnessDiscriminator(IGM, { "_ObjectiveCBridgeable", "_conditionallyBridgeFromObjectiveC" }, SpecialPointerAuthDiscriminators::conditionallyBridgeFromObjectiveCDiscriminator);
+}
+#endif
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
@@ -508,6 +557,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
       ClangCodeGen->CGM());
 
+#ifndef NDEBUG
+  sanityCheckStdlib(*this);
+#endif
+
   DynamicReplacementsTy =
       llvm::StructType::get(getLLVMContext(), {Int8PtrPtrTy, Int8PtrTy});
   DynamicReplacementsPtrTy = DynamicReplacementsTy->getPointerTo(DefaultAS);
@@ -532,6 +585,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 IRGenModule::~IRGenModule() {
   destroyClangTypeConverter();
   destroyMetadataLayoutMap();
+  destroyPointerAuthCaches();
   delete &Types;
 }
 
@@ -963,6 +1017,12 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
     FuncOptMode = IRGen.Opts.OptMode;
   if (FuncOptMode == OptimizationMode::ForSize)
     Attrs.addAttribute(llvm::Attribute::MinSize);
+
+  auto triple = llvm::Triple(ClangOpts.Triple);
+  if (triple.getArchName() == "arm64e") {
+    Attrs.addAttribute("ptrauth-returns");
+    Attrs.addAttribute("ptrauth-calls");
+  }
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
@@ -976,7 +1036,7 @@ llvm::ConstantInt *IRGenModule::getInt32(uint32_t value) {
   return llvm::ConstantInt::get(Int32Ty, value);
 }
 
-llvm::Constant *IRGenModule::getSize(Size size) {
+llvm::ConstantInt *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
 }
 

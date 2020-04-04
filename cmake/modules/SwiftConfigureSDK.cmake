@@ -127,12 +127,9 @@ macro(configure_sdk_darwin
         COMMAND "xcrun" "--sdk" "${xcrun_name}" "--show-sdk-path"
         OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PATH
         OUTPUT_STRIP_TRAILING_WHITESPACE)
-    if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
-      message(FATAL_ERROR "${name} SDK not found at ${SWIFT_SDK_${prefix}_PATH}.")
-    endif()
   endif()
 
-  if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
+  if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/SDKSettings.plist")
     message(FATAL_ERROR "${name} SDK not found at SWIFT_SDK_${prefix}_PATH.")
   endif()
 

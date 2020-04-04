@@ -23,6 +23,7 @@
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DTHIN_LIBRARY -emit-dependencies-path - | %FileCheck -check-prefixes=DEPS,DEPS-MOST -DMODULE=ThinLibrary -DTARGET=%module-target-triple %s
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DFAT_LIBRARY -emit-dependencies-path - | %FileCheck -check-prefixes=DEPS,DEPS-MOST -DMODULE=FatLibrary -DTARGET=%module-target-triple %s
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DCLANG_LIBRARY -emit-dependencies-path - | %FileCheck -check-prefixes=DEPS,DEPS-MOST -DMODULE=ClangLibrary -DTARGET=%module-target-triple %s
+// RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DCLANG_LIBRARY_SUBMODULE -emit-dependencies-path - | %FileCheck -check-prefixes=DEPS,DEPS-MOST -DMODULE=ClangLibrary -DTARGET=%module-target-triple %s
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DSWIFT_FRAMEWORK -emit-dependencies-path - | %FileCheck -check-prefixes=DEPS,DEPS-MOST -DMODULE=SwiftFramework -DTARGET=%module-target-triple %s
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DCLANG_FRAMEWORK -emit-dependencies-path - | %FileCheck -check-prefixes=DEPS,DEPS-MOST -DMODULE=ClangFramework -DTARGET=%module-target-triple %s
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DOVERLAID_CLANG_FRAMEWORK -emit-dependencies-path - | %FileCheck -check-prefix=DEPS -DMODULE=OverlaidClangFramework -DTARGET=%module-target-triple %s
@@ -35,6 +36,7 @@
 // RUN: not %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDONT_ALWAYS_IMPORT -DTHIN_LIBRARY 2>/dev/null
 // RUN: not %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDONT_ALWAYS_IMPORT -DFAT_LIBRARY 2>/dev/null
 // RUN: not %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDONT_ALWAYS_IMPORT -DCLANG_LIBRARY 2>/dev/null
+// RUN: not %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDONT_ALWAYS_IMPORT -DCLANG_LIBRARY_SUBMODULE 2>/dev/null
 // RUN: not %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDONT_ALWAYS_IMPORT -DSWIFT_FRAMEWORK 2>/dev/null
 // RUN: not %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDONT_ALWAYS_IMPORT -DCLANG_FRAMEWORK 2>/dev/null
 // RUN: not %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDONT_ALWAYS_IMPORT -DOVERLAID_CLANG_FRAMEWORK 2>/dev/null
@@ -106,6 +108,10 @@ import FatLibrary
 
 #if CLANG_LIBRARY
 import ClangLibrary
+#endif
+
+#if CLANG_LIBRARY_SUBMODULE
+import ClangLibrary.Submodule
 #endif
 
 #if SWIFT_FRAMEWORK

@@ -92,6 +92,8 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
+  P.addDifferentiation();
+
   // Only run semantic arc opts if we are optimizing and if mandatory semantic
   // arc opts is explicitly enabled.
   //
@@ -356,6 +358,9 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   }
 
   P.addPerformanceConstantPropagation();
+  // Remove redundant arguments right before CSE and DCE, so that CSE and DCE
+  // can cleanup redundant and dead instructions.
+  P.addRedundantPhiElimination();
   P.addCSE();
   P.addDCE();
 
@@ -453,6 +458,9 @@ static bool addMidLevelPassPipeline(SILPassPipelinePlan &P) {
   // for CapturePropagation.
   P.addDeadArgSignatureOpt();
 
+  // A LICM pass at mid-level is mainly needed to hoist addressors of globals.
+  // It needs to be before global_init functions are inlined.
+  P.addLICM();
   // Run loop unrolling after inlining and constant propagation, because loop
   // trip counts may have became constant.
   P.addLoopUnroll();
@@ -765,82 +773,82 @@ SILPassPipelinePlan::getPassPipelineForKinds(const SILOptions &Options,
 //                Dumping And Loading Pass Pipelines from Yaml
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+struct YAMLPassPipeline {
+  std::string name;
+  std::vector<PassKind> passes;
+
+  YAMLPassPipeline() {}
+  YAMLPassPipeline(const SILPassPipeline &pipeline,
+                   SILPassPipelinePlan::PipelineKindRange pipelineKinds)
+      : name(pipeline.Name), passes() {
+    llvm::copy(pipelineKinds, std::back_inserter(passes));
+  }
+};
+
+} // end anonymous namespace
+
+namespace llvm {
+namespace yaml {
+
+template <> struct ScalarEnumerationTraits<PassKind> {
+  static void enumeration(IO &io, PassKind &value) {
+#define PASS(ID, TAG, NAME) io.enumCase(value, #TAG, PassKind::ID);
+#include "swift/SILOptimizer/PassManager/Passes.def"
+  }
+};
+
+template <> struct MappingTraits<YAMLPassPipeline> {
+  static void mapping(IO &io, YAMLPassPipeline &info) {
+    io.mapRequired("name", info.name);
+    io.mapRequired("passes", info.passes);
+  }
+};
+
+} // namespace yaml
+} // namespace llvm
+
+LLVM_YAML_IS_FLOW_SEQUENCE_VECTOR(PassKind)
+LLVM_YAML_IS_DOCUMENT_LIST_VECTOR(YAMLPassPipeline)
+
 void SILPassPipelinePlan::dump() {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
 
 void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
-  // Our pipelines yaml representation is simple, we just output it ourselves
-  // rather than use the yaml writer interface. We want to use the yaml reader
-  // interface to be resilient against slightly different forms of yaml.
-  os << "[\n";
-  interleave(getPipelines(),
-             [&](const SILPassPipeline &Pipeline) {
-               os << "    [\n";
-
-               os << "        \"" << Pipeline.Name << "\"";
-               for (PassKind Kind : getPipelinePasses(Pipeline)) {
-                 os << ",\n        [\"" << PassKindID(Kind) << "\","
-                    << "\"" << PassKindTag(Kind) << "\"]";
-               }
-             },
-             [&] { os << "\n    ],\n"; });
-  os << "\n    ]\n";
-  os << ']';
+  llvm::yaml::Output out(os);
+  std::vector<YAMLPassPipeline> data;
+  transform(getPipelines(), std::back_inserter(data),
+            [&](const SILPassPipeline &pipeline) {
+              return YAMLPassPipeline(pipeline, getPipelinePasses(pipeline));
+            });
+  out << data;
 }
 
 SILPassPipelinePlan
-SILPassPipelinePlan::getPassPipelineFromFile(const SILOptions &Options,
-                                             StringRef Filename) {
-  namespace yaml = llvm::yaml;
-  LLVM_DEBUG(llvm::dbgs() << "Parsing Pass Pipeline from " << Filename << "\n");
-
-  // Load the input file.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(Filename);
-  if (!FileBufOrErr) {
-    llvm_unreachable("Failed to read yaml file");
-  }
-
-  StringRef Buffer = FileBufOrErr->get()->getBuffer();
-  llvm::SourceMgr SM;
-  yaml::Stream Stream(Buffer, SM);
-  yaml::document_iterator DI = Stream.begin();
-  assert(DI != Stream.end() && "Failed to read a document");
-  yaml::Node *N = DI->getRoot();
-  assert(N && "Failed to find a root");
-
-  SILPassPipelinePlan P(Options);
-
-  auto *RootList = cast<yaml::SequenceNode>(N);
-  llvm::SmallVector<PassKind, 32> Passes;
-  for (yaml::Node &PipelineNode :
-       make_range(RootList->begin(), RootList->end())) {
-    Passes.clear();
-    LLVM_DEBUG(llvm::dbgs() << "New Pipeline:\n");
-
-    auto *Desc = cast<yaml::SequenceNode>(&PipelineNode);
-    yaml::SequenceNode::iterator DescIter = Desc->begin();
-    StringRef Name = cast<yaml::ScalarNode>(&*DescIter)->getRawValue();
-    LLVM_DEBUG(llvm::dbgs() << "    Name: \"" << Name << "\"\n");
-    ++DescIter;
-
-    for (auto DescEnd = Desc->end(); DescIter != DescEnd; ++DescIter) {
-      auto *InnerPassList = cast<yaml::SequenceNode>(&*DescIter);
-      auto *FirstNode = &*InnerPassList->begin();
-      StringRef PassName = cast<yaml::ScalarNode>(FirstNode)->getRawValue();
-      unsigned Size = PassName.size() - 2;
-      PassName = PassName.substr(1, Size);
-      LLVM_DEBUG(llvm::dbgs() << "    Pass: \"" << PassName << "\"\n");
-      auto Kind = PassKindFromString(PassName);
-      assert(Kind != PassKind::invalidPassKind && "Found invalid pass kind?!");
-      Passes.push_back(Kind);
+SILPassPipelinePlan::getPassPipelineFromFile(const SILOptions &options,
+                                             StringRef filename) {
+  std::vector<YAMLPassPipeline> yamlPipelines;
+  {
+    // Load the input file.
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
+        llvm::MemoryBuffer::getFileOrSTDIN(filename);
+    if (!fileBufOrErr) {
+      llvm_unreachable("Failed to read yaml file");
     }
 
-    P.startPipeline(Name);
-    P.addPasses(Passes);
+    llvm::yaml::Input in(fileBufOrErr->get()->getBuffer());
+    in >> yamlPipelines;
   }
 
-  return P;
+  SILPassPipelinePlan silPlan(options);
+
+  for (auto &pipeline : yamlPipelines) {
+    silPlan.startPipeline(pipeline.name);
+    silPlan.addPasses(pipeline.passes);
+  }
+
+  return silPlan;
 }

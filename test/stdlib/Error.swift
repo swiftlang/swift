@@ -193,7 +193,7 @@ ErrorTests.test("test dealloc empty error box") {
 
 var errors: [Error] = []
 ErrorTests.test("willThrow") {
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
     // Error isn't allowed in a @convention(c) function when ObjC interop is
     // not available, so pass it through an OpaquePointer.
     typealias WillThrow = @convention(c) (OpaquePointer) -> Void

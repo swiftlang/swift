@@ -131,7 +131,7 @@ func arrayToPointer() {
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_CONST]]<Int, UnsafePointer<Int>>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafePointer<Int> on [[OWNER]]
-  // CHECK: [[OPTPTR:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.some!enumelt.1, [[DEPENDENT]]
+  // CHECK: [[OPTPTR:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.some!enumelt, [[DEPENDENT]]
   // CHECK: [[TAKES_OPT_CONST_POINTER:%.*]] = function_ref @$s18pointer_conversion20takesOptConstPointer_3andySPySiGSg_SitF :
   // CHECK: apply [[TAKES_OPT_CONST_POINTER]]([[OPTPTR]], [[RESULT1]])
   // CHECK: destroy_value [[OWNER]]
@@ -164,7 +164,7 @@ func stringToPointer(_ s: String) {
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_STRING]]<UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: [[DEPENDENT:%.*]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]]
-  // CHECK: [[OPTPTR:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEPENDENT]]
+  // CHECK: [[OPTPTR:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt, [[DEPENDENT]]
   // CHECK: [[TAKES_OPT_CONST_RAW_POINTER:%.*]] = function_ref @$s18pointer_conversion23takesOptConstRawPointer_3andySVSg_SitF :
   // CHECK: apply [[TAKES_OPT_CONST_RAW_POINTER]]([[OPTPTR]], [[RESULT1]])
   // CHECK: destroy_value [[OWNER]]
@@ -268,7 +268,7 @@ func functionInoutToPointer() {
   // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
   var f: () -> () = {}
 
-  // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <()>
+  // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
   // CHECK: address_to_pointer [[REABSTRACT_BUF]]
   takesMutableVoidPointer(&f)
 }
@@ -308,7 +308,7 @@ func optArrayToOptPointer(array: [Int]?) {
   // CHECK:   [[COPY:%.*]] = copy_value %0
   // CHECK:   [[SIDE1:%.*]] = function_ref @$s18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
-  // CHECK:   switch_enum [[COPY]] : $Optional<Array<Int>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  // CHECK:   switch_enum [[COPY]] : $Optional<Array<Int>>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
   // CHECK: [[SOME_BB]]([[SOME_VALUE:%.*]] :
   // CHECK:   [[CONVERT:%.*]] = function_ref @$ss35_convertConstArrayToPointerArgumentyyXlSg_q_tSayxGs01_E0R_r0_lF
@@ -316,7 +316,7 @@ func optArrayToOptPointer(array: [Int]?) {
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<Int, UnsafePointer<Int>>([[TEMP:%.*]], [[SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
   // CHECK:   [[DEP:%.*]] = mark_dependence [[PTR]] : $UnsafePointer<Int> on [[OWNER]]
-  // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.some!enumelt.1, [[DEP]]
+  // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.some!enumelt, [[DEP]]
   // CHECK:   dealloc_stack [[TEMP]]
   // CHECK:   br [[CONT_BB:bb[0-9]+]]([[OPTPTR]] : $Optional<UnsafePointer<Int>>, [[OWNER]] : $Optional<AnyObject>)
   // CHECK: [[CONT_BB]]([[OPTPTR:%.*]] : $Optional<UnsafePointer<Int>>, [[OWNER:%.*]] : @owned $Optional<AnyObject>):
@@ -337,10 +337,10 @@ func optOptArrayToOptOptPointer(array: [Int]??) {
   // CHECK:   [[COPY:%.*]] = copy_value %0
   // CHECK:   [[SIDE1:%.*]] = function_ref @$s18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
-  // CHECK:   switch_enum [[COPY]] : $Optional<Optional<Array<Int>>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  // CHECK:   switch_enum [[COPY]] : $Optional<Optional<Array<Int>>>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
   // CHECK: [[SOME_BB]]([[SOME_VALUE:%.*]] :
-  // CHECK:   switch_enum [[SOME_VALUE]] : $Optional<Array<Int>>, case #Optional.some!enumelt.1: [[SOME_SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[SOME_NONE_BB:bb[0-9]+]]
+  // CHECK:   switch_enum [[SOME_VALUE]] : $Optional<Array<Int>>, case #Optional.some!enumelt: [[SOME_SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[SOME_NONE_BB:bb[0-9]+]]
   //
   // CHECK: [[SOME_SOME_BB]]([[SOME_SOME_VALUE:%.*]] :
   // CHECK:   [[CONVERT:%.*]] = function_ref @$ss35_convertConstArrayToPointerArgumentyyXlSg_q_tSayxGs01_E0R_r0_lF
@@ -348,12 +348,12 @@ func optOptArrayToOptOptPointer(array: [Int]??) {
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<Int, UnsafePointer<Int>>([[TEMP:%.*]], [[SOME_SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
   // CHECK:   [[DEP:%.*]] = mark_dependence [[PTR]] : $UnsafePointer<Int> on [[OWNER]]
-  // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.some!enumelt.1, [[DEP]]
+  // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.some!enumelt, [[DEP]]
   // CHECK:   dealloc_stack [[TEMP]]
   // CHECK:   br [[SOME_SOME_CONT_BB:bb[0-9]+]]([[OPTPTR]] : $Optional<UnsafePointer<Int>>, [[OWNER]] : $Optional<AnyObject>)
   // CHECK: [[SOME_SOME_CONT_BB]]([[OPTPTR:%.*]] : $Optional<UnsafePointer<Int>>, [[OWNER:%.*]] : @owned $Optional<AnyObject>):
   // CHECK:   [[OPTDEP:%.*]] = mark_dependence [[OPTPTR]] : $Optional<UnsafePointer<Int>> on [[OWNER]]
-  // CHECK:   [[OPTOPTPTR:%.*]] = enum $Optional<Optional<UnsafePointer<Int>>>, #Optional.some!enumelt.1, [[OPTDEP]]
+  // CHECK:   [[OPTOPTPTR:%.*]] = enum $Optional<Optional<UnsafePointer<Int>>>, #Optional.some!enumelt, [[OPTDEP]]
   // CHECK:   br [[SOME_CONT_BB:bb[0-9]+]]([[OPTOPTPTR]] : $Optional<Optional<UnsafePointer<Int>>>, [[OWNER]] : $Optional<AnyObject>)
   // CHECK: [[SOME_CONT_BB]]([[OPTOPTPTR:%.*]] : $Optional<Optional<UnsafePointer<Int>>>, [[OWNER:%.*]] : @owned $Optional<AnyObject>):
   // CHECK:   [[OPTOPTDEP:%.*]] = mark_dependence [[OPTOPTPTR]] : $Optional<Optional<UnsafePointer<Int>>> on [[OWNER]]
@@ -377,7 +377,7 @@ func optStringToOptPointer(string: String?) {
   // CHECK:   [[COPY:%.*]] = copy_value %0
   // CHECK:   [[SIDE1:%.*]] = function_ref @$s18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
-  // CHECK:   switch_enum [[COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  // CHECK:   switch_enum [[COPY]] : $Optional<String>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
   // CHECK: [[SOME_BB]]([[SOME_VALUE:%.*]] :
   // CHECK:   [[CONVERT:%.*]] = function_ref @$ss40_convertConstStringToUTF8PointerArgumentyyXlSg_xtSSs01_F0RzlF
@@ -385,7 +385,7 @@ func optStringToOptPointer(string: String?) {
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<UnsafeRawPointer>([[TEMP:%.*]], [[SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
   // CHECK:   [[DEP:%.*]] = mark_dependence [[PTR]] : $UnsafeRawPointer on [[OWNER]]
-  // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEP]]
+  // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt, [[DEP]]
   // CHECK:   dealloc_stack [[TEMP]]
   // CHECK:   br [[CONT_BB:bb[0-9]+]]([[OPTPTR]] : $Optional<UnsafeRawPointer>, [[OWNER]] : $Optional<AnyObject>)
   // CHECK: [[CONT_BB]]([[OPTPTR:%.*]] : $Optional<UnsafeRawPointer>, [[OWNER:%.*]] : @owned $Optional<AnyObject>):
@@ -407,22 +407,22 @@ func optOptStringToOptOptPointer(string: String??) {
   // CHECK:   [[SIDE1:%.*]] = function_ref @$s18pointer_conversion11sideEffect1SiyF
   // CHECK:   [[RESULT1:%.*]] = apply [[SIDE1]]()
   //   FIXME: this should really go somewhere that will make nil, not some(nil)
-  // CHECK:   switch_enum [[COPY]] : $Optional<Optional<String>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  // CHECK:   switch_enum [[COPY]] : $Optional<Optional<String>>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
   // CHECK: [[SOME_BB]]([[SOME_VALUE:%.*]] :
-  // CHECK:   switch_enum [[SOME_VALUE]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[SOME_NONE_BB:bb[0-9]+]]
+  // CHECK:   switch_enum [[SOME_VALUE]] : $Optional<String>, case #Optional.some!enumelt: [[SOME_SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[SOME_NONE_BB:bb[0-9]+]]
   // CHECK: [[SOME_SOME_BB]]([[SOME_SOME_VALUE:%.*]] :
   // CHECK:   [[CONVERT:%.*]] = function_ref @$ss40_convertConstStringToUTF8PointerArgumentyyXlSg_xtSSs01_F0RzlF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafeRawPointer
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<UnsafeRawPointer>([[TEMP:%.*]], [[SOME_SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
   // CHECK:   [[DEP:%.*]] = mark_dependence [[PTR]] : $UnsafeRawPointer on [[OWNER]]
-  // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEP]]
+  // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt, [[DEP]]
   // CHECK:   dealloc_stack [[TEMP]]
   // CHECK:   br [[SOME_SOME_CONT_BB:bb[0-9]+]]([[OPTPTR]] : $Optional<UnsafeRawPointer>, [[OWNER]] : $Optional<AnyObject>)
   // CHECK: [[SOME_SOME_CONT_BB]]([[OPTPTR:%.*]] : $Optional<UnsafeRawPointer>, [[OWNER:%.*]] : @owned $Optional<AnyObject>):
   // CHECK:   [[OPTDEP:%.*]] = mark_dependence [[OPTPTR]] : $Optional<UnsafeRawPointer> on [[OWNER]]
-  // CHECK:   [[OPTOPTPTR:%.*]] = enum $Optional<Optional<UnsafeRawPointer>>, #Optional.some!enumelt.1, [[OPTDEP]]
+  // CHECK:   [[OPTOPTPTR:%.*]] = enum $Optional<Optional<UnsafeRawPointer>>, #Optional.some!enumelt, [[OPTDEP]]
   // CHECK:   br [[SOME_CONT_BB:bb[0-9]+]]([[OPTOPTPTR]] : $Optional<Optional<UnsafeRawPointer>>, [[OWNER]] : $Optional<AnyObject>)
   // CHECK: [[SOME_CONT_BB]]([[OPTOPTPTR:%.*]] : $Optional<Optional<UnsafeRawPointer>>, [[OWNER:%.*]] : @owned $Optional<AnyObject>):
   // CHECK:   [[OPTOPTDEP:%.*]] = mark_dependence [[OPTOPTPTR]] : $Optional<Optional<UnsafeRawPointer>> on [[OWNER]]

@@ -80,6 +80,8 @@ foreach(sdk ${SWIFT_SDKS})
 
     if(${sdk} STREQUAL ANDROID)
       set(glibc_modulemap_source "bionic.modulemap.gyb")
+    elseif(${sdk} STREQUAL OPENBSD)
+      set(glibc_modulemap_source "libc-openbsd.modulemap.gyb")
     else()
       set(glibc_modulemap_source "glibc.modulemap.gyb")
     endif()

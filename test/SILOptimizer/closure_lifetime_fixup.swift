@@ -74,7 +74,7 @@ public protocol P {
 // CHECK:  [[PA2:%.*]] = partial_apply [callee_guaranteed]
 // CHECK:  [[CF2:%.*]] = convert_function [[PA2]]
 // CHECK:  [[CVT2:%.*]] = convert_escape_to_noescape [[CF2]]
-// CHECK:  [[W:%.*]] = witness_method $T, #P.subscript!modify.1
+// CHECK:  [[W:%.*]] = witness_method $T, #P.subscript!modify
 // CHECK:  ([[BUFFER:%.*]], [[TOKEN:%.*]]) = begin_apply [[W]]<T, Int>([[CVT1]], [[CVT2]], {{.*}})
 // CHECK:  end_apply [[TOKEN]]
 // CHECK:  strong_release [[CF1]]
@@ -96,11 +96,12 @@ public func dontCrash<In, Out>(test: Bool, body: @escaping ((In) -> Out, In) -> 
 }
 
 // CHECK-LABEL: sil @$s22closure_lifetime_fixup28to_stack_of_convert_function1pySvSg_tF
-// CHECK:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack]
-// CHECK:  [[MD:%.*]] = mark_dependence [[PA]]
-// CHECK:  [[CVT:%.*]] = convert_function [[MD]]
+// CHECK:  [[FN:%.*]] = function_ref @$s22closure_lifetime_fixup28to_stack_of_convert_function1pySvSg_tFSSSvcfu_ : $@convention(thin) (UnsafeMutableRawPointer) -> @owned String
+// CHECK:  [[PA:%.*]] = thin_to_thick_function [[FN]]
+// CHECK:  [[CVT:%.*]] = convert_function [[PA]]
+// CHECK:  [[CVT2:%.*]] = convert_escape_to_noescape [[CVT]]
 // CHECK:  [[REABSTRACT:%.*]] = function_ref @$sSvSSs5Error_pIgyozo_SvSSsAA_pIegnrzo_TR
-// CHECK:  [[PA2:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[REABSTRACT]]([[CVT]])
+// CHECK:  [[PA2:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[REABSTRACT]]([[CVT2]])
 // CHECK:  [[CF2:%.*]] = convert_function [[PA2]]
 // CHECK:  [[MAP:%.*]] = function_ref @$sSq3mapyqd__Sgqd__xKXEKlF
 // CHECK:  try_apply [[MAP]]<UnsafeMutableRawPointer, String>({{.*}}, [[CF2]], {{.*}})

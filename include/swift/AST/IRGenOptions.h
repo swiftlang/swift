@@ -23,6 +23,7 @@
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/OptimizationMode.h"
+#include "clang/Basic/PointerAuthOptions.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
 #include "llvm/Transforms/Instrumentation.h"
@@ -68,6 +69,59 @@ enum class IRGenEmbedMode : unsigned {
   None,
   EmbedMarker,
   EmbedBitcode
+};
+
+using clang::PointerAuthSchema;
+
+struct PointerAuthOptions : clang::PointerAuthOptions {
+  /// Native opaque function types, both thin and thick.
+  /// Never address-sensitive.
+  PointerAuthSchema SwiftFunctionPointers;
+
+  /// Swift key path helpers.
+  PointerAuthSchema KeyPaths;
+
+  /// Swift value witness functions.
+  PointerAuthSchema ValueWitnesses;
+
+  /// Swift protocol witness functions.
+  PointerAuthSchema ProtocolWitnesses;
+
+  /// Swift protocol witness table associated type metadata access functions.
+  PointerAuthSchema ProtocolAssociatedTypeAccessFunctions;
+
+  /// Swift protocol witness table associated conformance witness table
+  /// access functions.
+  PointerAuthSchema ProtocolAssociatedTypeWitnessTableAccessFunctions;
+
+  /// Swift class v-table functions.
+  PointerAuthSchema SwiftClassMethods;
+
+  /// Swift dynamic replacement implementations.
+  PointerAuthSchema SwiftDynamicReplacements;
+  PointerAuthSchema SwiftDynamicReplacementKeys;
+
+  /// Swift class v-table functions not signed with an address. This is the
+  /// return type of swift_lookUpClassMethod().
+  PointerAuthSchema SwiftClassMethodPointers;
+
+  /// Swift heap metadata destructors.
+  PointerAuthSchema HeapDestructors;
+
+  /// Non-constant function pointers captured in a partial-apply context.
+  PointerAuthSchema PartialApplyCapture;
+
+  /// Type descriptor data pointers.
+  PointerAuthSchema TypeDescriptors;
+
+  /// Type descriptor data pointers when passed as arguments.
+  PointerAuthSchema TypeDescriptorsAsArguments;
+
+  /// Resumption functions from yield-once coroutines.
+  PointerAuthSchema YieldOnceResumeFunctions;
+
+  /// Resumption functions from yield-many coroutines.
+  PointerAuthSchema YieldManyResumeFunctions;
 };
 
 /// The set of options supported by IR generation.
@@ -226,6 +280,9 @@ public:
   /// Whether to disable shadow copies for local variables on the stack. This is
   /// only used for testing.
   unsigned DisableDebuggerShadowCopies : 1;
+  
+  /// Whether to disable using mangled names for accessing concrete type metadata.
+  unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1;
 
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
@@ -235,6 +292,9 @@ public:
 
   /// Which sanitizer coverage is turned on.
   llvm::SanitizerCoverageOptions SanitizeCoverage;
+
+  /// Pointer authentication.
+  PointerAuthOptions PointerAuth;
 
   /// The different modes for dumping IRGen type info.
   enum class TypeInfoDumpFilter {
@@ -270,6 +330,7 @@ public:
         UseSwiftCall(false), UseTypeLayoutValueHandling(true), GenerateProfile(false),
         EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
+        DisableConcreteTypeMetadataMangledNameAccessors(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 

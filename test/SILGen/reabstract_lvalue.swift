@@ -19,7 +19,7 @@ func reabstractFunctionInOut() {
   // CHECK: [[THICK_ARG:%.*]] = thin_to_thick_function [[ARG]]
   // CHECK: store [[THICK_ARG:%.*]] to [init] [[PB]]
   // CHECK:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*@callee_guaranteed (Int) -> Double
-  // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Double>
+  // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Double>
   // CHECK: [[THICK_ARG:%.*]] = load [copy] [[WRITE]]
   // CHECK: [[THUNK1:%.*]] = function_ref @$sSiSdIegyd_SiSdIegnr_TR
   // CHECK: [[ABSTRACTED_ARG:%.*]] = partial_apply [callee_guaranteed] [[THUNK1]]([[THICK_ARG]])

@@ -139,6 +139,14 @@ ERROR(sdk_node_unrecognized_decl_kind,none,
 ERROR(sdk_node_unrecognized_accessor_kind,none,
       "unrecognized accessor kind '%0' in SDK node", (StringRef))
 
+// Emitted from ModuleDecl::computeMagicFileStringMap()
+WARNING(pound_source_location_creates_pound_file_conflicts,none,
+        "'#sourceLocation' directive produces '#file' string of '%0', which "
+        "conflicts with '#file' strings produced by other paths in the module",
+        (StringRef))
+NOTE(fixit_correct_source_location_file,none,
+     "change file in '#sourceLocation' to '%0'", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Circular reference diagnostics
 //------------------------------------------------------------------------------

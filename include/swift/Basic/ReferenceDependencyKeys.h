@@ -33,6 +33,36 @@ static constexpr StringLiteral dependsExternal("depends-external");
 
 static constexpr StringLiteral interfaceHash("interface-hash");
 } // end namespace reference_dependency_keys
+
+namespace fine_grained_dependencies {
+/// Encode the current sorts of dependencies as kinds of nodes in the dependency
+/// graph, splitting the current *member* into \ref member and \ref
+/// potentialMember and adding \ref sourceFileProvide.
+
+enum class NodeKind {
+  topLevel,
+  nominal,
+  /// In the status quo scheme, *member* dependencies could have blank names
+  /// for the member, to indicate that the provider might add members.
+  /// This code uses a separate kind, \ref potentialMember. The holder field is
+  /// unused.
+  potentialMember,
+  /// Corresponding to the status quo *member* dependency with a non-blank
+  /// member.
+  member,
+  dynamicLookup,
+  externalDepend,
+  sourceFileProvide,
+  /// For iterating through the NodeKinds.
+  kindCount
+};
+
+/// Used for printing out NodeKinds to dot files, and dumping nodes for
+/// debugging.
+const std::string NodeKindNames[]{
+    "topLevel",      "nominal",        "potentialMember",  "member",
+    "dynamicLookup", "externalDepend", "sourceFileProvide"};
+} // end namespace fine_grained_dependencies
 } // end namespace swift
 
 #endif

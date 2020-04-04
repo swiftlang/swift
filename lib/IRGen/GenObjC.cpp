@@ -41,6 +41,7 @@
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
@@ -512,7 +513,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(SILDeclRef method) {
 
 std::string IRGenModule::getObjCSelectorName(SILDeclRef method) {
   assert(method.isForeign);
-  return Selector(method).str();
+  return Selector(method).str().str();
 }
 
 static llvm::Value *emitSuperArgument(IRGenFunction &IGF,
@@ -898,17 +899,19 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
                                              fieldType, false);
 
   // Create the forwarding stub.
-  llvm::Function *forwarder = emitObjCPartialApplicationForwarder(IGF.IGM,
+  llvm::Value *forwarder = emitObjCPartialApplicationForwarder(IGF.IGM,
                                                                 method,
                                                                 origMethodType,
                                                                 resultType,
                                                                 layout,
                                                                 selfType);
-  llvm::Value *forwarderValue = IGF.Builder.CreateBitCast(forwarder,
-                                                          IGF.IGM.Int8PtrTy);
-  
+  forwarder =
+    IGF.IGM.getConstantSignedFunctionPointer(cast<llvm::Constant>(forwarder),
+                                             resultType);
+  forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
+
   // Emit the result explosion.
-  out.add(forwarderValue);
+  out.add(forwarder);
   out.add(data);
 }
 
@@ -1283,25 +1286,32 @@ irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   llvm_unreachable("unknown storage!");
 }
 
-static void buildMethodDescriptor(ConstantArrayBuilder &descriptors,
+static void buildMethodDescriptor(IRGenModule &IGM,
+                                  ConstantArrayBuilder &descriptors,
                                   ObjCMethodDescriptor &parts) {
   auto descriptor = descriptors.beginStruct();
   descriptor.add(parts.selectorRef);
   descriptor.add(parts.typeEncoding);
-  descriptor.add(parts.impl);
+  if (parts.impl->isNullValue()) {
+    descriptor.add(parts.impl);
+  } else {
+    descriptor.addSignedPointer(parts.impl,
+               IGM.getOptions().PointerAuth.ObjCMethodListFunctionPointers,
+                                PointerAuthEntity());
+  }
   descriptor.finishAndAddTo(descriptors);
 }
 
 static void emitObjCDescriptor(IRGenModule &IGM,
                                ConstantArrayBuilder &descriptors,
                                ObjCMethodDescriptor &descriptor) {
-  buildMethodDescriptor(descriptors, descriptor);
+  buildMethodDescriptor(IGM, descriptors, descriptor);
   auto *silFn = descriptor.silFunction;
   if (silFn && silFn->hasObjCReplacement()) {
     auto replacedSelector =
       IGM.getAddrOfObjCMethodName(silFn->getObjCReplacement().str());
     descriptor.selectorRef = replacedSelector;
-    buildMethodDescriptor(descriptors, descriptor);
+    buildMethodDescriptor(IGM, descriptors, descriptor);
   }
 }
 
@@ -1328,7 +1338,6 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
   SILDeclRef declRef = SILDeclRef(cd, 
                                   isDestroyer? SILDeclRef::Kind::IVarDestroyer
                                              : SILDeclRef::Kind::IVarInitializer,
-                                  1, 
                                   /*foreign*/ true);
   Selector selector(declRef);
   ObjCMethodDescriptor descriptor{};
@@ -1346,7 +1355,7 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
   descriptor.impl = llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 
   // Form the method_t instance.
-  buildMethodDescriptor(descriptors, descriptor);
+  buildMethodDescriptor(IGM, descriptors, descriptor);
 }
 
 llvm::Constant *

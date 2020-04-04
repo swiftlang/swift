@@ -90,7 +90,8 @@ public:
     }
 
     if (ParsedArgs.getLastArg(OPT_help)) {
-      std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
+      std::string ExecutableName =
+          llvm::sys::path::stem(MainExecutablePath).str();
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Module Wrapper", options::ModuleWrapOption, 0,
                        /*ShowAllAliases*/false);
@@ -159,7 +160,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SmallString<128> RuntimeResourcePath;
   CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
     MainExecutablePath, RuntimeResourcePath);
-  SearchPathOpts.RuntimeResourcePath = RuntimeResourcePath.str();
+  SearchPathOpts.RuntimeResourcePath = std::string(RuntimeResourcePath.str());
 
   SourceManager SrcMgr;
   TypeCheckerOptions TypeCheckOpts;

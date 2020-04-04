@@ -109,7 +109,8 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(existential)
 
   // CHECK:   [[ERROR_COPY:%.*]] = copy_value [[ERROR]] : $Error
-  // CHECK:   [[ERROR_BOX:%[0-9]+]] = open_existential_box [[ERROR_COPY]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
+  // CHECK:   [[BORROWED_ERROR_COPY:%.*]] = begin_borrow [[ERROR_COPY]]
+  // CHECK:   [[ERROR_BOX:%[0-9]+]] = open_existential_box [[BORROWED_ERROR_COPY]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
   // CHECK:   [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]]) Error
   // CHECK:   copy_addr [[ERROR_BOX]] to [initialization] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
   // CHECK:   [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF
@@ -320,12 +321,14 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(existential)
 
   // CHECK-NEXT: [[ERROR_COPY:%.*]] = copy_value [[ERROR]] : $Error
-  // CHECK-NEXT: [[ERROR_BOX:%[0-9]+]] = open_existential_box [[ERROR_COPY]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
+  // CHECK-NEXT: [[BORROWED_ERROR_COPY:%.*]] = begin_borrow [[ERROR_COPY]]
+  // CHECK-NEXT: [[ERROR_BOX:%[0-9]+]] = open_existential_box [[BORROWED_ERROR_COPY]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
   // CHECK-NEXT: [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]]) Error
   // CHECK-NEXT: copy_addr [[ERROR_BOX]] to [initialization] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
+  // CHECK-NEXT: end_borrow [[BORROWED_ERROR_COPY]]
   // CHECK: [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[BRIDGED_ERROR:%[0-9]+]] = apply [[BRIDGE_FUNCTION]]<@opened([[ERROR_ARCHETYPE]]) Error>([[ERROR_STACK]])
-  // CHECK-NEXT: [[BRIDGED_ERROR_OPT:%[0-9]+]] = enum $Optional<AnyObject>, #Optional.some!enumelt.1, [[BRIDGED_ERROR]] : $AnyObject
+  // CHECK-NEXT: [[BRIDGED_ERROR_OPT:%[0-9]+]] = enum $Optional<AnyObject>, #Optional.some!enumelt, [[BRIDGED_ERROR]] : $AnyObject
   // CHECK-NEXT: destroy_addr [[ERROR_STACK]]
   // CHECK-NEXT: dealloc_stack [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
   // CHECK-NEXT: destroy_value [[ERROR_COPY]] : $Error
@@ -362,7 +365,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   receiver.takesNullableId(knownUnbridged)
 
   // CHECK: [[OPT_STRING_COPY:%.*]] = copy_value [[OPT_STRING]]
-  // CHECK: switch_enum [[OPT_STRING_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  // CHECK: switch_enum [[OPT_STRING_COPY]] : $Optional<String>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
   // CHECK: [[SOME_BB]]([[STRING_DATA:%.*]] : @owned $String):
   // CHECK:   [[BRIDGE_STRING:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
@@ -664,7 +667,7 @@ class AnyHashableClass : NSObject {
 // CHECK: [[BRIDGE:%.*]] = function_ref @$sSq19_bridgeToObjectiveCyXlyF
 // CHECK: [[FN:%.*]] = function_ref @$sIeg_ytIegr_TR
 // CHECK: partial_apply [callee_guaranteed] [[FN]]
-// CHECK: [[SELF:%.*]] = alloc_stack $Optional<@callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <()>>
+// CHECK: [[SELF:%.*]] = alloc_stack $Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>
 // CHECK: apply [[BRIDGE]]<() -> ()>([[SELF]])
 func bridgeOptionalFunctionToAnyObject(fn: (() -> ())?) -> AnyObject {
   return fn as AnyObject
@@ -702,7 +705,7 @@ func bridgeNoPayloadEnumCase(_ receiver: NSIdLover) {
 
 // CHECK-LABEL: sil_witness_table shared [serialized] GenericOption: Hashable module objc_generics {
 // CHECK-NEXT: base_protocol Equatable: GenericOption: Equatable module objc_generics
-// CHECK-DAG: method #Hashable.hashValue!getter.1: {{.*}} : @$sSo13GenericOptionaSHSCSH9hashValueSivgTW
-// CHECK-DAG: method #Hashable.hash!1: {{.*}} : @$sSo13GenericOptionaSHSCSH4hash4intoys6HasherVz_tFTW
-// CHECK-DAG: method #Hashable._rawHashValue!1: {{.*}} : @$sSo13GenericOptionaSHSCSH13_rawHashValue4seedS2i_tFTW
+// CHECK-DAG: method #Hashable.hashValue!getter: {{.*}} : @$sSo13GenericOptionaSHSCSH9hashValueSivgTW
+// CHECK-DAG: method #Hashable.hash: {{.*}} : @$sSo13GenericOptionaSHSCSH4hash4intoys6HasherVz_tFTW
+// CHECK-DAG: method #Hashable._rawHashValue: {{.*}} : @$sSo13GenericOptionaSHSCSH13_rawHashValue4seedS2i_tFTW
 // CHECK: }

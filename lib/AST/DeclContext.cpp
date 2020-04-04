@@ -323,7 +323,7 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
                            ResilienceExpansion::Minimal);
 }
 
-llvm::Expected<ResilienceExpansion>
+ResilienceExpansion
 swift::ResilienceExpansionRequest::evaluate(Evaluator &evaluator,
                                             DeclContext *context) const {
   for (const auto *dc = context->getLocalContext(); dc && dc->isLocalContext();
@@ -918,7 +918,13 @@ Optional<std::string> IterableDeclContext::getBodyFingerprint() const {
       .fingerprint;
 }
 
-bool IterableDeclContext::areDependenciesUsingTokenHashesForTypeBodies() const {
+bool IterableDeclContext::areTokensHashedForThisBodyInsteadOfInterfaceHash()
+    const {
+  // Do not keep separate hashes for extension bodies because the dependencies
+  // can miss the addition of a member in an extension because there is nothing
+  // corresponding to the fingerprinted nominal dependency node.
+  if (isa<ExtensionDecl>(this))
+    return false;
   return getASTContext().LangOpts.EnableTypeFingerprints;
 }
 
@@ -948,14 +954,16 @@ getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
   return lastExtension ? lastExtension : DC;
 }
 
-AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
-    : Value(DC, isPrivate) {
+AccessScope::AccessScope(const DeclContext *DC, bool isPrivate, bool isSPI)
+    : Value(DC, isPrivate || isSPI) {
   if (isPrivate) {
     DC = getPrivateDeclContext(DC, DC->getParentSourceFile());
     Value.setPointer(DC);
   }
   if (!DC || isa<ModuleDecl>(DC))
     assert(!isPrivate && "public or internal scope can't be private");
+  if (DC)
+    assert(!isSPI && "only public scopes can be SPI");
 }
 
 bool AccessScope::isFileScope() const {
@@ -1072,11 +1080,12 @@ bool DeclContext::isClassConstrainedProtocolExtension() const {
 
 SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   switch (dc->getContextKind()) {
+  case DeclContextKind::Module:
+    return SourceLoc();
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::GenericTypeDecl:
-  case DeclContextKind::Module:
   case DeclContextKind::SubscriptDecl:
   case DeclContextKind::TopLevelCodeDecl:
     return extractNearestSourceLoc(dc->getAsDecl());

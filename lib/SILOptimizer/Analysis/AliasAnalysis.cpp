@@ -330,14 +330,18 @@ static bool isTypedAccessOracle(SILInstruction *I) {
 /// given value is directly derived from a memory location, it cannot
 /// alias. Call arguments also cannot alias because they must follow \@in, @out,
 /// @inout, or \@in_guaranteed conventions.
-static bool isAddressRootTBAASafe(SILValue V) {
-  if (isa<SILFunctionArgument>(V))
+static bool isAccessedAddressTBAASafe(SILValue V) {
+  if (!V->getType().isAddress())
+    return false;
+
+  SILValue accessedAddress = getAccessedAddress(V);
+  if (isa<SILFunctionArgument>(accessedAddress))
     return true;
 
-  if (auto *PtrToAddr = dyn_cast<PointerToAddressInst>(V))
+  if (auto *PtrToAddr = dyn_cast<PointerToAddressInst>(accessedAddress))
     return PtrToAddr->isStrict();
 
-  switch (V->getKind()) {
+  switch (accessedAddress->getKind()) {
   default:
     return false;
   case ValueKind::AllocStackInst:
@@ -352,6 +356,8 @@ static bool isAddressRootTBAASafe(SILValue V) {
 /// TypedAccessOracle which enable one to ascertain via undefined behavior the
 /// "true" type of the instruction.
 static SILType findTypedAccessType(SILValue V) {
+  assert(V->getType().isAddress());
+
   // First look at the origin of V and see if we have any instruction that is a
   // typed oracle.
   // TODO: MultiValueInstruction
@@ -370,7 +376,7 @@ static SILType findTypedAccessType(SILValue V) {
 }
 
 SILType swift::computeTBAAType(SILValue V) {
-  if (isAddressRootTBAASafe(getUnderlyingAddressRoot(V)))
+  if (isAccessedAddressTBAASafe(V))
     return findTypedAccessType(V);
 
   // FIXME: add ref_element_addr check here. TBAA says that objects cannot be
@@ -695,8 +701,11 @@ bool AliasAnalysis::canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr) {
       continue;
 
     // A builtin can only release an object if it can escape to one of the
-    // builtin's arguments.
-    if (EA->mayReleaseContent(Arg, Ptr))
+    // builtin's arguments. 'EscapeAnalysis::mayReleaseContent()' expects 'Arg'
+    // to be an owned reference and disallows addresses. Conservatively handle
+    // address type arguments as and conservatively treat all other values
+    // potential owned references.
+    if (Arg->getType().isAddress() || EA->mayReleaseContent(Arg, Ptr))
       return true;
   }
   return false;
@@ -741,34 +750,6 @@ bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(
   // object are irrelevant--they must already have sufficient refcount that they
   // won't be released when releasing Ptr.
   return EA->mayReleaseContent(releasedReference, accessedPointer);
-}
-
-bool swift::isLetPointer(SILValue V) {
-  // Traverse the "access" path for V and check that it starts with "let"
-  // and everything along this path is a value-type (i.e. struct or tuple).
-
-  // Is this an address of a "let" class member?
-  if (auto *REA = dyn_cast<RefElementAddrInst>(V))
-    return REA->getField()->isLet();
-
-  // Is this an address of a global "let"?
-  if (auto *GAI = dyn_cast<GlobalAddrInst>(V)) {
-    auto *GlobalDecl = GAI->getReferencedGlobal()->getDecl();
-    return GlobalDecl && GlobalDecl->isLet();
-  }
-
-  // Is this an address of a struct "let" member?
-  if (auto *SEA = dyn_cast<StructElementAddrInst>(V))
-    // Check if it is a "let" in the parent struct.
-    // Check if its parent is a "let".
-    return isLetPointer(SEA->getOperand());
-
-
-  // Check if a parent of a tuple is a "let"
-  if (auto *TEA = dyn_cast<TupleElementAddrInst>(V))
-    return isLetPointer(TEA->getOperand());
-
-  return false;
 }
 
 void AliasAnalysis::initialize(SILPassManager *PM) {

@@ -76,13 +76,11 @@ std::pair<Expr *, bool> FailureDiagnostic::computeAnchor() const {
 }
 
 Type FailureDiagnostic::getType(Expr *expr, bool wantRValue) const {
-  return resolveType(CS.getType(expr), /*reconstituteSugar=*/false,
-                     wantRValue);
+  return resolveType(S.getType(expr), /*reconstituteSugar=*/false, wantRValue);
 }
 
 Type FailureDiagnostic::getType(const TypeLoc &loc, bool wantRValue) const {
-  return resolveType(CS.getType(loc), /*reconstituteSugar=*/false,
-                     wantRValue);
+  return resolveType(S.getType(&loc), /*reconstituteSugar=*/false, wantRValue);
 }
 
 template <typename... ArgTypes>
@@ -93,7 +91,8 @@ FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
 }
 
 Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
-  return CS.getParentExpr(subExpr);
+  auto &cs = getConstraintSystem();
+  return cs.getParentExpr(subExpr);
 }
 
 Expr *
@@ -133,8 +132,7 @@ Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
 
 Optional<SelectedOverload>
 FailureDiagnostic::getChoiceFor(ConstraintLocator *locator) const {
-  auto &cs = getConstraintSystem();
-  return getOverloadChoiceIfAvailable(cs.getCalleeLocator(locator));
+  return getOverloadChoiceIfAvailable(S.getCalleeLocator(locator));
 }
 
 Type FailureDiagnostic::restoreGenericParameters(
@@ -212,8 +210,6 @@ ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
 }
 
 ValueDecl *RequirementFailure::getDeclRef() const {
-  auto &cs = getConstraintSystem();
-
   // Get a declaration associated with given type (if any).
   // This is used to retrieve affected declaration when
   // failure is in any way contextual, and declaration can't
@@ -233,7 +229,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
 
   if (isFromContextualType())
     return getAffectedDeclFromType(
-        cs.getContextualType(getLocator()->getAnchor()));
+        getContextualType(getLocator()->getAnchor()));
 
   if (auto overload = getChoiceFor(getLocator())) {
     // If there is a declaration associated with this
@@ -524,10 +520,11 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   // about missing conformance just in case.
   auto operatorID = name.getIdentifier();
 
-  auto *applyExpr = cast<ApplyExpr>(findParentExpr(anchor));
-  if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
-    auto lhsType = getType(binaryOp->getArg()->getElement(0));
-    auto rhsType = getType(binaryOp->getArg()->getElement(1));
+  auto *fnType = getType(anchor)->getAs<AnyFunctionType>();
+  auto params = fnType->getParams();
+  if (params.size() == 2) {
+    auto lhsType = params[0].getPlainType();
+    auto rhsType = params[1].getPlainType();
 
     if (lhsType->isEqual(rhsType)) {
       emitDiagnostic(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
@@ -538,7 +535,7 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
     }
   } else {
     emitDiagnostic(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
-                   operatorID.str(), getType(applyExpr->getArg()));
+                   operatorID.str(), params[0].getPlainType());
   }
 
   diagnoseAsNote();
@@ -663,6 +660,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::ClosureBody:
     case ConstraintLocator::ClosureResult: {
       diagnostic = diag::cannot_convert_closure_result;
       break;
@@ -674,6 +672,15 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
         diagnostic = getDiagnosticFor(CTP_AssignSource);
         fromType = getType(assignExpr->getSrc());
         toType = getType(assignExpr->getDest());
+      }
+      break;
+    }
+    
+    case ConstraintLocator::OptionalPayload: {
+      // If we have an inout expression, this comes from an
+      // InoutToPointer argument mismatch failure.
+      if (isa<InOutExpr>(anchor)) {
+        diagnostic = diag::cannot_convert_argument_value;
       }
       break;
     }
@@ -793,8 +800,7 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
     // Let's check whether this is a function parameter passed
     // as an argument to another function which accepts @escaping
     // function at that position.
-    auto &cs = getConstraintSystem();
-    if (auto argApplyInfo = cs.getFunctionArgApplyInfo(getLocator())) {
+    if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator())) {
       auto paramInterfaceTy = argApplyInfo->getParamInterfaceType();
       if (paramInterfaceTy->isTypeParameter()) {
         auto diagnoseGenericParamFailure = [&](GenericTypeParamDecl *decl) {
@@ -1004,8 +1010,7 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   if (!anchor || isa<InOutExpr>(anchor))
     return;
 
-  auto &cs = getConstraintSystem();
-  if (auto argApplyInfo = cs.getFunctionArgApplyInfo(getLocator()))
+  if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator()))
     if (argApplyInfo->getParameterFlags().isInOut())
       return;
 
@@ -1199,11 +1204,10 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   Expr *diagExpr = getRawAnchor();
   SourceLoc loc = diagExpr->getLoc();
 
-  auto &cs = getConstraintSystem();
   // Assignment is not allowed inside of a condition,
   // so let's not diagnose immutability, because
   // most likely the problem is related to use of `=` itself.
-  if (cs.getContextualTypePurpose(diagExpr) == CTP_Condition)
+  if (getContextualTypePurpose(diagExpr) == CTP_Condition)
     return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
@@ -1303,8 +1307,8 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     subElementDiagID = diag::assignment_lhs_is_immutable_variable;
   }
 
-  AssignmentFailure failure(diagExpr, getConstraintSystem(), loc,
-                            subElementDiagID, rvalueDiagID);
+  AssignmentFailure failure(diagExpr, getSolution(), loc, subElementDiagID,
+                            rvalueDiagID);
   return failure.diagnose();
 }
 
@@ -1425,16 +1429,14 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
   return true;
 }
 
-AssignmentFailure::AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,
+AssignmentFailure::AssignmentFailure(Expr *destExpr, const Solution &solution,
                                      SourceLoc diagnosticLoc)
-    : FailureDiagnostic(cs, cs.getConstraintLocator(destExpr)),
-      DestExpr(destExpr),
+    : FailureDiagnostic(solution, destExpr), DestExpr(destExpr),
       Loc(diagnosticLoc),
-      DeclDiagnostic(findDeclDiagonstic(cs.getASTContext(), destExpr)),
+      DeclDiagnostic(findDeclDiagonstic(getASTContext(), destExpr)),
       TypeDiagnostic(diag::assignment_lhs_not_lvalue) {}
 
 bool AssignmentFailure::diagnoseAsError() {
-  auto &cs = getConstraintSystem();
   auto *DC = getDC();
 
   // Walk through the destination expression, resolving what the problem is.  If
@@ -1459,7 +1461,7 @@ bool AssignmentFailure::diagnoseAsError() {
         std::string message = "key path is read-only";
         if (auto *SE = dyn_cast<SubscriptExpr>(immutableExpr)) {
           if (auto *DRE = dyn_cast<DeclRefExpr>(getKeyPathArgument(SE))) {
-            auto identifier = DRE->getDecl()->getBaseName().getIdentifier();
+            auto identifier = DRE->getDecl()->getBaseIdentifier();
             message =
                 "'" + identifier.str().str() + "' is a read-only key path";
           }
@@ -1572,7 +1574,7 @@ bool AssignmentFailure::diagnoseAsError() {
     // If we're trying to set an unapplied method, say that.
     if (auto *VD = choice->getDecl()) {
       std::string message = "'";
-      message += VD->getBaseName().getIdentifier().str();
+      message += VD->getBaseIdentifier().str();
       message += "'";
 
       auto diagID = DeclDiagnostic;
@@ -1637,14 +1639,14 @@ bool AssignmentFailure::diagnoseAsError() {
 
     if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn()->getValueProvidingExpr()))
       name = std::string("'") +
-             DRE->getDecl()->getBaseName().getIdentifier().str().str() + "'";
+             DRE->getDecl()->getBaseIdentifier().str().str() + "'";
 
     emitDiagnostic(Loc, DeclDiagnostic, name + " returns immutable value")
         .highlight(AE->getSourceRange());
     return true;
   }
 
-  if (auto contextualType = cs.getContextualType(immutableExpr)) {
+  if (auto contextualType = getContextualType(immutableExpr)) {
     Type neededType = contextualType->getInOutObjectType();
     Type actualType = getType(immutableExpr)->getInOutObjectType();
     if (!neededType->isEqual(actualType)) {
@@ -1878,6 +1880,18 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseCoercionToUnrelatedType())
       return true;
 
+    if (isa<OptionalTryExpr>(anchor)) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_convert_initializer_value,
+                     getFromType(), getToType());
+      return true;
+    }
+
+    if (isa<AssignExpr>(anchor)) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_convert_assign,
+                     getFromType(), getToType());
+      return true;
+    }
+
     return false;
   }
 
@@ -1899,6 +1913,7 @@ bool ContextualFailure::diagnoseAsError() {
 
   Diag<Type, Type> diagnostic;
   switch (path.back().getKind()) {
+  case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
     auto *closure = cast<ClosureExpr>(getRawAnchor());
     if (closure->hasExplicitResultType() &&
@@ -1952,7 +1967,8 @@ bool ContextualFailure::diagnoseAsError() {
       auto objectType = fromType->getOptionalObjectType();
       if (objectType->isEqual(toType)) {
         auto &cs = getConstraintSystem();
-        MissingOptionalUnwrapFailure failure(cs, getType(anchor), toType,
+        MissingOptionalUnwrapFailure failure(getSolution(), getType(anchor),
+                                             toType,
                                              cs.getConstraintLocator(anchor));
         if (failure.diagnoseAsError())
           return true;
@@ -2119,7 +2135,6 @@ bool ContextualFailure::diagnoseConversionToNil() const {
   if (!isa<NilLiteralExpr>(anchor))
     return false;
 
-  auto &cs = getConstraintSystem();
   auto *locator = getLocator();
 
   Optional<ContextualTypePurpose> CTP;
@@ -2205,8 +2220,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
   emitDiagnostic(anchor->getLoc(), *diagnostic, getToType());
 
   if (CTP == CTP_Initialization) {
-    auto *patternTR =
-      cs.getContextualTypeLoc(locator->getAnchor()).getTypeRepr();
+    auto *patternTR = getContextualTypeLoc(locator->getAnchor()).getTypeRepr();
     if (!patternTR)
       return true;
 
@@ -2940,11 +2954,9 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 bool TupleContextualFailure::diagnoseAsError() {
   Diag<Type, Type> diagnostic;
   auto purpose = getContextualTypePurpose();
-  auto &cs = getConstraintSystem();
   if (isNumElementsMismatch())
     diagnostic = diag::tuple_types_not_convertible_nelts;
-  else if ((purpose == CTP_Initialization) &&
-           !cs.getContextualType(getAnchor()))
+  else if ((purpose == CTP_Initialization) && !getContextualType(getAnchor()))
     diagnostic = diag::tuple_types_not_convertible;
   else if (auto diag = getDiagnosticFor(purpose, getToType()))
     diagnostic = *diag;
@@ -3037,9 +3049,8 @@ bool MissingCallFailure::diagnoseAsError() {
     }
 
     case ConstraintLocator::AutoclosureResult: {
-      auto &cs = getConstraintSystem();
       auto loc = getConstraintLocator(getRawAnchor(), path.drop_back());
-      AutoClosureForwardingFailure failure(cs, loc);
+      AutoClosureForwardingFailure failure(getSolution(), loc);
       return failure.diagnoseAsError();
     }
     default:
@@ -3049,7 +3060,7 @@ bool MissingCallFailure::diagnoseAsError() {
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
     emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function,
-                   DRE->getDecl()->getBaseName().getIdentifier())
+                   DRE->getDecl()->getBaseIdentifier())
         .fixItInsertAfter(insertLoc, "()");
     return true;
   }
@@ -3064,7 +3075,7 @@ bool MissingCallFailure::diagnoseAsError() {
   if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(baseExpr)) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
       emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_method,
-                     DRE->getDecl()->getBaseName().getIdentifier())
+                     DRE->getDecl()->getBaseIdentifier())
           .fixItInsertAfter(insertLoc, "()");
       return true;
     }
@@ -3189,7 +3200,7 @@ DeclName MissingMemberFailure::findCorrectEnumCaseName(
   auto candidate =
       corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
         return (isa<EnumElementDecl>(candidate) &&
-                candidate->getFullName().getBaseIdentifier().str().equals_lower(
+                candidate->getBaseIdentifier().str().equals_lower(
                     memberName.getBaseIdentifier().str()));
       });
   return (candidate ? candidate->getFullName() : DeclName());
@@ -3490,7 +3501,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         OverloadChoice choice = selection->choice;
         if (choice.isDecl() && isMutable(choice.getDecl()) &&
             !isCallArgument(initCall) &&
-            cs.getContextualTypePurpose(getRootExpr(ctorRef)) == CTP_Unused) {
+            getContextualTypePurpose(getRootExpr(ctorRef)) == CTP_Unused) {
           auto fixItLoc = ctorRef->getBase()->getSourceRange().End;
           emitDiagnostic(loc, diag::init_not_instance_member_use_assignment)
               .fixItInsertAfter(fixItLoc, " = ");
@@ -3648,7 +3659,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // components, let's provide a tailored diagnostic and return because
     // that is unsupported so there is no fix-it.
     if (locator->isForKeyPathComponent()) {
-      InvalidStaticMemberRefInKeyPath failure(cs, Member, locator);
+      InvalidStaticMemberRefInKeyPath failure(getSolution(), Member, locator);
       return failure.diagnoseAsError();
     }
 
@@ -3673,12 +3684,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // Determine the contextual type of the expression
-    Type contextualType;
-    for (auto iterateCS = &cs; contextualType.isNull() && iterateCS;
-         iterateCS = iterateCS->baseCS) {
-      contextualType = iterateCS->getContextualType(getRawAnchor());
-    }
-    
+    Type contextualType = getContextualType(getRawAnchor());
     // Try to provide a fix-it that only contains a '.'
     if (contextualType && baseTy->isEqual(contextualType)) {
       Diag->fixItInsert(loc, ".");
@@ -3688,11 +3694,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // Check if the expression is the matching operator ~=, most often used in
     // case statements. If so, try to provide a single dot fix-it
     const Expr *contextualTypeNode = getRootExpr(getAnchor());
-    ConstraintSystem *lastCS = nullptr;
-    for (auto iterateCS = &cs; iterateCS; iterateCS = iterateCS->baseCS) {
-      lastCS = iterateCS;
-    }
-    
+
     // The '~=' operator is an overloaded decl ref inside a binaryExpr
     if (auto binaryExpr = dyn_cast<BinaryExpr>(contextualTypeNode)) {
       if (auto overloadedFn
@@ -3707,7 +3709,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
             // If the rhs of '~=' is the enum type, a single dot suffixes
             // since the type can be inferred
             Type secondArgType =
-            lastCS->getType(binaryExpr->getArg()->getElement(1));
+                cs.getType(binaryExpr->getArg()->getElement(1));
             if (secondArgType->isEqual(baseTy)) {
               Diag->fixItInsert(loc, ".");
               return true;
@@ -3718,15 +3720,19 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // Fall back to a fix-it with a full type qualifier
-    if (auto *NTD = Member->getDeclContext()->getSelfNominalTypeDecl()) {
-      auto type = NTD->getSelfInterfaceType();
-      if (auto *SE = dyn_cast<SubscriptExpr>(getRawAnchor())) {
-        auto *baseExpr = SE->getBase();
-        Diag->fixItReplace(baseExpr->getSourceRange(), diag::replace_with_type,
-                           type);
-      } else {
-        Diag->fixItInsert(loc, diag::insert_type_qualification, type);
-      }
+    const Expr *baseExpr = nullptr;
+    if (const auto SE = dyn_cast<SubscriptExpr>(getRawAnchor()))
+      baseExpr = SE->getBase();
+    else if (const auto UDE = dyn_cast<UnresolvedDotExpr>(getRawAnchor()))
+      baseExpr = UDE->getBase();
+
+    // An implicit 'self' reference base expression means we should
+    // prepend with qualification.
+    if (baseExpr && !baseExpr->isImplicit()) {
+      Diag->fixItReplace(baseExpr->getSourceRange(),
+                         diag::replace_with_type, baseTy);
+    } else {
+      Diag->fixItInsert(loc, diag::insert_type_qualification, baseTy);
     }
 
     return true;
@@ -3791,18 +3797,18 @@ bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
 }
 
 bool MissingArgumentsFailure::diagnoseAsError() {
-  auto &cs = getConstraintSystem();
   auto *locator = getLocator();
 
   if (!(locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
         locator->isLastElement<LocatorPathElt::ContextualType>() ||
         locator->isLastElement<LocatorPathElt::ApplyArgument>() ||
-        locator->isLastElement<LocatorPathElt::ClosureResult>()))
+        locator->isLastElement<LocatorPathElt::ClosureResult>() ||
+        locator->isLastElement<LocatorPathElt::ClosureBody>()))
     return false;
 
   // If this is a misplaced `missng argument` situation, it would be
   // diagnosed by invalid conversion fix.
-  if (isMisplacedMissingArgument(cs, locator))
+  if (isMisplacedMissingArgument(getSolution(), locator))
     return false;
 
   auto *anchor = getAnchor();
@@ -3822,7 +3828,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // foo(bar) // `() -> Void` vs. `(Int) -> Void`
   // ```
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    auto info = *(cs.getFunctionArgApplyInfo(locator));
+    auto info = *(getFunctionArgApplyInfo(locator));
 
     auto *argExpr = info.getArgExpr();
     emitDiagnostic(argExpr->getLoc(), diag::cannot_convert_argument_value,
@@ -3838,10 +3844,9 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // let _: (Int) -> Void = foo
   // ```
   if (locator->isLastElement<LocatorPathElt::ContextualType>()) {
-    auto &cs = getConstraintSystem();
     emitDiagnostic(anchor->getLoc(), diag::cannot_convert_initializer_value,
                    getType(anchor),
-                   resolveType(cs.getContextualType(getAnchor())));
+                   resolveType(getContextualType(getAnchor())));
     // TODO: It would be great so somehow point out which arguments are missing.
     return true;
   }
@@ -3862,15 +3867,13 @@ bool MissingArgumentsFailure::diagnoseAsError() {
 
   interleave(
       SynthesizedArgs,
-      [&](const AnyFunctionType::Param &arg) {
+      [&](const std::pair<unsigned, AnyFunctionType::Param> &e) {
+        const auto paramIdx = e.first;
+        const auto &arg = e.second;
+
         if (arg.hasLabel()) {
           arguments << "'" << arg.getLabel().str() << "'";
         } else {
-          auto *typeVar = arg.getPlainType()->castTo<TypeVariableType>();
-          auto *locator = typeVar->getImpl().getLocator();
-          auto paramIdx = locator->findLast<LocatorPathElt::ApplyArgToParam>()
-                              ->getParamIdx();
-
           arguments << "#" << (paramIdx + 1);
         }
       },
@@ -3894,7 +3897,9 @@ bool MissingArgumentsFailure::diagnoseAsError() {
     llvm::raw_svector_ostream fixIt(scratch);
     interleave(
         SynthesizedArgs,
-        [&](const AnyFunctionType::Param &arg) { forFixIt(fixIt, arg); },
+        [&](const std::pair<unsigned, AnyFunctionType::Param> &arg) {
+          forFixIt(fixIt, arg.second);
+        },
         [&] { fixIt << ", "; });
 
     auto *tuple = cast<TupleExpr>(argExpr);
@@ -3939,11 +3944,8 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
     return false;
 
   const auto &argument = SynthesizedArgs.front();
-  auto *argType = argument.getPlainType()->castTo<TypeVariableType>();
-  auto *argLocator = argType->getImpl().getLocator();
-  auto position =
-      argLocator->findLast<LocatorPathElt::ApplyArgToParam>()->getParamIdx();
-  auto label = argument.getLabel();
+  auto position = argument.first;
+  auto label = argument.second.getLabel();
 
   SmallString<32> insertBuf;
   llvm::raw_svector_ostream insertText(insertBuf);
@@ -3951,7 +3953,7 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   if (position != 0)
     insertText << ", ";
 
-  forFixIt(insertText, argument);
+  forFixIt(insertText, argument.second);
 
   Expr *fnExpr = nullptr;
   Expr *argExpr = nullptr;
@@ -4048,20 +4050,20 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
 }
 
 bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
-  auto &cs = getConstraintSystem();
   FunctionType *funcType = nullptr;
 
   auto *locator = getLocator();
   if (locator->isForContextualType()) {
-    funcType = cs.getContextualType(locator->getAnchor())->getAs<FunctionType>();
-  } else if (auto info = cs.getFunctionArgApplyInfo(locator)) {
+    funcType = getContextualType(locator->getAnchor())->getAs<FunctionType>();
+  } else if (auto info = getFunctionArgApplyInfo(locator)) {
     auto paramType = info->getParamType();
     // Drop a single layer of optionality because argument could get injected
     // into optional and that doesn't contribute to the problem.
     if (auto objectType = paramType->getOptionalObjectType())
       paramType = objectType;
     funcType = paramType->getAs<FunctionType>();
-  } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
+  } else if (locator->isLastElement<LocatorPathElt::ClosureResult>() ||
+             locator->isLastElement<LocatorPathElt::ClosureBody>()) {
     // Based on the locator we know this this is something like this:
     // `let _: () -> ((Int) -> Void) = { return {} }`.
     funcType = getType(getRawAnchor())
@@ -4203,30 +4205,31 @@ bool MissingArgumentsFailure::isPropertyWrapperInitialization() const {
 }
 
 bool MissingArgumentsFailure::isMisplacedMissingArgument(
-    ConstraintSystem &cs, ConstraintLocator *locator) {
-  auto *calleeLocator = cs.getCalleeLocator(locator);
-  auto overloadChoice = cs.findSelectedOverloadFor(calleeLocator);
+    const Solution &solution, ConstraintLocator *locator) {
+  auto *calleeLocator = solution.getCalleeLocator(locator);
+  auto overloadChoice = solution.getOverloadChoiceIfAvailable(calleeLocator);
   if (!overloadChoice)
     return false;
 
   auto *fnType =
-      cs.simplifyType(overloadChoice->openedType)->getAs<FunctionType>();
+      solution.simplifyType(overloadChoice->openedType)->getAs<FunctionType>();
   if (!(fnType && fnType->getNumParams() == 2))
     return false;
 
   auto *anchor = locator->getAnchor();
 
   auto hasFixFor = [&](FixKind kind, ConstraintLocator *locator) -> bool {
-    auto fix = llvm::find_if(cs.getFixes(), [&](const ConstraintFix *fix) {
+    auto fix = llvm::find_if(solution.Fixes, [&](const ConstraintFix *fix) {
       return fix->getLocator() == locator;
     });
 
-    if (fix == cs.getFixes().end())
+    if (fix == solution.Fixes.end())
       return false;
 
     return (*fix)->getKind() == kind;
   };
 
+  auto &cs = solution.getConstraintSystem();
   auto *callLocator =
       cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument);
 
@@ -4257,7 +4260,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
     argument = tuple->getElement(0);
   }
 
-  auto argType = cs.simplifyType(cs.getType(argument));
+  auto argType = solution.simplifyType(solution.getType(argument));
   auto paramType = fnType->getParams()[1].getPlainType();
 
   return TypeChecker::isConvertibleTo(argType, paramType, cs.DC);
@@ -4790,8 +4793,7 @@ SourceLoc InvalidUseOfAddressOf::getLoc() const {
 }
 
 bool InvalidUseOfAddressOf::diagnoseAsError() {
-  auto &cs = getConstraintSystem();
-  if (auto argApplyInfo = cs.getFunctionArgApplyInfo(getLocator())) {
+  if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator())) {
     if (!argApplyInfo->getParameterFlags().isInOut()) {
       auto anchor = getAnchor();
       emitDiagnostic(anchor->getLoc(), diag::extra_address_of, getToType())
@@ -4817,7 +4819,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
     // because certain decls will have empty name (like setters).
     if (FD->getBodyResultTypeLoc().getLoc().isInvalid() &&
         FD->getParameters()->getStartLoc().isValid() &&
-        !FD->getName().empty()) {
+        !FD->getBaseIdentifier().empty()) {
       auto fixItLoc = Lexer::getLocForEndOfToken(
           getASTContext().SourceMgr, FD->getParameters()->getEndLoc());
       emitDiagnostic(anchor->getLoc(), diag::add_return_type_note)
@@ -4863,12 +4865,27 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   }
 
   if (locator->isForSequenceElementType()) {
-    diagnostic.emplace(
-        emitDiagnostic(anchor->getLoc(),
-                       contextualType->isExistentialType()
-                           ? diag::cannot_convert_sequence_element_protocol
-                           : diag::cannot_convert_sequence_element_value,
-                       eltType, contextualType));
+    auto &cs = getConstraintSystem();
+    // If this is a conversion failure related to binding of `for-each`
+    // statement it has to be diagnosed as pattern match if there are
+    // holes present in the contextual type.
+    if (cs.getContextualTypePurpose(anchor) ==
+            ContextualTypePurpose::CTP_ForEachStmt &&
+        contextualType->hasHole()) {
+      diagnostic.emplace(emitDiagnostic(
+          anchor->getLoc(),
+          (contextualType->is<TupleType>() && !eltType->is<TupleType>())
+              ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
+              : diag::cannot_match_unresolved_expr_pattern_with_value,
+          eltType));
+    } else {
+      diagnostic.emplace(
+          emitDiagnostic(anchor->getLoc(),
+                         contextualType->isExistentialType()
+                             ? diag::cannot_convert_sequence_element_protocol
+                             : diag::cannot_convert_sequence_element_value,
+                         eltType, contextualType));
+    }
   }
 
   if (!diagnostic)
@@ -5212,8 +5229,8 @@ bool MutatingMemberRefOnImmutableBase::diagnoseAsError() {
     }
   }
 
-  auto &cs = getConstraintSystem();
-  AssignmentFailure failure(baseExpr, cs, anchor->getLoc(), diagIDsubelt,
+  const auto &solution = getSolution();
+  AssignmentFailure failure(baseExpr, solution, anchor->getLoc(), diagIDsubelt,
                             diagIDmember);
   return failure.diagnoseAsError();
 }
@@ -5307,19 +5324,18 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 }
 
 bool InOutConversionFailure::diagnoseAsError() {
-  auto &cs = getConstraintSystem();
   auto *anchor = getAnchor();
   auto *locator = getLocator();
   auto path = locator->getPath();
 
   if (!path.empty() &&
       path.back().getKind() == ConstraintLocator::FunctionArgument) {
-    if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
+    if (auto argApplyInfo = getFunctionArgApplyInfo(locator)) {
       emitDiagnostic(anchor->getLoc(), diag::cannot_convert_argument_value,
           argApplyInfo->getArgType(), argApplyInfo->getParamType());
     } else {
       assert(locator->findLast<LocatorPathElt::ContextualType>());
-      auto contextualType = cs.getContextualType(anchor);
+      auto contextualType = getContextualType(anchor);
       auto purpose = getContextualTypePurpose();
       auto diagnostic = getDiagnosticFor(purpose, contextualType);
 
@@ -5503,7 +5519,7 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
   // comparison with nil is illegal, albeit for different reasons spelled
   // out by the diagnosis.
   if (isa<NilLiteralExpr>(lhs) || isa<NilLiteralExpr>(rhs)) {
-    std::string revisedName = name.str();
+    std::string revisedName = std::string(name);
     revisedName.pop_back();
 
     auto loc = binaryOp->getLoc();
@@ -5613,26 +5629,21 @@ bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {
 }
 
 bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
-  auto &cs = getConstraintSystem();
+  const auto &solution = getSolution();
   auto *locator = getLocator();
 
-  if (!MissingArgumentsFailure::isMisplacedMissingArgument(cs, locator))
+  if (!MissingArgumentsFailure::isMisplacedMissingArgument(solution, locator))
     return false;
-
-  auto *argType = cs.createTypeVariable(
-      cs.getConstraintLocator(locator, LocatorPathElt::SynthesizedArgument(1)),
-      /*flags=*/0);
 
   // Assign new type variable to a type of a parameter.
   auto *fnType = getFnType();
   const auto &param = fnType->getParams()[0];
-  cs.assignFixedType(argType, param.getOldType());
 
   auto *anchor = getRawAnchor();
 
   MissingArgumentsFailure failure(
-      cs, {param.withType(argType)},
-      cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument));
+      solution, {std::make_pair(0, param)},
+      getConstraintLocator(anchor, ConstraintLocator::ApplyArgument));
 
   return failure.diagnoseSingleMissingArgument();
 }
@@ -5729,7 +5740,7 @@ bool ExtraneousCallFailure::diagnoseAsError() {
       if (auto *enumCase = dyn_cast<EnumElementDecl>(decl)) {
         auto diagnostic = emitDiagnostic(
             anchor->getLoc(), diag::unexpected_arguments_in_enum_case,
-            enumCase->getName());
+            enumCase->getBaseIdentifier());
         removeParensFixIt(diagnostic);
         return true;
       }
@@ -6032,8 +6043,6 @@ bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
 
 bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
-  auto &cs = getConstraintSystem();
-
   // Member reference could be wrapped into a number of parens
   // e.g. `((.foo))`.
   auto *parentExpr = findParentExpr(anchor);
@@ -6045,7 +6054,7 @@ bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
       break;
   } while ((parentExpr = findParentExpr(parentExpr)));
 
-  auto diagnostic = parentExpr || cs.getContextualType(anchor)
+  auto diagnostic = parentExpr || getContextualType(anchor)
                         ? diag::cannot_infer_base_of_unresolved_member
                         : diag::unresolved_member_no_inference;
 

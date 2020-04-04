@@ -109,7 +109,7 @@ extension String {
     ) throws -> Int
   ) rethrows -> String {
     let result = try __StringStorage.create(
-      uninitializedCapacity: capacity,
+      uninitializedCodeUnitCapacity: capacity,
       initializingUncheckedUTF8With: initializer)
     
     switch validateUTF8(result.codeUnits) {

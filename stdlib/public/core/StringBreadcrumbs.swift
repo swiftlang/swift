@@ -13,16 +13,16 @@
 
 // @opaque
 internal final class _StringBreadcrumbs {
-  static var breadcrumbStride: Int { return 32 }
+  internal static var breadcrumbStride: Int { 64 }
 
-  var utf16Length: Int
+  internal var utf16Length: Int
 
   // TODO: does this need to be a pair?.... Can we be smaller than Int?
-  var crumbs: [String.Index]
+  internal var crumbs: [String.Index]
 
   // TODO: Does this need to be inout, unique, or how will we be enforcing
   // atomicity?
-  init(_ str: String) {
+  internal init(_ str: String) {
     let stride = _StringBreadcrumbs.breadcrumbStride
 
     self.crumbs = []
@@ -62,7 +62,7 @@ internal final class _StringBreadcrumbs {
 }
 
 extension _StringBreadcrumbs {
-  var stride: Int {
+  internal var stride: Int {
     @inline(__always) get { return _StringBreadcrumbs.breadcrumbStride }
   }
 
@@ -108,37 +108,3 @@ extension _StringBreadcrumbs {
   #endif // INTERNAL_CHECKS_ENABLED
 }
 
-extension _StringGuts {
-  @_effects(releasenone)
-  internal func getBreadcrumbsPtr() -> UnsafePointer<_StringBreadcrumbs> {
-    _internalInvariant(hasBreadcrumbs)
-
-    let mutPtr: UnsafeMutablePointer<_StringBreadcrumbs?>
-    if hasNativeStorage {
-      mutPtr = _object.nativeStorage._breadcrumbsAddress
-    } else {
-      mutPtr = UnsafeMutablePointer(
-        Builtin.addressof(&_object.sharedStorage._breadcrumbs))
-    }
-
-    if _slowPath(mutPtr.pointee == nil) {
-      populateBreadcrumbs(mutPtr)
-    }
-
-    _internalInvariant(mutPtr.pointee != nil)
-    // assuming optional class reference and class reference can alias
-    return UnsafeRawPointer(mutPtr).assumingMemoryBound(to: _StringBreadcrumbs.self)
-  }
-
-  @inline(never) // slow-path
-  @_effects(releasenone)
-  internal func populateBreadcrumbs(
-    _ mutPtr: UnsafeMutablePointer<_StringBreadcrumbs?>
-  ) {
-    // Thread-safe compare-and-swap
-    let crumbs = _StringBreadcrumbs(String(self))
-    _stdlib_atomicInitializeARCRef(
-      object: UnsafeMutableRawPointer(mutPtr).assumingMemoryBound(to: Optional<AnyObject>.self), 
-      desired: crumbs)
-  }
-}

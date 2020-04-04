@@ -294,6 +294,10 @@ public:
   ManagedValue createOpenExistentialBoxValue(SILLocation loc,
                                           ManagedValue original, SILType type);
 
+  using SILBuilder::createOpenExistentialBox;
+  ManagedValue createOpenExistentialBox(SILLocation loc, ManagedValue original,
+                                        SILType type);
+
   using SILBuilder::createOpenExistentialMetatype;
   ManagedValue createOpenExistentialMetatype(SILLocation loc,
                                              ManagedValue value,

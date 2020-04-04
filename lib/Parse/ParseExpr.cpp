@@ -46,8 +46,8 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
   SyntaxParsingContext ExprParsingContext(SyntaxContext, SyntaxContextKind::Expr);
 
   // If we are parsing a refutable pattern, check to see if this is the start
-  // of a let/var/is pattern.  If so, parse it to an UnresolvedPatternExpr and
-  // name binding will perform final validation.
+  // of a let/var/is pattern.  If so, parse it as an UnresolvedPatternExpr and
+  // let pattern type checking determine its final form.
   //
   // Only do this if we're parsing a pattern, to improve QoI on malformed
   // expressions followed by (e.g.) let/var decls.
@@ -62,14 +62,8 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
     return makeParserResult(new (Context) UnresolvedPatternExpr(pattern.get()));
   }
   
-  auto expr = parseExprSequence(Message, isExprBasic,
+  return parseExprSequence(Message, isExprBasic,
                                 /*forConditionalDirective*/false);
-  if (expr.hasCodeCompletion())
-    return expr;
-  if (expr.isNull())
-    return nullptr;
-  
-  return makeParserResult(expr.get());
 }
 
 /// parseExprIs
@@ -173,7 +167,7 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
 
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
-  bool HasCodeCompletion = false;
+  ParserStatus SequenceStatus;
   bool PendingTernary = false;
 
   while (true) {
@@ -183,20 +177,18 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
     // Parse a unary expression.
     ParserResult<Expr> Primary =
       parseExprSequenceElement(Message, isExprBasic);
+    SequenceStatus |= Primary;
 
-    if (Primary.hasCodeCompletion()) {
-      HasCodeCompletion = true;
-      if (CodeCompletion)
+    if (SequenceStatus.hasCodeCompletion() && CodeCompletion)
         CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
-    }
+
     if (Primary.isNull()) {
-      if (HasCodeCompletion) {
+      if (SequenceStatus.hasCodeCompletion()) {
         SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
         break;
       }
-      return Primary;
+      return nullptr;
     }
-
     SequencedExprs.push_back(Primary.get());
 
     // We know we can make a syntax node for ternary expression.
@@ -204,6 +196,9 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       SyntaxContext->createNodeInPlace(SyntaxKind::TernaryExpr);
       PendingTernary = false;
     }
+
+    if (SequenceStatus.isError() && !SequenceStatus.hasCodeCompletion())
+      break;
 
     if (isForConditionalDirective && Tok.isAtStartOfLine())
       break;
@@ -242,9 +237,8 @@ parse_operator:
       // Parse the middle expression of the ternary.
       ParserResult<Expr> middle =
           parseExprSequence(diag::expected_expr_after_if_question, isExprBasic);
+      SequenceStatus |= middle;
       ParserStatus Status = middle;
-      if (middle.hasCodeCompletion())
-        HasCodeCompletion = true;
       if (middle.isNull())
         return nullptr;
 
@@ -304,6 +298,7 @@ parse_operator:
       
       // Store the expr itself as a placeholder RHS. The real RHS is the
       // type parameter stored in the node itself.
+      SequenceStatus |= is;
       SequencedExprs.push_back(is.get());
       SequencedExprs.push_back(is.get());
       
@@ -320,6 +315,7 @@ parse_operator:
         
       // Store the expr itself as a placeholder RHS. The real RHS is the
       // type parameter stored in the node itself.
+      SequenceStatus |= as;
       SequencedExprs.push_back(as.get());
       SequencedExprs.push_back(as.get());
       
@@ -334,6 +330,7 @@ parse_operator:
       ParserResult<Expr> arrow = parseExprArrow();
       if (arrow.isNull() || arrow.hasCodeCompletion())
         return arrow;
+      SequenceStatus |= arrow;
       SequencedExprs.push_back(arrow.get());
       break;
     }
@@ -356,19 +353,13 @@ done:
   assert(!SequencedExprs.empty());
 
   // If we saw no operators, don't build a sequence.
-  if (SequencedExprs.size() == 1) {
-    auto Result = makeParserResult(SequencedExprs[0]);
-    if (HasCodeCompletion)
-      Result.setHasCodeCompletion();
-    return Result;
-  }
+  if (SequencedExprs.size() == 1)
+    return makeParserResult(SequenceStatus, SequencedExprs[0]);
 
   ExprSequnceContext.createNodeInPlace(SyntaxKind::ExprList);
   ExprSequnceContext.setCreateSyntax(SyntaxKind::SequenceExpr);
-  auto Result = makeParserResult(SequenceExpr::create(Context, SequencedExprs));
-  if (HasCodeCompletion)
-    Result.setHasCodeCompletion();
-  return Result;
+  return makeParserResult(SequenceStatus,
+                          SequenceExpr::create(Context, SequencedExprs));
 }
 
 /// parseExprSequenceElement
@@ -568,9 +559,12 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
 
   // FIXME: diagnostics
   ParserResult<Expr> rootResult, pathResult;
+  ParserStatus parseStatus;
+
   if (!startsWithSymbol(Tok, '.')) {
     rootResult = parseExprPostfix(diag::expr_keypath_expected_expr,
                                   /*isBasic=*/true);
+    parseStatus = rootResult;
 
     if (rootResult.isParseError())
       return rootResult;
@@ -600,10 +594,11 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     pathResult = parseExprPostfixSuffix(inner, /*isExprBasic=*/true,
                                         /*periodHasKeyPathBehavior=*/false,
                                         unusedHasBindOptional);
+    parseStatus |= pathResult;
   }
 
-  if (!rootResult.getPtrOrNull() && !pathResult.getPtrOrNull())
-    return pathResult;
+  if (rootResult.isNull() && pathResult.isNull())
+    return nullptr;
 
   auto keypath = new (Context) KeyPathExpr(
       backslashLoc, rootResult.getPtrOrNull(), pathResult.getPtrOrNull());
@@ -619,7 +614,6 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     return makeParserCodeCompletionResult(keypath);
   }
 
-  ParserStatus parseStatus = ParserStatus(rootResult) | ParserStatus(pathResult);
   return makeParserResult(parseStatus, keypath);
 }
 
@@ -1148,8 +1142,11 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
                      : diag::expected_member_name;
       auto Name = parseDeclNameRef(NameLoc, D,
           DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames);
-      if (!Name)
-        return nullptr;
+      if (!Name) {
+        SourceRange ErrorRange = Result.get()->getSourceRange();
+        ErrorRange.widen(TokLoc);
+        return makeParserErrorResult(new (Context) ErrorExpr(ErrorRange, Type(), Result.get()));
+      }
       SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
       Result = makeParserResult(Result, new (Context) UnresolvedDotExpr(
                                             Result.get(), TokLoc, Name, NameLoc,
@@ -1296,9 +1293,13 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
     // If we end up with an unknown token on this line, return an ErrorExpr
     // covering the range of the token.
-    if (!Tok.isAtStartOfLine() && consumeIf(tok::unknown)) {
-      Result = makeParserResult(
-          Result, new (Context) ErrorExpr(Result.get()->getSourceRange()));
+    if (!Tok.isAtStartOfLine() && Tok.is(tok::unknown)) {
+      SourceLoc UnknownLoc = consumeToken();
+      SourceRange ErrorRange = Result.get()->getSourceRange();
+      ErrorRange.widen(UnknownLoc);
+      Result = makeParserResult(Result, new (Context) ErrorExpr(ErrorRange,
+                                                                Type(),
+                                                                Result.get()));
       continue;
     }
 
@@ -1592,7 +1593,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
     Name = parseDeclNameRef(NameLoc, diag::expected_identifier_after_dot_expr,
         DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames);
-    if (!Name) return nullptr;
+    if (!Name)
+      return makeParserErrorResult(new (Context) ErrorExpr(DotLoc));
     SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
     // Check for a () suffix, which indicates a call when constructing
@@ -2262,7 +2264,10 @@ Expr *Parser::parseExprIdentifier() {
   }
   
   ValueDecl *D = nullptr;
-  if (!InPoundIfEnvironment) {
+  // When doing incremental re-parsing for SwiftSyntax this check may emit bogus
+  // diagnostic. Also really the syntactic parser should not be doing name
+  // lookups, so disable this check when parsing for SwiftSyntax.
+  if (!InPoundIfEnvironment && !Context.LangOpts.ParseForSyntaxTreeOnly) {
     D = lookupInScope(name);
     // FIXME: We want this to work: "var x = { x() }", but for now it's better
     // to disallow it than to crash.
@@ -2738,8 +2743,10 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
   for (unsigned i = 0, e = params->size(); i != e; ++i) {
     auto *param = params->get(i);
-    if (!isTupleDestructuring(param))
+    if (!isTupleDestructuring(param)) {
+      param->setDestructured(false);
       continue;
+    }
 
     auto argName = "arg" + std::to_string(i);
 
@@ -2830,6 +2837,15 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SmallVector<ASTNode, 4> bodyElements;
   ParserStatus Status;
   Status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
+
+  if (SourceMgr.rangeContainsCodeCompletionLoc({leftBrace, PreviousLoc})) {
+    // Ignore 'CodeCompletionDelayedDeclState' inside closures.
+    // Completions inside functions body inside closures at top level should
+    // be considered top-level completions.
+    if (State->hasCodeCompletionDelayedDeclState())
+      (void)State->takeCodeCompletionDelayedDeclState();
+    Status.setHasCodeCompletion();
+  }
 
   // Parse the closing '}'.
   SourceLoc rightBrace;

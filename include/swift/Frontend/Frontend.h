@@ -31,6 +31,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
+#include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Migrator/MigratorOptions.h"
@@ -202,6 +203,12 @@ public:
   void setMainExecutablePath(StringRef Path);
 
   void setRuntimeResourcePath(StringRef Path);
+
+  /// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
+  /// the default value of <resource-dir>/<platform>/prebuilt-modules.
+  /// @note This should be called once, after search path options and frontend
+  ///       options have been parsed.
+  void setDefaultPrebuiltCacheIfNecessary();
 
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
@@ -399,8 +406,7 @@ class CompilerInstance {
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<SILModule> TheSILModule;
-
-  std::unique_ptr<PersistentParserState> PersistentState;
+  std::unique_ptr<DiagnosticVerifier> DiagVerifier;
 
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
@@ -430,6 +436,9 @@ class CompilerInstance {
   /// invariant is that any SourceFile in this set with an associated
   /// buffer will also have its buffer ID in PrimaryBufferIDs.
   std::vector<SourceFile *> PrimarySourceFiles;
+
+  /// The file that has been registered for code completion.
+  NullablePtr<SourceFile> CodeCompletionFile;
 
   /// Return whether there is an entry in PrimaryInputs for buffer \p BufID.
   bool isPrimaryInput(unsigned BufID) const {
@@ -550,12 +559,13 @@ public:
     return Invocation;
   }
 
-  bool hasPersistentParserState() const {
-    return bool(PersistentState);
-  }
+  /// If a code completion buffer has been set, returns the corresponding source
+  /// file.
+  NullablePtr<SourceFile> getCodeCompletionFile() { return CodeCompletionFile; }
 
-  PersistentParserState &getPersistentParserState() {
-    return *PersistentState.get();
+  /// Set a new file that we're performing code completion on.
+  void setCodeCompletionFile(SourceFile *file) {
+    CodeCompletionFile = file;
   }
 
 private:
@@ -577,6 +587,7 @@ private:
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
+  void setupDiagnosticVerifierIfNeeded();
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Set up all state in the CompilerInstance to process the given input file.
@@ -615,7 +626,7 @@ public:
   void performParseOnly(bool EvaluateConditionals = false,
                         bool CanDelayBodies = true);
 
-  /// Parses and performs name binding on all input files.
+  /// Parses and performs import resolution on all input files.
   ///
   /// This is similar to a parse-only invocation, but module imports will also
   /// be processed.
@@ -623,7 +634,6 @@ public:
 
   /// Performs mandatory, diagnostic, and optimization passes over the SIL.
   /// \param silModule The SIL module that was generated during SILGen.
-  /// \param stats A stats reporter that will report optimization statistics.
   /// \returns true if any errors occurred.
   bool performSILProcessing(SILModule *silModule);
 
@@ -631,7 +641,8 @@ private:
   SourceFile *
   createSourceFileForMainModule(SourceFileKind FileKind,
                                 SourceFile::ImplicitModuleImportKind ImportKind,
-                                Optional<unsigned> BufferID);
+                                Optional<unsigned> BufferID,
+                                SourceFile::ParsingOptions options = {});
 
 public:
   void freeASTContext();

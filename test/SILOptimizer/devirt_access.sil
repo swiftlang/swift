@@ -19,7 +19,7 @@ class K {
 //CHECK-NEXT: return
 sil @_TFC4test1K4pingfS0_FT_Si : $@convention(method) (@guaranteed K) -> Int {
 bb0(%0 : $K):
-  %1 = class_method %0 : $K, #K.pong!1 : (K) -> () -> Int, $@convention(method) (@guaranteed K) -> Int // user: %2
+  %1 = class_method %0 : $K, #K.pong : (K) -> () -> Int, $@convention(method) (@guaranteed K) -> Int // user: %2
   %2 = apply %1(%0) : $@convention(method) (@guaranteed K) -> Int // user: %3
   return %2 : $Int                                // id: %3
 }
@@ -32,9 +32,9 @@ sil @_TFC4test1KcfMS0_FT_S0_ : $@convention(method) (@owned K) -> @owned K
 sil @_TFC4test1KCfMS0_FT_S0_ : $@convention(thin) (@thick K.Type) -> @owned K
 
 sil_vtable K {
-  #K.ping!1: @_TFC4test1K4pingfS0_FT_Si	// test.K.ping (test.K)() -> Swift.Int
-  #K.pong!1: @_TFC4test1K4pongfS0_FT_Si	// test.K.pong (test.K)() -> Swift.Int
-  #K.init!initializer.1: @_TFC4test1KcfMS0_FT_S0_	// test.K.init (test.K.Type)() -> test.K
+  #K.ping: @_TFC4test1K4pingfS0_FT_Si	// test.K.ping (test.K)() -> Swift.Int
+  #K.pong: @_TFC4test1K4pongfS0_FT_Si	// test.K.pong (test.K)() -> Swift.Int
+  #K.init!initializer: @_TFC4test1KcfMS0_FT_S0_	// test.K.init (test.K.Type)() -> test.K
 }
 
 
@@ -94,7 +94,7 @@ sil @Case1 : $@convention(thin) (@owned X) -> Int {
 bb0(%0 : $X):
   debug_value %0 : $X, let, name "a" // id: %1
   strong_retain %0 : $X                           // id: %2
-  %3 = class_method %0 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int // user: %4
+  %3 = class_method %0 : $X, #X.ping : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int // user: %4
   %4 = apply %3(%0) : $@convention(method) (@guaranteed X) -> Int // user: %6
   strong_release %0 : $X                          // id: %5
   return %4 : $Int                                // id: %6
@@ -113,7 +113,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y, let, name "a" // id: %1
   strong_retain %0 : $Y                           // id: %2
   %3 = upcast %0 : $Y to $X                       // users: %4, %5
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int // user: %5
+  %4 = class_method %3 : $X, #X.ping : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int // user: %5
   %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int // user: %7
   strong_release %0 : $Y                          // id: %6
   return %5 : $Int                                // id: %7
@@ -126,7 +126,7 @@ sil @Case3 : $@convention(thin) (@owned A) -> Int {
 bb0(%0 : $A):
   debug_value %0 : $A, let, name "a" // id: %1
   strong_retain %0 : $A                           // id: %2
-  %3 = class_method %0 : $A, #A.ping!1 : (A) -> () -> Int, $@convention(method) (@guaranteed A) -> Int // user: %4
+  %3 = class_method %0 : $A, #A.ping : (A) -> () -> Int, $@convention(method) (@guaranteed A) -> Int // user: %4
   %4 = apply %3(%0) : $@convention(method) (@guaranteed A) -> Int // user: %6
   strong_release %0 : $A                          // id: %5
   return %4 : $Int                                // id: %6
@@ -139,28 +139,28 @@ sil @Case4 : $@convention(thin) (@owned B) -> Int {
 bb0(%0 : $B):
   debug_value %0 : $B, let, name "a" // id: %1
   strong_retain %0 : $B                           // id: %2
-  %3 = class_method %0 : $B, #B.ping!1 : (B) -> () -> Int, $@convention(method) (@guaranteed B) -> Int // user: %4
+  %3 = class_method %0 : $B, #B.ping : (B) -> () -> Int, $@convention(method) (@guaranteed B) -> Int // user: %4
   %4 = apply %3(%0) : $@convention(method) (@guaranteed B) -> Int // user: %6
   strong_release %0 : $B                          // id: %5
   return %4 : $Int                                // id: %6
 }
 
 sil_vtable X {
-  #X.ping!1: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
-  #X.init!initializer.1: @_TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
+  #X.ping: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer: @_TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
 }
 
 sil_vtable Y {
-  #X.ping!1: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
-  #X.init!initializer.1: @_TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
+  #X.ping: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer: @_TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
 }
 
 sil_vtable A {
-  #A.ping!1: @_TFC14devirt_access21A4pingfS0_FT_Si	// devirt_access2.A.ping (devirt_access2.A)() -> Swift.Int
-  #A.init!initializer.1: @_TFC14devirt_access21AcfMS0_FT_S0_	// devirt_access2.A.init (devirt_access2.A.Type)() -> devirt_access2.A
+  #A.ping: @_TFC14devirt_access21A4pingfS0_FT_Si	// devirt_access2.A.ping (devirt_access2.A)() -> Swift.Int
+  #A.init!initializer: @_TFC14devirt_access21AcfMS0_FT_S0_	// devirt_access2.A.init (devirt_access2.A.Type)() -> devirt_access2.A
 }
 
 sil_vtable B {
-  #A.ping!1: @_TFC14devirt_access21B4pingfS0_FT_Si	// devirt_access2.B.ping (devirt_access2.B)() -> Swift.Int
-  #A.init!initializer.1: @_TFC14devirt_access21BcfMS0_FT_S0_	// devirt_access2.B.init (devirt_access2.B.Type)() -> devirt_access2.B
+  #A.ping: @_TFC14devirt_access21B4pingfS0_FT_Si	// devirt_access2.B.ping (devirt_access2.B)() -> Swift.Int
+  #A.init!initializer: @_TFC14devirt_access21BcfMS0_FT_S0_	// devirt_access2.B.init (devirt_access2.B.Type)() -> devirt_access2.B
 }

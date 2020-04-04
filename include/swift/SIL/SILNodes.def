@@ -591,6 +591,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
   SINGLE_VALUE_INST(StoreBorrowInst, store_borrow,
                     SILInstruction, MayWrite, DoesNotRelease)
+  // begin_access may trap. Trapping is unordered with respect to memory access,
+  // and with respect to other traps, but it is still conservatively considered
+  // a side effect.
   SINGLE_VALUE_INST(BeginAccessInst, begin_access,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
@@ -689,6 +692,16 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
 
   // Differentiable programming
+  SINGLE_VALUE_INST(DifferentiableFunctionInst, differentiable_function,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(LinearFunctionInst, linear_function,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(DifferentiableFunctionExtractInst,
+                    differentiable_function_extract,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(LinearFunctionExtractInst,
+                    linear_function_extract,
+                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(DifferentiabilityWitnessFunctionInst,
                     differentiability_witness_function,
                     SingleValueInstruction, None, DoesNotRelease)
@@ -803,6 +816,10 @@ NON_VALUE_INST(DestroyValueInst, destroy_value,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(EndBorrowInst, end_borrow,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
+// end_access is considered to have side effects because it modifies runtime
+// state outside of the memory modified by the access that is visible to
+// Swift. This "side effect" only needs to creates a dependency on begin_access
+// instructions.
 NON_VALUE_INST(EndAccessInst, end_access,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(BeginUnpairedAccessInst, begin_unpaired_access,

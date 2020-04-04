@@ -18,13 +18,16 @@
 
 namespace swift {
 
+class PersistentParserState;
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
-/// the REPL). Since it contains raw source, it must be parsed and name-bound
-/// before being used for anything; a full type-check is also necessary for
-/// IR generation.
+/// the REPL). Since it contains raw source, it must be type checked for IR
+/// generation.
 class SourceFile final : public FileUnit {
+  friend class ParseSourceFileRequest;
+
 public:
   class Impl;
   struct SourceFileSyntaxInfo;
@@ -88,13 +91,43 @@ public:
     }
   };
 
+  /// Flags that direct how the source file is parsed.
+  enum class ParsingFlags : uint8_t {
+    /// Whether to disable delayed parsing for nominal type, extension, and
+    /// function bodies.
+    ///
+    /// If set, type and function bodies will be parsed eagerly. Otherwise they
+    /// will be lazily parsed when their contents is queried. This lets us avoid
+    /// building AST nodes when they're not needed.
+    ///
+    /// This is set for primary files, since we want to type check all
+    /// declarations and function bodies anyway, so there's no benefit in lazy
+    /// parsing.
+    DisableDelayedBodies = 1 << 0,
+
+    /// Whether to disable evaluating the conditions of #if decls.
+    ///
+    /// If set, #if decls are parsed as-is. Otherwise, the bodies of any active
+    /// clauses are hoisted such that they become sibling nodes with the #if
+    /// decl.
+    ///
+    /// FIXME: When condition evaluation moves to a later phase, remove this
+    /// and adjust the client call 'performParseOnly'.
+    DisablePoundIfEvaluation = 1 << 1,
+
+    /// Whether to suppress warnings when parsing. This is set for secondary
+    /// files, as they get parsed multiple times.
+    SuppressWarnings = 1 << 2
+  };
+  using ParsingOptions = OptionSet<ParsingFlags>;
+
 private:
   std::unique_ptr<SourceLookupCache> Cache;
   SourceLookupCache &getCache() const;
 
   /// This is the list of modules that are imported by this module.
   ///
-  /// This is filled in by the Name Binding phase.
+  /// This is filled in by the import resolution phase.
   ArrayRef<ImportedModuleDesc> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
@@ -109,6 +142,7 @@ private:
 
   /// If non-null, used to track name lookups that happen within this file.
   Optional<ReferencedNameTracker> ReferencedNames;
+  Optional<ReferencedNameTracker> RequestReferencedNames;
 
   /// The class in this file marked \@NS/UIApplicationMain.
   ClassDecl *MainClass = nullptr;
@@ -130,6 +164,9 @@ private:
   /// If not, we can fast-path module checks.
   bool HasImplementationOnlyImports = false;
 
+  /// The parsing options for the file.
+  ParsingOptions ParsingOpts;
+
   /// The scope map that describes this source file.
   std::unique_ptr<ASTScope> Scope;
 
@@ -140,8 +177,11 @@ private:
   /// been validated.
   llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
 
-  /// The list of top-level declarations in the source file.
-  std::vector<Decl *> Decls;
+  /// The list of top-level declarations in the source file. This is \c None if
+  /// they have not yet been parsed.
+  /// FIXME: Once addTopLevelDecl/prependTopLevelDecl/truncateTopLevelDecls
+  /// have been removed, this can become an optional ArrayRef.
+  Optional<std::vector<Decl *>> Decls;
 
   using SeparatelyImportedOverlayMap =
     llvm::SmallDenseMap<ModuleDecl *, llvm::SmallPtrSet<ModuleDecl *, 1>>;
@@ -154,13 +194,36 @@ private:
   /// mechanism which is not SourceFile-dependent.)
   SeparatelyImportedOverlayMap separatelyImportedOverlays;
 
+  using SeparatelyImportedOverlayReverseMap =
+    llvm::SmallDenseMap<ModuleDecl *, ModuleDecl *>;
+
+  /// A lazily populated mapping from a separately imported overlay to its
+  /// underlying shadowed module.
+  ///
+  /// This is used by tooling to substitute the name of the underlying module
+  /// wherever the overlay's name would otherwise be reported.
+  SeparatelyImportedOverlayReverseMap separatelyImportedOverlaysReversed;
+
+  /// A pointer to PersistentParserState with a function reference to its
+  /// deleter to handle the fact that it's forward declared.
+  using ParserStatePtr =
+      std::unique_ptr<PersistentParserState, void (*)(PersistentParserState *)>;
+
+  /// Stores delayed parser state that code completion needs to be able to
+  /// resume parsing at the code completion token in the file.
+  ParserStatePtr DelayedParserState =
+      ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
+
   friend ASTContext;
   friend Impl;
 
 public:
-  /// Appends the given declaration to the end of the top-level decls list.
+  /// Appends the given declaration to the end of the top-level decls list. Do
+  /// not add any additional uses of this function.
   void addTopLevelDecl(Decl *d) {
-    Decls.push_back(d);
+    // Force decl parsing if we haven't already.
+    (void)getTopLevelDecls();
+    Decls->push_back(d);
   }
 
   /// Prepends a declaration to the top-level decls list.
@@ -170,19 +233,33 @@ public:
   ///
   /// See rdar://58355191
   void prependTopLevelDecl(Decl *d) {
-    Decls.insert(Decls.begin(), d);
+    // Force decl parsing if we haven't already.
+    (void)getTopLevelDecls();
+    Decls->insert(Decls->begin(), d);
   }
 
   /// Retrieves an immutable view of the list of top-level decls in this file.
-  ArrayRef<Decl *> getTopLevelDecls() const {
-    return Decls;
+  ArrayRef<Decl *> getTopLevelDecls() const;
+
+  /// Retrieves an immutable view of the top-level decls if they have already
+  /// been parsed, or \c None if they haven't. Should only be used for dumping.
+  Optional<ArrayRef<Decl *>> getCachedTopLevelDecls() const {
+    if (!Decls)
+      return None;
+    return llvm::makeArrayRef(*Decls);
   }
 
-  /// Truncates the list of top-level decls so it contains \c count elements.
+  /// Truncates the list of top-level decls so it contains \c count elements. Do
+  /// not add any additional uses of this function.
   void truncateTopLevelDecls(unsigned count) {
-    assert(count <= Decls.size() && "Can only truncate top-level decls!");
-    Decls.resize(count);
+    // Force decl parsing if we haven't already.
+    (void)getTopLevelDecls();
+    assert(count <= Decls->size() && "Can only truncate top-level decls!");
+    Decls->resize(count);
   }
+
+  /// Retrieve the parsing options for the file.
+  ParsingOptions getParsingOptions() const { return ParsingOpts; }
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.
@@ -199,6 +276,14 @@ public:
 
   /// A set of synthesized declarations that need to be type checked.
   llvm::SmallVector<Decl *, 8> SynthesizedDecls;
+
+  /// The list of functions defined in this file whose bodies have yet to be
+  /// typechecked. They must be held in this list instead of eagerly validated
+  /// because their bodies may force us to perform semantic checks of arbitrary
+  /// complexity, and we currently cannot handle those checks in isolation. E.g.
+  /// we cannot, in general, perform witness matching on singular requirements
+  /// unless the entire conformance has been evaluated.
+  std::vector<AbstractFunctionDecl *> DelayedFunctions;
 
   /// We might perform type checking on the same source file more than once,
   /// if its the main file or a REPL instance, so keep track of the last
@@ -226,25 +311,15 @@ public:
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
 
-  template <typename T>
-  using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;
-
-  OperatorMap<InfixOperatorDecl*> InfixOperators;
-  OperatorMap<PostfixOperatorDecl*> PostfixOperators;
-  OperatorMap<PrefixOperatorDecl*> PrefixOperators;
-  OperatorMap<PrecedenceGroupDecl*> PrecedenceGroups;
-
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.
   const SourceFileKind Kind;
 
   enum ASTStage_t {
-    /// Parsing is underway.
-    Parsing,
-    /// Parsing has completed.
-    Parsed,
-    /// Name binding has completed.
-    NameBound,
+    /// The source file has not had its imports resolved or been type checked.
+    Unprocessed,
+    /// Import resolution has completed.
+    ImportsResolved,
     /// Type checking has completed.
     TypeChecked
   };
@@ -254,11 +329,20 @@ public:
   ///
   /// Only files that have been fully processed (i.e. type-checked) will be
   /// forwarded on to IRGen.
-  ASTStage_t ASTStage = Parsing;
+  ASTStage_t ASTStage = Unprocessed;
+
+  /// Virtual file paths declared by \c #sourceLocation(file:) declarations in
+  /// this source file.
+  llvm::SmallVector<Located<StringRef>, 0> VirtualFilePaths;
+
+  /// Returns information about the file paths used for diagnostics and magic
+  /// identifiers in this source file, including virtual filenames introduced by
+  /// \c #sourceLocation(file:) declarations.
+  llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
-             bool KeepSyntaxTree = false);
+             bool KeepSyntaxTree = false, ParsingOptions parsingOpts = {});
 
   ~SourceFile();
 
@@ -300,6 +384,7 @@ public:
   /// \returns true if the overlay was added; false if it already existed.
   bool addSeparatelyImportedOverlay(ModuleDecl *overlay,
                                     ModuleDecl *declaring) {
+    separatelyImportedOverlaysReversed.clear();
     return std::get<1>(separatelyImportedOverlays[declaring].insert(overlay));
   }
 
@@ -316,6 +401,12 @@ public:
     auto &value = std::get<1>(*i);
     overlays.append(value.begin(), value.end());
   }
+
+  /// Retrieves a module shadowed by the provided separately imported overlay
+  /// \p shadowed. If such a module is returned, it should be presented to users
+  /// as owning the symbols in \p overlay.
+  ModuleDecl *
+  getModuleShadowedBySeparatelyImportedOverlay(const ModuleDecl *overlay);
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
@@ -337,7 +428,20 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
+protected:
+  virtual void
+  lookupOperatorDirect(Identifier name, OperatorFixity fixity,
+                       TinyPtrVector<OperatorDecl *> &results) const override;
+
+  virtual void lookupPrecedenceGroupDirect(
+      Identifier name,
+      TinyPtrVector<PrecedenceGroupDecl *> &results) const override;
+
+public:
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const override;
 
   virtual void
   getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &results) const override;
@@ -362,33 +466,32 @@ public:
 
   virtual bool walk(ASTWalker &walker) override;
 
-  /// @{
-
-  /// Look up the given operator in this file.
-  ///
-  /// The file must be name-bound already. If the operator is not found, or if
-  /// there is an ambiguity, returns null.
-  ///
-  /// \param isCascading If true, the lookup of this operator may affect
-  /// downstream files.
-  InfixOperatorDecl *lookupInfixOperator(Identifier name, bool isCascading,
-                                         SourceLoc diagLoc = {});
-  PrefixOperatorDecl *lookupPrefixOperator(Identifier name, bool isCascading,
-                                           SourceLoc diagLoc = {});
-  PostfixOperatorDecl *lookupPostfixOperator(Identifier name, bool isCascading,
-                                             SourceLoc diagLoc = {});
-  PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name, bool isCascading,
-                                             SourceLoc diagLoc = {});
-  /// @}
-
-  ReferencedNameTracker *getReferencedNameTracker() {
+  ReferencedNameTracker *getLegacyReferencedNameTracker() {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
-  const ReferencedNameTracker *getReferencedNameTracker() const {
+  const ReferencedNameTracker *getLegacyReferencedNameTracker() const {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
 
+  ReferencedNameTracker *getRequestBasedReferencedNameTracker() {
+    return RequestReferencedNames ? RequestReferencedNames.getPointer() : nullptr;
+  }
+  const ReferencedNameTracker *getRequestBasedReferencedNameTracker() const {
+    return RequestReferencedNames ? RequestReferencedNames.getPointer() : nullptr;
+  }
+
+  /// Creates and installs the referenced name trackers in this source file.
+  ///
+  /// This entrypoint must be called before incremental compilation can proceed,
+  /// else reference dependencies will not be registered.
   void createReferencedNameTracker();
+
+  /// Retrieves the name tracker instance corresponding to
+  /// \c EnableRequestBasedIncrementalDependencies
+  ///
+  /// If incremental dependencies tracking is not enabled or \c createReferencedNameTracker()
+  /// has not been invoked on this source file, the result is \c nullptr.
+  const ReferencedNameTracker *getConfiguredReferencedNameTracker() const;
 
   /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
@@ -404,6 +507,27 @@ public:
 
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
+
+  /// Retrieves the previously set delayed parser state, asserting that it
+  /// exists.
+  PersistentParserState *getDelayedParserState() {
+    // Force parsing of the top-level decls, which will set DelayedParserState
+    // if necessary.
+    // FIXME: Ideally the parser state should be an output of
+    // ParseSourceFileRequest, but the evaluator doesn't currently support
+    // move-only outputs for cached requests.
+    (void)getTopLevelDecls();
+
+    auto *state = DelayedParserState.get();
+    assert(state && "Didn't set any delayed parser state!");
+    return state;
+  }
+
+  /// Record delayed parser state for the source file. This is needed for code
+  /// completion's second pass.
+  void setDelayedParserState(ParserStatePtr &&state) {
+    DelayedParserState = std::move(state);
+  }
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;
@@ -507,6 +631,10 @@ public:
 
   bool isSuitableForASTScopes() const { return canBeParsedInFull(); }
 
+  /// Whether the bodies of types and functions within this file can be lazily
+  /// parsed.
+  bool hasDelayedBodyParsing() const;
+
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
@@ -529,6 +657,11 @@ private:
 
   std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
 };
+
+inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
+                                            SourceFile::ParsingFlags rhs) {
+  return SourceFile::ParsingOptions(lhs) | rhs;
+}
 
 inline SourceFile &
 ModuleDecl::getMainSourceFile(SourceFileKind expectedKind) const {

@@ -7,7 +7,7 @@ import Swift
 var zero = 0
 
 // <rdar://problem/15921334>
-// CHECK-LABEL: sil hidden [ossa] @$s8closures46return_local_generic_function_without_captures{{[_0-9a-zA-Z]*}}F : $@convention(thin) <A, R> () -> @owned @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0) -> @out τ_0_1 for <A, R> {
+// CHECK-LABEL: sil hidden [ossa] @$s8closures46return_local_generic_function_without_captures{{[_0-9a-zA-Z]*}}F : $@convention(thin) <A, R> () -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <A, R> {
 
 func return_local_generic_function_without_captures<A, R>() -> (A) -> R {
   func f(_: A) -> R {
@@ -441,7 +441,7 @@ class SuperSub : SuperBase {
   func a() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_1]] : $@convention(thin) (@guaranteed SuperSub) -> () {
     // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
-    // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom!1
+    // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom :
     // CHECK:   = apply [[CLASS_METHOD]]([[ARG]])
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
@@ -470,7 +470,7 @@ class SuperSub : SuperBase {
     func b1() {
       // CHECK: sil private [ossa] @[[INNER_FUNC_2]] : $@convention(thin) (@guaranteed SuperSub) -> () {
       // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
-      // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom!1
+      // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom :
       // CHECK:   = apply [[CLASS_METHOD]]([[ARG]]) : $@convention(method) (@guaranteed SuperSub) -> ()
       // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
@@ -504,7 +504,7 @@ class SuperSub : SuperBase {
   func c() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_1]] : $@convention(thin) (@guaranteed SuperSub) -> ()
     // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
-    // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom!1
+    // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom :
     // CHECK:   = apply [[CLASS_METHOD]]([[ARG]]) : $@convention(method) (@guaranteed SuperSub) -> ()
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase

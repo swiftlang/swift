@@ -108,6 +108,7 @@ set(SWIFTLIB_ESSENTIAL
   Policy.swift
   PrefixWhile.swift
   Print.swift
+  PtrAuth.swift
   Random.swift
   RandomAccessCollection.swift
   Range.swift

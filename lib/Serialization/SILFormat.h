@@ -149,6 +149,10 @@ namespace sil_block {
     SIL_PROPERTY,
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SIL_TWO_OPERANDS_EXTRA_ATTR,
+    SIL_INST_DIFFERENTIABLE_FUNCTION,
+    SIL_INST_LINEAR_FUNCTION,
+    SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
+    SIL_INST_LINEAR_FUNCTION_EXTRACT,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -273,7 +277,7 @@ namespace sil_block {
                      BCFixed<2>,  // serialized
                      BCFixed<2>,  // thunks: signature optimized/reabstraction
                      BCFixed<1>,  // without_actually_escaping
-                     BCFixed<1>,  // global_init
+                     BCFixed<3>,  // specialPurpose
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode
                      BCFixed<3>,  // side effect info.
@@ -446,6 +450,37 @@ namespace sil_block {
     ValueIDField,          // existential
     BCArray<ValueIDField>  // SILDeclRef
     // may be trailed by an inline protocol conformance
+  >;
+
+  using SILInstDifferentiableFunctionLayout = BCRecordLayout<
+    SIL_INST_DIFFERENTIABLE_FUNCTION,
+    BCVBR<8>,             // number of function parameters
+    BCFixed<1>,           // has derivative functions?
+    BCArray<ValueIDField> // parameter indices and operands
+  >;
+
+  using SILInstLinearFunctionLayout = BCRecordLayout<
+    SIL_INST_LINEAR_FUNCTION,
+    BCVBR<8>,             // number of function parameters
+    BCFixed<1>,           // has transpose function?
+    BCArray<ValueIDField> // parameter indices and operands
+  >;
+
+  using SILInstDifferentiableFunctionExtractLayout = BCRecordLayout<
+    SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    BCFixed<2>, // extractee
+    BCFixed<1>  // has explicit extractee type?
+  >;
+
+  using SILInstLinearFunctionExtractLayout = BCRecordLayout<
+    SIL_INST_LINEAR_FUNCTION_EXTRACT,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    BCFixed<1> // extractee
   >;
 }
 

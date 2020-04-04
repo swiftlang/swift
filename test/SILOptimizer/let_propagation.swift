@@ -173,6 +173,13 @@ public func testUseGlobalLet() -> Int32 {
 }
 */
 
+// FIXME: 'A1's let properties cannot be optimized in -primary-file
+// mode. However, this case could potentially be handled in WMO mode
+// by finding all enclosing types that reference 'A1'. If they are all
+// either internal or resilient and no pointers to these types escape,
+// then it may be possible to prove that code outside this module
+// never overwrites a value of type 'A1'. This will be easier to do
+// when access markers are guaranteed complete in the -O pipeline.
 struct A1 {
   private let x: Int32
   
@@ -190,14 +197,14 @@ struct A1 {
   }
 
   // CHECK-LABEL: sil hidden @$s15let_propagation2A1V2f1{{[_0-9a-zA-Z]*}}F
-  // CHECK: bb0
-  // CHECK: struct_extract {{.*}}#A1.x
-  // CHECK: struct_extract {{.*}}#Int32._value
-  // CHECK-NOT: load
-  // CHECK-NOT: struct_extract
-  // CHECK-NOT: struct_element_addr
-  // CHECK-NOT: ref_element_addr
-  // CHECK-NOT: bb1
+  // FIX_CHECK: bb0
+  // FIX_CHECK: struct_extract {{.*}}#A1.x
+  // FIX_CHECK: struct_extract {{.*}}#Int32._value
+  // FIX_CHECK-NOT: load
+  // FIX_CHECK-NOT: struct_extract
+  // FIX_CHECK-NOT: struct_element_addr
+  // FIX_CHECK-NOT: ref_element_addr
+  // FIX_CHECK-NOT: bb1
   // CHECK: return
   func f1() -> Int32 {
     // x should be loaded only once.
@@ -206,9 +213,9 @@ struct A1 {
 
   // CHECK-LABEL: sil hidden @$s15let_propagation2A1V2f2{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0
-  // CHECK: integer_literal $Builtin.Int32, 200
-  // CHECK-NEXT: struct $Int32
-  // CHECK-NEXT: return
+  // FIX_CHECK: integer_literal $Builtin.Int32, 200
+  // FIX_CHECK-NEXT: struct $Int32
+  // FIX_CHECK-NEXT: return
   func f2() -> Int32 {
     // load y only once.
     return y + y

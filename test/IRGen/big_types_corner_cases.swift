@@ -117,11 +117,7 @@ class Foo {
   func myMethod(_ callback: (MyStruct, Int) -> Void) -> Void { }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden swiftcc { i8*, %swift.refcounted* } @"$s22big_types_corner_cases3FooC8myMethodyyyAA8MyStructV_SitXEFTc"(%T22big_types_corner_cases3FooC* %0)
-// CHECK: getelementptr inbounds %T22big_types_corner_cases3FooC, %T22big_types_corner_cases3FooC*
-// CHECK: getelementptr inbounds void (i8*, %swift.opaque*, %T22big_types_corner_cases3FooC*)*, void (i8*, %swift.opaque*, %T22big_types_corner_cases3FooC*)**
-// CHECK: call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata*
-// CHECK: ret { i8*, %swift.refcounted* }
+// CHECK-LABEL: define internal swiftcc void @"$s22big_types_corner_cases3FooC4blamyyFyyAA8MyStructV_SitXEcACcfu_yyAF_SitXEcfu0_"(i8* %0, %swift.opaque* %1, %T22big_types_corner_cases3FooC* %2)
 
 public enum LargeEnum {
   public enum InnerEnum {
@@ -209,8 +205,7 @@ public func testGetFunc() {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases7TestBigC4testyyF"(%T22big_types_corner_cases7TestBigC* swiftself %0)
 // CHECK: [[CALL1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$sSayy22big_types_corner_cases9BigStructVcSgGMD"
 // CHECK: [[CALL2:%.*]] = call i8** @"$sSayy22big_types_corner_cases9BigStructVcSgGSayxGSlsWl
-// CHECK: call swiftcc void @"$sSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(%TSq.{{.*}}* noalias nocapture sret {{.*}}, i8* bitcast (i1 (%Txq_r0_ly22big_types_corner_cases9BigStructVytIsegnr_Sg*, %swift.refcounted*, %swift.error**)* @"$s22big_types_corner_cases9BigStructVIegy_SgSbs5Error_pIggdzo_xq_r0_lyACytIsegnr_SgSbsAE_pIegndzo_TRTA" to i8*), %swift.opaque* {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself
-// CHECK: ret void
+// CHECK:  call swiftcc void @"$sSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(%TSq.{{.*}}* noalias nocapture sret %{{[0-9]+}}, i8* bitcast ({{.*}}* @"$s22big_types_corner_cases9BigStruct{{.*}}_TRTA{{(\.ptrauth)?}}" to i8*), %swift.opaque* %{{[0-9]+}}, %swift.type* %{{[0-9]+}}, i8** [[CALL2]]
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases7TestBigC5test2yyF"(%T22big_types_corner_cases7TestBigC* swiftself %0)
 // CHECK: [[CALL1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$sSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGMD"

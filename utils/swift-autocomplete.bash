@@ -68,6 +68,7 @@ _swift_complete()
       -sil-verify-without-invalidation \
       -sil-inline-test-threshold \
       -sil-inline-test \
+      -sil-inline-never-functions \
       -sroa-args-remove-dead-args-after \
       -ml \
       -sil-print-escapes \

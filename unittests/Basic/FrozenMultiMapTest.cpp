@@ -90,6 +90,37 @@ TEST(FrozenMultiMapCustomTest, SimpleFind) {
   }
 }
 
+TEST(FrozenMultiMapCustomTest, TestResetWorks) {
+  Canary::resetIDs();
+  FrozenMultiMap<Canary, Canary> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+  map.reset();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  // Just do a quick sanity test.
+  auto range = map.getRange();
+  auto begin = range.begin();
+  auto end = range.end();
+  ++begin;
+  ++begin;
+  EXPECT_EQ(std::distance(begin, end), 0);
+}
+
 TEST(FrozenMultiMapCustomTest, SimpleIter) {
   Canary::resetIDs();
   FrozenMultiMap<Canary, Canary> map;

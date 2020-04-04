@@ -762,3 +762,6 @@ enum E7: String {
 // RUN: %sourcekitd-test -req=cursor -pos=228:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK93 %s
 // CHECK93: <Declaration>case b = &quot;f&quot;</Declaration>
 // CHECK93-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>b</decl.name> = <syntaxtype.string>&quot;f&quot;</syntaxtype.string></decl.enumelement>
+
+// RUN: %sourcekitd-test -req=cursor -pos=227:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK94 %s
+// CHECK94: <empty cursor info; internal diagnostic: "Resolved to incomplete expression or statement.">

@@ -60,6 +60,7 @@
 #include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -888,7 +889,7 @@ IRGenModule::getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto) {
 
 void IRGenModule::addLazyConformances(DeclContext *dc) {
   for (const ProtocolConformance *conf :
-         dc->getLocalConformances(ConformanceLookupKind::All, nullptr)) {
+         dc->getLocalConformances(ConformanceLookupKind::All)) {
     IRGen.addLazyWitnessTable(conf);
   }
 }
@@ -1463,6 +1464,22 @@ static llvm::GlobalVariable *getChainEntryForDynamicReplacement(
   auto *funPtr =
       implFunction ? llvm::ConstantExpr::getBitCast(implFunction, IGM.Int8PtrTy)
                    : llvm::ConstantExpr::getNullValue(IGM.Int8PtrTy);
+
+  if (implFunction) {
+    llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, 0),
+                                 llvm::ConstantInt::get(IGM.Int32Ty, 0)};
+    auto *storageAddr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        nullptr, linkEntry, indices);
+
+    auto &schema = IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
+    assert(entity.hasSILFunction() || entity.isOpaqueTypeDescriptorAccessor());
+    auto authEntity = entity.hasSILFunction()
+                          ? PointerAuthEntity(entity.getSILFunction())
+                          : PointerAuthEntity::Special::TypeDescriptor;
+    funPtr =
+        IGM.getConstantSignedPointer(funPtr, schema, authEntity, storageAddr);
+  }
+
   auto *nextEntry =
       llvm::ConstantExpr::getNullValue(IGM.DynamicReplacementLinkEntryPtrTy);
   llvm::Constant *fields[] = {funPtr, nextEntry};
@@ -1708,8 +1725,8 @@ void IRGenModule::emitVTableStubs() {
 
 static IRLinkage
 getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
-             ForDefinition_t isDefinition,
-             bool isWeakImported) {
+             ForDefinition_t isDefinition, bool isWeakImported,
+             bool isKnownLocal = false) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   IRLinkage{llvm::GlobalValue::LINKAGE##Linkage,                               \
             llvm::GlobalValue::VISIBILITY##Visibility,                         \
@@ -1749,7 +1766,8 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
   case SILLinkage::Private: {
     if (info.forcePublicDecls() && !isDefinition)
       return getIRLinkage(info, SILLinkage::PublicExternal, isDefinition,
-                          isWeakImported);
+                          isWeakImported, isKnownLocal);
+
     auto linkage = info.needLinkerToMergeDuplicateSymbols()
                        ? llvm::GlobalValue::LinkOnceODRLinkage
                        : llvm::GlobalValue::InternalLinkage;
@@ -1765,7 +1783,10 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
     auto linkage = isWeakImported ? llvm::GlobalValue::ExternalWeakLinkage
                                   : llvm::GlobalValue::ExternalLinkage;
-    return {linkage, llvm::GlobalValue::DefaultVisibility, ImportedStorage};
+    return {linkage, llvm::GlobalValue::DefaultVisibility,
+            isKnownLocal
+                ? llvm::GlobalValue::DefaultStorageClass
+                : ImportedStorage};
   }
 
   case SILLinkage::HiddenExternal:
@@ -1774,8 +1795,10 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
       return RESULT(AvailableExternally, Hidden, Default);
 
     return {llvm::GlobalValue::ExternalLinkage,
-            llvm::GlobalValue::DefaultVisibility, ImportedStorage};
-
+            llvm::GlobalValue::DefaultVisibility,
+            isKnownLocal
+                ? llvm::GlobalValue::DefaultStorageClass
+                : ImportedStorage};
   }
 
   llvm_unreachable("bad SIL linkage");
@@ -1790,9 +1813,15 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   // entire linkage computation.
   UniversalLinkageInfo linkInfo(IGM);
   bool weakImported = entity.isWeakImported(IGM.getSwiftModule());
+
+  bool isKnownLocal = entity.isAlwaysSharedLinkage();
+  if (const auto *DC = entity.getDeclContextForEmission())
+    if (const auto *MD = DC->getParentModule())
+      isKnownLocal = IGM.getSwiftModule() == MD;
+
   auto IRL =
       getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
-                   ForDefinition, weakImported);
+                   ForDefinition, weakImported, isKnownLocal);
   ApplyIRLinkage(IRL).to(global);
 
   // Everything externally visible is considered used in Swift.
@@ -1817,21 +1846,16 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
                        const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
   LinkInfo result;
-  // FIXME: For anything in the standard library, we assume is locally defined.
-  // The only two ways imported interfaces are currently created is via a shims
-  // interface where the ClangImporter will correctly give us the proper DLL
-  // storage for the declaration.  Otherwise, it is from a `@_silgen_name`
-  // attributed declaration, which we explicitly handle elsewhere.  So, in the
-  // case of a standard library build, just assume everything is locally
-  // defined.  Ideally, we would integrate the linkage calculation properly to
-  // avoid this special casing.
-  ForDefinition_t isStdlibOrDefinition =
-      ForDefinition_t(swiftModule->isStdlibModule() || isDefinition);
+
+  bool isKnownLocal = entity.isAlwaysSharedLinkage();
+  if (const auto *DC = entity.getDeclContextForEmission())
+    if (const auto *MD = DC->getParentModule())
+      isKnownLocal = MD == swiftModule;
 
   entity.mangle(result.Name);
   bool weakImported = entity.isWeakImported(swiftModule);
-  result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isStdlibOrDefinition),
-                            isDefinition, weakImported);
+  result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
+                            isDefinition, weakImported, isKnownLocal);
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2312,7 +2336,17 @@ static llvm::GlobalVariable *createGlobalForDynamicReplacementFunctionKey(
   ConstantInitBuilder builder(IGM);
   auto B = builder.beginStruct(IGM.DynamicReplacementKeyTy);
   B.addRelativeAddress(linkEntry);
-  B.addInt32(0);
+  auto schema = IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
+  if (schema) {
+    assert(keyEntity.hasSILFunction() ||
+           keyEntity.isOpaqueTypeDescriptorAccessor());
+    auto authEntity = keyEntity.hasSILFunction()
+                          ? PointerAuthEntity(keyEntity.getSILFunction())
+                          : PointerAuthEntity::Special::TypeDescriptor;
+    B.addInt32(PointerAuthInfo::getOtherDiscriminator(IGM, schema, authEntity)
+                   ->getZExtValue());
+  } else
+    B.addInt32(0);
   B.finishAndSetAsInitializer(key);
   key->setConstant(true);
   IGM.setTrueConstGlobal(key);
@@ -2352,20 +2386,25 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto *FnAddr = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
       IGF.CurFn, FunctionPtrTy);
 
-  llvm::Value *ReplFn = nullptr, *rhs = nullptr;
+  auto &schema = getOptions().PointerAuth.SwiftDynamicReplacements;
+  llvm::Value *ReplFn = nullptr, *hasReplFn = nullptr;
 
   if (UseBasicDynamicReplacement) {
     ReplFn = IGF.Builder.CreateLoad(fnPtrAddr, getPointerAlignment());
-    rhs = FnAddr;
+    llvm::Value *lhs = ReplFn;
+    if (schema.isEnabled()) {
+      lhs = emitPointerAuthStrip(IGF, lhs, schema.getKey());
+    }
+    hasReplFn = IGF.Builder.CreateICmpEQ(lhs, FnAddr);
   } else {
     // Call swift_getFunctionReplacement to check which function to call.
     auto *callRTFunc =
         IGF.Builder.CreateCall(getGetReplacementFn(), {ReplAddr, FnAddr});
     callRTFunc->setDoesNotThrow();
     ReplFn = callRTFunc;
-    rhs = llvm::ConstantExpr::getNullValue(ReplFn->getType());
+    hasReplFn = IGF.Builder.CreateICmpEQ(ReplFn,
+                  llvm::ConstantExpr::getNullValue(ReplFn->getType()));
   }
-  auto *hasReplFn = IGF.Builder.CreateICmpEQ(ReplFn, rhs);
 
   auto *replacedBB = IGF.createBasicBlock("forward_to_replaced");
   auto *origEntryBB = IGF.createBasicBlock("original_entry");
@@ -2380,7 +2419,11 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto *fnType = signature.getType()->getPointerTo();
   auto *realReplFn = IGF.Builder.CreateBitCast(ReplFn, fnType);
 
-  auto *Res = IGF.Builder.CreateCall(FunctionPointer(realReplFn, signature),
+  auto authEntity = PointerAuthEntity(f);
+  auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
+
+  auto *Res = IGF.Builder.CreateCall(FunctionPointer(realReplFn, authInfo,
+                                                     signature),
                                      forwardedArgs);
   Res->setTailCall();
   if (IGF.CurFn->getReturnType()->isVoidTy())
@@ -2417,16 +2460,26 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
     IGM.DebugInfo->emitArtificialFunction(IGF, dispatchFn);
   llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, 0),
                                llvm::ConstantInt::get(IGM.Int32Ty, 0)};
-  auto *fnPtr = IGF.Builder.CreateLoad(
-      llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices),
-      IGM.getPointerAlignment());
-  auto *typeFnPtr =
-      IGF.Builder.CreateBitOrPointerCast(fnPtr, implFn->getType());
+
+  auto *fnPtrAddr =
+      llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices);
+  auto *fnPtr = IGF.Builder.CreateLoad(fnPtrAddr, IGM.getPointerAlignment());
+  auto *typeFnPtr = IGF.Builder.CreateBitOrPointerCast(fnPtr, implFn->getType());
+
   SmallVector<llvm::Value *, 16> forwardedArgs;
   for (auto &arg : dispatchFn->args())
     forwardedArgs.push_back(&arg);
-  auto *Res = IGF.Builder.CreateCall(FunctionPointer(typeFnPtr, signature),
-                                     forwardedArgs);
+
+  auto &schema = IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
+  assert(keyEntity.hasSILFunction() ||
+         keyEntity.isOpaqueTypeDescriptorAccessor());
+  auto authEntity = keyEntity.hasSILFunction()
+                        ? PointerAuthEntity(keyEntity.getSILFunction())
+                        : PointerAuthEntity::Special::TypeDescriptor;
+  auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
+  auto *Res = IGF.Builder.CreateCall(
+      FunctionPointer(typeFnPtr, authInfo, signature), forwardedArgs);
+
   Res->setTailCall();
   if (implFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
@@ -2535,8 +2588,13 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   SmallVector<llvm::Value *, 16> forwardedArgs;
   for (auto &arg : implFn->args())
     forwardedArgs.push_back(&arg);
-  auto *Res = IGF.Builder.CreateCall(FunctionPointer(typeFnPtr, signature),
-                                     forwardedArgs);
+
+  auto &schema = getOptions().PointerAuth.SwiftDynamicReplacements;
+  auto authInfo = PointerAuthInfo::emit(
+      IGF, schema, fnPtrAddr,
+      PointerAuthEntity(f->getDynamicallyReplacedFunction()));
+  auto *Res = IGF.Builder.CreateCall(
+      FunctionPointer(typeFnPtr, authInfo, signature), forwardedArgs);
 
   if (implFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
@@ -2675,6 +2733,28 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
   } else {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
       .to(gotEquivalent);
+  }
+
+  // Context descriptor pointers need to be signed.
+  // TODO: We should really sign a pointer to *any* code entity or true-const
+  // metadata structure that may reference data structures with function
+  // pointers inside them.
+  if (entity.isContextDescriptor()) {
+    auto schema = IGM.getOptions().PointerAuth.TypeDescriptors;
+    if (schema) {
+      auto signedValue = IGM.getConstantSignedPointer(
+          global, schema, PointerAuthEntity::Special::TypeDescriptor,
+          /*storageAddress*/ gotEquivalent);
+      gotEquivalent->setInitializer(signedValue);
+    }
+  } else if (entity.isDynamicallyReplaceableKey()) {
+    auto schema = IGM.getOptions().PointerAuth.SwiftDynamicReplacementKeys;
+    if (schema) {
+      auto signedValue = IGM.getConstantSignedPointer(
+          global, schema, PointerAuthEntity::Special::DynamicReplacementKey,
+          /*storageAddress*/ gotEquivalent);
+      gotEquivalent->setInitializer(signedValue);
+    }
   }
 
   return gotEquivalent;

@@ -147,7 +147,8 @@ public:
     }
 
     if (ParsedArgs.getLastArg(OPT_help)) {
-      std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
+      std::string ExecutableName =
+          llvm::sys::path::stem(MainExecutablePath).str();
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Format Tool", options::SwiftIndentOption, 0,
                        /*ShowAllAliases*/false);
@@ -183,7 +184,7 @@ public:
       LineRanges.push_back("1:" + std::to_string(UINT_MAX));
     }
 
-    std::string Output = Doc.memBuffer().getBuffer();
+    std::string Output = Doc.memBuffer().getBuffer().str();
     for (unsigned Range = 0; Range < LineRanges.size(); ++Range) {
       unsigned FromLine;
       unsigned ToLine;

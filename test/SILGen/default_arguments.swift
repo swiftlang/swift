@@ -236,8 +236,8 @@ class ReabstractDefaultArgument<T> {
 
 // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments32testDefaultArgumentReabstractionyyF
 // function_ref default_arguments.ReabstractDefaultArgument.__allocating_init <A>(default_arguments.ReabstractDefaultArgument<A>.Type)(a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>
-// CHECK: [[FN:%.*]] = function_ref @$s17default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <τ_0_0, τ_0_0>
-// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Int>() : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed <τ_0_0, τ_0_1> in (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <τ_0_0, τ_0_0>
+// CHECK: [[FN:%.*]] = function_ref @$s17default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <τ_0_0, τ_0_0>
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Int>() : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <τ_0_0, τ_0_0>
 // CHECK-NEXT: [[RESULT_CONV:%.*]] = convert_function [[RESULT]]
 // CHECK-NEXT: function_ref reabstraction thunk helper from @escaping @callee_guaranteed (@in_guaranteed Swift.Int, @in_guaranteed Swift.Int) -> (@unowned Swift.Bool) to @escaping @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
 // CHECK-NEXT: [[THUNK:%.*]] = function_ref @$sS2iSbIegnnd_S2iSbIegyyd_TR : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed Int, @in_guaranteed Int) -> Bool) -> Bool

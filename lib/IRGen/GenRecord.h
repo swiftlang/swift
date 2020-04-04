@@ -595,6 +595,28 @@ public:
     return 0;
   }
 
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override {
+    if (auto field = asImpl().getFixedExtraInhabitantProvidingField(IGM)) {
+      // The non-extra-inhabitant-providing fields of the type must be
+      // trivial, because an enum may contain garbage values in those fields'
+      // storage which the value witness operation won't handle.
+      for (auto &otherField : asImpl().getFields()) {
+        if (field == &otherField)
+          continue;
+        auto &ti = otherField.getTypeInfo();
+        if (!ti.isPOD(ResilienceExpansion::Maximal)) {
+          return false;
+        }
+      }
+
+      return field->getTypeInfo()
+        .canValueWitnessExtraInhabitantsUpTo(IGM, index);
+    }
+    
+    return false;
+  }
+
   APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
                                      unsigned bits,
                                      unsigned index) const override {

@@ -129,7 +129,6 @@ public:
     ImportFilter |= ModuleDecl::ImportFilterKind::Public;
     ImportFilter |= ModuleDecl::ImportFilterKind::Private;
     ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
 
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
       SF->getImportedModules(Modules, ImportFilter);
@@ -147,6 +146,7 @@ struct IndexedWitness {
 class IndexSwiftASTWalker : public SourceEntityWalker {
   IndexDataConsumer &IdxConsumer;
   SourceManager &SrcMgr;
+  SourceFile *InitialFile; ///< The SoureFile we started walking from, if any.
   unsigned BufferID;
   bool enableWarnings;
 
@@ -282,8 +282,9 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
-                      unsigned BufferID = -1)
-      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr), BufferID(BufferID),
+                      SourceFile *SF = nullptr)
+      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr), InitialFile(SF),
+        BufferID(SF ? SF->getBufferID().getValueOr(-1) : -1),
         enableWarnings(IdxConsumer.enableWarnings()) {}
 
   ~IndexSwiftASTWalker() override {
@@ -493,6 +494,13 @@ private:
     }
 
     return finishSourceEntity(Info.symInfo, Info.roles);
+  }
+
+  bool visitCallAsFunctionReference(ValueDecl *D, CharSourceRange Range,
+                                    ReferenceMetaData Data) override {
+    // Index implicit callAsFunction reference.
+    return visitDeclReference(D, Range, /*CtorTyRef*/ nullptr,
+                              /*ExtTyRef*/ nullptr, Type(), Data);
   }
 
   Decl *getParentDecl() const {
@@ -748,7 +756,18 @@ bool IndexSwiftASTWalker::visitImports(
       continue;
     bool IsClangModule = *IsClangModuleOpt;
 
-    if (!IdxConsumer.startDependency(Mod->getName().str(), Path, IsClangModule,
+    StringRef ModuleName = Mod->getNameStr();
+
+    // If this module is an underscored cross-import overlay, use the name
+    // of the underlying module instead.
+    if (InitialFile) {
+      ModuleDecl *Underlying =
+        InitialFile->getModuleShadowedBySeparatelyImportedOverlay(Mod);
+      if (Underlying)
+        ModuleName = Underlying->getNameStr();
+    }
+
+    if (!IdxConsumer.startDependency(ModuleName, Path, IsClangModule,
                                      Mod->isSystemModule()))
       return false;
     if (!IsClangModule)
@@ -1577,16 +1596,15 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
 
 void index::indexDeclContext(DeclContext *DC, IndexDataConsumer &consumer) {
   assert(DC);
-  unsigned bufferId = DC->getParentSourceFile()->getBufferID().getValue();
-  IndexSwiftASTWalker walker(consumer, DC->getASTContext(), bufferId);
+  SourceFile *SF = DC->getParentSourceFile();
+  IndexSwiftASTWalker walker(consumer, DC->getASTContext(), SF);
   walker.visitDeclContext(DC);
   consumer.finish();
 }
 
 void index::indexSourceFile(SourceFile *SF, IndexDataConsumer &consumer) {
   assert(SF);
-  unsigned bufferID = SF->getBufferID().getValue();
-  IndexSwiftASTWalker walker(consumer, SF->getASTContext(), bufferID);
+  IndexSwiftASTWalker walker(consumer, SF->getASTContext(), SF);
   walker.visitModule(*SF->getParentModule());
   consumer.finish();
 }

@@ -462,6 +462,7 @@ extension String {
         // and bridge that instead. Also avoids CF deleting any BOM that may be
         // present
         var copy = self
+        // TODO: small capacity minimum is lifted, just need to make native
         copy._guts.grow(_SmallString.capacity + 1)
         _internalInvariant(!copy._guts.isSmall)
         return copy._bridgeToObjectiveCImpl()
@@ -482,14 +483,13 @@ extension String {
   }
 }
 
-@available(macOS, introduced: 9999, deprecated)
-@available(iOS, introduced: 9999, deprecated)
-@available(watchOS, introduced: 9999, deprecated)
-@available(tvOS, introduced: 9999, deprecated)
-@available(*, deprecated)
+// Note: This function is not intended to be called from Swift.  The
+// availability information here is perfunctory; this function isn't considered
+// part of the Stdlib's Swift ABI.
+@available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
 @_cdecl("_SwiftCreateBridgedString")
 @usableFromInline
-internal func _SwiftCreateBridgedString(
+internal func _SwiftCreateBridgedString_DoNotCall(
   bytes: UnsafePointer<UInt8>,
   length: Int,
   encoding: _swift_shims_CFStringEncoding
@@ -528,7 +528,7 @@ public func _getDescription<T>(_ x: T) -> AnyObject {
 
 @_silgen_name("swift_stdlib_NSStringFromUTF8")
 @usableFromInline //this makes the symbol available to the runtime :(
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
 internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   -> AnyObject {
   return String(

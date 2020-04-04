@@ -109,6 +109,38 @@ enum class SourceFileKind {
   Interface ///< Came from a .swiftinterface file, representing another module.
 };
 
+/// Contains information about where a particular path is used in
+/// \c SourceFiles.
+struct SourceFilePathInfo {
+  struct Comparator {
+    bool operator () (SourceLoc lhs, SourceLoc rhs) const {
+      return lhs.getOpaquePointerValue() <
+             rhs.getOpaquePointerValue();
+    }
+  };
+
+  SourceLoc physicalFileLoc{};
+  std::set<SourceLoc, Comparator> virtualFileLocs{}; // std::set for sorting
+
+  SourceFilePathInfo() = default;
+
+  void merge(const SourceFilePathInfo &other) {
+    if (other.physicalFileLoc.isValid()) {
+      assert(!physicalFileLoc.isValid());
+      physicalFileLoc = other.physicalFileLoc;
+    }
+
+    for (auto &elem : other.virtualFileLocs) {
+      virtualFileLocs.insert(elem);
+    }
+  }
+
+  bool operator == (const SourceFilePathInfo &other) const {
+    return physicalFileLoc == other.physicalFileLoc &&
+           virtualFileLocs == other.virtualFileLocs;
+  }
+};
+
 /// Discriminator for resilience strategy.
 enum class ResilienceStrategy : unsigned {
   /// Public nominal types: fragile
@@ -133,6 +165,9 @@ class OverlayFile;
 ///
 /// \sa FileUnit
 class ModuleDecl : public DeclContext, public TypeDecl {
+  friend class DirectOperatorLookupRequest;
+  friend class DirectPrecedenceGroupLookupRequest;
+
 public:
   typedef ArrayRef<Located<Identifier>> AccessPathTy;
   typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;
@@ -257,8 +292,38 @@ public:
   void addFile(FileUnit &newFile);
   void removeFile(FileUnit &existingFile);
 
+  /// Creates a map from \c #filePath strings to corresponding \c #file
+  /// strings, diagnosing any conflicts.
+  ///
+  /// A given \c #filePath string always maps to exactly one \c #file string,
+  /// but it is possible for \c #sourceLocation directives to introduce
+  /// duplicates in the opposite direction. If there are such conflicts, this
+  /// method will diagnose the conflict and choose a "winner" among the paths
+  /// in a reproducible way. The \c bool paired with the \c #file string is
+  /// \c true for paths which did not have a conflict or won a conflict, and
+  /// \c false for paths which lost a conflict. Thus, if you want to generate a
+  /// reverse mapping, you should drop or special-case the \c #file strings that
+  /// are paired with \c false.
+  ///
+  /// Note that this returns an empty StringMap if concise \c #file strings are
+  /// disabled. Users should fall back to using the file path in this case.
+  llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>
+  computeMagicFileStringMap(bool shouldDiagnose) const;
+
   /// Add a file declaring a cross-import overlay.
   void addCrossImportOverlayFile(StringRef file);
+
+  /// If this method returns \c false, the module does not declare any
+  /// cross-import overlays.
+  ///
+  /// This is a quick check you can use to bail out of expensive logic early;
+  /// however, a \c true return doesn't guarantee that the module declares
+  /// cross-import overlays--it only means that it \em might declare some.
+  ///
+  /// (Specifically, this method checks if the module loader found any
+  /// swiftoverlay files, but does not load the files to see if they list any
+  /// overlay modules.)
+  bool mightDeclareCrossImportOverlays() const;
 
   /// Append to \p overlayNames the names of all modules that this module
   /// declares should be imported when \p bystanderName is imported.
@@ -272,6 +337,31 @@ public:
   /// Get the list of all modules this module declares a cross-import with.
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
+
+  /// A lazily populated  mapping from each declared cross import overlay this
+  /// module transitively underlies to its bystander and immediate underlying
+  /// module.
+  llvm::SmallDenseMap<ModuleDecl *, std::pair<Identifier, ModuleDecl *>, 1>
+  declaredCrossImportsTransitive;
+
+  /// Determines if the given \p overlay is a declarared cross-import overlay of
+  /// this module, or an of its transitively declared overlay modules.
+  ///
+  /// This is used by tooling to map overlays to their underlying modules, and t
+  bool isUnderlyingModuleOfCrossImportOverlay(const ModuleDecl *overlay);
+
+  /// If \p overlay is a transitively declared cross-import overlay of this
+  /// module, gets the list of bystander modules that need to be imported
+  /// alongside this module for the overlay to be loaded.
+  void getAllBystandersForCrossImportOverlay(
+      ModuleDecl *overlay, SmallVectorImpl<Identifier> &bystanders);
+
+  /// Walks and loads the declared cross-import overlays of this module,
+  /// transitively, to find all overlays this module underlies.
+  ///
+  /// This is used by tooling to present these overlays as part of this module.
+  void findDeclaredCrossImportOverlaysTransitive(
+      SmallVectorImpl<ModuleDecl *> &overlays);
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
@@ -532,6 +622,12 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const;
+
+  /// Finds all operator decls of this module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const;
 
   /// Finds all precedence group decls of this module.
   ///

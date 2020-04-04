@@ -12,7 +12,7 @@
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -33,7 +33,7 @@ public struct _stdlib_thread_barrier_t {
 #if os(Windows)
   var mutex: UnsafeMutablePointer<SRWLOCK>?
   var cond: UnsafeMutablePointer<CONDITION_VARIABLE>?
-#elseif os(Cygwin) || os(FreeBSD)
+#elseif os(Cygwin) || os(FreeBSD) || os(OpenBSD)
   var mutex: UnsafeMutablePointer<pthread_mutex_t?>?
   var cond: UnsafeMutablePointer<pthread_cond_t?>?
 #else

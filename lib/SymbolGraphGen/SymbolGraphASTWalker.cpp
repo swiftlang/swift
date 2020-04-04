@@ -25,84 +25,47 @@ SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
                                            const SymbolGraphOptions &Options)
   : Options(Options),
     M(M),
-    Graph(M, None, Options.Target, Ctx) {}
+    MainGraph(*this, M, None, Ctx) {}
 
-/// Returns `true` if the symbol should be included as a node in the graph.
-bool SymbolGraphASTWalker::shouldIncludeNode(const Decl *D) const {
-  // If this decl isn't in this module, don't record it,
-  // as it will appear elsewhere in its module's symbol graph.
-  if (D->getModuleContext()->getName() != M.getName()) {
-    return false;
+/// Get a "sub" symbol graph for the parent module of a type that
+/// the main module `M` is extending.
+SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(ModuleDecl *M) {
+  if (this->M.getNameStr().equals(M->getNameStr())) {
+    return &MainGraph;
   }
-
-  // Implicit declarations are probably not going to have documentation,
-  // so don't record it in the symbol graph.
-  if (D->isImplicit()) {
-    return false;
-  }
-  
-  // At this point, the declaration must be a ValueDecl.
-  auto VD = cast<ValueDecl>(D);
-
-  // Don't record unconditionally private declarations
-  if (VD->isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic=*/false)) {
-    return false;
-  }
-
-  // Don't record effectively internal declarations if specified
-  if (Options.MinimumAccessLevel > AccessLevel::Internal &&
-      VD->hasUnderscoredNaming()) {
-    return false;
-  }
-
-  // Symbols must meet the minimum access level to be included in the graph.
-  if (VD->getFormalAccess() < Options.MinimumAccessLevel) {
-    return false;
-  }
-
-  // Special cases
-
-  auto BaseName = VD->getBaseName().userFacingName();
-
-  // ${MODULE}Version{Number,String} in ${Module}.h
-  SmallString<32> VersionNameIdentPrefix { M.getName().str() };
-  VersionNameIdentPrefix.append("Version");
-
-  if (BaseName.startswith(VersionNameIdentPrefix.str())) {
-    return false;
-  }
-
-  // Automatically mapped SIMD types 
-  bool ShouldInclude = llvm::StringSwitch<bool>(BaseName)
-#define MAP_SIMD_TYPE(C_TYPE, _, __) \
-    .Case("swift_" #C_TYPE "2", false) \
-    .Case("swift_" #C_TYPE "3", false) \
-    .Case("swift_" #C_TYPE "4", false)
-#include "swift/ClangImporter/SIMDMappedTypes.def"
-    .Case("SWIFT_TYPEDEFS", false)
-    .Case("char16_t", false)
-    .Case("char32_t", false)
-    .Default(true);
-
-  return ShouldInclude;
-}
-
-/// Get a "sub" symbol graph for the parent module of a type that the main module `M` is extending.
-SymbolGraph &SymbolGraphASTWalker::getExtendedModuleSymbolGraph(ModuleDecl *M) {
   auto Found = ExtendedModuleGraphs.find(M);
   if (Found != ExtendedModuleGraphs.end()) {
-    return *Found->getSecond();
+    return Found->getSecond();
   }
   auto *Memory = Ctx.allocate(sizeof(SymbolGraph), alignof(SymbolGraph));  
-  auto *SG = new (Memory) SymbolGraph(Graph.M,
+  auto *SG = new (Memory) SymbolGraph(*this,
+                                      MainGraph.M,
                                       Optional<ModuleDecl *>(M),
-                                      Options.Target,
                                       Ctx);
   ExtendedModuleGraphs.insert({M, SG});
-  return *SG;
+  return SG;
 }
 
+namespace {
+bool isUnavailableOrObsoleted(const Decl *D) {
+  if (const auto *Avail =
+        D->getAttrs().getUnavailable(D->getASTContext())) {
+    switch (Avail->getVersionAvailability(D->getASTContext())) {
+      case AvailableVersionComparison::Unavailable:
+      case AvailableVersionComparison::Obsoleted:
+        return true;
+      default:
+        break;
+    }
+  }
+  return false;
+}
+} // end anonymous namespace
+
 bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
+    if (isUnavailableOrObsoleted(D)) {
+      return false;
+    }
 
     switch (D->getKind()) {
     // We'll record nodes for the following kinds of declarations.
@@ -114,7 +77,10 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     case swift::DeclKind::Constructor:
     case swift::DeclKind::Func:
     case swift::DeclKind::Var:
+    case swift::DeclKind::Subscript:
     case swift::DeclKind::TypeAlias:
+    case swift::DeclKind::AssociatedType:
+    case swift::DeclKind::Extension:
       break;
       
     // We'll descend into everything else.
@@ -122,28 +88,103 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
       return true;
   }
 
-  if (!shouldIncludeNode(D)) {
-    return false;
+  auto SG = getModuleSymbolGraph(D->getModuleContext());
+
+  // If this is an extension, let's check that it implies some new conformances,
+  // potentially with generic requirements.
+  if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
+    const auto *ExtendedNominal = Extension->getExtendedNominal();
+    // Ignore effecively private decls.
+    if (ExtendedNominal->hasUnderscoredNaming()) {
+      return false;
+    }
+
+    if (isUnavailableOrObsoleted(ExtendedNominal)) {
+      return false;
+    }
+
+    // If there are some protocol conformances on this extension, we'll
+    // grab them for some new conformsTo relationships.
+    if (!Extension->getInherited().empty()) {
+      auto ExtendedSG =
+          getModuleSymbolGraph(ExtendedNominal->getModuleContext());
+
+      // The symbol graph to use to record these relationships.
+      SmallVector<const ProtocolDecl *, 4> Protocols;
+      SmallVector<const ProtocolCompositionType *, 4> UnexpandedCompositions;
+
+      auto HandleProtocolOrComposition = [&](Type Ty) {
+        if (const auto *Proto =
+            dyn_cast_or_null<ProtocolDecl>(Ty->getAnyNominal())) {
+          Protocols.push_back(Proto);
+        } else if (const auto *Comp = Ty->getAs<ProtocolCompositionType>()) {
+          UnexpandedCompositions.push_back(Comp);
+        } else {
+          abort();
+        }
+      };
+
+      for (const auto InheritedLoc : Extension->getInherited()) {
+        auto InheritedTy = InheritedLoc.getType();
+        if (!InheritedTy) {
+          continue;
+        }
+        HandleProtocolOrComposition(InheritedTy);
+      }
+
+      while (!UnexpandedCompositions.empty()) {
+        const auto *Comp = UnexpandedCompositions.pop_back_val();
+        for (const auto Member : Comp->getMembers()) {
+          HandleProtocolOrComposition(Member);
+        }
+      }
+
+      Symbol Source(ExtendedSG, ExtendedNominal, nullptr);
+
+      for (const auto *Proto : Protocols) {
+        Symbol Target(&MainGraph, Proto, nullptr);
+        ExtendedSG->recordEdge(Source, Target, RelationshipKind::ConformsTo(),
+                               Extension);
+      }
+
+      // While we won't record this node per se, or all of the other kinds of
+      // relationships, we might establish some synthesized members because we
+      // extended an external type.
+      if (ExtendedNominal->getModuleContext() != &M) {
+        ExtendedSG->recordConformanceSynthesizedMemberRelationships({
+          ExtendedSG,
+          ExtendedNominal,
+          nullptr
+        });
+      }
+    }
+
+    // Continue looking into the extension.
+    return true;
   }
 
   auto *VD = cast<ValueDecl>(D);
 
+  if (!SG->canIncludeDeclAsNode(VD)) {
+    return false;
+  }
+
   // If this symbol extends a type from another module, record it in that
   // module's symbol graph, which will be emitted separately.
   if (const auto *Extension
-          = dyn_cast_or_null<ExtensionDecl>(VD->getInnermostDeclContext())) {
+      = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
     if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
       auto ExtendedModule = ExtendedNominal->getModuleContext();
+      auto ExtendedSG = getModuleSymbolGraph(ExtendedModule);
       if (ExtendedModule != &M) {
-        auto &SG = getExtendedModuleSymbolGraph(ExtendedModule);
-        SG.recordNode(VD);
+        ExtendedSG->recordNode(Symbol(ExtendedSG, VD, nullptr));
         return true;
       }
     }
   }
 
   // Otherwise, record this in the main module `M`'s symbol graph.
-  Graph.recordNode(VD);
+  SG->recordNode(Symbol(SG, VD, nullptr));
 
   return true;
 }

@@ -165,7 +165,7 @@ assuming ``E``, ``F`` do not have any overriding declarations in the same file:
   }
 
 Advice: If WMO is enabled, use 'internal' when a declaration does not need to be accessed outside of module
----------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------
 
 WMO (see section above) causes the compiler to compile a module's
 sources all together at once. This allows the optimizer to have module

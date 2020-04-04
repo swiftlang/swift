@@ -71,6 +71,7 @@ public:
     case PatternMatch:
       return 0;
 
+    case ClosureBody:
     case ContextualType:
     case OpenedGeneric:
     case GenericArgument:
@@ -370,6 +371,15 @@ public:
 
   /// Determine whether this locator points to the coercion expression.
   bool isForCoercion() const;
+
+  /// Determine whether this locator points to the `try?` expression.
+  bool isForOptionalTry() const;
+
+  /// Determine whether this locator points directly to a given expression.
+  template <class E> bool directlyAt() const {
+    auto *anchor = getAnchor();
+    return anchor && isa<E>(anchor) && getPath().empty();
+  }
 
   /// Attempts to cast the first path element of the locator to a specific
   /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or
@@ -705,6 +715,20 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::TypeParameterRequirement;
+  }
+};
+
+class LocatorPathElt::ClosureBody final : public LocatorPathElt {
+  public:
+  ClosureBody(bool hasExplicitReturn = false)
+    : LocatorPathElt(ConstraintLocator::ClosureBody,
+                     hasExplicitReturn) {}
+
+  /// Indicates whether body of the closure has any `return` statements.
+  bool hasExplicitReturn() const { return bool(getValue(0)); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ClosureBody;
   }
 };
 

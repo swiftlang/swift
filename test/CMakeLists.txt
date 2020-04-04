@@ -66,6 +66,7 @@ function(get_test_dependencies SDK result_var_name)
       dsymutil
       FileCheck
       llc
+      llvm-ar
       llvm-as
       llvm-bcanalyzer
       llvm-cov
@@ -240,30 +241,30 @@ foreach(SDK ${SWIFT_SDKS})
     set(test_dependencies)
     get_test_dependencies("${SDK}" test_dependencies)
 
-    # NOTE create a stub BlocksRuntime library that can be used for the
-    # reflection tests
-    file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
-      "void
+    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+      # NOTE create a stub BlocksRuntime library that can be used for the
+      # reflection tests
+      file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
+        "void
 #if defined(_WIN32)
 __declspec(dllexport)
 #endif
 _Block_release(void) { }\n")
-    _add_swift_target_library_single(
-      BlocksRuntimeStub${VARIANT_SUFFIX}
-      BlocksRuntimeStub
-      SHARED
-      ARCHITECTURE ${ARCH}
-      SDK ${SDK}
-      INSTALL_IN_COMPONENT dev
-      ${test_bin_dir}/Inputs/BlocksRuntime.c)
-    set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
-      ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
-      LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
-      RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
-      OUTPUT_NAME BlocksRuntime)
-    list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
+      _add_swift_target_library_single(
+        BlocksRuntimeStub${VARIANT_SUFFIX}
+        BlocksRuntimeStub
+        SHARED
+        ARCHITECTURE ${ARCH}
+        SDK ${SDK}
+        INSTALL_IN_COMPONENT dev
+        ${test_bin_dir}/Inputs/BlocksRuntime.c)
+      set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
+        LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
+        RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
+        OUTPUT_NAME BlocksRuntime)
+      list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
 
-    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
       list(APPEND test_dependencies
           "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 

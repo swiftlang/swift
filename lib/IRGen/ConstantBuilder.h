@@ -24,8 +24,13 @@
 #include "IRGenModule.h"
 #include "IRGenFunction.h"
 
+namespace clang {
+class PointerAuthSchema;
+}
+
 namespace swift {
 namespace irgen {
+class PointerAuthEntity;
 
 class ConstantAggregateBuilderBase;
 class ConstantStructBuilder;
@@ -115,6 +120,15 @@ public:
             llvm::ArrayType::get(IGM().Int8Ty,
                                  align.getValue() - misalignment.getValue())));
   }
+
+  using super::addSignedPointer;
+  void addSignedPointer(llvm::Constant *pointer,
+                        const clang::PointerAuthSchema &schema,
+                        const PointerAuthEntity &entity);
+
+  void addSignedPointer(llvm::Constant *pointer,
+                        const clang::PointerAuthSchema &schema,
+                        uint16_t otherDiscriminator);
 };
 
 class ConstantArrayBuilder

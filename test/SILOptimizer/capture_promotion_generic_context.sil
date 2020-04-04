@@ -90,11 +90,11 @@ sil @generic_promotable_box2 : $@convention(thin) <T> (@in R<T>, @in Int, <τ_0_
 entry(%0: $*R<T>, %1 : $*Int, %b : $<τ_0_0> { var E< (R<τ_0_0>)->Int > } <T>):
   %a = project_box %b : $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>, 0
   %e = load %a : $*E<(R<T>)->Int>
-  switch_enum %e : $E<(R<T>)->Int>, case #E.Some!enumelt.1 : bb1, default bb2
+  switch_enum %e : $E<(R<T>)->Int>, case #E.Some!enumelt : bb1, default bb2
 
-bb1(%f : $@callee_guaranteed <A, B> in (@in_guaranteed A) -> @out B for <R<T>, Int>):
+bb1(%f : $@callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <R<T>, Int>):
   %t = tuple ()
-  apply %f(%1, %0) : $@callee_guaranteed <A, B> in (@in_guaranteed A) -> @out B for <R<T>, Int>
+  apply %f(%1, %0) : $@callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <R<T>, Int>
   br exit
 bb2:
   br exit

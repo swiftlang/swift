@@ -61,14 +61,20 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
                                             ModuleInterfaceOptions const &Opts,
                                             ModuleDecl *M) {
   auto &Ctx = M->getASTContext();
-  auto ToolsVersion = swift::version::getSwiftFullVersion(
-      Ctx.LangOpts.EffectiveLanguageVersion);
+  auto ToolsVersion =
+      getSwiftInterfaceCompilerVersionForCurrentCompiler(Ctx);
   out << "// " SWIFT_INTERFACE_FORMAT_VERSION_KEY ": "
       << InterfaceFormatVersion << "\n";
   out << "// " SWIFT_COMPILER_VERSION_KEY ": "
       << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
       << Opts.Flags << "\n";
+}
+
+std::string
+swift::getSwiftInterfaceCompilerVersionForCurrentCompiler(ASTContext &ctx) {
+  return swift::version::getSwiftFullVersion(
+             ctx.LangOpts.EffectiveLanguageVersion);
 }
 
 llvm::Regex swift::getSwiftInterfaceFormatVersionRegex() {
@@ -79,6 +85,11 @@ llvm::Regex swift::getSwiftInterfaceFormatVersionRegex() {
 llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
   return llvm::Regex("^// " SWIFT_MODULE_FLAGS_KEY ":(.*)$",
                      llvm::Regex::Newline);
+}
+
+llvm::Regex swift::getSwiftInterfaceCompilerVersionRegex() {
+  return llvm::Regex("^// " SWIFT_COMPILER_VERSION_KEY
+                     ": (.+)$", llvm::Regex::Newline);
 }
 
 /// Prints the imported modules in \p M to \p out in the form of \c import
@@ -283,21 +294,26 @@ public:
     const NominalTypeDecl *nominal;
     const IterableDeclContext *memberContext;
 
+    auto shouldInclude = [](const ExtensionDecl *extension) {
+      if (extension->isConstrainedExtension()) {
+        // Conditional conformances never apply to inherited protocols, nor
+        // can they provide unconditional conformances that might be used in
+        // other extensions.
+        return false;
+      }
+      return true;
+    };
     if ((nominal = dyn_cast<NominalTypeDecl>(D))) {
       directlyInherited = nominal->getInherited();
       memberContext = nominal;
 
     } else if (auto *extension = dyn_cast<ExtensionDecl>(D)) {
-      if (extension->isConstrainedExtension()) {
-        // Conditional conformances never apply to inherited protocols, nor
-        // can they provide unconditional conformances that might be used in
-        // other extensions.
+      if (!shouldInclude(extension)) {
         return;
       }
       nominal = extension->getExtendedNominal();
       directlyInherited = extension->getInherited();
       memberContext = extension;
-
     } else {
       return;
     }
@@ -306,6 +322,18 @@ public:
       return;
 
     map[nominal].recordProtocols(directlyInherited, D);
+    // Collect protocols inherited from super classes
+    if (auto *CD = dyn_cast<ClassDecl>(D)) {
+      for (auto *SD = CD->getSuperclassDecl(); SD;
+           SD = SD->getSuperclassDecl()) {
+        map[nominal].recordProtocols(SD->getInherited(), SD);
+        for (auto *Ext: SD->getExtensions()) {
+          if (shouldInclude(Ext)) {
+            map[nominal].recordProtocols(Ext->getInherited(), Ext);
+          }
+        }
+      }
+    }
 
     // Recurse to find any nested types.
     for (const Decl *member : memberContext->getMembers())
@@ -352,6 +380,9 @@ public:
                                     ModuleDecl *M,
                                     const NominalTypeDecl *nominal) const {
     if (ExtraProtocols.empty())
+      return;
+
+    if (!printOptions.shouldPrint(nominal))
       return;
 
     SmallPtrSet<ProtocolDecl *, 16> handledProtocols;

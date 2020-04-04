@@ -50,7 +50,9 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 
 SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
-    : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr) {
+    : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
+      MagicFileStringsByFilePath(
+          SM->computeMagicFileStringMap(/*shouldDiagnose=*/true)) {
   const SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
     auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
@@ -73,12 +75,8 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
               SILGenModule &SGM,
               Identifier moduleName,
               StringRef functionName,
-              Optional<std::initializer_list<Type>> inputTypes,
-              Optional<Type> outputType) {
-  // FIXME: the optionality of outputType and the presence of trustInputTypes
-  // are hacks for cases where coming up with those types is complicated, i.e.,
-  // when dealing with generic bridging functions.
-
+              std::initializer_list<Type> inputTypes,
+              Type outputType) {
   if (!cacheSlot) {
     ASTContext &ctx = SGM.M.getASTContext();
     ModuleDecl *mod = ctx.getLoadedModule(moduleName);
@@ -120,21 +118,18 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
       return SGM.Types.getLoweredType(ty, TypeExpansionContext::minimal());
     };
 
-    if (inputTypes) {
-      if (fnConv.hasIndirectSILResults()
-          || funcTy->getNumParameters() != inputTypes->size()
-          || !std::equal(
-                 fnConv.getParameterSILTypes().begin(),
-                 fnConv.getParameterSILTypes().end(),
-                 makeTransformIterator(inputTypes->begin(), toSILType))) {
-        SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
-                     moduleName.str(), functionName);
-        llvm::report_fatal_error("unable to set up the ObjC bridge!");
-      }
+    if (fnConv.hasIndirectSILResults()
+        || funcTy->getNumParameters() != inputTypes.size()
+        || !std::equal(
+               fnConv.getParameterSILTypes().begin(),
+               fnConv.getParameterSILTypes().end(),
+               makeTransformIterator(inputTypes.begin(), toSILType))) {
+      SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
+                   moduleName.str(), functionName);
+      llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
-    if (outputType
-        && fnConv.getSingleSILResultType() != toSILType(*outputType)) {
+    if (fnConv.getSingleSILResultType() != toSILType(outputType)) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName.str(), functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
@@ -151,16 +146,15 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
   return *cacheSlot;
 }
 
-#define REQUIRED(X) { Types.get##X##Type() }
-#define OPTIONAL(X) { OptionalType::get(Types.get##X##Type()) }
-#define GENERIC(X) None
+#define REQUIRED(X) Types.get##X##Type()
+#define OPTIONAL(X) OptionalType::get(Types.get##X##Type())
 
 #define GET_BRIDGING_FN(Module, FromKind, FromTy, ToKind, ToTy) \
   SILDeclRef SILGenModule::get##FromTy##To##ToTy##Fn() { \
     return getBridgingFn(FromTy##To##ToTy##Fn, *this, \
                          getASTContext().Id_##Module, \
                          "_convert" #FromTy "To" #ToTy, \
-                         FromKind(FromTy), \
+                         { FromKind(FromTy) }, \
                          ToKind(ToTy)); \
   }
 
@@ -176,7 +170,6 @@ GET_BRIDGING_FN(WinSDK, REQUIRED, WindowsBool, REQUIRED, Bool)
 #undef GET_BRIDGING_FN
 #undef REQUIRED
 #undef OPTIONAL
-#undef GENERIC
 
 static FuncDecl *diagnoseMissingIntrinsic(SILGenModule &sgm,
                                           SILLocation loc,
@@ -432,7 +425,8 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                          yields,
                                          /*results*/ {},
                                          /*error result*/ {},
-                                         SubstitutionMap(), false,
+                                         SubstitutionMap(),
+                                         SubstitutionMap(),
                                          getASTContext());
 
   auto env = sig->getGenericEnvironment();
@@ -493,7 +487,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
                                    None,
-                                   SubstitutionMap(), false,
+                                   SubstitutionMap(), SubstitutionMap(),
                                    C);
 
   SILGenFunctionBuilder builder(*this);
@@ -546,8 +540,7 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
 }
 
 static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
-  return constant.isDefaultArgGenerator() || constant.isForeign ||
-         constant.isCurried;
+  return constant.isDefaultArgGenerator() || constant.isForeign;
 }
 
 /// Set up the function for profiling instrumentation.
@@ -579,9 +572,7 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   if (!constant.hasDecl())
     return false;
 
-  if (constant.isCurried ||
-      constant.isForeign ||
-      constant.isDirectReference)
+  if (constant.isForeign)
     return false;
 
   auto *d = constant.getDecl();
@@ -760,6 +751,127 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
              F->print(llvm::dbgs()));
   F->verify();
+
+  emitDifferentiabilityWitnessesForFunction(constant, F);
+}
+
+void SILGenModule::emitDifferentiabilityWitnessesForFunction(
+    SILDeclRef constant, SILFunction *F) {
+  // Visit `@derivative` attributes and generate SIL differentiability
+  // witnesses.
+  // Skip if the SILDeclRef is a:
+  // - Default argument generator function.
+  // - Thunk.
+  if (!constant.hasDecl() || !constant.getAbstractFunctionDecl())
+    return;
+  if (constant.kind == SILDeclRef::Kind::DefaultArgGenerator ||
+      constant.isThunk())
+    return;
+  auto *AFD = constant.getAbstractFunctionDecl();
+  auto emitWitnesses = [&](DeclAttributes &Attrs) {
+    for (auto *diffAttr : Attrs.getAttributes<DifferentiableAttr>()) {
+      auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
+      assert((!F->getLoweredFunctionType()->getSubstGenericSignature() ||
+              diffAttr->getDerivativeGenericSignature()) &&
+             "Type-checking should resolve derivative generic signatures for "
+             "all original SIL functions with generic signatures");
+      AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
+                            diffAttr->getDerivativeGenericSignature());
+      emitDifferentiabilityWitness(AFD, F, config, /*jvp*/ nullptr,
+                                   /*vjp*/ nullptr, diffAttr);
+    }
+    for (auto *derivAttr : Attrs.getAttributes<DerivativeAttr>()) {
+      SILFunction *jvp = nullptr;
+      SILFunction *vjp = nullptr;
+      switch (derivAttr->getDerivativeKind()) {
+      case AutoDiffDerivativeFunctionKind::JVP:
+        jvp = F;
+        break;
+      case AutoDiffDerivativeFunctionKind::VJP:
+        vjp = F;
+        break;
+      }
+      auto *origAFD = derivAttr->getOriginalFunction();
+      auto origDeclRef =
+          SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
+      auto *origFn = getFunction(origDeclRef, NotForDefinition);
+      auto derivativeGenSig = AFD->getGenericSignature();
+      auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
+      AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
+                            derivativeGenSig);
+      emitDifferentiabilityWitness(origAFD, origFn, config, jvp, vjp,
+                                   derivAttr);
+    }
+  };
+  if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
+    if (accessor->isGetter())
+      emitWitnesses(accessor->getStorage()->getAttrs());
+  emitWitnesses(AFD->getAttrs());
+}
+
+void SILGenModule::emitDifferentiabilityWitness(
+    AbstractFunctionDecl *originalAFD, SILFunction *originalFunction,
+    const AutoDiffConfig &config, SILFunction *jvp, SILFunction *vjp,
+    const DeclAttribute *attr) {
+  assert(isa<DifferentiableAttr>(attr) || isa<DerivativeAttr>(attr));
+  auto *origFnType = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
+  auto origSilFnType = originalFunction->getLoweredFunctionType();
+  auto *silParamIndices =
+      autodiff::getLoweredParameterIndices(config.parameterIndices, origFnType);
+  // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
+  // parameters corresponding to captured variables. These parameters do not
+  // appear in the type of `origFnType`.
+  // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
+  // take `CaptureInfo` into account.
+  if (origSilFnType->getNumParameters() > silParamIndices->getCapacity())
+    silParamIndices = silParamIndices->extendingCapacity(
+        getASTContext(), origSilFnType->getNumParameters());
+
+  // Get or create new SIL differentiability witness.
+  // Witness already exists when there are two `@derivative` attributes
+  // (registering JVP and VJP functions) for the same derivative function
+  // configuration.
+  // Witness JVP and VJP are set below.
+  AutoDiffConfig silConfig(silParamIndices, config.resultIndices,
+                           config.derivativeGenericSignature);
+  SILDifferentiabilityWitnessKey key{originalFunction->getName(), silConfig};
+  auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
+  if (!diffWitness) {
+    // Strip external from linkage of original function.
+    // Necessary for Clang-imported functions, which have external linkage.
+    auto linkage = stripExternalFromLinkage(originalFunction->getLinkage());
+    diffWitness = SILDifferentiabilityWitness::createDefinition(
+        M, linkage, originalFunction, silConfig.parameterIndices,
+        silConfig.resultIndices, config.derivativeGenericSignature,
+        /*jvp*/ nullptr, /*vjp*/ nullptr,
+        /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),
+        attr);
+  }
+
+  // Set derivative function in differentiability witness.
+  auto setDerivativeInDifferentiabilityWitness =
+      [&](AutoDiffDerivativeFunctionKind kind, SILFunction *derivative) {
+        auto derivativeThunk = getOrCreateCustomDerivativeThunk(
+            derivative, originalFunction, silConfig, kind);
+        // Check for existing same derivative.
+        // TODO(TF-835): Remove condition below and simplify assertion to
+        // `!diffWitness->getDerivative(kind)` after `@derivative` attribute
+        // type-checking no longer generates implicit `@differentiable`
+        // attributes.
+        auto *existingDerivative = diffWitness->getDerivative(kind);
+        if (existingDerivative && existingDerivative == derivativeThunk)
+          return;
+        assert(!existingDerivative &&
+               "SIL differentiability witness already has a different existing "
+               "derivative");
+        diffWitness->setDerivative(kind, derivativeThunk);
+      };
+  if (jvp)
+    setDerivativeInDifferentiabilityWitness(AutoDiffDerivativeFunctionKind::JVP,
+                                            jvp);
+  if (vjp)
+    setDerivativeInDifferentiabilityWitness(AutoDiffDerivativeFunctionKind::VJP,
+                                            vjp);
 }
 
 void SILGenModule::
@@ -1738,7 +1850,7 @@ public:
 };
 } // end anonymous namespace
 
-llvm::Expected<std::unique_ptr<SILModule>>
+std::unique_ptr<SILModule>
 SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
                                   SILGenDescriptor desc) const {
   auto *unit = desc.context.get<FileUnit *>();
@@ -1754,10 +1866,10 @@ SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
       M->getSILLoader()->getAllForModule(mod->getName(), file);
   }
 
-  return std::move(M);
+  return M;
 }
 
-llvm::Expected<std::unique_ptr<SILModule>>
+std::unique_ptr<SILModule>
 SILGenWholeModuleRequest::evaluate(Evaluator &evaluator,
                                    SILGenDescriptor desc) const {
   auto *mod = desc.context.get<ModuleDecl *>();
@@ -1782,7 +1894,7 @@ SILGenWholeModuleRequest::evaluate(Evaluator &evaluator,
   if (hasSIB)
     M->getSILLoader()->getAllForModule(mod->getName(), nullptr);
 
-  return std::move(M);
+  return M;
 }
 
 std::unique_ptr<SILModule>

@@ -51,6 +51,7 @@
 #include "GenArchetype.h"
 #include "GenClass.h"
 #include "GenDecl.h"
+#include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenStruct.h"
 #include "GenValueWitness.h"
@@ -87,11 +88,13 @@ static Address emitAddressOfMetadataSlotAtIndex(IRGenFunction &IGF,
 /// Emit a load from the given metadata at a constant index.
 static llvm::LoadInst *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
                                                    llvm::Value *metadata,
+                                                   llvm::Value **slotPtr,
                                                    int index,
                                                    llvm::Type *objectTy,
                                              const llvm::Twine &suffix = "") {
   Address slot =
     emitAddressOfMetadataSlotAtIndex(IGF, metadata, index, objectTy);
+  if (slotPtr) *slotPtr = slot.getAddress();
 
   // Load.
   return IGF.Builder.CreateLoad(slot, metadata->getName() + suffix);
@@ -686,6 +689,11 @@ namespace {
 
       if (entry.isAssociatedType()) {
         auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
+        if (auto &schema = IGM.getOptions().PointerAuth
+                              .ProtocolAssociatedTypeAccessFunctions) {
+          addDiscriminator(flags, schema,
+                           AssociatedType(entry.getAssociatedType()));
+        }
 
         // Look for a default witness.
         llvm::Constant *defaultImpl =
@@ -696,6 +704,13 @@ namespace {
 
       if (entry.isAssociatedConformance()) {
         auto flags = Flags(Flags::Kind::AssociatedConformanceAccessFunction);
+        if (auto &schema = IGM.getOptions().PointerAuth
+                           .ProtocolAssociatedTypeWitnessTableAccessFunctions) {
+          addDiscriminator(flags, schema,
+                           AssociatedConformance(Proto,
+                                 entry.getAssociatedConformancePath(),
+                                 entry.getAssociatedConformanceRequirement()));
+        }
 
         // Look for a default witness.
         llvm::Constant *defaultImpl =
@@ -716,10 +731,27 @@ namespace {
       // Classify the function.
       auto flags = getMethodDescriptorFlags<Flags>(func.getDecl());
 
+      if (auto &schema = IGM.getOptions().PointerAuth.ProtocolWitnesses) {
+        SILDeclRef declRef(func.getDecl(),
+                           isa<ConstructorDecl>(func.getDecl())
+                             ? SILDeclRef::Kind::Allocator
+                             : SILDeclRef::Kind::Func);
+        addDiscriminator(flags, schema, declRef);
+      }
+
       // Look for a default witness.
       llvm::Constant *defaultImpl = findDefaultWitness(func);
 
       return { flags, defaultImpl };
+    }
+
+    void addDiscriminator(ProtocolRequirementFlags &flags,
+                          const PointerAuthSchema &schema,
+                          const PointerAuthEntity &entity) {
+      assert(schema);
+      auto discriminator =
+        PointerAuthInfo::getOtherDiscriminator(IGM, schema, entity);
+      flags = flags.withExtraDiscriminator(discriminator->getZExtValue());
     }
 
     void addRequirements() {
@@ -992,10 +1024,10 @@ namespace {
         abiName = synthesizedTypeAttr->originalTypeName;
 
         getMutableImportInfo().RelatedEntityName =
-          synthesizedTypeAttr->getManglingName();
+            std::string(synthesizedTypeAttr->getManglingName());
 
-      // Otherwise, if this was imported from a Clang declaration, use that
-      // declaration's name as the ABI name.
+        // Otherwise, if this was imported from a Clang declaration, use that
+        // declaration's name as the ABI name.
       } else if (auto clangDecl =
                             Mangle::ASTMangler::getClangDeclForMangling(Type)) {
         abiName = clangDecl->getName();
@@ -1012,7 +1044,7 @@ namespace {
       // If the ABI name differs from the user-facing name, add it as
       // an override.
       if (!abiName.empty() && abiName != UserFacingName) {
-        getMutableImportInfo().ABIName = abiName;
+        getMutableImportInfo().ABIName = std::string(abiName);
       }
     }
 
@@ -1522,6 +1554,13 @@ namespace {
       if (func->isObjCDynamic())
         flags = flags.withIsDynamic(true);
 
+      // Include the pointer-auth discriminator.
+      if (auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods) {
+        auto discriminator =
+          PointerAuthInfo::getOtherDiscriminator(IGM, schema, fn);
+        flags = flags.withExtraDiscriminator(discriminator->getZExtValue());
+      }
+
       // TODO: final? open?
       descriptor.addInt(IGM.Int32Ty, flags.getIntValue());
 
@@ -1702,7 +1741,12 @@ namespace {
         auto underlyingConformance = conformance
           .subst(O->getUnderlyingInterfaceType(),
                  *O->getUnderlyingTypeSubstitutions());
-        
+
+        // Skip protocols without Witness tables, e.g. @objc protocols.
+        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(
+                underlyingConformance.getRequirement()))
+          continue;
+
         auto witnessTableRef = IGM.emitWitnessTableRefString(
                                           underlyingType, underlyingConformance,
                                           contextSig,
@@ -2740,7 +2784,9 @@ namespace {
 
     void addDestructorFunction() {
       if (auto ptr = getAddrOfDestructorFunction(IGM, Target)) {
-        B.add(*ptr);
+        B.addSignedPointer(*ptr,
+                           IGM.getOptions().PointerAuth.HeapDestructors,
+                           PointerAuthEntity::Special::HeapDestructor);
       } else {
         // In case the optimizer removed the function. See comment in
         // addMethod().
@@ -2754,7 +2800,9 @@ namespace {
                                                    /*isForeign=*/ false,
                                                    NotForDefinition);
       if (dtorFunc) {
-        B.add(*dtorFunc);
+        B.addSignedPointer(*dtorFunc,
+                           IGM.getOptions().PointerAuth.HeapDestructors,
+                           PointerAuthEntity::Special::HeapDestructor);
       } else {
         B.addNullPointer(IGM.FunctionPtrTy);
       }
@@ -2765,7 +2813,9 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      B.add(emitNominalTypeDescriptor());
+      B.addSignedPointer(emitNominalTypeDescriptor(),
+                         IGM.getOptions().PointerAuth.TypeDescriptors,
+                         PointerAuthEntity::Special::TypeDescriptor);
     }
 
     bool canBeConstant() {
@@ -2850,14 +2900,19 @@ namespace {
       auto entry = VTable->getEntry(IGM.getSILModule(), fn);
 
       // The class is fragile. Emit a direct reference to the vtable entry.
+      llvm::Constant *ptr;
       if (entry) {
-        B.add(IGM.getAddrOfSILFunction(entry->Implementation, NotForDefinition));
-        return;
+        ptr = IGM.getAddrOfSILFunction(entry->Implementation,
+                                       NotForDefinition);
+      } else {
+        // The method is removed by dead method elimination.
+        // It should be never called. We add a pointer to an error function.
+        ptr = llvm::ConstantExpr::getBitCast(IGM.getDeletedMethodErrorFn(),
+                                             IGM.FunctionPtrTy);
       }
 
-      // The method is removed by dead method elimination.
-      // It should be never called. We add a pointer to an error function.
-      B.addBitCast(IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
+      auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods;
+      B.addSignedPointer(ptr, schema, fn);
     }
 
     void addPlaceholder(MissingMemberDecl *m) {
@@ -3198,6 +3253,15 @@ namespace {
                                       llvm::Value *descriptor,
                                       llvm::Value *arguments,
                                       llvm::Value *templatePointer) {
+      // Sign the descriptor.
+      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
+      if (schema) {
+        auto authInfo = PointerAuthInfo::emit(
+            IGF, schema, nullptr,
+            PointerAuthEntity::Special::TypeDescriptorAsArgument);
+        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
+      }
+
       auto metadata =
         IGF.Builder.CreateCall(IGM.getAllocateGenericClassMetadataFn(),
                                {descriptor, arguments, templatePointer});
@@ -3378,11 +3442,12 @@ void IRGenFunction::setDereferenceableLoad(llvm::LoadInst *load,
 static llvm::LoadInst *
 emitInvariantLoadFromMetadataAtIndex(IRGenFunction &IGF,
                                      llvm::Value *metadata,
+                                     llvm::Value **slotPtr,
                                      int index,
                                      llvm::Type *objectTy,
                                const Twine &suffix = Twine::createNull()) {
-  auto result = emitLoadFromMetadataAtIndex(IGF, metadata, index, objectTy,
-                                            suffix);
+  auto result = emitLoadFromMetadataAtIndex(IGF, metadata, slotPtr,
+                                            index, objectTy, suffix);
   IGF.setInvariantLoad(result);
   return result;
 }
@@ -3390,8 +3455,8 @@ emitInvariantLoadFromMetadataAtIndex(IRGenFunction &IGF,
 /// Given a type metadata pointer, load its value witness table.
 llvm::Value *
 IRGenFunction::emitValueWitnessTableRefForMetadata(llvm::Value *metadata) {
-  auto witness = emitInvariantLoadFromMetadataAtIndex(*this, metadata, -1,
-                                                      IGM.WitnessTablePtrTy,
+  auto witness = emitInvariantLoadFromMetadataAtIndex(*this, metadata, nullptr,
+                                                      -1, IGM.WitnessTablePtrTy,
                                                       ".valueWitnesses");
   // A value witness table is dereferenceable to the number of value witness
   // pointers.
@@ -3520,7 +3585,10 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      B.add(asImpl().getNominalTypeDescriptor());
+      auto descriptor = asImpl().getNominalTypeDescriptor();
+      B.addSignedPointer(descriptor,
+                         IGM.getOptions().PointerAuth.TypeDescriptors,
+                         PointerAuthEntity::Special::TypeDescriptor);
     }
 
     ConstantReference emitValueWitnessTable(bool relativeReference) {
@@ -3636,6 +3704,15 @@ namespace {
       auto extraSize = layout.getSize().getOffsetToEnd()
                          - IGM.getOffsetOfStructTypeSpecificMetadataMembers();
       auto extraSizeV = IGM.getSize(extraSize);
+
+      // Sign the descriptor.
+      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
+      if (schema) {
+        auto authInfo = PointerAuthInfo::emit(
+            IGF, schema, nullptr,
+            PointerAuthEntity::Special::TypeDescriptorAsArgument);
+        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
+      }
 
       return IGF.Builder.CreateCall(IGM.getAllocateGenericValueMetadataFn(),
                                     {descriptor, arguments, templatePointer,
@@ -3968,7 +4045,9 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      B.add(asImpl().getNominalTypeDescriptor());
+      B.addSignedPointer(asImpl().getNominalTypeDescriptor(),
+                         IGM.getOptions().PointerAuth.TypeDescriptors,
+                         PointerAuthEntity::Special::TypeDescriptor);
     }
 
     void addGenericArgument(GenericRequirement requirement) {
@@ -4082,6 +4161,15 @@ namespace {
       auto extraSize = layout.getSize().getOffsetToEnd()
                          - IGM.getOffsetOfEnumTypeSpecificMetadataMembers();
       auto extraSizeV = IGM.getSize(extraSize);
+
+      // Sign the descriptor.
+      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
+      if (schema) {
+        auto authInfo = PointerAuthInfo::emit(
+            IGF, schema, nullptr,
+            PointerAuthEntity::Special::TypeDescriptorAsArgument);
+        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
+      }
 
       auto metadata =
         IGF.Builder.CreateCall(IGM.getAllocateGenericValueMetadataFn(),
@@ -4356,7 +4444,9 @@ namespace {
     void addNominalTypeDescriptor() {
       auto descriptor =
         ClassContextDescriptorBuilder(this->IGM, Target, RequireMetadata).emit();
-      B.add(descriptor);
+      B.addSignedPointer(descriptor,
+                         IGM.getOptions().PointerAuth.TypeDescriptors,
+                         PointerAuthEntity::Special::TypeDescriptor);
     }
 
     void addSuperclass() {
@@ -4549,6 +4639,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Encodable:
   case KnownProtocolKind::Decodable:
   case KnownProtocolKind::StringInterpolationProtocol:
+  case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::Differentiable:
     return SpecialProtocol::None;
   }
@@ -4706,7 +4797,7 @@ llvm::Value *irgen::emitMetatypeInstanceType(IRGenFunction &IGF,
                                              llvm::Value *metatypeMetadata) {
   // The instance type field of MetatypeMetadata is immediately after
   // the isa field.
-  return emitInvariantLoadFromMetadataAtIndex(IGF, metatypeMetadata, 1,
+  return emitInvariantLoadFromMetadataAtIndex(IGF, metatypeMetadata, nullptr, 1,
                                               IGF.IGM.TypeMetadataPtrTy);
 }
 

@@ -2278,7 +2278,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
     }
 
     bool checkName(FuncDecl *FD) {
-      auto Name = FD->getName().str();
+      const auto Name = FD->getBaseIdentifier().str();
       return Name == "~="
       || Name == "=="
       || Name == "__derived_enum_equals"
@@ -2391,7 +2391,8 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
     bool isFunctionNameAllowed(BinaryExpr *E) {
       auto FunctionBody = dyn_cast<DotSyntaxCallExpr>(E->getFn())->getFn();
       auto FunctionDeclaration = dyn_cast<DeclRefExpr>(FunctionBody)->getDecl();
-      auto FunctionName = dyn_cast<FuncDecl>(FunctionDeclaration)->getName().str();
+      const auto FunctionName = dyn_cast<FuncDecl>(FunctionDeclaration)
+          ->getBaseIdentifier().str();
       return FunctionName == "~="
       || FunctionName == "=="
       || FunctionName == "__derived_enum_equals"
@@ -3252,8 +3253,11 @@ static std::string insertUnderscore(StringRef Text) {
 
 static void insertUnderscoreInDigits(StringRef Digits,
                                      llvm::raw_ostream &OS) {
-  std::string BeforePoint, AfterPoint;
-  std::tie(BeforePoint, AfterPoint) = Digits.split('.');
+  StringRef BeforePointRef, AfterPointRef;
+  std::tie(BeforePointRef, AfterPointRef) = Digits.split('.');
+
+  std::string BeforePoint(BeforePointRef);
+  std::string AfterPoint(AfterPointRef);
 
   // Insert '_' for the part before the decimal point.
   std::reverse(BeforePoint.begin(), BeforePoint.end());
@@ -3752,7 +3756,7 @@ refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
 
   // Use the default name if not specified.
   if (Opts.PreferredName.empty()) {
-    Opts.PreferredName = getDefaultPreferredName(Opts.Kind);
+    Opts.PreferredName = getDefaultPreferredName(Opts.Kind).str();
   }
 
   switch (Opts.Kind) {

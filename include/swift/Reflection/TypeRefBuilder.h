@@ -215,23 +215,24 @@ struct ClosureContextInfo {
 
 struct FieldTypeInfo {
   std::string Name;
+  int Value;
   const TypeRef *TR;
   bool Indirect;
 
-  FieldTypeInfo() : Name(""), TR(nullptr), Indirect(false) {}
-  FieldTypeInfo(const std::string &Name, const TypeRef *TR, bool Indirect)
-      : Name(Name), TR(TR), Indirect(Indirect) {}
+  FieldTypeInfo() : Name(""), Value(0), TR(nullptr), Indirect(false) {}
+  FieldTypeInfo(const std::string &Name, int Value, const TypeRef *TR, bool Indirect)
+    : Name(Name), Value(Value), TR(TR), Indirect(Indirect) {}
 
-  static FieldTypeInfo forEmptyCase(std::string Name) {
-    return FieldTypeInfo(Name, nullptr, false);
+  static FieldTypeInfo forEmptyCase(std::string Name, int Value) {
+    return FieldTypeInfo(Name, Value, nullptr, false);
   }
 
-  static FieldTypeInfo forIndirectCase(std::string Name, const TypeRef *TR) {
-    return FieldTypeInfo(Name, TR, true);
+  static FieldTypeInfo forIndirectCase(std::string Name, int Value, const TypeRef *TR) {
+    return FieldTypeInfo(Name, Value, TR, true);
   }
 
-  static FieldTypeInfo forField(std::string Name, const TypeRef *TR) {
-    return FieldTypeInfo(Name, TR, false);
+  static FieldTypeInfo forField(std::string Name, int Value, const TypeRef *TR) {
+    return FieldTypeInfo(Name, Value, TR, false);
   }
 };
 

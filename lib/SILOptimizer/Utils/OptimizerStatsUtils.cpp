@@ -648,7 +648,7 @@ bool isMatchingFunction(SILFunction *F, bool shouldHaveNamePattern = false) {
     return FuncName.contains(StatsOnlyFunctionsNamePattern);
   }
 
-  return shouldHaveNamePattern ? true : false;
+  return shouldHaveNamePattern;
 }
 
 /// Compute the delta between the old and new values.

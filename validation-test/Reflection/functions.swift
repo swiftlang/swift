@@ -9,6 +9,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 /*
    This file pokes at the swift_reflection_infoForInstance() API
@@ -105,22 +106,66 @@ func generic<T : P, U, V : C>(x: T, y: U, z: V, i: Int) {
 // CHECK-NEXT:    (builtin Builtin.NativeObject)
 
 // CHECK-32:      Type info:
-// CHECK-32-NEXT: (closure_context size=36 alignment=4 stride=36 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-32-NEXT:   (field offset=24
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=28
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=32
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native)))
+// CHECK-32-NEXT:(closure_context size=44 alignment=4 stride=44 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:  (field offset=24
+// CHECK-32-NEXT:    (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:      (field name=_value offset=0
+// CHECK-32-NEXT:        (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:  (field offset=28
+// CHECK-32-NEXT:    (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:      (field name=_guts offset=0
+// CHECK-32-NEXT:        (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:          (field name=_object offset=0
+// CHECK-32-NEXT:            (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:              (field name=_count offset=0
+// CHECK-32-NEXT:                (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:                  (field name=_value offset=0
+// CHECK-32-NEXT:                    (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:              (field name=_variant offset=4
+// CHECK-32-NEXT:                (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:                  (case name=immortal index=0 offset=0
+// CHECK-32-NEXT:                    (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:                      (field name=_value offset=0
+// CHECK-32-NEXT:                        (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:                  (case name=native index=1 offset=0
+// CHECK-32-NEXT:                    (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT:                      (field name=object offset=0
+// CHECK-32-NEXT:                        (reference kind=strong refcounting=unknown))))
+// CHECK-32-NEXT:                  (case name=bridged index=2 offset=0
+// CHECK-32-NEXT:                    (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT:                      (field name=object offset=0
+// CHECK-32-NEXT:                        (reference kind=strong refcounting=unknown))))))
+// CHECK-32-NEXT:              (field name=_discriminator offset=9
+// CHECK-32-NEXT:                (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:                  (field name=_value offset=0
+// CHECK-32-NEXT:                    (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:              (field name=_flags offset=10
+// CHECK-32-NEXT:                (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:                  (field name=_value offset=0
+// CHECK-32-NEXT:                    (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1))))))))))
+// CHECK-32-NEXT:  (field offset=40
+// CHECK-32-NEXT:    (reference kind=strong refcounting=native)))
 
 // CHECK-64:      Type info:
-// CHECK-64-NEXT: (closure_context size=72 alignment=8 stride=72 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64-NEXT:   (field offset=48
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=56
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=64
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native)))
+// CHECK-64-NEXT:(closure_context size=80 alignment=8 stride=80 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:  (field offset=48
+// CHECK-64-NEXT:    (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:      (field name=_value offset=0
+// CHECK-64-NEXT:        (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:  (field offset=56
+// CHECK-64-NEXT:    (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:      (field name=_guts offset=0
+// CHECK-64-NEXT:        (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:          (field name=_object offset=0
+// CHECK-64-NEXT:            (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
+// CHECK-64-NEXT:              (field name=_countAndFlagsBits offset=0
+// CHECK-64-NEXT:                (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:                  (field name=_value offset=0
+// CHECK-64-NEXT:                    (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:              (field name=_object offset=8
+// CHECK-64-NEXT:                (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
+// CHECK-64-NEXT:  (field offset=72
+// CHECK-64-NEXT:    (reference kind=strong refcounting=native)))
 }
 
 generic(x: 10, y: "", z: C(), i: 101)
@@ -134,26 +179,46 @@ func genericWithSources<A, B, C>(a: A, b: B, c: C, gc: GC<A, B, C>) {
 // CHECK-NEXT:    (builtin Builtin.NativeObject)
 
 // CHECK-32:      Type info:
-// CHECK-32-NEXT: (closure_context size=24 alignment=4 stride=24
-// CHECK-32-NEXT:   (field offset=8
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=12
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=16
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=20
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native)))
+// CHECK-32-NEXT:(closure_context size=24 alignment=4 stride=24 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:  (field offset=20
+// CHECK-32-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-32-NEXT:  (field offset=20
+// CHECK-32-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:      (field offset=0
+// CHECK-32-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-32-NEXT:      (field offset=0
+// CHECK-32-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:  (field offset=20
+// CHECK-32-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:      (field offset=0
+// CHECK-32-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-32-NEXT:      (field offset=0
+// CHECK-32-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-32-NEXT:      (field offset=0
+// CHECK-32-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:  (field offset=20
+// CHECK-32-NEXT:    (reference kind=strong refcounting=native)))
 
 // CHECK-64:      Type info:
-// CHECK-64-NEXT: (closure_context size=48 alignment=8 stride=48
-// CHECK-64-NEXT:   (field offset=16
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=24
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=32
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=40
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native)))
+// CHECK-64-NEXT:(closure_context size=48 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:  (field offset=40
+// CHECK-64-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-64-NEXT:  (field offset=40
+// CHECK-64-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:      (field offset=0
+// CHECK-64-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-64-NEXT:      (field offset=0
+// CHECK-64-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:  (field offset=40
+// CHECK-64-NEXT:    (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:      (field offset=0
+// CHECK-64-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-64-NEXT:      (field offset=0
+// CHECK-64-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-64-NEXT:      (field offset=0
+// CHECK-64-NEXT:        (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:  (field offset=40
+// CHECK-64-NEXT:    (reference kind=strong refcounting=native)))
 }
 
 genericWithSources(a: (), b: ((), ()), c: ((), (), ()), gc: GC<(), ((), ()), ((), (), ())>())
@@ -161,19 +226,15 @@ genericWithSources(a: (), b: ((), ()), c: ((), (), ()), gc: GC<(), ((), ()), (()
 
 class CapturingClass {
 
-  // CHECK-64: Reflecting an object.
-  // CHECK-64: Type reference:
-  // CHECK-64: (class functions.CapturingClass)
+  // CHECK: Reflecting an object.
+  // CHECK: Type reference:
+  // CHECK-NEXT: (class functions.CapturingClass)
  
   // CHECK-64: Type info:
-  // CHECK-64: (class_instance size=16 alignment=1 stride=16
-  
-  // CHECK-32: Reflecting an object.
-  // CHECK-32: Type reference:
-  // CHECK-32: (class functions.CapturingClass)
+  // CHECK-64-NEXT: (class_instance size=16 alignment=1 stride=16
   
   // CHECK-32: Type info:
-  // CHECK-32: (class_instance size=8 alignment=1 stride=8
+  // CHECK-32-NEXT: (class_instance size=8 alignment=1 stride=8
   @_optimize(none)
   func arity0Capture1() -> () -> () {
     let closure = {
@@ -184,12 +245,12 @@ class CapturingClass {
     return closure
   }
 
-  // CHECK-64: Reflecting an object.
-  // CHECK-64: Type reference:
-  // CHECK-64: (builtin Builtin.NativeObject)
+  // CHECK: Reflecting an object.
+  // CHECK: Type reference:
+  // CHECK-NEXT: (builtin Builtin.NativeObject)
   
   // CHECK-64:        Type info:
-  // CHECK-64:        (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT: (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:   (field offset=16
   // CHECK-64-NEXT:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:       (field offset=0
@@ -201,12 +262,8 @@ class CapturingClass {
   // CHECK-64-NEXT:           (field name=_value offset=0
   // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
 
-  // CHECK-32: Reflecting an object.
-  // CHECK-32: Type reference:
-  // CHECK-32: (builtin Builtin.NativeObject)
-
   // CHECK-32:        Type info:
-  // CHECK-32:        (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT: (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-32-NEXT:   (field offset=8
   // CHECK-32-NEXT:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-32-NEXT:       (field offset=0
@@ -227,12 +284,12 @@ class CapturingClass {
     return closure
   }
 
-  // CHECK-64: Reflecting an object.
-  // CHECK-64: Type reference:
-  // CHECK-64: (builtin Builtin.NativeObject)
+  // CHECK: Reflecting an object.
+  // CHECK: Type reference:
+  // CHECK-NEXT: (builtin Builtin.NativeObject)
 
   // CHECK-64:      Type info:
-  // CHECK-64:      (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT: (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT: (field offset=16
   // CHECK-64-NEXT:   (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
   // CHECK-64-NEXT:     (field offset=0
@@ -242,12 +299,8 @@ class CapturingClass {
   // CHECK-64-NEXT:     (field offset=8
   // CHECK-64-NEXT:       (reference kind=strong refcounting=native)))))
 
-  // CHECK-32: Reflecting an object.
-  // CHECK-32: Type reference:
-  // CHECK-32: (builtin Builtin.NativeObject)
-  
   // CHECK-32:        Type info:
-  // CHECK-32:        (closure_context size=16 alignment=4 stride=16 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT: (closure_context size=16 alignment=4 stride=16 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-32-NEXT:   (field offset=8
   // CHECK-32-NEXT:     (tuple size=8 alignment=4 stride=8 num_extra_inhabitants=4096 bitwise_takable=1
   // CHECK-32-NEXT:       (field offset=0
@@ -267,31 +320,29 @@ class CapturingClass {
    return closure
   }
 
-  // CHECK-64: Reflecting an object.
-  // CHECK-64: Type reference:
-  // CHECK-64: (builtin Builtin.NativeObject)
+  // CHECK: Reflecting an object.
+  // CHECK: Type reference:
+  // CHECK-NEXT: (builtin Builtin.NativeObject)
   
   // CHECK-64:        Type info:
-  // CHECK-64:        (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT: (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:   (field offset=16
   // CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
-  // CHECK-64-NEXT:       (field name=some offset=0
+  // CHECK-64-NEXT:       (case name=some index=0 offset=0
   // CHECK-64-NEXT:         (class_existential size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
   // CHECK-64-NEXT:           (field name=object offset=0
-  // CHECK-64-NEXT:             (reference kind=strong refcounting=unknown))))))
+  // CHECK-64-NEXT:             (reference kind=strong refcounting=unknown))))
+  // CHECK-64-NEXT:       (case name=none index=1))))
 
-  // CHECK-32: Reflecting an object.
-  // CHECK-32: Type reference:
-  // CHECK-32: (builtin Builtin.NativeObject)
-  
   // CHECK-32:        Type info:
-  // CHECK-32:        (closure_context size=12 alignment=4 stride=12 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT: (closure_context size=12 alignment=4 stride=12 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-32-NEXT:   (field offset=8
   // CHECK-32-NEXT:     (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
-  // CHECK-32-NEXT:       (field name=some offset=0
+  // CHECK-32-NEXT:       (case name=some index=0 offset=0
   // CHECK-32-NEXT:         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
   // CHECK-32-NEXT:           (field name=object offset=0
-  // CHECK-32-NEXT:             (reference kind=strong refcounting=unknown)))))
+  // CHECK-32-NEXT:             (reference kind=strong refcounting=unknown))))
+  // CHECK-32-NEXT:       (case name=none index=1))))
   @_optimize(none)
   func arity3Capture1() -> (Int, String, AnyObject?) -> () {
     let c: AnyObject? = C()
@@ -304,11 +355,12 @@ class CapturingClass {
   }
 
 
-  // CHECK-64: Reflecting an object.
-  // CHECK-64: Type reference:
-  // CHECK-64: (builtin Builtin.NativeObject)
-  // CHECK-64:        Type info:
-  // CHECK-64:        (closure_context size=40 alignment=8 stride=40 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK: Reflecting an object.
+  // CHECK: Type reference:
+  // CHECK-NEXT: (builtin Builtin.NativeObject)
+
+  // CHECK-64: Type info:
+  // CHECK-64-NEXT: (closure_context size=40 alignment=8 stride=40 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:   (field offset=16
   // CHECK-64-NEXT:     (reference kind=strong refcounting=native))
   // CHECK-64-NEXT:   (field offset=24
@@ -322,12 +374,8 @@ class CapturingClass {
   // CHECK-64-NEXT:           (field name=_value offset=0
   // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
 
-  // CHECK-32: Reflecting an object.
-  // CHECK-32: Type reference:
-  // CHECK-32: (builtin Builtin.NativeObject)
-
   // CHECK-32:        Type info:
-  // CHECK-32:        (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT: (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-32-NEXT:   (field offset=8
   // CHECK-32-NEXT:     (reference kind=strong refcounting=native))
   // CHECK-32-NEXT:   (field offset=16
@@ -351,29 +399,29 @@ class CapturingClass {
     return closure
   }
 
-  // CHECK-64: Reflecting an object.
-  // CHECK-64: Type reference:
-  // CHECK-64: (builtin Builtin.NativeObject)
+  // CHECK: Reflecting an object.
+  // CHECK: Type reference:
+  // CHECK-NEXT: (builtin Builtin.NativeObject)
   
   // CHECK-64:        Type info:
-  // CHECK-64:        (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT: (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:   (field offset=16
   // CHECK-64-NEXT:     (reference kind=strong refcounting=native))
   // CHECK-64-NEXT:   (field offset=24
   // CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
-  // CHECK-64-NEXT:       (field name=some offset=0
-  // CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
+  // CHECK-64-NEXT:       (case name=some index=0 offset=0
+  // CHECK-64-NEXT:         (reference kind=strong refcounting=native))
+  // CHECK-64-NEXT:       (case name=none index=1))))
 
-  // CHECK-32: Reflecting an object.
-  // CHECK-32: Type reference:
-  // CHECK-32: (builtin Builtin.NativeObject)
-  
   // CHECK-32: Type info:
-  // CHECK-32: (closure_context size=16 alignment=4 stride=16 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-32:   (field offset=8
-  // CHECK-32:     (reference kind=strong refcounting=native))
-  // CHECK-32:   (field offset=12
-  // CHECK-32:     (reference kind=strong refcounting=native)))
+  // CHECK-32-NEXT: (closure_context size=16 alignment=4 stride=16 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT:   (field offset=8
+  // CHECK-32-NEXT:     (reference kind=strong refcounting=native))
+  // CHECK-32-NEXT:   (field offset=12
+  // CHECK-32-NEXT:     (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
+  // CHECK-32-NEXT:       (case name=some index=0 offset=0
+  // CHECK-32-NEXT:         (reference kind=strong refcounting=native))
+  // CHECK-32-NEXT:       (case name=none index=1))))
   @_optimize(none)
   func arity1Capture2() -> (Int) -> () {
    let x: C? = C()
@@ -385,43 +433,39 @@ class CapturingClass {
    return closure
   }
 
-  // CHECK-64: Reflecting an object.
-  // CHECK-64: Type reference:
-  // CHECK-64: (builtin Builtin.NativeObject)
+  // CHECK: Reflecting an object.
+  // CHECK: Type reference:
+  // CHECK-NEXT: (builtin Builtin.NativeObject)
   
   // CHECK-64: Type info:
-  // CHECK-64: (closure_context size=40 alignment=8 stride=40 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-64:   (field offset=16
-  // CHECK-64:     (reference kind=strong refcounting=native))
-  // CHECK-64:   (field offset=24
-  // CHECK-64:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-64:       (field offset=0
-  // CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-64:           (field name=_value offset=0
-  // CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-  // CHECK-64:       (field offset=8
-  // CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-64:           (field name=_value offset=0
-  // CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
+  // CHECK-64-NEXT: (closure_context size=40 alignment=8 stride=40 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT:   (field offset=16
+  // CHECK-64-NEXT:     (reference kind=strong refcounting=native))
+  // CHECK-64-NEXT:   (field offset=24
+  // CHECK-64-NEXT:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT:       (field offset=0
+  // CHECK-64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT:           (field name=_value offset=0
+  // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+  // CHECK-64-NEXT:       (field offset=8
+  // CHECK-64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT:           (field name=_value offset=0
+  // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
 
-  // CHECK-32: Reflecting an object.
-  // CHECK-32: Type reference:
-  // CHECK-32: (builtin Builtin.NativeObject)
-  
   // CHECK-32: Type info:
-  // CHECK-32: (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-32:   (field offset=8
-  // CHECK-32:     (reference kind=strong refcounting=native))
-  // CHECK-32:   (field offset=16
-  // CHECK-32:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-32:       (field offset=0
-  // CHECK-32:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-32:           (field name=_value offset=0
-  // CHECK-32:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
-  // CHECK-32:       (field offset=8
-  // CHECK-32:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-32:           (field name=_value offset=0
-  // CHECK-32:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
+  // CHECK-32-NEXT: (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT:   (field offset=8
+  // CHECK-32-NEXT:     (reference kind=strong refcounting=native))
+  // CHECK-32-NEXT:   (field offset=16
+  // CHECK-32-NEXT:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT:       (field offset=0
+  // CHECK-32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT:           (field name=_value offset=0
+  // CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+  // CHECK-32-NEXT:       (field offset=8
+  // CHECK-32-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT:           (field name=_value offset=0
+  // CHECK-32-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
   @_optimize(none)
   func arity2Capture2() -> (Int, String) -> () {
    let pair = (999, 1010.2)
@@ -434,43 +478,39 @@ class CapturingClass {
    return closure
   }
 
-  // CHECK-64: Reflecting an object.
-  // CHECK-64: Type reference:
-  // CHECK-64: (builtin Builtin.NativeObject)
+  // CHECK: Reflecting an object.
+  // CHECK: Type reference:
+  // CHECK-NEXT: (builtin Builtin.NativeObject)
  
   // CHECK-64: Type info:
-  // CHECK-64: (closure_context size=40 alignment=8 stride=40 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-64:   (field offset=16
-  // CHECK-64:     (reference kind=strong refcounting=native))
-  // CHECK-64:   (field offset=24
-  // CHECK-64:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-64:       (field offset=0
-  // CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-64:           (field name=_value offset=0
-  // CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-  // CHECK-64:       (field offset=8
-  // CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-64:           (field name=_value offset=0
-  // CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
+  // CHECK-64-NEXT: (closure_context size=40 alignment=8 stride=40 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT:   (field offset=16
+  // CHECK-64-NEXT:     (reference kind=strong refcounting=native))
+  // CHECK-64-NEXT:   (field offset=24
+  // CHECK-64-NEXT:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT:       (field offset=0
+  // CHECK-64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT:           (field name=_value offset=0
+  // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+  // CHECK-64-NEXT:       (field offset=8
+  // CHECK-64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-64-NEXT:           (field name=_value offset=0
+  // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
 
-  // CHECK-32: Reflecting an object.
-  // CHECK-32: Type reference:
-  // CHECK-32: (builtin Builtin.NativeObject)
-  
   // CHECK-32: Type info:
-  // CHECK-32: (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-32:   (field offset=8
-  // CHECK-32:     (reference kind=strong refcounting=native))
-  // CHECK-32:   (field offset=16
-  // CHECK-32:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-32:       (field offset=0
-  // CHECK-32:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-32:           (field name=_value offset=0
-  // CHECK-32:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
-  // CHECK-32:       (field offset=8
-  // CHECK-32:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-  // CHECK-32:           (field name=_value offset=0
-  // CHECK-32:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
+  // CHECK-32-NEXT: (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT:   (field offset=8
+  // CHECK-32-NEXT:     (reference kind=strong refcounting=native))
+  // CHECK-32-NEXT:   (field offset=16
+  // CHECK-32-NEXT:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT:       (field offset=0
+  // CHECK-32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT:           (field name=_value offset=0
+  // CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+  // CHECK-32-NEXT:       (field offset=8
+  // CHECK-32-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+  // CHECK-32-NEXT:           (field name=_value offset=0
+  // CHECK-32-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1)))))))
   @_optimize(none)
   func arity3Capture2() -> (Int, String, AnyObject?) -> () {
    let pair = (999, 1010.2)
@@ -496,44 +536,34 @@ _ = cc.arity2Capture2()
 _ = cc.arity3Capture2()
 
 reflect(function: C().captureWeakSelf())
-// CHECK-64: Reflecting an object.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (builtin Builtin.NativeObject)
+// CHECK: Reflecting an object.
+// CHECK-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (builtin Builtin.NativeObject)
 
 // CHECK-64:        Type info:
-// CHECK-64:        (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=0
+// CHECK-64-NEXT: (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-64-NEXT:   (field offset=16
 // CHECK-64-NEXT:     (reference kind=weak refcounting=native)))
 
-// CHECK-32: Reflecting an object.
-// CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-32: Type reference:
-// CHECK-32: (builtin Builtin.NativeObject)
-
 // CHECK-32:        Type info:
-// CHECK-32:        (closure_context size=12 alignment=4 stride=12 num_extra_inhabitants=0 bitwise_takable=0
+// CHECK-32-NEXT: (closure_context size=12 alignment=4 stride=12 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-32-NEXT:   (field offset=8
 // CHECK-32-NEXT:     (reference kind=weak refcounting=native)))
 
 reflect(function: C().captureUnownedSelf())
-// CHECK-64: Reflecting an object.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (builtin Builtin.NativeObject)
+// CHECK: Reflecting an object.
+// CHECK-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK-NEXT: Type reference:
+// CHECK-NEXT: (builtin Builtin.NativeObject)
 
 // CHECK-64:        Type info:
-// CHECK-64:        (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT: (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:   (field offset=16
 // CHECK-64-NEXT:     (reference kind=unowned refcounting=native)))
 
-// CHECK-32: Reflecting an object.
-// CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-32: Type reference:
-// CHECK-32: (builtin Builtin.NativeObject)
-
 // CHECK-32:        Type info:
-// CHECK-32:        (closure_context size=12 alignment=4 stride=12 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT: (closure_context size=12 alignment=4 stride=12 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:   (field offset=8
 // CHECK-32-NEXT:     (reference kind=unowned refcounting=native)))
 

@@ -6,6 +6,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 import Foundation
 
@@ -15,6 +16,8 @@ import Foundation
 */
 
 import SwiftReflectionTest
+
+class MyClass<T> {}
 
 if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
   // Imported class wrapped in AnyObject
@@ -32,6 +35,17 @@ if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
   // CHECK: Type info:
   // CHECK: $sSo9NSCopying_Xl 
   reflect(any: { () -> NSCopying in NSString("abc") }())
+
+  // Generic types involving ObjC and CF types.
+  // CHECK: Type info:
+  // CHECK: Mangled name: $s17existentials_objc7MyClassCySo8NSStringCG
+  // CHECK: Demangled name: existentials_objc.MyClass<__C.NSString>
+  reflect(any: MyClass<NSString>())
+
+  // CHECK: Type info:
+  // CHECK: Mangled name: $s17existentials_objc7MyClassCySo11CFStringRefaG
+  // CHECK: Demangled name: existentials_objc.MyClass<__C.CFStringRef>
+  reflect(any: MyClass<CFString>())
 } else {
   // The Swift 5.0 libraries don't support this test.
   class SkipTheTest {}

@@ -71,7 +71,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "cmake": "v3.15.1",
+                "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
                 "swift-format": "master",
@@ -99,10 +99,12 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "cmake": "v3.15.1",
+                "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
-                "swift-format": "master"
+                "swift-format": "master",
+                "pythonkit": "master",
+                "tensorflow-swift-apis": "master"
             }
         },
        "swift-3.0-branch" : {
@@ -295,7 +297,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "cmake": "v3.15.1",
+                "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
                 "swift-format": "master"

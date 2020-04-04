@@ -53,6 +53,10 @@ struct RuntimeTarget;
 template <>
 struct RuntimeTarget<4> {
   using StoredPointer = uint32_t;
+  // To avoid implicit conversions from StoredSignedPointer to StoredPointer.
+  using StoredSignedPointer = struct {
+    uint32_t SignedValue;
+  };
   using StoredSize = uint32_t;
   using StoredPointerDifference = int32_t;
   static constexpr size_t PointerSize = 4;
@@ -61,6 +65,10 @@ struct RuntimeTarget<4> {
 template <>
 struct RuntimeTarget<8> {
   using StoredPointer = uint64_t;
+  // To avoid implicit conversions from StoredSignedPointer to StoredPointer.
+  using StoredSignedPointer = struct {
+    uint64_t SignedValue;
+  };
   using StoredSize = uint64_t;
   using StoredPointerDifference = int64_t;
   static constexpr size_t PointerSize = 8;
@@ -77,6 +85,7 @@ namespace reflection {
 struct InProcess {
   static constexpr size_t PointerSize = sizeof(uintptr_t);
   using StoredPointer = uintptr_t;
+  using StoredSignedPointer = uintptr_t;
   using StoredSize = size_t;
   using StoredPointerDifference = ptrdiff_t;
 
@@ -85,6 +94,9 @@ struct InProcess {
   
   template <typename T>
   using Pointer = T*;
+
+  template <typename T>
+  using SignedPointer = T;
   
   template <typename T, bool Nullable = false>
   using FarRelativeDirectPointer = FarRelativeDirectPointer<T, Nullable>;
@@ -111,6 +123,7 @@ struct ExternalPointer {
 template <typename Runtime>
 struct External {
   using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
   static constexpr size_t PointerSize = Runtime::PointerSize;
@@ -118,6 +131,9 @@ struct External {
   
   template <typename T>
   using Pointer = StoredPointer;
+
+  template <typename T>
+  using SignedPointer = StoredSignedPointer;
   
   template <typename T, bool Nullable = false>
   using FarRelativeDirectPointer = StoredPointer;
@@ -142,7 +158,11 @@ template <typename Runtime, typename T>
 using TargetPointer = typename Runtime::template Pointer<T>;
 
 template <typename Runtime, typename T>
+using TargetSignedPointer = typename Runtime::template SignedPointer<T>;
+  
+template <typename Runtime, typename T>
 using ConstTargetPointer = typename Runtime::template Pointer<const T>;
+
 
 template <typename Runtime, template <typename> class Pointee,
           bool Nullable = true>
@@ -281,7 +301,10 @@ public:
 #define WANT_ALL_VALUE_WITNESSES
 #define DATA_VALUE_WITNESS(lowerId, upperId, type)
 #define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes) \
-  typedef TargetPointer<Runtime, returnType paramTypes> lowerId;
+  typedef returnType (*lowerId ## Unsigned) paramTypes; \
+  typedef TargetSignedPointer<Runtime, lowerId ## Unsigned \
+  __ptrauth_swift_value_witness_function_pointer( \
+    SpecialPointerAuthDiscriminators::upperId)> lowerId;
 #define MUTABLE_VALUE_TYPE TargetPointer<Runtime, OpaqueValue>
 #define IMMUTABLE_VALUE_TYPE ConstTargetPointer<Runtime, OpaqueValue>
 #define MUTABLE_BUFFER_TYPE TargetPointer<Runtime, ValueBuffer>
@@ -314,6 +337,9 @@ template <typename Runtime> struct TargetValueWitnessTable {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
   typename TargetValueWitnessTypes<Runtime>::LOWER_ID LOWER_ID;
+#define FUNCTION_VALUE_WITNESS(LOWER_ID, UPPER_ID, RET, PARAMS) \
+  typename TargetValueWitnessTypes<Runtime>::LOWER_ID LOWER_ID;
+
 #include "swift/ABI/ValueWitness.def"
 
   using StoredSize = typename Runtime::StoredSize;
@@ -595,7 +621,7 @@ public:
   #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
   #define FUNCTION_VALUE_WITNESS(WITNESS, UPPER, RET_TYPE, PARAM_TYPES)    \
     template<typename...A>                                                 \
-    _ResultOf<ValueWitnessTypes::WITNESS>::type                            \
+    _ResultOf<ValueWitnessTypes::WITNESS ## Unsigned>::type                            \
     vw_##WITNESS(A &&...args) const {                                      \
       return getValueWitnesses()->WITNESS(std::forward<A>(args)..., this); \
     }
@@ -744,7 +770,7 @@ template <typename Runtime>
 struct TargetHeapMetadataHeaderPrefix {
   /// Destroy the object, returning the allocated size of the object
   /// or 0 if the object shouldn't be deallocated.
-  TargetPointer<Runtime, HeapObjectDestroyer> destroy;
+  TargetSignedPointer<Runtime, HeapObjectDestroyer *__ptrauth_swift_heap_object_destructor> destroy;
 };
 using HeapMetadataHeaderPrefix =
   TargetHeapMetadataHeaderPrefix<InProcess>;
@@ -838,10 +864,17 @@ public:
 
 template<typename Runtime> struct TargetContextDescriptor;
 
-template<typename Runtime>
+template<typename Runtime,
+         template<typename _Runtime> class Context = TargetContextDescriptor>
+using TargetSignedContextPointer = TargetSignedPointer<Runtime,
+                          Context<Runtime> * __ptrauth_swift_type_descriptor>;
+
+template<typename Runtime,
+         template<typename _Runtime> class Context = TargetContextDescriptor>
 using TargetRelativeContextPointer =
-  RelativeIndirectablePointer<const TargetContextDescriptor<Runtime>,
-                              /*nullable*/ true>;
+  RelativeIndirectablePointer<const Context<Runtime>,
+                              /*nullable*/ true, int32_t,
+                              TargetSignedContextPointer<Runtime, Context>>;
 
 using RelativeContextPointer = TargetRelativeContextPointer<InProcess>;
 
@@ -849,7 +882,8 @@ template<typename Runtime, typename IntTy,
          template<typename _Runtime> class Context = TargetContextDescriptor>
 using RelativeContextPointerIntPair =
   RelativeIndirectablePointerIntPair<const Context<Runtime>, IntTy,
-                              /*nullable*/ true, int32_t>;
+                              /*nullable*/ true, int32_t,
+                              TargetSignedContextPointer<Runtime, Context>>;
 
 template<typename Runtime> struct TargetMethodDescriptor;
 
@@ -1085,13 +1119,13 @@ private:
   /// if this is an artificial subclass.  We currently provide no
   /// supported mechanism for making a non-artificial subclass
   /// dynamically.
-  ConstTargetMetadataPointer<Runtime, TargetClassDescriptor> Description;
+  TargetSignedPointer<Runtime, const TargetClassDescriptor<Runtime> * __ptrauth_swift_type_descriptor> Description;
 
 public:
   /// A function for destroying instance variables, used to clean up after an
   /// early return from a constructor. If null, no clean up will be performed
   /// and all ivars must be trivial.
-  TargetPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
+  TargetSignedPointer<Runtime, ClassIVarDestroyer * __ptrauth_swift_heap_object_destructor> IVarDestroyer;
 
   // After this come the class members, laid out as follows:
   //   - class members for the superclass (recursively)
@@ -1104,6 +1138,12 @@ public:
 
   ConstTargetMetadataPointer<Runtime, TargetClassDescriptor>
   getDescription() const {
+    assert(isTypeMetadata());
+    return Description;
+  }
+
+  typename Runtime::StoredSignedPointer
+  getDescriptionAsSignedPointer() const {
     assert(isTypeMetadata());
     return Description;
   }
@@ -1255,6 +1295,14 @@ public:
     assert(isTypeMetadata());
   }
 
+  bool isCanonicalStaticallySpecializedGenericMetadata() const {
+    auto *description = getDescription();
+    if (!description->isGeneric())
+      return false;
+
+    return this->Flags & ClassFlags::IsCanonicalStaticSpecialization;
+  }
+
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Class;
   }
@@ -1314,7 +1362,7 @@ struct TargetForeignClassMetadata : public TargetForeignTypeMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
 
   /// An out-of-line description of the type.
-  ConstTargetMetadataPointer<Runtime, TargetClassDescriptor> Description;
+  TargetSignedPointer<Runtime, const TargetClassDescriptor<Runtime> * __ptrauth_swift_type_descriptor> Description;
 
   /// The superclass of the foreign class, if any.
   ConstTargetMetadataPointer<Runtime, swift::TargetForeignClassMetadata>
@@ -1327,6 +1375,11 @@ struct TargetForeignClassMetadata : public TargetForeignTypeMetadata<Runtime> {
 
   ConstTargetMetadataPointer<Runtime, TargetClassDescriptor>
   getDescription() const {
+    return Description;
+  }
+
+  typename Runtime::StoredSignedPointer
+  getDescriptionAsSignedPointer() const {
     return Description;
   }
 
@@ -1345,8 +1398,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
       : TargetMetadata<Runtime>(Kind), Description(description) {}
 
   /// An out-of-line description of the type.
-  ConstTargetMetadataPointer<Runtime, TargetValueTypeDescriptor>
-    Description;
+  TargetSignedPointer<Runtime, const TargetValueTypeDescriptor<Runtime> * __ptrauth_swift_type_descriptor> Description;
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Struct
@@ -1356,6 +1408,11 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
 
   ConstTargetMetadataPointer<Runtime, TargetValueTypeDescriptor>
   getDescription() const {
+    return Description;
+  }
+
+  typename Runtime::StoredSignedPointer
+  getDescriptionAsSignedPointer() const {
     return Description;
   }
 };
@@ -1822,11 +1879,16 @@ using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
 /// the layout of a witness table is dependent on the protocol being
 /// represented.
 template <typename Runtime>
-struct TargetWitnessTable {
+class TargetWitnessTable {
   /// The protocol conformance descriptor from which this witness table
   /// was generated.
   ConstTargetMetadataPointer<Runtime, TargetProtocolConformanceDescriptor>
     Description;
+
+public:
+  const TargetProtocolConformanceDescriptor<Runtime> *getDescription() const {
+    return Description;
+  }
 };
 
 using WitnessTable = TargetWitnessTable<InProcess>;
@@ -2189,7 +2251,7 @@ private:
       DirectNominalTypeDescriptor;
 
     /// An indirect reference to a nominal type descriptor.
-    RelativeDirectPointerIntPair<TargetContextDescriptor<Runtime> * const,
+    RelativeDirectPointerIntPair<TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor>,
                                  TypeReferenceKind>
       IndirectNominalTypeDescriptor;
 
@@ -2242,24 +2304,25 @@ template<typename Runtime> class TargetGenericRequirementDescriptor;
 /// pointer equivalent to \c TargetProtocolDescriptorRef.
 template <typename Runtime>
 class RelativeTargetProtocolDescriptorPointer {
-  union AnyProtocol {
-    TargetProtocolDescriptor<Runtime> descriptor;
+  union {
+    /// Relative pointer to a Swift protocol descriptor.
+    /// The \c bool value will be false to indicate that the protocol
+    /// is a Swift protocol, or true to indicate that this references
+    /// an Objective-C protocol.
+    RelativeContextPointerIntPair<Runtime, bool, TargetProtocolDescriptor>
+      swiftPointer;
+#if SWIFT_OBJC_INTEROP    
+    /// Relative pointer to an ObjC protocol descriptor.
+    /// The \c bool value will be false to indicate that the protocol
+    /// is a Swift protocol, or true to indicate that this references
+    /// an Objective-C protocol.
+    RelativeIndirectablePointerIntPair<Protocol, bool> objcPointer;
+#endif
   };
-
-  /// The relative pointer itself.
-  ///
-  /// The \c AnyProtocol value type ensures that we can reference any
-  /// protocol descriptor; it will be reinterpret_cast to the appropriate
-  /// protocol descriptor type.
-  ///
-  /// The \c bool integer value will be false to indicate that the protocol
-  /// is a Swift protocol, or true to indicate that this references
-  /// an Objective-C protocol.
-  RelativeIndirectablePointerIntPair<AnyProtocol, bool> pointer;
 
 #if SWIFT_OBJC_INTEROP
   bool isObjC() const {
-    return pointer.getInt();
+    return objcPointer.getInt();
   }
 #endif
 
@@ -2269,13 +2332,13 @@ public:
 #if SWIFT_OBJC_INTEROP
     if (isObjC()) {
       return TargetProtocolDescriptorRef<Runtime>::forObjC(
-          protocol_const_cast(pointer.getPointer()));
+          const_cast<Protocol*>(objcPointer.getPointer()));
     }
 #endif
 
     return TargetProtocolDescriptorRef<Runtime>::forSwift(
         reinterpret_cast<ConstTargetMetadataPointer<
-            Runtime, TargetProtocolDescriptor>>(pointer.getPointer()));
+            Runtime, TargetProtocolDescriptor>>(swiftPointer.getPointer()));
   }
 
   operator TargetProtocolDescriptorRef<Runtime>() const {
@@ -2293,7 +2356,7 @@ struct TargetTypeReference {
 
     /// An indirect reference to a TypeContextDescriptor or ProtocolDescriptor.
     RelativeDirectPointer<
-        ConstTargetMetadataPointer<Runtime, TargetContextDescriptor>>
+        TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor>>
       IndirectTypeDescriptor;
 
     /// An indirect reference to an Objective-C class.
@@ -2378,10 +2441,6 @@ struct TargetProtocolConformanceDescriptor final
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
 public:
-  using WitnessTableAccessorFn
-    = const TargetWitnessTable<Runtime> *(const TargetMetadata<Runtime>*,
-                                          const TargetWitnessTable<Runtime> **);
-
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<Runtime>;
 
@@ -2391,7 +2450,7 @@ public:
 
 private:
   /// The protocol being conformed to.
-  RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
+  TargetRelativeContextPointer<Runtime, TargetProtocolDescriptor> Protocol;
   
   // Some description of the type that conforms to the protocol.
   TargetTypeReference<Runtime> TypeRef;
@@ -2424,7 +2483,8 @@ public:
     return TypeRef.getTypeDescriptor(getTypeKind());
   }
 
-  const TargetContextDescriptor<Runtime> **_getTypeDescriptorLocation() const {
+  TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor *
+  _getTypeDescriptorLocation() const {
     if (getTypeKind() != TypeReferenceKind::IndirectTypeDescriptor)
       return nullptr;
     return TypeRef.IndirectTypeDescriptor.get();
@@ -2669,7 +2729,7 @@ public:
     /// The conformance the param is constrained to use.
     ///
     /// Only valid if the requirement has SameConformance kind.
-    RelativeIndirectablePointer<TargetProtocolConformanceRecord<Runtime>,
+    RelativeIndirectablePointer<TargetProtocolConformanceDescriptor<Runtime>,
                                 /*nullable*/ false> Conformance;
     
     /// The kind of layout constraint.
@@ -2707,7 +2767,7 @@ public:
 
   /// Retrieve the protocol conformance record for a SameConformance
   /// requirement.
-  const TargetProtocolConformanceRecord<Runtime> *getConformance() const {
+  const TargetProtocolConformanceDescriptor<Runtime> *getConformance() const {
     assert(getKind() == GenericRequirementKind::SameConformance);
     return Conformance;
   }
@@ -4490,11 +4550,20 @@ struct DynamicReplacementChainEntry {
 struct DynamicReplacementKey {
   RelativeDirectPointer<DynamicReplacementChainEntry, false> root;
   uint32_t flags;
+
+  uint16_t getExtraDiscriminator() const {
+    return flags & 0x0000FFFF;
+  }
 };
 
 /// A record describing a dynamic function replacement.
 class DynamicReplacementDescriptor {
-  RelativeIndirectablePointer<DynamicReplacementKey, false> replacedFunctionKey;
+  RelativeIndirectablePointer<
+      const DynamicReplacementKey, false, int32_t,
+      TargetSignedPointer<InProcess,
+                          DynamicReplacementKey *
+                              __ptrauth_swift_dynamic_replacement_key>>
+      replacedFunctionKey;
   RelativeDirectPointer<void, false> replacementFunction;
   RelativeDirectPointer<DynamicReplacementChainEntry, false> chainEntry;
   uint32_t flags;

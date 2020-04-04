@@ -265,6 +265,7 @@ func rdar19831698() {
   var v71 = true + 1.0 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Double'}}
 // expected-note@-1{{overloads for '+'}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
+  // expected-note@-1{{overloads for '+'}}
   var v73 = true + [] // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'Array<Bool>'}}
   var v75 = true + "str" // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'String'}}
 }
@@ -373,4 +374,13 @@ func bridgeTupleToAnyObject() {
 // Array defaulting and bridging type checking error per rdar://problem/54274245
 func rdar54274245(_ arr: [Any]?) {
   _ = (arr ?? []) as [NSObject]
+}
+
+// rdar://problem/60501780 - failed to infer NSString as a value type of a dictionary
+func rdar60501780() {
+  func foo(_: [String: NSObject]) {}
+
+  func bar(_ v: String) {
+    foo(["": "", "": v as NSString])
+  }
 }

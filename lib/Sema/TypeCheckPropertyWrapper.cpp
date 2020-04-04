@@ -28,7 +28,8 @@ using namespace swift;
 
 /// The kind of property initializer to look for
 enum class PropertyWrapperInitKind {
-  /// An initial-value initializer (i.e. `init(initialValue:)`)
+  /// An initial-value initializer (i.e. `init(initialValue:)`), which is
+  /// deprecated.
   InitialValue,
   /// An wrapped-value initializer (i.e. `init(wrappedValue:)`)
   WrappedValue,
@@ -291,7 +292,43 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
   return subscript;
 }
 
-llvm::Expected<PropertyWrapperTypeInfo>
+/// Whether the argument with label 'argumentLabel' in the initializer 'init'
+/// is an escaping autoclosure argument.
+static bool isEscapingAutoclosureArgument(const ConstructorDecl *init,
+                                          Identifier argumentLabel) {
+  if (!init)
+    return false;
+
+  Optional<size_t> parameterIndex = None;
+  auto params = init->getParameters();
+  for (size_t i = 0; i < params->size(); i++) {
+    if (params->get(i)->getArgumentName() == argumentLabel) {
+      parameterIndex = i;
+      break;
+    }
+  }
+
+  if (!parameterIndex.hasValue())
+    return false;
+
+  size_t paramIndex = parameterIndex.getValue();
+  if (!params->get(paramIndex)->isAutoClosure())
+    return false;
+
+  if (auto initTy = init->getInterfaceType()->getAs<AnyFunctionType>()) {
+    if (auto funcTy = initTy->getResult()->getAs<FunctionType>()) {
+      if (funcTy->getNumParams() > paramIndex) {
+        Type paramTy = funcTy->getParams()[paramIndex].getPlainType();
+        if (auto paramFuncTy = paramTy->getAs<FunctionType>())
+          return !paramFuncTy->isNoEscape();
+      }
+    }
+  }
+
+  return false;
+}
+
+PropertyWrapperTypeInfo
 PropertyWrapperTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
   // We must have the @propertyWrapper attribute to continue.
@@ -313,12 +350,16 @@ PropertyWrapperTypeInfoRequest::evaluate(
   
   PropertyWrapperTypeInfo result;
   result.valueVar = valueVar;
-  if (findSuitableWrapperInit(ctx, nominal, valueVar,
-                              PropertyWrapperInitKind::WrappedValue))
+  if (auto init = findSuitableWrapperInit(ctx, nominal, valueVar,
+                              PropertyWrapperInitKind::WrappedValue)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasWrappedValueInit;
-  else if (auto init = findSuitableWrapperInit(
+    result.isWrappedValueInitUsingEscapingAutoClosure =
+      isEscapingAutoclosureArgument(init, ctx.Id_wrappedValue);
+  } else if (auto init = findSuitableWrapperInit(
                ctx, nominal, valueVar, PropertyWrapperInitKind::InitialValue)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasInitialValueInit;
+    result.isWrappedValueInitUsingEscapingAutoClosure =
+      isEscapingAutoclosureArgument(init, ctx.Id_initialValue);
 
     if (init->getLoc().isValid()) {
       auto diag = init->diagnose(diag::property_wrapper_init_initialValue);
@@ -364,7 +405,7 @@ PropertyWrapperTypeInfoRequest::evaluate(
   return result;
 }
 
-llvm::Expected<llvm::TinyPtrVector<CustomAttr *>>
+llvm::TinyPtrVector<CustomAttr *>
 AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
                                           VarDecl *var) const {
   ASTContext &ctx = var->getASTContext();
@@ -479,27 +520,20 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
-llvm::Expected<Type>
-AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
-                                             VarDecl *var,
-                                             unsigned index) const {
+Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
+                                                  VarDecl *var,
+                                                  unsigned index) const {
   // Find the custom attributes for the attached property wrapper.
-  llvm::Expected<llvm::TinyPtrVector<CustomAttr *>> customAttrVal =
-      evaluator(AttachedPropertyWrappersRequest{var});
-  if (!customAttrVal)
-    return customAttrVal.takeError();
+  llvm::TinyPtrVector<CustomAttr *> customAttrVal =
+      evaluateOrDefault(evaluator, AttachedPropertyWrappersRequest{var}, {});
 
   // If there isn't an attached property wrapper at this index, we're done.
-  if (index >= customAttrVal->size())
+  if (index >= customAttrVal.size())
     return Type();
                                                
-  auto customAttr = (*customAttrVal)[index];
+  auto customAttr = customAttrVal[index];
   if (!customAttr)
     return Type();
-
-  ASTContext &ctx = var->getASTContext();
-  if (!ctx.areSemanticQueriesEnabled())
-    return nullptr;
 
   auto resolution =
       TypeResolution::forContextual(var->getDeclContext());
@@ -508,21 +542,20 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
 
   if (TypeChecker::validateType(var->getASTContext(),
                                 customAttr->getTypeLoc(),
-                                resolution, options))
-    return ErrorType::get(ctx);
+                                resolution, options)) {
+    return ErrorType::get(var->getASTContext());
+  }
 
   return customAttr->getTypeLoc().getType();
 }
 
-llvm::Expected<Type>
+Type
 PropertyWrapperBackingPropertyTypeRequest::evaluate(
-                                    Evaluator &evaluator, VarDecl *var) const {
-  llvm::Expected<Type> rawTypeResult =
-    evaluator(AttachedPropertyWrapperTypeRequest{var, 0});
-  if (!rawTypeResult)
-    return rawTypeResult;
+    Evaluator &evaluator, VarDecl *var) const {
+  Type rawType =
+      evaluateOrDefault(evaluator,
+                        AttachedPropertyWrapperTypeRequest{var, 0}, Type());
 
-  Type rawType = *rawTypeResult;
   if (!rawType || rawType->hasError())
     return Type();
 
@@ -531,10 +564,6 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
 
   auto binding = var->getParentPatternBinding();
   if (!binding)
-    return Type();
-
-  ASTContext &ctx = var->getASTContext();
-  if (!ctx.areSemanticQueriesEnabled())
     return Type();
 
   // If there's an initializer of some sort, checking it will determine the
@@ -546,6 +575,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     if (!binding->isInitializerChecked(index))
       TypeChecker::typeCheckPatternBinding(binding, index);
 
+    ASTContext &ctx = var->getASTContext();
     Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
     assert(type || ctx.Diags.hadAnyError());
     return type;
@@ -638,13 +668,32 @@ Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
   return wrappedValueType;
 }
 
-Expr *swift::buildPropertyWrapperInitialValueCall(
+static bool isOpaquePlaceholderClosure(const Expr *value) {
+  auto ove = dyn_cast<OpaqueValueExpr>(value);
+  if (!ove || !ove->isPlaceholder())
+    return false;
+
+  if (auto valueFnTy = ove->getType()->getAs<FunctionType>()) {
+    return (valueFnTy->getNumParams() == 0);
+  }
+
+  return false;
+}
+
+Expr *swift::buildPropertyWrapperWrappedValueCall(
     VarDecl *var, Type backingStorageType, Expr *value,
     bool ignoreAttributeArgs) {
   // From the innermost wrapper type out, form init(wrapperValue:) calls.
   ASTContext &ctx = var->getASTContext();
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   Expr *initializer = value;
+  if (var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure() &&
+      isOpaquePlaceholderClosure(value)) {
+    // We can't pass the opaque closure directly as an autoclosure arg.
+    // So we instead pass a CallExpr calling the opaque closure, which
+    // the type checker shall wrap in an AutoClosureExpr.
+    initializer = CallExpr::createImplicit(ctx, value, {}, {});
+  }
   for (unsigned i : llvm::reverse(indices(wrapperAttrs))) {
     Type wrapperType =
       backingStorageType ? computeWrappedValueType(var, backingStorageType, i)

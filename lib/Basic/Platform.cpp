@@ -180,7 +180,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::KFreeBSD:
   case llvm::Triple::Lv2:
   case llvm::Triple::NetBSD:
-  case llvm::Triple::OpenBSD:
   case llvm::Triple::Solaris:
   case llvm::Triple::Minix:
   case llvm::Triple::RTEMS:
@@ -207,6 +206,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return triple.isAndroid() ? "android" : "linux";
   case llvm::Triple::FreeBSD:
     return "freebsd";
+  case llvm::Triple::OpenBSD:
+    return "openbsd";
   case llvm::Triple::Win32:
     switch (triple.getEnvironment()) {
     case llvm::Triple::Cygnus:
@@ -286,6 +287,7 @@ getArchForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   //          .Case ("armv7s", "armv7s")
   //          .Case ("armv7k", "armv7k")
   //          .Case ("armv7", "armv7")
+  //          .Case ("arm64e", "arm64e")
               .Default(tripleArchName);
 }
 
@@ -394,6 +396,9 @@ Optional<llvm::VersionTuple>
 swift::getSwiftRuntimeCompatibilityVersionForTarget(
     const llvm::Triple &Triple) {
   unsigned Major, Minor, Micro;
+
+  if (Triple.getArchName() == "arm64e")
+    return llvm::VersionTuple(5, 3);
 
   if (Triple.isMacOSX()) {
     Triple.getMacOSXVersion(Major, Minor, Micro);

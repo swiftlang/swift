@@ -219,7 +219,7 @@ namespace {
         return false;
       return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
     }
-    
+       
     void verify(IRGenTypeVerifierFunction &IGF,
                 llvm::Value *metadata,
                 SILType structType) const override {

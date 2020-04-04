@@ -25,6 +25,10 @@ unsigned long long swift_reflection_classIsSwiftMask = 2;
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/Runtime/Unreachable.h"
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#endif
+
 using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
@@ -59,14 +63,55 @@ template <uint8_t WordSize>
 static int minimalDataLayoutQueryFunction(void *ReaderContext,
                                           DataLayoutQueryType type,
                                           void *inBuffer, void *outBuffer) {
+    // TODO: The following should be set based on the target.
+    // This code sets it to match the platform this code was compiled for.
+#if defined(__APPLE__) && __APPLE__
+    auto applePlatform = true;
+#else
+    auto applePlatform = false;
+#endif
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+    auto iosDerivedPlatform = true;
+#else
+    auto iosDerivedPlatform = false;
+#endif
+
   if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
     auto result = static_cast<uint8_t *>(outBuffer);
     *result = WordSize;
     return 1;
   }
+  if (type == DLQ_GetObjCReservedLowBits) {
+    auto result = static_cast<uint8_t *>(outBuffer);
+    if (applePlatform && !iosDerivedPlatform && WordSize == 8) {
+      // Obj-C reserves low bit on 64-bit macOS only.
+      // Other Apple platforms don't reserve this bit (even when
+      // running on x86_64-based simulators).
+      *result = 1;
+    } else {
+      *result = 0;
+    }
+    return 1;
+  }
+  if (type == DLQ_GetLeastValidPointerValue) {
+    auto result = static_cast<uint64_t *>(outBuffer);
+    if (applePlatform && WordSize == 8) {
+      // Swift reserves the first 4GiB on all 64-bit Apple platforms
+      *result = 0x100000000;
+    } else {
+      // Swift reserves the first 4KiB everywhere else
+      *result = 0x1000;
+    }
+    return 1;
+  }
   return 0;
 }
 
+// Caveat: This basically only works correctly if running on the same
+// host as the target.  Otherwise, you'll need to use
+// swift_reflection_createReflectionContextWithDataLayout() below
+// with an appropriate data layout query function that understands
+// the target environment.
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
                                          uint8_t PointerSize,
@@ -225,6 +270,16 @@ swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 
+char *
+swift_reflection_copyDemangledNameForTypeRef(
+  SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef) {
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+
+  Demangle::Demangler Dem;
+  auto Name = nodeToString(TR->getDemangling(Dem));
+  return strdup(Name.c_str());
+}
+
 swift_typeref_t
 swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
                                           unsigned Index) {
@@ -251,6 +306,9 @@ swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef) {
 
 swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   switch (TI.getKind()) {
+  case TypeInfoKind::Invalid: {
+    return SWIFT_UNKNOWN;
+  }
   case TypeInfoKind::Builtin: {
     auto &BuiltinTI = cast<BuiltinTypeInfo>(TI);
     if (BuiltinTI.getMangledTypeName() == "Bp")
@@ -266,12 +324,6 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
       return SWIFT_TUPLE;
     case RecordKind::Struct:
       return SWIFT_STRUCT;
-    case RecordKind::NoPayloadEnum:
-      return SWIFT_NO_PAYLOAD_ENUM;
-    case RecordKind::SinglePayloadEnum:
-      return SWIFT_SINGLE_PAYLOAD_ENUM;
-    case RecordKind::MultiPayloadEnum:
-      return SWIFT_MULTI_PAYLOAD_ENUM;
     case RecordKind::ThickFunction:
       return SWIFT_THICK_FUNCTION;
     case RecordKind::OpaqueExistential:
@@ -286,6 +338,17 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
       return SWIFT_CLASS_INSTANCE;
     case RecordKind::ClosureContext:
       return SWIFT_CLOSURE_CONTEXT;
+    }
+  }
+  case TypeInfoKind::Enum: {
+    auto &EnumTI = cast<EnumTypeInfo>(TI);
+    switch (EnumTI.getEnumKind()) {
+    case EnumKind::NoPayloadEnum:
+      return SWIFT_NO_PAYLOAD_ENUM;
+    case EnumKind::SinglePayloadEnum:
+      return SWIFT_SINGLE_PAYLOAD_ENUM;
+    case EnumKind::MultiPayloadEnum:
+      return SWIFT_MULTI_PAYLOAD_ENUM;
     }
   }
   case TypeInfoKind::Reference: {
@@ -314,8 +377,11 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
   }
 
   unsigned NumFields = 0;
-  if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI))
+  if (auto *RecordTI = dyn_cast<EnumTypeInfo>(TI)) {
+    NumFields = RecordTI->getNumCases();
+  } else if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
     NumFields = RecordTI->getNumFields();
+  }
 
   return {
     getTypeInfoKind(*TI),
@@ -327,14 +393,20 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
 }
 
 static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
-  auto *RecordTI = cast<RecordTypeInfo>(TI);
-  auto &FieldInfo = RecordTI->getFields()[Index];
+  const FieldInfo *FieldInfo;
+  if (auto *EnumTI = dyn_cast<EnumTypeInfo>(TI)) {
+    FieldInfo = &(EnumTI->getCases()[Index]);
+  } else if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
+    FieldInfo = &(RecordTI->getFields()[Index]);
+  } else {
+    assert(false && "convertChild(TI): TI must be record or enum typeinfo");
+  }
 
   return {
-    FieldInfo.Name.c_str(),
-    FieldInfo.Offset,
-    getTypeInfoKind(FieldInfo.TI),
-    reinterpret_cast<swift_typeref_t>(FieldInfo.TR),
+    FieldInfo->Name.c_str(),
+    FieldInfo->Offset,
+    getTypeInfoKind(FieldInfo->TI),
+    reinterpret_cast<swift_typeref_t>(FieldInfo->TR),
   };
 }
 
@@ -414,6 +486,25 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
   return Success;
 }
 
+int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
+                                      swift_addr_t EnumAddress,
+                                      swift_typeref_t EnumTypeRef,
+                                      int *CaseIndex) {
+  auto Context = ContextRef->nativeContext;
+  auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
+  auto RemoteEnumAddress = RemoteAddress(EnumAddress);
+  if (!Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex)) {
+    return false;
+  }
+  auto TI = Context->getTypeInfo(EnumTR);
+  auto *RecordTI = dyn_cast<EnumTypeInfo>(TI);
+  assert(RecordTI != nullptr);
+  if (static_cast<size_t>(*CaseIndex) >= RecordTI->getNumCases()) {
+    return false;
+  }
+  return true;
+}
+
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   if (TR == nullptr) {
@@ -436,6 +527,12 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
     std::string MangledName = mangleNode(TR->getDemangling(Dem));
     fprintf(stdout, "Mangled name: %s%s\n", MANGLING_PREFIX_STR,
             MangledName.c_str());
+
+    char *DemangledName =
+      swift_reflection_copyDemangledNameForTypeRef(ContextRef, OpaqueTypeRef);
+    fprintf(stdout, "Demangled name: %s\n", DemangledName);
+    free(DemangledName);
+
 #ifndef NDEBUG
     assert(mangleNode(TR->getDemangling(Dem)) == MangledName &&
            "round-trip diff");

@@ -19,7 +19,7 @@ public protocol Observer {
 
 sil hidden @witness_method : $@convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @callee_owned (@in O) -> () {
 bb0(%0 : $*S):
-  %1 = witness_method $S, #Observable.subscribe!1 : $@convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+  %1 = witness_method $S, #Observable.subscribe : $@convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
   %2 = partial_apply %1<S, O>(%0) : $@convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
   return %2 : $@callee_owned (@in O) -> ()
 }
@@ -87,7 +87,7 @@ sil hidden_external @takingEmptyAndQ : $@convention(thin) <τ_0_0 where  τ_0_0 
 // CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[WEAKBOXTYPE]]
 // CHECK:   [[WB:%.*]] = bitcast %swift.refcounted* [[OBJ]] to %T23partial_apply_forwarder7WeakBoxC*
 // CHECK:   [[REF:%.*]] = bitcast %T23partial_apply_forwarder7WeakBoxC* [[WB]] to %swift.refcounted*
-// CHECK:   [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @"$s7takingQTA" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[REF]], 1
+// CHECK:   [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast ({{.*}}* @"$s7takingQTA{{(\.ptrauth)?}}" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[REF]], 1
 // CHECK:   ret { i8*, %swift.refcounted* } [[CLOSURE]]
 
 // CHECK-LABEL: define internal swiftcc void @"$s7takingQTA"(%swift.refcounted* swiftself %0)
@@ -115,7 +115,7 @@ bb0(%0 : $*τ_0_1):
 // CHECK:   [[OBJ:%.*]] = call {{.*}} @swift_allocObject
 // CHECK:   [[WB:%.*]] = bitcast %swift.refcounted* [[OBJ]]
 // CHECK:   [[REF:%.*]] = bitcast {{.*}}* [[WB]] to %swift.refcounted*
-// CHECK:   [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @"$s15takingQAndEmptyTA" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[REF]], 1
+// CHECK:   [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast ({{.*}}* @"$s15takingQAndEmptyTA{{(\.ptrauth)?}}" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[REF]], 1
 // CHECK: }
 sil public @bind_polymorphic_param_from_context_2 : $@convention(thin) <τ_0_1>(@in τ_0_1, EmptyType) -> @owned @callee_owned () -> () {
 bb0(%0 : $*τ_0_1, %2: $EmptyType):
@@ -129,7 +129,7 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
 // CHECK:   [[OBJ:%.*]] = call {{.*}} @swift_allocObject
 // CHECK:   [[WB:%.*]] = bitcast %swift.refcounted* [[OBJ]]
 // CHECK:   [[REF:%.*]] = bitcast {{.*}}* [[WB]] to %swift.refcounted*
-// CHECK:   [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @"$s15takingEmptyAndQTA" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[REF]], 1
+// CHECK:   [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast ({{.*}}* @"$s15takingEmptyAndQTA{{(\.ptrauth)?}}" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[REF]], 1
 // CHECK: }
 
 sil public @bind_polymorphic_param_from_context_3 : $@convention(thin) <τ_0_1>(@in τ_0_1, EmptyType) -> @owned @callee_owned () -> () {
@@ -176,7 +176,7 @@ struct S {
 
 sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q> (S, @owned WeakBox<τ_0_0>) -> ()
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @bind_polymorphic_param_from_context_with_layout(%swift.opaque* noalias nocapture %0, i64 %1, %swift.type* %"\CF\84_0_1")
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{.*}} @bind_polymorphic_param_from_context_with_layout(%swift.opaque* noalias nocapture %0, i64 %1, %swift.type* %"\CF\84_0_1")
 // CHECK: entry:
 // CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s23partial_apply_forwarder12BaseProducerVMa"([[INT]] 255, %swift.type* %"\CF\84_0_1")
 // CHECK:   [[BPTY:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
@@ -191,7 +191,7 @@ sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q>
 // CHECK:   store i64 %1, i64* [[XADDR]]
 // CHECK:   [[WBADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>, <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, %T23partial_apply_forwarder7WeakBoxC* }>* [[CONTEXT]], i32 0, i32 {{(2|3)}}
 // CHECK:   store %T23partial_apply_forwarder7WeakBoxC* [[WB]], %T23partial_apply_forwarder7WeakBoxC** [[WBADDR]]
-// CHECK:   [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @"$s11takingQAndSTA" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT0]], 1
+// CHECK:   [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast ({{.*}}* @"$s11takingQAndSTA{{(\.ptrauth)?}}" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT0]], 1
 // CHECK:   ret { i8*, %swift.refcounted* } [[CLOSURE]]
 
 // CHECK-LABEL: define internal swiftcc void @"$s11takingQAndSTA"(%swift.refcounted* swiftself %0)
@@ -213,7 +213,6 @@ sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q>
 // CHECK:   %"BaseProducer<\CF\84_0_1>" = load %swift.type*, %swift.type** [[GENPARAMADDR]]
 // CHECK:   [[WITNESS:%.*]] = call i8** @swift_getWitnessTable
 // CHECK:   tail call swiftcc void @takingQAndS(i64 [[X]], %T23partial_apply_forwarder7WeakBoxC.1* %.asUnsubstituted, i8** [[WITNESS]])
-
 sil public @bind_polymorphic_param_from_context_with_layout : $@convention(thin) <τ_0_1>(@in τ_0_1, S) -> @owned @callee_owned () -> () {
 bb0(%0 : $*τ_0_1, %1: $S):
   %2 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
@@ -246,7 +245,7 @@ bb0:
 
 // CHECK-LABEL: define hidden swiftcc { i8*, %swift.refcounted* } @specializes_closure_returning_closure() #0 {
 // CHECK: entry:
-// CHECK: ret { i8*, %swift.refcounted* } { i8* bitcast ({ %{{.*}}Empty{{.*}}*, i8*, %swift.refcounted* } (%{{.*}}Empty{{.*}}*, %swift.refcounted*)* @"{{.*}}returns_closure{{.*}}" to i8*), %swift.refcounted* null }
+// CHECK: ret { i8*, %swift.refcounted* } { i8* bitcast ({{.*}} @"{{.*}}returns_closure{{.*}}" to i8*), %swift.refcounted* null }
 
 protocol MyEquatable {
   static func isEqual (lhs: Self, rhs: Self) -> Builtin.Int1

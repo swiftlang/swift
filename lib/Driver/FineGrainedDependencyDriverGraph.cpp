@@ -107,12 +107,12 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromSourceFileDepGraph(
 }
 
 bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
-  const StringRef swiftDeps = getSwiftDeps(cmd);
+  std::string swiftDeps = getSwiftDeps(cmd).str();
 
   // optimization
   const auto fileKey = DependencyKey::createKeyForWholeSourceFile(
       DeclAspect::interface, swiftDeps);
-  if (const auto fileNode = nodeMap.find(swiftDeps.str(), fileKey)) {
+  if (const auto fileNode = nodeMap.find(swiftDeps, fileKey)) {
     if (fileNode && fileNode.getValue()->getHasBeenTraced())
       return true;
   }
@@ -178,7 +178,7 @@ std::vector<const Job *> ModuleDepGraph::jobsContaining(
 void ModuleDepGraph::registerJob(const Job *job) {
   // No need to create any nodes; that will happen when the swiftdeps file is
   // read. Just record the correspondence.
-  jobsBySwiftDeps.insert(std::make_pair(getSwiftDeps(job), job));
+  jobsBySwiftDeps.insert(std::make_pair(getSwiftDeps(job).str(), job));
 }
 
 std::vector<const Job *> ModuleDepGraph::getAllJobs() const {

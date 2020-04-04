@@ -89,7 +89,7 @@ bb0(%0 : @owned $B):
   %1 = begin_borrow %0 : $B
   %2 = struct_extract %1 : $B, #B.a1
   %3 = struct_extract %2 : $A, #A.ptr2
-  %4 = unchecked_enum_data %3 : $Optional<(Builtin.NativeObject, Builtin.NativeObject)>, #Optional.some!enumelt.1
+  %4 = unchecked_enum_data %3 : $Optional<(Builtin.NativeObject, Builtin.NativeObject)>, #Optional.some!enumelt
   %5 = tuple_extract %4 : $(Builtin.NativeObject, Builtin.NativeObject), 1
   destroy_value %5 : $Builtin.NativeObject
   end_borrow %1 : $B
@@ -109,7 +109,7 @@ bb0(%0 : @owned $B):
   %1 = begin_borrow %0 : $B
   %2 = struct_extract %1 : $B, #B.a1
   %3 = struct_extract %2 : $A, #A.ptr2
-  %4 = unchecked_enum_data %3 : $Optional<(Builtin.NativeObject, Builtin.NativeObject)>, #Optional.some!enumelt.1
+  %4 = unchecked_enum_data %3 : $Optional<(Builtin.NativeObject, Builtin.NativeObject)>, #Optional.some!enumelt
   end_borrow %1 : $B
   %5 = tuple_extract %4 : $(Builtin.NativeObject, Builtin.NativeObject), 1
   destroy_value %0 : $B
@@ -145,7 +145,7 @@ sil [ossa] @funcarg_subobject_with_destroy_of_subobject : $@convention(thin) (@g
 bb0(%0 : @guaranteed $B):
   %2 = struct_extract %0 : $B, #B.a1
   %3 = struct_extract %2 : $A, #A.ptr2
-  %4 = unchecked_enum_data %3 : $Optional<(Builtin.NativeObject, Builtin.NativeObject)>, #Optional.some!enumelt.1
+  %4 = unchecked_enum_data %3 : $Optional<(Builtin.NativeObject, Builtin.NativeObject)>, #Optional.some!enumelt
   %5 = tuple_extract %4 : $(Builtin.NativeObject, Builtin.NativeObject), 1
   destroy_value %5 : $Builtin.NativeObject
   %9999 = tuple()

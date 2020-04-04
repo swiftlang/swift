@@ -61,10 +61,10 @@ public final class OptionalReqsAbsent: OptionalReqs {}
 
 // It would be okay if this one got optimized...
 // CHECK-LABEL: sil @$s16ConformancesUser19testOptionalPresentySb0A00d4ReqsE0CF
-// CHECK: dynamic_method_br %0 : $OptionalReqsPresent, #OptionalReqs.method!1.foreign
+// CHECK: dynamic_method_br %0 : $OptionalReqsPresent, #OptionalReqs.method!foreign
 // CHECK: end sil function '$s16ConformancesUser19testOptionalPresentySb0A00d4ReqsE0CF'
 
 // ...but not this one, because the method that's currently absent might get added.
 // CHECK-LABEL: sil @$s16ConformancesUser18testOptionalAbsentySb0A00d4ReqsE0CF
-// CHECK: dynamic_method_br %0 : $OptionalReqsAbsent, #OptionalReqs.method!1.foreign
+// CHECK: dynamic_method_br %0 : $OptionalReqsAbsent, #OptionalReqs.method!foreign
 // CHECK: end sil function '$s16ConformancesUser18testOptionalAbsentySb0A00d4ReqsE0CF'

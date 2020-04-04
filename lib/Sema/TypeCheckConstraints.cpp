@@ -2058,13 +2058,8 @@ TypeChecker::typeCheckExpression(
 
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
-  // FIXME: Look through LoadExpr. This is an egregious hack due to the
-  // way typeCheckExprIndependently works.
-  Expr *contextualTypeExpr = expr;
-  if (auto loadExpr = dyn_cast_or_null<LoadExpr>(contextualTypeExpr))
-    contextualTypeExpr = loadExpr->getSubExpr();
   cs.setContextualType(
-      contextualTypeExpr,
+      expr,
       target.getExprContextualTypeLoc(),
       target.getExprContextualTypePurpose());
 
@@ -2226,39 +2221,6 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   return exprType;
 }
 
-void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
-    Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
-    FreeTypeVariableBinding allowFreeTypeVariables,
-    ExprTypeCheckListener *listener) {
-  auto &Context = dc->getASTContext();
-  FrontendStatsTracer StatsTracer(Context.Stats,
-                                  "get-possible-types-no-apply", expr);
-  PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
-
-  // Construct a constraint system from this expression.
-  ConstraintSystemOptions options;
-  options |= ConstraintSystemFlags::ReturnAllDiscoveredSolutions;
-  options |= ConstraintSystemFlags::SuppressDiagnostics;
-
-  ConstraintSystem cs(dc, options);
-
-  // Attempt to solve the constraint system.
-  const Type originalType = expr->getType();
-  if (originalType && originalType->hasError())
-    expr->setType(Type());
-
-  SolutionApplicationTarget target(
-      expr, dc, CTP_Unused, Type(), /*isDiscarded=*/false);
-  if (auto viable = cs.solve(target, listener, allowFreeTypeVariables)) {
-    expr = target.getAsExpr();
-    for (auto &solution : *viable) {
-      auto exprType = solution.simplifyType(cs.getType(expr));
-      assert(exprType && !exprType->hasTypeVariable());
-      types.insert(exprType.getPointer());
-    }
-  }
-}
-
 static FunctionType *
 getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
                                 ConcreteDeclRef &referencedDecl) {
@@ -2385,11 +2347,16 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   }
 }
 
-bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
-                                   DeclContext *DC,
-                                   Type patternType) {
-  auto target = SolutionApplicationTarget::forInitialization(
-      initializer, DC, patternType, pattern, /*bindPatternVarsOneWay=*/false);
+bool TypeChecker::typeCheckBinding(
+    Pattern *&pattern, Expr *&initializer, DeclContext *DC,
+    Type patternType, PatternBindingDecl *PBD, unsigned patternNumber) {
+  SolutionApplicationTarget target =
+    PBD ? SolutionApplicationTarget::forInitialization(
+            initializer, DC, patternType, PBD, patternNumber,
+            /*bindPatternVarsOneWay=*/false)
+        : SolutionApplicationTarget::forInitialization(
+            initializer, DC, patternType, pattern,
+            /*bindPatternVarsOneWay=*/false);
 
   // Type-check the initializer.
   bool unresolvedTypeExprs = false;
@@ -2458,7 +2425,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
     }
   }
 
-  bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC, patternType);
+  bool hadError = TypeChecker::typeCheckBinding(
+      pattern, init, DC, patternType, PBD, patternNumber);
   if (!init) {
     PBD->setInvalid();
     return true;
@@ -2583,7 +2551,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
       InitType = cs.generateConstraints(
-          pattern, elementLocator, /*bindPatternVarsOneWay=*/false);
+          pattern, elementLocator, /*bindPatternVarsOneWay=*/false,
+          /*patternBinding=*/nullptr, /*patternBindingIndex=*/0);
       if (!InitType)
         return true;
 
@@ -3201,10 +3170,6 @@ void Solution::dump(raw_ostream &out) const {
           << ovl.second.openedType->getString(PO) << "\n";
       break;
 
-    case OverloadChoiceKind::BaseType:
-      out << "base type " << choice.getBaseType()->getString(PO) << "\n";
-      break;
-
     case OverloadChoiceKind::KeyPathApplication:
       out << "key path application root "
           << choice.getBaseType()->getString(PO) << "\n";
@@ -3405,10 +3370,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
         out << choice.getDecl()->getBaseName() << ": "
             << resolved.boundType->getString(PO) << " == "
             << resolved.openedType->getString(PO) << "\n";
-        break;
-
-      case OverloadChoiceKind::BaseType:
-        out << "base type " << choice.getBaseType()->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::KeyPathApplication:
@@ -3868,7 +3829,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
           if (!FD->getResultInterfaceType()->isVoid()) {
             diags.diagnose(diagLoc, diag::downcast_to_unrelated_fixit,
-                           FD->getName())
+                           FD->getBaseIdentifier())
                 .fixItInsertAfter(fromExpr->getEndLoc(), "()");
           }
         }
@@ -4231,7 +4192,7 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   return nullptr;
 }
 
-llvm::Expected<bool>
+bool
 IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
                                        DeclContext *dc) const {
   auto options = defaultMemberLookupOptions;
@@ -4251,18 +4212,18 @@ IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
   });
 }
 
-llvm::Expected<bool>
-HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
-                                                 CanType ty) const {
+template <class DynamicAttribute>
+static bool checkForDynamicAttribute(CanType ty,
+                                     llvm::function_ref<bool (Type)> hasAttribute) {
   // If this is an archetype type, check if any types it conforms to
   // (superclass or protocols) have the attribute.
   if (auto archetype = dyn_cast<ArchetypeType>(ty)) {
     for (auto proto : archetype->getConformsTo()) {
-      if (proto->getDeclaredType()->hasDynamicMemberLookupAttribute())
+      if (hasAttribute(proto->getDeclaredType()))
         return true;
     }
     if (auto superclass = archetype->getSuperclass()) {
-      if (superclass->hasDynamicMemberLookupAttribute())
+      if (hasAttribute(superclass))
         return true;
     }
   }
@@ -4271,33 +4232,50 @@ HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
   // attribute.
   if (auto protocolComp = dyn_cast<ProtocolCompositionType>(ty)) {
     for (auto member : protocolComp->getMembers()) {
-      if (member->hasDynamicMemberLookupAttribute())
+      if (hasAttribute(member))
         return true;
     }
   }
 
   // Otherwise, this must be a nominal type.
-  // Dynamic member lookup doesn't work for tuples, etc.
+  // Neither Dynamic member lookup nor Dynamic Callable doesn't
+  // work for tuples, etc.
   auto nominal = ty->getAnyNominal();
   if (!nominal)
     return false;
 
   // If this type has the attribute on it, then yes!
-  if (nominal->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
+  if (nominal->getAttrs().hasAttribute<DynamicAttribute>())
     return true;
 
   // Check the protocols the type conforms to.
   for (auto proto : nominal->getAllProtocols()) {
-    if (proto->getDeclaredType()->hasDynamicMemberLookupAttribute())
+    if (hasAttribute(proto->getDeclaredType()))
       return true;
   }
 
   // Check the superclass if present.
   if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
     if (auto superclass = classDecl->getSuperclass()) {
-      if (superclass->hasDynamicMemberLookupAttribute())
+      if (hasAttribute(superclass))
         return true;
     }
   }
   return false;
+}
+
+bool
+HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
+                                                 CanType ty) const {
+  return checkForDynamicAttribute<DynamicMemberLookupAttr>(ty, [](Type type) {
+    return type->hasDynamicMemberLookupAttribute();
+  });
+}
+
+bool
+HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
+                                             CanType ty) const {
+  return checkForDynamicAttribute<DynamicCallableAttr>(ty, [](Type type) {
+    return type->hasDynamicCallableAttribute();
+  });
 }

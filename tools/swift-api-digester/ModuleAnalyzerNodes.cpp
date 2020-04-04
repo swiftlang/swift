@@ -592,7 +592,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   };
 
   static auto getAsInt = [&](llvm::yaml::Node *N) -> int {
-    return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
+    return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue().str());
   };
   static auto getAsBool = [&](llvm::yaml::Node *N) -> bool {
     auto txt = cast<llvm::yaml::ScalarNode>(N)->getRawValue();

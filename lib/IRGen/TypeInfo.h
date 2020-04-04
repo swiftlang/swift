@@ -408,6 +408,17 @@ public:
   /// have extra inhabitants based on type arguments?
   virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;
 
+  /// Returns true if the value witness operations on this type work correctly
+  /// with extra inhabitants up to the given index.
+  ///
+  /// An example of this is retainable pointers. The first extra inhabitant for
+  /// these types is the null pointer, on which swift_retain is a harmless
+  /// no-op. If this predicate returns true, then a single-payload enum with
+  /// this type as its payload (like Optional<T>) can avoid additional branching
+  /// on the enum tag for value witness operations.
+  virtual bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                                   unsigned index) const;
+  
   /// Get the tag of a single payload enum with a payload of this type (\p T) e.g
   /// Optional<T>.
   virtual llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,

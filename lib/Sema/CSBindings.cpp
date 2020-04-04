@@ -30,17 +30,14 @@ void ConstraintSystem::inferTransitiveSupertypeBindings(
   llvm::SmallVector<Constraint *, 4> subtypeOf;
   // First, let's collect all of the `subtype` constraints associated
   // with this type variable.
-  llvm::copy_if(
-      bindings.Sources, std::back_inserter(subtypeOf),
-      [&](const Constraint *constraint) -> bool {
-        if (constraint->getKind() != ConstraintKind::Subtype &&
-            constraint->getKind() != ConstraintKind::ArgumentConversion &&
-            constraint->getKind() != ConstraintKind::OperatorArgumentConversion)
-          return false;
+  llvm::copy_if(bindings.Sources, std::back_inserter(subtypeOf),
+                [&](const Constraint *constraint) -> bool {
+                  if (constraint->getKind() != ConstraintKind::Subtype)
+                    return false;
 
-        auto rhs = simplifyType(constraint->getSecondType());
-        return rhs->getAs<TypeVariableType>() == typeVar;
-      });
+                  auto rhs = simplifyType(constraint->getSecondType());
+                  return rhs->getAs<TypeVariableType>() == typeVar;
+                });
 
   if (subtypeOf.empty())
     return;
@@ -635,7 +632,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
           continue;
 
         literalBindings.push_back(
-            {defaultType, AllowedBindingKind::Exact, constraint});
+            {defaultType, AllowedBindingKind::Subtypes, constraint});
         continue;
       }
 
@@ -661,7 +658,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       if (!matched) {
         exactTypes.insert(defaultType->getCanonicalType());
         literalBindings.push_back(
-            {defaultType, AllowedBindingKind::Exact, constraint});
+            {defaultType, AllowedBindingKind::Subtypes, constraint});
       }
 
       break;
@@ -1035,15 +1032,6 @@ bool TypeVarBindingProducer::computeNext() {
       }
     }
 
-    if (binding.Kind != BindingKind::Supertypes)
-      continue;
-
-    for (auto supertype : enumerateDirectSupertypes(type)) {
-      // If we're not allowed to try this binding, skip it.
-      if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
-        addNewBinding(binding.withType(*simplifiedSuper));
-    }
-
     auto srcLocator = binding.getLocator();
     if (srcLocator &&
         srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
@@ -1061,6 +1049,14 @@ bool TypeVarBindingProducer::computeNext() {
       auto newType = CS.openUnboundGenericType(UGT, dstLocator)
                          ->reconstituteSugar(/*recursive=*/false);
       addNewBinding(binding.withType(newType));
+    }
+
+    if (binding.Kind == BindingKind::Supertypes) {
+      for (auto supertype : enumerateDirectSupertypes(type)) {
+        // If we're not allowed to try this binding, skip it.
+        if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
+          addNewBinding(binding.withType(*simplifiedSuper));
+      }
     }
   }
 
@@ -1090,6 +1086,10 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     cs.DefaultedConstraints.push_back(srcLocator);
 
     if (type->isHole()) {
+      // Reflect in the score that this type variable couldn't be
+      // resolved and had to be bound to a placeholder "hole" type.
+      cs.increaseScore(SK_Hole);
+
       if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
         auto path = dstLocator->getPath();
         // Drop `generic parameter` locator element so that all missing

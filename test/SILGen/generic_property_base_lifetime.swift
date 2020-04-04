@@ -19,7 +19,7 @@ protocol ProtocolB {
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[ARG]]
 // CHECK:   [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
 // CHECK:   [[BORROWED_PROJECTION_COPY:%.*]] = begin_borrow [[PROJECTION_COPY]]
-// CHECK:   [[WITNESS_METHOD:%.*]] = witness_method $@opened({{.*}}) ProtocolA, #ProtocolA.intProp!getter.1 : {{.*}}, [[PROJECTION]]
+// CHECK:   [[WITNESS_METHOD:%.*]] = witness_method $@opened({{.*}}) ProtocolA, #ProtocolA.intProp!getter : {{.*}}, [[PROJECTION]]
 // CHECK:   [[RESULT:%.*]] = apply [[WITNESS_METHOD]]<@opened{{.*}}>([[BORROWED_PROJECTION_COPY]])
 // CHECK:   end_borrow [[BORROWED_PROJECTION_COPY]]
 // CHECK:   destroy_value [[PROJECTION_COPY]]
@@ -33,7 +33,7 @@ func getIntPropExistential(_ a: ProtocolA) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ProtocolA):
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[ARG]]
 // CHECK:   [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
-// CHECK:   [[WITNESS_METHOD:%.*]] = witness_method $@opened({{.*}}) ProtocolA, #ProtocolA.intProp!setter.1 : {{.*}}, [[PROJECTION]]
+// CHECK:   [[WITNESS_METHOD:%.*]] = witness_method $@opened({{.*}}) ProtocolA, #ProtocolA.intProp!setter : {{.*}}, [[PROJECTION]]
 // CHECK:   apply [[WITNESS_METHOD]]<@opened{{.*}}>({{%.*}}, [[PROJECTION_COPY]])
 // CHECK:   destroy_value [[PROJECTION_COPY]]
 // CHECK: } // end sil function '$s30generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolA_pF'
@@ -82,7 +82,7 @@ func getIntPropGeneric<T: ProtocolB>(_ a: T) -> Int {
 // CHECK:  [[PROJECTION:%.*]] = open_existential_ref [[ARG]]
 // CHECK:  [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
 // CHECK:  [[PROJECTION_BORROW:%.*]] = begin_borrow [[PROJECTION_COPY]]
-// CHECK:  [[METHOD:%.*]] = objc_method [[PROJECTION_BORROW]] : $@opened({{.*}}) ProtocolO, #ProtocolO.intProp!getter.1.foreign : {{.*}}
+// CHECK:  [[METHOD:%.*]] = objc_method [[PROJECTION_BORROW]] : $@opened({{.*}}) ProtocolO, #ProtocolO.intProp!getter.foreign : {{.*}}
 // CHECK:  apply [[METHOD]]<@opened{{.*}}>([[PROJECTION_BORROW]])
 // CHECK:  destroy_value [[PROJECTION_COPY]]
 // CHECK: } // end sil function '$s30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolO_pF'
@@ -94,7 +94,7 @@ func getIntPropExistential(_ a: ProtocolO) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ProtocolO):
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[ARG]]
 // CHECK:   [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
-// CHECK:   [[METHOD:%.*]] = objc_method [[PROJECTION_COPY]] : $@opened({{.*}}) ProtocolO, #ProtocolO.intProp!setter.1.foreign : {{.*}}
+// CHECK:   [[METHOD:%.*]] = objc_method [[PROJECTION_COPY]] : $@opened({{.*}}) ProtocolO, #ProtocolO.intProp!setter.foreign : {{.*}}
 // CHECK:   apply [[METHOD]]<@opened{{.*}}>({{.*}}, [[PROJECTION_COPY]])
 // CHECK:   destroy_value [[PROJECTION_COPY]]
 // CHECK: } // end sil function '$s30generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolO_pF'

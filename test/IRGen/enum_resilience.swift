@@ -6,7 +6,7 @@
 // RUN: %target-swift-frontend -disable-type-layout -emit-ir -enable-library-evolution -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %t/enum_resilience.swift --check-prefix=ENUM_RES
 // RUN: %target-swift-frontend -disable-type-layout -emit-ir -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %t/enum_resilience.swift --check-prefix=ENUM_NOT_RES
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
-// RUN: %target-swift-frontend -disable-type-layout -module-name enum_resilience -I %t -emit-ir -enable-library-evolution %s | %FileCheck %t/enum_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -disable-type-layout -module-name enum_resilience -I %t -emit-ir -enable-library-evolution %s | %FileCheck %t/enum_resilience.swift -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-cpu
 // RUN: %target-swift-frontend -module-name enum_resilience -I %t -emit-ir -enable-library-evolution -O %s
 
 import resilient_enum
@@ -100,6 +100,8 @@ public func functionWithResilientEnum(_ m: Medium) -> Medium {
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK-NEXT: [[WITNESS:%.*]]  = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%initializeWithCopy]] = bitcast i8* [[WITNESS]]
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call %swift.opaque* [[WITNESS_FN]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* [[METADATA]])
 // CHECK-NEXT: ret void
 
@@ -118,6 +120,8 @@ public func functionWithIndirectResilientEnum(_ ia: IndirectApproach) -> Indirec
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK-NEXT: [[WITNESS:%.*]]  = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%initializeWithCopy]] = bitcast i8* [[WITNESS]]
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call %swift.opaque* [[WITNESS_FN]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* [[METADATA]])
 // CHECK-NEXT: ret void
 
@@ -138,6 +142,8 @@ public func constructResilientEnumNoPayload() -> Medium {
 // CHECK-64-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 13
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]]
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call void [[WITNESS_FN]](%swift.opaque* noalias %0, i32 [[TAG]], %swift.type* [[METADATA]])
 
 // CHECK-NEXT: ret void
@@ -162,11 +168,15 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%initializeWithCopy]] = bitcast i8* [[WITNESS]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call %swift.opaque* [[WITNESS_FN]](%swift.opaque* noalias [[ENUM_STORAGE]], %swift.opaque* noalias %1, %swift.type* [[METADATA]])
 
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%initializeWithTake]] = bitcast i8* [[WITNESS]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call %swift.opaque* [[WITNESS_FN]](%swift.opaque* noalias %0, %swift.opaque* noalias [[ENUM_STORAGE]], %swift.type* [[METADATA]])
 
 // CHECK-NEXT: [[TAG:%.*]] = load i32, i32* @"$s14resilient_enum6MediumO8PostcardyAC0A7_struct4SizeVcACmFWC"
@@ -181,6 +191,8 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK-64-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT2]], i32 13
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%destructiveInjectEnumTag]] = bitcast i8* [[WITNESS]]
+// CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call void [[WITNESS_FN]](%swift.opaque* noalias %0, i32 [[TAG]], %swift.type* [[METADATA2]])
 // CHECK-NEXT: [[STORAGE_ALLOCA:%.*]] = bitcast %swift.opaque* [[ENUM_STORAGE]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.end.p0i8({{(i32|i64)}} -1, i8* [[STORAGE_ALLOCA]])
@@ -268,7 +280,7 @@ public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 
 // CHECK:     [[STACKALLOC:%.*]] = alloca i8
 // CHECK:     [[CONTEXT:%.*]] = bitcast i8* [[STACKALLOC]] to %swift.opaque*
-// CHECK:     call swiftcc void @"$s15enum_resilience13reabstractionyyx010resilient_A06MediumOXElF"(i8* bitcast (void (%TSi*, %swift.opaque*, %swift.refcounted*)* @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA" to i8*), %swift.opaque* [[CONTEXT:%.*]], %swift.type* @"$sSiN")
+// CHECK:     call swiftcc void @"$s15enum_resilience13reabstractionyyx010resilient_A06MediumOXElF"(i8* bitcast ({{.*}} @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA{{(\.ptrauth)?}}" to i8*), %swift.opaque* [[CONTEXT:%.*]], %swift.type* @"$sSiN")
   reabstraction(f)
 
 // CHECK:     ret void
@@ -334,6 +346,8 @@ extension ResilientMultiPayloadGenericEnum {
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[STORE_TAG:%.*]] = bitcast i8* {{%.+}} to void (%swift.opaque*, i32, i32, %swift.type*)* 
+// CHECK-arm64e-NEXT: ptrtoint i8** {{.*}} to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
 // CHECK-NEXT: call void [[STORE_TAG]](%swift.opaque* noalias [[BUFFER]], i32 1, i32 1, %swift.type* [[METADATA]])
 // CHECK-NEXT: ret void
 // CHECK-NEXT: {{^}$}}

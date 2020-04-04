@@ -120,7 +120,7 @@ struct T20341012 {
     private var options: ArrayLike<Test20341012> { get {} set {} }
 
     // CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction9T20341012V1t{{[_0-9a-zA-Z]*}}F
-    // CHECK:         [[TMP1:%.*]] = alloc_stack $(title: (), action: @callee_guaranteed <τ_0_0> in () -> @out τ_0_0 for <()>)
+    // CHECK:         [[TMP1:%.*]] = alloc_stack $(title: (), action: @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>)
     // CHECK:         apply {{.*}}<(title: (), action: () -> ())>([[TMP1]],
     mutating func t() {
         _ = self.options[()].title
@@ -146,5 +146,5 @@ func setBuilder<F: Factory>(_ factory: inout F) where F.Product == MyClass {
 // CHECK:   [[F2:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[F1]])
 // CHECK:   [[F3:%.*]] = convert_function [[F2]]
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*F
-// CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
+// CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter
 // CHECK:   apply [[SETTER]]<F>([[F3]], [[WRITE]])

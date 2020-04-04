@@ -420,3 +420,33 @@ func test_force_unwrap_not_being_too_eager() {
   if let _ = obj.delegate?.window { // Ok
   }
 }
+
+// rdar://problem/57097401
+func invalidOptionalChaining(a: Any) {
+  a == "="? // expected-error {{cannot use optional chaining on non-optional value of type 'String'}}
+  // expected-error@-1 {{value of protocol type 'Any' cannot conform to 'Equatable'; only struct/enum/class types can conform to protocols}}
+  // expected-note@-2 {{requirement from conditional conformance of 'Any?' to 'Equatable'}}
+}
+
+// SR-12309 - Force unwrapping 'nil' compiles without warning
+func sr_12309() {
+  struct S {
+    var foo: Int
+  }
+
+  _ = S(foo: nil!) // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = nil! // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = (nil!) // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = (nil)! // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = ((nil))! // expected-error {{'nil' literal cannot be force unwrapped}}
+  _ = nil? // expected-error {{'nil' requires a contextual type}}
+  _ = ((nil?)) // expected-error {{'nil' requires a contextual type}}
+  _ = ((nil))? // expected-error {{'nil' requires a contextual type}}
+  _ = ((nil)?) // expected-error {{'nil' requires a contextual type}}
+  _ = nil // expected-error {{'nil' requires a contextual type}}
+  _ = (nil) // expected-error {{'nil' requires a contextual type}}
+  _ = ((nil)) // expected-error {{'nil' requires a contextual type}}
+  _ = (((nil))) // expected-error {{'nil' requires a contextual type}}
+  _ = ((((((nil)))))) // expected-error {{'nil' requires a contextual type}}
+  _ = (((((((((nil))))))))) // expected-error {{'nil' requires a contextual type}}
+}

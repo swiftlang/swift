@@ -1,14 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-differentiable-programming %s -emit-module -parse-as-library -o %t
+// RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
 // RUN: llvm-bcanalyzer %t/transpose_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -enable-experimental-differentiable-programming -disable-sil-linking -enable-sil-verify-all %t/transpose_attr.swiftmodule -o - | %FileCheck %s
+// RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/transpose_attr.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
-// REQUIRES: differentiable_programming
-
-// TODO(TF-838): Enable this test.
-// Blocked by TF-830: `@transpose` attribute type-checking.
-// XFAIL: *
 
 import _Differentiation
 
@@ -51,14 +46,14 @@ extension S {
 
   // CHECK: @transpose(of: instanceMethod, wrt: 0)
   @transpose(of: instanceMethod, wrt: 0)
-  func transposeInstanceMethod(v: S) -> (S, S) {
-    (v, v)
+  func transposeInstanceMethod(t: S) -> S {
+    self + t
   }
 
   // CHECK: @transpose(of: instanceMethod, wrt: self)
   @transpose(of: instanceMethod, wrt: self)
-  func transposeInstanceMethodWrtSelf(v: S) -> (S, S) {
-    (v, v)
+  static func transposeInstanceMethodWrtSelf(_ other: S, t: S) -> S {
+    other + t
   }
 }
 
@@ -71,8 +66,8 @@ extension S {
 
   // CHECK: @transpose(of: staticMethod, wrt: 0)
   @transpose(of: staticMethod, wrt: 0)
-  func transposeStaticMethod(_: S.Type) -> S {
-    self
+  static func transposeStaticMethod(t: S) -> S {
+    t
   }
 }
 
@@ -82,8 +77,8 @@ extension S {
 
   // CHECK: @transpose(of: computedProperty, wrt: self)
   @transpose(of: computedProperty, wrt: self)
-  func transposeProperty() -> Self {
-    self
+  static func transposeProperty(t: Self) -> Self {
+    t
   }
 }
 
@@ -93,7 +88,7 @@ extension S {
 
   // CHECK: @transpose(of: subscript, wrt: self)
   @transpose(of: subscript(_:), wrt: self)
-  func transposeSubscript<T: Differentiable>(x: T) -> Self {
-    self
+  static func transposeSubscript<T: Differentiable>(x: T, t: Self) -> Self {
+    t
   }
 }

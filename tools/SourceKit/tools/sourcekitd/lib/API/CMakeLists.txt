@@ -14,6 +14,7 @@ add_sourcekit_library(sourcekitdAPI
   ExpressionTypeArray.cpp
 )
 target_link_libraries(sourcekitdAPI PRIVATE
+  swiftBasic
   SourceKitSupport
   SourceKitSwiftLang)
 

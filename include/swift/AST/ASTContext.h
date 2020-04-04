@@ -105,11 +105,11 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
-  class TypeChecker;
   class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
   class SILBoxType;
+  class SILTransform;
   class TypeAliasDecl;
   class VarDecl;
   class UnifiedStatsReporter;
@@ -441,18 +441,7 @@ public:
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);
 
-private:
-  friend class TypeChecker;
-
-  void installGlobalTypeChecker(TypeChecker *TC);
 public:
-  /// Returns if semantic AST queries are enabled. This generally means module
-  /// loading and name lookup can take place.
-  bool areSemanticQueriesEnabled() const;
-
-  /// Retrieve the global \c TypeChecker instance associated with this context.
-  TypeChecker *getLegacyGlobalTypeChecker() const;
-
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
@@ -623,9 +612,26 @@ public:
   void addDestructorCleanup(T &object) {
     addCleanup([&object]{ object.~T(); });
   }
+
+  /// Get the runtime availability of the class metadata update callback
+  /// mechanism for the target platform.
+  AvailabilityContext getObjCMetadataUpdateCallbackAvailability();
+
+  /// Get the runtime availability of the objc_getClass() hook for the target
+  /// platform.
+  AvailabilityContext getObjCGetClassHookAvailability();
   
-  /// Get the runtime availability of the opaque types language feature for the target platform.
+  /// Get the runtime availability of features introduced in the Swift 5.0
+  /// compiler for the target platform.
+  AvailabilityContext getSwift50Availability();
+
+  /// Get the runtime availability of the opaque types language feature for the
+  /// target platform.
   AvailabilityContext getOpaqueTypeAvailability();
+
+  /// Get the runtime availability of the objc_loadClassref() entry point for
+  /// the target platform.
+  AvailabilityContext getObjCClassStubsAvailability();
 
   /// Get the runtime availability of features introduced in the Swift 5.1
   /// compiler for the target platform.
@@ -734,6 +740,19 @@ public:
                        bool isInstanceMethod,
                        unsigned previousGeneration,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
+
+  /// Load derivative function configurations for the given
+  /// AbstractFunctionDecl.
+  ///
+  /// \param originalAFD The declaration whose derivative function
+  /// configurations should be loaded.
+  ///
+  /// \param previousGeneration The previous generation number. The AST already
+  /// contains derivative function configurations loaded from any generation up
+  /// to and including this one.
+  void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
+      llvm::SetVector<AutoDiffConfig> &results);
 
   /// Retrieve the Clang module loader for this ASTContext.
   ///
@@ -977,6 +996,15 @@ public:
 
   /// Each kind and SourceFile has its own cache for a Type.
   Type &getDefaultTypeRequestCache(SourceFile *, KnownProtocolKind);
+
+  using SILTransformCtors = ArrayRef<SILTransform *(*)(void)>;
+
+  /// Register IRGen specific SIL passes such that the SILOptimizer can access
+  /// and execute them without directly depending on IRGen.
+  void registerIRGenSILTransforms(SILTransformCtors fns);
+
+  /// Retrieve the IRGen specific SIL passes.
+  SILTransformCtors getIRGenSILTransforms() const;
 
 private:
   friend Decl;

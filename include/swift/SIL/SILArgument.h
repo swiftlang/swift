@@ -144,6 +144,11 @@ public:
   getIncomingPhiValues(SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
                            &returnedPredAndPhiValuePairs) const;
 
+  /// If this argument is a true phi, populate `OutArray` with the operand in
+  /// each predecessor block associated with an incoming value.
+  bool
+  getIncomingPhiOperands(SmallVectorImpl<Operand *> &returnedPhiOperands) const;
+
   /// Returns true if we were able to find a single terminator operand value for
   /// each predecessor of this arguments basic block. The found values are
   /// stored in OutArray.
@@ -238,6 +243,11 @@ public:
   bool
   getIncomingPhiValues(SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
                            &returnedPredAndPhiValuePairs) const;
+
+  /// If this argument is a true phi, populate `OutArray` with the operand in
+  /// each predecessor block associated with an incoming value.
+  bool
+  getIncomingPhiOperands(SmallVectorImpl<Operand *> &returnedPhiOperands) const;
 
   /// Returns true if we were able to find a single terminator operand value for
   /// each predecessor of this arguments basic block. The found values are
@@ -417,6 +427,18 @@ inline TermInst *SILArgument::getSingleTerminator() const {
     return cast<SILPhiArgument>(this)->getSingleTerminator();
   case SILArgumentKind::SILFunctionArgument:
     return nullptr;
+  }
+  llvm_unreachable("Covered switch is not covered?!");
+}
+
+inline bool SILArgument::getIncomingPhiOperands(
+    SmallVectorImpl<Operand *> &returnedPhiOperands) const {
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->getIncomingPhiOperands(
+        returnedPhiOperands);
+  case SILArgumentKind::SILFunctionArgument:
+    return false;
   }
   llvm_unreachable("Covered switch is not covered?!");
 }

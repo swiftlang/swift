@@ -253,7 +253,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
                      isDeferBody
                      ? diag::capture_before_declaration_defer
                      : diag::capture_before_declaration,
-                     vd->getBaseName().getIdentifier());
+                     vd->getBaseIdentifier());
       Diags.diagnose(vd->getLoc(), diag::captured_value_declared_here);
       Diags.diagnose(capture.getLoc(), diag::value_captured_here);
 
@@ -262,6 +262,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       case CaptureKind::Constant:
         capturedArgs.push_back(emitUndef(getLoweredType(type)));
         break;
+      case CaptureKind::Immutable:
       case CaptureKind::StorageAddress:
         capturedArgs.push_back(emitUndef(getLoweredType(type).getAddressType()));
         break;
@@ -333,7 +334,25 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       capturedArgs.push_back(emitManagedRValueWithCleanup(Val));
       break;
     }
-
+    case CaptureKind::Immutable: {
+      if (canGuarantee) {
+        auto entryValue = getAddressValue(Entry.value);
+        // No-escaping stored declarations are captured as the
+        // address of the value.
+        assert(entryValue->getType().isAddress() && "no address for captured var!");
+        capturedArgs.push_back(ManagedValue::forLValue(entryValue));
+      }
+      else {
+        auto entryValue = getAddressValue(Entry.value);
+        // We cannot pass a valid SILDebugVariable while creating the temp here
+        // See rdar://60425582
+        auto addr = B.createAllocStack(loc, entryValue->getType().getObjectType());
+        enterDeallocStackCleanup(addr);
+        B.createCopyAddr(loc, entryValue, addr, IsNotTake, IsInitialization);
+        capturedArgs.push_back(ManagedValue::forLValue(addr));
+      }
+      break;
+    }
     case CaptureKind::StorageAddress: {
       auto entryValue = getAddressValue(Entry.value);
       // No-escaping stored declarations are captured as the
@@ -588,7 +607,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   SILResultInfo(OptNSStringTy,
                                 ResultConvention::Autoreleased),
                   /*error result*/ None,
-                  SubstitutionMap(), false,
+                  SubstitutionMap(), SubstitutionMap(),
                   ctx);
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
@@ -675,7 +694,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   SILResultInfo(argc->getType().getASTType(),
                                 ResultConvention::Unowned),
                   /*error result*/ None,
-                  SubstitutionMap(), false,
+                  SubstitutionMap(), SubstitutionMap(),
                   getASTContext());
 
     SILGenFunctionBuilder builder(SGM);
@@ -731,7 +750,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                      ctx.getIdentifier("$input_value"),
                                      dc);
     param->setSpecifier(ParamSpecifier::Owned);
-    param->setInterfaceType(function.getDecl()->getInterfaceType());
+    auto vd = cast<VarDecl>(function.getDecl());
+    param->setInterfaceType(vd->getPropertyWrapperInitValueInterfaceType());
 
     params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());
   }
@@ -781,7 +801,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   // will be in terms of the original property's type.
   if (auto originalProperty = var->getOriginalWrappedProperty()) {
     if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
-      interfaceType = originalProperty->getValueInterfaceType();
+      interfaceType = originalProperty->getPropertyWrapperInitValueInterfaceType();
     }
   }
 

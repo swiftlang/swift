@@ -43,6 +43,10 @@ struct PropertyWrapperTypeInfo {
     HasInitialValueInit
   } wrappedValueInit = NoWrappedValueInit;
 
+  /// Whether the init(wrappedValue:), if it exists, has the wrappedValue
+  /// argument as an escaping autoclosure.
+  bool isWrappedValueInitUsingEscapingAutoClosure = false;
+
   /// The initializer that will be called to default-initialize a
   /// value with an attached property wrapper.
   enum {

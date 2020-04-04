@@ -492,8 +492,8 @@ enum U {
 // CHECK: bb0([[TYPE_ARG:%[0-9]+]] : $@thin U.Type, [[CLASS_ARG:%[0-9]+]] : $C):
 // CHECK-NEXT: enum $U, #U.X!enumelt
 // CHECK-NEXT: integer_literal $Builtin.Int64, 32
-// CHECK-NEXT: enum $U, #U.Y!enumelt.1, {{%[0-9]+}} : $Builtin.Int64
-// CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt.1, {{%[0-9]+}} : $C
+// CHECK-NEXT: enum $U, #U.Y!enumelt, {{%[0-9]+}} : $Builtin.Int64
+// CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt, {{%[0-9]+}} : $C
 // CHECK-NEXT: strong_release [[CLASS_ARG]] : $C
 // CHECK-NEXT: tuple ({{%[0-9]+}} : $U, {{%[0-9]+}} : $U, [[INVALID_CASE]] : $U)
 // CHECK-NEXT: return
@@ -508,9 +508,9 @@ bb0(%0 : $@thin U.Type, %1 : $C):
   %2 = enum $U, #U.X!enumelt
   release_value %2 : $U
   %3 = integer_literal $Builtin.Int64, 32
-  %4 = enum $U, #U.Y!enumelt.1, %3 : $Builtin.Int64
+  %4 = enum $U, #U.Y!enumelt, %3 : $Builtin.Int64
   release_value %4 : $U
-  %5 = enum $U, #U.Z!enumelt.1, %1 : $C
+  %5 = enum $U, #U.Z!enumelt, %1 : $C
   release_value %5 : $U
   %6 = tuple(%2 : $U, %4 : $U, %5 : $U)
   return %6 : $(U, U, U)
@@ -520,8 +520,8 @@ bb0(%0 : $@thin U.Type, %1 : $C):
 // CHECK: bb0([[TYPE_ARG:%[0-9]+]] : $@thin U.Type, [[CLASS_ARG:%[0-9]+]] : $C):
 // CHECK-NEXT: enum $U, #U.X!enumelt
 // CHECK-NEXT: integer_literal $Builtin.Int64, 32
-// CHECK-NEXT: enum $U, #U.Y!enumelt.1, {{%[0-9]+}} : $Builtin.Int64
-// CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt.1, {{%[0-9]+}} : $C
+// CHECK-NEXT: enum $U, #U.Y!enumelt, {{%[0-9]+}} : $Builtin.Int64
+// CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt, {{%[0-9]+}} : $C
 // CHECK-NEXT: strong_retain [[CLASS_ARG]] : $C
 // CHECK-NEXT: tuple ({{%[0-9]+}} : $U, {{%[0-9]+}} : $U, [[INVALID_CASE]] : $U)
 // CHECK-NEXT: return
@@ -535,9 +535,9 @@ bb0(%0 : $@thin U.Type, %1 : $C):
   %2 = enum $U, #U.X!enumelt
   retain_value %2 : $U
   %3 = integer_literal $Builtin.Int64, 32
-  %4 = enum $U, #U.Y!enumelt.1, %3 : $Builtin.Int64
+  %4 = enum $U, #U.Y!enumelt, %3 : $Builtin.Int64
   retain_value %4 : $U
-  %5 = enum $U, #U.Z!enumelt.1, %1 : $C
+  %5 = enum $U, #U.Z!enumelt, %1 : $C
   retain_value %5 : $U
   %6 = tuple(%2 : $U, %4 : $U, %5 : $U)
   return %6 : $(U, U, U)
@@ -1057,7 +1057,7 @@ bb3(%16 : $Int32):                                  // Preds: bb1 bb2
 // CHECK-NEXT: store [[ENUM1]] to [[ALLOCA1]]
 // CHECK-NEXT: [[ALLOCA2:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
 // CHECK-NEXT: [[INT:%[0-9]+]] = load [[INT_PTR]] : $*Builtin.Int1
-// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1, [[INT]] : $Builtin.Int1
+// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt, [[INT]] : $Builtin.Int1
 // CHECK-NEXT: store [[ENUM2]] to [[ALLOCA2]] : $*FakeOptional<Builtin.Int1>
 // CHECK-NEXT: [[RESULT1:%[0-9]+]] = load [[ALLOCA1]]
 // CHECK-NEXT: [[RESULT2:%[0-9]+]] = load [[ALLOCA2]]
@@ -1072,10 +1072,10 @@ bb0(%0 : $*Builtin.Int1):
 
   %2 = integer_literal $Builtin.Int1, 1
   %3 = alloc_stack $FakeOptional<Builtin.Int1>
-  %4 = init_enum_data_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
+  %4 = init_enum_data_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt
   %5 = load %0 : $*Builtin.Int1
   store %5 to %4 : $*Builtin.Int1
-  inject_enum_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
+  inject_enum_addr %3 : $*FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt
 
   %6 = load %1 : $*FakeOptional<Builtin.Int1>
   %7 = load %3 : $*FakeOptional<Builtin.Int1>
@@ -1091,7 +1091,7 @@ bb0(%0 : $*Builtin.Int1):
 // CHECK: bb0([[B_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
 // CHECK-NEXT: strong_retain [[B_PTR]]
-// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[B_PTR]] : $B
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[B_PTR]] : $B
 // CHECK-NEXT: store [[ENUM]] to [[ALLOCA]] : $*FakeOptional<B>
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [[ALLOCA]]
 // CHECK-NEXT: dealloc_stack
@@ -1100,14 +1100,14 @@ bb0(%0 : $*Builtin.Int1):
 sil @enum_promotion_case2 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
 bb0(%0 : $B):
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   store %0 to %3 : $*B
 
   // This instruction between the store and the inject_enum_addr should not prevent
   // the optimization.
   strong_retain %0 : $B
 
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   strong_release %0 : $B
@@ -1120,7 +1120,7 @@ bb0(%0 : $B):
 // CHECK-NEXT: alloc_stack $FakeOptional<T>
 // CHECK-NEXT: inject_enum_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.none!enumelt
 // CHECK-NEXT: alloc_stack $FakeOptional<T>
-// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
+// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.some!enumelt
 // CHECK-NEXT: copy_addr
 // CHECK-NEXT:  inject_enum_addr
 // CHECK-NEXT: cond_br
@@ -1139,9 +1139,9 @@ bb0(%0 : $*FakeOptional<T>, %1 : $*T, %2 : $Builtin.Int1):
   %3 = alloc_stack $FakeOptional<T>
   inject_enum_addr %3 : $*FakeOptional<T>, #FakeOptional.none!enumelt
   %4 = alloc_stack $FakeOptional<T>
-  %5 = init_enum_data_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
+  %5 = init_enum_data_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt
   copy_addr [take] %1 to [initialization] %5 : $*T
-  inject_enum_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt.1
+  inject_enum_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt
   cond_br %2, bb1, bb2
 
 bb1:
@@ -1201,8 +1201,8 @@ bb0(%0 : $*E):
 sil @unchecked_enum_data_of_enum : $@convention(thin) () -> Builtin.Int1 {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0
-  %1 = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1, %0 : $Builtin.Int1
-  %2 = unchecked_enum_data %1 : $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt.1
+  %1 = enum $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt, %0 : $Builtin.Int1
+  %2 = unchecked_enum_data %1 : $FakeOptional<Builtin.Int1>, #FakeOptional.some!enumelt
   return %2 : $Builtin.Int1
 }
 
@@ -1309,10 +1309,10 @@ bb0(%0 : $E):
 // CHECK-NEXT: return
 sil @unchecked_take_enum_data_addr_promotion : $@convention(thin) (@inout FakeOptional<B>) -> B {
 bb0(%0 : $*FakeOptional<B>):
-  switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   debug_value %2 : $*B  // should not prevent the optimization
   %3 = load %2 : $*B
   return %3 : $B
@@ -1613,7 +1613,7 @@ bb0:
 // CHECK-NEXT: return
 sil @ref_ops_of_enum_is_equivalent_to_ref_ops_of_payload : $@convention(thin) (Builtin.NativeObject) -> FakeOptional<Builtin.NativeObject> {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1, %0 : $Builtin.NativeObject
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %0 : $Builtin.NativeObject
   retain_value %1 : $FakeOptional<Builtin.NativeObject>
   br bb1
 
@@ -1629,7 +1629,7 @@ bb1:
 // CHECK-NEXT: return
 sil @loadable_payload_address_only_enum_payload_promotion : $@convention(thin) (@in AddressOnlyEnum) -> Builtin.Int32 {
 bb0(%0 : $*AddressOnlyEnum):
-  %1 = unchecked_take_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.Loadable!enumelt.1
+  %1 = unchecked_take_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.Loadable!enumelt
   %2 = load %1 : $*Builtin.Int32
   return %2 : $Builtin.Int32
 }
@@ -1641,7 +1641,7 @@ bb0(%0 : $*AddressOnlyEnum):
 // CHECK-NEXT:   return
 sil @dead_unchecked_take_enum_data_addr : $@convention(thin) (@in AddressOnlyEnum) -> () {
 bb0(%0 : $*AddressOnlyEnum):
-  %1 = unchecked_take_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.Loadable!enumelt.1
+  %1 = unchecked_take_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.Loadable!enumelt
   destroy_addr %1 : $*Builtin.Int32
   %r = tuple ()
   return %r : $()
@@ -1863,11 +1863,11 @@ bb0:
 // CHECK-NOT: select_enum
   %1 = integer_literal $Builtin.Int32, 8
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = enum $Optional<Int32>, #Optional.some!enumelt.1, %2 : $Int32
+  %3 = enum $Optional<Int32>, #Optional.some!enumelt, %2 : $Int32
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0
 // CHECK: [[ONE:%[^ ]+]] = integer_literal $Builtin.Int1, -1
-  %5 = select_enum %3 : $Optional<Int32>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
+  %5 = select_enum %3 : $Optional<Int32>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
 // CHECK: return [[ONE]]
   return %5 : $Builtin.Int1
 }
@@ -1881,7 +1881,7 @@ bb0:
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0
 // CHECK: [[ZERO:%[^ ]+]] = integer_literal $Builtin.Int1, 0
-  %5 = select_enum %1 : $Optional<Int>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
+  %5 = select_enum %1 : $Optional<Int>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
 // CHECK: return [[ZERO]]
   return %5 : $Builtin.Int1
 }
@@ -2217,7 +2217,7 @@ struct FakeInt32 {
 // CHECK-NOT: switch_enum_addr
 sil @loadable_switchenumaddr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
 bb0(%0 : $*FakeOptional<Builtin.RawPointer>):
-  switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
   br bb3
@@ -2773,7 +2773,7 @@ bb0(%0 : $*T):
   copy_addr %0 to [initialization] %4 : $*T       // id: %5
   destroy_addr %0 : $*T                           // id: %6
   %7 = open_existential_addr immutable_access %3 : $*someProtocol to $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol // users: %8, %9
-  %8 = witness_method $@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol, #someProtocol.i!getter.1, %7 : $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol : $@convention(witness_method: someProtocol) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int // user: %9
+  %8 = witness_method $@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol, #someProtocol.i!getter, %7 : $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol : $@convention(witness_method: someProtocol) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int // user: %9
   %9 = apply %8<@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol>(%7) : $@convention(witness_method: someProtocol) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int
   destroy_addr %3 : $*someProtocol              // id: %13
   dealloc_stack %3 : $*someProtocol // id: %15
@@ -2952,7 +2952,7 @@ sil @insert_compensating_release_at_release_of_box : $@convention(method) (@in_g
 bb0(%0 : $*Array<Error>):
   %20 = load %0 : $*Array<Error>
   %22 = tuple $(label: Array<Error>) (%20)
-  %23 = enum $ErrorEnum, #ErrorEnum.errorCase!enumelt.1, %22 : $(label: Array<Error>)
+  %23 = enum $ErrorEnum, #ErrorEnum.errorCase!enumelt, %22 : $(label: Array<Error>)
   %36 = alloc_existential_box $Error, $ErrorEnum
   %37 = project_existential_box $ErrorEnum in %36 : $Error
   store %23 to %37 : $*ErrorEnum
@@ -3062,7 +3062,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK: bb0([[B_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
 // CHECK-NEXT: strong_release [[B_PTR]]
-// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[B_PTR]] : $B
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[B_PTR]] : $B
 // CHECK-NEXT: store [[ENUM]] to [[ALLOCA]] : $*FakeOptional<B>
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [[ALLOCA]]
 // CHECK-NEXT: dealloc_stack
@@ -3071,14 +3071,14 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 sil @enum_promotion_case3 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
 bb0(%0 : $B):
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   store %0 to %3 : $*B
 
   // This instruction between the store and the inject_enum_addr should not prevent
   // the optimization.
   strong_release %0 : $B
 
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   strong_release %0 : $B
@@ -3096,16 +3096,16 @@ sil @init_enum : $@convention(thin) () -> @out B
 // CHECK:  [[V3:%.*]] = alloc_stack $B
 // CHECK:               apply [[V2]]([[V3]])
 // CHECK:  [[V4:%.*]] = load [[V3]]
-// CHECK:  [[V5:%.*]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt.1, [[V4]]
+// CHECK:  [[V5:%.*]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[V4]]
 // CHECK:  store [[V5]] to [[V1]]
 
 sil @enum_promotion_case4 : $@convention(thin) () -> @owned FakeOptional<B> {
 bb0:
   %2 = alloc_stack $FakeOptional<B>
-  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  %3 = init_enum_data_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   %4 = function_ref @init_enum : $@convention(thin) () -> @out B
   %5 = apply %4(%3) : $@convention(thin) () -> @out B
-  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt.1
+  inject_enum_addr %2 : $*FakeOptional<B>, #FakeOptional.some!enumelt
   %7 = load %2 : $*FakeOptional<B>
   dealloc_stack %2 : $*FakeOptional<B>
   return %7 : $FakeOptional<B>
@@ -3133,7 +3133,7 @@ bb0:
   %0 = metatype $@thick ClientSocket.Type
   %1 = init_existential_metatype %0 : $@thick ClientSocket.Type, $@thick Socket.Type
   %2 = open_existential_metatype %1 : $@thick Socket.Type to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket).Type
-  %3 = witness_method $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket, #Socket.newWithConfig!1, %2 : $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket).Type : $@convention(witness_method: Socket) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+  %3 = witness_method $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket, #Socket.newWithConfig, %2 : $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket).Type : $@convention(witness_method: Socket) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
   try_apply %3<@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket>(%2) : $@convention(witness_method: Socket) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType), normal bb1, error bb2
 
 bb1(%4 : $Builtin.Int32):
@@ -3414,7 +3414,7 @@ sil @getMetaType : $@convention(thin) () -> @thick Prot2.Type
 // CHECK:bb0:
 // CHECK:  [[APPLY:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @thick Prot2.Type
 // CHECK:  [[OE:%.*]] = open_existential_metatype [[APPLY]] : $@thick Prot2.Type to $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type
-// CHECK:  [[WM:%.*]] = witness_method $@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1, #Prot1.newWithConfig!1 : <Self where Self : Prot1> (Self.Type) -> () throws -> Builtin.Int32, [[OE]] : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+// CHECK:  [[WM:%.*]] = witness_method $@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1, #Prot1.newWithConfig : <Self where Self : Prot1> (Self.Type) -> () throws -> Builtin.Int32, [[OE]] : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
 // CHECK:  try_apply [[WM]]<@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1>([[OE]]) : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
 sil @meta_existential : $@convention(thin) () -> (Builtin.Int32, @error MyErrorType) {
 bb0:
@@ -3423,7 +3423,7 @@ bb0:
   %open = open_existential_metatype %apply : $@thick Prot2.Type to $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type
   %1 = init_existential_metatype %open : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type, $@thick Prot1.Type
   %2 = open_existential_metatype %1 : $@thick Prot1.Type to $@thick (@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1).Type
-  %3 = witness_method $@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1, #Prot1.newWithConfig!1, %2 : $@thick (@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+  %3 = witness_method $@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1, #Prot1.newWithConfig, %2 : $@thick (@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
   try_apply %3<@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1>(%2) : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType), normal bb1, error bb2
 
 bb1(%4 : $Builtin.Int32):
@@ -3443,7 +3443,7 @@ bb2(%5 : $MyErrorType):
 sil @mark_dependence_base : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int64, %1 : $B):
   %x = init_existential_ref %1 : $B : $B, $AnyObject
-  %2 = enum $Optional<AnyObject>, #Optional.some!enumelt.1, %x : $AnyObject
+  %2 = enum $Optional<AnyObject>, #Optional.some!enumelt, %x : $AnyObject
   %3 = mark_dependence %0 : $*Builtin.Int64 on %2 : $Optional<AnyObject>
   %4 = load %3 : $*Builtin.Int64
   return %4 : $Builtin.Int64
@@ -3627,7 +3627,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK:   dealloc_partial_ref %0 : $TestObjCInit, [[VMT]] : $@thick TestObjCInit.Type
 // CHECK-NOT: value_metatype
 // CHECK:   [[O:%.*]] = alloc_ref_dynamic [objc] [[VMT2]] : $@objc_metatype TestObjCInit.Type, $TestObjCInit
-// CHECK:   [[M:%.*]] = objc_method [[O]] : $TestObjCInit, #TestObjCInit.init!initializer.1.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+// CHECK:   [[M:%.*]] = objc_method [[O]] : $TestObjCInit, #TestObjCInit.init!initializer.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
 // CHECK:   apply [[M]]([[O]]) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
 // CHECK-LABEL: } // end sil function 'objc_init_partial_dealloc'
 sil hidden [thunk] @objc_init_partial_dealloc : $@convention(objc_method) (@owned TestObjCInit) -> Optional<TestObjCInit> {
@@ -3636,9 +3636,9 @@ bb0(%2 : $TestObjCInit):
   dealloc_partial_ref %2 : $TestObjCInit, %8 : $@thick TestObjCInit.Type
   %11 = thick_to_objc_metatype %8 : $@thick TestObjCInit.Type to $@objc_metatype TestObjCInit.Type
   %12 = alloc_ref_dynamic [objc] %11 : $@objc_metatype TestObjCInit.Type, $TestObjCInit
-  %13 = objc_method %12 : $TestObjCInit, #TestObjCInit.init!initializer.1.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+  %13 = objc_method %12 : $TestObjCInit, #TestObjCInit.init!initializer.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
   %14 = apply %13(%12) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
-  %19 = enum $Optional<TestObjCInit>, #Optional.some!enumelt.1, %14 : $TestObjCInit
+  %19 = enum $Optional<TestObjCInit>, #Optional.some!enumelt, %14 : $TestObjCInit
   return %19 : $Optional<TestObjCInit>
 }
 
@@ -3670,9 +3670,9 @@ bb0(%0 : $@thin T.Type):
 // CHECK:         apply %0
 sil @convert_function_substitution : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> () {
 bb0(%0 : $@callee_guaranteed () -> @out ()):
-  %1 = convert_function %0 : $@callee_guaranteed () -> @out () to $@callee_guaranteed <A> in () -> @out A for <()>
+  %1 = convert_function %0 : $@callee_guaranteed () -> @out () to $@callee_guaranteed @substituted <A> () -> @out A for <()>
   %2 = alloc_stack $()
-  apply %1(%2) : $@callee_guaranteed <A> in () -> @out A for <()>
+  apply %1(%2) : $@callee_guaranteed @substituted <A> () -> @out A for <()>
   dealloc_stack %2 : $*()
   return undef : $()
 }
@@ -3680,10 +3680,10 @@ bb0(%0 : $@callee_guaranteed () -> @out ()):
 // CHECK-LABEL: sil @convert_function_substitution_pa :
 sil @convert_function_substitution_pa : $@convention(thin) (@guaranteed @callee_guaranteed (@in Int, @in Int) -> @out (), @in Int) -> @owned @callee_guaranteed () -> @out () {
 bb0(%0 : $@callee_guaranteed (@in Int, @in Int) -> @out (), %1 : $*Int):
-  %2 = convert_function %0 : $@callee_guaranteed (@in Int, @in Int) -> @out () to $@callee_guaranteed <A, B, C> in (@in A, @in B) -> @out C for <Int, Int, ()>
-  %3 = partial_apply [callee_guaranteed] %2(%1) : $@callee_guaranteed <A, B, C> in (@in A, @in B) -> @out C for <Int, Int, ()>
-  %4 = partial_apply [callee_guaranteed] %3(%1) : $@callee_guaranteed <A, B, C> in (@in A) -> @out C for <Int, Int, ()>
-  %5 = convert_function %4 : $@callee_guaranteed <A, B, C> in () -> @out C for <Int, Int, ()> to $@callee_guaranteed () -> @out ()
+  %2 = convert_function %0 : $@callee_guaranteed (@in Int, @in Int) -> @out () to $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
+  %4 = partial_apply [callee_guaranteed] %3(%1) : $@callee_guaranteed @substituted <A, B, C> (@in A) -> @out C for <Int, Int, ()>
+  %5 = convert_function %4 : $@callee_guaranteed @substituted <A, B, C> () -> @out C for <Int, Int, ()> to $@callee_guaranteed () -> @out ()
   return %5 : $@callee_guaranteed () -> @out ()
 
 }
