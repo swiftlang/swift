@@ -69,7 +69,7 @@ extension UnsafeAtomic {
   ///
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The current value.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public func load(
     ordering: AtomicLoadOrdering
@@ -82,7 +82,7 @@ extension UnsafeAtomic {
   ///
   /// - Parameter desired: The desired new value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public func store(
     _ desired: __owned Value,
@@ -97,7 +97,7 @@ extension UnsafeAtomic {
   /// - Parameter desired: The desired new value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public func exchange(
     _ desired: __owned Value,
@@ -129,7 +129,7 @@ extension UnsafeAtomic {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
     expected: Value,
@@ -170,7 +170,7 @@ extension UnsafeAtomic {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
     expected: Value,
@@ -216,7 +216,7 @@ extension UnsafeAtomic {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public func weakCompareExchange(
     expected: Value,
@@ -247,7 +247,7 @@ extension UnsafeAtomic where Value: AtomicInteger {
   /// - Parameter operand: An integer value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public func loadThen${name}(
     ${label} operand: Value${defaultValue(name)},
@@ -272,7 +272,7 @@ extension UnsafeAtomic where Value: AtomicInteger {
   /// - Parameter operand: An integer value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The new value after the operation.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public func ${lowerFirst(name)}ThenLoad(
     ${label} operand: Value${defaultValue(name)},
@@ -293,7 +293,7 @@ extension UnsafeAtomic where Value: AtomicInteger {
   ///
   /// - Parameter operand: The value to add to the current value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public func wrappingIncrement(
     by operand: Value = 1,
@@ -313,7 +313,7 @@ extension UnsafeAtomic where Value: AtomicInteger {
   ///
   /// - Parameter operand: The value to subtract from the current value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public func wrappingDecrement(
     by operand: Value = 1,

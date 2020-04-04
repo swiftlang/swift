@@ -26,7 +26,7 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   ///   returned by `atomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicLoadThenWrappingIncrement(
     by operand: Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
@@ -45,7 +45,7 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   ///   returned by `atomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicLoadThenWrappingDecrement(
     by operand: Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
@@ -61,7 +61,7 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   ///   returned by `atomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicLoadThenBitwiseAnd(
     with operand: Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
@@ -77,7 +77,7 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   ///   returned by `atomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicLoadThenBitwiseOr(
     with operand: Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
@@ -93,7 +93,7 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   ///   returned by `atomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicLoadThenBitwiseXor(
     with operand: Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,

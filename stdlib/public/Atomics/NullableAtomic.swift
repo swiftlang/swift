@@ -24,27 +24,27 @@ public protocol NullableAtomic: AtomicProtocol {
     at pointer: UnsafeMutablePointer<NullableAtomicStorage>
   )
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicOptionalLoad(
     at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicLoadOrdering
   ) -> Self?
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicOptionalStore(
     _ desired: __owned Self?,
     at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicStoreOrdering
   )
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicOptionalExchange(
     _ desired: __owned Self?,
     at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
     ordering: AtomicUpdateOrdering
   ) -> Self?
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicOptionalCompareExchange(
     expected: Self?,
     desired: __owned Self?,
@@ -52,7 +52,7 @@ public protocol NullableAtomic: AtomicProtocol {
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Self?)
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicOptionalCompareExchange(
     expected: Self?,
     desired: __owned Self?,
@@ -61,7 +61,7 @@ public protocol NullableAtomic: AtomicProtocol {
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self?)
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicOptionalWeakCompareExchange(
     expected: Self?,
     desired: __owned Self?,
@@ -104,7 +104,7 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
     Wrapped.deinitializeNullableAtomicStorage(at: pointer)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicLoad(
     at pointer: UnsafeMutablePointer<AtomicStorage>,
@@ -113,7 +113,7 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
     Wrapped.atomicOptionalLoad(at: pointer, ordering: ordering)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
     _ desired: __owned Self,
@@ -123,7 +123,7 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
     Wrapped.atomicOptionalStore(desired, at: pointer, ordering: ordering)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
     _ desired: __owned Self,
@@ -133,7 +133,7 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
     Wrapped.atomicOptionalExchange(desired, at: pointer, ordering: ordering)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
     expected: Self,
@@ -148,7 +148,7 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
       ordering: ordering)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
     expected: Self,
@@ -165,7 +165,7 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
       failureOrdering: failureOrdering)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicWeakCompareExchange(
     expected: Self,

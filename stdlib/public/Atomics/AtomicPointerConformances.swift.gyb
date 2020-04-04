@@ -123,7 +123,7 @@ extension ${swiftType}: AtomicProtocol {
     pointer.deinitialize(count: 1)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicLoad(
     at pointer: UnsafeMutablePointer<AtomicStorage>,
@@ -140,7 +140,7 @@ extension ${swiftType}: AtomicProtocol {
     return Self(_atomicRawValue: raw)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
     _ desired: Self,
@@ -157,7 +157,7 @@ extension ${swiftType}: AtomicProtocol {
     }
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
     _ desired: Self,
@@ -176,7 +176,7 @@ extension ${swiftType}: AtomicProtocol {
     return Self(_atomicRawValue: rawResult)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
     expected: Self,
@@ -200,7 +200,7 @@ extension ${swiftType}: AtomicProtocol {
       Self(_atomicRawValue: old))
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
     expected: Self,
@@ -232,7 +232,7 @@ extension ${swiftType}: AtomicProtocol {
       Self(_atomicRawValue: old))
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicWeakCompareExchange(
     expected: Self,
@@ -327,7 +327,7 @@ extension ${swiftType}: NullableAtomic {
     pointer.deinitialize(count: 1)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalLoad(
     at pointer: UnsafeMutablePointer<NullableAtomicStorage>,
@@ -344,7 +344,7 @@ extension ${swiftType}: NullableAtomic {
     return ${swiftType}(_atomicOptionalRawValue: raw)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalStore(
     _ desired: Self?,
@@ -361,7 +361,7 @@ extension ${swiftType}: NullableAtomic {
     }
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalExchange(
     _ desired: Self?,
@@ -380,7 +380,7 @@ extension ${swiftType}: NullableAtomic {
     return Self(_atomicOptionalRawValue: rawResult)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalCompareExchange(
     expected: Self?,
@@ -404,7 +404,7 @@ extension ${swiftType}: NullableAtomic {
       Self(_atomicOptionalRawValue: old))
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalCompareExchange(
     expected: Self?,
@@ -436,7 +436,7 @@ extension ${swiftType}: NullableAtomic {
       Self(_atomicOptionalRawValue: old))
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicOptionalWeakCompareExchange(
     expected: Self?,

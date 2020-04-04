@@ -94,7 +94,7 @@ import Swift
 extension ${swiftType}: AtomicProtocol {
   public typealias AtomicStorage = ${swiftType}
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicLoad(
     at pointer: UnsafeMutablePointer<${swiftType}>,
@@ -109,7 +109,7 @@ extension ${swiftType}: AtomicProtocol {
     }
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
     _ desired: ${swiftType},
@@ -126,7 +126,7 @@ extension ${swiftType}: AtomicProtocol {
     }
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
     _ desired: ${swiftType},
@@ -142,7 +142,7 @@ extension ${swiftType}: AtomicProtocol {
     }
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
     expected: ${swiftType},
@@ -160,7 +160,7 @@ extension ${swiftType}: AtomicProtocol {
     }
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
     expected: ${swiftType},
@@ -185,7 +185,7 @@ extension ${swiftType}: AtomicProtocol {
     }
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicWeakCompareExchange(
     expected: ${swiftType},
@@ -215,7 +215,7 @@ extension ${swiftType}: AtomicProtocol {
 extension ${swiftType}: AtomicInteger {
   % for (name, llvmop, op, label, doc) in integerOperations:
   % defaultValue = " = 1" if label <> "" else ""
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
   public static func atomicLoadThen${name}(

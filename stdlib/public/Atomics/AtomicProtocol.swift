@@ -75,7 +75,7 @@ public protocol AtomicProtocol {
   ///   returned by `atomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The current value referenced by `pointer`.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicLoad(
     at pointer: UnsafeMutablePointer<AtomicStorage>,
     ordering: AtomicLoadOrdering
@@ -88,7 +88,7 @@ public protocol AtomicProtocol {
   /// - Parameter pointer: A memory location previously initialized with a value
   ///   returned by `atomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicStore(
     _ desired: __owned Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
@@ -103,7 +103,7 @@ public protocol AtomicProtocol {
   ///   returned by `atomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicExchange(
     _ desired: __owned Self,
     at pointer: UnsafeMutablePointer<AtomicStorage>,
@@ -135,7 +135,7 @@ public protocol AtomicProtocol {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicCompareExchange(
     expected: Self,
     desired: __owned Self,
@@ -172,7 +172,7 @@ public protocol AtomicProtocol {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicCompareExchange(
     expected: Self,
     desired: __owned Self,
@@ -214,7 +214,7 @@ public protocol AtomicProtocol {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   static func atomicWeakCompareExchange(
     expected: Self,
     desired: __owned Self,
@@ -257,7 +257,7 @@ extension AtomicProtocol where
     pointer.deinitialize(count: 1)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicLoad(
     at pointer: UnsafeMutablePointer<AtomicStorage>,
@@ -267,7 +267,7 @@ extension AtomicProtocol where
     return Self(rawValue: raw)!
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicStore(
     _ desired: __owned Self,
@@ -280,7 +280,7 @@ extension AtomicProtocol where
       ordering: ordering)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicExchange(
     _ desired: __owned Self,
@@ -294,7 +294,7 @@ extension AtomicProtocol where
     return Self(rawValue: raw)!
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
     expected: Self,
@@ -310,7 +310,7 @@ extension AtomicProtocol where
     return (exchanged, Self(rawValue: raw)!)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicCompareExchange(
     expected: Self,
@@ -328,7 +328,7 @@ extension AtomicProtocol where
     return (exchanged, Self(rawValue: raw)!)
   }
 
-  @_semantics("has_constant_evaluable_arguments")
+  @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   public static func atomicWeakCompareExchange(
     expected: Self,
