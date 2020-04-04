@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/ToolChain.h"
+#include "clang/Driver/DarwinSDKInfo.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Compiler.h"
 
@@ -58,9 +59,17 @@ protected:
                          const llvm::opt::ArgList &args,
                          StringRef defaultTarget) const override;
 
+  void validateOutputInfo(DiagnosticEngine &diags,
+                          const OutputInfo &outputInfo) const override;
+
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
 
   bool shouldStoreInvocationInDebugInfo() const override;
+
+  /// Information about the SDK that the application is being built against.
+  /// This information is only used by the linker, so it is only populated
+  /// when there will be a linker job.
+  mutable Optional<clang::driver::DarwinSDKInfo> SDKInfo;
 
   const Optional<llvm::Triple> TargetVariant;
 
