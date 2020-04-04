@@ -2154,7 +2154,16 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
   interleave(decl->getFullAccessPath(),
              [&](const ImportDecl::AccessPathElement &Elem) {
                if (!Mods.empty()) {
-                 Printer.printModuleRef(Mods.front(), Elem.Item);
+                 Identifier Name = Elem.Item;
+                 if (Options.MapCrossImportOverlaysToDeclaringModule) {
+                   if (auto *MD = Mods.front().getAsSwiftModule()) {
+                     ModuleDecl *Declaring = const_cast<ModuleDecl*>(MD)
+                       ->getDeclaringModuleIfCrossImportOverlay();
+                     if (Declaring)
+                       Name = Declaring->getName();
+                   }
+                 }
+                 Printer.printModuleRef(Mods.front(), Name);
                  Mods = Mods.slice(1);
                } else {
                  Printer << Elem.Item.str();
@@ -3592,8 +3601,12 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   template <typename T>
   void printModuleContext(T *Ty) {
     FileUnit *File = cast<FileUnit>(Ty->getDecl()->getModuleScopeContext());
-    const ModuleDecl *Mod =
-        Options.mapModuleToUnderlying(File->getParentModule());
+    ModuleDecl *Mod = File->getParentModule();
+
+    if (Options.MapCrossImportOverlaysToDeclaringModule) {
+      if (ModuleDecl *Declaring = Mod->getDeclaringModuleIfCrossImportOverlay())
+        Mod = Declaring;
+    }
 
     Identifier Name = Mod->getName();
     if (Options.UseExportedModuleNames)

@@ -114,7 +114,7 @@ public:
     NumBytesToErase = N;
   }
 
-  void setAssociatedDecl(const Decl *D, SourceFile *SF);
+  void setAssociatedDecl(const Decl *D);
 
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
