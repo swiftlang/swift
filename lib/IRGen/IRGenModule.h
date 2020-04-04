@@ -324,7 +324,16 @@ public:
     assert(IGM);
     return IGM;
   }
-  
+
+  SourceFile *getSourceFile(IRGenModule *module) {
+    for (auto pair : GenModules) {
+      if (pair.second == module) {
+        return pair.first;
+      }
+    }
+    return nullptr;
+  }
+
   /// Get an IRGenModule for a declaration context.
   /// Returns the IRGenModule of the containing source file, or if this cannot
   /// be determined, returns the primary IRGenModule.
