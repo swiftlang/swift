@@ -59,6 +59,7 @@ func one() {
   do {
     throw opaque_error()
   } catch MSV.Foo, MSV.CarriesInt(let num) { // expected-error {{'num' must be bound in every pattern}}
+    // expected-error@-1 {{'catch' statements do not yet support multiple patterns}}
   } catch {
   }
 }

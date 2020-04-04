@@ -1994,7 +1994,7 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
       parseGuardedPattern(*this, PatternResult, status, boundDecls,
                           GuardedPatternContext::Catch, isFirst);
       if (status.hasCodeCompletion()) {
-        return makeParserCodeCompletionResult<CaseStmt>();
+        return makeParserCodeCompletionResult<CatchStmt>();
       }
       caseLabelItems.emplace_back(PatternResult.ThePattern,
                                   PatternResult.WhereLoc, PatternResult.Guard);
@@ -2005,34 +2005,38 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
 
     // Grab the first case label item pattern and use it to initialize the case
     // body var decls.
-    SmallVector<VarDecl *, 4> tmp;
-    caseLabelItems.front().getPattern()->collectVariables(tmp);
-    auto Result = Context.AllocateUninitialized<VarDecl *>(tmp.size());
-    for (unsigned i : indices(tmp)) {
-      auto *vOld = tmp[i];
-      auto *vNew = new (Context) VarDecl(
-          /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
-          vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-      vNew->setHasNonPatternBindingInit();
-      vNew->setImplicit();
-      Result[i] = vNew;
-    }
-    caseBodyDecls.emplace(Result);
+    // TODO: Uncomment when AST supports multi-pattern catches
+    //  SmallVector<VarDecl *, 4> tmp;
+    //  caseLabelItems.front().getPattern()->collectVariables(tmp);
+    //  auto Result = Context.AllocateUninitialized<VarDecl *>(tmp.size());
+    //  for (unsigned i : indices(tmp)) {
+    //    auto *vOld = tmp[i];
+    //    auto *vNew = new (Context) VarDecl(
+    //        /*IsStatic*/ false, vOld->getIntroducer(), false
+    //        /*IsCaptureList*/, vOld->getNameLoc(), vOld->getName(),
+    //        vOld->getDeclContext());
+    //    vNew->setHasNonPatternBindingInit();
+    //    vNew->setImplicit();
+    //    Result[i] = vNew;
+    //  }
+    //  caseBodyDecls.emplace(Result);
   }
 
   // Add a scope so that the parser can find our body bound decls if it emits
   // optimized accesses.
-  Optional<Scope> BodyScope;
-  if (caseBodyDecls) {
-    BodyScope.emplace(this, ScopeKind::CatchVars);
-    for (auto *v : *caseBodyDecls) {
-      setLocalDiscriminator(v);
-      // If we had any bad redefinitions, we already diagnosed them against the
-      // first case label item.
-      if (v->hasName())
-        addToScope(v, false /*diagnoseRedefinitions*/);
-    }
-  }
+  // TODO: Uncomment when AST supports multi-pattern catches
+  // Optional<Scope> BodyScope;
+  // if (caseBodyDecls) {
+  //  BodyScope.emplace(this, ScopeKind::CatchVars);
+  //  for (auto *v : *caseBodyDecls) {
+  //    setLocalDiscriminator(v);
+  //    // If we had any bad redefinitions, we already diagnosed them against
+  //    the
+  //    // first case label item.
+  //    if (v->hasName())
+  //      addToScope(v, false /*diagnoseRedefinitions*/);
+  //  }
+  //}
 
   auto bodyResult = parseBraceItemList(diag::expected_lbrace_after_catch);
   status |= bodyResult;
@@ -2042,10 +2046,16 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
                                                          /*implicit=*/ true));
   }
 
-  auto result =
-    new (Context) CatchStmt(catchLoc, pattern.ThePattern, pattern.WhereLoc,
-                            pattern.Guard, bodyResult.get());
-  return makeParserResult(status, result);
+  auto result = new (Context) CatchStmt(
+      catchLoc, caseLabelItems[0].getPattern(), caseLabelItems[0].getWhereLoc(),
+      caseLabelItems[0].getGuardExpr(), bodyResult.get());
+
+  if (caseLabelItems.size() > 1) {
+    diagnose(catchLoc, diag::multi_pattern_catch_unsupported);
+    return makeParserErrorResult(result);
+  } else {
+    return makeParserResult(status, result);
+  }
 }
 
 static bool isStmtForCStyle(Parser &P) {

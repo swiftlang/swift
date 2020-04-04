@@ -99,8 +99,8 @@ class eight {
 
 func multiPattern() {
   do {
-    throw opaque_error()
-  } catch MSV.Foo, _ {
+    throw opaque_error() // expected-error {{error is not handled because the enclosing catch is not exhaustive}}
+  } catch MSV.Foo, _ { // expected-error {{'catch' statements do not yet support multiple patterns}}
     _ = e
   }
 }
