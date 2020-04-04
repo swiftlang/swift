@@ -2384,13 +2384,14 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = getTypeAttrRangeWithAt(Context, loc);
 
-        diagnoseInvalid(repr, loc, diag::escaping_non_function_parameter)
-            .fixItRemove(attrRange);
-
-        // Try to find a helpful note based on how the type is being used
+        // Try to find a better diagnostic based on how the type is being used
         if (options.is(TypeResolverContext::ImmediateOptionalTypeArgument)) {
           diagnoseInvalid(repr, repr->getLoc(),
-                          diag::escaping_optional_type_argument);
+                          diag::escaping_optional_type_argument)
+              .fixItRemove(attrRange);
+        } else {
+          diagnoseInvalid(repr, loc, diag::escaping_non_function_parameter)
+              .fixItRemove(attrRange);
         }
       }
 
@@ -2414,7 +2415,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       if (!attrs.has(i))
         continue;
 
-      if (i == TAK_escaping && ty->getOptionalObjectType()) {
+      Type optionalObjectType = ty->getOptionalObjectType();
+      if (i == TAK_escaping && optionalObjectType &&
+          optionalObjectType->is<AnyFunctionType>()) {
         auto diag = diagnoseInvalid(repr, attrs.getLoc(i),
                                     diag::escaping_optional_type_argument);
         diag.fixItRemove(
