@@ -4103,11 +4103,13 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
   if (protocols.size() != 1)
     return expr;
 
-  auto *attr = protocols.front()->getAttrs().getAttribute<TypeEraserAttr>();
+  auto *PD = protocols.front();
+  auto *attr = PD->getAttrs().getAttribute<TypeEraserAttr>();
   if (!attr)
     return expr;
 
-  auto typeEraser = attr->getTypeEraserLoc().getType();
+  auto typeEraser = attr->getResolvedType(PD);
+  assert(typeEraser && "Failed to resolve eraser type!");
   auto &ctx = dc->getASTContext();
   return CallExpr::createImplicit(ctx,
                                   TypeExpr::createImplicit(typeEraser, ctx),

@@ -2394,25 +2394,36 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
   }
 }
 
+Type
+ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
+                                       ProtocolDecl *PD,
+                                       TypeEraserAttr *attr) const {
+  if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
+    auto resolution = TypeResolution::forContextual(PD);
+    return resolution.resolveType(typeEraserRepr, /*options=*/None);
+  } else {
+    auto *LazyResolver = attr->Resolver;
+    assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
+    auto ty = LazyResolver->loadTypeEraserType(attr, attr->ResolverContextData);
+    attr->Resolver = nullptr;
+    if (!ty) {
+      return ErrorType::get(PD->getASTContext());
+    }
+    return ty;
+  }
+}
+
 bool
 TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
                                          TypeEraserAttr *attr,
                                          ProtocolDecl *protocol) const {
   auto &ctx = protocol->getASTContext();
   auto &diags = ctx.Diags;
-  TypeLoc &typeEraserLoc = attr->getTypeEraserLoc();
-  TypeRepr *typeEraserRepr = typeEraserLoc.getTypeRepr();
   DeclContext *dc = protocol->getDeclContext();
   Type protocolType = protocol->getDeclaredType();
 
   // Get the NominalTypeDecl for the type eraser.
-  Type typeEraser = typeEraserLoc.getType();
-  if (!typeEraser && typeEraserRepr) {
-    auto resolution = TypeResolution::forContextual(protocol);
-    typeEraser = resolution.resolveType(typeEraserRepr, /*options=*/None);
-    typeEraserLoc.setType(typeEraser);
-  }
-
+  Type typeEraser = attr->getResolvedType(protocol);
   if (typeEraser->hasError())
     return false;
 
@@ -2422,13 +2433,13 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
     nominalTypeDecl = typeAliasDecl->getUnderlyingType()->getAnyNominal();
 
   if (!nominalTypeDecl || isa<ProtocolDecl>(nominalTypeDecl)) {
-    diags.diagnose(typeEraserLoc.getLoc(), diag::non_nominal_type_eraser);
+    diags.diagnose(attr->getLoc(), diag::non_nominal_type_eraser);
     return false;
   }
 
   // The nominal type must be accessible wherever the protocol is accessible
   if (nominalTypeDecl->getFormalAccess() < protocol->getFormalAccess()) {
-    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_not_accessible,
+    diags.diagnose(attr->getLoc(), diag::type_eraser_not_accessible,
                    nominalTypeDecl->getFormalAccess(), nominalTypeDecl->getName(),
                    protocolType, protocol->getFormalAccess());
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
@@ -2437,7 +2448,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
 
   // The type eraser must conform to the annotated protocol
   if (!TypeChecker::conformsToProtocol(typeEraser, protocol, dc, None)) {
-    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_does_not_conform,
+    diags.diagnose(attr->getLoc(), diag::type_eraser_does_not_conform,
                    typeEraser, protocolType);
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
     return false;

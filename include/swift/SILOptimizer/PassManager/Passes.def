@@ -120,6 +120,8 @@ PASS(CopyForwarding, "copy-forwarding",
      "Copy Forwarding to Remove Redundant Copies")
 PASS(CopyPropagation, "copy-propagation",
      "Copy propagation to Remove Redundant SSA Copies")
+PASS(Differentiation, "differentiation",
+     "Automatic Differentiation")
 PASS(EpilogueARCMatcherDumper, "sil-epilogue-arc-dumper",
      "Print Epilogue retains of Returned Values and Argument releases")
 PASS(EpilogueRetainReleaseMatcherDumper, "sil-epilogue-retain-release-dumper",

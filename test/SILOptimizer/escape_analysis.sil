@@ -1127,6 +1127,23 @@ bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
   return %5 : $()
 }
 
+// CHECK-LABEL: CG of test_unchecked_addr_cast
+// CHECK-NEXT:    Arg [ref] %0 Esc: G, Succ: 
+// CHECK-NEXT:    Val %1 Esc: , Succ: (%1.1)
+// CHECK-NEXT:    Con [ref] %1.1 Esc: G, Succ: 
+// CHECK-NEXT:    Val %2 Esc: , Succ: (%2.1)
+// CHECK-NEXT:    Con [ref] %2.1 Esc: G, Succ: %0
+// CHECK-NEXT:  End
+sil @test_unchecked_addr_cast : $@convention(thin) (@guaranteed AnyObject) -> Int {
+bb0(%0 : $AnyObject):
+  %1 = alloc_stack $Int
+  %2 = unchecked_addr_cast %1 : $*Int to $*AnyObject
+  store %0 to %2 : $*AnyObject
+  %4 = load %1 : $*Int
+  dealloc_stack %1 : $*Int
+  return %4 : $Int
+}
+
 sil_global @global_y : $SomeData
 
 // CHECK-LABEL: CG of test_node_merge_during_struct_inst

@@ -882,6 +882,9 @@ public:
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) override;
 
+  virtual Type loadTypeEraserType(const TypeEraserAttr *TRA,
+                                  uint64_t contextData) override;
+
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 

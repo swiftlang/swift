@@ -41,20 +41,49 @@ const bool IsImplicit = true;
 
 Expr *swift::buildSelfReference(VarDecl *selfDecl,
                                 SelfAccessorKind selfAccessorKind,
-                                bool isLValue,
-                                ASTContext &ctx) {
+                                bool isLValue, Type convertTy) {
+  auto &ctx = selfDecl->getASTContext();
+  auto selfTy = selfDecl->getType();
+
   switch (selfAccessorKind) {
   case SelfAccessorKind::Peer:
+    assert(!convertTy || convertTy->isEqual(selfTy));
     return new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(), IsImplicit,
                                  AccessSemantics::Ordinary,
-                                 isLValue
-                                  ? LValueType::get(selfDecl->getType())
-                                  : selfDecl->getType());
+                                 isLValue ? LValueType::get(selfTy) : selfTy);
 
-  case SelfAccessorKind::Super:
+  case SelfAccessorKind::Super: {
     assert(!isLValue);
-    return new (ctx) SuperRefExpr(selfDecl, SourceLoc(), IsImplicit,
-                                  selfDecl->getType()->getSuperclass());
+
+    // Get the superclass type of self, looking through a metatype if needed.
+    auto isMetatype = false;
+    if (auto *metaTy = selfTy->getAs<MetatypeType>()) {
+      isMetatype = true;
+      selfTy = metaTy->getInstanceType();
+    }
+    selfTy = selfTy->getSuperclass();
+    if (isMetatype)
+      selfTy = MetatypeType::get(selfTy);
+
+    auto *superRef =
+        new (ctx) SuperRefExpr(selfDecl, SourceLoc(), IsImplicit, selfTy);
+
+    // If no conversion type was specified, or we're already at that type, we're
+    // done.
+    if (!convertTy || convertTy->isEqual(selfTy))
+      return superRef;
+
+    // Insert the appropriate expr to handle the upcast.
+    if (isMetatype) {
+      assert(convertTy->castTo<MetatypeType>()
+                 ->getInstanceType()
+                 ->isExactSuperclassOf(selfTy->getMetatypeInstanceType()));
+      return new (ctx) MetatypeConversionExpr(superRef, convertTy);
+    } else {
+      assert(convertTy->isExactSuperclassOf(selfTy));
+      return new (ctx) DerivedToBaseExpr(superRef, convertTy);
+    }
+  }
   }
   llvm_unreachable("bad self access kind");
 }
@@ -537,7 +566,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   // Reference to super.init.
   auto *selfDecl = ctor->getImplicitSelfDecl();
   auto *superRef = buildSelfReference(selfDecl, SelfAccessorKind::Super,
-                                      /*isLValue=*/false, ctx);
+                                      /*isLValue=*/false);
 
   SubstitutionMap subs;
   if (auto *genericEnv = fn->getGenericEnvironment())

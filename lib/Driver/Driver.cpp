@@ -883,6 +883,10 @@ Driver::buildCompilation(const ToolChain &TC,
   assert(OI.CompilerOutputType != file_types::ID::TY_INVALID &&
          "buildOutputInfo() must set a valid output type!");
 
+  TC.validateOutputInfo(Diags, OI);
+  if (Diags.hadAnyError())
+    return nullptr;
+
   validateEmbedBitcode(*TranslatedArgList, OI, Diags);
 
   if (OI.CompilerMode == OutputInfo::Mode::REPL)
