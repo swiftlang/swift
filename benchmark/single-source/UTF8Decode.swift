@@ -198,6 +198,7 @@ struct CustomContiguousCollection: Collection {
   var endIndex: Index { storage.count }
   func index(after i: Index) -> Index { i+1 }
 
+  @inline(never)
   func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R? {
@@ -214,6 +215,13 @@ struct CustomNoncontiguousCollection: Collection {
   var startIndex: Index { 0 }
   var endIndex: Index { storage.count }
   func index(after i: Index) -> Index { i+1 }
+
+  @inline(never)
+  func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R? {
+    nil
+  }
 }
 let allStringsCustomContiguous = CustomContiguousCollection(allStringsBytes)
 let asciiCustomContiguous = CustomContiguousCollection(Array(ascii.utf8))
