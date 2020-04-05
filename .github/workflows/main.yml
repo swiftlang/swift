@@ -28,7 +28,7 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: ../build-cache
-          key: ${{ runner.os }}-sccache-v3
+          key: ${{ runner.os }}-sccache-v4
       - name: Build Linux installable archive
         run: |
           ./utils/webassembly/ci.sh
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/cache@v1
         with:
           path: ../build-cache
-          key: ${{ runner.os }}-sccache-v3
+          key: ${{ runner.os }}-sccache-v4
       - name: Build macOS installable archive
         run: ./utils/webassembly/ci.sh
       - name: Upload macOS installable archive
