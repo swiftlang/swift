@@ -146,7 +146,6 @@ struct IndexedWitness {
 class IndexSwiftASTWalker : public SourceEntityWalker {
   IndexDataConsumer &IdxConsumer;
   SourceManager &SrcMgr;
-  SourceFile *InitialFile; ///< The SoureFile we started walking from, if any.
   unsigned BufferID;
   bool enableWarnings;
 
@@ -283,7 +282,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
                       SourceFile *SF = nullptr)
-      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr), InitialFile(SF),
+      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr),
         BufferID(SF ? SF->getBufferID().getValueOr(-1) : -1),
         enableWarnings(IdxConsumer.enableWarnings()) {}
 
@@ -759,13 +758,9 @@ bool IndexSwiftASTWalker::visitImports(
     StringRef ModuleName = Mod->getNameStr();
 
     // If this module is an underscored cross-import overlay, use the name
-    // of the underlying module instead.
-    if (InitialFile) {
-      ModuleDecl *Underlying =
-        InitialFile->getModuleShadowedBySeparatelyImportedOverlay(Mod);
-      if (Underlying)
-        ModuleName = Underlying->getNameStr();
-    }
+    // of the underlying module that declared it instead.
+    if (ModuleDecl *Declaring = Mod->getDeclaringModuleIfCrossImportOverlay())
+      ModuleName = Declaring->getNameStr();
 
     if (!IdxConsumer.startDependency(ModuleName, Path, IsClangModule,
                                      Mod->isSystemModule()))

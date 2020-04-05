@@ -238,13 +238,16 @@ swift::ide::findGroupNameForUSR(ModuleDecl *M, StringRef USR) {
   return None;
 }
 
-/// Prints a single decl using the \p Printer and \p Options provided.
+/// Prints a single decl using the \p Printer and \p Options provided. If
+/// \p LeadingComment is non-empty, it will be printed verbatim before the decl
+/// and any documentation comment associated with it.
 ///
 /// \returns Whether the given decl was printed.
 static bool printModuleInterfaceDecl(Decl *D,
                                      ASTPrinter &Printer,
                                      PrintOptions &Options,
-                                     bool PrintSynthesizedExtensions) {
+                                     bool PrintSynthesizedExtensions,
+                                     StringRef LeadingComment = StringRef()) {
   if (!Options.shouldPrint(D)) {
     Printer.callAvoidPrintDeclPost(D);
     return false;
@@ -271,6 +274,8 @@ static bool printModuleInterfaceDecl(Decl *D,
       };
     }
   }
+  if (!LeadingComment.empty() && Options.shouldPrint(D))
+    Printer << LeadingComment << "\n";
   if (D->print(Printer, Options)) {
     if (Options.BracketOptions.shouldCloseNominal(D))
       Printer << "\n";
@@ -297,6 +302,8 @@ static bool printModuleInterfaceDecl(Decl *D,
             if (extensionHasClangNode(Ext))
               continue; // will be printed in its source location, see above.
             Printer << "\n";
+            if (!LeadingComment.empty())
+              Printer << LeadingComment << "\n";
             Ext->print(Printer, Options);
             Printer << "\n";
           }
@@ -349,8 +356,11 @@ static bool printModuleInterfaceDecl(Decl *D,
               Options.BracketOptions = {
                 ET.Ext, !Opened, Decls.back().Ext == ET.Ext, true
               };
-              if (Options.BracketOptions.shouldOpenExtension(ET.Ext))
+              if (Options.BracketOptions.shouldOpenExtension(ET.Ext)) {
                 Printer << "\n";
+                if (Options.shouldPrint(ET.Ext) && !LeadingComment.empty())
+                  Printer << LeadingComment << "\n";
+              }
               if (ET.IsSynthesized) {
                 if (ET.EnablingExt)
                   Options.initForSynthesizedExtension(ET.EnablingExt);
@@ -400,15 +410,16 @@ static bool compareSwiftDecls(Decl *LHS, Decl *RHS) {
 };
 
 static std::pair<ArrayRef<Decl*>, ArrayRef<Decl*>>
-getDeclsFromOverlay(ModuleDecl *Overlay, ModuleDecl *Underlying,
-                    SmallVectorImpl<Decl *> &Decls, AccessLevel AccessFilter) {
+getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
+                               SmallVectorImpl<Decl *> &Decls,
+                               AccessLevel AccessFilter) {
   Overlay->getDisplayDecls(Decls);
 
-  // Collector the imports of the underlying module so we can filter them out.
+  // Collect the imports of the underlying module so we can filter them out.
   SmallPtrSet<ModuleDecl *, 8> PrevImported;
-  SmallVector<Decl*, 1> UnderlyingDecls;
-  Underlying->getDisplayDecls(UnderlyingDecls);
-  for (auto *D: UnderlyingDecls) {
+  SmallVector<Decl*, 1> DeclaringDecls;
+  Declaring->getDisplayDecls(DeclaringDecls);
+  for (auto *D: DeclaringDecls) {
     if (auto *ID = dyn_cast<ImportDecl>(D))
       PrevImported.insert(ID->getModule());
   }
@@ -417,13 +428,14 @@ getDeclsFromOverlay(ModuleDecl *Overlay, ModuleDecl *Underlying,
   // underlying module.
   auto NewEnd = std::partition(Decls.begin(), Decls.end(), [&](Decl *D) {
     if (auto *ID = dyn_cast<ImportDecl>(D)) {
+      ModuleDecl *Imported = ID->getModule();
       // Ignore imports of the underlying module, or any cross-import
       // that would map back to it.
-      if (ID->getModule() == Underlying ||
-          Underlying->isUnderlyingModuleOfCrossImportOverlay(ID->getModule()))
+      if (Imported == Declaring || Imported->isCrossImportOverlayOf(Declaring))
         return false;
+
       // Ignore an imports of modules also imported by the underlying module.
-      if (PrevImported.find(ID->getModule()) != PrevImported.end())
+      if (PrevImported.find(Imported) != PrevImported.end())
         return false;
     }
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -454,28 +466,21 @@ getDeclsFromOverlay(ModuleDecl *Overlay, ModuleDecl *Underlying,
   return {Imports, Remainder};
 }
 
-static void printCrossImportOverlays(ModuleDecl *Underlying, ASTContext &Ctx,
+static void printCrossImportOverlays(ModuleDecl *Declaring, ASTContext &Ctx,
                                      ASTPrinter &Printer,
                                      PrintOptions Options,
                                      bool PrintSynthesizedExtensions) {
-  // If we end up printing decls from any cross-import overlay modules, make
-  // sure we map any qualifying module references to the underlying module.
-  Options.mapModuleToUnderlying = [&](const ModuleDecl *M) {
-    if (Underlying->isUnderlyingModuleOfCrossImportOverlay(M))
-      return const_cast<const ModuleDecl*>(Underlying);
-    return M;
-  };
-
   SmallVector<Decl *, 1> OverlayDecls;
   SmallVector<Identifier, 1> Bystanders;
 
-  auto PrintDecl = [&](Decl *D) {
+  auto PrintDecl = [&](Decl *D, StringRef LeadingComment = StringRef()) {
     return printModuleInterfaceDecl(D, Printer, Options,
-                                    PrintSynthesizedExtensions);
+                                    PrintSynthesizedExtensions,
+                                    LeadingComment);
   };
 
   SmallVector<ModuleDecl *, 1> OverlayModules;
-  Underlying->findDeclaredCrossImportOverlaysTransitive(OverlayModules);
+  Declaring->findDeclaredCrossImportOverlaysTransitive(OverlayModules);
   std::sort(OverlayModules.begin(), OverlayModules.end(),
             [](ModuleDecl *LHS, ModuleDecl *RHS) {
     return LHS->getNameStr() < RHS->getNameStr();
@@ -483,15 +488,16 @@ static void printCrossImportOverlays(ModuleDecl *Underlying, ASTContext &Ctx,
 
   for (auto *Overlay: OverlayModules) {
     OverlayDecls.clear();
-    auto DeclLists = getDeclsFromOverlay(Overlay, Underlying, OverlayDecls,
-                                         Options.AccessFilter);
+    auto DeclLists = getDeclsFromCrossImportOverlay(Overlay, Declaring,
+                                                    OverlayDecls,
+                                                    Options.AccessFilter);
 
     // Ignore overlays without any decls
     if (OverlayDecls.empty())
       continue;
 
     Bystanders.clear();
-    Underlying->getAllBystandersForCrossImportOverlay(Overlay, Bystanders);
+    Overlay->getRequiredBystandersIfCrossImportOverlay(Declaring, Bystanders);
     assert(!Bystanders.empty() && "Overlay with no bystanders?");
     std::sort(Bystanders.begin(), Bystanders.end(),
               [](Identifier LHS, Identifier RHS) {
@@ -516,12 +522,10 @@ static void printCrossImportOverlays(ModuleDecl *Underlying, ASTContext &Ctx,
 
     std::string PerDeclComment = "// Available when " + BystanderList;
     PerDeclComment += Bystanders.size() == 1 ? " is" : " are";
-    PerDeclComment += " imported with " + Underlying->getNameStr().str();
+    PerDeclComment += " imported with " + Declaring->getNameStr().str();
 
     for (auto *D : DeclLists.second) {
-      // FIXME: only print this comment if the decl is actually printed.
-      Printer << PerDeclComment << "\n";
-      if (PrintDecl(D))
+      if (PrintDecl(D, PerDeclComment))
         Printer << "\n";
     }
   }

@@ -908,21 +908,10 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   } else if (VD->getModuleContext() != MainModule) {
     ModuleDecl *MD = VD->getModuleContext();
     // If the decl is from a cross-import overlay module, report the overlay's
-    // underlying module as the owning module.
-    if (SF) {
-      // In a source file we map the imported overlays to the underlying
-      // modules they shadow.
-      auto *Underlying = SF->getModuleShadowedBySeparatelyImportedOverlay(MD);
-      if (Underlying)
-        MD = Underlying;
-    } else if (MainModule) {
-      // In a module interface we need to map the declared overlays of the main
-      // module (which are included in its generated interface) back to the main
-      // module itself.
-      if (MainModule->isUnderlyingModuleOfCrossImportOverlay(MD))
-        MD = MainModule;
-    }
-    ModuleName = MD->getName().str().str();
+    // declaring module as the owning module.
+    if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
+      MD = Declaring;
+    ModuleName = MD->getNameStr().str();
   }
   StringRef ModuleInterfaceName;
   if (auto IFaceGenRef = Lang.getIFaceGenContexts().find(ModuleName, Invok))
