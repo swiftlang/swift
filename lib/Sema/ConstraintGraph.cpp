@@ -472,6 +472,67 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
   }
 }
 
+#pragma mark Algorithms
+
+/// Perform a depth-first search.
+///
+/// \param cg The constraint graph.
+/// \param typeVar The type variable we're searching from.
+/// \param preVisitNode Called before traversing a node. Must return \c
+/// false when the node has already been visited.
+/// \param visitConstraint Called before considering a constraint. If it
+/// returns \c false, that constraint will be skipped.
+/// \param visitedConstraints Set of already-visited constraints, used
+/// internally to avoid duplicated work.
+static void depthFirstSearch(
+    ConstraintGraph &cg,
+    TypeVariableType *typeVar,
+    llvm::function_ref<bool(TypeVariableType *)> preVisitNode,
+    llvm::function_ref<bool(Constraint *)> visitConstraint,
+    llvm::SmallPtrSet<Constraint *, 8> &visitedConstraints) {
+  // Visit this node. If we've already seen it, bail out.
+  if (!preVisitNode(typeVar))
+    return;
+
+  // Local function to visit adjacent type variables.
+  auto visitAdjacencies = [&](ArrayRef<TypeVariableType *> adjTypeVars) {
+    for (auto adj : adjTypeVars) {
+      if (adj == typeVar)
+        continue;
+
+      // Recurse into this node.
+      depthFirstSearch(cg, adj, preVisitNode, visitConstraint,
+                       visitedConstraints);
+    }
+  };
+
+  // Walk all of the constraints associated with this node to find related
+  // nodes.
+  auto &node = cg[typeVar];
+  for (auto constraint : node.getConstraints()) {
+    // If we've already seen this constraint, skip it.
+    if (!visitedConstraints.insert(constraint).second)
+      continue;
+
+    if (visitConstraint(constraint))
+      visitAdjacencies(constraint->getTypeVariables());
+  }
+
+  // Visit all of the other nodes in the equivalence class.
+  auto repTypeVar = cg.getConstraintSystem().getRepresentative(typeVar);
+  if (typeVar == repTypeVar) {
+    // We are the representative, so visit all of the other type variables
+    // in this equivalence class.
+    visitAdjacencies(node.getEquivalenceClass());
+  } else {
+    // We are not the representative; visit the representative.
+    visitAdjacencies(repTypeVar);
+  }
+
+  // Walk any type variables related via fixed bindings.
+  visitAdjacencies(node.getFixedBindings());
+}
+
 llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     TypeVariableType *typeVar, GatheringKind kind,
     llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
@@ -569,67 +630,6 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
   }
 
   return constraints;
-}
-
-#pragma mark Algorithms
-
-/// Perform a depth-first search.
-///
-/// \param cg The constraint graph.
-/// \param typeVar The type variable we're searching from.
-/// \param preVisitNode Called before traversing a node. Must return \c
-/// false when the node has already been visited.
-/// \param visitConstraint Called before considering a constraint. If it
-/// returns \c false, that constraint will be skipped.
-/// \param visitedConstraints Set of already-visited constraints, used
-/// internally to avoid duplicated work.
-static void depthFirstSearch(
-    ConstraintGraph &cg,
-    TypeVariableType *typeVar,
-    llvm::function_ref<bool(TypeVariableType *)> preVisitNode,
-    llvm::function_ref<bool(Constraint *)> visitConstraint,
-    llvm::SmallPtrSet<Constraint *, 8> &visitedConstraints) {
-  // Visit this node. If we've already seen it, bail out.
-  if (!preVisitNode(typeVar))
-    return;
-
-  // Local function to visit adjacent type variables.
-  auto visitAdjacencies = [&](ArrayRef<TypeVariableType *> adjTypeVars) {
-    for (auto adj : adjTypeVars) {
-      if (adj == typeVar)
-        continue;
-
-      // Recurse into this node.
-      depthFirstSearch(cg, adj, preVisitNode, visitConstraint,
-                       visitedConstraints);
-    }
-  };
-
-  // Walk all of the constraints associated with this node to find related
-  // nodes.
-  auto &node = cg[typeVar];
-  for (auto constraint : node.getConstraints()) {
-    // If we've already seen this constraint, skip it.
-    if (!visitedConstraints.insert(constraint).second)
-      continue;
-
-    if (visitConstraint(constraint))
-      visitAdjacencies(constraint->getTypeVariables());
-  }
-
-  // Visit all of the other nodes in the equivalence class.
-  auto repTypeVar = cg.getConstraintSystem().getRepresentative(typeVar);
-  if (typeVar == repTypeVar) {
-    // We are the representative, so visit all of the other type variables
-    // in this equivalence class.
-    visitAdjacencies(node.getEquivalenceClass());
-  } else {
-    // We are not the representative; visit the representative.
-    visitAdjacencies(repTypeVar);
-  }
-
-  // Walk any type variables related via fixed bindings.
-  visitAdjacencies(node.getFixedBindings());
 }
 
 namespace {
