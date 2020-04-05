@@ -793,7 +793,7 @@ public:
   }
 
   /// Print a debug representation of the code completion result to \p OS.
-  void print(raw_ostream &OS) const;
+  void printPrefix(raw_ostream &OS) const;
   SWIFT_DEBUG_DUMP;
 
   static CodeCompletionDeclKind getCodeCompletionDeclKind(const Decl *D);
@@ -911,14 +911,17 @@ class PrintingCodeCompletionConsumer
   llvm::raw_ostream &OS;
   bool IncludeKeywords;
   bool IncludeComments;
+  bool PrintAnnotatedDescription;
 
 public:
  PrintingCodeCompletionConsumer(llvm::raw_ostream &OS,
                                 bool IncludeKeywords = true,
-                                bool IncludeComments = true)
+                                bool IncludeComments = true,
+                                bool PrintAnnotatedDescription = false)
      : OS(OS),
        IncludeKeywords(IncludeKeywords),
-       IncludeComments(IncludeComments) {}
+       IncludeComments(IncludeComments),
+       PrintAnnotatedDescription(PrintAnnotatedDescription) {}
 
  void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override;
 };

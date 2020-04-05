@@ -31,6 +31,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IDE/CodeCompletionCache.h"
+#include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -535,7 +536,7 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   llvm_unreachable("invalid DeclKind");
 }
 
-void CodeCompletionResult::print(raw_ostream &OS) const {
+void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
   llvm::SmallString<64> Prefix;
   switch (getKind()) {
   case ResultKind::Declaration:
@@ -738,11 +739,12 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     Prefix.append(" ");
   }
   OS << Prefix;
-  CompletionString->print(OS);
 }
 
 void CodeCompletionResult::dump() const {
-  print(llvm::errs());
+  printPrefix(llvm::errs());
+  CompletionString->print(llvm::errs());
+  llvm::errs() << "\n";
 }
 
 static StringRef copyString(llvm::BumpPtrAllocator &Allocator,
@@ -5969,7 +5971,11 @@ void PrintingCodeCompletionConsumer::handleResults(
   for (auto Result : Results) {
     if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
       continue;
-    Result->print(OS);
+    Result->printPrefix(OS);
+    if (PrintAnnotatedDescription)
+      printCodeCompletionResultDescriptionAnnotated(*Result, OS, /*leadingPunctuation=*/false);
+    else
+      Result->getCompletionString()->print(OS);
 
     llvm::SmallString<64> Name;
     llvm::raw_svector_ostream NameOs(Name);

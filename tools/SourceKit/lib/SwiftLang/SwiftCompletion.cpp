@@ -449,7 +449,8 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
 
       LogMessageOs << "Code completion result with empty description "
                       "was ignored: \n";
-      Result->print(LogMessageOs);
+      Result->printPrefix(LogMessageOs);
+      Result->getCompletionString()->print(LogMessageOs);
 
       *Log << LogMessage;
     }
