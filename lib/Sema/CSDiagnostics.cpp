@@ -672,10 +672,33 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
         diagnostic = getDiagnosticFor(CTP_AssignSource);
         fromType = getType(assignExpr->getSrc());
         toType = getType(assignExpr->getDest());
+      } else {
+        // Handle cases where we have an apply arg to param
+        if (!path.empty() &&
+            path.front().getKind() == ConstraintLocator::ApplyArgument) {
+          auto &cs = getConstraintSystem();
+          auto applyArgPath = path.drop_back();
+
+          if (!applyArgPath.empty()) {
+            auto applyArg =
+                applyArgPath.back().getAs<LocatorPathElt::ApplyArgToParam>();
+            if (!applyArg)
+              break;
+
+            auto calleeLocator = cs.getCalleeLocator(getLocator());
+            auto calleeType =
+                getType(calleeLocator->getAnchor())->getAs<FunctionType>();
+
+            diagnostic = diag::cannot_convert_argument_value;
+            fromType = getType(anchor);
+            toType = calleeType->getParams()[applyArg->getParamIdx()]
+                         .getParameterType();
+          }
+        }
       }
       break;
     }
-    
+
     case ConstraintLocator::OptionalPayload: {
       // If we have an inout expression, this comes from an
       // InoutToPointer argument mismatch failure.
