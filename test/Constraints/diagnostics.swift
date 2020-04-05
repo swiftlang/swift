@@ -1415,3 +1415,17 @@ f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform
 let f12: (Int) -> Void = { _ in }
 func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}
 f12(3, f4)// expected-error {{extra argument in call}}
+
+// SR-12242
+struct SR_12242_R<Value> {}
+struct SR_12242_T {}
+
+protocol SR_12242_P {}
+
+func fSR_12242() -> SR_12242_R<[SR_12242_T]> {}
+
+func genericFunc<SR_12242_T: SR_12242_P>(_ completion:  @escaping (SR_12242_R<[SR_12242_T]>) -> Void) {
+  let t = fSR_12242()
+  completion(t) // expected-error {{cannot convert value of type 'diagnostics.SR_12242_R<[diagnostics.SR_12242_T]>' to expected argument type 'diagnostics.SR_12242_R<[SR_12242_T]>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('diagnostics.SR_12242_T' and 'SR_12242_T') are expected to be equal}}
+}
