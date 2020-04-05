@@ -675,6 +675,9 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       // InoutToPointer argument mismatch failure.
       if (isa<InOutExpr>(anchor)) {
         diagnostic = diag::cannot_convert_argument_value;
+        auto applyInfo = getFunctionArgApplyInfo(getLocator());
+        if (applyInfo)
+          toType = applyInfo->getParamType();
       }
       break;
     }

@@ -1443,3 +1443,30 @@ func assignGenericMismatch() {
   // expected-note@-3 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
   // expected-note@-4 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }
+
+// [Int] to [String]? argument to param conversion
+let value: [Int] = []
+func gericArgToParamOptional(_ param: [String]?) {}
+
+gericArgToParamOptional(value) // expected-error {{convert value of type '[Int]' to expected argument type '[String]?'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+
+// Inout Expr conversions
+func gericArgToParamInout1(_ x: inout [[Int]]) {}
+func gericArgToParamInout2(_ x: inout [[String]]) {
+  gericArgToParamInout1(&x) // expected-error {{cannot convert value of type '[[String]]' to expected argument type '[[Int]]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+}
+
+func gericArgToParamInoutOptional(_ x: inout [[String]]?) {
+  gericArgToParamInout1(&x) // expected-error {{cannot convert value of type '[[String]]?' to expected argument type '[[Int]]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+  // expected-error@-2 {{value of optional type '[[String]]?' must be unwrapped to a value of type '[[String]]'}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}
+
+func gericArgToParamInout(_ x: inout [[Int]]) { // expected-note {{change variable type to '[[String]]?' if it doesn't need to be declared as '[[Int]]'}}
+  gericArgToParamInoutOptional(&x) // expected-error {{cannot convert value of type '[[Int]]' to expected argument type '[[String]]?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  // expected-error@-2 {{inout argument could be set to a value with a type other than '[[Int]]'; use a value declared as type '[[String]]?' instead}}
+}
