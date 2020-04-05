@@ -508,7 +508,7 @@ SourceLookupCache &ModuleDecl::getSourceLookupCache() const {
   return *Cache;
 }
 
-ModuleDecl *ModuleDecl::getTopLevelModule() {
+ModuleDecl *ModuleDecl::getTopLevelModule(bool overlay) {
   // If this is a Clang module, ask the Clang importer for the top-level module.
   // We need to check isNonSwiftModule() to ensure we don't look through
   // overlays.
@@ -516,7 +516,8 @@ ModuleDecl *ModuleDecl::getTopLevelModule() {
     if (auto *underlying = findUnderlyingClangModule()) {
       auto &ctx = getASTContext();
       auto *clangLoader = ctx.getClangModuleLoader();
-      return clangLoader->getWrapperForModule(underlying->getTopLevelModule());
+      return clangLoader->getWrapperForModule(underlying->getTopLevelModule(),
+                                              overlay);
     }
   }
   // Swift modules don't currently support submodules.
