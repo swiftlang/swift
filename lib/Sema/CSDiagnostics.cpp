@@ -667,12 +667,6 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     }
 
     case ConstraintLocator::GenericArgument: {
-      // In cases like `[[Int]]` vs. `[[String]]`
-      if (auto *assignExpr = dyn_cast<AssignExpr>(anchor)) {
-        diagnostic = getDiagnosticFor(CTP_AssignSource);
-        fromType = getType(assignExpr->getSrc());
-        toType = getType(assignExpr->getDest());
-      }
       break;
     }
 
@@ -704,13 +698,20 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   }
 
   if (!diagnostic) {
-    // If we couldn't find a specific diagnostic let's fallback to
-    // attempt to handle cases where we have an apply arg to param.
-    auto applyInfo = getFunctionArgApplyInfo(getLocator());
-    if (applyInfo) {
-      diagnostic = diag::cannot_convert_argument_value;
-      fromType = applyInfo->getArgType();
-      toType = applyInfo->getParamType();
+    // In cases like `[[Int]]` vs. `[[String]]`
+    if (auto *assignExpr = dyn_cast<AssignExpr>(anchor)) {
+      diagnostic = getDiagnosticFor(CTP_AssignSource);
+      fromType = getType(assignExpr->getSrc());
+      toType = getType(assignExpr->getDest());
+    } else {
+      // If we couldn't find a specific diagnostic let's fallback to
+      // attempt to handle cases where we have an apply arg to param.
+      auto applyInfo = getFunctionArgApplyInfo(getLocator());
+      if (applyInfo) {
+        diagnostic = diag::cannot_convert_argument_value;
+        fromType = applyInfo->getArgType();
+        toType = applyInfo->getParamType();
+      }
     }
   }
   
