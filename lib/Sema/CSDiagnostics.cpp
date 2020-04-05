@@ -698,7 +698,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   }
 
   if (!diagnostic) {
-    // In cases like `[[Int]]` vs. `[[String]]`
+    // Handle all mismatches involving an `AssignExpr`
     if (auto *assignExpr = dyn_cast<AssignExpr>(anchor)) {
       diagnostic = getDiagnosticFor(CTP_AssignSource);
       fromType = getType(assignExpr->getSrc());

@@ -1429,3 +1429,17 @@ func genericFunc<SR_12242_T: SR_12242_P>(_ completion:  @escaping (SR_12242_R<[S
   completion(t) // expected-error {{cannot convert value of type 'diagnostics.SR_12242_R<[diagnostics.SR_12242_T]>' to expected argument type 'diagnostics.SR_12242_R<[SR_12242_T]>'}}
   // expected-note@-1 {{arguments to generic parameter 'Element' ('diagnostics.SR_12242_T' and 'SR_12242_T') are expected to be equal}}
 }
+
+func assignGenericMismatch() {
+  var a: [Int]?
+  var b: [String]
+
+  a = b // expected-error {{cannot assign value of type '[String]' to type '[Int]?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+
+  b = a // expected-error {{cannot assign value of type '[Int]' to type '[String]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  // expected-error@-2 {{value of optional type '[Int]?' must be unwrapped to a value of type '[Int]'}}
+  // expected-note@-3 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-4 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}
