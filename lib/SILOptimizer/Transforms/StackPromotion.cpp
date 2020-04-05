@@ -247,7 +247,8 @@ bool StackPromotion::tryPromoteToObject(
   if (!props.empty())
     return false;
 
-  // Collect the dead stores and values of the class class property initializers.
+  // Collect the dead stores and values of the class class property
+  // initializers.
   SmallVector<StoreInst *, 8> deadStores;
   SmallVector<SILValue, 8> elements;
   for (auto *init : propertyInitializers) {
@@ -308,7 +309,8 @@ bool StackPromotion::tryPromoteToObject(
   // Find the first use of the alloc_ref that isn't a ref_element_addr and
   // record where that use is. We use that as an upper bound for were we have to
   // stop replacing uses of the class reference.
-  SmallVector<Operand *, 8> users(allocRef->use_begin(), allocRef->use_end());
+  SmallVector<Operand *, 8> users;
+  getOrderedNonDebugUses(allocRef, domInfo, users);
   SILInstruction *firstUnknownUse = nullptr;
   for (auto *use : users) {
     auto user = use->getUser();
@@ -327,6 +329,14 @@ bool StackPromotion::tryPromoteToObject(
   SILInstruction *endUse = nullptr;
   for (auto *use : users) {
     auto user = use->getUser();
+
+    // Either we'll remove the alloc ref in which case this needs to be removed,
+    // or we'll add a dealloc_ref so we also need this to be removed.
+    if (isa<StrongReleaseInst>(user)) {
+      user->eraseFromParent();
+      continue;
+    }
+
     if (firstUnknownUse && domInfo->dominates(firstUnknownUse, user))
       continue;
 
@@ -342,7 +352,7 @@ bool StackPromotion::tryPromoteToObject(
       for (auto *use : ref->getUses()) {
         if (firstUnknownUse &&
             domInfo->dominates(firstUnknownUse, use->getUser()))
-          continue;
+          goto done;
         // Then update endUse so that we put the final copy in the right place.
         if (!endUse || domInfo->dominates(endUse, use->getUser()))
           endUse = use->getUser();
@@ -363,6 +373,8 @@ bool StackPromotion::tryPromoteToObject(
       }
       ref->eraseFromParent();
     }
+  done:
+    continue;
   }
 
   // If there aren't any unknown uses, we will remove the alloc_ref so don't
