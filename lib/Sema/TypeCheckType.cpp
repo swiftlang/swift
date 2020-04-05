@@ -2411,28 +2411,29 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.clearAttribute(TAK_autoclosure);
     }
 
+    const auto diagnoseInvalidAttr = [&](TypeAttrKind kind) {
+      if (kind == TAK_escaping) {
+        Type optionalObjectType = ty->getOptionalObjectType();
+        if (optionalObjectType && optionalObjectType->is<AnyFunctionType>()) {
+          return diagnoseInvalid(repr, attrs.getLoc(kind),
+                                 diag::escaping_optional_type_argument);
+        }
+      }
+      return diagnoseInvalid(repr, attrs.getLoc(kind),
+                             diag::attribute_requires_function_type,
+                             TypeAttributes::getAttrName(kind));
+    };
+
     for (auto i : FunctionAttrs) {
       if (!attrs.has(i))
         continue;
 
-      Type optionalObjectType = ty->getOptionalObjectType();
-      if (i == TAK_escaping && optionalObjectType &&
-          optionalObjectType->is<AnyFunctionType>()) {
-        auto diag = diagnoseInvalid(repr, attrs.getLoc(i),
-                                    diag::escaping_optional_type_argument);
+      auto diag = diagnoseInvalidAttr(i);
+      // If we see @escaping among the attributes on this type, because it
+      // isn't a function type, we'll remove it.
+      if (i == TAK_escaping) {
         diag.fixItRemove(
             getTypeAttrRangeWithAt(Context, attrs.getLoc(TAK_escaping)));
-      } else {
-        auto diag = diagnoseInvalid(repr, attrs.getLoc(i),
-                                    diag::attribute_requires_function_type,
-                                    TypeAttributes::getAttrName(i));
-
-        // If we see @escaping among the attributes on this type, because it
-        // isn't a function type, we'll remove it.
-        if (i == TAK_escaping) {
-          diag.fixItRemove(
-              getTypeAttrRangeWithAt(Context, attrs.getLoc(TAK_escaping)));
-        }
       }
       attrs.clearAttribute(i);
     }
