@@ -40,6 +40,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
+#include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
@@ -944,9 +945,8 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     auto *vjp = createEmptyVJP(context, original, witness, serializeFunctions);
     witness->setVJP(vjp);
     context.recordGeneratedFunction(vjp);
-    // TODO(TF-1211): Upstream and use `VJPEmitter`. Fatal error with a nice
-    // message for now.
-    emitFatalError(context, vjp, "_fatalErrorVJPNotGenerated");
+    VJPEmitter emitter(context, original, witness, vjp, invoker);
+    return emitter.run();
   }
   return false;
 }

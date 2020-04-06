@@ -4,4 +4,5 @@ silopt_register_sources(
   DifferentiationInvoker.cpp
   LinearMapInfo.cpp
   Thunk.cpp
+  VJPEmitter.cpp
 )

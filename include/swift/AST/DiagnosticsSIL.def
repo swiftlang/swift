@@ -510,6 +510,25 @@ NOTE(autodiff_member_subset_indices_not_differentiable,none,
 NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,
      "cannot convert a direct method reference to a '@differentiable' "
      "function; use an explicit closure instead", ())
+NOTE(autodiff_cannot_differentiate_through_multiple_results,none,
+     "cannot differentiate through multiple results", ())
+// TODO(TF-1149): Remove this diagnostic.
+NOTE(autodiff_loadable_value_addressonly_tangent_unsupported,none,
+     "cannot yet differentiate value whose type %0 has a compile-time known "
+     "size, but whose 'TangentVector' contains stored properties of unknown "
+     "size; consider modifying %1 to use fewer generic parameters in stored "
+     "properties", (Type, Type))
+NOTE(autodiff_enums_unsupported,none,
+     "differentiating enum values is not yet supported", ())
+NOTE(autodiff_stored_property_no_corresponding_tangent,none,
+     "property cannot be differentiated because '%0.TangentVector' does not "
+     "have a member named '%1'", (StringRef, StringRef))
+NOTE(autodiff_coroutines_not_supported,none,
+     "differentiation of coroutine calls is not yet supported", ())
+NOTE(autodiff_cannot_differentiate_writes_to_global_variables,none,
+     "cannot differentiate writes to global variables", ())
+NOTE(autodiff_cannot_differentiate_writes_to_mutable_captures,none,
+     "cannot differentiate writes to mutable captures", ())
 
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
