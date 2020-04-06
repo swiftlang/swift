@@ -15,8 +15,11 @@
 // CHECK: key.name: "From_ABAdditionsType"
 // CHECK: key.modulename: "A"
 
-// Set up a cross-import module with doc comments
+// Set up a cross-import module with doc comments that also uses cross-imports.
+// This lets us check that that imports of overlays are printed as their
+// underlying modules, and that the synthesized comment above each decl
+// originally from an overlay appears before any doc comments.
 //
-// RUN: %target-swift-frontend -emit-module-path %t.mod/_OtherCAdditions.swiftmodule -emit-module-doc-path %t.mod/_OtherCAdditions.swiftdoc -module-cache-path %t.mod/mcp -I %S/../Inputs/CrossImport %S/../Inputs/CrossImport/_OtherCAdditions.swift -parse-as-library
+// RUN: %target-swift-frontend -emit-module-path %t.mod/_OtherCAdditions.swiftmodule -emit-module-doc-path %t.mod/_OtherCAdditions.swiftdoc -module-cache-path %t.mod/mcp -I %S/../Inputs/CrossImport %S/../Inputs/CrossImport/_OtherCAdditions.swift -parse-as-library -enable-cross-import-overlays
 // RUN: %sourcekitd-test -req=interface-gen -module Other -- -target %target-triple -I %S/../Inputs/CrossImport -I %t.mod/ -module-cache-path %t.mod/mcp > %t.response
 // RUN: diff --strip-trailing-cr -u %s.Other.response %t.response

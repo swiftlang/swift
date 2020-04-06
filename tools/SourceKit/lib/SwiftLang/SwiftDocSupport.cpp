@@ -65,7 +65,7 @@ struct TextEntity {
   const Decl *Dcl = nullptr;
   TypeOrExtensionDecl SynthesizeTarget;
   const Decl *DefaultImplementationOf = nullptr;
-  ModuleDecl *UnderlyingModIfFromOverlay = nullptr;
+  ModuleDecl *DeclaringModIfFromCrossImportOverlay = nullptr;
   StringRef Argument;
   TextRange Range;
   unsigned LocOffset = 0;
@@ -305,7 +305,7 @@ static bool initDocEntityInfo(const Decl *D,
                               const Decl *DefaultImplementationOf, bool IsRef,
                               bool IsSynthesizedExtension, DocEntityInfo &Info,
                               StringRef Arg = StringRef(),
-                              ModuleDecl *ModIfFromOverlay = nullptr){
+                              ModuleDecl *DeclaringModForCrossImport = nullptr){
   if (!IsRef && D->isImplicit())
     return true;
   if (!D || isa<ParamDecl>(D) ||
@@ -412,13 +412,19 @@ static bool initDocEntityInfo(const Decl *D,
       }
     }
 
-    if (ModIfFromOverlay) {
+    if (DeclaringModForCrossImport) {
       ModuleDecl *MD = D->getModuleContext();
       SmallVector<Identifier, 1> Bystanders;
-      ModIfFromOverlay->getAllBystandersForCrossImportOverlay(MD, Bystanders);
-      std::transform(Bystanders.begin(), Bystanders.end(),
-                     std::back_inserter(Info.RequiredBystanders),
-                     [](Identifier Bystander){ return Bystander.str().str(); });
+      if (MD->getRequiredBystandersIfCrossImportOverlay(
+          DeclaringModForCrossImport, Bystanders)) {
+        std::transform(Bystanders.begin(), Bystanders.end(),
+                       std::back_inserter(Info.RequiredBystanders),
+                       [](Identifier Bystander){
+          return Bystander.str().str();
+        });
+      } else {
+        llvm_unreachable("DeclaringModForCrossImport not correct?");
+      }
     }
   }
 
@@ -458,7 +464,7 @@ static bool initDocEntityInfo(const TextEntity &Entity,
                         Entity.DefaultImplementationOf,
                         /*IsRef=*/false, Entity.IsSynthesizedExtension,
                         Info, Entity.Argument,
-                        Entity.UnderlyingModIfFromOverlay))
+                        Entity.DeclaringModIfFromCrossImportOverlay))
     return true;
   Info.Offset = Entity.Range.Offset;
   Info.Length = Entity.Range.Length;
@@ -981,8 +987,8 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
     auto *EntityMod = Entity.Dcl->getModuleContext();
     if (!EntityMod || EntityMod == M)
       continue;
-    if (M->isUnderlyingModuleOfCrossImportOverlay(EntityMod))
-      Entity.UnderlyingModIfFromOverlay = M;
+    if (EntityMod->isCrossImportOverlayOf(M))
+      Entity.DeclaringModIfFromCrossImportOverlay = M;
   }
   return false;
 }

@@ -40,8 +40,7 @@ void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
 /// Emit diagnostics for a given statement.
 void performStmtDiagnostics(ASTContext &ctx, const Stmt *S);
 
-void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD,
-                                        BraceStmt *body);
+void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD);
 
 /// Perform diagnostics on the top level code declaration.
 void performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD);

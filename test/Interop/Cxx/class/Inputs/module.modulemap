@@ -1,0 +1,3 @@
+module CxxMemberVariables {
+  header "member-variables.h"
+}

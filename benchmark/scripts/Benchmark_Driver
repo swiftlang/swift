@@ -26,6 +26,7 @@ class `BenchmarkDoctor` analyzes performance tests, implements `check` COMMAND.
 """
 
 import argparse
+import functools
 import glob
 import logging
 import math
@@ -64,7 +65,9 @@ class BenchmarkDriver(object):
         os.environ["SWIFT_DETERMINISTIC_HASHING"] = "1"
 
     def _invoke(self, cmd):
-        return self._subprocess.check_output(cmd, stderr=self._subprocess.STDOUT)
+        return self._subprocess.check_output(
+            cmd, stderr=self._subprocess.STDOUT, universal_newlines=True
+        )
 
     @property
     def test_harness(self):
@@ -165,7 +168,7 @@ class BenchmarkDriver(object):
         )
         output = self._invoke(cmd)
         results = self.parser.results_from_string(output)
-        return results.items()[0][1] if test else results
+        return list(results.items())[0][1] if test else results
 
     def _cmd_run(
         self,
@@ -207,7 +210,7 @@ class BenchmarkDriver(object):
             a.merge(b)
             return a
 
-        return reduce(
+        return functools.reduce(
             merge_results,
             [
                 self.run(test, measure_memory=True, num_iters=1, quantile=20)
@@ -249,19 +252,21 @@ class BenchmarkDriver(object):
             print(format(values))
 
         def result_values(r):
-            return map(
-                str,
-                [
-                    r.test_num,
-                    r.name,
-                    r.num_samples,
-                    r.min,
-                    r.samples.q1,
-                    r.median,
-                    r.samples.q3,
-                    r.max,
-                    r.max_rss,
-                ],
+            return list(
+                map(
+                    str,
+                    [
+                        r.test_num,
+                        r.name,
+                        r.num_samples,
+                        r.min,
+                        r.samples.q1,
+                        r.median,
+                        r.samples.q3,
+                        r.max,
+                        r.max_rss,
+                    ],
+                )
             )
 
         header = [
@@ -370,7 +375,12 @@ class MarkdownReportHandler(logging.StreamHandler):
         msg = self.format(record)
         stream = self.stream
         try:
-            if isinstance(msg, unicode) and getattr(stream, "encoding", None):
+            # In Python 2 Unicode strings have a special type
+            unicode_type = unicode
+        except NameError:
+            unicode_type = str
+        try:
+            if isinstance(msg, unicode_type) and getattr(stream, "encoding", None):
                 stream.write(msg.encode(stream.encoding))
             else:
                 stream.write(msg)
@@ -487,16 +497,14 @@ class BenchmarkDoctor(object):
         name = measurements["name"]
         setup, ratio = BenchmarkDoctor._setup_overhead(measurements)
         setup = 0 if ratio < 0.05 else setup
-        runtime = min(
-            [
-                (result.samples.min - correction)
-                for i_series in [
-                    BenchmarkDoctor._select(measurements, num_iters=i)
-                    for correction in [(setup / i) for i in [1, 2]]
-                ]
-                for result in i_series
-            ]
-        )
+
+        runtimes = []
+        for i in range(1, 3):
+            correction = setup / i
+            i_series = BenchmarkDoctor._select(measurements, num_iters=i)
+            for result in i_series:
+                runtimes.append(result.samples.min - correction)
+        runtime = min(runtimes)
 
         threshold = 1000
         if threshold < runtime:
@@ -572,7 +580,9 @@ class BenchmarkDoctor(object):
 
     @staticmethod
     def _reasonable_setup_time(measurements):
-        setup = min([result.setup for result in BenchmarkDoctor._select(measurements)])
+        setup = min(
+            [result.setup or 0 for result in BenchmarkDoctor._select(measurements)]
+        )
         if 200000 < setup:  # 200 ms
             BenchmarkDoctor.log_runtime.error(
                 "'%s' setup took at least %d μs.", measurements["name"], setup
@@ -857,6 +867,7 @@ def parse_args(args):
         help="See COMMAND -h for additional arguments",
         metavar="COMMAND",
     )
+    subparsers.required = True
 
     shared_benchmarks_parser = argparse.ArgumentParser(add_help=False)
     benchmarks_group = shared_benchmarks_parser.add_mutually_exclusive_group()

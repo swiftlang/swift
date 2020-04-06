@@ -2395,7 +2395,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_TypeEraser: {
       auto abbrCode = S.DeclTypeAbbrCodes[TypeEraserDeclAttrLayout::Code];
       auto attr = cast<TypeEraserAttr>(DA);
-      auto typeEraser = attr->getTypeEraserLoc().getType();
+      auto typeEraser = attr->getResolvedType(cast<ProtocolDecl>(D));
+      assert(typeEraser && "Failed to resolve erasure type!");
       TypeEraserDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                            attr->isImplicit(),
                                            S.addTypeRef(typeEraser));

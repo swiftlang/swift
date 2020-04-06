@@ -1,0 +1,18 @@
+// RUN: %scale-test --begin 1 --end 10  --step 1 --select NumLeafScopes %s
+// REQUIRES: asserts,no_asan
+
+func test(_ array: [UInt8]) {
+  var bytes = array.makeIterator()
+
+  while let firstByte = bytes.next() {
+    let secondByte = bytes.next() ?? 0
+
+    let encoded = (
+      (firstByte & 0xF8) >> 3,
+      %for i in range(0, N):
+      ((firstByte & 0x07) << 2) | ((secondByte & 0xC0) >> 6),
+      %end
+      (firstByte & 0xF8) >> 3
+    )
+  }
+}

@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-silgen -verify %s | %FileCheck %s
 
 if true {
-  var x = 0
+  var x = 0 // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
   func local() -> Int { return 0 }
   func localWithContext() -> Int { return x }
   func transitiveWithoutContext() -> Int { return local() }
