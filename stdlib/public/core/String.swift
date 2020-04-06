@@ -388,6 +388,22 @@ extension String {
 }
 
 extension String {
+  // This force type-casts element to UInt8, since we cannot currently
+  // communicate to the type checker that we proved this with our dynamic
+  // check in String(decoding:as:).
+  @_alwaysEmitIntoClient
+  @inline(never) // slow-path
+  private static func _fromNonContiguousUnsafeBitcastUTF8Repairing<
+    C: Collection
+  >(_ input: C) -> (result: String, repairsMade: Bool) {
+    _internalInvariant(C.Element.self == UInt8.self)
+    return Array(input).withUnsafeBufferPointer {
+      let raw = UnsafeRawBufferPointer($0)
+      return String._fromUTF8Repairing(raw.bindMemory(to: UInt8.self))
+    }
+  }
+
+
   /// Creates a string from the given Unicode code units in the specified
   /// encoding.
   ///
@@ -406,7 +422,6 @@ extension String {
         codeUnits, encoding: sourceEncoding, repair: true)!.0
       return
     }
-
     if let str = codeUnits.withContiguousStorageIfAvailable({
       (buffer: UnsafeBufferPointer<C.Element>) -> String in
       return String._fromUTF8Repairing(
@@ -416,13 +431,7 @@ extension String {
       return
     }
 
-    // Just copying to an Array is significantly faster than performing
-    // generic operations
-    self = Array(codeUnits).withUnsafeBufferPointer {
-      let raw = UnsafeRawBufferPointer($0)
-      return String._fromUTF8Repairing(raw.bindMemory(to: UInt8.self)).0
-    }
-    return
+    self = String._fromNonContiguousUnsafeBitcastUTF8Repairing(codeUnits).0
   }
 
   /// Creates a new string with the specified capacity in UTF-8 code units, and
