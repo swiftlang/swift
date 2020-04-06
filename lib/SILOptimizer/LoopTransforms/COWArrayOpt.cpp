@@ -843,7 +843,7 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable,
     return false;
   }
 
-  SmallVector<unsigned, 4> AccessPath;
+  SmallVector<int, 4> AccessPath;
   SILValue ArrayContainer =
     StructUseCollector::getAccessPath(CurrentArrayAddr, AccessPath);
   bool arrayContainerIsUnique = checkUniqueArrayContainer(ArrayContainer);
