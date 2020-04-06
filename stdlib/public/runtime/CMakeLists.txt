@@ -44,6 +44,7 @@ set(swift_runtime_sources
     ErrorDefaultImpls.cpp
     Exclusivity.cpp
     ExistentialContainer.cpp
+    Float16Support.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionMachO.cpp
