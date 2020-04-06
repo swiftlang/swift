@@ -2932,9 +2932,15 @@ substOpaqueTypesWithUnderlyingTypes(Type ty, const DeclContext *inContext,
 static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
                                   OpaqueSubstitutionKind kind,
                                   bool isContextWholeModule) {
-  auto nominal = ty->getAnyNominal();
-  if (!nominal)
+  ValueDecl *nominal = ty->getAnyNominal();
+  if (!nominal) {
+    // We also need to check that the opaque type descriptor is accessible.
+    if (auto opaqueTy = ty->getAs<OpaqueTypeArchetypeType>())
+      nominal = opaqueTy->getDecl();
+  }
+  if (!nominal) {
     return true;
+  }
 
   switch (kind) {
   case OpaqueSubstitutionKind::DontSubstitute:
