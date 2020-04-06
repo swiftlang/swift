@@ -1,50 +1,54 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
-@_silgen_name("_swift_metadataAccessorCall")
-func _metadataAccessorCall(
-  fn: UnsafeRawPointer,
-  request: UInt,
-  args: UnsafePointer<Any.Type>?,
-  count: Int
-) -> MetadataResponse
-
-struct MetadataResponse {
-  let type: Any.Type
-
-  let state: UInt8
-}
+import SwiftShims
 
 struct MetadataAccessFunction {
-  let ptr: UnsafeRawPointer
+  let ptr: UnsafeMutableRawPointer
 
-  func callAsFunction(request: UInt, args: [Any.Type]) -> MetadataResponse {
+  func callAsFunction(request: Int, args: [Any.Type]) -> MetadataResponse {
     args.withUnsafeBufferPointer {
-      _metadataAccessorCall(
-        fn: ptr,
-        request: request,
-        args: $0.baseAddress!,
-        count: $0.count
-      )
+      $0.baseAddress!.withMemoryRebound(
+        to: UnsafeRawPointer?.self,
+        capacity: args.count
+      ) {
+        _swift_metadataAccessorCall(ptr, request, $0, args.count)
+      }
     }
   }
 }
 
-func callStructAccessor(for type: Any.Type, with generics: Any.Type...) {
+func callStructAccessor(
+  for type: Any.Type,
+  with generics: Any.Type...
+) -> MetadataResponse {
   let metadata = unsafeBitCast(type, to: UnsafeRawPointer.self)
-  let descriptor = metadata.advanced(by: 8).load(as: UnsafeRawPointer.self)
-  let accessorLoc = descriptor.advanced(by: 12)
+  let descriptor = metadata.advanced(by: MemoryLayout<Int>.size)
+                           .load(as: UnsafeMutableRawPointer.self)
+  let accessorLoc = descriptor.advanced(by: MemoryLayout<Int32>.size * 3)
   let accessor = accessorLoc.advanced(by: Int(accessorLoc.load(as: Int32.self)))
 
   let accessFn = MetadataAccessFunction(ptr: accessor)
-  print(accessFn(request: 0, args: generics))
+  return accessFn(request: 0, args: generics)
 }
 
-// CHECK: MetadataResponse(type: Swift.Int, state: 0)
-callStructAccessor(for: Int.self)
+let int = callStructAccessor(for: Int.self)
+// CHECK: Int
+print(unsafeBitCast(int.type!, to: Any.Type.self))
+// CHECK: 0
+print(int.state)
 
-// CHECK: MetadataResponse(type: Swift.Array<Swift.Double>, state: 0)
-callStructAccessor(for: [Int].self, with: Double.self)
+let doubleArray = callStructAccessor(for: [Int].self, with: Double.self)
+// CHECK: Array<Double>
+print(unsafeBitCast(doubleArray.type!, to: Any.Type.self))
+// CHECK: 0
+print(doubleArray.state)
 
-// CHECK: MetadataResponse(type: Swift.Dictionary<Swift.Int, Swift.Array<Swift.Double>>, state: 0)
-callStructAccessor(for: [String: [Int]].self, with: Int.self, [Double].self)
+let dictOfIntAndDoubleArray = callStructAccessor(
+  for: [String: [Int]].self,
+  with: Int.self, [Double].self
+)
+// CHECK: Dictionary<Int, Array<Double>>
+print(unsafeBitCast(dictOfIntAndDoubleArray.type!, to: Any.Type.self))
+// CHECK: 0
+print(dictOfIntAndDoubleArray.state)
