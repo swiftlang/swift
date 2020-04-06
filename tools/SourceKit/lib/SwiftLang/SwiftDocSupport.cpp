@@ -261,26 +261,34 @@ struct SourceTextInfo {
 } // end anonymous namespace
 
 static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
-  auto *DC = dyn_cast<DeclContext>(D);
-  if (DC == nullptr || !DC->isInnermostContextGeneric())
+  auto *GC = D->getAsGenericContext();
+  if (!GC)
     return;
 
-  GenericSignature GenericSig = DC->getGenericSignatureOfContext();
-
+  GenericSignature GenericSig = GC->getGenericSignatureOfContext();
   if (!GenericSig)
     return;
 
+  // The declaration may not be generic itself, but instead carry additional
+  // generic requirements in a contextual where clause, so checking !isGeneric()
+  // is insufficient.
+  const auto ParentSig = GC->getParent()->getGenericSignatureOfContext();
+  if (ParentSig && ParentSig->isEqual(GenericSig))
+    return;
+
   // FIXME: Not right for extensions of nested generic types
-  for (auto *GP : GenericSig->getInnermostGenericParams()) {
-    if (GP->getDecl()->isImplicit())
-      continue;
-    DocGenericParam Param;
-    Param.Name = std::string(GP->getName());
-    Info.GenericParams.push_back(Param);
+  if (GC->isGeneric()) {
+    for (auto *GP : GenericSig->getInnermostGenericParams()) {
+      if (GP->getDecl()->isImplicit())
+        continue;
+      DocGenericParam Param;
+      Param.Name = std::string(GP->getName());
+      Info.GenericParams.push_back(Param);
+    }
   }
 
   ProtocolDecl *proto = nullptr;
-  if (auto *typeDC = DC->getInnermostTypeContext())
+  if (auto *typeDC = GC->getInnermostTypeContext())
     proto = typeDC->getSelfProtocolDecl();
 
   for (auto &Req : GenericSig->getRequirements()) {

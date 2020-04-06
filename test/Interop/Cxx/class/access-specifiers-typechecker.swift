@@ -1,7 +1,7 @@
 // Test that C++ access specifiers are honored, i.e. private members aren't
 // imported.
 
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs/custom-modules/ -enable-cxx-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -enable-cxx-interop
 
 import AccessSpecifiers
 
