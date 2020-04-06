@@ -754,7 +754,7 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
 
     // The unknown argument access is considered a modify of the root subpath.
     auto argAccess = RecordedAccess(SILAccessKind::Modify, Apply.getLoc(),
-                                    State.ASA->getSubPathTrieRoot());
+                                    Apply.getModule().getIndexTrieRoot());
 
     // Construct a conflicting RecordedAccess if one doesn't already exist.
     const AccessInfo &info = AccessIt->getSecond();
