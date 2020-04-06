@@ -5,6 +5,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -disable-availability-checking -enable-library-evolution -emit-module -emit-module-path=%t/Repo1.swiftmodule -module-name=Repo1 %S/Inputs/opaque_result_type_private_underlying_2.swift
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -emit-ir -primary-file %s  -DUSEMODULE | %FileCheck %s --check-prefix=RESILIENT
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -disable-availability-checking -enable-library-evolution -emit-module -emit-module-path=%t/Repo1.swiftmodule -module-name=Repo1 %S/Inputs/opaque_result_type_private_underlying_2.swift
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -emit-ir -primary-file %s -primary-file %S/Inputs/opaque_result_type_private_underlying_3.swift -DUSEMODULE -DUSESECONDFILE | %FileCheck %s --check-prefix=RESILIENT
 
 #if USEMODULE
 import Repo1
@@ -49,3 +52,19 @@ public struct UsePrivate: A {
     return PrivateUnderlying().bindAssoc()
   }
 }
+
+#if USESECONDFILE
+public struct MyThing {
+    public let which: MyEnum
+    public init(_ which: MyEnum) {
+      self.which = which
+    }
+
+    public var body: some Q {
+        self.thing
+    }
+    public var thing: some Q {
+        self.which.thing
+    }
+}
+#endif
