@@ -1,3 +1,4 @@
+// REQUIRES: rdar61346236
 // RUN: %empty-directory(%t.mod)
 // RUN: %empty-directory(%t.mod/mcp)
 
