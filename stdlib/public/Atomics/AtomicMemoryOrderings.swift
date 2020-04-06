@@ -265,6 +265,7 @@ extension AtomicUpdateOrdering: CustomStringConvertible {
   }
 }
 
+@_semantics("atomics.requires_constant_orderings")
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_transparent // Debug performance
 public func atomicMemoryFence(
