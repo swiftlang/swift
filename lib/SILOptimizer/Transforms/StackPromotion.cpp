@@ -214,6 +214,9 @@ static void copyTupleToRef(SILValue src, AllocRefInst *refDest,
 
 bool StackPromotion::tryPromoteToObject(
     AllocRefInst *allocRef, ValueLifetimeAnalysis::Frontier &frontier) {
+  if (allocRef->getTailAllocatedCounts().size())
+    return false;
+
   DominanceInfo *domInfo =
       PM->getAnalysis<DominanceAnalysis>()->get(allocRef->getFunction());
   auto *classDecl = allocRef->getType().getClassOrBoundGenericClass();
