@@ -2873,8 +2873,8 @@ ERROR(autoclosure_function_input_nonunit,none,
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
 
-NOTE(escaping_optional_type_argument, none,
-     "closure is already escaping in optional type argument", ())
+ERROR(escaping_optional_type_argument, none,
+      "closure is already escaping in optional type argument", ())
 
 // @_nonEphemeral attribute
 ERROR(non_ephemeral_non_pointer_type,none,
