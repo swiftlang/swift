@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,27 +10,25 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// SWIFT_ENABLE_TENSORFLOW
-//
 // Automatic differentiation common utilities.
-//
-// NOTE: Though automatic differentiation is developed as part of the Swift for
-// TensorFlow project, it is completely independent from TensorFlow.
-// Read the differentiable programming manifesto for more information:
-// docs/DifferentiableProgramming.md.
-//
-// TODO: Move definitions from lib/SILOptimizer/Mandatory/Differentiation.cpp.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 
+#include "swift/SIL/SILDifferentiabilityWitness.h"
+#include "swift/SIL/SILType.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
+// SWIFT_ENABLE_TENSORFLOW
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+// SWIFT_ENABLE_TENSORFLOW END
 
 namespace swift {
 
+// SWIFT_ENABLE_TENSORFLOW
 using llvm::DenseMap;
 using llvm::SmallDenseMap;
 using llvm::SmallDenseSet;
@@ -39,6 +37,7 @@ using llvm::SmallSet;
 
 class ApplyInst;
 class DifferentiableActivityInfo;
+// SWIFT_ENABLE_TENSORFLOW END
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -50,6 +49,25 @@ namespace autodiff {
 /// This is being used to print short debug messages within the AD pass.
 raw_ostream &getADDebugStream();
 
+/// Returns the underlying instruction for the given SILValue, if it exists,
+/// peering through function conversion instructions.
+template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
+  if (auto *inst = dyn_cast<Inst>(value))
+    return inst;
+  if (auto *cvi = dyn_cast<CopyValueInst>(value))
+    return peerThroughFunctionConversions<Inst>(cvi->getOperand());
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(value))
+    return peerThroughFunctionConversions<Inst>(bbi->getOperand());
+  if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(tttfi->getOperand());
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(cfi->getOperand());
+  if (auto *pai = dyn_cast<PartialApplyInst>(value))
+    return peerThroughFunctionConversions<Inst>(pai->getCallee());
+  return nullptr;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
 /// Returns true if this is an full apply site whose callee has
 /// `array.uninitialized_intrinsic` semantics.
 bool isArrayLiteralIntrinsic(FullApplySite applySite);
@@ -110,24 +128,6 @@ void collectAllDirectResultsInTypeOrder(SILFunction &function,
 void collectAllActualResultsInTypeOrder(
     ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
     SmallVectorImpl<SILValue> &results);
-
-/// Returns the underlying instruction for the given SILValue, if it exists,
-/// peering through function conversion instructions.
-template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
-  if (auto *inst = dyn_cast<Inst>(value))
-    return inst;
-  if (auto *cvi = dyn_cast<CopyValueInst>(value))
-    return peerThroughFunctionConversions<Inst>(cvi->getOperand());
-  if (auto *bbi = dyn_cast<BeginBorrowInst>(value))
-    return peerThroughFunctionConversions<Inst>(bbi->getOperand());
-  if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(value))
-    return peerThroughFunctionConversions<Inst>(tttfi->getOperand());
-  if (auto *cfi = dyn_cast<ConvertFunctionInst>(value))
-    return peerThroughFunctionConversions<Inst>(cfi->getOperand());
-  if (auto *pai = dyn_cast<PartialApplyInst>(value))
-    return peerThroughFunctionConversions<Inst>(pai->getCallee());
-  return nullptr;
-}
 
 /// For an `apply` instruction with active results, compute:
 /// - The results of the `apply` instruction, in type order.
@@ -257,6 +257,7 @@ public:
     }
   }
 };
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// Creates arguments in the entry block based on the function type.
 inline void createEntryArguments(SILFunction *f) {
@@ -275,21 +276,19 @@ inline void createEntryArguments(SILFunction *f) {
     decl->setSpecifier(ParamDecl::Specifier::Default);
     entry->createFunctionArgument(type, decl);
   };
-  // f->getLoweredFunctionType()->remap
   for (auto indResTy : conv.getIndirectSILResultTypes()) {
     if (indResTy.hasArchetype())
       indResTy = indResTy.mapTypeOutOfContext();
     createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
-    // createFunctionArgument(indResTy.getAddressType());
   }
   for (auto paramTy : conv.getParameterSILTypes()) {
     if (paramTy.hasArchetype())
       paramTy = paramTy.mapTypeOutOfContext();
     createFunctionArgument(f->mapTypeIntoContext(paramTy));
-    // createFunctionArgument(paramTy);
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 /// Cloner that remaps types using the target function's generic environment.
 class BasicTypeSubstCloner final
     : public TypeSubstCloner<BasicTypeSubstCloner, SILOptFunctionBuilder> {
@@ -317,6 +316,7 @@ public:
     cloneFunctionBody(&Original, entry, entryArguments);
   }
 };
+// SWIFT_ENABLE_TENSORFLOW END
 
 } // end namespace swift
 

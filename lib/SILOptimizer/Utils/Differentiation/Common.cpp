@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,22 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// SWIFT_ENABLE_TENSORFLOW
+// Automatic differentiation common utilities.
 //
-// Automatic differentiation utilities.
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Utils/Differentiation/Common.h"
+// SWIFT_ENABLE_TENSORFLOW
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+// SWIFT_ENABLE_TENSORFLOW END
 
 namespace swift {
 namespace autodiff {
 
 raw_ostream &getADDebugStream() { return llvm::dbgs() << "[AD] "; }
 
+// SWIFT_ENABLE_TENSORFLOW
 bool isArrayLiteralIntrinsic(FullApplySite applySite) {
   return doesApplyCalleeHaveSemantics(applySite.getCalleeOrigin(),
                                       "array.uninitialized_intrinsic");
@@ -385,6 +387,7 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
       minimalConfig->parameterIndices, minimalConfig->resultIndices,
       minimalConfig->derivativeGenericSignature);
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 } // end namespace autodiff
 } // end namespace swift

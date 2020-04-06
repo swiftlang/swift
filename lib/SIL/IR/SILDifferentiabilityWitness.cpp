@@ -75,8 +75,6 @@ SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
   return std::make_pair(getOriginalFunction()->getName(), getConfig());
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 SILAutoDiffIndices SILDifferentiabilityWitness::getSILAutoDiffIndices() const {
   return getConfig().getSILAutoDiffIndices();
 }
-// SWIFT_ENABLE_TENSORFLOW END

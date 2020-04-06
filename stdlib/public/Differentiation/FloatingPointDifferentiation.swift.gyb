@@ -60,11 +60,6 @@ extension ${Self} : VectorProtocol {
   }
 }
 
-% if self_type.bits == 80:
-#endif
-% end
-% end
-
 //===----------------------------------------------------------------------===//
 // Derivatives
 //===----------------------------------------------------------------------===//
@@ -250,6 +245,11 @@ extension ${Self} {
     return ((), { $0 /= $1 })
   }
 }
+
+% if self_type.bits == 80:
+#endif
+% end
+% end
 
 extension FloatingPoint
 where

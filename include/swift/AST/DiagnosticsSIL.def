@@ -457,9 +457,13 @@ ERROR(not_constant_evaluable, none, "not constant evaluable", ())
 ERROR(constexpr_imported_func_not_onone, none, "imported constant evaluable "
       "function '%0' must be annotated '@_optimize(none)'", (StringRef))
 
-// Automatic differentiation diagnostics
+// Differentiation transform diagnostics
 ERROR(autodiff_internal_swift_not_imported,none,
-      "AD internal error: the Swift module is not imported", ())
+      "Automatic differentiation internal error: the Swift module is not "
+      "imported", ())
+ERROR(autodiff_differentiation_module_not_imported,none,
+      "Automatic differentiation requires the '_Differentiation' module to be "
+      "imported", ())
 ERROR(autodiff_conversion_to_linear_function_not_supported,none,
       "conversion to '@differentiable(linear)' function type is not yet "
       "supported", ())
@@ -469,6 +473,20 @@ ERROR(autodiff_expression_not_differentiable_error,none,
       "expression is not differentiable", ())
 NOTE(autodiff_expression_not_differentiable_note,none,
      "expression is not differentiable", ())
+NOTE(autodiff_when_differentiating_function_call,none,
+     "when differentiating this function call", ())
+NOTE(autodiff_when_differentiating_function_definition,none,
+     "when differentiating this function definition", ())
+NOTE(autodiff_implicitly_inherited_differentiable_attr_here,none,
+     "differentiability required by the corresponding protocol requirement "
+     "here", ())
+NOTE(autodiff_jvp_control_flow_not_supported,none,
+     "forward-mode differentiation does not yet support control flow", ())
+NOTE(autodiff_control_flow_not_supported,none,
+     "cannot differentiate unsupported control flow", ())
+NOTE(autodiff_missing_return,none,
+     "missing return for differentiation", ())
+// SWIFT_ENABLE_TENSORFLOW
 NOTE(autodiff_external_nondifferentiable_function,none,
      "cannot differentiate functions that have not been marked "
      "'@differentiable' and that are defined in other files", ())
@@ -530,33 +548,21 @@ NOTE(autodiff_stored_property_no_corresponding_tangent,none,
      "have a member named '%1'", (StringRef, StringRef))
 NOTE(autodiff_value_defined_here,none,
      "value defined here", ())
-NOTE(autodiff_when_differentiating_function_call,none,
-     "when differentiating this function call", ())
-NOTE(autodiff_when_differentiating_function_definition,none,
-     "when differentiating this function definition", ())
 NOTE(autodiff_cannot_differentiate_through_inout_arguments,none,
      "cannot differentiate through 'inout' arguments", ())
 NOTE(autodiff_cannot_differentiate_through_multiple_results,none,
      "cannot differentiate through multiple results", ())
 NOTE(autodiff_class_member_not_supported,none,
      "differentiating class members is not yet supported", ())
-NOTE(autodiff_implicitly_inherited_differentiable_attr_here,none,
-     "differentiability required by the corresponding protocol requirement "
-     "here", ())
 // TODO(TF-642): Remove when `partial_apply` works with `@differentiable`
 // functions.
 NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,
      "cannot convert a direct method reference to a '@differentiable' "
      "function; use an explicit closure instead", ())
-NOTE(autodiff_jvp_control_flow_not_supported,none,
-     "forward-mode differentiation does not yet support control flow", ())
-NOTE(autodiff_control_flow_not_supported,none,
-     "cannot differentiate unsupported control flow", ())
 // TODO(TF-1080): Remove when differentiation supports `begin_apply`.
 NOTE(autodiff_coroutines_not_supported,none,
      "differentiation of coroutine calls is not yet supported", ())
-NOTE(autodiff_missing_return,none,
-     "missing return for differentiation", ())
+// SWIFT_ENABLE_TENSORFLOW END
 
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "

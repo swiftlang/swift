@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2018 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,21 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// SWIFT_ENABLE_TENSORFLOW
-//
 // This file implements automatic differentiation.
-//
-// NOTE: Though automatic differentiation is developed as part of the Swift for
-// TensorFlow project, it is completely independent from TensorFlow.
-// Read the differentiable programming manifesto for more information:
-// docs/DifferentiableProgramming.md.
-//
-// TODO(TF-993): Organize Differentiation.cpp into smaller files.
 //
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "differentiation"
 
+#include "llvm/ADT/APSInt.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/CommandLine.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -55,10 +49,6 @@
 #include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "llvm/ADT/APSInt.h"
-#include "llvm/ADT/BreadthFirstIterator.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 using namespace swift::autodiff;
@@ -177,6 +167,7 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
   return false;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 /// Check whether the given requirements are satisfied, with the given
 /// derivative generic signature (containing requirements), and substitution
 /// map. Returns true if error is emitted.
@@ -758,6 +749,7 @@ emitDerivativeFunctionReference(
       original, invoker, diag::autodiff_opaque_function_not_differentiable);
   return None;
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 //===----------------------------------------------------------------------===//
 // `SILDifferentiabilityWitness` processing
@@ -853,6 +845,40 @@ static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
   return jvp;
 }
 
+/// Apply the fatal error function with the given name of type
+/// `@convention(thin) () -> Never` in `f`.
+static void emitFatalError(ADContext &context, SILFunction *f,
+                           StringRef fatalErrorFuncName) {
+  auto *entry = f->createBasicBlock();
+  createEntryArguments(f);
+  SILBuilder builder(entry);
+  auto loc = f->getLocation();
+  // Destroy all owned arguments to pass ownership verification.
+  for (auto *arg : entry->getArguments())
+    if (arg->getOwnershipKind() == ValueOwnershipKind::Owned)
+      builder.emitDestroyOperation(loc, arg);
+  // Fatal error with a nice message.
+  auto neverResultInfo =
+      SILResultInfo(context.getModule().getASTContext().getNeverType(),
+                    ResultConvention::Unowned);
+  // Fatal error function must have type `@convention(thin) () -> Never`.
+  auto fatalErrorFnType = SILFunctionType::get(
+      /*genericSig*/ nullptr,
+      SILFunctionType::ExtInfo().withRepresentation(
+          SILFunctionTypeRepresentation::Thin),
+      SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
+      /*interfaceYields*/ {}, neverResultInfo,
+      /*interfaceErrorResults*/ None, {}, {}, context.getASTContext());
+  auto fnBuilder = SILOptFunctionBuilder(context.getTransform());
+  auto *fatalErrorFn = fnBuilder.getOrCreateFunction(
+      loc, fatalErrorFuncName, SILLinkage::PublicExternal, fatalErrorFnType,
+      IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+      ProfileCounter(), IsNotThunk);
+  auto *fatalErrorFnRef = builder.createFunctionRef(loc, fatalErrorFn);
+  builder.createApply(loc, fatalErrorFnRef, SubstitutionMap(), {});
+  builder.createUnreachable(loc);
+}
+
 /// Returns true on error.
 bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     SILFunction *original, SILDifferentiabilityWitness *witness,
@@ -897,45 +923,15 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
             diag::autodiff_jvp_control_flow_not_supported);
         return true;
       }
-
       JVPEmitter emitter(context, original, witness, witness->getJVP(),
                          invoker);
       if (emitter.run())
         return true;
     } else {
-      LLVM_DEBUG(getADDebugStream() << "Generating empty JVP for original @"
-                                    << original->getName() << '\n');
-      // Create empty JVP body since custom VJP exists.
-      auto *entry = witness->getJVP()->createBasicBlock();
-      createEntryArguments(witness->getJVP());
-      SILBuilder builder(entry);
-      auto loc = witness->getJVP()->getLocation();
-
-      // Destroy all owned arguments.
-      for (auto *arg : entry->getArguments())
-        if (arg->getOwnershipKind() == ValueOwnershipKind::Owned)
-          builder.emitDestroyOperation(loc, arg);
-
-      // Fatal error in case this JVP is called by the user.
-      auto neverResultInfo =
-          SILResultInfo(context.getModule().getASTContext().getNeverType(),
-                        ResultConvention::Unowned);
-      auto fatalErrorJVPType = SILFunctionType::get(
-          /*genericSig*/ nullptr,
-          SILFunctionType::ExtInfo().withRepresentation(
-              SILFunctionTypeRepresentation::Thin),
-          SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
-          /*interfaceYields*/ {}, neverResultInfo,
-          /*interfaceErrorResults*/ None, {}, {}, context.getASTContext());
-      auto fnBuilder = SILOptFunctionBuilder(context.getTransform());
-      auto *fatalErrrorJvpFunc = fnBuilder.getOrCreateFunction(
-          loc, "_printJVPErrorAndExit", SILLinkage::PublicExternal,
-          fatalErrorJVPType, IsNotBare, IsNotTransparent, IsNotSerialized,
-          IsNotDynamic, ProfileCounter(), IsNotThunk);
-      auto *jvpErrorFuncRef =
-          builder.createFunctionRef(loc, fatalErrrorJvpFunc);
-      builder.createApply(loc, jvpErrorFuncRef, SubstitutionMap(), {});
-      builder.createUnreachable(loc);
+      // If JVP generation is disabled or a user-defined custom VJP function
+      // exists, fatal error with a nice message.
+      emitFatalError(context, witness->getJVP(),
+                     "_fatalErrorForwardModeDifferentiationDisabled");
       LLVM_DEBUG(getADDebugStream()
                  << "Generated empty JVP for " << original->getName() << ":\n"
                  << *witness->getJVP());
@@ -954,10 +950,10 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     witness->setVJP(
         createEmptyVJP(context, original, witness, serializeFunctions));
     context.recordGeneratedFunction(witness->getVJP());
+
     VJPEmitter emitter(context, original, witness, witness->getVJP(), invoker);
     return emitter.run();
   }
-
   return false;
 }
 
@@ -1236,7 +1232,7 @@ bool DifferentiationTransformer::processDifferentiableFunctionInst(
 
   SILFunction *parent = dfi->getFunction();
   auto loc = dfi->getLoc();
-  SILBuilder builder(dfi);
+  SILBuilderWithScope builder(dfi);
   auto differentiableFnValue =
       promoteToDifferentiableFunction(dfi, builder, loc, dfi);
   // Mark `dfi` as processed so that it won't be reprocessed after deletion.
@@ -1261,7 +1257,7 @@ bool DifferentiationTransformer::processDifferentiableFunctionInst(
   return false;
 }
 
-/// AD pass entry.
+/// Automatic differentiation transform entry.
 void Differentiation::run() {
   auto &module = *getModule();
   auto &astCtx = module.getASTContext();
@@ -1273,12 +1269,11 @@ void Differentiation::run() {
 
   bool errorOccurred = false;
 
-  // Register all the `SILDifferentiabilityWitness`es in the module that trigger
+  // Register all the SIL differentiability witnesses in the module that trigger
   // differentiation.
   for (auto &witness : module.getDifferentiabilityWitnesses()) {
     if (witness.isDeclaration())
       continue;
-
     context.addInvoker(&witness);
   }
 
@@ -1308,11 +1303,25 @@ void Differentiation::run() {
       context.isDifferentiableFunctionInstsWorklistEmpty())
     return;
 
-  // AD relies on stdlib (the Swift module). If it's not imported, it's an
-  // internal error.
+  // Differentiation relies on the stdlib (the Swift module).
+  // If it's not imported, it's an internal error.
   if (!astCtx.getStdlibModule()) {
     astCtx.Diags.diagnose(SourceLoc(),
                           diag::autodiff_internal_swift_not_imported);
+    return;
+  }
+  if (!astCtx.getProtocol(KnownProtocolKind::Differentiable)) {
+    SourceLoc loc;
+    if (!context.getInvokers().empty()) {
+      loc = context.getInvokers().front().second.getLocation();
+    } else {
+      assert(!context.isDifferentiableFunctionInstsWorklistEmpty());
+      loc = context.popDifferentiableFunctionInstFromWorklist()
+                ->getLoc()
+                .getSourceLoc();
+    }
+    astCtx.Diags.diagnose(loc,
+                          diag::autodiff_differentiation_module_not_imported);
     return;
   }
 

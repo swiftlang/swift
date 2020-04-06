@@ -335,10 +335,10 @@ namespace swift {
     // SWIFT_ENABLE_TENSORFLOW
     /// Whether to enable cross-file derivative registration.
     bool EnableExperimentalCrossFileDerivativeRegistration = false;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     /// Whether to enable forward mode differentiation.
     bool EnableExperimentalForwardModeDifferentiation = false;
-    // SWIFT_ENABLE_TENSORFLOW END
 
     /// Whether to enable experimental `AdditiveArithmetic` derived
     /// conformances.
