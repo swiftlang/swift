@@ -12,10 +12,11 @@
 
 #define DEBUG_TYPE "sil-projection"
 #include "swift/SIL/Projection.h"
+#include "swift/Basic/IndexTrie.h"
 #include "swift/Basic/NullablePtr.h"
-#include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/None.h"
 #include "llvm/Support/Debug.h"
@@ -42,21 +43,26 @@ static_assert(std::is_standard_layout<Projection>::value,
 /// Return true if IndexVal is a constant index representable as unsigned
 /// int. We do not support symbolic projections yet, only 32-bit unsigned
 /// integers.
-bool swift::getIntegerIndex(SILValue IndexVal, unsigned &IndexConst) {
-  if (auto *IndexLiteral = dyn_cast<IntegerLiteralInst>(IndexVal)) {
-    APInt ConstInt = IndexLiteral->getValue();
-    // IntegerLiterals are signed.
-    if (ConstInt.isIntN(32) && ConstInt.isNonNegative()) {
-      IndexConst = (unsigned)ConstInt.getSExtValue();
-      return true;
-    }    
-  }
-  return false;
+bool swift::getIntegerIndex(SILValue IndexVal, int &IndexConst) {
+  auto *IndexLiteral = dyn_cast<IntegerLiteralInst>(IndexVal);
+  if (!IndexLiteral)
+    return false;
+
+  APInt ConstInt = IndexLiteral->getValue();
+  // Reserve 1 bit for encoding. See AccessPath::Index.
+  if (!ConstInt.isSignedIntN(31))
+    return false;
+
+  IndexConst = ConstInt.getSExtValue();
+  assert(((IndexConst << 1) >> 1) == IndexConst);
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
 //                               Projection
 //===----------------------------------------------------------------------===//
+
+constexpr int ProjectionIndex::TailIndex;
 
 Projection::Projection(SingleValueInstruction *I) : Value() {
   if (!I)
@@ -72,21 +78,21 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     auto *SEAI = cast<StructElementAddrInst>(I);
     Value = ValueTy(ProjectionKind::Struct, SEAI->getFieldIndex());
     assert(getKind() == ProjectionKind::Struct);
-    assert(getIndex() == SEAI->getFieldIndex());
+    assert(getIndex() == int(SEAI->getFieldIndex()));
     break;
   }
   case SILInstructionKind::StructExtractInst: {
     auto *SEI = cast<StructExtractInst>(I);
     Value = ValueTy(ProjectionKind::Struct, SEI->getFieldIndex());
     assert(getKind() == ProjectionKind::Struct);
-    assert(getIndex() == SEI->getFieldIndex());
+    assert(getIndex() == int(SEI->getFieldIndex()));
     break;
   }
   case SILInstructionKind::RefElementAddrInst: {
     auto *REAI = cast<RefElementAddrInst>(I);
     Value = ValueTy(ProjectionKind::Class, REAI->getFieldIndex());
     assert(getKind() == ProjectionKind::Class);
-    assert(getIndex() == REAI->getFieldIndex());
+    assert(getIndex() == int(REAI->getFieldIndex()));
     break;
   }
   case SILInstructionKind::RefTailAddrInst: {
@@ -108,28 +114,28 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     auto *TEI = cast<TupleExtractInst>(I);
     Value = ValueTy(ProjectionKind::Tuple, TEI->getFieldIndex());
     assert(getKind() == ProjectionKind::Tuple);
-    assert(getIndex() == TEI->getFieldIndex());
+    assert(getIndex() == int(TEI->getFieldIndex()));
     break;
   }
   case SILInstructionKind::TupleElementAddrInst: {
     auto *TEAI = cast<TupleElementAddrInst>(I);
     Value = ValueTy(ProjectionKind::Tuple, TEAI->getFieldIndex());
     assert(getKind() == ProjectionKind::Tuple);
-    assert(getIndex() == TEAI->getFieldIndex());
+    assert(getIndex() == int(TEAI->getFieldIndex()));
     break;
   }
   case SILInstructionKind::UncheckedEnumDataInst: {
     auto *UEDI = cast<UncheckedEnumDataInst>(I);
     Value = ValueTy(ProjectionKind::Enum, UEDI->getElementNo());
     assert(getKind() == ProjectionKind::Enum);
-    assert(getIndex() == UEDI->getElementNo());
+    assert(getIndex() == int(UEDI->getElementNo()));
     break;
   }
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
     auto *UTEDAI = cast<UncheckedTakeEnumDataAddrInst>(I);
     Value = ValueTy(ProjectionKind::Enum, UTEDAI->getElementNo());
     assert(getKind() == ProjectionKind::Enum);
-    assert(getIndex() == UTEDAI->getElementNo());
+    assert(getIndex() == int(UTEDAI->getElementNo()));
     break;
   }
   case SILInstructionKind::IndexAddrInst: {
@@ -138,9 +144,10 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     // updated and a MaxLargeIndex will need to be used here. Currently we
     // represent large Indexes using a 64 bit integer, so we don't need to mess
     // with anything.
-    unsigned NewIndex = 0;
+    int NewIndex = 0;
     auto *IAI = cast<IndexAddrInst>(I);
-    if (getIntegerIndex(IAI->getIndex(), NewIndex)) {
+    // TODO: handle negative indices
+    if (getIntegerIndex(IAI->getIndex(), NewIndex) && NewIndex >= 0) {
       Value = ValueTy(ProjectionKind::Index, NewIndex);
       assert(getKind() == ProjectionKind::Index);
       assert(getIndex() == NewIndex);
@@ -321,10 +328,6 @@ void Projection::getFirstLevelProjections(
 
   if (auto *C = Ty.getClassOrBoundGenericClass()) {
     unsigned Count = 0;
-    for (auto *superDecl = C->getSuperclassDecl(); superDecl != nullptr;
-         superDecl = superDecl->getSuperclassDecl()) {
-      Count += superDecl->getStoredProperties().size();
-    }
     for (auto *VDecl : C->getStoredProperties()) {
       (void) VDecl;
       Projection P(ProjectionKind::Class, Count++);
