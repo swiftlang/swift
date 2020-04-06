@@ -2184,7 +2184,6 @@ namespace {
           closure->getExplicitResultTypeLoc().getType()) {
         resultTy = closure->getExplicitResultTypeLoc().getType();
       } else {
-        auto &ctx = CS.getASTContext();
         auto *resultLoc =
             CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult);
 
@@ -2196,11 +2195,7 @@ namespace {
           return Type();
         };
 
-        if (closure->hasEmptyBody()) {
-          // Closures with empty bodies should be inferred to return
-          // ().
-          resultTy = ctx.TheEmptyTupleType;
-        } else if (auto contextualResultTy = getContextualResultType()) {
+        if (auto contextualResultTy = getContextualResultType()) {
           resultTy = contextualResultTy;
         } else {
           // If no return type was specified, create a fresh type
