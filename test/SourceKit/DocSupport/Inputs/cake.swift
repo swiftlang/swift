@@ -106,3 +106,16 @@ some comments
 public extension C1 {
   func addition() {}
 }
+
+
+public struct Box<Wrapped> {
+    public func boxes() -> [Box<Wrapped.Element>] where Wrapped: Sequence { fatalError() }
+}
+
+public protocol P {
+    func foo()
+}
+
+public extension P {
+    func bar() where Self: Equatable {}
+}
