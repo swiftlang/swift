@@ -130,19 +130,15 @@ EnumDecl *LinearMapInfo::createBranchingTraceDecl(
   auto *moduleDecl = original->getModule().getSwiftModule();
   auto &file = getDeclarationFileUnit();
   // Create a branching trace enum.
-  std::string enumName;
-  switch (kind) {
-  case AutoDiffLinearMapKind::Differential:
-    enumName = "_AD__" + original->getName().str() + "_bb" +
-               std::to_string(originalBB->getDebugID()) + "__Succ__" +
-               indices.mangle();
-    break;
-  case AutoDiffLinearMapKind::Pullback:
-    enumName = "_AD__" + original->getName().str() + "_bb" +
-               std::to_string(originalBB->getDebugID()) + "__Pred__" +
-               indices.mangle();
-    break;
-  }
+  Mangle::ASTMangler mangler;
+  auto *resultIndices = IndexSubset::get(
+      original->getASTContext(),
+      original->getLoweredFunctionType()->getNumResults(), indices.source);
+  auto *parameterIndices = indices.parameters;
+  AutoDiffConfig config(parameterIndices, resultIndices, genericSig);
+  auto enumName = mangler.mangleAutoDiffGeneratedDeclaration(
+      AutoDiffGeneratedDeclarationKind::BranchingTraceEnum,
+      original->getName().str(), originalBB->getDebugID(), kind, config);
   auto enumId = astCtx.getIdentifier(enumName);
   auto loc = original->getLocation().getSourceLoc();
   GenericParamList *genericParams = nullptr;
@@ -205,19 +201,16 @@ LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
   auto *original = originalBB->getParent();
   auto &astCtx = original->getASTContext();
   auto &file = getDeclarationFileUnit();
-  std::string structName;
-  switch (kind) {
-  case swift::AutoDiffLinearMapKind::Differential:
-    structName = "_AD__" + original->getName().str() + "_bb" +
-                 std::to_string(originalBB->getDebugID()) + "__DF__" +
-                 indices.mangle();
-    break;
-  case swift::AutoDiffLinearMapKind::Pullback:
-    structName = "_AD__" + original->getName().str() + "_bb" +
-                 std::to_string(originalBB->getDebugID()) + "__PB__" +
-                 indices.mangle();
-    break;
-  }
+  // Create a linear map struct.
+  Mangle::ASTMangler mangler;
+  auto *resultIndices = IndexSubset::get(
+      original->getASTContext(),
+      original->getLoweredFunctionType()->getNumResults(), indices.source);
+  auto *parameterIndices = indices.parameters;
+  AutoDiffConfig config(parameterIndices, resultIndices, genericSig);
+  auto structName = mangler.mangleAutoDiffGeneratedDeclaration(
+      AutoDiffGeneratedDeclarationKind::LinearMapStruct,
+      original->getName().str(), originalBB->getDebugID(), kind, config);
   auto structId = astCtx.getIdentifier(structName);
   GenericParamList *genericParams = nullptr;
   if (genericSig)
