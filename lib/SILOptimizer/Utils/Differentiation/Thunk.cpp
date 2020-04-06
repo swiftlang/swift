@@ -249,6 +249,212 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
       fn->getASTContext());
 }
 
+SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
+                                           SILModule &module, SILLocation loc,
+                                           SILFunction *caller,
+                                           CanSILFunctionType fromType,
+                                           CanSILFunctionType toType) {
+  assert(!fromType->getCombinedSubstitutions());
+  assert(!toType->getCombinedSubstitutions());
+
+  SubstitutionMap interfaceSubs;
+  GenericEnvironment *genericEnv = nullptr;
+  auto thunkType =
+      buildThunkType(caller, fromType, toType, genericEnv, interfaceSubs,
+                     /*withoutActuallyEscaping*/ false,
+                     DifferentiationThunkKind::Reabstraction);
+  auto thunkDeclType =
+      thunkType->getWithExtInfo(thunkType->getExtInfo().withNoEscape(false));
+
+  auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
+  auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
+
+  Mangle::ASTMangler mangler;
+  std::string name = mangler.mangleReabstractionThunkHelper(
+      thunkType, fromInterfaceType, toInterfaceType, Type(),
+      module.getSwiftModule());
+
+  // FIXME(TF-989): Mark reabstraction thunks as transparent. This requires
+  // generating ossa reabstraction thunks so that they can be inlined during
+  // mandatory inlining when `-enable-strip-ownership-after-serialization` is
+  // true and ownership model eliminator is not run after differentiation.
+  auto *thunk = fb.getOrCreateSharedFunction(
+      loc, name, thunkDeclType, IsBare, IsNotTransparent, IsSerialized,
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
+  if (!thunk->empty())
+    return thunk;
+
+  thunk->setGenericEnvironment(genericEnv);
+  thunk->setOwnershipEliminated();
+  auto *entry = thunk->createBasicBlock();
+  SILBuilder builder(entry);
+  createEntryArguments(thunk);
+
+  SILFunctionConventions fromConv(fromType, module);
+  SILFunctionConventions toConv(toType, module);
+  assert(toConv.useLoweredAddresses());
+
+  auto *fnArg = thunk->getArgumentsWithoutIndirectResults().back();
+
+  SmallVector<SILValue, 4> arguments;
+  auto toArgIter = thunk->getArguments().begin();
+  auto useNextArgument = [&]() { arguments.push_back(*toArgIter++); };
+
+  SmallVector<AllocStackInst *, 4> localAllocations;
+  auto createAllocStack = [&](SILType type) {
+    auto *alloc = builder.createAllocStack(loc, type);
+    localAllocations.push_back(alloc);
+    return alloc;
+  };
+
+  // Handle indirect results.
+  assert(fromType->getNumResults() == toType->getNumResults());
+  for (unsigned resIdx : range(toType->getNumResults())) {
+    auto fromRes = fromConv.getResults()[resIdx];
+    auto toRes = toConv.getResults()[resIdx];
+    // No abstraction mismatch.
+    if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
+      // If result types are indirect, directly pass as next argument.
+      if (toRes.isFormalIndirect())
+        useNextArgument();
+      continue;
+    }
+    // Convert indirect result to direct result.
+    if (fromRes.isFormalIndirect()) {
+      SILType resultTy = fromConv.getSILType(fromRes);
+      assert(resultTy.isAddress());
+      auto *indRes = createAllocStack(resultTy);
+      arguments.push_back(indRes);
+      continue;
+    }
+    // Convert direct result to indirect result.
+    // Increment thunk argument iterator; reabstraction handled later.
+    toArgIter++;
+  }
+
+  // Reabstract parameters.
+  assert(toType->getNumParameters() == fromType->getNumParameters());
+  for (unsigned paramIdx : range(toType->getNumParameters())) {
+    auto fromParam = fromConv.getParameters()[paramIdx];
+    auto toParam = toConv.getParameters()[paramIdx];
+    // No abstraction mismatch. Directly use next argument.
+    if (fromParam.isFormalIndirect() == toParam.isFormalIndirect()) {
+      useNextArgument();
+      continue;
+    }
+    // Convert indirect parameter to direct parameter.
+    if (fromParam.isFormalIndirect()) {
+      auto paramTy = fromConv.getSILType(fromType->getParameters()[paramIdx]);
+      if (!paramTy.hasArchetype())
+        paramTy = thunk->mapTypeIntoContext(paramTy);
+      assert(paramTy.isAddress());
+      auto *toArg = *toArgIter++;
+      auto *buf = createAllocStack(toArg->getType());
+      builder.createStore(loc, toArg, buf,
+                          StoreOwnershipQualifier::Unqualified);
+      arguments.push_back(buf);
+      continue;
+    }
+    // Convert direct parameter to indirect parameter.
+    assert(toParam.isFormalIndirect());
+    auto *toArg = *toArgIter++;
+    auto *load =
+        builder.createLoad(loc, toArg, LoadOwnershipQualifier::Unqualified);
+    arguments.push_back(load);
+  }
+
+  auto *apply = builder.createApply(loc, fnArg, SubstitutionMap(), arguments,
+                                    /*isNonThrowing*/ false);
+
+  // Get return elements.
+  SmallVector<SILValue, 4> results;
+  // Extract all direct results.
+  SmallVector<SILValue, 4> directResults;
+  extractAllElements(apply, builder, directResults);
+
+  auto fromDirResultsIter = directResults.begin();
+  auto fromIndResultsIter = apply->getIndirectSILResults().begin();
+  auto toIndResultsIter = thunk->getIndirectResults().begin();
+  // Reabstract results.
+  for (unsigned resIdx : range(toType->getNumResults())) {
+    auto fromRes = fromConv.getResults()[resIdx];
+    auto toRes = toConv.getResults()[resIdx];
+    // No abstraction mismatch.
+    if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
+      // If result types are direct, add call result as direct thunk result.
+      if (toRes.isFormalDirect())
+        results.push_back(*fromDirResultsIter++);
+      // If result types are indirect, increment indirect result iterators.
+      else {
+        ++fromIndResultsIter;
+        ++toIndResultsIter;
+      }
+      continue;
+    }
+    // Load direct results from indirect results.
+    if (fromRes.isFormalIndirect()) {
+      auto indRes = *fromIndResultsIter++;
+      auto *load =
+          builder.createLoad(loc, indRes, LoadOwnershipQualifier::Unqualified);
+      results.push_back(load);
+      continue;
+    }
+    // Store direct results to indirect results.
+    assert(toRes.isFormalIndirect());
+    SILType resultTy = toConv.getSILType(toRes);
+    assert(resultTy.isAddress());
+    auto indRes = *toIndResultsIter++;
+    builder.createStore(loc, *fromDirResultsIter++, indRes,
+                        StoreOwnershipQualifier::Unqualified);
+  }
+  auto retVal = joinElements(results, builder, loc);
+
+  // Deallocate local allocations.
+  for (auto *alloc : llvm::reverse(localAllocations))
+    builder.createDeallocStack(loc, alloc);
+
+  // Create return.
+  builder.createReturn(loc, retVal);
+
+  LLVM_DEBUG(auto &s = getADDebugStream() << "Created reabstraction thunk.\n";
+             s << "  From type: " << fromType << '\n';
+             s << "  To type: " << toType << '\n'; s << '\n'
+                                                     << *thunk);
+
+  return thunk;
+}
+
+SILValue reabstractFunction(
+    SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
+    SILValue fn, CanSILFunctionType toType,
+    std::function<SubstitutionMap(SubstitutionMap)> remapSubstitutions) {
+  auto &module = *fn->getModule();
+  auto fromType = fn->getType().getAs<SILFunctionType>();
+  auto unsubstFromType = fromType->getUnsubstitutedType(module);
+  auto unsubstToType = toType->getUnsubstitutedType(module);
+
+  auto *thunk = getOrCreateReabstractionThunk(fb, module, loc,
+                                              /*caller*/ fn->getFunction(),
+                                              unsubstFromType, unsubstToType);
+  auto *thunkRef = builder.createFunctionRef(loc, thunk);
+
+  if (fromType != unsubstFromType)
+    fn = builder.createConvertFunction(
+        loc, fn, SILType::getPrimitiveObjectType(unsubstFromType),
+        /*withoutActuallyEscaping*/ false);
+
+  fn = builder.createPartialApply(
+      loc, thunkRef, remapSubstitutions(thunk->getForwardingSubstitutionMap()),
+      {fn}, fromType->getCalleeConvention());
+
+  if (toType != unsubstToType)
+    fn = builder.createConvertFunction(loc, fn,
+                                       SILType::getPrimitiveObjectType(toType),
+                                       /*withoutActuallyEscaping*/ false);
+
+  return fn;
+}
+
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForLinearMap(
     SILOptFunctionBuilder &fb, SILFunction *parentThunk,
