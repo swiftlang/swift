@@ -667,20 +667,17 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     }
 
     case ConstraintLocator::GenericArgument: {
-      // In cases like `[[Int]]` vs. `[[String]]`
-      if (auto *assignExpr = dyn_cast<AssignExpr>(anchor)) {
-        diagnostic = getDiagnosticFor(CTP_AssignSource);
-        fromType = getType(assignExpr->getSrc());
-        toType = getType(assignExpr->getDest());
-      }
       break;
     }
-    
+
     case ConstraintLocator::OptionalPayload: {
       // If we have an inout expression, this comes from an
       // InoutToPointer argument mismatch failure.
       if (isa<InOutExpr>(anchor)) {
         diagnostic = diag::cannot_convert_argument_value;
+        auto applyInfo = getFunctionArgApplyInfo(getLocator());
+        if (applyInfo)
+          toType = applyInfo->getParamType();
       }
       break;
     }
@@ -703,6 +700,24 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     }
   }
 
+  if (!diagnostic) {
+    // Handle all mismatches involving an `AssignExpr`
+    if (auto *assignExpr = dyn_cast<AssignExpr>(anchor)) {
+      diagnostic = getDiagnosticFor(CTP_AssignSource);
+      fromType = getType(assignExpr->getSrc());
+      toType = getType(assignExpr->getDest());
+    } else {
+      // If we couldn't find a specific diagnostic let's fallback to
+      // attempt to handle cases where we have an apply arg to param.
+      auto applyInfo = getFunctionArgApplyInfo(getLocator());
+      if (applyInfo) {
+        diagnostic = diag::cannot_convert_argument_value;
+        fromType = applyInfo->getArgType();
+        toType = applyInfo->getParamType();
+      }
+    }
+  }
+  
   if (!diagnostic)
     return false;
 
