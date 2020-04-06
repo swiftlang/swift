@@ -652,7 +652,7 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
             current->diagnose(diag::invalid_redecl_init,
                               current->getFullName(),
                               otherInit->isMemberwiseInitializer());
-        } else {
+        } else if (!current->isImplicit() && !other->isImplicit()) {
           ctx.Diags.diagnoseWithNotes(
             current->diagnose(diag::invalid_redecl,
                               current->getFullName()), [&]() {
