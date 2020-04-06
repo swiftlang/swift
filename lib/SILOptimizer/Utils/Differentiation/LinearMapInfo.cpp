@@ -59,7 +59,7 @@ LinearMapInfo::LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
     : kind(kind), original(original), derivative(derivative),
       activityInfo(activityInfo), indices(indices),
       typeConverter(context.getTypeConverter()) {
-  generateDifferentiationDataStructures(context, indices, derivative);
+  generateDifferentiationDataStructures(context, derivative);
 }
 
 SILType LinearMapInfo::remapTypeInDerivative(SILType ty) {
@@ -122,9 +122,10 @@ void LinearMapInfo::computeAccessLevel(NominalTypeDecl *nominal,
   }
 }
 
-EnumDecl *LinearMapInfo::createBranchingTraceDecl(
-    SILBasicBlock *originalBB, SILAutoDiffIndices indices,
-    CanGenericSignature genericSig, SILLoopInfo *loopInfo) {
+EnumDecl *
+LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
+                                        CanGenericSignature genericSig,
+                                        SILLoopInfo *loopInfo) {
   assert(originalBB->getParent() == original);
   auto &astCtx = original->getASTContext();
   auto *moduleDecl = original->getModule().getSwiftModule();
@@ -195,7 +196,6 @@ EnumDecl *LinearMapInfo::createBranchingTraceDecl(
 
 StructDecl *
 LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
-                                     SILAutoDiffIndices indices,
                                      CanGenericSignature genericSig) {
   assert(originalBB->getParent() == original);
   auto *original = originalBB->getParent();
@@ -267,8 +267,7 @@ VarDecl *LinearMapInfo::addLinearMapDecl(ApplyInst *ai, SILType linearMapType) {
   return linearMapDecl;
 }
 
-void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
-                                         SILAutoDiffIndices indices) {
+void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
   SmallVector<SILValue, 4> allResults;
   SmallVector<unsigned, 8> activeParamIndices;
   SmallVector<unsigned, 8> activeResultIndices;
@@ -372,7 +371,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
 }
 
 void LinearMapInfo::generateDifferentiationDataStructures(
-    ADContext &context, SILAutoDiffIndices indices, SILFunction *derivativeFn) {
+    ADContext &context, SILFunction *derivativeFn) {
   auto &astCtx = original->getASTContext();
   auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
   auto *loopInfo = loopAnalysis->get(original);
@@ -385,8 +384,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
 
   // Create linear map struct for each original block.
   for (auto &origBB : *original) {
-    auto *linearMapStruct =
-        createLinearMapStruct(&origBB, indices, derivativeFnGenSig);
+    auto *linearMapStruct = createLinearMapStruct(&origBB, derivativeFnGenSig);
     linearMapStructs.insert({&origBB, linearMapStruct});
   }
 
@@ -402,8 +400,8 @@ void LinearMapInfo::generateDifferentiationDataStructures(
     break;
   }
   for (auto &origBB : *original) {
-    auto *traceEnum = createBranchingTraceDecl(&origBB, indices,
-                                               derivativeFnGenSig, loopInfo);
+    auto *traceEnum =
+        createBranchingTraceDecl(&origBB, derivativeFnGenSig, loopInfo);
     branchingTraceDecls.insert({&origBB, traceEnum});
     if (origBB.isEntry())
       continue;
@@ -426,7 +424,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
           continue;
         LLVM_DEBUG(getADDebugStream()
                    << "Adding linear map struct field for " << *ai);
-        addLinearMapToStruct(context, ai, indices);
+        addLinearMapToStruct(context, ai);
       }
     }
   }
