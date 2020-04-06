@@ -563,18 +563,16 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     bool isUnexpectedFixitsSeen =
         expected.Fixits.size() < FoundDiagnostic.FixIts.size();
 
+    // it returns actual fix-its string and diagnostic phrase
     auto makeActualFixitsPhrase =
-        [&](ArrayRef<DiagnosticInfo::FixIt> actualFixits,
-            std::string &actualFixitsStr) -> std::string {
-      actualFixitsStr = renderFixits(actualFixits, InputFile);
+        [&](ArrayRef<DiagnosticInfo::FixIt> actualFixits)
+        -> std::tuple<std::string, std::string> {
+      std::string actualFixitsStr = renderFixits(actualFixits, InputFile);
 
-      std::string str("actual fix-it");
-      if (actualFixits.size() >= 2) {
-        str += "s";
-      }
-      str += " seen: ";
-      str += actualFixitsStr;
-      return str;
+      auto phrase = Twine("actual fix-it") +
+                    (actualFixits.size() >= 2 ? "s" : "") +
+                    " seen: " + actualFixitsStr;
+      return std::make_tuple(actualFixitsStr, phrase.str());
     };
 
     auto emitFixItsError = [&](const char *location, const std::string &message,
@@ -603,12 +601,22 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       std::string actualFixits;
 
       if (FoundDiagnostic.FixIts.empty()) {
+        /// If actual fix-its is empty,
+        /// eat a space before first marker.
+        /// For example,
+        ///
+        /// @code
+        /// expected-error {{message}} {{1-2=aa}}
+        ///                           ~~~~~~~~~~~
+        ///                           ^ remove
+        /// @endcode
         if (replStartLoc[-1] == ' ') {
           replStartLoc--;
         }
       } else {
-        message +=
-            "; " + makeActualFixitsPhrase(FoundDiagnostic.FixIts, actualFixits);
+        auto actualAndPhrase = makeActualFixitsPhrase(FoundDiagnostic.FixIts);
+        actualFixits = std::get<0>(actualAndPhrase);
+        message += "; " + std::get<1>(actualAndPhrase);
       }
 
       emitFixItsError(missedFixitLoc, message, replStartLoc, replEndLoc,
@@ -635,11 +643,20 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         replEndLoc = expected.Fixits.back().EndLoc;
       }
 
-      std::string actualFixits;
-      message +=
-          "; " + makeActualFixitsPhrase(FoundDiagnostic.FixIts, actualFixits);
+      auto actualAndPhrase = makeActualFixitsPhrase(FoundDiagnostic.FixIts);
+      std::string actualFixits = std::get<0>(actualAndPhrase);
+      message += "; " + std::get<1>(actualAndPhrase);
 
       if (replStartLoc == replEndLoc) {
+        /// If no fix-its was expected and range of replacement is empty,
+        /// insert space after new last marker.
+        /// For example:
+        ///
+        /// @code
+        /// expected-error {{message}} {{none}}
+        ///                            ^
+        ///                    insert `{{1-2=aa}} `
+        /// @endcode
         actualFixits += " ";
       }
 
