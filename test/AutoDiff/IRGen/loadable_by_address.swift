@@ -4,6 +4,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// `isLargeLoadableType` depends on the ABI and differs between architectures.
+// REQUIRES: CPU=x86_64
+
 // TF-11: Verify that LoadableByAddress works with differentiation-related instructions:
 // - `differentiable_function`
 // - `differentiable_function_extract`
