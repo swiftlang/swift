@@ -53,9 +53,6 @@
     ]
 
   def caseStatementForOrdering(ordering):
-    if ordering == 'sequentiallyConsistent':
-      return "default"
-    else:
       return "case .{}".format(ordering)
 
   # FIXME: Swift should provide intrinsics for arbitrary ordering pairs
@@ -106,6 +103,8 @@ extension ${swiftType}: AtomicProtocol {
       return ${swiftType}(Builtin.atomicload_${llvmOrder}_${builtinType}(
           pointer._rawValue))
 %   end
+    default:
+      Builtin.unreachable()
     }
   }
 
@@ -123,6 +122,8 @@ extension ${swiftType}: AtomicProtocol {
         pointer._rawValue,
         desired.${getter})
 %   end
+    default:
+      Builtin.unreachable()
     }
   }
 
@@ -139,6 +140,8 @@ extension ${swiftType}: AtomicProtocol {
       return ${swiftType}(Builtin.atomicrmw_xchg_${llvmOrder}_${builtinType}(
           pointer._rawValue, desired.${getter}))
 %   end
+    default:
+      Builtin.unreachable()
     }
   }
 
@@ -157,6 +160,8 @@ extension ${swiftType}: AtomicProtocol {
         pointer._rawValue, expected.${getter}, desired.${getter})
       return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
 %   end
+    default:
+      Builtin.unreachable()
     }
   }
 
@@ -179,9 +184,7 @@ extension ${swiftType}: AtomicProtocol {
 %   end
 % end
     default:
-      let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_${builtinType}(
-        pointer._rawValue, expected.${getter}, desired.${getter})
-      return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
+      Builtin.unreachable()
     }
   }
 
@@ -204,9 +207,7 @@ extension ${swiftType}: AtomicProtocol {
 %   end
 % end
     default:
-      let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_weak_${builtinType}(
-        pointer._rawValue, expected.${getter}, desired.${getter})
-      return (Bool(_builtinBooleanLiteral: won), ${swiftType}(oldValue))
+      Builtin.unreachable()
     }
   }
 }
@@ -229,6 +230,8 @@ extension ${swiftType}: AtomicInteger {
       return Self(Builtin.atomicrmw_${llvmop}_${llvmOrder}_${builtinType}(
         pointer._rawValue, operand.${getter}))
     % end
+    default:
+      Builtin.unreachable()
     }
   }
   % end

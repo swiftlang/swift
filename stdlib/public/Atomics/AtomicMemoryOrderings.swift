@@ -276,6 +276,7 @@ public func atomicMemoryFence(
   case .acquiring: Builtin.fence_acquire()
   case .releasing: Builtin.fence_release()
   case .acquiringAndReleasing: Builtin.fence_acqrel()
-  default: Builtin.fence_seqcst()
+  case .sequentiallyConsistent: Builtin.fence_seqcst()
+  default: Builtin.unreachable()
   }
 }

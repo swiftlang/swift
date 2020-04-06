@@ -58,9 +58,6 @@
     ]
 
   def caseStatementForOrdering(ordering):
-    if ordering == 'sequentiallyConsistent':
-      return "default"
-    else:
       return "case .{}".format(ordering)
 
   # FIXME: Swift should provide intrinsics for arbitrary ordering pairs
@@ -136,6 +133,8 @@ extension ${swiftType}: AtomicProtocol {
       raw = Builtin.atomicload_${llvmOrder}_${builtinType}(
         pointer._atomicRawValue)
 %   end
+    default:
+      Builtin.unreachable()
     }
     return Self(_atomicRawValue: raw)
   }
@@ -154,6 +153,8 @@ extension ${swiftType}: AtomicProtocol {
         pointer._rawValue,
         desired._atomicRawValue)
 %   end
+    default:
+      Builtin.unreachable()
     }
   }
 
@@ -172,6 +173,8 @@ extension ${swiftType}: AtomicProtocol {
         pointer._rawValue,
         desired._atomicRawValue)
 %   end
+    default:
+      Builtin.unreachable()
     }
     return Self(_atomicRawValue: rawResult)
   }
@@ -194,6 +197,8 @@ extension ${swiftType}: AtomicProtocol {
         expected._atomicRawValue,
         desired._atomicRawValue)
 %   end
+    default:
+      Builtin.unreachable()
     }
     return (
       Bool(_builtinBooleanLiteral: won),
@@ -222,10 +227,7 @@ extension ${swiftType}: AtomicProtocol {
 %   end
 % end
     default:
-      (old, won) = Builtin.cmpxchg_seqcst_seqcst_${builtinType}(
-        pointer._rawValue,
-        expected._atomicRawValue,
-        desired._atomicRawValue)
+      Builtin.unreachable()
     }
     return (
       Bool(_builtinBooleanLiteral: won),
@@ -254,10 +256,7 @@ extension ${swiftType}: AtomicProtocol {
 %   end
 % end
     default:
-      (old, won) = Builtin.cmpxchg_seqcst_seqcst_weak_${builtinType}(
-        pointer._rawValue,
-        expected._atomicRawValue,
-        desired._atomicRawValue)
+      Builtin.unreachable()
     }
     return (
       Bool(_builtinBooleanLiteral: won),
@@ -340,6 +339,8 @@ extension ${swiftType}: NullableAtomic {
       raw = Builtin.atomicload_${llvmOrder}_${builtinType}(
         pointer._rawValue)
 %   end
+    default:
+      Builtin.unreachable()
     }
     return ${swiftType}(_atomicOptionalRawValue: raw)
   }
@@ -358,6 +359,8 @@ extension ${swiftType}: NullableAtomic {
         pointer._rawValue,
         Self._atomicOptionalRawValue(for: desired))
 %   end
+    default:
+      Builtin.unreachable()
     }
   }
 
@@ -376,6 +379,8 @@ extension ${swiftType}: NullableAtomic {
         pointer._rawValue,
         Self._atomicOptionalRawValue(for: desired))
 %   end
+    default:
+      Builtin.unreachable()
     }
     return Self(_atomicOptionalRawValue: rawResult)
   }
@@ -398,6 +403,8 @@ extension ${swiftType}: NullableAtomic {
         Self._atomicOptionalRawValue(for: expected),
         Self._atomicOptionalRawValue(for: desired))
 %   end
+    default:
+      Builtin.unreachable()
     }
     return (
       Bool(_builtinBooleanLiteral: won),
@@ -426,10 +433,7 @@ extension ${swiftType}: NullableAtomic {
 %   end
 % end
     default:
-      (old, won) = Builtin.cmpxchg_seqcst_seqcst_${builtinType}(
-        pointer._rawValue,
-        Self._atomicOptionalRawValue(for: expected),
-        Self._atomicOptionalRawValue(for: desired))
+      Builtin.unreachable()
     }
     return (
       Bool(_builtinBooleanLiteral: won),
@@ -458,10 +462,7 @@ extension ${swiftType}: NullableAtomic {
 %   end
 % end
     default:
-      (old, won) = Builtin.cmpxchg_seqcst_seqcst_weak_${builtinType}(
-        pointer._rawValue,
-        Self._atomicOptionalRawValue(for: expected),
-        Self._atomicOptionalRawValue(for: desired))
+      Builtin.unreachable()
     }
     return (
       Bool(_builtinBooleanLiteral: won),
