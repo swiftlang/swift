@@ -109,7 +109,7 @@ extension FixedWidthInteger {
   }
 }
 
-@usableFromInline
+@usableFromInline @_effects(readonly)
 internal func _parseIntegerBase10(
   from utf8: UnsafeBufferPointer<UInt8>, allowNegative: Bool, max: UInt64
 ) -> UInt64? {
@@ -117,7 +117,7 @@ internal func _parseIntegerBase10(
                                   max: max, using: _parseUnsignedBase10(from:))
 }
 
-@usableFromInline
+@usableFromInline @_effects(readonly)
 internal func _parseIntegerBase16(
   from utf8: UnsafeBufferPointer<UInt8>, allowNegative: Bool, max: UInt64
 ) -> UInt64? {
@@ -125,7 +125,7 @@ internal func _parseIntegerBase16(
                                   max: max, using: _parseUnsignedBase16(from:))
 }
 
-@usableFromInline
+@usableFromInline @_effects(readonly)
 internal func _parseIntegerBase2(
   from utf8: UnsafeBufferPointer<UInt8>, allowNegative: Bool, max: UInt64
 ) -> UInt64? {
@@ -133,7 +133,7 @@ internal func _parseIntegerBase2(
                                   max: max, using: _parseUnsignedBase2(from:))
 }
 
-@usableFromInline
+@usableFromInline @_effects(readonly)
 internal func _parseInteger(
   from utf8: UnsafeBufferPointer<UInt8>,
   radix: Int,
