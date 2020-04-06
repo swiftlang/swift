@@ -68,25 +68,25 @@ SWIFT_RUNTIME_EXPORT short __gnu_f2h_ieee(float f) {
 // Input in di, result in xmm0. We can get that calling convention in C++
 // by taking a int16 arg instead of Float16, which we don't have (or else
 // we wouldn't need this function).
-SWIFT_RUNTIME_EXPORT float __gnu_h2f_ieee(short h) {
+SWIFT_RUNTIME_EXPORT float __gnu_h2f_ieee(unsigned short h) {
   // We need to have two cases; subnormals and zeros, and everything else.
   // We are in the first case if the exponent field (bits 14:10) is zero:
   if ((h & 0x7c00) == 0) {
     // Sign-extend and mask so that we get a subnormal or zero in f32
     // with the appropriate sign, then multiply by the appropriate scale
     // factor to produce the f32 result.
-    return 0x1.0p125f * fromEncoding((int)h & 0x80007fffU);
+    return 0x1.0p125f * fromEncoding((int)(short)h & 0x80007fffU);
   }
   // We have either a normal number of an infinity or NaN. All of these
   // can be handled by shifting the significand into the correct position,
   // extending the exponent, and then multiplying by the correct scale.
-  return 0x1.0p-112f * fromEncoding((int)h << 13 | 0x70000000U);
+  return 0x1.0p-112f * fromEncoding((int)(short)h << 13 | 0x70000000U);
 }
 
 // Input in xmm0, result in di. We can get that calling convention in C++
 // by returning int16 instead of Float16, which we don't have (or else
 // we wouldn't need this function).
-SWIFT_RUNTIME_EXPORT short __gnu_f2h_ieee(float f) {
+SWIFT_RUNTIME_EXPORT unsigned short __gnu_f2h_ieee(float f) {
   unsigned signbit = toEncoding(f) & 0x80000000U;
   // Construct a "magic" rounding constant for f; this is a value that
   // we will add and subtract from f to force rounding to occur in the
@@ -136,7 +136,7 @@ static double fromEncoding(unsigned long long e) {
 //
 // Note that F16C doesn't provide this operation, so we still need a software
 // implementation on those cores.
-SWIFT_RUNTIME_EXPORT short __truncdfhf2(double d) {
+SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
   // You can't just do (half)(float)x, because that makes the result
   // susceptible to double-rounding. Instead we need to make the first
   // rounding use round-to-odd, but that doesn't exist on x86, so we have
