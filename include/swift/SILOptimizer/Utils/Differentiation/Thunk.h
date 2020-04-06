@@ -81,6 +81,21 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
                                   bool withoutActuallyEscaping,
                                   DifferentiationThunkKind thunkKind);
 
+/// Get or create a reabstraction thunk from `fromType` to `toType`, to be
+/// called in `caller`.
+SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
+                                           SILModule &module, SILLocation loc,
+                                           SILFunction *caller,
+                                           CanSILFunctionType fromType,
+                                           CanSILFunctionType toType);
+
+/// Reabstracts the given function-typed value `fn` to the target type `toType`.
+/// Remaps substitutions using `remapSubstitutions`.
+SILValue reabstractFunction(
+    SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
+    SILValue fn, CanSILFunctionType toType,
+    std::function<SubstitutionMap(SubstitutionMap)> remapSubstitutions);
+
 /// Get or create a derivative function parameter index subset thunk from
 /// `actualIndices` to `desiredIndices` for the given associated function
 /// value and original function operand. Returns a pair of the parameter
