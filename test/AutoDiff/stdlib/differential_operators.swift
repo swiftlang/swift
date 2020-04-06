@@ -4,9 +4,6 @@
 // RUN: %target-run %t/differential_operators
 // REQUIRES: executable_test
 
-// FIXME(SR-12493): Disable test for `-O` due to SIL verification error.
-// REQUIRES: swift_test_mode_optimize_none
-
 import _Differentiation
 
 import StdlibUnittest
