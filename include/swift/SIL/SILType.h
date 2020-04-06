@@ -552,7 +552,6 @@ public:
   bool isLoweringOf(TypeExpansionContext context, SILModule &M,
                     CanType formalType);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Returns true if this SILType is a differentiable type.
   bool isDifferentiable(SILModule &M) const;
 

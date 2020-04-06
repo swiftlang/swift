@@ -4,9 +4,9 @@ silopt_register_sources(
   DifferentiationInvoker.cpp
   # SWIFT_ENABLE_TENSORFLOW
   JVPEmitter.cpp
+  # SWIFT_ENABLE_TENSORFLOW END
   LinearMapInfo.cpp
   PullbackEmitter.cpp
   Thunk.cpp
   VJPEmitter.cpp
-  # SWIFT_ENABLE_TENSORFLOW END
 )

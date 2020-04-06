@@ -21,10 +21,8 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
-// SWIFT_ENABLE_TENSORFLOW
 #include "swift/SIL/TypeSubstCloner.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-// SWIFT_ENABLE_TENSORFLOW END
+#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 
 namespace swift {
 
@@ -49,25 +47,6 @@ namespace autodiff {
 /// This is being used to print short debug messages within the AD pass.
 raw_ostream &getADDebugStream();
 
-/// Returns the underlying instruction for the given SILValue, if it exists,
-/// peering through function conversion instructions.
-template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
-  if (auto *inst = dyn_cast<Inst>(value))
-    return inst;
-  if (auto *cvi = dyn_cast<CopyValueInst>(value))
-    return peerThroughFunctionConversions<Inst>(cvi->getOperand());
-  if (auto *bbi = dyn_cast<BeginBorrowInst>(value))
-    return peerThroughFunctionConversions<Inst>(bbi->getOperand());
-  if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(value))
-    return peerThroughFunctionConversions<Inst>(tttfi->getOperand());
-  if (auto *cfi = dyn_cast<ConvertFunctionInst>(value))
-    return peerThroughFunctionConversions<Inst>(cfi->getOperand());
-  if (auto *pai = dyn_cast<PartialApplyInst>(value))
-    return peerThroughFunctionConversions<Inst>(pai->getCallee());
-  return nullptr;
-}
-
-// SWIFT_ENABLE_TENSORFLOW
 /// Returns true if this is an full apply site whose callee has
 /// `array.uninitialized_intrinsic` semantics.
 bool isArrayLiteralIntrinsic(FullApplySite applySite);
@@ -139,11 +118,27 @@ void collectMinimalIndicesForFunctionCall(
     SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices);
 
-/// Emit a zero value into the given buffer access by calling
-/// `AdditiveArithmetic.zero`. The given type must conform to
-/// `AdditiveArithmetic`.
-void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
-                        SILValue bufferAccess, SILLocation loc);
+/// Returns the underlying instruction for the given SILValue, if it exists,
+/// peering through function conversion instructions.
+template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
+  if (auto *inst = dyn_cast<Inst>(value))
+    return inst;
+  if (auto *cvi = dyn_cast<CopyValueInst>(value))
+    return peerThroughFunctionConversions<Inst>(cvi->getOperand());
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(value))
+    return peerThroughFunctionConversions<Inst>(bbi->getOperand());
+  if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(tttfi->getOperand());
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(cfi->getOperand());
+  if (auto *pai = dyn_cast<PartialApplyInst>(value))
+    return peerThroughFunctionConversions<Inst>(pai->getCallee());
+  return nullptr;
+}
+
+//===----------------------------------------------------------------------===//
+// Code emission utilities
+//===----------------------------------------------------------------------===//
 
 /// Given a range of elements, joins these into a single value. If there's
 /// exactly one element, returns that element. Otherwise, creates a tuple using
@@ -155,6 +150,12 @@ SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
 /// a tuple type. Otherwise, add this value directly to `results`.
 void extractAllElements(SILValue value, SILBuilder &builder,
                         SmallVectorImpl<SILValue> &results);
+
+/// Emit a zero value into the given buffer access by calling
+/// `AdditiveArithmetic.zero`. The given type must conform to
+/// `AdditiveArithmetic`.
+void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
+                        SILValue bufferAccess, SILLocation loc);
 
 //===----------------------------------------------------------------------===//
 // Utilities for looking up derivatives of functions
@@ -204,6 +205,35 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
     IndexSubset *resultIndices);
 
 } // end namespace autodiff
+
+/// Creates arguments in the entry block based on the function type.
+inline void createEntryArguments(SILFunction *f) {
+  auto *entry = f->getEntryBlock();
+  auto conv = f->getConventions();
+  auto &ctx = f->getASTContext();
+  auto moduleDecl = f->getModule().getSwiftModule();
+  assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
+         "Entry already has arguments?!");
+  auto createFunctionArgument = [&](SILType type) {
+    // Create a dummy parameter declaration.
+    // Necessary to prevent crash during argument explosion optimization.
+    auto loc = f->getLocation().getSourceLoc();
+    auto *decl = new (ctx)
+        ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
+    decl->setSpecifier(ParamDecl::Specifier::Default);
+    entry->createFunctionArgument(type, decl);
+  };
+  for (auto indResTy : conv.getIndirectSILResultTypes()) {
+    if (indResTy.hasArchetype())
+      indResTy = indResTy.mapTypeOutOfContext();
+    createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
+  }
+  for (auto paramTy : conv.getParameterSILTypes()) {
+    if (paramTy.hasArchetype())
+      paramTy = paramTy.mapTypeOutOfContext();
+    createFunctionArgument(f->mapTypeIntoContext(paramTy));
+  }
+}
 
 /// Helper class for visiting basic blocks in post-order post-dominance order,
 /// based on a worklist algorithm.
@@ -257,38 +287,7 @@ public:
     }
   }
 };
-// SWIFT_ENABLE_TENSORFLOW END
 
-/// Creates arguments in the entry block based on the function type.
-inline void createEntryArguments(SILFunction *f) {
-  auto *entry = f->getEntryBlock();
-  auto conv = f->getConventions();
-  auto &ctx = f->getASTContext();
-  auto moduleDecl = f->getModule().getSwiftModule();
-  assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
-         "Entry already has arguments?!");
-  auto createFunctionArgument = [&](SILType type) {
-    // Create a dummy parameter declaration.
-    // Necessary to prevent crash during argument explosion optimization.
-    auto loc = f->getLocation().getSourceLoc();
-    auto *decl = new (ctx)
-        ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
-    decl->setSpecifier(ParamDecl::Specifier::Default);
-    entry->createFunctionArgument(type, decl);
-  };
-  for (auto indResTy : conv.getIndirectSILResultTypes()) {
-    if (indResTy.hasArchetype())
-      indResTy = indResTy.mapTypeOutOfContext();
-    createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
-  }
-  for (auto paramTy : conv.getParameterSILTypes()) {
-    if (paramTy.hasArchetype())
-      paramTy = paramTy.mapTypeOutOfContext();
-    createFunctionArgument(f->mapTypeIntoContext(paramTy));
-  }
-}
-
-// SWIFT_ENABLE_TENSORFLOW
 /// Cloner that remaps types using the target function's generic environment.
 class BasicTypeSubstCloner final
     : public TypeSubstCloner<BasicTypeSubstCloner, SILOptFunctionBuilder> {
@@ -307,16 +306,15 @@ public:
     SILClonerWithScopes::postProcess(orig, cloned);
   }
 
-  void run() {
-    auto &target = Builder.getFunction();
-    auto *entry = target.createBasicBlock();
-    createEntryArguments(&target);
-    SmallVector<SILValue, 8> entryArguments(target.getArguments().begin(),
-                                            target.getArguments().end());
+  void cloneFunction() {
+    auto &newFunction = Builder.getFunction();
+    auto *entry = newFunction.createBasicBlock();
+    createEntryArguments(&newFunction);
+    SmallVector<SILValue, 8> entryArguments(newFunction.getArguments().begin(),
+                                            newFunction.getArguments().end());
     cloneFunctionBody(&Original, entry, entryArguments);
   }
 };
-// SWIFT_ENABLE_TENSORFLOW END
 
 } // end namespace swift
 

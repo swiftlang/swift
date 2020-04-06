@@ -31,6 +31,7 @@ ANALYSIS(Caller)
 ANALYSIS(ClassHierarchy)
 ANALYSIS(ClosureScope)
 ANALYSIS(Destructor)
+ANALYSIS(DifferentiableActivity)
 ANALYSIS(Dominance)
 ANALYSIS(EpilogueARC)
 ANALYSIS(Escape)
@@ -45,7 +46,5 @@ ANALYSIS(RCIdentity)
 ANALYSIS(SideEffect)
 ANALYSIS(TypeExpansion)
 ANALYSIS(PassManagerVerifier)
-// SWIFT_ENABLE_TENSORFLOW
-ANALYSIS(DifferentiableActivity)
 
 #undef ANALYSIS

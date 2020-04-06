@@ -399,7 +399,6 @@ public:
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
-  // SWIFT_ENABLE_TENSORFLOW
   void addVisibleDecl(ValueDecl *decl);
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,

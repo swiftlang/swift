@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Automatic differentiation thunk generation utilities
+// Automatic differentiation thunk generation utilities.
 //
 //===----------------------------------------------------------------------===//
 
@@ -173,16 +173,15 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
       return newArchetype;
     return Type(type).subst(contextSubs);
   };
-  auto substConformanceHelper =
-    LookUpConformanceInSubstitutionMap(contextSubs);
+  auto substConformanceHelper = LookUpConformanceInSubstitutionMap(contextSubs);
 
   // Utility function to apply contextSubs, and also replace the
   // opened existential with the new archetype.
   auto substLoweredTypeIntoThunkContext =
       [&](CanSILFunctionType t) -> CanSILFunctionType {
     return SILType::getPrimitiveObjectType(t)
-             .subst(fn->getModule(), substTypeHelper, substConformanceHelper)
-             .castTo<SILFunctionType>();
+        .subst(fn->getModule(), substTypeHelper, substConformanceHelper)
+        .castTo<SILFunctionType>();
   };
 
   sourceType = substLoweredTypeIntoThunkContext(sourceType);
@@ -205,10 +204,9 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   // Add reabstraction function parameter only if building a reabstraction thunk
   // type.
   if (thunkKind == DifferentiationThunkKind::Reabstraction)
-    params.push_back({sourceType,
-                      sourceType->getExtInfo().hasContext()
-                        ? contextConvention
-                        : ParameterConvention::Direct_Unowned});
+    params.push_back({sourceType, sourceType->getExtInfo().hasContext()
+                                      ? contextConvention
+                                      : ParameterConvention::Direct_Unowned});
 
   auto mapTypeOutOfContext = [&](CanType type) -> CanType {
     return type->mapTypeOutOfContext()->getCanonicalType(genericSig);
@@ -238,18 +236,16 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   Optional<SILResultInfo> interfaceErrorResult;
   if (expectedType->hasErrorResult()) {
     auto errorResult = expectedType->getErrorResult();
-    interfaceErrorResult = errorResult.map(mapTypeOutOfContext);;
+    interfaceErrorResult = errorResult.map(mapTypeOutOfContext);
   }
 
   // The type of the thunk function.
-  return SILFunctionType::get(genericSig, extInfo,
-                              expectedType->getCoroutineKind(),
-                              ParameterConvention::Direct_Unowned,
-                              interfaceParams, interfaceYields,
-                              interfaceResults, interfaceErrorResult,
-                              expectedType->getPatternSubstitutions(),
-                              SubstitutionMap(),
-                              fn->getASTContext());
+  return SILFunctionType::get(
+      genericSig, extInfo, expectedType->getCoroutineKind(),
+      ParameterConvention::Direct_Unowned, interfaceParams, interfaceYields,
+      interfaceResults, interfaceErrorResult,
+      expectedType->getPatternSubstitutions(), SubstitutionMap(),
+      fn->getASTContext());
 }
 
 SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
@@ -427,6 +423,37 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   return thunk;
 }
 
+SILValue reabstractFunction(
+    SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
+    SILValue fn, CanSILFunctionType toType,
+    std::function<SubstitutionMap(SubstitutionMap)> remapSubstitutions) {
+  auto &module = *fn->getModule();
+  auto fromType = fn->getType().getAs<SILFunctionType>();
+  auto unsubstFromType = fromType->getUnsubstitutedType(module);
+  auto unsubstToType = toType->getUnsubstitutedType(module);
+
+  auto *thunk = getOrCreateReabstractionThunk(fb, module, loc,
+                                              /*caller*/ fn->getFunction(),
+                                              unsubstFromType, unsubstToType);
+  auto *thunkRef = builder.createFunctionRef(loc, thunk);
+
+  if (fromType != unsubstFromType)
+    fn = builder.createConvertFunction(
+        loc, fn, SILType::getPrimitiveObjectType(unsubstFromType),
+        /*withoutActuallyEscaping*/ false);
+
+  fn = builder.createPartialApply(
+      loc, thunkRef, remapSubstitutions(thunk->getForwardingSubstitutionMap()),
+      {fn}, fromType->getCalleeConvention());
+
+  if (toType != unsubstToType)
+    fn = builder.createConvertFunction(loc, fn,
+                                       SILType::getPrimitiveObjectType(toType),
+                                       /*withoutActuallyEscaping*/ false);
+
+  return fn;
+}
+
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForLinearMap(
     SILOptFunctionBuilder &fb, SILFunction *parentThunk,
@@ -475,8 +502,9 @@ getOrCreateSubsetParametersThunkForLinearMap(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
-  thunk->setGenericEnvironment(genericEnv);
+  // TODO(TF-1206): Enable ownership in all differentiation thunks.
   thunk->setOwnershipEliminated();
+  thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);
   createEntryArguments(thunk);
@@ -490,8 +518,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
     auto zeroSILObjType = zeroSILType.getObjectType();
     auto zeroType = zeroSILType.getASTType();
     auto *swiftMod = parentThunk->getModule().getSwiftModule();
-    auto tangentSpace = zeroType->getAutoDiffTangentSpace(
-      LookUpConformanceInModule(swiftMod));
+    auto tangentSpace =
+        zeroType->getAutoDiffTangentSpace(LookUpConformanceInModule(swiftMod));
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
     case TangentSpace::Kind::TangentVector: {
@@ -508,8 +536,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
       break;
     }
     case TangentSpace::Kind::Tuple: {
-      llvm_unreachable(
-          "Unimplemented: Handle zero initialization for tuples");
+      llvm_unreachable("Unimplemented: Handle zero initialization for tuples");
     }
     }
   };
@@ -760,6 +787,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
+  // TODO(TF-1206): Enable ownership in all differentiation thunks.
   thunk->setOwnershipEliminated();
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
@@ -842,7 +870,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
     thunkedLinearMap = builder.createConvertFunction(
         loc, thunkedLinearMap,
         SILType::getPrimitiveObjectType(unsubstLinearMapType),
-        /*withoutActuallyEscaping*/ false); // todo: correct boolean value?
+        /*withoutActuallyEscaping*/ false);
   }
   thunkedLinearMap = builder.createPartialApply(
       loc, linearMapThunkFRI, linearMapSubs, {thunkedLinearMap},
@@ -851,7 +879,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
     thunkedLinearMap = builder.createConvertFunction(
         loc, thunkedLinearMap,
         SILType::getPrimitiveObjectType(linearMapTargetType),
-        /*withoutActuallyEscaping*/ false); // todo: correct boolean value?
+        /*withoutActuallyEscaping*/ false);
   }
   assert(origFnType->getNumResults() +
              origFnType->getNumIndirectMutatingParameters() ==
@@ -866,37 +894,6 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   }
 
   return {thunk, interfaceSubs};
-}
-
-SILValue reabstractFunction(
-    SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
-    SILValue fn, CanSILFunctionType toType,
-    std::function<SubstitutionMap(SubstitutionMap)> remapSubstitutions) {
-  auto &module = *fn->getModule();
-  auto fromType = fn->getType().getAs<SILFunctionType>();
-  auto unsubstFromType = fromType->getUnsubstitutedType(module);
-  auto unsubstToType = toType->getUnsubstitutedType(module);
-
-  auto *thunk = getOrCreateReabstractionThunk(fb, module, loc,
-                                              /*caller*/ fn->getFunction(),
-                                              unsubstFromType, unsubstToType);
-  auto *thunkRef = builder.createFunctionRef(loc, thunk);
-
-  if (fromType != unsubstFromType)
-    fn = builder.createConvertFunction(
-        loc, fn, SILType::getPrimitiveObjectType(unsubstFromType),
-        /*withoutActuallyEscaping*/ false);
-
-  fn = builder.createPartialApply(
-      loc, thunkRef, remapSubstitutions(thunk->getForwardingSubstitutionMap()),
-      {fn}, fromType->getCalleeConvention());
-
-  if (toType != unsubstToType)
-    fn = builder.createConvertFunction(loc, fn,
-                                       SILType::getPrimitiveObjectType(toType),
-                                       /*withoutActuallyEscaping*/ false);
-
-  return fn;
 }
 
 } // end namespace autodiff
