@@ -642,17 +642,14 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
       assert(!FoundDiagnostic.FixIts.empty() &&
              "some fix-its should be produced here");
-
-      const char *noneStartLoc =
-          expected.ExpectedEnd -
-          (fixitExpectationNoneString.size() + 4) /* length of '{{none}}' */;
+      assert(expected.noneMarkerStartLoc && "none marker location is null");
 
       const char *replStartLoc = nullptr, *replEndLoc = nullptr;
       std::string message;
       if (expected.Fixits.empty()) {
         message = "expected no fix-its";
-        replStartLoc = noneStartLoc;
-        replEndLoc = noneStartLoc;
+        replStartLoc = expected.noneMarkerStartLoc;
+        replEndLoc = expected.noneMarkerStartLoc;
       } else {
         message = "unexpected fix-it seen";
         replStartLoc = expected.Fixits.front().StartLoc;
@@ -676,8 +673,8 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         actualFixits += " ";
       }
 
-      emitFixItsError(noneStartLoc, message, replStartLoc, replEndLoc,
-                      actualFixits);
+      emitFixItsError(expected.noneMarkerStartLoc, message, replStartLoc,
+                      replEndLoc, actualFixits);
     }
 
     // Actually remove the diagnostic from the list, so we don't match it
