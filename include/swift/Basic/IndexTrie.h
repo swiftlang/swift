@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_INDEXTREE_H
 #define SWIFT_SILOPTIMIZER_UTILS_INDEXTREE_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include <algorithm>
