@@ -2,11 +2,6 @@ module script {
   header "script.h"
 }
 
-module AccessSpecifiers {
-  header "AccessSpecifiers.h"
-  export *
-}
-
 module AvailabilityExtras {
   header "AvailabilityExtras.h"
   export *
@@ -87,11 +82,6 @@ module LinkMusket {
   link "Lock"
   link "Stock"
   link framework "Barrel"
-}
-
-module MemoryLayout {
-  header "MemoryLayout.h"
-  export *
 }
 
 module MissingHeader {
