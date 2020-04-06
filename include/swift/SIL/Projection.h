@@ -137,6 +137,8 @@ static inline bool isCastProjectionKind(ProjectionKind Kind) {
 ///
 /// This lightweight utility maps a SIL address projection to an index.
 struct ProjectionIndex {
+  static constexpr unsigned MaxIndex = ~0U;
+
   SILValue Aggregate;
   unsigned Index;
 
@@ -164,7 +166,7 @@ struct ProjectionIndex {
     }
     case ValueKind::RefTailAddrInst: {
       RefTailAddrInst *REA = cast<RefTailAddrInst>(V);
-      Index = 0;
+      Index = MaxIndex;
       Aggregate = REA->getOperand();
       break;
     }
