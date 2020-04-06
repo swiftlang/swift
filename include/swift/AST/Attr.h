@@ -1865,6 +1865,7 @@ class DerivativeAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
+  friend class DerivativeAttrOriginalDeclRequest;
 
   /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
@@ -1873,8 +1874,11 @@ class DerivativeAttr final
   TypeRepr *BaseTypeRepr;
   /// The original function name.
   DeclNameRefWithLoc OriginalFunctionName;
-  /// The original function declaration, resolved by the type checker.
-  AbstractFunctionDecl *OriginalFunction = nullptr;
+  /// Auxiliary lazy member loader, used to resolve the original function
+  /// declaration.
+  LazyMemberLoader *Resolver = nullptr;
+  /// Data representing the original function declaration.
+  uint64_t ResolverContextData = 0;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiability parameter indices, resolved by the type checker.
@@ -1907,12 +1911,8 @@ public:
   DeclNameRefWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
   }
-  AbstractFunctionDecl *getOriginalFunction() const {
-    return OriginalFunction;
-  }
-  void setOriginalFunction(AbstractFunctionDecl *decl) {
-    OriginalFunction = decl;
-  }
+  AbstractFunctionDecl *getOriginalFunction(ASTContext &context) const;
+  void setOriginalFunction(AbstractFunctionDecl *decl);
 
   AutoDiffDerivativeFunctionKind getDerivativeKind() const {
     assert(Kind && "Derivative function kind has not yet been resolved");

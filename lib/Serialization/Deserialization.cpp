@@ -5941,6 +5941,12 @@ ValueDecl *ModuleFile::loadDynamicallyReplacedFunctionDecl(
   return cast<ValueDecl>(getDecl(contextData));
 }
 
+AbstractFunctionDecl *
+ModuleFile::loadReferencedFunctionDecl(const DerivativeAttr *DA,
+                                       uint64_t contextData) {
+  return cast<AbstractFunctionDecl>(getDecl(contextData));
+}
+
 Type ModuleFile::loadTypeEraserType(const TypeEraserAttr *TRA,
                                     uint64_t contextData) {
   return getType(contextData);

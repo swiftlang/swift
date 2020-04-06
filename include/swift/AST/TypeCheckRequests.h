@@ -2130,6 +2130,26 @@ public:
   void cacheResult(IndexSubset *value) const;
 };
 
+/// Resolves the referenced original declaration for a `@derivative` attribute.
+class DerivativeAttrOriginalDeclRequest
+    : public SimpleRequest<DerivativeAttrOriginalDeclRequest,
+                           AbstractFunctionDecl *(DerivativeAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator,
+                                 DerivativeAttr *attr) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks whether a type eraser has a viable initializer.
 class TypeEraserHasViableInitRequest
     : public SimpleRequest<TypeEraserHasViableInitRequest,

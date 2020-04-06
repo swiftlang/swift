@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IndexSubset.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1749,6 +1750,16 @@ DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
   return new (mem) DerivativeAttr(implicit, atLoc, baseRange, baseTypeRepr,
                                   std::move(originalName), parameterIndices);
 }
+
+AbstractFunctionDecl *
+DerivativeAttr::getOriginalFunction(ASTContext &context) const {
+  return evaluateOrDefault(
+      context.evaluator,
+      DerivativeAttrOriginalDeclRequest{const_cast<DerivativeAttr *>(this)},
+      nullptr);
+}
+
+void DerivativeAttr::setOriginalFunction(AbstractFunctionDecl *decl) {}
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
                              SourceRange baseRange, TypeRepr *baseTypeRepr,
