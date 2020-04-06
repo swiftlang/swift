@@ -3,6 +3,7 @@ silopt_register_sources(
   Common.cpp
   DifferentiationInvoker.cpp
   LinearMapInfo.cpp
+  PullbackEmitter.cpp
   Thunk.cpp
   VJPEmitter.cpp
 )
