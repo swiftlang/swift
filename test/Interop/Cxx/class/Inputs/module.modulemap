@@ -1,3 +1,11 @@
-module CxxMemberVariables {
+module AccessSpecifiers {
+  header "access-specifiers.h"
+}
+
+module MemoryLayout {
+  header "memory-layout.h"
+}
+
+module MemberVariables {
   header "member-variables.h"
 }
