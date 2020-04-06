@@ -70,7 +70,6 @@ class TensorFlowSwiftAPIs(product.Product):
                                              'tensorflow')
         tensorflow_source_dir = os.path.realpath(tensorflow_source_dir)
 
-
         # FIXME: this is a workaround for CMake <3.16 which does not correctly
         # generate the build rules if you are not in the build directory.  As a
         # result, we need to create the build tree before we can use it and

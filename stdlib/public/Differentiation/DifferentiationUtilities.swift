@@ -15,8 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 /// Create a differentiable function from a vector-Jacobian products function.
 @inlinable
 public func differentiableFunction<T : Differentiable, R : Differentiable>(
