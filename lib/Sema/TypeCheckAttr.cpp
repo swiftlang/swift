@@ -4425,6 +4425,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     return true;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
   // Reject different-file derivative registration.
   // TODO(TF-1021): Lift same-file derivative registration restriction.
   if (!Ctx.LangOpts.EnableExperimentalCrossFileDerivativeRegistration &&
@@ -4433,6 +4434,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
                    diag::derivative_attr_not_in_same_file_as_original);
     return true;
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // Reject duplicate `@derivative` attributes.
   auto &derivativeAttrs = Ctx.DerivativeAttrs[std::make_tuple(
