@@ -23,7 +23,7 @@ ArrayAutoDiffTests.test("ArraySubscript") {
     return array[0] + array[1] + array[2]
   }
 
-  expectEqual(				
+  expectEqual(
     FloatArrayTan([1, 1, 1, 0, 0, 0]),
     gradient(at: [2, 3, 4, 5, 6, 7], in: sumFirstThree))
 }

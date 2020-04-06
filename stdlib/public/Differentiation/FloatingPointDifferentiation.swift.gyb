@@ -1,4 +1,4 @@
-//===--- FloatingPointTypesDerivatives.swift.gyb --------------*- swift -*-===//
+//===--- FloatingPointDifferentiation.swift.gyb ---------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -207,7 +207,6 @@ extension ${Self} {
 #endif
 % end
 % end
-
 
 extension FloatingPoint where Self : Differentiable,
                               Self == Self.TangentVector {
