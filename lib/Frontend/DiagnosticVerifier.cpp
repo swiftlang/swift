@@ -49,7 +49,7 @@ struct ExpectedDiagnosticInfo {
 
   // This is true if a '{{none}}' is present to mark that there should be no
   // extra fixits.
-  bool noExtraFixitsMayAppear = false;
+  bool noExtraFixitsMayAppear() const { return noneMarkerStartLoc != nullptr; };
 
   // This is the raw input buffer for the message text, the part in the
   // {{...}}
@@ -61,6 +61,9 @@ struct ExpectedDiagnosticInfo {
   Optional<unsigned> ColumnNo;
 
   std::vector<ExpectedFixIt> Fixits;
+
+  // Loc of {{none}}
+  const char *noneMarkerStartLoc = nullptr;
 
   ExpectedDiagnosticInfo(const char *ExpectedStart,
                          DiagnosticKind Classification)
@@ -291,16 +294,15 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   unsigned PrevExpectedContinuationLine = 0;
 
   std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
-  
-  auto addError = [&](const char *Loc, std::string message,
+
+  auto addError = [&](const char *Loc, const Twine &message,
                       ArrayRef<llvm::SMFixIt> FixIts = {}) {
     auto loc = SourceLoc(SMLoc::getFromPointer(Loc));
     auto diag = SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message,
                               {}, FixIts);
     Errors.push_back(diag);
   };
-  
-  
+
   // Scan the memory buffer looking for expected-note/warning/error.
   for (size_t Match = InputFile.find("expected-");
        Match != StringRef::npos; Match = InputFile.find("expected-", Match+1)) {
@@ -461,8 +463,22 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       
       // Special case for specifying no fixits should appear.
       if (FixItStr == fixitExpectationNoneString) {
-        Expected.noExtraFixitsMayAppear = true;
+        if (Expected.noneMarkerStartLoc) {
+          addError(FixItStr.data() - 2,
+                   Twine("A second {{") + fixitExpectationNoneString +
+                       "}} is found. it can be put only one.");
+          break;
+        }
+
+        Expected.noneMarkerStartLoc = FixItStr.data() - 2;
         continue;
+      }
+
+      if (Expected.noneMarkerStartLoc) {
+        addError(Expected.noneMarkerStartLoc, Twine("{{") +
+                                                  fixitExpectationNoneString +
+                                                  "}} must be at the end.");
+        break;
       }
 
       // Parse the pieces of the fix-it.
@@ -575,7 +591,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       return std::make_tuple(actualFixitsStr, phrase.str());
     };
 
-    auto emitFixItsError = [&](const char *location, const std::string &message,
+    auto emitFixItsError = [&](const char *location, const Twine &message,
                                const char *replStartLoc, const char *replEndLoc,
                                const std::string &replStr) {
       llvm::SMFixIt fix(llvm::SMRange(SMLoc::getFromPointer(replStartLoc),
@@ -621,7 +637,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
       emitFixItsError(missedFixitLoc, message, replStartLoc, replEndLoc,
                       actualFixits);
-    } else if (expected.noExtraFixitsMayAppear && isUnexpectedFixitsSeen) {
+    } else if (expected.noExtraFixitsMayAppear() && isUnexpectedFixitsSeen) {
       // If unexpected fixit were produced, add a fixit to add them in.
 
       assert(!FoundDiagnostic.FixIts.empty() &&

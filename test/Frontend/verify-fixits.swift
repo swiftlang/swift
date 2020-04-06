@@ -4,6 +4,14 @@
 
 func labeledFunc(aa: Int, bb: Int) {}
 
+func testNoneMarkerCheck() {
+  // CHECK: [[@LINE+1]]:95: error: A second {{{{}}none}} is found. it can be put only one.
+  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{none}} {{none}}
+
+  // CHECK: [[@LINE+1]]:134: error: {{{{}}none}} must be at the end.
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=aa}} {{none}} {{23-26=bb}}
+}
+
 func test0Fixits() {
   undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
 
