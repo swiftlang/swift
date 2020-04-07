@@ -166,8 +166,11 @@ bool TempRValueOptPass::collectLoads(
     }
     return true;
   }
-  case SILInstructionKind::ApplyInst:
   case SILInstructionKind::PartialApplyInst:
+    if (!cast<PartialApplyInst>(user)->isOnStack())
+      return false;
+     LLVM_FALLTHROUGH;
+  case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst: {
     ApplySite apply(user);
 
