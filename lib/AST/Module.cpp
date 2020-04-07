@@ -2232,11 +2232,6 @@ SourceFile::getCachedVisibleDecls() const {
   return getCache().AllVisibleValues;
 }
 
-void SourceFile::addVisibleDecl(ValueDecl *decl) {
-  Decls->push_back(decl);
-  getCache().AllVisibleValues.push_back(decl);
-}
-
 static void performAutoImport(
     SourceFile &SF,
     SourceFile::ImplicitModuleImportKind implicitModuleImportKind) {
