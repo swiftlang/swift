@@ -5,9 +5,9 @@ func fromOther()
 
 // MARK: - C Additions
 
-import A
 import B
 import C
+import A
 
 // Available when C is imported with Other
 func filtered()
