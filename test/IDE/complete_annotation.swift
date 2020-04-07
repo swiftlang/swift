@@ -1,4 +1,6 @@
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=GLOBAL_EXPR | %FileCheck %s --check-prefix=GLOBAL_EXPR
+// RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=GLOBAL_EXPR | %FileCheck %s --check-prefix=GLOBAL_EXPR
+// NOTE: To GLOBAL_EXPR twice to test completion from the cache.
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=GLOBAL_TYPE | %FileCheck %s --check-prefix=GLOBAL_TYPE
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=EXPR_MEMBER | %FileCheck %s --check-prefix=EXPR_MEMBER
 // RUN: %swift-ide-test -code-completion -code-completion-annotate-results -source-filename %s -code-completion-token=EXPR_POSTFIX | %FileCheck %s --check-prefix=EXPR_POSTFIX
