@@ -424,6 +424,45 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
   return result;
 }
 
+std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
+    AutoDiffGeneratedDeclarationKind declKind, StringRef origFnName,
+    unsigned bbId, AutoDiffLinearMapKind linearMapKind, AutoDiffConfig config) {
+  beginManglingWithoutPrefix();
+
+  Buffer << "_AD__" << origFnName << "_bb" + std::to_string(bbId);
+  switch (declKind) {
+  case AutoDiffGeneratedDeclarationKind::LinearMapStruct:
+    switch (linearMapKind) {
+    case AutoDiffLinearMapKind::Differential:
+      Buffer << "__DF__";
+      break;
+    case AutoDiffLinearMapKind::Pullback:
+      Buffer << "__PB__";
+      break;
+    }
+    break;
+  case AutoDiffGeneratedDeclarationKind::BranchingTraceEnum:
+    switch (linearMapKind) {
+    case AutoDiffLinearMapKind::Differential:
+      Buffer << "__Succ__";
+      break;
+    case AutoDiffLinearMapKind::Pullback:
+      Buffer << "__Pred__";
+      break;
+    }
+    break;
+  }
+  Buffer << config.getSILAutoDiffIndices().mangle();
+  if (config.derivativeGenericSignature) {
+    Buffer << '_';
+    appendGenericSignature(config.derivativeGenericSignature);
+  }
+
+  auto result = Storage.str().str();
+  Storage.clear();
+  return result;
+}
+
 std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
     SILDifferentiabilityWitnessKey key) {
   // TODO(TF-20): Make the mangling scheme robust. Support demangling.
