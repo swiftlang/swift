@@ -11,8 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
+
 %from SwiftMathFunctions import *
 %from SwiftFloatingPointTypes import all_floating_point_types
+
+%# Skip `Float16` for now until it's clear how to conform it to
+%# `ElementaryFunctions`, i.e. after apple/swift-numerics adds the conformance.
+%floating_point_types = [type for type in all_floating_point_types() if type.bits != 16]
 
 /// A type that has elementary functions available.
 ///
@@ -58,7 +63,7 @@ public protocol ElementaryFunctions {
   static func root(_ x: Self, _ n: Int) -> Self
 }
 
-%for type in all_floating_point_types():
+%for type in floating_point_types:
 % if type.bits == 80:
 #if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 % end
