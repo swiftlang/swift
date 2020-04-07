@@ -58,6 +58,7 @@ LinearMapInfo::LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
                              const DifferentiableActivityInfo &activityInfo)
     : kind(kind), original(original), derivative(derivative),
       activityInfo(activityInfo), indices(indices),
+      synthesizedFile(context.getSynthesizedFile()),
       typeConverter(context.getTypeConverter()) {
   generateDifferentiationDataStructures(context, derivative);
 }
@@ -82,17 +83,6 @@ VarDecl *LinearMapInfo::addVarDecl(NominalTypeDecl *nominal, StringRef name,
     varDecl->setInterfaceType(type);
   nominal->addMember(varDecl);
   return varDecl;
-}
-
-SourceFile &LinearMapInfo::getDeclarationFileUnit() {
-  if (original->hasLocation())
-    if (auto *declContext = original->getLocation().getAsDeclContext())
-      if (auto *parentSourceFile = declContext->getParentSourceFile())
-        return *parentSourceFile;
-  for (auto *file : original->getModule().getSwiftModule()->getFiles())
-    if (auto *src = dyn_cast<SourceFile>(file))
-      return *src;
-  llvm_unreachable("No files?");
 }
 
 void LinearMapInfo::computeAccessLevel(NominalTypeDecl *nominal,
@@ -129,7 +119,7 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   assert(originalBB->getParent() == original);
   auto &astCtx = original->getASTContext();
   auto *moduleDecl = original->getModule().getSwiftModule();
-  auto &file = getDeclarationFileUnit();
+  auto &file = getSynthesizedFile();
   // Create a branching trace enum.
   Mangle::ASTMangler mangler;
   auto *resultIndices = IndexSubset::get(
@@ -200,7 +190,7 @@ LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
   assert(originalBB->getParent() == original);
   auto *original = originalBB->getParent();
   auto &astCtx = original->getASTContext();
-  auto &file = getDeclarationFileUnit();
+  auto &file = getSynthesizedFile();
   // Create a linear map struct.
   Mangle::ASTMangler mangler;
   auto *resultIndices = IndexSubset::get(

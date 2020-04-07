@@ -1180,6 +1180,8 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
     // The Builtin module declares no operators.
     return nullptr;
   case FileUnitKind::Synthesized:
+    // Synthesized files currently declare no operators.
+    return nullptr;
   case FileUnitKind::Source:
     break;
   case FileUnitKind::SerializedAST:
@@ -1527,6 +1529,9 @@ StringRef ModuleDecl::getModuleFilename() const {
       Result = LF->getFilename();
       continue;
     }
+    // Skip synthesized files.
+    if (auto *SFU = dyn_cast<SynthesizedFileUnit>(F))
+      continue;
     return StringRef();
   }
   return Result;

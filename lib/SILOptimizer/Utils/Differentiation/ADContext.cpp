@@ -54,9 +54,17 @@ static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
 // ADContext methods
 //===----------------------------------------------------------------------===//
 
+static SynthesizedFileUnit *createNewSynthesizedFileUnit(ModuleDecl *module) {
+  auto &ctx = module->getASTContext();
+  auto *file = new (ctx) SynthesizedFileUnit(*module);
+  module->addFile(*file);
+  return file;
+}
+
 ADContext::ADContext(SILModuleTransform &transform)
     : transform(transform), module(*transform.getModule()),
-      passManager(*transform.getPassManager()) {}
+      passManager(*transform.getPassManager()),
+      synthesizedFile(*createNewSynthesizedFileUnit(module.getSwiftModule())) {}
 
 FuncDecl *ADContext::getPlusDecl() const {
   if (!cachedPlusFn) {

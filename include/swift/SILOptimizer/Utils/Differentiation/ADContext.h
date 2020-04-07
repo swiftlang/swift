@@ -19,6 +19,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Common.h"
 #include "swift/SILOptimizer/Utils/Differentiation/DifferentiationInvoker.h"
@@ -65,6 +66,9 @@ private:
 
   /// Shared pass manager.
   SILPassManager &passManager;
+
+  /// A synthesized file unit.
+  SynthesizedFileUnit &synthesizedFile;
 
   /// The worklist (stack) of `differentiable_function` instructions to be
   /// processed.
@@ -120,6 +124,7 @@ public:
   SILModule &getModule() const { return module; }
   ASTContext &getASTContext() const { return module.getASTContext(); }
   SILPassManager &getPassManager() const { return passManager; }
+  SynthesizedFileUnit &getSynthesizedFile() { return synthesizedFile; }
   Lowering::TypeConverter &getTypeConverter() { return module.Types; }
 
   /// Returns true if the `differentiable_function` instruction worklist is

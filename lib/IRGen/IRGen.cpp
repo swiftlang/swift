@@ -1241,7 +1241,7 @@ static void performParallelIRGeneration(
       CurrentIGMPtr IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF);
     } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File)) {
-      CurrentIGMPtr IGM = irgen.getGenModule(SF);
+      CurrentIGMPtr IGM = irgen.getGenModule(nextSFU);
       IGM->emitSynthesizedFileUnit(*nextSFU);
     } else {
       File->collectLinkLibraries([&](LinkLibrary LinkLib) {

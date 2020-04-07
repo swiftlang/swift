@@ -33,7 +33,7 @@ public:
   ~SynthesizedFileUnit() = default;
 
   /// Add a synthesized top-level declaration.
-  void addTopLevelDecl(ValueDecl *FD) { TopLevelDecls.push_back(FD); }
+  void addTopLevelDecl(ValueDecl *D) { TopLevelDecls.push_back(D); }
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl *> &result) const override;
