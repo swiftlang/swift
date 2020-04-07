@@ -1759,7 +1759,10 @@ DerivativeAttr::getOriginalFunction(ASTContext &context) const {
       nullptr);
 }
 
-void DerivativeAttr::setOriginalFunction(AbstractFunctionDecl *decl) {}
+void DerivativeAttr::setOriginalFunction(AbstractFunctionDecl *decl) {
+  assert(!OriginalFunction && "cannot overwrite original function");
+  OriginalFunction = decl;
+}
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
                              SourceRange baseRange, TypeRepr *baseTypeRepr,

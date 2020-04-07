@@ -4455,21 +4455,15 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
 AbstractFunctionDecl *
 DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
                                             DerivativeAttr *attr) const {
-  // Note: body is copied from `DynamicallyReplacedDeclRequest::evaluate`.
-
-  // If the attribute is invalid, bail.
-  if (attr->isInvalid())
-    return nullptr;
+  // If the typechecker has resolved the original function, return it.
+  if (auto *FD = attr->OriginalFunction.dyn_cast<AbstractFunctionDecl *>())
+    return FD;
 
   // If the function can be lazily resolved, do so now.
-  if (auto *LazyResolver = attr->Resolver) {
-    auto decl = LazyResolver->loadReferencedFunctionDecl(
-        attr, attr->ResolverContextData);
-    attr->Resolver = nullptr;
-    return decl;
-  }
+  if (auto *Resolver = attr->OriginalFunction.dyn_cast<LazyMemberLoader *>())
+    return Resolver->loadReferencedFunctionDecl(attr,
+                                                attr->ResolverContextData);
 
-  // Note: do name lookup as a fallback?
   return nullptr;
 }
 

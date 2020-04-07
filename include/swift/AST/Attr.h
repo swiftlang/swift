@@ -1874,10 +1874,23 @@ class DerivativeAttr final
   TypeRepr *BaseTypeRepr;
   /// The original function name.
   DeclNameRefWithLoc OriginalFunctionName;
-  /// Auxiliary lazy member loader, used to resolve the original function
-  /// declaration.
-  LazyMemberLoader *Resolver = nullptr;
-  /// Data representing the original function declaration.
+  /// The original function.
+  ///
+  /// The states are:
+  /// - nullptr:
+  ///   The original function is unknown. The typechecker is responsible for
+  ///   eventually resolving it.
+  /// - AbstractFunctionDecl:
+  ///   The original function is known to be this `AbstractFunctionDecl`.
+  /// - LazyMemberLoader:
+  ///   This `LazyMemberLoader` knows how to resolve the original function.
+  ///   `ResolverContextData` is an additional piece of data that the
+  ///   `LazyMemberLoader` needs.
+  // TODO(TF-1235): Making `DerivativeAttr` immutable will simplify this by
+  // removing the `AbstractFunctionDecl` state.
+  llvm::PointerUnion<AbstractFunctionDecl *, LazyMemberLoader *> OriginalFunction;
+  /// Data representing the original function declaration. See doc comment for
+  /// `OriginalFunction`.
   uint64_t ResolverContextData = 0;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
