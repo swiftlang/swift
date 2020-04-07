@@ -115,27 +115,10 @@ endfunction()
 
 function (write_component_test_script test_bin_dir component_name)
   string(REPLACE ";" " " args "${LIT_ARGS}")
-  file(
-    WRITE
-    ${test_bin_dir}/check-swift-${component_name}.sh
-    "${PYTHON_EXECUTABLE} ${LIT} \\
-    ${args} \\
-    ${test_bin_dir}/ \\
-    --filter=${component_name}\n")
-
-  file(
-    INSTALL
-    ${test_bin_dir}/check-swift-${component_name}.sh
-    DESTINATION ${test_bin_dir}/../test
-    FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ
-      GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../utils/test-scripts-template.sh
+    ${test_bin_dir}/../test/check-swift-${component_name}.sh
   )
-
-  file(
-    REMOVE
-    ${test_bin_dir}/check-swift-${component_name}.sh
-  )
-
 endfunction()
 
 set(LIT "${LLVM_MAIN_SRC_DIR}/utils/lit/lit.py")
