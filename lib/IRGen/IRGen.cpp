@@ -990,6 +990,11 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
       }
     }
 
+    // Emit synthesized file units.
+    for (auto *File : M->getFiles())
+      if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File))
+        IGM.emitSynthesizedFileUnit(*nextSFU);
+
     // Okay, emit any definitions that we suddenly need.
     irgen.emitLazyDefinitions();
 
@@ -1235,6 +1240,9 @@ static void performParallelIRGeneration(
     if (auto *SF = dyn_cast<SourceFile>(File)) {
       CurrentIGMPtr IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF);
+    } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File)) {
+      CurrentIGMPtr IGM = irgen.getGenModule(SF);
+      IGM->emitSynthesizedFileUnit(*nextSFU);
     } else {
       File->collectLinkLibraries([&](LinkLibrary LinkLib) {
         irgen.getPrimaryIGM()->addLinkLibrary(LinkLib);
