@@ -37,6 +37,7 @@ public let _noopClosure = { (x : String, y : UnsafeBufferPointer<UInt8>) in retu
 ///   - message: An instance of `OSLogMessage` created from string interpolation
 ///   - assertion: A closure that takes a format string and a pointer to a
 ///     byte buffer and asserts a condition.
+@_semantics("oslog.requires_constant_arguments")
 @_transparent
 @_optimize(none)
 public // @testable
