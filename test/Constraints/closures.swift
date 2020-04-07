@@ -793,7 +793,7 @@ func test() -> Int? {
 }
 
 var fn: () -> [Int] = {}
-// expected-error@-1 {{cannot convert value of type '()' to closure result type '[Int]'}}
+// expected-error@-1 {{cannot convert value of type '[Int]' to closure result type '()'}}
 
 fn = {}
 // expected-error@-1 {{cannot assign value of type '() -> ()' to type '() -> [Int]'}}
