@@ -1434,6 +1434,7 @@ function(add_swift_target_library name)
 
       # Add PrivateFrameworks, rdar://28466433
       set(swiftlib_c_compile_flags_all ${SWIFTLIB_C_COMPILE_FLAGS})
+      set(swiftlib_link_flags_all ${SWIFTLIB_LINK_FLAGS})
 
       # Add flags to prepend framework search paths for the parallel framework
       # hierarchy rooted at /System/iOSSupport/...
