@@ -887,6 +887,8 @@ find_package(PythonInterp REQUIRED)
 # Find optional dependencies.
 #
 
+find_package(LibCXX)
+
 if(LLVM_ENABLE_LIBXML2)
   find_package(LibXml2 REQUIRED)
 else()

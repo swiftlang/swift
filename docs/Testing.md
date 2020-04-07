@@ -465,6 +465,9 @@ use this pattern::
 
 FIXME: full list.
 
+* ``libc++``: present if libc++ was found. This is intended for C++ interop
+  tests.
+
 * ``swift_ast_verifier``: present if the AST verifier is enabled in this build.
 
 * When writing a test specific to x86, if possible, prefer ``REQUIRES:

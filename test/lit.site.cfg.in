@@ -57,6 +57,10 @@ config.darwin_osx_variant_suffix = "@DEFAULT_OSX_VARIANT_SUFFIX@"
 
 # Please remember to handle empty strings and/or unset variables correctly.
 
+
+if "@LibCXX_FOUND@" == "TRUE":
+    config.available_features.add("libc++")
+
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
 else:
