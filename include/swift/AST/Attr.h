@@ -1926,6 +1926,8 @@ public:
   }
   AbstractFunctionDecl *getOriginalFunction(ASTContext &context) const;
   void setOriginalFunction(AbstractFunctionDecl *decl);
+  void setOriginalFunctionResolver(LazyMemberLoader *resolver,
+                                   uint64_t resolverContextData);
 
   AutoDiffDerivativeFunctionKind getDerivativeKind() const {
     assert(Kind && "Derivative function kind has not yet been resolved");

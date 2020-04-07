@@ -1764,6 +1764,13 @@ void DerivativeAttr::setOriginalFunction(AbstractFunctionDecl *decl) {
   OriginalFunction = decl;
 }
 
+void DerivativeAttr::setOriginalFunctionResolver(
+    LazyMemberLoader *resolver, uint64_t resolverContextData) {
+  assert(!OriginalFunction && "cannot overwrite original function");
+  OriginalFunction = resolver;
+  ResolverContextData = resolverContextData;
+}
+
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
                              SourceRange baseRange, TypeRepr *baseTypeRepr,
                              DeclNameRefWithLoc originalName,
