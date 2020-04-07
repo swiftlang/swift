@@ -1102,7 +1102,7 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
                                 /*forcePublicDecls*/ false);
 
   llvm::MachO::InterfaceFile file;
-  file.setFileType(llvm::MachO::FileType::TBD_V3);
+  file.setFileType(llvm::MachO::FileType::TBD_V4);
   file.setApplicationExtensionSafe(
     isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);
