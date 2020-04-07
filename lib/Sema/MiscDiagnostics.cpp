@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -4332,6 +4332,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
     diagAvailability(E, const_cast<DeclContext*>(DC));
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
+  diagnoseConstantArgumentRequirement(E, DC);
 }
 
 void swift::performStmtDiagnostics(ASTContext &ctx, const Stmt *S) {
