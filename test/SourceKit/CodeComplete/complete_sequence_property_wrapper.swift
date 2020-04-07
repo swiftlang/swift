@@ -21,16 +21,13 @@ struct MyStruct {
 // RUN:   -req=track-compiles == \
 // RUN:   -req=complete -pos=16:1 -repeat-request=2 %s -- %s > %t.response
 // RUN: %FileCheck --check-prefix=RESULT  %s < %t.response
-// RUN: %FileCheck --check-prefix=TRACE  %s < %t.response
 
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.description: "barParam"
 // RESULT: ]
+// RESULT-NOT: key.reusingastcontext: 1
+
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.description: "barParam"
 // RESULT: ]
-
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE-NOT: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
+// RESULT: key.reusingastcontext: 1

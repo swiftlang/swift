@@ -792,7 +792,8 @@ static bool doCodeCompletionImpl(
       Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
       Offset, /*EnableASTCaching=*/false, Error,
       CodeCompletionDiagnostics ? &PrintDiags : nullptr,
-      [&](CompilerInstance &CI) {
+      [&](CompilerInstance &CI, bool reusingASTContext) {
+        assert(!reusingASTContext && "reusing AST context without enabling it");
         auto SF = CI.getCodeCompletionFile();
         performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
       });
