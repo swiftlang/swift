@@ -2,6 +2,6 @@
 
 public func testSwiftFunc() {}
 
-// CHECK: --- !tapi-tbd-v3
-// CHECK: archs: [ arm64e ]
+// CHECK: --- !tapi-tbd
+// CHECK: arm64e
 // CHECK: symbols: [ '_$s{{.*}}testSwiftFunc{{.*}}' ]
