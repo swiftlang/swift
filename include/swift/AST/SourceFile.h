@@ -210,11 +210,7 @@ private:
 public:
   /// Appends the given declaration to the end of the top-level decls list. Do
   /// not add any additional uses of this function.
-  void addTopLevelDecl(Decl *d) {
-    // Force decl parsing if we haven't already.
-    (void)getTopLevelDecls();
-    Decls->push_back(d);
-  }
+  void addTopLevelDecl(Decl *d);
 
   /// Prepends a declaration to the top-level decls list.
   ///
@@ -393,8 +389,6 @@ public:
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
-
-  void addVisibleDecl(ValueDecl *decl);
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;

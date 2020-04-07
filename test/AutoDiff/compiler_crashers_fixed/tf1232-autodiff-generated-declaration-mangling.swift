@@ -1,4 +1,4 @@
-// RUN: not %target-build-swift -g %s
+// RUN: %target-build-swift -g %s
 // REQUIRES: asserts
 
 // TF-1232: IRGenDebugInfo crash due to lack of proper mangling for

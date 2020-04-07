@@ -156,7 +156,10 @@ class swift::SourceLookupCache {
     }
   };
 
+public:
   ValueDeclMap TopLevelValues;
+
+private:
   ValueDeclMap ClassMembers;
   bool MemberCachePopulated = false;
 
@@ -215,6 +218,8 @@ public:
   void lookupClassMember(AccessPathTy accessPath,
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results);
+
+  void addTopLevelDecl(ValueDecl *decl);
 
   SmallVector<ValueDecl *, 0> AllVisibleValues;
 };
@@ -320,6 +325,10 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
     auto &SF = *cast<SourceFile>(file);
     addToUnqualifiedLookupCache(SF.getTopLevelDecls(), false);
   }
+}
+
+void SourceLookupCache::addTopLevelDecl(ValueDecl *decl) {
+  TopLevelValues.add(decl);
 }
 
 void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
@@ -2232,9 +2241,15 @@ SourceFile::getCachedVisibleDecls() const {
   return getCache().AllVisibleValues;
 }
 
-void SourceFile::addVisibleDecl(ValueDecl *decl) {
-  Decls->push_back(decl);
-  getCache().AllVisibleValues.push_back(decl);
+void SourceFile::addTopLevelDecl(Decl *d) {
+  // Force decl parsing if we haven't already.
+  (void)getTopLevelDecls();
+  Decls->push_back(d);
+  // Update caches.
+  if (auto *valueDecl = dyn_cast<ValueDecl>(d)) {
+    getCache().TopLevelValues.add(valueDecl);
+    getParentModule()->getSourceLookupCache().TopLevelValues.add(valueDecl);
+  }
 }
 
 static void performAutoImport(

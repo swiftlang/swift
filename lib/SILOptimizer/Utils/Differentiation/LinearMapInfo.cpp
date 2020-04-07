@@ -159,7 +159,7 @@ EnumDecl *LinearMapInfo::createBranchingTraceDecl(
   computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
   branchingTraceDecl->getInterfaceType();
   assert(branchingTraceDecl->hasInterfaceType());
-  file.addVisibleDecl(branchingTraceDecl);
+  file.addTopLevelDecl(branchingTraceDecl);
   // Add basic block enum cases.
   for (auto *predBB : originalBB->getPredecessorBlocks()) {
     auto bbId = "bb" + std::to_string(predBB->getDebugID());
@@ -233,7 +233,7 @@ LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
   computeAccessLevel(linearMapStruct, original->getEffectiveSymbolLinkage());
   linearMapStruct->getInterfaceType();
   assert(linearMapStruct->hasInterfaceType());
-  file.addVisibleDecl(linearMapStruct);
+  file.addTopLevelDecl(linearMapStruct);
   return linearMapStruct;
 }
 

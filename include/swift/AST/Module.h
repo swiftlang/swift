@@ -244,8 +244,11 @@ private:
     declaredCrossImports;
 
   std::unique_ptr<SourceLookupCache> Cache;
+
+public:
   SourceLookupCache &getSourceLookupCache() const;
 
+private:
   /// Tracks the file that will generate the module's entry point, either
   /// because it contains a class marked with \@UIApplicationMain
   /// or \@NSApplicationMain, or because it is a script file.
