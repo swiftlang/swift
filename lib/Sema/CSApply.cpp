@@ -1964,6 +1964,7 @@ namespace {
       auto *keyPath = new (ctx) KeyPathExpr(/*backslashLoc=*/dotLoc,
                                             /*parsedRoot=*/nullptr,
                                             /*parsedPath=*/anchor,
+                                            /*hasLeadingDot=*/false,
                                             /*isImplicit=*/true);
       // Type of the keypath expression we are forming is known
       // in advance, so let's set it right away.
