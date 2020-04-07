@@ -67,6 +67,9 @@ cp -r $WASI_SDK_PATH/share/wasi-sysroot usr/share
 # Build SwiftPM and install it into toolchain
 $UTILS_PATH/build-swiftpm.sh $TMP_DIR/$TOOLCHAIN_NAME
 
+# Replace absolute sysroot path with relative path
+sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift/wasi/wasm32/glibc.modulemap
+
 # Copy nightly-toolchain's host environment stdlib into toolchain
 
 if [[ "$(uname)" == "Linux" ]]; then
