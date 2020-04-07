@@ -25,7 +25,7 @@ public let AngryPhonebook = [
 
   // Small String Workloads
   BenchmarkInfo(
-    name: "AngryPhonebook.ASCII.Small",
+    name: "AngryPhonebook.ASCII2.Small",
     runFunction: { angryPhonebook($0*10, ascii) },
     tags: t,
     setUpFunction: { blackHole(ascii) }),
@@ -47,7 +47,7 @@ public let AngryPhonebook = [
 
   // Regular String Workloads
   BenchmarkInfo(
-    name: "AngryPhonebook.ASCII",
+    name: "AngryPhonebook.ASCII2",
     runFunction: { angryPhonebook($0*10, precomposed: longASCII) },
     tags: t,
     setUpFunction: { blackHole(longASCII) }),
