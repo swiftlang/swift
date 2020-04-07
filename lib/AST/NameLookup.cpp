@@ -2626,21 +2626,9 @@ void FindLocalVal::visitDoCatchStmt(DoCatchStmt *S) {
   if (!isReferencePointInRange(S->getSourceRange()))
     return;
   visit(S->getBody());
-  visitCatchClauses(S->getCatches());
-}
-void FindLocalVal::visitCatchClauses(ArrayRef<CatchStmt*> clauses) {
-  // TODO: some sort of binary search?
-  for (auto clause : clauses) {
-    visitCatchStmt(clause);
+  for (CaseStmt *C : S->getCatches()) {
+    visit(C);
   }
-}
-void FindLocalVal::visitCatchStmt(CatchStmt *S) {
-  if (!isReferencePointInRange(S->getSourceRange()))
-    return;
-  // Names in the pattern aren't visible until after the pattern.
-  if (!isReferencePointInRange(S->getErrorPattern()->getSourceRange()))
-    checkPattern(S->getErrorPattern(), DeclVisibilityKind::LocalVariable);
-  visit(S->getBody());
 }
 
 void swift::simple_display(llvm::raw_ostream &out, NLKind kind) {
