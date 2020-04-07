@@ -3687,3 +3687,22 @@ bb0(%0 : $@callee_guaranteed (@in Int, @in Int) -> @out (), %1 : $*Int):
   return %5 : $@callee_guaranteed () -> @out ()
 
 }
+
+// Test builtin "is_same_metatype" folding.
+protocol SomeP {}
+
+public enum SpecialEnum : SomeP {}
+
+// CHECK-LABEL: sil @testFoldBuiltinIsSameMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
+// CHECK-NEXT: bb0(%0 : $@thick SpecialEnum.Type):
+// CHECK-NEXT:   [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   struct $Bool ([[TRUE]] : $Builtin.Int1)
+// CHECK-NEXT:   return
+// CHECK-LABEL: }  // end sil function 'testFoldBuiltinIsSameMetatype'
+sil @testFoldBuiltinIsSameMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
+bb0(%0 : $@thick SpecialEnum.Type):
+  %1 = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+  %3 = builtin "is_same_metatype"(%1 : $@thick Any.Type, %1 : $@thick Any.Type) : $Builtin.Int1
+  %4 = struct $Bool (%3 : $Builtin.Int1)
+  return %4 : $Bool
+}
