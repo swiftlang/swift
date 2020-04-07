@@ -26,13 +26,13 @@ All public APIs should come with documentation comments describing their purpose
 
 Note that implementation details are generally outside the scope of the Swift Evolution -- the stdlib is free to change its internal algorithms, internal APIs and data structures etc. from release to release, as long as the documented API (and ABI) remains intact. 
 
-For example, since `hashValue` was always documented to allow changing its return value across different executions of the same program, we were able to switch to randomly seeded hashing in Swift 4.2 without going through the Swift Evolution process. However, the introduction of `hash(into:)` required a formal proposal. (Note though that highly visible behavioral changes like this can be more difficult to implement now that we have a stable ABI -- we can still do them, but in some cases they may require checking the version of the Swift SDK on which the main executable was compiled, to prevent breaking binaries compiled with previous releases.)
+For example, since `hashValue` was always documented to allow changing its return value across different executions of the same program, we were able to switch to randomly seeded hashing in Swift 4.2 without going through the Swift Evolution process. However, the introduction of `hash(into:)` required a formal proposal. (Note though that highly visible behavioral changes like this are much more difficult to implement now that they were in the early days -- in theory we can still do ABI-preserving changes, but [Hyrum's Law](https://www.hyrumslaw.com) makes it increasingly more difficult to change any observable behavior. For example, in some cases we may need to add runtime version checks for the Swift SDK on which the main executable was compiled, to prevent breaking binaries compiled with previous releases.)
 
-We sometimes need to expose some internal APIs as `public` for technical reasons (such as to interoperate with other system frameworks, and/or to enable testing/debugging certain functionality). We use the Leading Underscore Rule (see below) to differentiate these from the documented stdlib API. Underscored APIs aren't considered part of the public API surface, and as such they don't need to go through the Swift Evolution Process. Regular Swift code isn't supposed to directly call these; when necessary, we may change their behavior in incompatible ways or we may even remove them. (However, such changes are technically ABI breaking, so they need to be carefully considered against the risk of breaking existing binaries.)
+We sometimes need to expose some internal APIs as `public` for technical reasons (such as to interoperate with other system frameworks, and/or to enable testing/debugging certain functionality). We use the Leading Underscore Rule (see below) to differentiate these from the documented stdlib API. Underscored APIs aren't considered part of the public API surface, and as such they don't need to go through the Swift Evolution Process. Regular Swift code isn't supposed to directly call these; when necessary, we may change their behavior in source-incompatible ways or we may even remove them. (However, such changes are technically ABI breaking, so they need to be carefully considered against the risk of breaking existing binaries.)
 
 ### Overlays and Private Code
 
-The platform overlays generally have their own API review processes. These are outside the scope of Swift Evolution.
+The overlays specific to particular platforms generally have their own API review processes. These are outside the scope of Swift Evolution.
 
 Anything under `stdlib/private` can be added/removed/changed with the simple approval of a stdlib code owner.
 
@@ -67,6 +67,32 @@ extension String {
 This makes it trivial to identify the access level of every definition without having to scan the context it appears in.
 
 For historical reasons, the existing codebase generally uses `internal` as the catch-all non-public access level. However, it is okay to use `private`/`fileprivate` when appropriate.
+
+### Availability
+
+Every entry point in the standard library that has an ABI impact must be applied an `@available` attribute that describes the earliest ABI-stable OS releases that it can be deployed on. (Currently this only applies to macOS, iOS, watchOS and tvOS, since Swift isn't ABI stable on other platforms yet.)
+
+Unlike access control modifiers, we prefer to put `@available` attributes on the extension context rather than duplicating them on every individual entry point. This is an effort to fight against information overload: the `@available` attribute is information dense and it's generally easier to review/maintain if applied to a group of entry points all at once.
+
+```swift
+// 👍
+@available(macOS 10.6, iOS 10, watchOS 3, tvOS 12, *)
+extension String {
+  public func blanch() { ... }
+  public func roast() { ... }
+}
+```
+
+Features under development that haven't been released yet must be marked with the placeholder version number `9999`. This special version is always considered available in custom builds of the Swift toolchain (including development snapshots), but not in any ABI-stable production release.
+
+```swift
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public struct FutureFeature {
+  ...
+}
+```
+
+On these platforms, the Swift Standard Library ships as an integrated part of the operating system; as such, it is the platform owners' responsibility to update these placeholder version numbers to actual versions as part of their release process.
 
 ## Internals
 
