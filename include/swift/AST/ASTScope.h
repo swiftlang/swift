@@ -1893,29 +1893,6 @@ protected:
                              DeclConsumer) const override;
 };
 
-class CatchStmtScope final : public AbstractStmtScope {
-public:
-  CatchStmt *const stmt;
-  CatchStmtScope(CatchStmt *e) : stmt(e) {}
-  virtual ~CatchStmtScope() {}
-
-protected:
-  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-
-private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
-
-public:
-  std::string getClassName() const override;
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  Stmt *getStmt() const override { return stmt; }
-
-protected:
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             ASTScopeImpl::DeclConsumer) const override;
-};
-
 class CaseStmtScope final : public AbstractStmtScope {
 public:
   CaseStmt *const stmt;

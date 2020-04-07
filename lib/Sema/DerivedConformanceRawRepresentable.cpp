@@ -121,8 +121,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     auto body = BraceStmt::create(C, SourceLoc(),
                                   ASTNode(returnStmt), SourceLoc());
 
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
-                                     SourceLoc(), body,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     labelItem, SourceLoc(), SourceLoc(), body,
                                      /*case body var decls*/ None));
   }
 
@@ -350,8 +350,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
                                   stmts, SourceLoc());
 
     // cases.append("case \(litPat): \(body)")
-    cases.push_back(CaseStmt::create(C, SourceLoc(), CaseLabelItem(litPat),
-                                     SourceLoc(), SourceLoc(), body,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     CaseLabelItem(litPat), SourceLoc(),
+                                     SourceLoc(), body,
                                      /*case body var decls*/ None));
     Idx++;
   }
@@ -363,8 +364,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   auto dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto dfltBody = BraceStmt::create(C, SourceLoc(),
                                     ASTNode(dfltReturnStmt), SourceLoc());
-  cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem, SourceLoc(),
-                                   SourceLoc(), dfltBody,
+  cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                   dfltLabelItem, SourceLoc(), SourceLoc(),
+                                   dfltBody,
                                    /*case body var decls*/ None));
 
   auto rawDecl = initDecl->getParameters()->get(0);

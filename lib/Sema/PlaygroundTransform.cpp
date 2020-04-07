@@ -274,7 +274,7 @@ public:
         DCS->setBody(NB);
       }
     }
-    for (CatchStmt *C : DCS->getCatches()) {
+    for (CaseStmt *C : DCS->getCatches()) {
       if (auto *CB = dyn_cast_or_null<BraceStmt>(C->getBody())) {
         BraceStmt *NCB = transformBraceStmt(CB);
         if (NCB != CB) {

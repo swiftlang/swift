@@ -427,7 +427,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
         // Eat all of the catch clauses, so we don't trip over them in error
         // recovery.
         while (Tok.is(tok::kw_catch)) {
-          ParserResult<CatchStmt> clause = parseStmtCatch();
+          ParserResult<CaseStmt> clause = parseStmtCatch();
           if (clause.hasCodeCompletion() && clause.isNull())
             break;
         }

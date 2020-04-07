@@ -896,7 +896,7 @@ Pattern *resolvePattern(Pattern *P, DeclContext *dc, bool isStmtCondition);
 /// unbound generic types.
 Type typeCheckPattern(ContextualPattern pattern);
 
-bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
+bool typeCheckCatchPattern(CaseStmt *S, DeclContext *dc);
 
 /// Coerce a pattern to the given type.
 ///
