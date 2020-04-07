@@ -313,7 +313,6 @@ protected:
     super::visitDestroyValueInst(Destroy);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *dfei) {
     // If the extractee is the original function, do regular cloning.
@@ -370,7 +369,6 @@ protected:
             getOpLocation(dfei->getLoc()), dfei->getExtractee(),
             getOpValue(dfei->getOperand()), remappedDerivativeFnType));
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   /// One abstract function in the debug info can only have one set of variables
   /// and types. This function determines whether applying the substitutions in

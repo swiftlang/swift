@@ -432,12 +432,10 @@ struct PrintOptions {
   /// The information for converting archetypes to specialized types.
   llvm::Optional<TypeTransformContext> TransformContext;
 
-  /// Before printing the name of a ModuleDecl, this callback will be called and
-  /// the name of the ModuleDecl it returns will be printed instead. This is
-  /// currently used to present cross import overlays as if they were their
-  /// underlying module.
-  std::function<const ModuleDecl*(const ModuleDecl *)> mapModuleToUnderlying =
-    [] (const ModuleDecl *D) { return D; };
+  /// Whether cross-import overlay modules are printed with their own name (e.g.
+  /// _MyFrameworkYourFrameworkAdditions) or that of their underlying module
+  /// (e.g.  MyFramework).
+  bool MapCrossImportOverlaysToDeclaringModule = false;
 
   bool PrintAsMember = false;
   
@@ -525,6 +523,7 @@ struct PrintOptions {
     result.PrintDocumentationComments = true;
     result.SkipUnderscoredKeywords = true;
     result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
+    result.MapCrossImportOverlaysToDeclaringModule = true;
     return result;
   }
 

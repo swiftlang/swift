@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Automatic differentiation thunk generation utilities
+// Automatic differentiation thunk generation utilities.
 //
 //===----------------------------------------------------------------------===//
 
@@ -89,6 +89,13 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType);
 
+/// Reabstracts the given function-typed value `fn` to the target type `toType`.
+/// Remaps substitutions using `remapSubstitutions`.
+SILValue reabstractFunction(
+    SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
+    SILValue fn, CanSILFunctionType toType,
+    std::function<SubstitutionMap(SubstitutionMap)> remapSubstitutions);
+
 /// Get or create a derivative function parameter index subset thunk from
 /// `actualIndices` to `desiredIndices` for the given associated function
 /// value and original function operand. Returns a pair of the parameter
@@ -113,13 +120,6 @@ getOrCreateSubsetParametersThunkForLinearMap(
     CanSILFunctionType origFnType, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
     SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
-
-/// Reabstracts the given function-typed value `fn` to the target type `toType`.
-/// Remaps substitutions using `remapSubstitutions`.
-SILValue reabstractFunction(
-    SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
-    SILValue fn, CanSILFunctionType toType,
-    std::function<SubstitutionMap(SubstitutionMap)> remapSubstitutions);
 
 } // end namespace autodiff
 

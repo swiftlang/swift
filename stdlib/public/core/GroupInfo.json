@@ -239,6 +239,9 @@
     "DifferentialOperators.swift",
     "DifferentiationUtilities.swift",
     "DifferentiationSupport.swift",
-    "FloatingPointTypesDerivatives.swift"
+    "ArrayDifferentiation.swift",
+    "FloatingPointDifferentiation.swift",
+    "SIMDDifferentiation.swift",
+    "TgmathDerivatives.swift"
   ]
 }

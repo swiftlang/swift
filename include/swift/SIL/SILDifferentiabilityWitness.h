@@ -132,12 +132,10 @@ public:
   bool isSerialized() const { return IsSerialized; }
   const DeclAttribute *getAttribute() const { return Attribute; }
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
   // TODO(TF-893): This is a temporary shim for incremental removal of
   // `SILAutoDiffIndices`. Eventually remove this.
   SILAutoDiffIndices getSILAutoDiffIndices() const;
-  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Verify that the differentiability witness is well-formed.
   void verify(const SILModule &module) const;

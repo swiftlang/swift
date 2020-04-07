@@ -120,6 +120,8 @@ PASS(CopyForwarding, "copy-forwarding",
      "Copy Forwarding to Remove Redundant Copies")
 PASS(CopyPropagation, "copy-propagation",
      "Copy propagation to Remove Redundant SSA Copies")
+PASS(Differentiation, "differentiation",
+     "Automatic Differentiation")
 PASS(EpilogueARCMatcherDumper, "sil-epilogue-arc-dumper",
      "Print Epilogue retains of Returned Values and Argument releases")
 PASS(EpilogueRetainReleaseMatcherDumper, "sil-epilogue-retain-release-dumper",
@@ -150,9 +152,11 @@ PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
      "Constants Propagation for Diagnostics")
+// SWIFT_ENABLE_TENSORFLOW
 PASS(DifferentiabilityWitnessDevirtualizer,
      "differentiability-witness-devirtualizer",
      "Inlines Differentiability Witnesses")
+// SWIFT_ENABLE_TENSORFLOW END
 PASS(EagerSpecializer, "eager-specializer",
      "Eager Specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",
@@ -306,10 +310,6 @@ PASS(StripDebugInfo, "strip-debug-info",
      "Strip Debug Information")
 PASS(SwiftArrayPropertyOpt, "array-property-opt",
      "Loop Specialization for Array Properties")
-// SWIFT_ENABLE_TENSORFLOW
-PASS(Differentiation, "differentiation",
-     "Automatic Differentiation")
-// SWIFT_ENABLE_TENSORFLOW End
 PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
      "SIL retain/release Peephole Removal for Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",

@@ -1776,78 +1776,118 @@ void ModuleDecl::getDeclaredCrossImportBystanders(
     otherModules.push_back(std::get<0>(pair));
 }
 
-using TransitiveOverlays =
-    llvm::SmallDenseMap<ModuleDecl *, std::pair<Identifier, ModuleDecl *>, 1>;
-
-static void populateTransitiveCrossImports(ModuleDecl *base,
-                                           TransitiveOverlays &result) {
-  if (!result.empty() || !base->mightDeclareCrossImportOverlays())
-    return;
-
-  SmallVector<Identifier, 1> bystanders;
-  SmallVector<Identifier, 1> overlays;
+void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
+    SmallVectorImpl<ModuleDecl *> &overlayModules) {
   SmallVector<ModuleDecl *, 1> worklist;
-  SourceLoc diagLoc; // ignored
+  SmallPtrSet<ModuleDecl *, 1> seen;
+  SourceLoc unused;
 
-  worklist.push_back(base);
+  worklist.push_back(this);
   while (!worklist.empty()) {
     ModuleDecl *current = worklist.back();
     worklist.pop_back();
-    if (!current->mightDeclareCrossImportOverlays())
-      continue;
-    bystanders.clear();
-    current->getDeclaredCrossImportBystanders(bystanders);
-    for (Identifier bystander: bystanders) {
-      overlays.clear();
-      current->findDeclaredCrossImportOverlays(bystander, overlays, diagLoc);
-      for (Identifier overlay: overlays) {
-        if (!overlay.str().startswith("_"))
-          continue;
-        ModuleDecl *overlayMod =
-            base->getASTContext().getModuleByName(overlay.str());
-        if (!overlayMod)
-          continue;
-        if (result.insert({overlayMod, {bystander, current}}).second)
-          worklist.push_back(overlayMod);
+    for (auto &pair: current->declaredCrossImports) {
+      Identifier &bystander = std::get<0>(pair);
+      for (auto *file: std::get<1>(pair)) {
+        auto overlays = file->getOverlayModuleNames(current, unused, bystander);
+        for (Identifier overlay: overlays) {
+          // We don't present non-underscored overlays as part of the underlying
+          // module, so ignore them.
+          if (!overlay.str().startswith("_"))
+            continue;
+          ModuleDecl *overlayMod =
+              getASTContext().getModuleByName(overlay.str());
+          if (!overlayMod)
+            continue;
+          if (seen.insert(overlayMod).second) {
+            overlayModules.push_back(overlayMod);
+            worklist.push_back(overlayMod);
+          }
+        }
       }
     }
   }
 }
 
-bool ModuleDecl::isUnderlyingModuleOfCrossImportOverlay(
-    const ModuleDecl *overlay) {
-  if (!overlay->getNameStr().startswith("_"))
-    return false;
+std::pair<ModuleDecl *, Identifier>
+ModuleDecl::getDeclaringModuleAndBystander() {
+  if (declaringModuleAndBystander)
+    return *declaringModuleAndBystander;
 
-  populateTransitiveCrossImports(this, declaredCrossImportsTransitive);
-  return declaredCrossImportsTransitive.find(overlay) !=
-      declaredCrossImportsTransitive.end();
-}
+  if (!hasUnderscoredNaming())
+    return *(declaringModuleAndBystander = {nullptr, Identifier()});
 
-void ModuleDecl::getAllBystandersForCrossImportOverlay(
-    ModuleDecl *overlay, SmallVectorImpl<Identifier> &bystanders) {
-  if (!overlay->getNameStr().startswith("_"))
-    return;
+  // Search the transitive set of imported @_exported modules to see if any have
+  // this module as their overlay.
+  SmallPtrSet<ModuleDecl *, 16> seen;
+  SmallVector<ModuleDecl::ImportedModule, 16> imported;
+  SmallVector<ModuleDecl::ImportedModule, 16> furtherImported;
+  ModuleDecl *overlayModule = this;
 
-  populateTransitiveCrossImports(this, declaredCrossImportsTransitive);
+  getImportedModules(imported, ModuleDecl::ImportFilterKind::Public);
+  while (!imported.empty()) {
+    ModuleDecl *importedModule = std::get<1>(imported.back());
+    imported.pop_back();
+    if (!seen.insert(importedModule).second)
+      continue;
 
-  auto end = declaredCrossImportsTransitive.end();
-  for (auto i = declaredCrossImportsTransitive.find(overlay);
-       i != end;
-       i = declaredCrossImportsTransitive.find(i->second.second)) {
-    bystanders.push_back(i->second.first);
+    using CrossImportMap =
+        llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>;
+    CrossImportMap &crossImports = importedModule->declaredCrossImports;
+
+    // If any of MD's cross imports declare this module as its overlay, report
+    // MD as the underlying module.
+    auto ret = std::find_if(crossImports.begin(), crossImports.end(),
+                            [&](CrossImportMap::iterator::value_type &pair) {
+      for (OverlayFile *file: std::get<1>(pair)) {
+        ArrayRef<Identifier> overlays = file->getOverlayModuleNames(
+            importedModule, SourceLoc(), std::get<0>(pair));
+        if (std::find(overlays.begin(), overlays.end(),
+                      overlayModule->getName()) != overlays.end())
+          return true;
+      }
+      return false;
+    });
+    if (ret != crossImports.end())
+      return *(declaringModuleAndBystander = {importedModule, ret->first});
+
+    if (!importedModule->hasUnderscoredNaming())
+      continue;
+
+    furtherImported.clear();
+    importedModule->getImportedModules(furtherImported,
+                                       ModuleDecl::ImportFilterKind::Public);
+    imported.append(furtherImported.begin(), furtherImported.end());
   }
+
+  return *(declaringModuleAndBystander = {nullptr, Identifier()});
 }
 
-void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
-    SmallVectorImpl<ModuleDecl *> &overlayModules) {
-  populateTransitiveCrossImports(this, declaredCrossImportsTransitive);
-  std::transform(declaredCrossImportsTransitive.begin(),
-                 declaredCrossImportsTransitive.end(),
-                 std::back_inserter(overlayModules),
-                 [](TransitiveOverlays::iterator::value_type &i) {
-    return i.first;
-  });
+bool ModuleDecl::isCrossImportOverlayOf(ModuleDecl *other) {
+  ModuleDecl *current = this;
+  while ((current = current->getDeclaringModuleAndBystander().first)) {
+    if (current == other)
+      return true;
+  }
+  return false;
+}
+
+ModuleDecl *ModuleDecl::getDeclaringModuleIfCrossImportOverlay() {
+  ModuleDecl *current = this, *declaring = nullptr;
+  while ((current = current->getDeclaringModuleAndBystander().first))
+    declaring = current;
+  return declaring;
+}
+
+bool ModuleDecl::getRequiredBystandersIfCrossImportOverlay(
+    ModuleDecl *declaring, SmallVectorImpl<Identifier> &bystanderNames) {
+  auto current = std::make_pair(this, Identifier());
+  while ((current = current.first->getDeclaringModuleAndBystander()).first) {
+    bystanderNames.push_back(current.second);
+    if (current.first == declaring)
+      return true;
+  }
+  return false;
 }
 
 namespace {
@@ -2170,32 +2210,6 @@ bool SourceFile::shouldCrossImport() const {
          getASTContext().LangOpts.EnableCrossImportOverlays;
 }
 
-ModuleDecl*
-SourceFile::getModuleShadowedBySeparatelyImportedOverlay(const ModuleDecl *overlay) {
-  if (separatelyImportedOverlaysReversed.empty() &&
-      !separatelyImportedOverlays.empty()) {
-    for (auto &entry: separatelyImportedOverlays) {
-      ModuleDecl *shadowed = entry.first;
-      for (ModuleDecl *overlay: entry.second) {
-        // If for some reason the same overlay shadows more than one module,
-        // pick the one whose name is alphabetically first.
-        ModuleDecl *old = separatelyImportedOverlaysReversed[overlay];
-        if (!old || shadowed->getNameStr() < old->getNameStr())
-          separatelyImportedOverlaysReversed[overlay] = shadowed;
-      }
-    }
-  }
-
-  ModuleDecl *underlying = const_cast<ModuleDecl *>(overlay);
-  while (underlying->getNameStr().startswith("_")) {
-    auto next = separatelyImportedOverlaysReversed.find(underlying);
-    if (next == separatelyImportedOverlaysReversed.end())
-      return nullptr;
-    underlying = std::get<1>(*next);
-  }
-  return underlying;
-};
-
 void ModuleDecl::clearLookupCache() {
   getASTContext().getImportCache().clear();
 
@@ -2218,7 +2232,6 @@ SourceFile::getCachedVisibleDecls() const {
   return getCache().AllVisibleValues;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void SourceFile::addVisibleDecl(ValueDecl *decl) {
   Decls->push_back(decl);
   getCache().AllVisibleValues.push_back(decl);

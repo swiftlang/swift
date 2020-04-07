@@ -225,7 +225,8 @@ public:
       auto &function = builder.getFunction();
       auto substType = component.getComponentType().subst(keyPath->getSubstitutions(),
                                                            None);
-      SILType type = function.getLoweredType(substType);
+      SILType type = function.getLoweredType(
+                         Lowering::AbstractionPattern::getOpaque(), substType);
       auto addr = builder.createAllocStack(loc, type);
       
       assertHasNoContext();
@@ -302,7 +303,8 @@ public:
           auto &function = builder.getFunction();
           auto substType = component.getComponentType().subst(keyPath->getSubstitutions(),
                                                                None);
-          SILType type = function.getLoweredType(substType);
+          SILType type = function.getLoweredType(
+                        Lowering::AbstractionPattern::getOpaque(), substType);
           auto addr = builder.createAllocStack(loc, type);
 
           assertHasNoContext();
@@ -351,7 +353,8 @@ public:
       auto &function = builder.getFunction();
       auto substType = component.getComponentType().subst(keyPath->getSubstitutions(),
                                                            None);
-      SILType optType = function.getLoweredType(substType);
+      SILType optType = function.getLoweredType(
+                         Lowering::AbstractionPattern::getOpaque(), substType);
       SILType objType = optType.getOptionalObjectType().getAddressType();
       
       assert(objType && "optional wrap must return an optional");
@@ -557,7 +560,8 @@ public:
       auto resultCanType = components.back().getComponentType();
       auto &function = builder.getFunction();
       auto substType = resultCanType.subst(keyPath->getSubstitutions(), None);
-      auto optType = function.getLoweredType(substType);
+      auto optType = function.getLoweredType(
+                         Lowering::AbstractionPattern::getOpaque(), substType);
       
       assert(optType.getOptionalObjectType() &&
              "Optional-chained key path should result in an optional");

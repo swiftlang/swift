@@ -633,3 +633,108 @@ unwind:
   unwind
 }
 sil_vtable A3 {}
+
+
+// CHECK-LABEL: define{{.*}} swiftcc { i8*, %swift.refcounted* } @partial_apply_callee_guaranteed_indirect_guaranteed_class_pair_param
+// CHECK-NOT: ret
+// CHECK: call void @llvm.memcpy
+// CHECK:  insertvalue { i8*, %swift.refcounted* } { i8* bitcast (i64 (i64, %swift.refcounted*)* [[FORWARDER:@.*]] to
+// CHECK: ret
+// CHECK: define{{.*}} swiftcc i64 [[FORWARDER]](i64 %0, %swift.refcounted* swiftself %1)
+// CHECK: entry:
+// CHECK:   [[CAST:%.*]] = bitcast
+// CHECK:   [[FIELD:%.*]] = getelementptr inbounds {{.*}}* [[CAST]], i32 0, i32 1
+// CHECK:   call swiftcc i64 @indirect_guaranteed_captured_class_pair_param(i64 %0, %T13partial_apply14SwiftClassPairV* {{.*}} [[FIELD]])
+// CHECK:   ret
+// CHECK: }
+
+sil @partial_apply_callee_guaranteed_indirect_guaranteed_class_pair_param : $@convention(thin) (@in SwiftClassPair) -> @owned @callee_guaranteed (Int) -> Int {
+bb0(%x : $*SwiftClassPair):
+  %f = function_ref @indirect_guaranteed_captured_class_pair_param : $@convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int
+  %p = partial_apply [callee_guaranteed] %f(%x) : $@convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int
+  return %p : $@callee_guaranteed(Int) -> (Int)
+}
+
+sil public_external @use_closure2 : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> ()
+
+// CHECK-LABEL: define{{.*}} swiftcc void @partial_apply_stack_callee_guaranteed_indirect_guaranteed_class_pair_param(%T13partial_apply14SwiftClassPairV* {{.*}} %0)
+// CHECK:   [[CLOSURE_STACK_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, %T13partial_apply14SwiftClassPairV* }>, <{ %swift.refcounted, %T13partial_apply14SwiftClassPairV* }>* {{.*}}, i32 0, i32 1
+// CHECK:   store %T13partial_apply14SwiftClassPairV* %0, %T13partial_apply14SwiftClassPairV** [[CLOSURE_STACK_ADDR]]
+// CHECK:   call swiftcc void @use_closure2({{.*}}* [[FORWARDER:@.*]] to i8*), %swift.opaque* {{.*}})
+// CHECK:   ret void
+
+// CHECK: define{{.*}} swiftcc i64 [[FORWARDER]](i64 %0, %swift.refcounted* swiftself %1)
+// CHECK: entry:
+// CHECK:   [[ADDR:%.*]] = load %T13partial_apply14SwiftClassPairV*, %T13partial_apply14SwiftClassPairV**
+// CHECK:   [[RES:%.*]] = tail call swiftcc i64 @indirect_guaranteed_captured_class_pair_param(i64 %0, %T13partial_apply14SwiftClassPairV* {{.*}} [[ADDR]])
+// CHECK:   ret i64 [[RES]]
+// CHECK: }
+
+sil @partial_apply_stack_callee_guaranteed_indirect_guaranteed_class_pair_param : $@convention(thin) (@in_guaranteed SwiftClassPair) -> () {
+bb0(%x : $*SwiftClassPair):
+  %f = function_ref @indirect_guaranteed_captured_class_pair_param : $@convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int
+  %p = partial_apply [callee_guaranteed] [on_stack] %f(%x) : $@convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int
+  %u = function_ref @use_closure2 : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> ()
+  %r = apply %u(%p) : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> ()
+  dealloc_stack %p : $@noescape @callee_guaranteed (Int) ->(Int)
+  %t = tuple()
+  return %t : $()
+}
+
+// CHECK: define{{.*}} swiftcc void @partial_apply_stack_callee_guaranteed_indirect_in_class_pair_param(%T13partial_apply14SwiftClassPairV* {{.*}} %0)
+// CHECK:   [[CLOSURE_STACK_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, %T13partial_apply14SwiftClassPairV* }>, <{ %swift.refcounted, %T13partial_apply14SwiftClassPairV* }>* {{.*}}, i32 0, i32 1
+// CHECK:   store %T13partial_apply14SwiftClassPairV* %0, %T13partial_apply14SwiftClassPairV** [[CLOSURE_STACK_ADDR]]
+// CHECK:   call swiftcc void @use_closure2({{.*}}* [[FORWARDER:@.*]] to i8*), %swift.opaque* {{.*}})
+// CHECK:   ret void
+
+// CHECK: define{{.*}} swiftcc i64 [[FORWARDER]](i64 %0, %swift.refcounted* swiftself %1)
+// CHECK: entry:
+// CHECK:   [[TEMP:%.*]] = alloca %T13partial_apply14SwiftClassPairV
+// CHECK:   [[VALUE_ADDR:%.*]] = load %T13partial_apply14SwiftClassPairV*, %T13partial_apply14SwiftClassPairV** {{.*}}
+// CHECK:   call %T13partial_apply14SwiftClassPairV* @"$s13partial_apply14SwiftClassPairVWOc"(%T13partial_apply14SwiftClassPairV* [[VALUE_ADDR]], %T13partial_apply14SwiftClassPairV* [[TEMP]])
+// CHECK:   [[RES:%.*]] = call swiftcc i64 @indirect_in_captured_class_pair_param(i64 %0, %T13partial_apply14SwiftClassPairV* {{.*}} [[TEMP]])
+// CHECK:   ret i64 [[RES]]
+
+sil public_external @indirect_in_captured_class_pair_param : $@convention(thin) (Int, @in SwiftClassPair) -> Int
+
+sil @partial_apply_stack_callee_guaranteed_indirect_in_class_pair_param : $@convention(thin) (@in SwiftClassPair) -> () {
+bb0(%x : $*SwiftClassPair):
+  %f = function_ref @indirect_in_captured_class_pair_param : $@convention(thin) (Int, @in SwiftClassPair) -> Int
+  %p = partial_apply [callee_guaranteed] [on_stack] %f(%x) : $@convention(thin) (Int, @in SwiftClassPair) -> Int
+  %u = function_ref @use_closure2 : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> ()
+  %r = apply %u(%p) : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> ()
+  dealloc_stack %p : $@noescape @callee_guaranteed (Int) ->(Int)
+  destroy_addr %x: $*SwiftClassPair
+  %t = tuple()
+  return %t : $()
+}
+
+
+// CHECK-LABEL: define{{.*}}swiftcc void @partial_apply_stack_callee_guaranteed_indirect_in_constant_class_pair_param(%T13partial_apply14SwiftClassPairV* {{.*}} %0)
+// CHECK:   [[CLOSURE_STACK_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, %T13partial_apply14SwiftClassPairV* }>, <{ %swift.refcounted, %T13partial_apply14SwiftClassPairV* }>* {{.*}}, i32 0, i32 1
+// CHECK:   store %T13partial_apply14SwiftClassPairV* %0, %T13partial_apply14SwiftClassPairV** [[CLOSURE_STACK_ADDR]]
+// CHECK:   call swiftcc void @use_closure2({{.*}}* [[FORWARDER:@.*]] to i8*), %swift.opaque* {{.*}})
+// CHECK:   ret void
+
+// CHECK: define{{.*}} swiftcc i64 @"$s46indirect_in_constant_captured_class_pair_paramTA"(i64 %0, %swift.refcounted* swiftself %1)
+// CHECK: entry:
+// CHECK:   [[TEMP:%.*]] = alloca %T13partial_apply14SwiftClassPairV, align 8
+// CHECK:   [[VALUE_ADDR:%.*]] = load %T13partial_apply14SwiftClassPairV*, %T13partial_apply14SwiftClassPairV** {{.*}}
+// CHECK:   call %T13partial_apply14SwiftClassPairV* @"$s13partial_apply14SwiftClassPairVWOc"(%T13partial_apply14SwiftClassPairV* [[VALUE_ADDR]], %T13partial_apply14SwiftClassPairV* [[TEMP]])
+// CHECK:   [[RES:%.*]] = call swiftcc i64 @indirect_in_constant_captured_class_pair_param(i64 %0, %T13partial_apply14SwiftClassPairV* {{.*}} [[TEMP]])
+// CHECK:   ret i64 [[RES]]
+// CHECK: }
+
+sil public_external @indirect_in_constant_captured_class_pair_param : $@convention(thin) (Int, @in_constant SwiftClassPair) -> Int
+
+sil @partial_apply_stack_callee_guaranteed_indirect_in_constant_class_pair_param : $@convention(thin) (@in SwiftClassPair) -> () {
+bb0(%x : $*SwiftClassPair):
+  %f = function_ref @indirect_in_constant_captured_class_pair_param : $@convention(thin) (Int, @in_constant SwiftClassPair) -> Int
+  %p = partial_apply [callee_guaranteed] [on_stack] %f(%x) : $@convention(thin) (Int, @in_constant SwiftClassPair) -> Int
+  %u = function_ref @use_closure2 : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> ()
+  %r = apply %u(%p) : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> ()
+  dealloc_stack %p : $@noescape @callee_guaranteed (Int) ->(Int)
+  destroy_addr %x: $*SwiftClassPair
+  %t = tuple()
+  return %t : $()
+}

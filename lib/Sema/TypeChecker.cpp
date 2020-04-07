@@ -306,18 +306,6 @@ static void typeCheckDelayedFunctions(SourceFile &SF) {
   } while (currentFunctionIdx < SF.DelayedFunctions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size());
 
-
-  for (AbstractFunctionDecl *FD : llvm::reverse(SF.DelayedFunctions)) {
-    TypeChecker::computeCaptures(FD);
-    // SWIFT_ENABLE_TENSORFLOW
-    // Check @compilerEvaluable function body correctness for all the functions
-    // defined in this file. We do this here, rather than in
-    // AttributeChecker::visitCompilerEvaluableAttr() because we need the function
-    // bodies to be type checked.
-    TypeChecker::checkFunctionBodyCompilerEvaluable(FD);
-    // SWIFT_ENABLE_TENSORFLOW END
-  }
-
   SF.DelayedFunctions.clear();
 }
 

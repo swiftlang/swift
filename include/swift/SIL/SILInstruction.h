@@ -2056,7 +2056,6 @@ public:
 /// does it have the given semantics?
 bool doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics);
 
-// SWIFT_ENABLE_TENSORFLOW
 /// Predicate used to filter InoutArgumentRange.
 struct OperandToInoutArgument {
   ArrayRef<SILParameterInfo> paramInfos;
@@ -2075,7 +2074,6 @@ struct OperandToInoutArgument {
 
 using InoutArgumentRange =
     OptionalTransformRange<IntRange<size_t>, OperandToInoutArgument>;
-// SWIFT_ENABLE_TENSORFLOW END
 
 /// The partial specialization of ApplyInstBase for full applications.
 /// Adds some methods relating to 'self' and to result types that don't
@@ -2089,10 +2087,8 @@ protected:
   ApplyInstBase(As &&...args)
     : ApplyInstBase<Impl, Base, false>(std::forward<As>(args)...) {}
 
-// SWIFT_ENABLE_TENSORFLOW
 private:
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
-// SWIFT_ENABLE_TENSORFLOW END
 
 public:
   using super::getCallee;
@@ -2178,11 +2174,6 @@ public:
     return getArguments().slice(getNumIndirectResults());
   }
 
-  bool hasSemantics(StringRef semanticsString) const {
-    return doesApplyCalleeHaveSemantics(getCallee(), semanticsString);
-  }
-
-// SWIFT_ENABLE_TENSORFLOW
   /// Returns all `@inout` and `@inout_aliasable` arguments passed to the
   /// instruction.
   InoutArgumentRange getInoutArguments() const {
@@ -2192,7 +2183,10 @@ public:
         OperandToInoutArgument(impl.getSubstCalleeConv().getParameters(),
                                impl.getArgumentsWithoutIndirectResults()));
   }
-// SWIFT_ENABLE_TENSORFLOW END
+
+  bool hasSemantics(StringRef semanticsString) const {
+    return doesApplyCalleeHaveSemantics(getCallee(), semanticsString);
+  }
 };
 
 /// ApplyInst - Represents the full application of a function value.

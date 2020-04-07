@@ -2212,8 +2212,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     if (invalid)
       return false;
 
-    Attributes.add(new (Context)
-        TypeEraserAttr(AtLoc, {Loc, RParenLoc}, ErasedType.get()));
+    Attributes.add(TypeEraserAttr::create(Context, AtLoc, {Loc, RParenLoc}, ErasedType.get()));
     break;
   }
 

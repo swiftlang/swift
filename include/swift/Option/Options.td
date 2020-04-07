@@ -505,13 +505,14 @@ def enable_experimental_cross_file_derivative_registration :
   Flag<["-"], "enable-experimental-cross-file-derivative-registration">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental cross-file derivative registration">;
+// SWIFT_ENABLE_TENSORFLOW END
 
-// NOTE: This flag will be removed when JVP/differential generation is robust.
+// Note: this flag will be removed when JVP/differential generation in the
+// differentiation transform is robust.
 def enable_experimental_forward_mode_differentiation :
   Flag<["-"], "enable-experimental-forward-mode-differentiation">,
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental forward mode differentiation">;
-// SWIFT_ENABLE_TENSORFLOW END
 
 def enable_experimental_additive_arithmetic_derivation :
   Flag<["-"], "enable-experimental-additive-arithmetic-derivation">,

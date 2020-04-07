@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,27 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// SWIFT_ENABLE_TENSORFLOW
-//
 // Automatic differentiation common utilities.
-//
-// NOTE: Though automatic differentiation is developed as part of the Swift for
-// TensorFlow project, it is completely independent from TensorFlow.
-// Read the differentiable programming manifesto for more information:
-// docs/DifferentiableProgramming.md.
-//
-// TODO: Move definitions from lib/SILOptimizer/Mandatory/Differentiation.cpp.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 
+#include "swift/SIL/SILDifferentiabilityWitness.h"
+#include "swift/SIL/SILType.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeSubstCloner.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 
 namespace swift {
 
+// SWIFT_ENABLE_TENSORFLOW
 using llvm::DenseMap;
 using llvm::SmallDenseMap;
 using llvm::SmallDenseSet;
@@ -39,6 +35,7 @@ using llvm::SmallSet;
 
 class ApplyInst;
 class DifferentiableActivityInfo;
+// SWIFT_ENABLE_TENSORFLOW END
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -111,6 +108,16 @@ void collectAllActualResultsInTypeOrder(
     ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
     SmallVectorImpl<SILValue> &results);
 
+/// For an `apply` instruction with active results, compute:
+/// - The results of the `apply` instruction, in type order.
+/// - The set of minimal parameter and result indices for differentiating the
+///   `apply` instruction.
+void collectMinimalIndicesForFunctionCall(
+    ApplyInst *ai, SILAutoDiffIndices parentIndices,
+    const DifferentiableActivityInfo &activityInfo,
+    SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
+    SmallVectorImpl<unsigned> &resultIndices);
+
 /// Returns the underlying instruction for the given SILValue, if it exists,
 /// peering through function conversion instructions.
 template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
@@ -129,21 +136,9 @@ template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
   return nullptr;
 }
 
-/// For an `apply` instruction with active results, compute:
-/// - The results of the `apply` instruction, in type order.
-/// - The set of minimal parameter and result indices for differentiating the
-///   `apply` instruction.
-void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, SILAutoDiffIndices parentIndices,
-    const DifferentiableActivityInfo &activityInfo,
-    SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
-    SmallVectorImpl<unsigned> &resultIndices);
-
-/// Emit a zero value into the given buffer access by calling
-/// `AdditiveArithmetic.zero`. The given type must conform to
-/// `AdditiveArithmetic`.
-void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
-                        SILValue bufferAccess, SILLocation loc);
+//===----------------------------------------------------------------------===//
+// Code emission utilities
+//===----------------------------------------------------------------------===//
 
 /// Given a range of elements, joins these into a single value. If there's
 /// exactly one element, returns that element. Otherwise, creates a tuple using
@@ -155,6 +150,12 @@ SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
 /// a tuple type. Otherwise, add this value directly to `results`.
 void extractAllElements(SILValue value, SILBuilder &builder,
                         SmallVectorImpl<SILValue> &results);
+
+/// Emit a zero value into the given buffer access by calling
+/// `AdditiveArithmetic.zero`. The given type must conform to
+/// `AdditiveArithmetic`.
+void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
+                        SILValue bufferAccess, SILLocation loc);
 
 //===----------------------------------------------------------------------===//
 // Utilities for looking up derivatives of functions
@@ -204,6 +205,35 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
     IndexSubset *resultIndices);
 
 } // end namespace autodiff
+
+/// Creates arguments in the entry block based on the function type.
+inline void createEntryArguments(SILFunction *f) {
+  auto *entry = f->getEntryBlock();
+  auto conv = f->getConventions();
+  auto &ctx = f->getASTContext();
+  auto moduleDecl = f->getModule().getSwiftModule();
+  assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
+         "Entry already has arguments?!");
+  auto createFunctionArgument = [&](SILType type) {
+    // Create a dummy parameter declaration.
+    // Necessary to prevent crash during argument explosion optimization.
+    auto loc = f->getLocation().getSourceLoc();
+    auto *decl = new (ctx)
+        ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
+    decl->setSpecifier(ParamDecl::Specifier::Default);
+    entry->createFunctionArgument(type, decl);
+  };
+  for (auto indResTy : conv.getIndirectSILResultTypes()) {
+    if (indResTy.hasArchetype())
+      indResTy = indResTy.mapTypeOutOfContext();
+    createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
+  }
+  for (auto paramTy : conv.getParameterSILTypes()) {
+    if (paramTy.hasArchetype())
+      paramTy = paramTy.mapTypeOutOfContext();
+    createFunctionArgument(f->mapTypeIntoContext(paramTy));
+  }
+}
 
 /// Helper class for visiting basic blocks in post-order post-dominance order,
 /// based on a worklist algorithm.
@@ -258,38 +288,6 @@ public:
   }
 };
 
-/// Creates arguments in the entry block based on the function type.
-inline void createEntryArguments(SILFunction *f) {
-  auto *entry = f->getEntryBlock();
-  auto conv = f->getConventions();
-  auto &ctx = f->getASTContext();
-  auto moduleDecl = f->getModule().getSwiftModule();
-  assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
-         "Entry already has arguments?!");
-  auto createFunctionArgument = [&](SILType type) {
-    // Create a dummy parameter declaration.
-    // Necessary to prevent crash during argument explosion optimization.
-    auto loc = f->getLocation().getSourceLoc();
-    auto *decl = new (ctx)
-        ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
-    decl->setSpecifier(ParamDecl::Specifier::Default);
-    entry->createFunctionArgument(type, decl);
-  };
-  // f->getLoweredFunctionType()->remap
-  for (auto indResTy : conv.getIndirectSILResultTypes()) {
-    if (indResTy.hasArchetype())
-      indResTy = indResTy.mapTypeOutOfContext();
-    createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
-    // createFunctionArgument(indResTy.getAddressType());
-  }
-  for (auto paramTy : conv.getParameterSILTypes()) {
-    if (paramTy.hasArchetype())
-      paramTy = paramTy.mapTypeOutOfContext();
-    createFunctionArgument(f->mapTypeIntoContext(paramTy));
-    // createFunctionArgument(paramTy);
-  }
-}
-
 /// Cloner that remaps types using the target function's generic environment.
 class BasicTypeSubstCloner final
     : public TypeSubstCloner<BasicTypeSubstCloner, SILOptFunctionBuilder> {
@@ -308,12 +306,12 @@ public:
     SILClonerWithScopes::postProcess(orig, cloned);
   }
 
-  void run() {
-    auto &target = Builder.getFunction();
-    auto *entry = target.createBasicBlock();
-    createEntryArguments(&target);
-    SmallVector<SILValue, 8> entryArguments(target.getArguments().begin(),
-                                            target.getArguments().end());
+  void cloneFunction() {
+    auto &newFunction = Builder.getFunction();
+    auto *entry = newFunction.createBasicBlock();
+    createEntryArguments(&newFunction);
+    SmallVector<SILValue, 8> entryArguments(newFunction.getArguments().begin(),
+                                            newFunction.getArguments().end());
     cloneFunctionBody(&Original, entry, entryArguments);
   }
 };

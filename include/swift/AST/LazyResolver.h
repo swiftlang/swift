@@ -105,6 +105,10 @@ public:
   virtual ValueDecl *
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) = 0;
+
+  /// Returns the type for a given @_typeEraser() attribute.
+  virtual Type loadTypeEraserType(const TypeEraserAttr *TRA,
+                                  uint64_t contextData) = 0;
 };
 
 /// A class that can lazily load conformances from a serialized format.

@@ -40,7 +40,7 @@ func vjpSimple(x: Float) -> (Float, (Float) -> Float) {
 // CHECK-NEXT: func testWrtClause(x: Float, y: Float) -> Float
 @differentiable(wrt: x)
 func testWrtClause(x: Float, y: Float) -> Float {
-  return x + y
+  return x
 }
 
 struct InstanceMethod : Differentiable {
@@ -48,7 +48,7 @@ struct InstanceMethod : Differentiable {
   // CHECK-NEXT: func testWrtClause(x: Float, y: Float) -> Float
   @differentiable(wrt: (self, y))
   func testWrtClause(x: Float, y: Float) -> Float {
-    return x + y
+    return x
   }
 
   struct TangentVector: Differentiable, AdditiveArithmetic {

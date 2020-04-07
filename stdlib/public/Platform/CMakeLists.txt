@@ -2,8 +2,10 @@ set(swift_platform_sources
     Platform.swift
     TiocConstants.swift)
 set(swift_platform_gyb_sources
-    tgmath.swift.gyb
-    tgmath_derivatives.swift.gyb)
+    # SWIFT_ENABLE_TENSORFLOW_START
+    ../Differentiation/TgmathDerivatives.swift.gyb
+    # SWIFT_ENABLE_TENSORFLOW_END
+    tgmath.swift.gyb)
 
 set(darwin_depends)
 if(NOT BUILD_STANDALONE)

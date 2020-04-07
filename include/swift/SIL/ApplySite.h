@@ -510,7 +510,6 @@ public:
     return getArguments().slice(getNumIndirectSILResults());
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   InoutArgumentRange getInoutArguments() const {
     switch (getKind()) {
     case FullApplySiteKind::ApplyInst:
@@ -521,7 +520,6 @@ public:
       return cast<BeginApplyInst>(getInstruction())->getInoutArguments();
     }
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Returns true if \p op is the callee operand of this apply site
   /// and not an argument operand.
