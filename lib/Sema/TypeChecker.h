@@ -1520,9 +1520,6 @@ bool isMemberOperator(FuncDecl *decl, Type type);
 /// Complain if @objc or dynamic is used without importing Foundation.
 void diagnoseAttrsRequiringFoundation(SourceFile &SF);
 
-/// Returns `true` iff differentiable programming is enabled.
-bool isDifferentiableProgrammingEnabled(SourceFile &SF);
-
 /// Returns `true` iff `AdditiveArithmetic` derived conformances are enabled.
 bool isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF);
 
