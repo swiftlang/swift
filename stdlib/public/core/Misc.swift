@@ -86,7 +86,7 @@ public func _getMangledTypeName(_ type: Any.Type)
 /// Returns the mangled name for a given type.
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 public // SPI
-func _mangledTypeName<T>(_ type: T.Type) -> String? {
+func _mangledTypeName(_ type: Any.Type) -> String? {
   let (stringPtr, count) = _getMangledTypeName(type)
   guard count > 0 else {
     return nil
