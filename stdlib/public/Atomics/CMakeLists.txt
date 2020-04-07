@@ -15,12 +15,12 @@ add_swift_target_library(swiftAtomics ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   AtomicMemoryOrderings.swift
   AtomicProtocol.swift
   NullableAtomic.swift
-  UnsafeAtomicLazyReference.swift
+  UnsafePointerToAtomicLazyReference.swift
 
   GYB_SOURCES
   AtomicIntegerConformances.swift.gyb
   AtomicPointerConformances.swift.gyb
-  UnsafeAtomic.swift.gyb
+  UnsafePointerToAtomic.swift.gyb
 
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS} "-parse-stdlib"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"

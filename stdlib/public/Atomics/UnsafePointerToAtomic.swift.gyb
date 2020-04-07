@@ -37,7 +37,7 @@ import Swift
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct UnsafeAtomic<Value: AtomicProtocol> {
+public struct UnsafePointerToAtomic<Value: AtomicProtocol> {
   @usableFromInline
   internal let _ptr: UnsafeMutablePointer<Value.AtomicStorage>
 
@@ -63,7 +63,7 @@ public struct UnsafeAtomic<Value: AtomicProtocol> {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomic {
+extension UnsafePointerToAtomic {
   /// Atomically loads and returns the current value, applying the specified
   /// memory ordering.
   ///
@@ -234,7 +234,7 @@ extension UnsafeAtomic {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafeAtomic where Value: AtomicInteger {
+extension UnsafePointerToAtomic where Value: AtomicInteger {
   % for (name, _, op, label, doc) in integerOperations:
   /// Perform an atomic ${doc} operation and return the original value, with
   /// the specified memory ordering.
