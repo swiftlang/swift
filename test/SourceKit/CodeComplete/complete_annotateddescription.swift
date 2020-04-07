@@ -10,5 +10,8 @@ func test(value: MyStruct) {
   value 
 }
 
+// FIXME: windows testing failed with newline code mismatch.
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %sourcekitd-test -req=complete -pos=10:8 -req-opts=annotateddescription=1 %s -- %s > %t.result
 // RUN: diff -u %s.result %t.result
