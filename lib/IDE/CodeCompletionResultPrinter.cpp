@@ -66,10 +66,21 @@ namespace {
 class AnnotatingDescriptionPrinter {
   raw_ostream &OS;
 
+  /// Print \p content enclosing with \p tag.
   void printWithTag(StringRef tag, StringRef content) {
+    // Trim whitepsaces around the non-whitespace characters.
+    // (i.e. "  something   " -> "  <tag>something</tag>   ".
+    auto ltrimIdx = content.find_first_not_of(' ');
+    auto rtrimIdx = content.find_last_not_of(' ') + 1;
+    assert(ltrimIdx != StringRef::npos && rtrimIdx != StringRef::npos &&
+           "empty or whitespace only element");
+
+    OS << content.substr(0, ltrimIdx);
     OS << "<" << tag << ">";
-    swift::markup::appendWithXMLEscaping(OS, content);
+    swift::markup::appendWithXMLEscaping(
+        OS, content.substr(ltrimIdx, rtrimIdx - ltrimIdx));
     OS << "</" << tag << ">";
+    OS << content.substr(rtrimIdx);
   }
 
   void printTextChunk(CodeCompletionString::Chunk C) {
