@@ -388,12 +388,6 @@ bool ForEachPatternScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
       stmt->getPattern(), DeclVisibilityKind::LocalVariable, consumer);
 }
 
-bool CatchStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                                           DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(
-      stmt->getErrorPattern(), DeclVisibilityKind::LocalVariable, consumer);
-}
-
 bool CaseStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                                           DeclConsumer consumer) const {
   for (auto &item : stmt->getMutableCaseLabelItems())

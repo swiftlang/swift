@@ -1617,7 +1617,7 @@ public:
   ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo,
                                  bool shouldSkipDoTokenConsume = false);
-  ParserResult<CatchStmt> parseStmtCatch();
+  ParserResult<CaseStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
