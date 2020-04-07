@@ -2947,12 +2947,15 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     return true;
 
   // Collect aggregated fixes from all solutions
-  llvm::SmallMapVector<std::pair<ConstraintLocator *, FixKind>,
-                       llvm::TinyPtrVector<ConstraintFix *>, 4>
+  using LocatorAndKind = std::pair<ConstraintLocator *, FixKind>;
+  using SolutionAndFix = std::pair<const Solution *, const ConstraintFix *>;
+  llvm::SmallMapVector<LocatorAndKind, llvm::SmallVector<SolutionAndFix, 4>, 4>
       aggregatedFixes;
   for (const auto &solution : solutions) {
-    for (auto *fix : solution.Fixes)
-      aggregatedFixes[{fix->getLocator(), fix->getKind()}].push_back(fix);
+    for (const auto *fix : solution.Fixes) {
+      LocatorAndKind key(fix->getLocator(), fix->getKind());
+      aggregatedFixes[key].emplace_back(&solution, fix);
+    }
   }
 
   // If there is an overload difference, let's see if there's a common callee
@@ -2983,9 +2986,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     bool diagnosed = false;
     for (auto fixes: aggregatedFixes) {
       // A common fix must appear in all solutions
-      if (fixes.second.size() != solutions.size()) continue;
-      diagnosed |= fixes.second.front()->diagnoseForAmbiguity(solutions,
-                                                              fixes.second);
+      auto &commonFixes = fixes.second;
+      if (commonFixes.size() != solutions.size()) continue;
+
+      auto *firstFix = commonFixes.front().second;
+      diagnosed |= firstFix->diagnoseForAmbiguity(commonFixes);
     }
     return diagnosed;
   }

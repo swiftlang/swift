@@ -291,8 +291,10 @@ public:
   virtual bool diagnose(const Solution &solution,
                         bool asNote = false) const = 0;
 
-  virtual bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
-                                    ArrayRef<ConstraintFix *> fixes) const {
+  using CommonFixesArray =
+      ArrayRef<std::pair<const Solution *, const ConstraintFix *>>;
+
+  virtual bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
     return false;
   }
 
@@ -850,8 +852,7 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
-                            ArrayRef<ConstraintFix *> fixes) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
                                         DeclNameRef member, bool alreadyDiagnosed,
@@ -1125,9 +1126,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
-                            ArrayRef<ConstraintFix *> fixes) const override {
-    return diagnose(solutions.front());
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
   }
 
   static AddMissingArguments *create(ConstraintSystem &cs,
@@ -1170,9 +1170,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
-                            ArrayRef<ConstraintFix *> fixes) const override {
-    return diagnose(solutions.front());
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
   }
 
   /// FIXME(diagnostics): Once `resolveDeclRefExpr` is gone this
@@ -1381,9 +1380,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
-                            ArrayRef<ConstraintFix *> fixes) const override {
-    return diagnose(solutions.front());
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
   }
 
   static DefaultGenericArgument *create(ConstraintSystem &cs,
@@ -1457,9 +1455,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
-                            ArrayRef<ConstraintFix *> fixes) const override {
-    return diagnose(solutions.front());
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
   }
 
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,

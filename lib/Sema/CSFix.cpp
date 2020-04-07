@@ -489,15 +489,13 @@ bool DefineMemberBasedOnUse::diagnose(const Solution &solution,
 }
 
 bool
-DefineMemberBasedOnUse::diagnoseForAmbiguity(ArrayRef<Solution> solutions,
-                                             ArrayRef<ConstraintFix *> fixes) const {
+DefineMemberBasedOnUse::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
   Type concreteBaseType;
-  for (unsigned i = 0; i < solutions.size(); ++i) {
-    const auto *fix = fixes[i]->getAs<DefineMemberBasedOnUse>();
-    const auto &solution = solutions[i];
-    assert(llvm::find(solution.Fixes, fix) != solution.Fixes.end());
+  for (const auto &solutionAndFix : commonFixes) {
+    const auto *solution = solutionAndFix.first;
+    const auto *fix = solutionAndFix.second->getAs<DefineMemberBasedOnUse>();
 
-    auto baseType = solution.simplifyType(fix->BaseType);
+    auto baseType = solution->simplifyType(fix->BaseType);
     if (!concreteBaseType)
       concreteBaseType = baseType;
 
@@ -508,7 +506,7 @@ DefineMemberBasedOnUse::diagnoseForAmbiguity(ArrayRef<Solution> solutions,
     }
   }
 
-  return diagnose(solutions.front());
+  return diagnose(*commonFixes.front().first);
 }
 
 DefineMemberBasedOnUse *
