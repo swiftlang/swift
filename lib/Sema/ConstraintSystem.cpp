@@ -2983,8 +2983,9 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     bool diagnosed = false;
     for (auto fixes: aggregatedFixes) {
       // A common fix must appear in all solutions
-      if (fixes.second.size() < solutions.size()) continue;
-      diagnosed |= fixes.second.front()->diagnoseForAmbiguity(solutions);
+      if (fixes.second.size() != solutions.size()) continue;
+      diagnosed |= fixes.second.front()->diagnoseForAmbiguity(solutions,
+                                                              fixes.second);
     }
     return diagnosed;
   }

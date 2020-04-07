@@ -291,7 +291,10 @@ public:
   virtual bool diagnose(const Solution &solution,
                         bool asNote = false) const = 0;
 
-  virtual bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const { return false; }
+  virtual bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
+                                    ArrayRef<ConstraintFix *> fixes) const {
+    return false;
+  }
 
   void print(llvm::raw_ostream &Out) const;
 
@@ -847,11 +850,16 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override;
+  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
+                            ArrayRef<ConstraintFix *> fixes) const override;
 
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
                                         DeclNameRef member, bool alreadyDiagnosed,
                                         ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::DefineMemberBasedOnUse;
+  }
 };
 
 class AllowInvalidMemberRef : public ConstraintFix {
@@ -1117,7 +1125,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
+  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
+                            ArrayRef<ConstraintFix *> fixes) const override {
     return diagnose(solutions.front());
   }
 
@@ -1161,7 +1170,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
+  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
+                            ArrayRef<ConstraintFix *> fixes) const override {
     return diagnose(solutions.front());
   }
 
@@ -1371,7 +1381,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
+  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
+                            ArrayRef<ConstraintFix *> fixes) const override {
     return diagnose(solutions.front());
   }
 
@@ -1446,7 +1457,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
+  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions,
+                            ArrayRef<ConstraintFix *> fixes) const override {
     return diagnose(solutions.front());
   }
 
