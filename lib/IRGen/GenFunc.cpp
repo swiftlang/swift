@@ -654,17 +654,24 @@ static void emitApplyArgument(IRGenFunction &IGF,
                         silConv.getSILType(substParam, substFnTy), in, out);
 }
 
-static CanType getArgumentLoweringType(CanType type,
-                                       SILParameterInfo paramInfo) {
+static CanType getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
+                                       bool isNoEscape) {
   switch (paramInfo.getConvention()) {
   // Capture value parameters by value, consuming them.
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
+    return type;
+  // Capture indirect parameters if the closure is not [onstack]. [onstack]
+  // closures don't take ownership of their arguments so we just capture the
+  // address.
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_In_Guaranteed:
-    return type;
+    if (isNoEscape)
+      return CanInOutType::get(type);
+    else
+      return type;
 
   // Capture inout parameters by pointer.
   case ParameterConvention::Indirect_Inout:
@@ -1067,33 +1074,57 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       auto fieldConvention = conventions[nextCapturedField];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       auto &fieldTI = fieldLayout.getType();
-      auto fieldSchema = fieldTI.getSchema();
       lastCapturedFieldPtr = fieldAddr.getAddress();
       
       Explosion param;
       switch (fieldConvention) {
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Constant: {
-        // The +1 argument is passed indirectly, so we need to copy into a
-        // temporary.
-        needsAllocas = true;
-        auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
-        auto addressPointer = stackAddr.getAddress().getAddress();
-        fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr,
-                                   fieldTy, false);
-        param.add(addressPointer);
-        
-        // Remember to deallocate later.
-        addressesToDeallocate.push_back(
-            AddressToDeallocate{fieldTy, fieldTI, stackAddr});
 
+        auto initStackCopy = [&addressesToDeallocate, &needsAllocas, &param,
+                              &subIGF](const TypeInfo &fieldTI, SILType fieldTy,
+                                       Address fieldAddr) {
+          // The +1 argument is passed indirectly, so we need to copy into a
+          // temporary.
+          needsAllocas = true;
+          auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
+          auto addressPointer = stackAddr.getAddress().getAddress();
+          fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr,
+                                     fieldTy, false);
+          param.add(addressPointer);
+
+          // Remember to deallocate later.
+          addressesToDeallocate.push_back(
+              AddressToDeallocate{fieldTy, fieldTI, stackAddr});
+        };
+
+        if (outType->isNoEscape()) {
+          // If the closure is [onstack] it only captured the address of the
+          // value. Load that address from the context.
+          Explosion addressExplosion;
+          cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr,
+                                                     addressExplosion);
+          assert(fieldTy.isAddress());
+          auto newFieldTy = fieldTy.getObjectType();
+          auto &newFieldTI =
+              subIGF.getTypeInfoForLowered(newFieldTy.getASTType());
+          fieldAddr =
+              newFieldTI.getAddressForPointer(addressExplosion.claimNext());
+          initStackCopy(newFieldTI, newFieldTy, fieldAddr);
+        } else {
+          initStackCopy(fieldTI, fieldTy, fieldAddr);
+        }
         break;
       }
       case ParameterConvention::Indirect_In_Guaranteed:
-        // The argument is +0, so we can use the address of the param in
-        // the context directly.
-        param.add(fieldAddr.getAddress());
-        dependsOnContextLifetime = true;
+        if (outType->isNoEscape()) {
+          cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
+        } else {
+          // The argument is +0, so we can use the address of the param in
+          // the context directly.
+          param.add(fieldAddr.getAddress());
+          dependsOnContextLifetime = true;
+        }
         break;
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
@@ -1343,7 +1374,8 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   bool considerParameterSources = true;
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(param, origType);
-    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
+    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
+                                                 outType->isNoEscape());
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
     if (!isa<FixedTypeInfo>(ti)) {
@@ -1370,7 +1402,8 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(param, origType);
 
-    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
+    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
+                                                 outType->isNoEscape());
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
@@ -1608,9 +1641,15 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        auto addr = fieldLayout.getType().getAddressForPointer(args.claimNext());
-        fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr, fieldTy,
-                                                 isOutlined);
+        if (outType->isNoEscape()) {
+          cast<LoadableTypeInfo>(fieldLayout.getType())
+              .initialize(IGF, args, fieldAddr, isOutlined);
+        } else {
+          auto addr =
+              fieldLayout.getType().getAddressForPointer(args.claimNext());
+          fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr,
+                                                   fieldTy, isOutlined);
+        }
         break;
       }
       // Take direct value arguments and inout pointers by value.
