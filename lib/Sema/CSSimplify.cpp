@@ -7048,7 +7048,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   }
 
   bool hasReturn = hasExplicitResult(closure);
-
+  auto &ctx = getASTContext();
   // If this is a multi-statement closure its body doesn't participate
   // in type-checking.
   if (closure->hasSingleExpressionBody()) {
@@ -7061,12 +7061,18 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         closureType->getResult(),
         getConstraintLocator(closure, LocatorPathElt::ClosureBody(hasReturn)));
   } else if (!hasReturn) {
-    // If multi-statement closure doesn't have an explicit result
-    // (no `return` statements) let's default it to `Void`.
-    auto &ctx = getASTContext();
+    bool hasExplicitResult = closure->hasExplicitResultType() &&
+                             closure->getExplicitResultTypeLoc().getType();
+
+    // If this closure has an empty body and no explicit result type
+    // let's bind result type to `Void` since that's the only type empty body
+    // can produce. Otherwise, if (multi-statement) closure doesn't have
+    // an explicit result (no `return` statements) let's default it to `Void`.
+    auto constraintKind = (closure->hasEmptyBody() && !hasExplicitResult)
+                              ? ConstraintKind::Bind
+                              : ConstraintKind::Defaultable;
     addConstraint(
-        ConstraintKind::Defaultable, inferredClosureType->getResult(),
-        ctx.TheEmptyTupleType,
+        constraintKind, inferredClosureType->getResult(), ctx.TheEmptyTupleType,
         getConstraintLocator(closure, ConstraintLocator::ClosureResult));
   }
 
