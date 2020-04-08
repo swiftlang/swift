@@ -636,12 +636,9 @@ PrintTests.test("Printable_Float16") {
   expectEqual("nan", Float16(bitPattern: 0x7dff).description)
 
   // Every power of 10 should print with only a single digit '1'
-#if arch(arm)
-  let lowerBound = -7 // Or -4?  Does ARM support subnormals?
-#else
-  let lowerBound = -7
-#endif
-  for power in lowerBound ... 2 {
+  let leastPowerOfTen = -7
+  let greatestPowerOfTen = 4
+  for power in leastPowerOfTen ... greatestPowerOfTen {
     let s: String
     if power < -4 { // Exponential form
       s = exponentialPowerOfTen(power)
