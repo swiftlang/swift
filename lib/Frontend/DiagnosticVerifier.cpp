@@ -466,7 +466,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         if (Expected.noneMarkerStartLoc) {
           addError(FixItStr.data() - 2,
                    Twine("A second {{") + fixitExpectationNoneString +
-                       "}} is found. it can be put only one.");
+                       "}} was found. It may only appear once in an expectation.");
           break;
         }
 
