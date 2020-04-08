@@ -2764,7 +2764,8 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
     return false;
 
   bool noFixes = llvm::all_of(solutions, [](const Solution &solution) -> bool {
-    return solution.Fixes.empty();
+     const auto score = solution.getFixedScore();
+     return score.Data[SK_Fix] == 0 && solution.Fixes.empty();
   });
 
   bool allMismatches =
