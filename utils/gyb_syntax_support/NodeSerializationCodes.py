@@ -239,7 +239,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DifferentiationParams': 235,
     'DifferentiationParamList': 236,
     'DifferentiationParam': 237,
-    'DifferentiableAttributeFuncSpecifier': 238,
+    # removed: 'DifferentiableAttributeFuncSpecifier': 238,
     'FunctionDeclName': 239,
     'PoundFilePathExpr': 240,
     'DerivativeRegistrationAttributeArguments': 241,

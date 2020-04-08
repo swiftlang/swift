@@ -274,23 +274,6 @@ ATTRIBUTE_NODES = [
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
-    # differentiable-attr-func-specifier ->
-    #     ('jvp' | 'vjp') ':' func-decl-name ','?
-    Node('DifferentiableAttributeFuncSpecifier', kind='Syntax',
-         description='''
-         A function specifier, consisting of an identifier, colon, and a
-         function declaration name (e.g. `vjp: foo(_:_:)`).
-         ''',
-         traits=['WithTrailingComma'],
-         children=[
-             Child('Label', kind='IdentifierToken',
-                   text_choices=['jvp', 'vjp']),
-             Child('Colon', kind='ColonToken'),
-             Child('FunctionDeclName', kind='FunctionDeclName',
-                   description='The referenced function name.'),
-             Child('TrailingComma', kind='CommaToken', is_optional=True),
-         ]),
-
     # The argument of the derivative registration attribute
     # '@derivative(of: ...)' and the transpose registration attribute
     # '@transpose(of: ...)'.
