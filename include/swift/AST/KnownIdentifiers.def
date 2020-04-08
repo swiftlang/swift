@@ -203,6 +203,11 @@ IDENTIFIER_(nsError)
 // Custom string interpolation type used by os log APIs.
 IDENTIFIER(OSLogMessage)
 
+// Atomics ordering type identifiers.
+IDENTIFIER(AtomicLoadOrdering)
+IDENTIFIER(AtomicStoreOrdering)
+IDENTIFIER(AtomicUpdateOrdering)
+
 // Differentiable programming
 IDENTIFIER(along)
 IDENTIFIER(differential)

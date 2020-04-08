@@ -11,4 +11,4 @@ func test(value: MyStruct) {
 }
 
 // RUN: %sourcekitd-test -req=complete -pos=10:8 -req-opts=annotateddescription=1 %s -- %s > %t.result
-// RUN: diff -u %s.result %t.result
+// RUN: diff --strip-trailing-cr -u %s.result %t.result

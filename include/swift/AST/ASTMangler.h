@@ -172,6 +172,19 @@ public:
                                             AutoDiffLinearMapKind kind,
                                             AutoDiffConfig config);
 
+  /// Mangle the AutoDiff generated declaration for the given:
+  /// - Generated declaration kind: linear map struct or branching trace enum.
+  /// - Mangled original function name.
+  /// - Basic block number.
+  /// - Linear map kind: differential or pullback.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string
+  mangleAutoDiffGeneratedDeclaration(AutoDiffGeneratedDeclarationKind declKind,
+                                     StringRef origFnName, unsigned bbId,
+                                     AutoDiffLinearMapKind linearMapKind,
+                                     AutoDiffConfig config);
+
   /// Mangle a SIL differentiability witness key:
   /// - Mangled original function name.
   /// - Parameter indices.

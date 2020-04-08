@@ -113,7 +113,6 @@ private:
   /// whose cases represent the predecessors/successors of the given original
   /// block.
   EnumDecl *createBranchingTraceDecl(SILBasicBlock *originalBB,
-                                     SILAutoDiffIndices indices,
                                      CanGenericSignature genericSig,
                                      SILLoopInfo *loopInfo);
 
@@ -121,7 +120,6 @@ private:
   /// storing the linear map values and predecessor/successor basic block of the
   /// given original block.
   StructDecl *createLinearMapStruct(SILBasicBlock *originalBB,
-                                    SILAutoDiffIndices indices,
                                     CanGenericSignature genericSig);
 
   /// Adds a linear map field to the linear map struct.
@@ -129,14 +127,12 @@ private:
 
   /// Given an `apply` instruction, conditionally adds a linear map struct field
   /// for its linear map function if it is active.
-  void addLinearMapToStruct(ADContext &context, ApplyInst *ai,
-                            SILAutoDiffIndices indices);
+  void addLinearMapToStruct(ADContext &context, ApplyInst *ai);
 
   /// Generates linear map struct and branching enum declarations for the given
   /// function. Linear map structs are populated with linear map fields and a
   /// branching enum field.
   void generateDifferentiationDataStructures(ADContext &context,
-                                             SILAutoDiffIndices indices,
                                              SILFunction *derivative);
 
 public:

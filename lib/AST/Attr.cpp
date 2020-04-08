@@ -24,6 +24,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 // SWIFT_ENABLE_TENSORFLOW END
 #include "swift/AST/IndexSubset.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1763,6 +1764,26 @@ DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
   void *mem = context.Allocate(sizeof(DerivativeAttr), alignof(DerivativeAttr));
   return new (mem) DerivativeAttr(implicit, atLoc, baseRange, baseTypeRepr,
                                   std::move(originalName), parameterIndices);
+}
+
+AbstractFunctionDecl *
+DerivativeAttr::getOriginalFunction(ASTContext &context) const {
+  return evaluateOrDefault(
+      context.evaluator,
+      DerivativeAttrOriginalDeclRequest{const_cast<DerivativeAttr *>(this)},
+      nullptr);
+}
+
+void DerivativeAttr::setOriginalFunction(AbstractFunctionDecl *decl) {
+  assert(!OriginalFunction && "cannot overwrite original function");
+  OriginalFunction = decl;
+}
+
+void DerivativeAttr::setOriginalFunctionResolver(
+    LazyMemberLoader *resolver, uint64_t resolverContextData) {
+  assert(!OriginalFunction && "cannot overwrite original function");
+  OriginalFunction = resolver;
+  ResolverContextData = resolverContextData;
 }
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,

@@ -1290,6 +1290,12 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
+  AbstractFunctionDecl *
+  loadReferencedFunctionDecl(const DerivativeAttr *DA,
+                             uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
   Type loadTypeEraserType(const TypeEraserAttr *TRA,
                           uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");

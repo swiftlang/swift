@@ -22,28 +22,35 @@ namespace markup {
 // FIXME: copied from Clang's
 // CommentASTToXMLConverter::appendToResultWithXMLEscaping
 static inline void appendWithXMLEscaping(raw_ostream &OS, StringRef S) {
-  for (const char C : S) {
-    switch (C) {
+  auto Start = S.begin(), Cursor = Start, End = S.end();
+  for (; Cursor != End; ++Cursor) {
+    switch (*Cursor) {
     case '&':
+      OS.write(Start, Cursor - Start);
       OS << "&amp;";
       break;
     case '<':
+      OS.write(Start, Cursor - Start);
       OS << "&lt;";
       break;
     case '>':
+      OS.write(Start, Cursor - Start);
       OS << "&gt;";
       break;
     case '"':
+      OS.write(Start, Cursor - Start);
       OS << "&quot;";
       break;
     case '\'':
+      OS.write(Start, Cursor - Start);
       OS << "&apos;";
       break;
     default:
-      OS << C;
-      break;
+      continue;
     }
+    Start = Cursor + 1;
   }
+  OS.write(Start, Cursor - Start);
 }
 
 // FIXME: copied from Clang's
