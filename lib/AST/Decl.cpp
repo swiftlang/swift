@@ -639,6 +639,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
     return getSerializedLocs()->Loc;
   }
   case FileUnitKind::Builtin:
+  case FileUnitKind::Synthesized:
   case FileUnitKind::ClangModule:
   case FileUnitKind::DWARFModule:
     return SourceLoc();

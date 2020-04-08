@@ -350,6 +350,8 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
             llvm_unreachable("Unexpected module kind: DWARFModule");
           case FileUnitKind::Source:
             llvm_unreachable("Unexpected module kind: Source");
+          case FileUnitKind::Synthesized:
+            llvm_unreachable("Unexpected module kind: Synthesized");
             break;
           case FileUnitKind::SerializedAST: {
             auto SerializedAST = cast<SerializedASTFile>(MainFile);

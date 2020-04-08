@@ -406,6 +406,7 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
       switch (FU->getKind()) {
       case FileUnitKind::Source:
       case FileUnitKind::Builtin:
+      case FileUnitKind::Synthesized:
         break;
       case FileUnitKind::SerializedAST:
       case FileUnitKind::DWARFModule:
