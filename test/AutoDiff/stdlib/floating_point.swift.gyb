@@ -38,24 +38,33 @@ FloatingPointDerivativeTests.test("${Self}.+") {
   expectEqual((1, 1), gradient(at: ${Self}(4), ${Self}(5), in: +))
   expectEqual((10, 10), pullback(at: ${Self}(4), ${Self}(5), in: +)(${Self}(10)))
 
-  expectEqual(2, derivative(at: ${Self}(4), ${Self}(5), in: +))
-  expectEqual(20, differential(at: ${Self}(4), ${Self}(5), in: +)(${Self}(10), ${Self}(10)))
+  // TODO(TF-1237): Upstream forward-mode differentiation.
+  expectCrash {
+    expectEqual(2, derivative(at: ${Self}(4), ${Self}(5), in: +))
+    expectEqual(20, differential(at: ${Self}(4), ${Self}(5), in: +)(${Self}(10), ${Self}(10)))
+  }
 }
 
 FloatingPointDerivativeTests.test("${Self}.-") {
   expectEqual((1, -1), gradient(at: ${Self}(4), ${Self}(5), in: -))
   expectEqual((10, -10), pullback(at: ${Self}(4), ${Self}(5), in: -)(${Self}(10)))
 
-  expectEqual(0, derivative(at: ${Self}(4), ${Self}(5), in: -))
-  expectEqual(-5, differential(at: ${Self}(4), ${Self}(5), in: -)(${Self}(5), ${Self}(10)))
+  // TODO(TF-1237): Upstream forward-mode differentiation.
+  expectCrash {
+    expectEqual(0, derivative(at: ${Self}(4), ${Self}(5), in: -))
+    expectEqual(-5, differential(at: ${Self}(4), ${Self}(5), in: -)(${Self}(5), ${Self}(10)))
+  }
 }
 
 FloatingPointDerivativeTests.test("${Self}.*") {
   expectEqual((5, 4), gradient(at: ${Self}(4), ${Self}(5), in: *))
   expectEqual((50, 40), pullback(at: ${Self}(4), ${Self}(5), in: *)(${Self}(10)))
 
-  expectEqual(9, derivative(at: ${Self}(4), ${Self}(5), in: *))
-  expectEqual(90, differential(at: ${Self}(4), ${Self}(5), in: *)(${Self}(10), ${Self}(10)))
+  // TODO(TF-1237): Upstream forward-mode differentiation.
+  expectCrash {
+    expectEqual(9, derivative(at: ${Self}(4), ${Self}(5), in: *))
+    expectEqual(90, differential(at: ${Self}(4), ${Self}(5), in: *)(${Self}(10), ${Self}(10)))
+  }
 }
 
 FloatingPointDerivativeTests.test("${Self}./") {
@@ -70,8 +79,11 @@ FloatingPointDerivativeTests.test("${Self}./") {
     expectEqualWithTolerance(-1.6, dy)
   }
 
-  expectEqualWithTolerance(0.04, derivative(at: ${Self}(4), ${Self}(5), in: /))
-  expectEqual(90, differential(at: ${Self}(4), ${Self}(5), in: *)(${Self}(10), ${Self}(10)))
+  // TODO(TF-1237): Upstream forward-mode differentiation.
+  expectCrash {
+    expectEqualWithTolerance(0.04, derivative(at: ${Self}(4), ${Self}(5), in: /))
+    expectEqual(90, differential(at: ${Self}(4), ${Self}(5), in: *)(${Self}(10), ${Self}(10)))
+  }
 }
 
 FloatingPointDerivativeTests.test("${Self}.squareRoot") {

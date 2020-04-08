@@ -22,6 +22,9 @@ SIMDTests.test("init(repeating:)") {
   expectEqual(8, bp1(g))
 }
 
+// FIXME(TF-1103): Derivative registration does not yet support
+// `@_alwaysEmitIntoClient` original functions.
+/*
 SIMDTests.test("Sum") {
   let a = SIMD4<Float>(1, 2, 3, 4)
 
@@ -32,6 +35,7 @@ SIMDTests.test("Sum") {
   expectEqual(10, val1)
   expectEqual(SIMD4<Float>(3, 3, 3, 3), bp1(3))
 }
+*/
 
 SIMDTests.test("Identity") {
   let a = SIMD4<Float>(1, 2, 3, 4)
@@ -259,6 +263,8 @@ SIMDTests.test("Generics") {
   expectEqual(SIMD3<Double>(5, 10, 15), val4)
   expectEqual((SIMD3<Double>(5, 5, 5), 6), bp4(g))
 
+  // FIXME(TF-1103): Derivative registration does not yet support
+  /*
   func testSum<Scalar, SIMDType: SIMD>(x: SIMDType) -> Scalar
     where SIMDType.Scalar == Scalar,
           SIMDType : Differentiable,
@@ -271,6 +277,7 @@ SIMDTests.test("Generics") {
   let (val5, bp5) = valueWithPullback(at: a, in: simd3Sum)
   expectEqual(6, val5)
   expectEqual(SIMD3<Double>(7, 7, 7), bp5(7))
+  */
 }
 
 runAllTests()

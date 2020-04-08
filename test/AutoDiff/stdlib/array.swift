@@ -368,10 +368,10 @@ ArrayAutoDiffTests.test("Array.init(repeating:count:)") {
     Array(repeating: x, count: 10)
   }
   expectEqual(Float(10), gradient(at: .zero) { x in
-    repeating(x).differentiableReduce(0, {$0 + $1}).value
+    repeating(x).differentiableReduce(0, {$0 + $1})
   })
   expectEqual(Float(20), pullback(at: .zero, in: { x in
-    repeating(x).differentiableReduce(0, {$0 + $1}).value
+    repeating(x).differentiableReduce(0, {$0 + $1})
   })(2))
 }
 
@@ -401,22 +401,13 @@ ArrayAutoDiffTests.test("Array.DifferentiableView.base") {
     backprop(FloatArrayTan([1, 2, 3, 4])))
 }
 
-ArrayAutoDiffTests.test("Array.DifferentiableView : KeyPathIterable") {
-  struct Container : KeyPathIterable {
-    let a: Array<Float>.DifferentiableView
-  }
-  let container = Container(a: Array<Float>.DifferentiableView([1, 2, 3]))
-  expectEqual(
-    [1, 2, 3],
-    container.recursivelyAllKeyPaths(to: Float.self).map {
-      container[keyPath: $0]
-    })
-}
-
-ArrayAutoDiffTests.test("Array.zeroTangentVectorInitializer") {
+// TODO: Upstream `Differentiable.zeroTangentVector` and implementations.
+/*
+ArrayAutoDiffTests.test("Array.zeroTangentVector") {
   let count = 10
   let array: [Float] = Array((0..<count).map(Float.init))
   expectEqual(array.zeroTangentVector.base, Array(repeating: 0, count: count))
 }
+*/
 
 runAllTests()
