@@ -5,7 +5,7 @@
 func labeledFunc(aa: Int, bb: Int) {}
 
 func testNoneMarkerCheck() {
-  // CHECK: [[@LINE+1]]:95: error: A second {{{{}}none}} is found. it can be put only one.
+  // CHECK: [[@LINE+1]]:95: error: A second {{{{}}none}} was found. It may only appear once in an expectation.
   undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{none}} {{none}}
 
   // CHECK: [[@LINE+1]]:134: error: {{{{}}none}} must be at the end.
