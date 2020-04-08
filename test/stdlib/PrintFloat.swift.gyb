@@ -629,6 +629,12 @@ PrintTests.test("Printable_Float16") {
   expectFailure { expectNaN("-snan(0xff)", -Float16(nan: 255, signaling: true)) }
   expectFailure { expectNaN("snan(0xff)", Float16(bitPattern: 0x7dff)) }
 
+  expectEqual("nan", Float16.signalingNaN.description)
+  expectEqual("nan", (-Float16.signalingNaN).description)
+  expectEqual("nan", Float16(nan: 255, signaling: true).description)
+  expectEqual("nan", (-Float16(nan: 255, signaling: true)).description)
+  expectEqual("nan", Float16(bitPattern: 0x7dff).description)
+
   // Every power of 10 should print with only a single digit '1'
 #if arch(arm)
   let lowerBound = -7 // Or -4?  Does ARM support subnormals?
