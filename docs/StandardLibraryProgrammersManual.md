@@ -6,43 +6,93 @@ TODO: Should this subsume or link to [StdlibRationales.rst](https://github.com/a
 
 TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.com/apple/swift/blob/master/docs/AccessControlInStdlib.rst)
 
+In this document, "stdlib" refers to the core standard library (`stdlib/public/core`), our Swift overlays for system frameworks (`stdlib/public/Darwin/*`, `stdlib/public/Windows/*`, etc.), as well as the auxiliary and prototype libraries under `stdlib/private`.
 
-## (Meta): List of wants and TODOs for this guide
+## Coding style
 
-1. Library Organization
-    1. What files are where
-        1. Brief about CMakeLists
-        1. Brief about GroupInfo.json
-    1. What tests are where
-        1. Furthermore, should there be a split between whitebox tests and blackbox tests?
-    1. What benchmarks are where
-        1. Furthermore, should there be benchmarks, microbenchmarks, and nanobenchmarks (aka whitebox microbenchmarks)?
-    1. What SPIs exist, where, and who uses them
-    1. Explain test/Prototypes, and how to use that for rapid (relatively speaking) prototyping
-1. Library Concepts
-    1. Protocol hierarchy
-        1. Customization hooks
-    1. Use of classes, COW implementation, buffers, etc
-    1. Compatibility, `@available`, etc.
-    1. Resilience, ABI stability, `@inlinable`, `@usableFromInline`, etc
-    1. Strings and ICU
-    1. Lifetimes
-        1. withExtendedLifetime, withUnsafe...,
-    1. Shims and stubs
-1. Coding Standards
-    1. High level concerns
-    1. Best practices
-    1. Formatting
-1. Internals
-    1. `@inline(__always)` and `@inline(never)`
-    1. `@semantics(...)`
-    1. Builtins
-        1. Builtin.addressof, _isUnique, etc
-1. Dirty hacks
-    1. Why all the underscores and extra protocols?
-    1. How does the `...` ranges work?
-1. Frequently Encountered Issues
+### Formatting Conventions
 
+The stdlib currently has a hard line length limit of 80 characters. To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe.)
+   
+We use two spaces as the unit of indentation. We don't use tabs.
+
+### Public APIs
+
+#### Core Standard Library
+
+All new public API additions to the core Standard Library must go through the [Swift Evolution Process](https://github.com/apple/swift-evolution/blob/master/process.md). The Core Team must have approved the additions by the time we merge them into the stdlib codebase.
+
+All public APIs should come with documentation comments describing their purpose and behavior. It is highly recommended to use big-oh notation to document any guaranteed performance characteristics. (CPU and/or memory use, number of accesses to some underlying collection, etc.)
+
+Note that implementation details are generally outside the scope of the Swift Evolution -- the stdlib is free to change its internal algorithms, internal APIs and data structures etc. from release to release, as long as the documented API (and ABI) remains intact. 
+
+For example, since `hashValue` was always documented to allow changing its return value across different executions of the same program, we were able to switch to randomly seeded hashing in Swift 4.2 without going through the Swift Evolution process. However, the introduction of `hash(into:)` required a formal proposal. (Note though that highly visible behavioral changes like this are much more difficult to implement now that they were in the early days -- in theory we can still do ABI-preserving changes, but [Hyrum's Law](https://www.hyrumslaw.com) makes it increasingly more difficult to change any observable behavior. For example, in some cases we may need to add runtime version checks for the Swift SDK on which the main executable was compiled, to prevent breaking binaries compiled with previous releases.)
+
+We sometimes need to expose some internal APIs as `public` for technical reasons (such as to interoperate with other system frameworks, and/or to enable testing/debugging certain functionality). We use the Leading Underscore Rule (see below) to differentiate these from the documented stdlib API. Underscored APIs aren't considered part of the public API surface, and as such they don't need to go through the Swift Evolution Process. Regular Swift code isn't supposed to directly call these; when necessary, we may change their behavior in source-incompatible ways or we may even remove them. (However, such changes are technically ABI breaking, so they need to be carefully considered against the risk of breaking existing binaries.)
+
+### Overlays and Private Code
+
+The overlays specific to particular platforms generally have their own API review processes. These are outside the scope of Swift Evolution.
+
+Anything under `stdlib/private` can be added/removed/changed with the simple approval of a stdlib code owner.
+
+### The Leading Underscore Rule
+
+All APIs that aren't part of the stdlib's official public API must include at least one underscored component in their fully qualified names. This includes symbols that are technically declared `public` but that aren't considered part of the public stdlib API, as well as `@usableFromInline internal`, plain `internal` and `[file]private` types and members. 
+
+The underscored component need not be the last. For example, `Swift.Dictionary._worble()` is a good name for an internal helper method, but so is `Swift._NativeDictionary.worble()` -- the `_NativeDictionary` type already has the underscore.
+    
+Initializers don't have a handy base name on which we can put the underscore; instead, we put the underscore on the first argument label, adding one if necessary: e.g., `init(_ value: Int)` may become `init(_value: Int)`. If the initializer doesn't have any parameters, then we add a dummy parameter of type Void with an underscored label: for example, `UnsafeBufferPointer.init(_empty: ())`.
+
+This rule ensures we don't accidentally clutter the public namespace with `@usableFromInline` things (which could prevent us from choosing the best names for newly public API later), and it also makes it easy to see at a glance if a piece of stdlib code uses any non-public entities.
+
+### Explicit Access Modifiers
+
+We prefer to explicitly spell out all access modifiers in the stdlib codebase. (I.e., we type `internal` even if it's the implicit default.) Additionally, we put the access level on each individual entry point rather than inheriting them from the extension they are in:
+
+```swift
+public extension String {
+  // 😢👎
+  func blanch() { ... }
+  func roast() { ... }
+}
+
+extension String {
+  // 😊👍
+  public func blanch() { ... }
+  public func roast() { ... }
+}    
+```
+    
+This makes it trivial to identify the access level of every definition without having to scan the context it appears in.
+
+For historical reasons, the existing codebase generally uses `internal` as the catch-all non-public access level. However, it is okay to use `private`/`fileprivate` when appropriate.
+
+### Availability
+
+Every entry point in the standard library that has an ABI impact must be applied an `@available` attribute that describes the earliest ABI-stable OS releases that it can be deployed on. (Currently this only applies to macOS, iOS, watchOS and tvOS, since Swift isn't ABI stable on other platforms yet.)
+
+Unlike access control modifiers, we prefer to put `@available` attributes on the extension context rather than duplicating them on every individual entry point. This is an effort to fight against information overload: the `@available` attribute is information dense and it's generally easier to review/maintain if applied to a group of entry points all at once.
+
+```swift
+// 👍
+@available(macOS 10.6, iOS 10, watchOS 3, tvOS 12, *)
+extension String {
+  public func blanch() { ... }
+  public func roast() { ... }
+}
+```
+
+Features under development that haven't been released yet must be marked with the placeholder version number `9999`. This special version is always considered available in custom builds of the Swift toolchain (including development snapshots), but not in any ABI-stable production release.
+
+```swift
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public struct FutureFeature {
+  ...
+}
+```
+
+On these platforms, the Swift Standard Library ships as an integrated part of the operating system; as such, it is the platform owners' responsibility to update these placeholder version numbers to actual versions as part of their release process.
 
 ## Internals
 
@@ -239,3 +289,39 @@ internal mutating func _roundSlowPath(_ rule: FloatingPointRoundingRule) {
 Because `_roundSlowPath(_:)` isn't inlinable, the version of `round(_:)` that gets called at run time will always be the version implemented in the standard library dylib. And since FloatingPointRoundingRule is *also* defined in the standard library, we know it'll never be out of sync with this version of `round(_:)`.
 
 Maybe some day we'll have special syntax in the language to say "call this method without allowing inlining" to get the same effect, but for now, this Curiously Recursive Inlinable Switch Pattern allows for safe inlining of switches over non-frozen enums with less boilerplate than you might otherwise have. Not none, but less.
+
+## (Meta): List of wants and TODOs for this guide
+
+1. Library Organization
+    1. What files are where
+        1. Brief about CMakeLists
+        1. Brief about GroupInfo.json
+    1. What tests are where
+        1. Furthermore, should there be a split between whitebox tests and blackbox tests?
+    1. What benchmarks are where
+        1. Furthermore, should there be benchmarks, microbenchmarks, and nanobenchmarks (aka whitebox microbenchmarks)?
+    1. What SPIs exist, where, and who uses them
+    1. Explain test/Prototypes, and how to use that for rapid (relatively speaking) prototyping
+1. Library Concepts
+    1. Protocol hierarchy
+        1. Customization hooks
+    1. Use of classes, COW implementation, buffers, etc
+    1. Compatibility, `@available`, etc.
+    1. Resilience, ABI stability, `@inlinable`, `@usableFromInline`, etc
+    1. Strings and ICU
+    1. Lifetimes
+        1. withExtendedLifetime, withUnsafe...,
+    1. Shims and stubs
+1. Coding Standards
+    1. High level concerns
+    1. Best practices
+    1. Formatting
+1. Internals
+    1. `@inline(__always)` and `@inline(never)`
+    1. `@semantics(...)`
+    1. Builtins
+        1. Builtin.addressof, _isUnique, etc
+1. Dirty hacks
+    1. Why all the underscores and extra protocols?
+    1. How does the `...` ranges work?
+1. Frequently Encountered Issues
