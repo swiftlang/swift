@@ -454,6 +454,13 @@ func keywordInCaseAndLocalArgLabel(_ for: Int, for in: Int, class _: Int) {
   }
 }
 
+enum CasesWithMissingElement {
+  case a(Int, String),
+  // CHECK: <kw>case</kw> a(<type>Int</type>, <type>String</type>)
+  case b(Int, String),
+  // CHECK: <kw>case</kw> b(<type>Int</type>, <type>String</type>)
+}
+
 // CHECK: <kw>class</kw> Ownership {
 class Ownership {
   // CHECK: <attr-builtin>weak</attr-builtin> <kw>var</kw> w
