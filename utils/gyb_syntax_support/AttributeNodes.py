@@ -212,7 +212,7 @@ ATTRIBUTE_NODES = [
     Node('DifferentiableAttributeArguments', kind='Syntax',
          description='''
          The arguments for the `@differentiable` attribute: an optional
-         differentiation parameter list and associated functions.
+         differentiation parameter list and an optional `where` clause.
          ''',
          children=[
              Child('DiffParams', kind='DifferentiationParamsClause',
@@ -221,10 +221,6 @@ ATTRIBUTE_NODES = [
                    The comma following the differentiation parameters clause,
                    if it exists.
                    ''', is_optional=True),
-             Child('MaybeJVP', kind='DifferentiableAttributeFuncSpecifier',
-                   is_optional=True),
-             Child('MaybeVJP', kind='DifferentiableAttributeFuncSpecifier',
-                   is_optional=True),
              Child('WhereClause', kind='GenericWhereClause', is_optional=True),
          ]),
 
