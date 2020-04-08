@@ -104,7 +104,7 @@ size_t swift_format_double(double, char *dest, size_t length);
 #endif
 
 #if SWIFT_DTOA_FLOAT16_SUPPORT
-// See swift_decompose_double.  `digits_length` must be at least 9.
+// See swift_decompose_double.  `digits_length` must be at least 5.
 int swift_decompose_float16(const __fp16 *f,
     int8_t *digits, size_t digits_length, int *decimalExponent);
 // See swift_format_double.
