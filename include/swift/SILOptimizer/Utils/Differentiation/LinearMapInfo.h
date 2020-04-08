@@ -18,6 +18,7 @@
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_LINEARMAPINFO_H
 
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
@@ -85,6 +86,9 @@ private:
   /// Mapping from linear map structs to their branching trace enum fields.
   llvm::DenseMap<StructDecl *, VarDecl *> linearMapStructEnumFields;
 
+  /// A synthesized file unit.
+  SynthesizedFileUnit &synthesizedFile;
+
   /// A type converter, used to compute struct/enum SIL types.
   Lowering::TypeConverter &typeConverter;
 
@@ -97,13 +101,8 @@ private:
   VarDecl *addVarDecl(NominalTypeDecl *nominal, StringRef name, Type type);
 
   /// Retrieves the file unit that contains implicit declarations in the
-  /// current Swift module. If it does not exist, create one.
-  ///
-  // FIXME: Currently it defaults to the file containing `original`, if it can
-  // be determined. Otherwise, it defaults to any file unit in the module. To
-  // handle this more properly, we could revive the DerivedFileUnit class to
-  // contain all synthesized implicit type declarations.
-  SourceFile &getDeclarationFileUnit();
+  /// current Swift module.
+  SynthesizedFileUnit &getSynthesizedFile() { return synthesizedFile; }
 
   /// Computes and sets the access level for the given nominal type, given the
   /// original function linkage.
