@@ -2278,17 +2278,19 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         unsigned End = SM.getLocOffsetInBuffer(args->getEndLoc(), BufID);
         EffectiveLength = (End + 1) - EffectiveOffset;
 
-        OS << "{\n";
-
         unsigned argI = firstTrailingIndex;
         for (unsigned i = 0; argI != args->getNumElements(); ++i, ++argI) {
           const auto &closure = trailingClosures[i];
-          auto label = args->getElementName(argI);
-          OS << (label.empty() ? "_" : label.str()) << ": { ";
+          if (i == 0) {
+            OS << "{ ";
+          } else {
+            auto label = args->getElementName(argI);
+            OS << " " << (label.empty() ? "_" : label.str()) << ": { ";
+          }
           printClosureBody(closure, OS, SM);
-          OS << "}\n";
+          OS << "}";
         }
-        OS << "}";
+        OS << "\n";
       }
 
       Consumer.handleSourceText(ExpansionStr);
