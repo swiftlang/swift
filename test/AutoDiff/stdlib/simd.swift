@@ -3,11 +3,6 @@
 
 import _Differentiation
 import StdlibUnittest
-#if os(macOS)
-import Darwin.C
-#else
-import Glibc
-#endif
 
 var SIMDTests = TestSuite("SIMD")
 
