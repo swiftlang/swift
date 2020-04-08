@@ -546,6 +546,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    OPT_disable_cross_import_overlays,
                    Opts.EnableCrossImportOverlays);
 
+  Opts.EnableCrossImportRemarks = Args.hasArg(OPT_emit_cross_import_remarks);
+
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   if (const Arg *A = Args.getLastArg(OPT_target)) {

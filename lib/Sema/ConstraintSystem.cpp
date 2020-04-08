@@ -1694,7 +1694,14 @@ void ConstraintSystem::addOverloadSet(ArrayRef<Constraint *> choices,
     return;
   }
 
-  addDisjunctionConstraint(choices, locator, ForgetChoice);
+  auto *disjunction =
+      Constraint::createDisjunction(*this, choices, locator, ForgetChoice);
+  addUnsolvedConstraint(disjunction);
+  if (simplifyAppliedOverloads(disjunction, locator)) {
+    retireConstraint(disjunction);
+    if (!failedConstraint)
+      failedConstraint = disjunction;
+  }
 }
 
 /// If we're resolving an overload set with a decl that has special type
