@@ -856,6 +856,11 @@ public:
   /// e.g. `x = .foo`.
   bool MayUseImplicitMemberExpr = false;
 
+  /// Flag to indicate that the completion is happening reusing ASTContext
+  /// from the previous completion.
+  /// NOTE: Do not use this to change the behavior. This is only for debugging.
+  bool ReusingASTContext = false;
+
   CodeCompletionContext(CodeCompletionCache &Cache)
       : Cache(Cache) {}
 

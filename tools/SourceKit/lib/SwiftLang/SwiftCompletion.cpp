@@ -129,11 +129,12 @@ static bool swiftCodeCompleteImpl(
     bool EnableASTCaching, bool annotateDescription, std::string &Error) {
   return Lang.performCompletionLikeOperation(
       UnresolvedInputFile, Offset, Args, FileSystem, EnableASTCaching, Error,
-      [&](CompilerInstance &CI) {
+      [&](CompilerInstance &CI, bool reusingASTContext) {
         // Create a factory for code completion callbacks that will feed the
         // Consumer.
         auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
         ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
+        CompletionContext.ReusingASTContext = reusingASTContext;
         CompletionContext.setAnnotateResult(annotateDescription);
         std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
             ide::makeCodeCompletionCallbacksFactory(CompletionContext,
@@ -211,6 +212,8 @@ void SwiftLangSupport::codeComplete(
               SKConsumer, Result, CCOpts.annotatedDescription))
         break;
     }
+    
+    SKConsumer.setReusingASTContext(info.completionContext->ReusingASTContext);
   });
 
   std::string Error;

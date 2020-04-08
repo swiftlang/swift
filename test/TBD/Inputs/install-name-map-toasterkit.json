@@ -7,6 +7,6 @@
   {
     "module": "ToasterKit",
     "install_name": "/System/Previous/iOS/ToasterKit.dylib",
-    "platforms": ["iOS"]
+    "platforms": ["iOS", "iOS_sim"]
   }
 ]

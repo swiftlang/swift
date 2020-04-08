@@ -41,6 +41,11 @@
 #  define FIXIT(ID, Text, Signature)
 #endif
 
+#ifndef REMARK
+#  define REMARK(ID,Options,Text,Signature)   \
+DIAG(REMARK,ID,Options,Text,Signature)
+#endif
+
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
@@ -864,6 +869,9 @@ WARNING(module_not_compiled_with_library_evolution,none,
         "using it means binary compatibility for %1 can't be guaranteed",
         (Identifier, Identifier))
 
+REMARK(cross_import_added,none,
+       "import of %0 and %1 triggered a cross-import of %2",
+       (Identifier, Identifier, Identifier))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,

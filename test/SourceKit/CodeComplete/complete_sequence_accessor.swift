@@ -38,7 +38,6 @@ enum S {
 
 // Enabled.
 // RUN: %sourcekitd-test \
-// RUN:   -req=track-compiles == \
 // RUN:   -req=complete -pos=12:9 %s -- %s -parse-as-library == \
 // RUN:   -req=complete -pos=15:15 %s -- %s -parse-as-library == \
 // RUN:   -req=complete -pos=16:15 %s -- %s -parse-as-library == \
@@ -52,7 +51,6 @@ enum S {
 // RUN:   -req=complete -pos=23:1 %s -- %s -parse-as-library == \
 // RUN:   -req=complete -pos=16:1 %s -- %s -parse-as-library > %t.response
 // RUN: %FileCheck --check-prefix=RESULT  %s < %t.response
-// RUN: %FileCheck --check-prefix=TRACE  %s < %t.response
 
 // globalValImplicit
 // RESULT-LABEL: key.results: [
@@ -61,6 +59,8 @@ enum S {
 // RESULT-DAG: key.name: "a"
 // RESULT-DAG: key.name: "b"
 // RESULT: ]
+// RESULT-NOT: key.reusingastcontext: 1
+
 // globalValGetSet(get)
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.name: "fooMethod()"
@@ -68,6 +68,8 @@ enum S {
 // RESULT-DAG: key.name: "x"
 // RESULT-DAG: key.name: "y"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
+
 // globalValGetSet(set)
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.name: "barMethod()"
@@ -75,6 +77,8 @@ enum S {
 // RESULT-DAG: key.name: "a"
 // RESULT-DAG: key.name: "b"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
+
 // propertyImplicit
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.name: "fooMethod()"
@@ -82,6 +86,8 @@ enum S {
 // RESULT-DAG: key.name: "x"
 // RESULT-DAG: key.name: "y"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
+
 // propertyGetSet(get)
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.name: "barMethod()"
@@ -89,6 +95,8 @@ enum S {
 // RESULT-DAG: key.name: "a"
 // RESULT-DAG: key.name: "b"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
+
 // propertyGetSet(set)
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.name: "fooMethod()"
@@ -96,6 +104,8 @@ enum S {
 // RESULT-DAG: key.name: "x"
 // RESULT-DAG: key.name: "y"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
+
 // subscript(implicit getter)
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.name: "fooMethod()"
@@ -103,6 +113,8 @@ enum S {
 // RESULT-DAG: key.name: "x"
 // RESULT-DAG: key.name: "y"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
+
 // subscript(get)
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.name: "barMethod()"
@@ -110,6 +122,8 @@ enum S {
 // RESULT-DAG: key.name: "a"
 // RESULT-DAG: key.name: "b"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
+
 // subscript(set)
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.name: "barMethod()"
@@ -117,6 +131,8 @@ enum S {
 // RESULT-DAG: key.name: "a"
 // RESULT-DAG: key.name: "b"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
+
 // accessor top (global var)
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.description: "get"
@@ -125,6 +141,8 @@ enum S {
 // RESULT-DAG: key.description: "didSet"
 // RESULT-DAG: key.description: "Foo"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
+
 // accessor top (property)
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.description: "get"
@@ -133,6 +151,8 @@ enum S {
 // RESULT-DAG: key.description: "didSet"
 // RESULT-DAG: key.description: "Foo"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
+
 // accessor second (global var)
 // RESULT-LABEL: key.results: [
 // RESULT-NOT: key.description: "Foo"
@@ -141,29 +161,4 @@ enum S {
 // RESULT-DAG: key.description: "willSet"
 // RESULT-DAG: key.description: "didSet"
 // RESULT: ]
-
-
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE-NOT: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE-NOT: key.description: "completion reusing previous ASTContext (benign diagnostic)"
+// RESULT-NOT: key.reusingastcontext: 1

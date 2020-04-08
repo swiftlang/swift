@@ -38,6 +38,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -218,6 +219,7 @@ public:
 
   SmallVector<ValueDecl *, 0> AllVisibleValues;
 };
+
 SourceLookupCache &SourceFile::getCache() const {
   if (!Cache) {
     const_cast<SourceFile *>(this)->Cache =
@@ -317,6 +319,10 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
   FrontendStatsTracer tracer(M.getASTContext().Stats,
                              "module-populate-cache");
   for (const FileUnit *file : M.getFiles()) {
+    if (auto *SFU = dyn_cast<SynthesizedFileUnit>(file)) {
+      addToUnqualifiedLookupCache(SFU->getTopLevelDecls(), false);
+      continue;
+    }
     auto &SF = *cast<SourceFile>(file);
     addToUnqualifiedLookupCache(SF.getTopLevelDecls(), false);
   }
@@ -1173,6 +1179,9 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
   case FileUnitKind::Builtin:
     // The Builtin module declares no operators.
     return nullptr;
+  case FileUnitKind::Synthesized:
+    // Synthesized files currently declare no operators.
+    return nullptr;
   case FileUnitKind::Source:
     break;
   case FileUnitKind::SerializedAST:
@@ -1520,6 +1529,9 @@ StringRef ModuleDecl::getModuleFilename() const {
       Result = LF->getFilename();
       continue;
     }
+    // Skip synthesized files.
+    if (auto *SFU = dyn_cast<SynthesizedFileUnit>(F))
+      continue;
     return StringRef();
   }
   return Result;
@@ -2232,11 +2244,6 @@ SourceFile::getCachedVisibleDecls() const {
   return getCache().AllVisibleValues;
 }
 
-void SourceFile::addVisibleDecl(ValueDecl *decl) {
-  Decls->push_back(decl);
-  getCache().AllVisibleValues.push_back(decl);
-}
-
 static void performAutoImport(
     SourceFile &SF,
     SourceFile::ImplicitModuleImportKind implicitModuleImportKind) {
@@ -2663,6 +2670,70 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName) {
 }
 
 //===----------------------------------------------------------------------===//
+// SynthesizedFileUnit Implementation
+//===----------------------------------------------------------------------===//
+
+SynthesizedFileUnit::SynthesizedFileUnit(ModuleDecl &M)
+    : FileUnit(FileUnitKind::Synthesized, M) {
+  M.getASTContext().addDestructorCleanup(*this);
+}
+
+Identifier
+SynthesizedFileUnit::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
+  assert(D->getDeclContext()->getModuleScopeContext() == this);
+
+  // Use cached primitive discriminator if it exists.
+  if (!PrivateDiscriminator.empty())
+    return PrivateDiscriminator;
+
+  assert(1 == count_if(getParentModule()->getFiles(),
+                       [](const FileUnit *FU) -> bool {
+                         return isa<SynthesizedFileUnit>(FU);
+                       }) &&
+         "Cannot promise uniqueness if multiple synthesized file units exist");
+
+  // Use a discriminator invariant across Swift version: a hash of the module
+  // name and a special string.
+  llvm::MD5 hash;
+  hash.update(getParentModule()->getName().str());
+  // TODO: Use a more robust discriminator for synthesized files. Pick something
+  // that cannot conflict with `SourceFile` discriminators.
+  hash.update("SYNTHESIZED FILE");
+  llvm::MD5::MD5Result result;
+  hash.final(result);
+
+  // Use the hash as a hex string, prefixed with an underscore to make sure
+  // it is a valid identifier.
+  // FIXME: There are more compact ways to encode a 16-byte value.
+  SmallString<33> buffer{"_"};
+  SmallString<32> hashString;
+  llvm::MD5::stringifyResult(result, hashString);
+  buffer += hashString;
+  PrivateDiscriminator = getASTContext().getIdentifier(buffer.str().upper());
+  return PrivateDiscriminator;
+}
+
+void SynthesizedFileUnit::lookupValue(
+    DeclName name, NLKind lookupKind,
+    SmallVectorImpl<ValueDecl *> &result) const {
+  for (auto *decl : TopLevelDecls) {
+    if (decl->getFullName().matchesRef(name))
+      result.push_back(decl);
+  }
+}
+
+void SynthesizedFileUnit::lookupObjCMethods(
+    ObjCSelector selector,
+    SmallVectorImpl<AbstractFunctionDecl *> &results) const {
+  // Synthesized files only contain top-level declarations, no `@objc` methods.
+}
+
+void SynthesizedFileUnit::getTopLevelDecls(
+    SmallVectorImpl<swift::Decl *> &results) const {
+  results.append(TopLevelDecls.begin(), TopLevelDecls.end());
+}
+
+//===----------------------------------------------------------------------===//
 // Miscellaneous
 //===----------------------------------------------------------------------===//
 
@@ -2699,6 +2770,9 @@ void swift::simple_display(llvm::raw_ostream &out, const FileUnit *file) {
     return;
   case FileUnitKind::Builtin:
     out << "(Builtin)";
+    return;
+  case FileUnitKind::Synthesized:
+    out << "(synthesized)";
     return;
   case FileUnitKind::DWARFModule:
   case FileUnitKind::ClangModule:

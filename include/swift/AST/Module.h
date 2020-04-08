@@ -95,6 +95,8 @@ enum class FileUnitKind {
   Builtin,
   /// A serialized Swift AST.
   SerializedAST,
+  /// A synthesized file.
+  Synthesized,
   /// An imported Clang module.
   ClangModule,
   /// A Clang module imported from DWARF.

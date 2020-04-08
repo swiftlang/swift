@@ -1939,6 +1939,7 @@ public:
   void failed(StringRef ErrDescription) override;
 
   void setCompletionKind(UIdent kind) override;
+  void setReusingASTContext(bool flag) override;
   bool handleResult(const CodeCompletionInfo &Info) override;
 };
 } // end anonymous namespace
@@ -1968,6 +1969,11 @@ void SKCodeCompletionConsumer::failed(StringRef ErrDescription) {
 void SKCodeCompletionConsumer::setCompletionKind(UIdent kind) {
   assert(kind.isValid());
   RespBuilder.getDictionary().set(KeyKind, kind);
+}
+
+void SKCodeCompletionConsumer::setReusingASTContext(bool flag) {
+  if (flag)
+    RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
 }
 
 bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
