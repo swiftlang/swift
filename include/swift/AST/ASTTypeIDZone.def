@@ -29,6 +29,7 @@ SWIFT_TYPEID(Type)
 SWIFT_TYPEID(TypePair)
 SWIFT_TYPEID(TypeWitnessAndDecl)
 SWIFT_TYPEID(Witness)
+SWIFT_TYPEID_NAMED(AbstractFunctionDecl *, AbstractFunctionDecl)
 SWIFT_TYPEID_NAMED(ClosureExpr *, ClosureExpr)
 SWIFT_TYPEID_NAMED(CodeCompletionCallbacksFactory *,
                    CodeCompletionCallbacksFactory)
