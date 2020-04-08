@@ -515,8 +515,6 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       for (char ch : groupName) {
         if (ch == '/')
           buf += '.';
-        else if (ch == ' ' || ch == '-')
-          buf += '_';
         else
           buf += ch;
       }
