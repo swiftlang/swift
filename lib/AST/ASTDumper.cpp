@@ -3286,9 +3286,12 @@ void ProtocolConformanceRef::dump() const {
   llvm::errs() << '\n';
 }
 
-void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
-                                  unsigned indent) const {
+void ProtocolConformanceRef::dump(llvm::raw_ostream &out, unsigned indent,
+                                  bool details) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  if (!details && isConcrete())
+    visited.insert(getConcrete());
+
   dumpProtocolConformanceRefRec(*this, out, indent, visited);
 }
 void ProtocolConformance::dump() const {
