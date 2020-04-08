@@ -83,8 +83,10 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
     return nullptr;
 
   // partial_apply without any substitutions or arguments is just a
-  // thin_to_thick_function.
-  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0)) {
+  // thin_to_thick_function. thin_to_thick_function supports only thin operands.
+  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0) &&
+      PAI->getSubstCalleeType()->getRepresentation() ==
+          SILFunctionTypeRepresentation::Thin) {
     if (!PAI->isOnStack())
       return Builder.createThinToThickFunction(PAI->getLoc(), PAI->getCallee(),
                                                PAI->getType());

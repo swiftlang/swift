@@ -1,4 +1,4 @@
-// RUN: not %target-build-swift -O %s
+// RUN: %target-build-swift -O %s
 
 // SR-12548: SIL verification error regarding
 // `CapturePropagation::rewritePartialApply` for `partial_apply` with
