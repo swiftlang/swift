@@ -35,6 +35,19 @@ function(get_maccatalyst_build_flavor out_var sdk flavor)
   endif()
 endfunction()
 
+# Form a versioned target triple for the given SDK.
+function(get_versioned_target_triple target_out_var sdk arch version)
+  if (SWIFT_SDK_${sdk}_IS_SIMULATOR)
+    # The version goes before the "-simulator".
+    set(target "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
+    string(REPLACE "-simulator" "" target "${target}")
+    set(target "${target}${version}-simulator")
+  else ()
+    set(target "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}${version}")
+  endif()
+
+  set(${target_out_var} "${target}" PARENT_SCOPE)
+endfunction()
 
 # Sets target_out_var to the target triple for the given SDK and maccatalyst flavor.
 # For zippered flavors also sets the target_variant_out_var. For other
@@ -53,7 +66,8 @@ function(get_target_triple target_out_var target_variant_out_var sdk arch)
   set(deployment_version "${TARGET_DEPLOYMENT_VERSION}")
 
   # Default target triple
-  set(target "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}${deployment_version}")
+  get_versioned_target_triple(target ${sdk} ${arch} "${deployment_version}")
+
   set(target_variant)
 
   get_maccatalyst_build_flavor(maccatalyst_build_flavor
