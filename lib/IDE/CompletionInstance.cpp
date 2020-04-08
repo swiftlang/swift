@@ -166,7 +166,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &)> Callback) {
+    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
 
   if (!CachedCI)
     return false;
@@ -344,10 +344,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   if (DiagC)
     CI.addDiagnosticConsumer(DiagC);
 
-  CI.getDiags().diagnose(SM.getLocForOffset(newBufferID, newInfo.StartOffset),
-                         diag::completion_reusing_astcontext);
-
-  Callback(CI);
+  Callback(CI, /*reusingASTContext=*/true);
 
   if (DiagC)
     CI.removeDiagnosticConsumer(DiagC);
@@ -362,7 +359,7 @@ bool CompletionInstance::performNewOperation(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &)> Callback) {
+    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
 
   auto TheInstance = std::make_unique<CompilerInstance>();
   {
@@ -399,7 +396,7 @@ bool CompletionInstance::performNewOperation(
     if (!state->hasCodeCompletionDelayedDeclState())
       return true;
 
-    Callback(CI);
+    Callback(CI, /*reusingASTContext=*/false);
   }
 
   if (ArgsHash.hasValue()) {
@@ -416,7 +413,7 @@ bool swift::ide::CompletionInstance::performOperation(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     bool EnableASTCaching, std::string &Error, DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &)> Callback) {
+    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
 
   // Always disable source location resolutions from .swiftsourceinfo file
   // because they're somewhat heavy operations and aren't needed for completion.
