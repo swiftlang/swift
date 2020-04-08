@@ -103,9 +103,9 @@ ALPHASORT: FatCompactMap
 Substring filters using + and - prefix
 
 ````
-RUN: %Benchmark_O --list -.A +Angry -Small AngryPhonebook.ASCII.Small \
+RUN: %Benchmark_O --list -.A +Angry -Small AngryPhonebook.ASCII2.Small \
 RUN:             | %FileCheck %s --check-prefix FILTERS
-FILTERS: AngryPhonebook.ASCII.Small
+FILTERS: AngryPhonebook.ASCII2.Small
 FILTERS-NOT: AngryPhonebook.Armenian
 FILTERS-NOT: AngryPhonebook.Cyrillic.Small
 FILTERS: AngryPhonebook.Cyrillic
