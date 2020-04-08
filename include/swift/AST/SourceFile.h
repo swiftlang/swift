@@ -14,11 +14,13 @@
 #define SWIFT_AST_SOURCEFILE_H
 
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Debug.h"
 
 namespace swift {
 
 class PersistentParserState;
+class SynthesizedFileUnit;
 
 /// A file containing Swift source code.
 ///
@@ -134,6 +136,9 @@ private:
   /// within the file to keep them from conflicting with other files in the
   /// same module.
   mutable Identifier PrivateDiscriminator;
+
+  /// A synthesized file corresponding to this file, created on-demand.
+  SynthesizedFileUnit *SynthesizedFile = nullptr;
 
   /// The root TypeRefinementContext for this SourceFile.
   ///
@@ -446,6 +451,11 @@ public:
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
   Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
+
+  /// Returns the synthesized file for this source file, if it exists.
+  SynthesizedFileUnit *getSynthesizedFile() const { return SynthesizedFile; };
+
+  SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   virtual bool walk(ASTWalker &walker) override;
 
