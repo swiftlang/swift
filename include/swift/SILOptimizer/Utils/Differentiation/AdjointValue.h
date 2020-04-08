@@ -148,7 +148,7 @@ public:
               std::get<1>(elt).print(s);
             },
             [&s] { s << ", "; });
-      } else if (auto tupleType = getType().getAs<TupleType>()) {
+      } else if (getType().is<TupleType>()) {
         s << "Tuple>(";
         interleave(
             base->value.aggregate,
