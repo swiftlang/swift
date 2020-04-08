@@ -674,7 +674,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     auto *backing = var->getPropertyWrapperBackingProperty();
 
     // Error recovery.
-    if (!backing) {
+    if (!backing || backing->isInvalid()) {
       auto type = storage->getValueInterfaceType();
       if (isLValue)
         type = LValueType::get(type);
@@ -721,7 +721,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     auto *backing = var->getPropertyWrapperBackingProperty();
 
     // Error recovery.
-    if (!backing) {
+    if (!backing || backing->isInvalid()) {
       auto type = storage->getValueInterfaceType();
       if (isLValue)
         type = LValueType::get(type);
