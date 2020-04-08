@@ -817,19 +817,15 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     propertyKeyPath = UnresolvedDotExpr::createImplicit(ctx, propertyKeyPath,
         enclosingSelfAccess->accessedProperty->getFullName());
     propertyKeyPath = new (ctx) KeyPathExpr(
-        SourceLoc(), nullptr, propertyKeyPath);
+        SourceLoc(), nullptr, propertyKeyPath, /*hasLeadingDot=*/true);
 
     // Key path referring to the backing storage property.
     Expr *storageKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
     storageKeyPath = UnresolvedDotExpr::createImplicit(ctx, storageKeyPath,
                                                        storage->getFullName());
-    storageKeyPath = new (ctx) KeyPathExpr(
-        SourceLoc(), nullptr, storageKeyPath);
-    Expr *args[3] = {
-      selfDRE,
-      propertyKeyPath,
-      storageKeyPath
-    };
+    storageKeyPath = new (ctx) KeyPathExpr(SourceLoc(), nullptr, storageKeyPath,
+                                           /*hasLeadingDot=*/true);
+    Expr *args[3] = {selfDRE, propertyKeyPath, storageKeyPath};
 
     SubscriptDecl *subscriptDecl = enclosingSelfAccess->subscript;
     lookupExpr = SubscriptExpr::create(

@@ -1398,11 +1398,6 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
 bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
-  // Prespecialize generic metadata in the standard library always, disregarding
-  // flags.
-  if (isStandardLibrary()) {
-    return true;
-  }
   auto &context = getSwiftModule()->getASTContext();
   auto deploymentAvailability =
       AvailabilityContext::forDeploymentTarget(context);

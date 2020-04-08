@@ -874,6 +874,25 @@ func sr11562() {
   // expected-error@-1 {{subscript index of type '(Int, Int)' in a key path must be Hashable}}
 }
 
+// SR-12290: Ban keypaths with contextual root and without a leading dot
+struct SR_12290 {
+  let property: [Int] = []
+  let kp1: KeyPath<SR_12290, Int> = \property.count // expected-error {{a Swift key path with contextual root must begin with a leading dot}}{{38-38=.}}
+  let kp2: KeyPath<SR_12290, Int> = \.property.count // Ok
+  let kp3: KeyPath<SR_12290, Int> = \SR_12290.property.count // Ok
+
+  func foo1(_: KeyPath<SR_12290, Int> = \property.count) {} // expected-error {{a Swift key path with contextual root must begin with a leading dot}}{{42-42=.}}
+  func foo2(_: KeyPath<SR_12290, Int> = \.property.count) {} // Ok
+  func foo3(_: KeyPath<SR_12290, Int> = \SR_12290.property.count) {} // Ok
+
+  func foo4<T>(_: KeyPath<SR_12290, T>) {}
+  func useFoo4() {
+    foo4(\property.count) // expected-error {{a Swift key path with contextual root must begin with a leading dot}}{{11-11=.}}
+    foo4(\.property.count) // Ok
+    foo4(\SR_12290.property.count) // Ok
+  }
+}
+
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;

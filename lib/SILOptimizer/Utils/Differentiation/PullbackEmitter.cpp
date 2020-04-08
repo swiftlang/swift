@@ -1676,14 +1676,14 @@ void PullbackEmitter::visitBeginBorrowInst(BeginBorrowInst *bbi) {
 void PullbackEmitter::visitBeginAccessInst(BeginAccessInst *bai) {
   // Check for non-differentiable writes.
   if (bai->getAccessKind() == SILAccessKind::Modify) {
-    if (auto *gai = dyn_cast<GlobalAddrInst>(bai->getSource())) {
+    if (isa<GlobalAddrInst>(bai->getSource())) {
       getContext().emitNondifferentiabilityError(
           bai, getInvoker(),
           diag::autodiff_cannot_differentiate_writes_to_global_variables);
       errorOccurred = true;
       return;
     }
-    if (auto *pbi = dyn_cast<ProjectBoxInst>(bai->getSource())) {
+    if (isa<ProjectBoxInst>(bai->getSource())) {
       getContext().emitNondifferentiabilityError(
           bai, getInvoker(),
           diag::autodiff_cannot_differentiate_writes_to_mutable_captures);
@@ -1904,7 +1904,7 @@ AdjointValue PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs,
       SmallVector<AdjointValue, 8> newElements;
       auto lhsTy = lhsVal->getType().getASTType();
       auto lhsValCopy = builder.emitCopyValueOperation(loc, lhsVal);
-      if (auto *tupTy = lhsTy->getAs<TupleType>()) {
+      if (lhsTy->is<TupleType>()) {
         auto elts = builder.createDestructureTuple(loc, lhsValCopy);
         llvm::for_each(elts->getResults(),
                        [this](SILValue result) { recordTemporary(result); });
@@ -1913,7 +1913,7 @@ AdjointValue PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs,
           newElements.push_back(accumulateAdjointsDirect(
               makeConcreteAdjointValue(elts->getResult(i)), rhsElt, loc));
         }
-      } else if (auto *structDecl = lhsTy->getStructOrBoundGenericStruct()) {
+      } else if (lhsTy->getStructOrBoundGenericStruct()) {
         auto elts =
             builder.createDestructureStruct(lhsVal.getLoc(), lhsValCopy);
         llvm::for_each(elts->getResults(),
