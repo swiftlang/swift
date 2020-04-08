@@ -489,14 +489,14 @@ function set_build_options_for_host() {
                     cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                     ;;
                 iphonesimulator-i386)
-                    SWIFT_HOST_TRIPLE="i386-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    SWIFT_HOST_TRIPLE="i386-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
                     llvm_target_arch="X86"
 
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 iphonesimulator-x86_64)
-                    SWIFT_HOST_TRIPLE="x86_64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    SWIFT_HOST_TRIPLE="x86_64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
                     llvm_target_arch="X86"
 
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
@@ -531,7 +531,7 @@ function set_build_options_for_host() {
                     cmake_osx_deployment_target=""
                     ;;
                 appletvsimulator-x86_64)
-                    SWIFT_HOST_TRIPLE="x86_64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+                    SWIFT_HOST_TRIPLE="x86_64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}-simulator"
                     llvm_target_arch="X86"
 
                     SWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
@@ -545,7 +545,7 @@ function set_build_options_for_host() {
                     cmake_osx_deployment_target=""
                     ;;
                 watchsimulator-i386)
-                    SWIFT_HOST_TRIPLE="i386-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                    SWIFT_HOST_TRIPLE="i386-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}-simulator"
                     llvm_target_arch="X86"
 
                     SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
