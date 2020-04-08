@@ -156,7 +156,7 @@ class Parent<V> {
   }
   class D<T> : C<T, Int> {}
   class E : D<Double> {
-    // CHECK-LABEL: sil hidden [transparent] [ossa] @$s9accessors6ParentC1EC3fooSivgZ : $@convention(method) <V> (@thick Parent<V>.E.Type) -> Int
+    // CHECK-LABEL: sil hidden [ossa] @$s9accessors6ParentC1EC3fooSivgZ : $@convention(method) <V> (@thick Parent<V>.E.Type) -> Int
     // CHECK: [[TY:%.+]] = upcast {{%.+}} : $@thick Parent<V>.E.Type to $@thick Parent<V>.D<Double>.Type
     // CHECK: [[UPCASTTY:%.+]] = upcast [[TY]] : $@thick Parent<V>.D<Double>.Type to $@thick Parent<V>.C<Double, Int>.Type
     // CHECK: [[GETTER:%.+]] = function_ref @$s9accessors6ParentC1CC3fooSivgZ : $@convention(method) <τ_0_0><τ_1_0, τ_1_1> (@thick Parent<τ_0_0>.C<τ_1_0, τ_1_1>.Type) -> Int

@@ -246,3 +246,5 @@ SWIFT_REQUEST(TypeChecker, ClosureHasExplicitResultRequest,
 SWIFT_REQUEST(TypeChecker, LookupAllConformancesInContextRequest,
               ProtocolConformanceLookupResult(const DeclContext *),
               Uncached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SimpleDidSetRequest, 
+              bool(AccessorDecl *), Cached, NoLocationInfo)
