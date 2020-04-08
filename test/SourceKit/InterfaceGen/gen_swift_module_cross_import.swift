@@ -4,7 +4,7 @@
 // Check the interface shows the decls from each of A's cross-import overlays.
 //
 // RUN: %sourcekitd-test -req=interface-gen -module A -- -I %S/../Inputs/CrossImport -module-cache-path %t.mod/mcp > %t.response
-// RUN: diff --strip-trailing-cr -u %s.A.response %t.response
+// RUN: %diff -u %s.A.response %t.response
 
 // Make sure cursor info within the generated interface of A on one of the
 // decls originally from a cross-import decls shows 'A' as the parent module.
@@ -22,4 +22,4 @@
 //
 // RUN: %target-swift-frontend -emit-module-path %t.mod/_OtherCAdditions.swiftmodule -emit-module-doc-path %t.mod/_OtherCAdditions.swiftdoc -module-cache-path %t.mod/mcp -I %S/../Inputs/CrossImport %S/../Inputs/CrossImport/_OtherCAdditions.swift -parse-as-library -enable-cross-import-overlays
 // RUN: %sourcekitd-test -req=interface-gen -module Other -- -target %target-triple -I %S/../Inputs/CrossImport -I %t.mod/ -module-cache-path %t.mod/mcp > %t.response
-// RUN: diff --strip-trailing-cr -u %s.Other.response %t.response
+// RUN: %diff -u %s.Other.response %t.response
