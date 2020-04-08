@@ -132,6 +132,9 @@ def main():
                         dest="targets",
                         help="stdlib deployment targets to test. Accept "
                              "multiple (default: " + host_target + ")")
+    parser.add_argument("--filter", type=str, metavar="REGEX",
+                        help="only run tests with paths matching the given "
+                             "regular expression")
     parser.add_argument("--mode",
                         choices=TEST_MODES, default='optimize_none',
                         help="test mode (default: optimize_none)")
@@ -261,6 +264,9 @@ def main():
         test_args += ['--param', 'swift_test_results_dir=%s' % args.result_dir,
                       '--xunit-xml-output=%s' % os.path.join(args.result_dir,
                                                              'lit-tests.xml')]
+
+    if args.filter:
+        test_args += ['--filter', args.filter]
 
     test_cmd = [sys.executable, args.lit] + test_args + paths
 
