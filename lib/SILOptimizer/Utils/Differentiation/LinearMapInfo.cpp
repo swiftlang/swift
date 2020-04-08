@@ -58,7 +58,7 @@ LinearMapInfo::LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
                              const DifferentiableActivityInfo &activityInfo)
     : kind(kind), original(original), derivative(derivative),
       activityInfo(activityInfo), indices(indices),
-      synthesizedFile(context.getSynthesizedFile()),
+      synthesizedFile(context.getOrCreateSynthesizedFile()),
       typeConverter(context.getTypeConverter()) {
   generateDifferentiationDataStructures(context, derivative);
 }

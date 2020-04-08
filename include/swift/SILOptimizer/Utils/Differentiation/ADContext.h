@@ -68,7 +68,7 @@ private:
   SILPassManager &passManager;
 
   /// A synthesized file unit.
-  SynthesizedFileUnit &synthesizedFile;
+  SynthesizedFileUnit *synthesizedFile = nullptr;
 
   /// The worklist (stack) of `differentiable_function` instructions to be
   /// processed.
@@ -124,8 +124,11 @@ public:
   SILModule &getModule() const { return module; }
   ASTContext &getASTContext() const { return module.getASTContext(); }
   SILPassManager &getPassManager() const { return passManager; }
-  SynthesizedFileUnit &getSynthesizedFile() { return synthesizedFile; }
   Lowering::TypeConverter &getTypeConverter() { return module.Types; }
+
+  /// Get or create a synthesized file for adding generated linear map structs
+  /// and branching trace enums. Used by `LinearMapInfo`.
+  SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   /// Returns true if the `differentiable_function` instruction worklist is
   /// empty.
