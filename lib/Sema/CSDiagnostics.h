@@ -153,13 +153,6 @@ protected:
     return None;
   }
 
-  ValueDecl *getResolvedMemberRef(UnresolvedDotExpr *member) const {
-    auto *locator = getConstraintLocator(member, ConstraintLocator::Member);
-    if (auto overload = getOverloadChoiceIfAvailable(locator))
-      return overload->choice.getDeclOrNull();
-    return nullptr;
-  }
-
   /// Retrieve overload choice resolved for a given locator
   /// by the constraint solver.
   Optional<SelectedOverload>

@@ -1277,8 +1277,10 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
             ConstructorDecl::BodyInitKind::Delegating) {
           emitDiagnostic(loc, diag::assignment_let_property_delegating_init,
                       member->getName());
-          if (auto *ref = getResolvedMemberRef(member)) {
-            emitDiagnostic(ref, diag::decl_declared_here, ref->getFullName());
+          if (auto overload = getOverloadChoiceIfAvailable(
+                  getConstraintLocator(member, ConstraintLocator::Member))) {
+            if (auto *ref = overload->choice.getDeclOrNull())
+              emitDiagnostic(ref, diag::decl_declared_here, ref->getFullName());
           }
           return true;
         }
