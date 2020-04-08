@@ -1865,6 +1865,7 @@ class DerivativeAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
+  friend class DerivativeAttrOriginalDeclRequest;
 
   /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
@@ -1873,8 +1874,24 @@ class DerivativeAttr final
   TypeRepr *BaseTypeRepr;
   /// The original function name.
   DeclNameRefWithLoc OriginalFunctionName;
-  /// The original function declaration, resolved by the type checker.
-  AbstractFunctionDecl *OriginalFunction = nullptr;
+  /// The original function.
+  ///
+  /// The states are:
+  /// - nullptr:
+  ///   The original function is unknown. The typechecker is responsible for
+  ///   eventually resolving it.
+  /// - AbstractFunctionDecl:
+  ///   The original function is known to be this `AbstractFunctionDecl`.
+  /// - LazyMemberLoader:
+  ///   This `LazyMemberLoader` knows how to resolve the original function.
+  ///   `ResolverContextData` is an additional piece of data that the
+  ///   `LazyMemberLoader` needs.
+  // TODO(TF-1235): Making `DerivativeAttr` immutable will simplify this by
+  // removing the `AbstractFunctionDecl` state.
+  llvm::PointerUnion<AbstractFunctionDecl *, LazyMemberLoader *> OriginalFunction;
+  /// Data representing the original function declaration. See doc comment for
+  /// `OriginalFunction`.
+  uint64_t ResolverContextData = 0;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiability parameter indices, resolved by the type checker.
@@ -1907,12 +1924,10 @@ public:
   DeclNameRefWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
   }
-  AbstractFunctionDecl *getOriginalFunction() const {
-    return OriginalFunction;
-  }
-  void setOriginalFunction(AbstractFunctionDecl *decl) {
-    OriginalFunction = decl;
-  }
+  AbstractFunctionDecl *getOriginalFunction(ASTContext &context) const;
+  void setOriginalFunction(AbstractFunctionDecl *decl);
+  void setOriginalFunctionResolver(LazyMemberLoader *resolver,
+                                   uint64_t resolverContextData);
 
   AutoDiffDerivativeFunctionKind getDerivativeKind() const {
     assert(Kind && "Derivative function kind has not yet been resolved");

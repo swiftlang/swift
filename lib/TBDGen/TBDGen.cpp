@@ -665,7 +665,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   for (const auto *derivativeAttr :
        AFD->getAttrs().getAttributes<DerivativeAttr>())
     addDerivativeConfiguration(
-        derivativeAttr->getOriginalFunction(),
+        derivativeAttr->getOriginalFunction(AFD->getASTContext()),
         AutoDiffConfig(derivativeAttr->getParameterIndices(),
                        IndexSubset::get(AFD->getASTContext(), 1, {0}),
                        AFD->getGenericSignature()));
