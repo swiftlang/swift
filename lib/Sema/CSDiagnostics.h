@@ -45,15 +45,11 @@ class FailureDiagnostic {
   Expr *RawAnchor;
   /// Simplified anchor associated with the given locator.
   Expr *Anchor;
-  /// Indicates whether locator could be simplified
-  /// down to anchor expression.
-  bool HasComplexLocator;
 
 public:
   FailureDiagnostic(const Solution &solution, ConstraintLocator *locator)
-      : S(solution), Locator(locator), RawAnchor(locator->getAnchor()) {
-    std::tie(Anchor, HasComplexLocator) = computeAnchor();
-  }
+      : S(solution), Locator(locator), RawAnchor(locator->getAnchor()),
+        Anchor(computeAnchor()) {}
 
   FailureDiagnostic(const Solution &solution, Expr *anchor)
       : FailureDiagnostic(solution, solution.getConstraintLocator(anchor)) {}
@@ -189,9 +185,6 @@ protected:
     return S.getFunctionArgApplyInfo(locator);
   }
 
-  /// \returns true is locator hasn't been simplified down to expression.
-  bool hasComplexLocator() const { return HasComplexLocator; }
-
   /// \returns A parent expression if sub-expression is contained anywhere
   /// in the root expression or `nullptr` otherwise.
   Expr *findParentExpr(Expr *subExpr) const;
@@ -219,7 +212,7 @@ protected:
 
 private:
   /// Compute anchor expression associated with current diagnostic.
-  std::pair<Expr *, bool> computeAnchor() const;
+  Expr *computeAnchor() const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement

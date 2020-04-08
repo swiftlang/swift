@@ -50,29 +50,25 @@ bool FailureDiagnostic::diagnoseAsNote() {
   return false;
 }
 
-std::pair<Expr *, bool> FailureDiagnostic::computeAnchor() const {
+Expr *FailureDiagnostic::computeAnchor() const {
   auto &cs = getConstraintSystem();
 
   auto *locator = getLocator();
   // Resolve the locator to a specific expression.
   SourceRange range;
-  bool isSubscriptMember =
-      (!locator->getPath().empty() && locator->getPath().back().getKind() ==
-                                          ConstraintLocator::SubscriptMember);
-
   ConstraintLocator *resolved = simplifyLocator(cs, locator, range);
   if (!resolved || !resolved->getAnchor())
-    return {locator->getAnchor(), true};
+    return locator->getAnchor();
 
   Expr *anchor = resolved->getAnchor();
   // FIXME: Work around an odd locator representation that doesn't separate the
   // base of a subscript member from the member access.
-  if (isSubscriptMember) {
+  if (locator->isLastElement<LocatorPathElt::SubscriptMember>()) {
     if (auto subscript = dyn_cast<SubscriptExpr>(anchor))
       anchor = subscript->getBase();
   }
 
-  return {anchor, !resolved->getPath().empty()};
+  return anchor;
 }
 
 Type FailureDiagnostic::getType(Expr *expr, bool wantRValue) const {
@@ -874,9 +870,6 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
 }
 
 bool MissingForcedDowncastFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
   auto *expr = getAnchor();
   if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
     expr = assignExpr->getSrc();
@@ -894,9 +887,6 @@ bool MissingForcedDowncastFailure::diagnoseAsError() {
 }
 
 bool MissingAddressOfFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
   auto *anchor = getAnchor();
   auto argTy = getFromType();
   auto paramTy = getToType();
@@ -913,9 +903,6 @@ bool MissingAddressOfFailure::diagnoseAsError() {
 }
 
 bool MissingExplicitConversionFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
   auto *DC = getDC();
   auto *anchor = getAnchor();
   if (auto *assign = dyn_cast<AssignExpr>(anchor))
@@ -976,9 +963,6 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
 }
 
 bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
   auto *anchor = getAnchor();
   auto baseType = getType(anchor);
   bool resultIsOptional = ResultTypeIsOptional;
@@ -1101,9 +1085,6 @@ public:
 };
 
 bool MissingOptionalUnwrapFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
   if (!getUnwrappedType()->isBool()) {
     if (diagnoseConversionToBool())
       return true;
