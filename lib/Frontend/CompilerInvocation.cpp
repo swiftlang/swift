@@ -449,6 +449,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
 
+  Opts.EnableExperimentalForwardModeDifferentiation |=
+      Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
+
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
