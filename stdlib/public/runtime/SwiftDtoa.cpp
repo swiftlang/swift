@@ -1180,10 +1180,7 @@ size_t swift_format_float16(const __fp16 *d, char *dest, size_t length)
             // NaN
             static const int significandBitCount = 10;
             const char *sign = (raw & 0x8000) ? "-" : "";
-            // XXX FIXME: This is different from Float/Double because
-            // Swift's Float16 NaN encoding gets altered before it gets
-            // here, probably because it gets converted to Float and back.
-            const char *signaling = ((raw >> (significandBitCount - 2)) & 1) ? "s" : "";
+            const char *signaling = ((raw >> (significandBitCount - 1)) & 1) ? "" : "s";
             uint32_t payload = raw & ((1L << (significandBitCount - 2)) - 1);
             char buff[32];
             if (payload != 0) {
