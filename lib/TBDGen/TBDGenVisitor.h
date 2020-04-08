@@ -70,7 +70,6 @@ public:
   ModuleDecl *SwiftModule;
   const TBDGenOptions &Opts;
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// A set of original function and derivative configuration pairs for which
   /// derivative symbols have been emitted.
   ///
@@ -107,7 +106,6 @@ private:
   void addAssociatedConformanceDescriptor(AssociatedConformance conformance);
   void addBaseConformanceDescriptor(BaseConformance conformance);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Adds the symbol for the linear map function of the given kind associated
   /// with the given original function and derivative function configuration.
   void addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
@@ -135,7 +133,6 @@ private:
   /// derivative function configuration.
   void addDerivativeConfiguration(AbstractFunctionDecl *original,
                                   AutoDiffConfig config);
-  // SWIFT_ENABLE_TENSORFLOW END
 
 public:
   TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,

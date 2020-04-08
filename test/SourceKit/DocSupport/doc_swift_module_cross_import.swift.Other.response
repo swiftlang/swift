@@ -5,7 +5,12 @@ func fromOther()
 
 // MARK: - C Additions
 
+import B
 import C
+import A
+
+// Available when C is imported with Other
+func filtered()
 
 // Available when C is imported with Other
 func from_OtherCAdditions()
@@ -53,18 +58,53 @@ func from_OtherCAdditions()
     key.length: 1
   },
   {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 78,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 85,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 87,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 94,
+    key.length: 1
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 79,
+    key.offset: 97,
     key.length: 43
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 122,
+    key.offset: 140,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 127,
+    key.offset: 145,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.comment,
+    key.offset: 157,
+    key.length: 43
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 200,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 205,
     key.length: 20
   }
 ]
@@ -79,10 +119,28 @@ func from_OtherCAdditions()
   },
   {
     key.kind: source.lang.swift.decl.function.free,
+    key.name: "filtered()",
+    key.usr: "s:16_OtherCAdditions8filteredyyF",
+    key.offset: 140,
+    key.length: 15,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>filtered</decl.name>()</decl.function.free>",
+    key.attributes: [
+      {
+        key.kind: source.lang.swift.attribute.availability,
+        key.is_unavailable: 1
+      }
+    ],
+    key.is_unavailable: 1,
+    key.required_bystanders: [
+      "C"
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
     key.name: "from_OtherCAdditions()",
     key.usr: "s:16_OtherCAdditions05from_aB0yyF",
     key.doc.full_as_xml: "<Function><Name>from_OtherCAdditions()</Name><USR>s:16_OtherCAdditions05from_aB0yyF</USR><Declaration>func from_OtherCAdditions()</Declaration><CommentParts><Abstract><Para>This has some interesting documentation that shouldn’t be separated from the decl when we print the comment detailing its required bystanders in the generated interface of ‘Other’.</Para></Abstract></CommentParts></Function>",
-    key.offset: 122,
+    key.offset: 200,
     key.length: 27,
     key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>from_OtherCAdditions</decl.name>()</decl.function.free>",
     key.required_bystanders: [

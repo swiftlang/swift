@@ -2,17 +2,17 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// SWIFT_ENABLE_TENSORFLOW
 //
-// AdjointValue - a symbolic representation for adjoint values that allows
-// for efficient differentiation of aggregates.
+// AdjointValue - a symbolic representation for adjoint values enabling
+// efficient differentiation by avoiding zero materialization.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADJOINTVALUE_H
@@ -31,7 +31,7 @@ enum AdjointValueKind {
   /// fanout).
   Zero,
 
-  /// An aggregate of adjoint values.
+  /// An aggregate of adjoint values: a struct or tuple.
   Aggregate,
 
   /// A concrete SIL value.

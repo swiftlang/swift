@@ -141,7 +141,6 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
-  case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UnconditionalCheckedCastInst:
     // DO NOT use LOADABLE_REF_STORAGE because unchecked references don't have
     // retain/release instructions that trigger the 'default' case.
@@ -151,6 +150,20 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
 #include "swift/AST/ReferenceStorage.def"
     return cast<SingleValueInstruction>(value)->getOperand(0);
 
+  case ValueKind::UncheckedAddrCastInst: {
+    auto *uac = cast<UncheckedAddrCastInst>(value);
+    SILValue op = uac->getOperand();
+    SILType srcTy = op->getType().getObjectType();
+    SILType destTy = value->getType().getObjectType();
+    SILFunction *f = uac->getFunction();
+    // If the source and destination of the cast don't agree on being a pointer,
+    // we bail. Otherwise we would miss important edges in the connection graph:
+    // e.g. loads of non-pointers are ignored, while it could be an escape of
+    // the value (which could be a pointer before the cast).
+    if (findCachedPointerKind(srcTy, *f) != findCachedPointerKind(destTy, *f))
+      return SILValue();
+    return op;
+  }
   case ValueKind::TupleExtractInst: {
     auto *TEI = cast<TupleExtractInst>(value);
     // Special handling for extracting the pointer-result from an

@@ -488,14 +488,21 @@ struct EnumImpl : ReflectionMirrorImpl {
 
     auto *caseName = getInfo(&tag, &payloadType, &indirect);
 
+    // Copy the enum itself so that we can project the data without destroying
+    // the original.
+    Any enumCopy;
+    auto *enumCopyContainer
+      = type->allocateBoxForExistentialIn(&enumCopy.Buffer);
+    type->vw_initializeWithCopy(enumCopyContainer,
+                                const_cast<OpaqueValue *>(value));
+
     // Copy the enum payload into a box
     const Metadata *boxType = (indirect ? &METADATA_SYM(Bo).base : payloadType);
     BoxPair pair = swift_allocBox(boxType);
-
-    type->vw_destructiveProjectEnumData(const_cast<OpaqueValue *>(value));
-    boxType->vw_initializeWithCopy(pair.buffer, const_cast<OpaqueValue *>(value));
-    type->vw_destructiveInjectEnumTag(const_cast<OpaqueValue *>(value), tag);
-
+    type->vw_destructiveProjectEnumData(enumCopyContainer);
+    boxType->vw_initializeWithTake(pair.buffer, enumCopyContainer);
+    type->deallocateBoxForExistentialIn(&enumCopy.Buffer);
+    
     value = pair.buffer;
 
     // If the payload is indirect, we need to jump through the box to get it.

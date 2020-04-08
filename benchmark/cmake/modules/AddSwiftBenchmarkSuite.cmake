@@ -166,7 +166,7 @@ macro(configure_sdks)
   endif()
 endmacro()
 
-function (add_swift_benchmark_library objfile_out sibfile_out)
+function (add_swift_benchmark_library objfile_out sibfile_out swiftmodule_out)
   cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS;DEPENDS" ${ARGN})
 
   precondition(BENCHLIB_MODULE_PATH)
@@ -197,6 +197,7 @@ function (add_swift_benchmark_library objfile_out sibfile_out)
       "-o" "${objfile}"
       ${sources})
   set(${objfile_out} "${objfile}" PARENT_SCOPE)
+  set(${swiftmodule_out} "${swiftmodule}" PARENT_SCOPE)
 
   if(SWIFT_BENCHMARK_EMIT_SIB)
     precondition(sibfile_out)
@@ -378,10 +379,13 @@ function (swift_benchmark_compile_archopts)
 
   set(common_swift4_options ${common_options} "-swift-version" "4")
 
-  # Always optimize the driver modules.
-  # Note that we compile the driver for Osize also with -Osize
-  # (and not with -O), because of <rdar://problem/19614516>.
-  string(REPLACE "Onone" "O" driver_opt "${optflag}")
+  # Always optimize the driver modules, unless we're building benchmarks for
+  # debugger testing.
+  if(NOT SWIFT_BENCHMARK_UNOPTIMIZED_DRIVER)
+    # Note that we compile the driver for Osize also with -Osize
+    # (and not with -O), because of <rdar://problem/19614516>.
+    string(REPLACE "Onone" "O" driver_opt "${optflag}")
+  endif()
 
   set(common_options_driver
       "-c"
@@ -401,12 +405,13 @@ function (swift_benchmark_compile_archopts)
   endif()
   set(bench_library_objects)
   set(bench_library_sibfiles)
+  set(bench_library_swiftmodules)
   set(opt_view_dirs)
   # Build libraries used by the driver and benchmarks.
   foreach(module_name_path ${BENCH_LIBRARY_MODULES})
     set(sources "${srcdir}/${module_name_path}.swift")
 
-    add_swift_benchmark_library(objfile_out sibfile_out
+    add_swift_benchmark_library(objfile_out sibfile_out swiftmodule_out
       MODULE_PATH "${module_name_path}"
       SOURCE_DIR "${srcdir}"
       OBJECT_DIR "${objdir}"
@@ -414,6 +419,7 @@ function (swift_benchmark_compile_archopts)
       LIBRARY_FLAGS ${common_swift4_options})
     precondition(objfile_out)
     list(APPEND bench_library_objects "${objfile_out}")
+    list(APPEND bench_library_swiftmodules "${swiftmodule_out}")
     if (SWIFT_BENCHMARK_EMIT_SIB)
       precondition(sibfile_out)
       list(APPEND bench_library_sibfiles "${sibfile_out}")
@@ -433,7 +439,7 @@ function (swift_benchmark_compile_archopts)
 
     set(objfile_out)
     set(sibfile_out)
-    add_swift_benchmark_library(objfile_out sibfile_out
+    add_swift_benchmark_library(objfile_out sibfile_out swiftmodule_out
       MODULE_PATH "${module_name_path}"
       SOURCE_DIR "${srcdir}"
       OBJECT_DIR "${objdir}"
@@ -442,6 +448,7 @@ function (swift_benchmark_compile_archopts)
       DEPENDS ${bench_library_objects})
     precondition(objfile_out)
     list(APPEND bench_driver_objects "${objfile_out}")
+    list(APPEND bench_library_swiftmodules "${swiftmodule_out}")
     if (SWIFT_BENCHMARK_EMIT_SIB)
       precondition(sibfile_out)
       list(APPEND bench_driver_sibfiles "${sibfile_out}")
@@ -464,6 +471,7 @@ function (swift_benchmark_compile_archopts)
       set(swiftmodule "${objdir}/${module_name}.swiftmodule")
       set(source "${srcdir}/${module_name_path}.swift")
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile}")
+      list(APPEND bench_library_swiftmodules "${swiftmodule}")
 
       if ("${bench_flags}" MATCHES "-whole-module.*")
         set(output_option "-o" "${objfile}")
@@ -622,6 +630,15 @@ function (swift_benchmark_compile_archopts)
     else()
       set(SWIFT_LINK_RPATH "${SWIFT_RPATH_BASE}/${BENCH_COMPILE_ARCHOPTS_PLATFORM}")
     endif()
+
+    # On Darwin, we pass the *.swiftmodule paths transitively referenced by the
+    # driver executable to ld64. ld64 inserts N_AST references to these modules
+    # into the program, for later use by lldb.
+    set(ld64_add_ast_path_opts)
+    foreach(ast_path ${bench_library_swiftmodules})
+      list(APPEND ld64_add_ast_path_opts "-Wl,-add_ast_path,${ast_path}")
+    endforeach()
+
     add_custom_command(
         OUTPUT "${OUTPUT_EXEC}"
         DEPENDS
@@ -647,6 +664,7 @@ function (swift_benchmark_compile_archopts)
           "-Xlinker" "${SWIFT_LINK_RPATH}"
           ${bench_library_objects}
           ${bench_driver_objects}
+          ${ld64_add_ast_path_opts}
           ${SWIFT_BENCH_OBJFILES}
           ${objcfile}
           "-o" "${OUTPUT_EXEC}"

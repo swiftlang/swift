@@ -47,7 +47,7 @@ SingleValueInstruction *swift::isAccessProjection(SILValue v) {
 // TODO: When the optimizer stops stripping begin_access markers, then we should
 // be able to assert that the result is a BeginAccessInst and the default case
 // is unreachable.
-SILValue swift::getAccessedAddress(SILValue v) {
+SILValue swift::getAddressAccess(SILValue v) {
   while (true) {
     assert(v->getType().isAddress());
     auto *projection = isAccessProjection(v);

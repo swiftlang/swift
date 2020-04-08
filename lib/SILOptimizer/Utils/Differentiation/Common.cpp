@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,21 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// SWIFT_ENABLE_TENSORFLOW
+// Automatic differentiation common utilities.
 //
-// Automatic differentiation utilities.
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Utils/Differentiation/Common.h"
-#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 
 namespace swift {
 namespace autodiff {
 
 raw_ostream &getADDebugStream() { return llvm::dbgs() << "[AD] "; }
+
+//===----------------------------------------------------------------------===//
+// Helpers
+//===----------------------------------------------------------------------===//
 
 bool isArrayLiteralIntrinsic(FullApplySite applySite) {
   return doesApplyCalleeHaveSemantics(applySite.getCalleeOrigin(),
@@ -130,9 +131,6 @@ void collectAllFormalResultsInTypeOrder(SILFunction &function,
   }
 }
 
-/// Given a function, gathers all of its direct results in an order defined by
-/// its result type. Note that "formal results" refer to result values in the
-/// body of the function, not at call sites.
 void collectAllDirectResultsInTypeOrder(SILFunction &function,
                                         SmallVectorImpl<SILValue> &results) {
   SILFunctionConventions convs(function.getLoweredFunctionType(),
@@ -146,8 +144,6 @@ void collectAllDirectResultsInTypeOrder(SILFunction &function,
     results.push_back(retVal);
 }
 
-/// Given a function call site, gathers all of its actual results (both direct
-/// and indirect) in an order defined by its result type.
 void collectAllActualResultsInTypeOrder(
     ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
     SmallVectorImpl<SILValue> &results) {
@@ -223,6 +219,33 @@ void collectMinimalIndicesForFunctionCall(
   }));
 }
 
+//===----------------------------------------------------------------------===//
+// Code emission utilities
+//===----------------------------------------------------------------------===//
+
+SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
+                      SILLocation loc) {
+  if (elements.size() == 1)
+    return elements.front();
+  return builder.createTuple(loc, elements);
+}
+
+void extractAllElements(SILValue value, SILBuilder &builder,
+                        SmallVectorImpl<SILValue> &results) {
+  auto tupleType = value->getType().getAs<TupleType>();
+  if (!tupleType) {
+    results.push_back(value);
+    return;
+  }
+  if (builder.hasOwnership()) {
+    auto *dti = builder.createDestructureTuple(value.getLoc(), value);
+    results.append(dti->getResults().begin(), dti->getResults().end());
+    return;
+  }
+  for (auto i : range(tupleType->getNumElements()))
+    results.push_back(builder.createTupleExtract(value.getLoc(), value, i));
+}
+
 void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
                         SILValue bufferAccess, SILLocation loc) {
   auto &astCtx = builder.getASTContext();
@@ -253,35 +276,6 @@ void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
   builder.createApply(loc, getter, subMap, {bufferAccess, metatype},
                       /*isNonThrowing*/ false);
   builder.emitDestroyValueOperation(loc, getter);
-}
-
-//===----------------------------------------------------------------------===//
-// Code emission utilities
-//===----------------------------------------------------------------------===//
-
-SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
-                      SILLocation loc) {
-  if (elements.size() == 1)
-    return elements.front();
-  return builder.createTuple(loc, elements);
-}
-
-/// Given a value, extracts all elements to `results` from this value if it has
-/// a tuple type. Otherwise, add this value directly to `results`.
-void extractAllElements(SILValue value, SILBuilder &builder,
-                        SmallVectorImpl<SILValue> &results) {
-  auto tupleType = value->getType().getAs<TupleType>();
-  if (!tupleType) {
-    results.push_back(value);
-    return;
-  }
-  if (builder.hasOwnership()) {
-    auto *dti = builder.createDestructureTuple(value.getLoc(), value);
-    results.append(dti->getResults().begin(), dti->getResults().end());
-    return;
-  }
-  for (auto i : range(tupleType->getNumElements()))
-    results.push_back(builder.createTupleExtract(value.getLoc(), value, i));
 }
 
 //===----------------------------------------------------------------------===//

@@ -2392,13 +2392,14 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = getTypeAttrRangeWithAt(Context, loc);
 
-        diagnoseInvalid(repr, loc, diag::escaping_non_function_parameter)
-            .fixItRemove(attrRange);
-
-        // Try to find a helpful note based on how the type is being used
+        // Try to find a better diagnostic based on how the type is being used
         if (options.is(TypeResolverContext::ImmediateOptionalTypeArgument)) {
           diagnoseInvalid(repr, repr->getLoc(),
-                          diag::escaping_optional_type_argument);
+                          diag::escaping_optional_type_argument)
+              .fixItRemove(attrRange);
+        } else {
+          diagnoseInvalid(repr, loc, diag::escaping_non_function_parameter)
+              .fixItRemove(attrRange);
         }
       }
 
@@ -2418,25 +2419,29 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.clearAttribute(TAK_autoclosure);
     }
 
+    const auto diagnoseInvalidAttr = [&](TypeAttrKind kind) {
+      if (kind == TAK_escaping) {
+        Type optionalObjectType = ty->getOptionalObjectType();
+        if (optionalObjectType && optionalObjectType->is<AnyFunctionType>()) {
+          return diagnoseInvalid(repr, attrs.getLoc(kind),
+                                 diag::escaping_optional_type_argument);
+        }
+      }
+      return diagnoseInvalid(repr, attrs.getLoc(kind),
+                             diag::attribute_requires_function_type,
+                             TypeAttributes::getAttrName(kind));
+    };
+
     for (auto i : FunctionAttrs) {
       if (!attrs.has(i))
         continue;
 
-      auto diag = diagnoseInvalid(repr, attrs.getLoc(i),
-                                  diag::attribute_requires_function_type,
-                                  TypeAttributes::getAttrName(i));
-
-      // If we see @escaping among the attributes on this type, because it isn't
-      // a function type, we'll remove it.
+      auto diag = diagnoseInvalidAttr(i);
+      // If we see @escaping among the attributes on this type, because it
+      // isn't a function type, we'll remove it.
       if (i == TAK_escaping) {
-        diag.fixItRemove(getTypeAttrRangeWithAt(Context,
-                                                attrs.getLoc(TAK_escaping)));
-        // Specialize the diagnostic for Optionals.
-        if (ty->getOptionalObjectType()) {
-          diag.flush();
-          diagnoseInvalid(repr, repr->getLoc(),
-                          diag::escaping_optional_type_argument);
-        }
+        diag.fixItRemove(
+            getTypeAttrRangeWithAt(Context, attrs.getLoc(TAK_escaping)));
       }
       attrs.clearAttribute(i);
     }

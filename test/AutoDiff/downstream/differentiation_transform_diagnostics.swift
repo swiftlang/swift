@@ -651,8 +651,9 @@ extension TF_1208_Struct: Differentiable where Scalar: Differentiable {
 public func TF_1208<Scalar: Differentiable>(
   _ x: TF_1208_Struct<Scalar>,
   // NOTE(TF-1208): This diagnostic is unexpected because `TF_1208_Struct.id` is marked `@differentiable`.
-  // expected-error @+2 {{function is not differentiable}}
-  // expected-note @+1 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'; this is not possible with a closure, make a top-level function instead}}
+  // expected-error @+3 2 {{function is not differentiable}}
+  // expected-note @+2 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'; this is not possible with a closure, make a top-level function instead}}
+  // expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
   reduction: @differentiable (TF_1208_Struct<Scalar>) -> TF_1208_Struct<Scalar> = TF_1208_Struct.id
 ) -> TF_1208_Struct<Scalar> {
   reduction(x)

@@ -2260,6 +2260,27 @@ public:
                            evaluator::SideEffect) const;
 };
 
+class ResolveTypeEraserTypeRequest
+    : public SimpleRequest<ResolveTypeEraserTypeRequest,
+                           Type (ProtocolDecl *, TypeEraserAttr *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, ProtocolDecl *PD,
+                TypeEraserAttr *attr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

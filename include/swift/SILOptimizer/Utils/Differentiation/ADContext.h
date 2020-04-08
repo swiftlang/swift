@@ -1,8 +1,8 @@
-//===--- ADContext.h - Context for Differentiation ----------*- C++ -*---===//
+//===--- ADContext.h - Differentiation Context ----------------*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,9 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// SWIFT_ENABLE_TENSORFLOW
+// Per-module contextual information for the differentiation transform.
 //
-// Per-module contextual information for the Differentiation pass.
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADCONTEXT_H
@@ -20,6 +19,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Common.h"
 #include "swift/SILOptimizer/Utils/Differentiation/DifferentiationInvoker.h"
 #include "llvm/ADT/DenseMap.h"

@@ -88,3 +88,34 @@ public func withoutDerivative<T>(at x: T) -> T {
 public func withoutDerivative<T, R>(at x: T, in body: (T) -> R) -> R {
   body(x)
 }
+
+//===----------------------------------------------------------------------===//
+// Diagnostics
+//===----------------------------------------------------------------------===//
+
+@_silgen_name("_fatalErrorForwardModeDifferentiationDisabled")
+public func _fatalErrorForwardModeDifferentiationDisabled() -> Never {
+  fatalError("""
+    JVP does not exist. Use \
+    '-Xfrontend -enable-experimental-forward-mode-differentiation' to enable \
+    differential-first differentiation APIs.
+    """)
+}
+
+// TODO(TF-1211): Remove this diagnostic helper function.
+@_silgen_name("_fatalErrorJVPNotGenerated")
+public func _fatalErrorJVPNotGenerated() -> Never {
+  fatalError("""
+    Forward-mode automatic differentiation has not yet been upstreamed from \
+    tensorflow branch. Tracked by https://bugs.swift.org/browse/TF-1211.
+    """)
+}
+
+// TODO(TF-1211): Remove this diagnostic helper function.
+@_silgen_name("_fatalErrorVJPNotGenerated")
+public func _fatalErrorVJPNotGenerated() -> Never {
+  fatalError("""
+    Reverse-mode automatic differentiation has not yet been upstreamed from \
+    tensorflow branch. Tracked by https://bugs.swift.org/browse/TF-1211.
+    """)
+}

@@ -403,23 +403,17 @@ SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
   } else if (isLargeLoadableType(env, storageType, IGM)) {
     if (param.getConvention() == ParameterConvention::Direct_Guaranteed)
       return SILParameterInfo(storageType.getASTType(),
-                              // SWIFT_ENABLE_TENSORFLOW
                               ParameterConvention::Indirect_In_Guaranteed,
                               param.getDifferentiability());
-                              // SWIFT_ENABLE_TENSORFLOW_END
     else
       return SILParameterInfo(storageType.getASTType(),
-                              // SWIFT_ENABLE_TENSORFLOW
                               ParameterConvention::Indirect_In_Constant,
                               param.getDifferentiability());
-                              // SWIFT_ENABLE_TENSORFLOW_END
   } else {
     auto newType = getNewSILType(env, storageType, IGM);
     return SILParameterInfo(newType.getASTType(),
-                            // SWIFT_ENABLE_TENSORFLOW
                             param.getConvention(),
                             param.getDifferentiability());
-                            // SWIFT_ENABLE_TENSORFLOW_END
   }
 }
 
@@ -1713,7 +1707,6 @@ private:
   bool fixStoreToBlockStorageInstr(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete);
 
-  // SWIFT_ENABLE_TENSORFLOW
   bool recreateDifferentiabilityWitnessFunction(
       SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete);
 
@@ -2721,7 +2714,6 @@ bool LoadableByAddress::fixStoreToBlockStorageInstr(
   return true;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 bool LoadableByAddress::recreateDifferentiabilityWitnessFunction(
     SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
   auto *instr = dyn_cast<DifferentiabilityWitnessFunctionInst>(&I);
@@ -2791,22 +2783,19 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   auto currSILFunctionType = currSILType.castTo<SILFunctionType>();
   GenericEnvironment *genEnv =
     getSubstGenericEnvironment(convInstr->getFunction());
-  // SWIFT_ENABLE_TENSORFLOW
   // Differentiable function conversion instructions can happen while the
   // function is still generic. In that case, we must calculate the new type
   // using the converted function's generic environment rather than the
   // converting function's generic environment.
   //
   // This happens in witness thunks for default implementations of derivative
-  // requirements, e.g. `requirement00024` in
-  // "test/AutoDiff/compiler_crashers_fixed/tf961".
+  // requirements.
   if (convInstr->getKind() == SILInstructionKind::DifferentiableFunctionInst ||
       convInstr->getKind() == SILInstructionKind::DifferentiableFunctionExtractInst ||
       convInstr->getKind() == SILInstructionKind::LinearFunctionInst ||
       convInstr->getKind() == SILInstructionKind::LinearFunctionExtractInst)
     if (auto genSig = currSILFunctionType->getSubstGenericSignature())
       genEnv = genSig->getGenericEnvironment();
-  // SWIFT_ENABLE_TENSORFLOW_END
   CanSILFunctionType newFnType = MapperCache.getNewSILFunctionType(
       genEnv, currSILFunctionType, *currIRMod);
   SILType newType = SILType::getPrimitiveObjectType(newFnType);
@@ -2847,7 +2836,6 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
         instr->getLoc(), instr->getValue(), instr->getBase());
     break;
   }
-  // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::DifferentiableFunctionInst: {
     auto instr = cast<DifferentiableFunctionInst>(convInstr);
     newInstr = convBuilder.createDifferentiableFunction(
@@ -2876,7 +2864,6 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
         instr->getLoc(), instr->getExtractee(), instr->getFunctionOperand());
     break;
   }
-  // SWIFT_ENABLE_TENSORFLOW END
   default:
     llvm_unreachable("Unexpected conversion instruction");
   }
@@ -2966,12 +2953,10 @@ void LoadableByAddress::run() {
               case SILInstructionKind::MarkDependenceInst:
               case SILInstructionKind::ThinFunctionToPointerInst:
               case SILInstructionKind::ThinToThickFunctionInst:
-              // SWIFT_ENABLE_TENSORFLOW
               case SILInstructionKind::DifferentiableFunctionInst:
               case SILInstructionKind::LinearFunctionInst:
               case SILInstructionKind::LinearFunctionExtractInst:
               case SILInstructionKind::DifferentiableFunctionExtractInst: {
-              // SWIFT_ENABLE_TENSORFLOW END
                 conversionInstrs.insert(
                               cast<SingleValueInstruction>(currInstr));
                 break;
@@ -3086,7 +3071,6 @@ void LoadableByAddress::run() {
           continue;
         else if (recreateApply(I, Delete))
           continue;
-        // SWIFT_ENABLE_TENSORFLOW
         else if (recreateDifferentiabilityWitnessFunction(I, Delete))
           continue;
         else

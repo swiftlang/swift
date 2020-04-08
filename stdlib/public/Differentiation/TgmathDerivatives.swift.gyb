@@ -1,6 +1,4 @@
-// SWIFT_ENABLE_TENSORFLOW
-
-//===--- tgmath_derivatives.swift.gyb -------------------------*- swift -*-===//
+//===--- TgmathDerivatives.swift.gyb --------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -13,6 +11,16 @@
 //===----------------------------------------------------------------------===//
 // This file defines derivatives for tgmath functions.
 //===----------------------------------------------------------------------===//
+
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin.C.tgmath
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
+#else
+#error("Unsupported platform")
+#endif
 
 @usableFromInline
 @derivative(of: fma)

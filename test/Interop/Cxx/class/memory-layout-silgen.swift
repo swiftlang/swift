@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -I %S/Inputs/custom-modules/ -enable-cxx-interop -emit-ir -o - %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %S/Inputs -enable-cxx-interop -emit-ir -o - %s | %FileCheck %s
 
 import MemoryLayout
 

@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 2689,
+  key.length: 2787,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -1645,6 +1645,50 @@
       key.namelength: 5,
       key.bodyoffset: 2675,
       key.bodylength: 8
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "MyProtocol",
+      key.offset: 2708,
+      key.length: 71,
+      key.nameoffset: 2717,
+      key.namelength: 10,
+      key.bodyoffset: 2747,
+      key.bodylength: 31,
+      key.inheritedtypes: [
+        {
+          key.name: "NSObjectProtocol"
+        }
+      ],
+      key.attributes: [
+        {
+          key.offset: 2702,
+          key.length: 5,
+          key.attribute: source.decl.attribute.objc
+        }
+      ],
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.typeref,
+          key.offset: 2729,
+          key.length: 16
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "thing",
+          key.offset: 2752,
+          key.length: 25,
+          key.typename: "NSObject",
+          key.nameoffset: 2756,
+          key.namelength: 5,
+          key.bodyoffset: 2773,
+          key.bodylength: 3
+        }
+      ]
     }
   ],
   key.diagnostics: [

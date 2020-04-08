@@ -7543,6 +7543,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
   } capability = Writable;
 
   bool anyComponentsUnresolved = false;
+  bool didOptionalChain = false;
 
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
@@ -7642,18 +7643,16 @@ ConstraintSystem::simplifyKeyPathConstraint(
     }
     
     case KeyPathExpr::Component::Kind::OptionalChain:
-      // Optional chains force the entire key path to be read-only.
-      capability = ReadOnly;
-      goto done;
+      didOptionalChain = true;
+      break;
     
     case KeyPathExpr::Component::Kind::OptionalForce:
       // Forcing an optional preserves its lvalue-ness.
       break;
     
     case KeyPathExpr::Component::Kind::OptionalWrap:
-      // An optional chain should already have forced the entire key path to
-      // be read-only.
-      assert(capability == ReadOnly);
+      // An optional chain should already have been recorded.
+      assert(didOptionalChain);
       break;
 
     case KeyPathExpr::Component::Kind::TupleElement:
@@ -7661,7 +7660,10 @@ ConstraintSystem::simplifyKeyPathConstraint(
       break;
     }
   }
-done:
+
+  // Optional chains force the entire key path to be read-only.
+  if (didOptionalChain)
+    capability = ReadOnly;
 
   // Resolve the type.
   NominalTypeDecl *kpDecl;

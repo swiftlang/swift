@@ -502,7 +502,6 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
   }
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
                                                  AutoDiffConfig config,
                                                  AutoDiffLinearMapKind kind) {
@@ -515,7 +514,7 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
   // Linear maps are public only when the original function is serialized.
   if (!declRef.isSerialized())
     return;
-  // Linear maps are emitted only when forward mode is enabled.
+  // Differential functions are emitted only when forward-mode is enabled.
   if (kind == AutoDiffLinearMapKind::Differential &&
       !ctx.LangOpts.EnableExperimentalForwardModeDifferentiation)
     return;
@@ -655,7 +654,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
+  // Add derivative function symbols.
   for (const auto *differentiableAttr :
        AFD->getAttrs().getAttributes<DifferentiableAttr>())
     addDerivativeConfiguration(
@@ -670,7 +669,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
         AutoDiffConfig(derivativeAttr->getParameterIndices(),
                        IndexSubset::get(AFD->getASTContext(), 1, {0}),
                        AFD->getGenericSignature()));
-  // SWIFT_ENABLE_TENSORFLOW END
 
   visitDefaultArguments(AFD, AFD->getParameters());
 }
@@ -725,7 +723,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     visitFuncDecl(accessor);
   });
 
-  // SWIFT_ENABLE_TENSORFLOW
+  // Add derivative function symbols.
   for (const auto *differentiableAttr :
        ASD->getAttrs().getAttributes<DifferentiableAttr>())
     addDerivativeConfiguration(
@@ -733,7 +731,6 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
         AutoDiffConfig(differentiableAttr->getParameterIndices(),
                        IndexSubset::get(ASD->getASTContext(), 1, {0}),
                        differentiableAttr->getDerivativeGenericSignature()));
-  // SWIFT_ENABLE_TENSORFLOW END
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
@@ -1105,7 +1102,7 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
                                 /*forcePublicDecls*/ false);
 
   llvm::MachO::InterfaceFile file;
-  file.setFileType(llvm::MachO::FileType::TBD_V3);
+  file.setFileType(llvm::MachO::FileType::TBD_V4);
   file.setApplicationExtensionSafe(
     isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);

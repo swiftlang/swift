@@ -2873,8 +2873,8 @@ ERROR(autoclosure_function_input_nonunit,none,
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
 
-NOTE(escaping_optional_type_argument, none,
-     "closure is already escaping in optional type argument", ())
+ERROR(escaping_optional_type_argument, none,
+      "closure is already escaping in optional type argument", ())
 
 // @_nonEphemeral attribute
 ERROR(non_ephemeral_non_pointer_type,none,
@@ -4400,6 +4400,13 @@ ERROR(objc_ambiguous_inference,none,
 NOTE(objc_ambiguous_inference_candidate,none,
      "%0 (in protocol %1) provides Objective-C name %2",
      (DeclName, DeclName, ObjCSelector))
+
+ERROR(objc_ambiguous_error_convention,none,
+      "%0 overrides or implements protocol requirements for Objective-C "
+      "declarations with incompatible error argument conventions",
+      (DeclName))
+NOTE(objc_ambiguous_error_convention_candidate,none,
+     "%0 provides an error argument here", (DeclName))
 
 ERROR(nonlocal_bridged_to_objc,none,
       "conformance of %0 to %1 can only be written in module %2",

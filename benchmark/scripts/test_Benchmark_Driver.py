@@ -15,14 +15,32 @@
 
 import logging
 import os
+import sys
 import time
 import unittest
-from StringIO import StringIO
-from imp import load_source
+
+try:
+    # for Python 2
+    from StringIO import StringIO
+except ImportError:
+    # for Python 3
+    from io import StringIO
 
 from compare_perf_tests import PerformanceTestResult
 
 from test_utils import Mock, MockLoggingHandler, Stub, captured_output
+
+
+# imp.load_source is deprecated in Python 3.4
+if sys.version_info < (3, 4):
+    from imp import load_source
+else:
+
+    def load_source(name, path):
+        from importlib.machinery import SourceFileLoader
+
+        return SourceFileLoader(name, path).load_module()
+
 
 # import Benchmark_Driver  # doesn't work because it misses '.py' extension
 Benchmark_Driver = load_source(
@@ -46,7 +64,17 @@ class Test_parse_args(unittest.TestCase):
     def test_requires_command_argument(self):
         with captured_output() as (_, err):
             self.assertRaises(SystemExit, parse_args, [])
-        self.assert_contains(["usage:", "COMMAND", "too few arguments"], err.getvalue())
+
+        if sys.version_info < (3, 3):
+            self.assert_contains(
+                ["usage:", "COMMAND", "too few arguments"], err.getvalue()
+            )
+        else:
+            # The error message has changed in Python 3.3
+            self.assert_contains(
+                ["usage:", "COMMAND", "the following arguments are required"],
+                err.getvalue(),
+            )
 
     def test_command_help_lists_commands(self):
         with captured_output() as (out, _):
@@ -151,7 +179,14 @@ class SubprocessMock(Mock):
     def __init__(self, responses=None):
         super(SubprocessMock, self).__init__(responses)
 
-        def _check_output(args, stdin=None, stdout=None, stderr=None, shell=False):
+        def _check_output(
+            args,
+            stdin=None,
+            stdout=None,
+            stderr=None,
+            shell=False,
+            universal_newlines=False,
+        ):
             return self.record_and_respond(args, stdin, stdout, stderr, shell)
 
         self.check_output = _check_output
@@ -190,8 +225,8 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         self.subprocess_mock.assert_called_all_expected()
         self.assertEqual(driver.tests, ["Benchmark1", "Benchmark2"])
         self.assertEqual(driver.all_tests, ["Benchmark1", "Benchmark2"])
-        self.assertEquals(driver.test_number["Benchmark1"], "1")
-        self.assertEquals(driver.test_number["Benchmark2"], "2")
+        self.assertEqual(driver.test_number["Benchmark1"], "1")
+        self.assertEqual(driver.test_number["Benchmark2"], "2")
 
     list_all_tests = (
         "/benchmarks/Benchmark_O --list --delim=\t --skip-tags=".split(" "),
@@ -330,10 +365,10 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         """
         r = self.driver.run("b")
         self.assertTrue(self.parser_stub.results_from_string_called)
-        self.assertEquals(r.name, "b1")  # non-matching name, just 1st result
+        self.assertEqual(r.name, "b1")  # non-matching name, just 1st result
         r = self.driver.run()
         self.assertTrue(isinstance(r, dict))
-        self.assertEquals(r["b1"].name, "b1")
+        self.assertEqual(r["b1"].name, "b1")
 
     def test_measure_memory(self):
         self.driver.run("b", measure_memory=True)
@@ -412,7 +447,11 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
 
         def assert_log_written(out, log_file, content):
             self.assertEqual(out.getvalue(), "Logging results to: " + log_file + "\n")
-            with open(log_file, "rU") as f:
+            if sys.version_info < (3, 0):
+                openmode = "rU"
+            else:
+                openmode = "r"  # 'U' mode is deprecated in Python 3
+            with open(log_file, openmode) as f:
                 text = f.read()
             self.assertEqual(text, "formatted output")
 

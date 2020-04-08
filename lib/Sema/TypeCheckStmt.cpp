@@ -1688,6 +1688,14 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   auto res = TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
   TypeChecker::checkFunctionErrorHandling(AFD);
+  TypeChecker::computeCaptures(AFD);
+  // SWIFT_ENABLE_TENSORFLOW
+  // Check `@compilerEvaluable` function body correctness.
+  // Do this here, rather than in
+  // `AttributeChecker::visitCompilerEvaluableAttr()` because we need the
+  // function bodies to be type checked.
+  TypeChecker::checkFunctionBodyCompilerEvaluable(AFD);
+  // SWIFT_ENABLE_TENSORFLOW END
   return res;
 }
 
@@ -1972,12 +1980,13 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  // If nothing went wrong yet, perform extra checking.
-  if (!hadError && endTypeCheckLoc.isInvalid())
-    performAbstractFuncDeclDiagnostics(AFD, body);
-
   // Wire up the function body now.
   AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+
+  // If nothing went wrong yet, perform extra checking.
+  if (!hadError && endTypeCheckLoc.isInvalid())
+    performAbstractFuncDeclDiagnostics(AFD);
+
   return hadError;
 }
 
