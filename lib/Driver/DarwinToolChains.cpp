@@ -712,6 +712,11 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back("-arch");
   Arguments.push_back(context.Args.MakeArgString(getTriple().getArchName()));
 
+  if (context.cxxInteropEnabled()) {
+    // We only support libc++ on Darwin.
+    Arguments.push_back("-lc++");
+  }
+
   addArgsToLinkStdlib(Arguments, job, context);
 
   addProfileGenerationArgs(Arguments, context);

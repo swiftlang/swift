@@ -182,27 +182,30 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 
   // Configure the toolchain.
   //
-  // By default use the system `clang` to perform the link.  We use `clang` for
-  // the driver here because we do not wish to select a particular C++ runtime.
-  // Furthermore, until C++ interop is enabled, we cannot have a dependency on
-  // C++ code from pure Swift code.  If linked libraries are C++ based, they
-  // should properly link C++.  In the case of static linking, the user can
-  // explicitly specify the C++ runtime to link against.  This is particularly
-  // important for platforms like android where as it is a Linux platform, the
-  // default C++ runtime is `libstdc++` which is unsupported on the target but
-  // as the builds are usually cross-compiled from Linux, libstdc++ is going to
-  // be present.  This results in linking the wrong version of libstdc++
-  // generating invalid binaries.  It is also possible to use different C++
-  // runtimes than the default C++ runtime for the platform (e.g. libc++ on
-  // Windows rather than msvcprt).  When C++ interop is enabled, we will need to
-  // surface this via a driver flag.  For now, opt for the simpler approach of
-  // just using `clang` and avoid a dependency on the C++ runtime.
-  const char *Clang = "clang";
+  // We use `clang++` if C++ interop is enabled, `clang` otherwise.
+  //
+  // We don't use `clang++` unconditionally because we want to avoid pulling in
+  // a C++ standard library if it's not needed, in particular because the
+  // standard library that `clang++` selects by default may not be the one that
+  // is desired.
+  //
+  // TODO: In principle, it should be possible to use a different C++ standard
+  // library than the one configured by default by passing a `-stdlib` option
+  // to `-Xcc` and `-Xclang-linker`, e.g.
+  // `-Xcc -stdlib=libc++ -Xclang-linker -stdlib=libc++`.
+  // Once there is a driver flag for C++ interop, we will probably also want to
+  // add a driver flag for selecting the C++ standard library.
+  //
+  // In practice, using libc++ on Linux, for example, does not work because the
+  // SwiftGlibc module definition is incompatible with libc++'s header layout.
+  // We probably need to ensure that we use libc++'s own module map instead of 
+  // the SwiftGlibc module map.
+  const char *Clang = context.cxxInteropEnabled()? "clang++" : "clang";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
     // If there is a clang in the toolchain folder, use that instead.
-    if (auto tool = llvm::sys::findProgramByName("clang", {toolchainPath})) {
+    if (auto tool = llvm::sys::findProgramByName(Clang, {toolchainPath})) {
       Clang = context.Args.MakeArgString(tool.get());
     }
 

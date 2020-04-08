@@ -101,6 +101,12 @@
 // INFERRED_NAMED_DARWIN tests above: 'libLINKER.dylib'.
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 -Xfrontend -enable-cxx-interop %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop %s
+
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -Xfrontend -enable-cxx-interop %s 2>&1 | %FileCheck -check-prefix LINUX-cxx-interop %s
+
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Xfrontend -enable-cxx-interop %s 2>&1 | %FileCheck -check-prefix WINDOWS-cxx-interop %s
+
 // Check reading the SDKSettings.json from an SDK
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15 %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.4.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4 %s
@@ -407,6 +413,31 @@
 // INFERRED_NAME_LINUX:   -o libLINKER.so
 // INFERRED_NAME_WINDOWS: -o LINKER.dll
 // INFERRED_NAME_WASI: -o libLINKER.so
+
+// IOS-cxx-interop: swift
+// IOS-cxx-interop-DAG: -enable-cxx-interop
+// IOS-cxx-interop-DAG: -o [[OBJECTFILE:.*]]
+
+// IOS-cxx-interop: {{(bin/)?}}ld{{"? }}
+// IOS-cxx-interop-DAG: [[OBJECTFILE]]
+// IOS-cxx-interop-DAG: -lc++
+// IOS-cxx-interop: -o linker
+
+// LINUX-cxx-interop: swift
+// LINUX-cxx-interop-DAG: -enable-cxx-interop
+// LINUX-cxx-interop-DAG: -o [[OBJECTFILE:.*]]
+
+// LINUX-cxx-interop: clang++{{(\.exe)?"? }}
+// LINUX-cxx-interop: [[OBJECTFILE]]
+// LINUX-cxx-interop: -o linker
+
+// WINDOWS-cxx-interop: swift
+// WINDOWS-cxx-interop-DAG: -enable-cxx-interop
+// WINDOWS-cxx-interop-DAG: -o [[OBJECTFILE:.*]]
+
+// WINDOWS-cxx-interop: clang++{{(\.exe)?"? }}
+// WINDOWS-cxx-interop: [[OBJECTFILE]]
+// WINDOWS-cxx-interop: -o linker
 
 // Test ld detection. We use hard links to make sure
 // the Swift driver really thinks it's been moved.

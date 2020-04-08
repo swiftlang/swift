@@ -105,6 +105,8 @@ protected:
 
     const char *computeFrontendModeForCompile() const;
 
+    bool cxxInteropEnabled() const;
+
     void addFrontendInputAndOutputArguments(
         llvm::opt::ArgStringList &Arguments,
         std::vector<FilelistInfo> &FilelistInfos) const;
