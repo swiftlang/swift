@@ -15,13 +15,37 @@ import SwiftShims
 
 % from SwiftFloatingPointTypes import all_floating_point_types
 % for self_type in all_floating_point_types():
-% Self = self_type.stdlib_name
+%{
+Self = self_type.stdlib_name
+bits = self_type.bits
 
-% if self_type.bits == 80:
+def Availability(bits):
+    if bits == 16:
+        return '@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)'
+    return ''
+}%
+
+% if bits == 80:
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 % end
 
+//===----------------------------------------------------------------------===//
+// Protocol conformances
+//===----------------------------------------------------------------------===//
+
+${Availability(bits)}
+extension ${Self}: Differentiable {
+  ${Availability(bits)}
+  public typealias TangentVector = ${Self}
+
+  ${Availability(bits)}
+  public mutating func move(along direction: TangentVector) {
+    self += direction
+  }
+}
+
 /// Derivatives of standard unary operators.
+${Availability(bits)}
 extension ${Self} {
   @usableFromInline
   @_transparent
@@ -41,7 +65,9 @@ extension ${Self} {
 }
 
 /// Derivatives of standard binary operators.
+${Availability(bits)}
 extension ${Self} {
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: +)
@@ -51,6 +77,7 @@ extension ${Self} {
     return (lhs + rhs, { v in (v, v) })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: +)
@@ -60,6 +87,7 @@ extension ${Self} {
     return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: +=)
@@ -70,6 +98,7 @@ extension ${Self} {
     return ((), { v in v })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: +=)
@@ -80,6 +109,7 @@ extension ${Self} {
     return ((), { $0 += $1 })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: -)
@@ -89,6 +119,7 @@ extension ${Self} {
     return (lhs - rhs, { v in (v, -v) })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: -)
@@ -98,6 +129,7 @@ extension ${Self} {
     return (lhs - rhs, { (dlhs, drhs) in dlhs - drhs })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: -=)
@@ -108,6 +140,7 @@ extension ${Self} {
     return ((), { v in -v })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: -=)
@@ -118,6 +151,7 @@ extension ${Self} {
     return ((), { $0 -= $1 })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: *)
@@ -127,6 +161,7 @@ extension ${Self} {
     return (lhs * rhs, { v in (rhs * v, lhs * v) })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: *)
@@ -136,6 +171,7 @@ extension ${Self} {
     return (lhs * rhs, { (dlhs, drhs) in lhs * drhs + rhs * dlhs })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: *=)
@@ -150,6 +186,7 @@ extension ${Self} {
     })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: *=)
@@ -160,6 +197,7 @@ extension ${Self} {
     return ((), { $0 *= $1 })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: /)
@@ -169,6 +207,7 @@ extension ${Self} {
     return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: /)
@@ -178,6 +217,7 @@ extension ${Self} {
     return (lhs / rhs, { (dlhs, drhs) in dlhs / rhs - lhs / (rhs * rhs) * drhs })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: /=)
@@ -192,6 +232,7 @@ extension ${Self} {
     })
   }
 
+  ${Availability(bits)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @derivative(of: /=)
@@ -203,17 +244,17 @@ extension ${Self} {
   }
 }
 
-% if self_type.bits == 80:
+% if bits == 80:
 #endif
 % end
 % end
 
-extension FloatingPoint where Self : Differentiable,
-                              Self == Self.TangentVector {
-  /// The vector-Jacobian product function of `addingProduct`. Returns the
-  /// original result and pullback of `addingProduct` with respect to `self`,
-  /// `lhs` and `rhs`.
-  @inlinable
+extension FloatingPoint
+where
+  Self: Differentiable,
+  Self == Self.TangentVector
+{
+  @inlinable // FIXME(sil-serialize-all)
   @derivative(of: addingProduct)
   func _vjpAddingProduct(
     _ lhs: Self, _ rhs: Self
@@ -221,8 +262,6 @@ extension FloatingPoint where Self : Differentiable,
     return (addingProduct(lhs, rhs), { _ in (1, rhs, lhs) })
   }
 
-  /// The vector-Jacobian product function of `squareRoot`. Returns the original
-  /// result and pullback of `squareRoot` with respect to `self`.
   @inlinable // FIXME(sil-serialize-all)
   @derivative(of: squareRoot)
   func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
@@ -230,4 +269,3 @@ extension FloatingPoint where Self : Differentiable,
     return (y, { v in v / (2 * y) })
   }
 }
-
