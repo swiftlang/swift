@@ -927,20 +927,31 @@ namespace {
       }
 
       // (Self) -> ...
-      auto *selfCall =
-        CallExpr::createImplicit(context, ref, selfOpenedRef, { },
-                                 [&](const Expr *E) { return cs.getType(E); });
-      selfCall->setType(refTy->getResult());
-      cs.cacheType(selfCall->getArg());
-      cs.cacheType(selfCall);
+      ApplyExpr *selfCall;
 
-      // FIXME: This is a holdover from the old tuple-based function call
-      // representation.
-      auto selfArgTy = ParenType::get(context,
-                                      selfParam.getPlainType(),
-                                      selfParam.getParameterFlags());
-      selfCall->getArg()->setType(selfArgTy);
-      cs.cacheType(selfCall->getArg());
+      // We build either a CallExpr or a DotSyntaxCallExpr depending on whether
+      // the base is implicit or not. This helps maintain some invariants around
+      // source ranges.
+      if (selfParamRef->isImplicit()) {
+          selfCall =
+            CallExpr::createImplicit(context, ref, selfOpenedRef, { },
+                                     [&](const Expr *E) { return cs.getType(E); });
+        selfCall->setType(refTy->getResult());
+        cs.cacheType(selfCall);
+
+        // FIXME: This is a holdover from the old tuple-based function call
+        // representation.
+        auto selfArgTy = ParenType::get(context,
+                                        selfParam.getPlainType(),
+                                        selfParam.getParameterFlags());
+        selfCall->getArg()->setType(selfArgTy);
+        cs.cacheType(selfCall->getArg());
+      } else {
+        selfCall = new (context) DotSyntaxCallExpr(ref, SourceLoc(), selfOpenedRef);
+        selfCall->setImplicit(false);
+        selfCall->setType(refTy->getResult());
+        cs.cacheType(selfCall);
+      }
 
       if (selfParamRef->isSuperExpr())
         selfCall->setIsSuper(true);

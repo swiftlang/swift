@@ -30,6 +30,7 @@ function(_report_sdk prefix)
     message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
     message(STATUS "  Version min name: ${SWIFT_SDK_${prefix}_VERSION_MIN_NAME}")
     message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
+    message(STATUS "  Simulator: ${SWIFT_SDK_${prefix}_IS_SIMULATOR}")
   endif()
   if(SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES)
     message(STATUS "  Module Architectures: ${SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES}")
@@ -112,6 +113,7 @@ endfunction()
 #   SWIFT_SDK_${prefix}_VERSION_MIN_NAME    Version min name for this SDK
 #   SWIFT_SDK_${prefix}_TRIPLE_NAME         Triple name for this SDK
 #   SWIFT_SDK_${prefix}_ARCHITECTURES       Architectures (as a list)
+#   SWIFT_SDK_${prefix}_IS_SIMULATOR        Whether this is a simulator target.
 #   SWIFT_SDK_${prefix}_ARCH_${ARCH}_TRIPLE Triple name
 macro(configure_sdk_darwin
     prefix name deployment_version xcrun_name
@@ -172,6 +174,13 @@ macro(configure_sdk_darwin
     "${SWIFT_SDK_${prefix}_ARCHITECTURES}"        # rhs
     SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES)     # result
 
+  # Determine whether this is a simulator SDK.
+  if ( ${xcrun_name} MATCHES "simulator" )
+    set(SWIFT_SDK_${prefix}_IS_SIMULATOR TRUE)
+  else()
+    set(SWIFT_SDK_${prefix}_IS_SIMULATOR FALSE)
+  endif()
+
   # Configure variables for _all_ architectures even if we aren't "building"
   # them because they aren't supported.
   foreach(arch ${architectures})
@@ -180,6 +189,12 @@ macro(configure_sdk_darwin
 
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
         "${arch}-apple-${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
+
+    # If this is a simulator target, append -simulator.
+    if (SWIFT_SDK_${prefix}_IS_SIMULATOR)
+      set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
+          "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}-simulator")
+    endif ()
 
     if(SWIFT_ENABLE_MACCATALYST AND "${prefix}" STREQUAL "OSX")
       # For macCatalyst append the '-macabi' environment to the target triple.

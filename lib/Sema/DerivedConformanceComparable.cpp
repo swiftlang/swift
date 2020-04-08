@@ -205,8 +205,9 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
 
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,
                                   SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
-                                     SourceLoc(), body, caseBodyVarDecls));
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     labelItem, SourceLoc(), SourceLoc(), body,
+                                     caseBodyVarDecls));
   }
 
   // default: result = <enum index>(lhs) < <enum index>(rhs)
@@ -218,8 +219,9 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     defaultPattern->setImplicit();
     auto defaultItem = CaseLabelItem::getDefault(defaultPattern);
     auto body = deriveBodyComparable_enum_noAssociatedValues_lt(ltDecl, nullptr).first;
-    cases.push_back(CaseStmt::create(C, SourceLoc(), defaultItem, SourceLoc(),
-                                     SourceLoc(), body,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     defaultItem, SourceLoc(), SourceLoc(),
+                                     body,
                                      /*case body var decls*/ None));
   }
 

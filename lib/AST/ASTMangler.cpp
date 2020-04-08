@@ -424,6 +424,45 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
   return result;
 }
 
+std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
+    AutoDiffGeneratedDeclarationKind declKind, StringRef origFnName,
+    unsigned bbId, AutoDiffLinearMapKind linearMapKind, AutoDiffConfig config) {
+  beginManglingWithoutPrefix();
+
+  Buffer << "_AD__" << origFnName << "_bb" + std::to_string(bbId);
+  switch (declKind) {
+  case AutoDiffGeneratedDeclarationKind::LinearMapStruct:
+    switch (linearMapKind) {
+    case AutoDiffLinearMapKind::Differential:
+      Buffer << "__DF__";
+      break;
+    case AutoDiffLinearMapKind::Pullback:
+      Buffer << "__PB__";
+      break;
+    }
+    break;
+  case AutoDiffGeneratedDeclarationKind::BranchingTraceEnum:
+    switch (linearMapKind) {
+    case AutoDiffLinearMapKind::Differential:
+      Buffer << "__Succ__";
+      break;
+    case AutoDiffLinearMapKind::Pullback:
+      Buffer << "__Pred__";
+      break;
+    }
+    break;
+  }
+  Buffer << config.getSILAutoDiffIndices().mangle();
+  if (config.derivativeGenericSignature) {
+    Buffer << '_';
+    appendGenericSignature(config.derivativeGenericSignature);
+  }
+
+  auto result = Storage.str().str();
+  Storage.clear();
+  return result;
+}
+
 std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
     SILDifferentiabilityWitnessKey key) {
   // TODO(TF-20): Make the mangling scheme robust. Support demangling.
@@ -445,6 +484,28 @@ std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
   return result;
 }
 
+// In order for the remangler to work correctly, it must agree with
+// AST mangler on the substitution scheme. The AST mangler will use a
+// substitution if a mangled type is identical to a previous type.
+//
+// In the DWARF mangling, we don't canonicalize types. Therefore, any
+// two types that differ by sugar must have distinct manglings. If this
+// invariant is not maintained, then demangling and remangling a type
+// will no longer be idempotent.
+//
+// Since we don't have a distinct mangling for sugared generic
+// parameter types, we must desugar them here.
+static Type getTypeForDWARFMangling(Type t) {
+  return t.subst(
+    [](SubstitutableType *t) -> Type {
+      if (isa<GenericTypeParamType>(t))
+        return t->getCanonicalType();
+      return t;
+    },
+    MakeAbstractConformanceForGenericType(),
+    SubstFlags::AllowLoweredTypes);
+}
+
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
                                         "mangling type for debugger", Ty);
@@ -452,6 +513,8 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   DWARFMangling = true;
   OptimizeProtocolNames = false;
   beginMangling();
+
+  Ty = getTypeForDWARFMangling(Ty);
 
   if (DC)
     bindGenericParameters(DC);
@@ -552,7 +615,9 @@ std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
 std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
   DWARFMangling = true;
   beginMangling();
-  
+
+  Ty = getTypeForDWARFMangling(Ty);
+
   if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
     appendFunction(fnType, false);
   } else {
@@ -1130,6 +1195,10 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
 
     case TypeKind::GenericTypeParam: {
       auto paramTy = cast<GenericTypeParamType>(tybase);
+      // If this assertion fires, it probably means the type being mangled here
+      // didn't go through getTypeForDWARFMangling().
+      assert(paramTy->getDecl() == nullptr &&
+             "cannot mangle non-canonical generic parameter");
       // A special mangling for the very first generic parameter. This shows up
       // frequently because it corresponds to 'Self' in protocol requirement
       // generic signatures.

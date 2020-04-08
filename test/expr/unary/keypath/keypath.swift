@@ -811,6 +811,16 @@ func test_keypath_with_method_refs() {
   let _ = \A.Type.faz.bar // expected-error {{key path cannot refer to static method 'faz()'}}
 }
 
+// SR-12519: Compiler crash on invalid method reference in key path.
+protocol Zonk {
+  func wargle()
+}
+typealias Blatz = (gloop: String, zoop: Zonk?)
+
+func sr12519(fleep: [Blatz]) {
+  fleep.compactMap(\.zoop?.wargle) // expected-error {{key path cannot refer to instance method 'wargle()'}}
+}
+
 // SR-10467 - Argument type 'KeyPath<String, Int>' does not conform to expected type 'Any'
 func test_keypath_in_any_context() {
   func foo(_: Any) {}

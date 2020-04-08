@@ -372,19 +372,6 @@ getModuleInfoFromOpaqueModule(clang::index::writer::OpaqueModule mod,
   return info;
 }
 
-/// Gets the module name of the given module, or its underlying module if it's a
-/// cross import overlay implicitly imported in \p initialFile.
-static StringRef getUnderlyingModuleName(ModuleDecl *module,
-                                         SourceFile *initialFile) {
-  if (initialFile) {
-    ModuleDecl *underlying =
-      initialFile->getModuleShadowedBySeparatelyImportedOverlay(module);
-    if (underlying)
-      module = underlying;
-  }
-  return module->getNameStr();
-}
-
 static bool
 emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  StringRef indexStorePath,
@@ -419,6 +406,7 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
       switch (FU->getKind()) {
       case FileUnitKind::Source:
       case FileUnitKind::Builtin:
+      case FileUnitKind::Synthesized:
         break;
       case FileUnitKind::SerializedAST:
       case FileUnitKind::DWARFModule:
@@ -454,7 +442,8 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
 
             // If this is a cross-import overlay, make sure we use the name of
             // the underlying module instead.
-            moduleName = getUnderlyingModuleName(mod, initialFile);
+            if (auto *declaring = mod->getDeclaringModuleIfCrossImportOverlay())
+              moduleName = declaring->getNameStr();
           }
           clang::index::writer::OpaqueModule opaqMod =
               moduleNameScratch.createString(moduleName);
@@ -480,9 +469,12 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  IndexUnitWriter &parentUnitWriter,
                                  SourceFile *initialFile) {
   StringRef filename = module->getModuleFilename();
+  std::string moduleName = module->getNameStr().str();
+
   // If this is a cross-import overlay, make sure we use the name of the
   // underlying module instead.
-  std::string moduleName = getUnderlyingModuleName(module, initialFile).str();
+  if (ModuleDecl *declaring = module->getDeclaringModuleIfCrossImportOverlay())
+    moduleName = declaring->getNameStr().str();
 
   std::string error;
   auto isUptodateOpt = parentUnitWriter.isUnitUpToDateForOutputFile(/*FilePath=*/filename,

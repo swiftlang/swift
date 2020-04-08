@@ -2056,6 +2056,25 @@ public:
 /// does it have the given semantics?
 bool doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics);
 
+/// Predicate used to filter InoutArgumentRange.
+struct OperandToInoutArgument {
+  ArrayRef<SILParameterInfo> paramInfos;
+  OperandValueArrayRef arguments;
+  OperandToInoutArgument(ArrayRef<SILParameterInfo> paramInfos,
+                         OperandValueArrayRef arguments)
+      : paramInfos(paramInfos), arguments(arguments) {
+    assert(paramInfos.size() == arguments.size());
+  }
+  Optional<SILValue> operator()(size_t i) const {
+    if (paramInfos[i].isIndirectMutating())
+      return arguments[i];
+    return None;
+  }
+};
+
+using InoutArgumentRange =
+    OptionalTransformRange<IntRange<size_t>, OperandToInoutArgument>;
+
 /// The partial specialization of ApplyInstBase for full applications.
 /// Adds some methods relating to 'self' and to result types that don't
 /// make sense for partial applications.
@@ -2067,6 +2086,9 @@ protected:
   template <class... As>
   ApplyInstBase(As &&...args)
     : ApplyInstBase<Impl, Base, false>(std::forward<As>(args)...) {}
+
+private:
+  const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
 
 public:
   using super::getCallee;
@@ -2150,6 +2172,16 @@ public:
 
   OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
     return getArguments().slice(getNumIndirectResults());
+  }
+
+  /// Returns all `@inout` and `@inout_aliasable` arguments passed to the
+  /// instruction.
+  InoutArgumentRange getInoutArguments() const {
+    auto &impl = asImpl();
+    return InoutArgumentRange(
+        indices(getArgumentsWithoutIndirectResults()),
+        OperandToInoutArgument(impl.getSubstCalleeConv().getParameters(),
+                               impl.getArgumentsWithoutIndirectResults()));
   }
 
   bool hasSemantics(StringRef semanticsString) const {

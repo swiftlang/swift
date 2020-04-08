@@ -971,17 +971,6 @@ public:
       verifyCheckedBase(S);
     }
 
-    bool shouldVerifyChecked(CatchStmt *S) {
-      return shouldVerifyChecked(S->getErrorPattern());
-    }
-
-    void verifyChecked(CatchStmt *S) {
-      checkSameType(S->getErrorPattern()->getType(),
-                    checkExceptionTypeExists("catch statement"),
-                    "catch pattern");
-      verifyCheckedBase(S);
-    }
-
     bool shouldVerifyChecked(ReturnStmt *S) {
       return !S->hasResult() || shouldVerifyChecked(S->getResult());
     }

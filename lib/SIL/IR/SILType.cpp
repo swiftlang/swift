@@ -619,6 +619,12 @@ bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
   return loweredType.getASTType() == formalType;
 }
 
+bool SILType::isDifferentiable(SILModule &M) const {
+  return getASTType()
+      ->getAutoDiffTangentSpace(LookUpConformanceInModule(M.getSwiftModule()))
+      .hasValue();
+}
+
 Type
 TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const {
   return Type(const_cast<TypeBase*>(this)).transform([&](Type t) -> Type {

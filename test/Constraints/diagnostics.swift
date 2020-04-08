@@ -1415,3 +1415,58 @@ f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform
 let f12: (Int) -> Void = { _ in }
 func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}
 f12(3, f4)// expected-error {{extra argument in call}}
+
+// SR-12242
+struct SR_12242_R<Value> {}
+struct SR_12242_T {}
+
+protocol SR_12242_P {}
+
+func fSR_12242() -> SR_12242_R<[SR_12242_T]> {}
+
+func genericFunc<SR_12242_T: SR_12242_P>(_ completion:  @escaping (SR_12242_R<[SR_12242_T]>) -> Void) {
+  let t = fSR_12242()
+  completion(t) // expected-error {{cannot convert value of type 'diagnostics.SR_12242_R<[diagnostics.SR_12242_T]>' to expected argument type 'diagnostics.SR_12242_R<[SR_12242_T]>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('diagnostics.SR_12242_T' and 'SR_12242_T') are expected to be equal}}
+}
+
+func assignGenericMismatch() {
+  var a: [Int]?
+  var b: [String]
+
+  a = b // expected-error {{cannot assign value of type '[String]' to type '[Int]?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+
+  b = a // expected-error {{cannot assign value of type '[Int]' to type '[String]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  // expected-error@-2 {{value of optional type '[Int]?' must be unwrapped to a value of type '[Int]'}}
+  // expected-note@-3 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-4 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}
+
+// [Int] to [String]? argument to param conversion
+let value: [Int] = []
+func gericArgToParamOptional(_ param: [String]?) {}
+
+gericArgToParamOptional(value) // expected-error {{convert value of type '[Int]' to expected argument type '[String]?'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+
+// Inout Expr conversions
+func gericArgToParamInout1(_ x: inout [[Int]]) {}
+func gericArgToParamInout2(_ x: inout [[String]]) {
+  gericArgToParamInout1(&x) // expected-error {{cannot convert value of type '[[String]]' to expected argument type '[[Int]]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+}
+
+func gericArgToParamInoutOptional(_ x: inout [[String]]?) {
+  gericArgToParamInout1(&x) // expected-error {{cannot convert value of type '[[String]]?' to expected argument type '[[Int]]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+  // expected-error@-2 {{value of optional type '[[String]]?' must be unwrapped to a value of type '[[String]]'}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}
+
+func gericArgToParamInout(_ x: inout [[Int]]) { // expected-note {{change variable type to '[[String]]?' if it doesn't need to be declared as '[[Int]]'}}
+  gericArgToParamInoutOptional(&x) // expected-error {{cannot convert value of type '[[Int]]' to expected argument type '[[String]]?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  // expected-error@-2 {{inout argument could be set to a value with a type other than '[[Int]]'; use a value declared as type '[[String]]?' instead}}
+}

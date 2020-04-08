@@ -25,6 +25,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -324,7 +325,16 @@ public:
     assert(IGM);
     return IGM;
   }
-  
+
+  SourceFile *getSourceFile(IRGenModule *module) {
+    for (auto pair : GenModules) {
+      if (pair.second == module) {
+        return pair.first;
+      }
+    }
+    return nullptr;
+  }
+
   /// Get an IRGenModule for a declaration context.
   /// Returns the IRGenModule of the containing source file, or if this cannot
   /// be determined, returns the primary IRGenModule.
@@ -1280,6 +1290,7 @@ public:
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
 
   void emitSourceFile(SourceFile &SF);
+  void emitSynthesizedFileUnit(SynthesizedFileUnit &SFU);
   void addLinkLibrary(const LinkLibrary &linkLib);
 
   /// Attempt to finalize the module.

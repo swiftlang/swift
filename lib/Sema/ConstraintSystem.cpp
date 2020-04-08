@@ -1694,7 +1694,14 @@ void ConstraintSystem::addOverloadSet(ArrayRef<Constraint *> choices,
     return;
   }
 
-  addDisjunctionConstraint(choices, locator, ForgetChoice);
+  auto *disjunction =
+      Constraint::createDisjunction(*this, choices, locator, ForgetChoice);
+  addUnsolvedConstraint(disjunction);
+  if (simplifyAppliedOverloads(disjunction, locator)) {
+    retireConstraint(disjunction);
+    if (!failedConstraint)
+      failedConstraint = disjunction;
+  }
 }
 
 /// If we're resolving an overload set with a decl that has special type
@@ -2947,12 +2954,15 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     return true;
 
   // Collect aggregated fixes from all solutions
-  llvm::SmallMapVector<std::pair<ConstraintLocator *, FixKind>,
-                       llvm::TinyPtrVector<ConstraintFix *>, 4>
+  using LocatorAndKind = std::pair<ConstraintLocator *, FixKind>;
+  using SolutionAndFix = std::pair<const Solution *, const ConstraintFix *>;
+  llvm::SmallMapVector<LocatorAndKind, llvm::SmallVector<SolutionAndFix, 4>, 4>
       aggregatedFixes;
   for (const auto &solution : solutions) {
-    for (auto *fix : solution.Fixes)
-      aggregatedFixes[{fix->getLocator(), fix->getKind()}].push_back(fix);
+    for (const auto *fix : solution.Fixes) {
+      LocatorAndKind key(fix->getLocator(), fix->getKind());
+      aggregatedFixes[key].emplace_back(&solution, fix);
+    }
   }
 
   // If there is an overload difference, let's see if there's a common callee
@@ -2983,8 +2993,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     bool diagnosed = false;
     for (auto fixes: aggregatedFixes) {
       // A common fix must appear in all solutions
-      if (fixes.second.size() < solutions.size()) continue;
-      diagnosed |= fixes.second.front()->diagnoseForAmbiguity(solutions);
+      auto &commonFixes = fixes.second;
+      if (commonFixes.size() != solutions.size()) continue;
+
+      auto *firstFix = commonFixes.front().second;
+      diagnosed |= firstFix->diagnoseForAmbiguity(commonFixes);
     }
     return diagnosed;
   }
@@ -4103,11 +4116,13 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
   if (protocols.size() != 1)
     return expr;
 
-  auto *attr = protocols.front()->getAttrs().getAttribute<TypeEraserAttr>();
+  auto *PD = protocols.front();
+  auto *attr = PD->getAttrs().getAttribute<TypeEraserAttr>();
   if (!attr)
     return expr;
 
-  auto typeEraser = attr->getTypeEraserLoc().getType();
+  auto typeEraser = attr->getResolvedType(PD);
+  assert(typeEraser && "Failed to resolve eraser type!");
   auto &ctx = dc->getASTContext();
   return CallExpr::createImplicit(ctx,
                                   TypeExpr::createImplicit(typeEraser, ctx),

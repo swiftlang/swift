@@ -10,7 +10,7 @@ import _Differentiation
 
 @differentiable
 func basic(_ x: Float) -> Float {
-  return x + 2
+  return x
 }
 
 //===----------------------------------------------------------------------===//
@@ -21,7 +21,7 @@ func basic(_ x: Float) -> Float {
 func conditional(_ x: Float, _ flag: Bool) -> Float {
   let y: Float
   if flag {
-    y = x + 1
+    y = x
   } else {
     y = x
   }
@@ -56,9 +56,13 @@ func try_apply_rethrows(_ x: Float) -> Float {
 // Unreachable
 //===----------------------------------------------------------------------===//
 
-let _: @differentiable (Float) -> Float = { x in
-  let _ = x + 1
-  // expected-error @+1 {{missing return in a closure expected to return 'Float'}}
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable
+func noReturn(_ x: Float) -> Float {
+  let _ = x
+  // expected-error @+2 {{missing return in a function expected to return 'Float'}}
+  // expected-note @+1 {{missing return for differentiation}}
 }
 
 //===----------------------------------------------------------------------===//

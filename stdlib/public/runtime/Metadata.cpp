@@ -2735,19 +2735,14 @@ initGenericObjCClass(ClassMetadata *self, size_t numFields,
 #endif
 
 SWIFT_CC(swift)
-static std::pair<MetadataDependency, const ClassMetadata *>
-getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
+SWIFT_RUNTIME_STDLIB_INTERNAL MetadataResponse
+getSuperclassMetadata(MetadataRequest request, const ClassMetadata *self) {
   // If there is a mangled superclass name, demangle it to the superclass
   // type.
-  const ClassMetadata *super = nullptr;
   if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
     StringRef superclassName =
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
     SubstGenericParametersFromMetadata substitutions(self);
-    MetadataRequest request(allowDependency
-                              ? MetadataState::NonTransitiveComplete
-                              : /*FIXME*/ MetadataState::Abstract,
-                            /*non-blocking*/ allowDependency);
     MetadataResponse response =
       swift_getTypeByMangledName(request, superclassName,
         substitutions.getGenericArgs(),
@@ -2765,22 +2760,42 @@ getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
                  superclassName.str().c_str());
     }
 
-    // If the request isn't satisfied, we have a new dependency.
-    if (!request.isSatisfiedBy(response.State)) {
-      assert(allowDependency);
-      return {MetadataDependency(superclass, request.getState()),
-              cast<ClassMetadata>(superclass)};
-    }
+    return response;
+  } else {
+    return MetadataResponse();
+  }
+}
 
+SWIFT_CC(swift)
+static std::pair<MetadataDependency, const ClassMetadata *>
+getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
+  MetadataRequest request(allowDependency ? MetadataState::NonTransitiveComplete
+                                          : /*FIXME*/ MetadataState::Abstract,
+                          /*non-blocking*/ allowDependency);
+  auto response = getSuperclassMetadata(request, self);
+
+  auto *superclass = response.Value;
+  if (!superclass)
+    return {MetadataDependency(), nullptr};
+
+  const ClassMetadata *second;
 #if SWIFT_OBJC_INTEROP
-    if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
-      superclass = objcWrapper->Class;
+  if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass)) {
+    second = objcWrapper->Class;
+  } else {
+    second = cast<ClassMetadata>(superclass);
+  }
+#else
+  second = cast<ClassMetadata>(superclass);
 #endif
 
-    super = cast<ClassMetadata>(superclass);
+  // If the request isn't satisfied, we have a new dependency.
+  if (!request.isSatisfiedBy(response.State)) {
+    assert(allowDependency);
+    return {MetadataDependency(superclass, request.getState()), second};
   }
 
-  return {MetadataDependency(), super};
+  return {MetadataDependency(), second};
 }
 
 // Suppress diagnostic about the availability of _objc_realizeClassFromSwift.
@@ -5511,6 +5526,8 @@ bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
   if (auto *metadata = dyn_cast<StructMetadata>(this))
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
   if (auto *metadata = dyn_cast<EnumMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<ClassMetadata>(this))
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
 
   return false;

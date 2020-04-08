@@ -426,12 +426,24 @@ func testLocalFunc() {
   // expected-warning@-1 {{initialization of variable 'unusedVar' was never used; consider replacing with assignment to '_' or removing it}}
 
   var notMutatedVar = 0
-  // FIXME: All captures are read/write for the purposes of this analysis.
+  // expected-warning@-1 {{variable 'notMutatedVar' was never mutated; consider changing to 'let' constant}}
 
   var mutatedVar = 0
+  // expected-warning@-1 {{variable 'mutatedVar' was written to, but never read}}
 
   func localFunc() {
     _ = notMutatedVar
     mutatedVar = 1
   }
+}
+
+// False positive "'var' was never mutated" warning - rdar://60563962
+func testForwardReferenceCapture() {
+  func innerFunc() {
+    x = 10
+  }
+
+  var x: Int = 1
+  innerFunc()
+  print(x)
 }

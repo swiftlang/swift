@@ -7048,7 +7048,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   }
 
   bool hasReturn = hasExplicitResult(closure);
-
+  auto &ctx = getASTContext();
   // If this is a multi-statement closure its body doesn't participate
   // in type-checking.
   if (closure->hasSingleExpressionBody()) {
@@ -7061,12 +7061,18 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         closureType->getResult(),
         getConstraintLocator(closure, LocatorPathElt::ClosureBody(hasReturn)));
   } else if (!hasReturn) {
-    // If multi-statement closure doesn't have an explicit result
-    // (no `return` statements) let's default it to `Void`.
-    auto &ctx = getASTContext();
+    bool hasExplicitResult = closure->hasExplicitResultType() &&
+                             closure->getExplicitResultTypeLoc().getType();
+
+    // If this closure has an empty body and no explicit result type
+    // let's bind result type to `Void` since that's the only type empty body
+    // can produce. Otherwise, if (multi-statement) closure doesn't have
+    // an explicit result (no `return` statements) let's default it to `Void`.
+    auto constraintKind = (closure->hasEmptyBody() && !hasExplicitResult)
+                              ? ConstraintKind::Bind
+                              : ConstraintKind::Defaultable;
     addConstraint(
-        ConstraintKind::Defaultable, inferredClosureType->getResult(),
-        ctx.TheEmptyTupleType,
+        constraintKind, inferredClosureType->getResult(), ctx.TheEmptyTupleType,
         getConstraintLocator(closure, ConstraintLocator::ClosureResult));
   }
 
@@ -7543,6 +7549,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
   } capability = Writable;
 
   bool anyComponentsUnresolved = false;
+  bool didOptionalChain = false;
 
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
@@ -7642,18 +7649,16 @@ ConstraintSystem::simplifyKeyPathConstraint(
     }
     
     case KeyPathExpr::Component::Kind::OptionalChain:
-      // Optional chains force the entire key path to be read-only.
-      capability = ReadOnly;
-      goto done;
+      didOptionalChain = true;
+      break;
     
     case KeyPathExpr::Component::Kind::OptionalForce:
       // Forcing an optional preserves its lvalue-ness.
       break;
     
     case KeyPathExpr::Component::Kind::OptionalWrap:
-      // An optional chain should already have forced the entire key path to
-      // be read-only.
-      assert(capability == ReadOnly);
+      // An optional chain should already have been recorded.
+      assert(didOptionalChain);
       break;
 
     case KeyPathExpr::Component::Kind::TupleElement:
@@ -7661,7 +7666,10 @@ ConstraintSystem::simplifyKeyPathConstraint(
       break;
     }
   }
-done:
+
+  // Optional chains force the entire key path to be read-only.
+  if (didOptionalChain)
+    capability = ReadOnly;
 
   // Resolve the type.
   NominalTypeDecl *kpDecl;
@@ -7833,21 +7841,10 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   return unsolved();
 }
 
-Type ConstraintSystem::simplifyAppliedOverloads(
-                                TypeVariableType *fnTypeVar,
-                                const FunctionType *argFnType,
-                                ConstraintLocatorBuilder locator) {
-  Type fnType(fnTypeVar);
-
-  // Always work on the representation.
-  fnTypeVar = getRepresentative(fnTypeVar);
-
-  // Dig out the disjunction that describes this overload.
-  unsigned numOptionalUnwraps = 0;
-  auto disjunction =
-      getUnboundBindOverloadDisjunction(fnTypeVar, &numOptionalUnwraps);
-  if (!disjunction) return fnType;
-
+bool ConstraintSystem::simplifyAppliedOverloadsImpl(
+    Constraint *disjunction, TypeVariableType *fnTypeVar,
+    const FunctionType *argFnType, unsigned numOptionalUnwraps,
+    ConstraintLocatorBuilder locator) {
   if (shouldAttemptFixes()) {
     auto arguments = argFnType->getParams();
     bool allHoles =
@@ -7877,7 +7874,7 @@ Type ConstraintSystem::simplifyAppliedOverloads(
     // regardless of problems related to missing or extraneous labels
     // and/or arguments.
     if (solverState)
-      return fnTypeVar;
+      return false;
   }
 
   /// The common result type amongst all function overloads.
@@ -7964,14 +7961,8 @@ retry_after_fail:
       argumentInfo.reset();
       goto retry_after_fail;
     }
-
-    return Type();
-
+    return true;
   case SolutionKind::Solved:
-    // We should now have a type for the one remaining overload.
-    fnType = getFixedTypeRecursive(fnType, /*wantRValue=*/true);
-    break;
-
   case SolutionKind::Unsolved:
     break;
   }
@@ -7979,7 +7970,7 @@ retry_after_fail:
   // If there was a constraint that we couldn't reason about, don't use the
   // results of any common-type computations.
   if (hasUnhandledConstraints)
-    return fnType;
+    return false;
 
   // If we have a common result type, bind the expected result type to it.
   if (commonResultType && !commonResultType->is<ErrorType>()) {
@@ -7992,16 +7983,67 @@ retry_after_fail:
         << ")\n";
     }
 
-    // FIXME: Could also rewrite fnType to include this result type.
-    // Introduction of `Bind` constraint here could result in the disconnect
+    // Introduction of a `Bind` constraint here could result in the disconnect
     // in the constraint system with unintended consequences because e.g.
     // in case of key path application it could disconnect one of the
     // components like subscript from the rest of the context.
     addConstraint(ConstraintKind::Equal, argFnType->getResult(),
                   commonResultType, locator);
   }
+  return false;
+}
 
-  return fnType;
+bool ConstraintSystem::simplifyAppliedOverloads(
+    Constraint *disjunction, ConstraintLocatorBuilder locator) {
+  auto choices = disjunction->getNestedConstraints();
+  assert(choices.size() >= 2);
+  assert(choices.front()->getKind() == ConstraintKind::BindOverload);
+
+  // If we've already bound the overload type var, bail.
+  auto *typeVar = choices.front()->getFirstType()->getAs<TypeVariableType>();
+  if (!typeVar || getFixedType(typeVar))
+    return false;
+
+  // Try to find an applicable fn constraint that applies the overload choice.
+  auto result = findConstraintThroughOptionals(
+      typeVar, OptionalWrappingDirection::Unwrap,
+      [&](Constraint *match, TypeVariableType *currentRep) {
+        // Check to see if we have an applicable fn with a type var RHS that
+        // matches the disjunction.
+        if (match->getKind() != ConstraintKind::ApplicableFunction)
+          return false;
+
+        auto *rhsTyVar = match->getSecondType()->getAs<TypeVariableType>();
+        return rhsTyVar && currentRep == getRepresentative(rhsTyVar);
+      });
+
+  if (!result)
+    return false;
+
+  auto *applicableFn = result->first;
+  auto *fnTypeVar = applicableFn->getSecondType()->castTo<TypeVariableType>();
+  auto argFnType = applicableFn->getFirstType()->castTo<FunctionType>();
+  return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
+                                      /*numOptionalUnwraps*/ result->second,
+                                      locator);
+}
+
+bool ConstraintSystem::simplifyAppliedOverloads(
+    Type fnType, const FunctionType *argFnType,
+    ConstraintLocatorBuilder locator) {
+  // If we've already bound the function type, bail.
+  auto *fnTypeVar = fnType->getAs<TypeVariableType>();
+  if (!fnTypeVar || getFixedType(fnTypeVar))
+    return false;
+
+  // Try to find a corresponding bind overload disjunction.
+  unsigned numOptionalUnwraps = 0;
+  auto *disjunction =
+      getUnboundBindOverloadDisjunction(fnTypeVar, &numOptionalUnwraps);
+  if (!disjunction)
+    return false;
+  return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
+                                      numOptionalUnwraps, locator);
 }
 
 ConstraintSystem::SolutionKind
@@ -8077,16 +8119,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     return SolutionKind::Unsolved;
 
   };
-
-  // If the right-hand side is a type variable,
-  // try to simplify the overload set.
-  if (auto typeVar = desugar2->getAs<TypeVariableType>()) {
-    Type newType2 = simplifyAppliedOverloads(typeVar, func1, locator);
-    if (!newType2)
-      return SolutionKind::Error;
-
-    desugar2 = newType2->getDesugaredType();
-  }
 
   // If right-hand side is a type variable, the constraint is unsolved.
   if (desugar2->isTypeVariableOrMember()) {
@@ -9431,9 +9463,14 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::BridgingConversion:
     return simplifyBridgingConstraint(first, second, subflags, locator);
 
-  case ConstraintKind::ApplicableFunction:
+  case ConstraintKind::ApplicableFunction: {
+    // First try to simplify the overload set for the function being applied.
+    if (simplifyAppliedOverloads(second, first->castTo<FunctionType>(),
+                                 locator)) {
+      return SolutionKind::Error;
+    }
     return simplifyApplicableFnConstraint(first, second, subflags, locator);
-
+  }
   case ConstraintKind::DynamicCallableApplicableFunction:
     return simplifyDynamicCallableApplicableFnConstraint(first, second,
                                                          subflags, locator);

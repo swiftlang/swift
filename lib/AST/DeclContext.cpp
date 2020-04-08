@@ -623,6 +623,9 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
     case FileUnitKind::Source:
       OS << " file=\"" << cast<SourceFile>(this)->getFilename() << "\"";
       break;
+    case FileUnitKind::Synthesized:
+      OS << " synthesized file";
+      break;
     case FileUnitKind::SerializedAST:
     case FileUnitKind::ClangModule:
     case FileUnitKind::DWARFModule:
@@ -1080,11 +1083,12 @@ bool DeclContext::isClassConstrainedProtocolExtension() const {
 
 SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   switch (dc->getContextKind()) {
+  case DeclContextKind::Module:
+    return SourceLoc();
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::GenericTypeDecl:
-  case DeclContextKind::Module:
   case DeclContextKind::SubscriptDecl:
   case DeclContextKind::TopLevelCodeDecl:
     return extractNearestSourceLoc(dc->getAsDecl());

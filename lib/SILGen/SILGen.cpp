@@ -791,7 +791,7 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
         vjp = F;
         break;
       }
-      auto *origAFD = derivAttr->getOriginalFunction();
+      auto *origAFD = derivAttr->getOriginalFunction(getASTContext());
       auto origDeclRef =
           SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
       auto *origFn = getFunction(origDeclRef, NotForDefinition);

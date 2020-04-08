@@ -14,7 +14,9 @@
 #include "SourceKit/Support/FuzzyStringMatcher.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
+#include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Markup/XMLUtils.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseSet.h"
@@ -1200,7 +1202,9 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
 
   auto FirstTextChunk = str->getFirstTextChunkIndex();
   if (FirstTextChunk.hasValue()) {
-    for (auto C : str->getChunks().slice(*FirstTextChunk)) {
+    auto chunks = str->getChunks().slice(*FirstTextChunk);
+    for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
+      auto &C = *i;
 
       if (C.is(ChunkKind::BraceStmtWithCursor))
         break; // Don't include brace-stmt in filter name.
@@ -1223,6 +1227,17 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
       case ChunkKind::Ampersand:
       case ChunkKind::OptionalMethodCallTail:
         continue;
+      case ChunkKind::CallParameterTypeBegin: {
+        // Skip call parameter type type structure.
+        auto nestingLevel = C.getNestingLevel();
+        ++i;
+        for (; i != e; ++i) {
+          if (i->endsPreviousNestedGroup(nestingLevel))
+            break;
+        }
+        --i;
+        continue;
+      }
       case ChunkKind::CallParameterColon:
         // Since we don't add the type, also don't add the space after ':'.
         if (shouldPrint)
@@ -1236,37 +1251,6 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
         OS << C.getText();
     }
   }
-}
-
-void CompletionBuilder::getDescription(SwiftResult *result, raw_ostream &OS,
-                                       bool leadingPunctuation) {
-  auto str = result->getCompletionString();
-  bool isOperator = result->isOperator();
-
-  auto FirstTextChunk = str->getFirstTextChunkIndex(leadingPunctuation);
-  int TextSize = 0;
-  if (FirstTextChunk.hasValue()) {
-    for (auto C : str->getChunks().slice(*FirstTextChunk)) {
-      using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
-
-      // FIXME: we need a more uniform way to handle operator completions.
-      if (C.is(ChunkKind::Equal))
-        isOperator = true;
-
-      if (C.is(ChunkKind::TypeAnnotation) ||
-          C.is(ChunkKind::CallParameterClosureType) ||
-          C.is(ChunkKind::Whitespace))
-        continue;
-      if (isOperator && C.is(ChunkKind::CallParameterType))
-        continue;
-      if (C.hasText()) {
-        TextSize += C.getText().size();
-        OS << C.getText();
-      }
-    }
-  }
-  assert((TextSize > 0) &&
-         "code completion result should have non-empty description!");
 }
 
 CompletionBuilder::CompletionBuilder(CompletionSink &sink, SwiftResult &base)
@@ -1336,7 +1320,8 @@ Completion *CompletionBuilder::finish() {
   llvm::SmallString<64> description;
   {
     llvm::raw_svector_ostream OSS(description);
-    getDescription(&base, OSS, /*leadingPunctuation*/ true);
+    ide::printCodeCompletionResultDescription(base, OSS,
+                                              /*leadingPunctuation=*/true);
   }
 
   auto *result = new (sink.allocator)

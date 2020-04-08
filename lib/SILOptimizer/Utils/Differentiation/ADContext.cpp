@@ -58,6 +58,16 @@ ADContext::ADContext(SILModuleTransform &transform)
     : transform(transform), module(*transform.getModule()),
       passManager(*transform.getPassManager()) {}
 
+SynthesizedFileUnit &ADContext::getOrCreateSynthesizedFile() {
+  if (synthesizedFile)
+    return *synthesizedFile;
+  auto *moduleDecl = module.getSwiftModule();
+  auto &ctx = moduleDecl->getASTContext();
+  synthesizedFile = new (ctx) SynthesizedFileUnit(*moduleDecl);
+  moduleDecl->addFile(*synthesizedFile);
+  return *synthesizedFile;
+}
+
 FuncDecl *ADContext::getPlusDecl() const {
   if (!cachedPlusFn) {
     cachedPlusFn = findOperatorDeclInProtocol(astCtx.getIdentifier("+"),

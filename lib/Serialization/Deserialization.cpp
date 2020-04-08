@@ -4295,10 +4295,8 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         serialization::decls_block::TypeEraserDeclAttrLayout::readRecord(
             scratch, isImplicit, typeEraserID);
 
-        auto typeEraser = MF.getType(typeEraserID);
         assert(!isImplicit);
-        Attr = new (ctx) TypeEraserAttr(SourceLoc(), SourceRange(),
-                                        TypeLoc::withoutLoc(typeEraser));
+        Attr = TypeEraserAttr::create(ctx, &MF, typeEraserID);
         break;
       }
 
@@ -4381,7 +4379,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
         DeclNameRefWithLoc origName{
             DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc()};
-        auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
         auto derivativeKind =
             getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);
         if (!derivativeKind)
@@ -4394,7 +4391,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         auto *derivativeAttr =
             DerivativeAttr::create(ctx, isImplicit, SourceLoc(), SourceRange(),
                                    /*baseType*/ nullptr, origName, indices);
-        derivativeAttr->setOriginalFunction(origDecl);
+        derivativeAttr->setOriginalFunctionResolver(&MF, origDeclId);
         derivativeAttr->setDerivativeKind(*derivativeKind);
         Attr = derivativeAttr;
         break;
@@ -5941,6 +5938,17 @@ ModuleFile::loadAssociatedTypeDefault(const swift::AssociatedTypeDecl *ATD,
 ValueDecl *ModuleFile::loadDynamicallyReplacedFunctionDecl(
     const DynamicReplacementAttr *DRA, uint64_t contextData) {
   return cast<ValueDecl>(getDecl(contextData));
+}
+
+AbstractFunctionDecl *
+ModuleFile::loadReferencedFunctionDecl(const DerivativeAttr *DA,
+                                       uint64_t contextData) {
+  return cast<AbstractFunctionDecl>(getDecl(contextData));
+}
+
+Type ModuleFile::loadTypeEraserType(const TypeEraserAttr *TRA,
+                                    uint64_t contextData) {
+  return getType(contextData);
 }
 
 void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,

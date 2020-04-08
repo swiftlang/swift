@@ -2130,6 +2130,26 @@ public:
   void cacheResult(IndexSubset *value) const;
 };
 
+/// Resolves the referenced original declaration for a `@derivative` attribute.
+class DerivativeAttrOriginalDeclRequest
+    : public SimpleRequest<DerivativeAttrOriginalDeclRequest,
+                           AbstractFunctionDecl *(DerivativeAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator,
+                                 DerivativeAttr *attr) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks whether a type eraser has a viable initializer.
 class TypeEraserHasViableInitRequest
     : public SimpleRequest<TypeEraserHasViableInitRequest,
@@ -2258,6 +2278,27 @@ public:
   evaluator::DependencySource readDependencySource(Evaluator &eval) const;
   void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
                            evaluator::SideEffect) const;
+};
+
+class ResolveTypeEraserTypeRequest
+    : public SimpleRequest<ResolveTypeEraserTypeRequest,
+                           Type (ProtocolDecl *, TypeEraserAttr *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, ProtocolDecl *PD,
+                TypeEraserAttr *attr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

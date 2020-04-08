@@ -41,6 +41,11 @@
 #  define FIXIT(ID, Text, Signature)
 #endif
 
+#ifndef REMARK
+#  define REMARK(ID,Options,Text,Signature)   \
+DIAG(REMARK,ID,Options,Text,Signature)
+#endif
+
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
@@ -864,6 +869,9 @@ WARNING(module_not_compiled_with_library_evolution,none,
         "using it means binary compatibility for %1 can't be guaranteed",
         (Identifier, Identifier))
 
+REMARK(cross_import_added,none,
+       "import of %0 and %1 triggered a cross-import of %2",
+       (Identifier, Identifier, Identifier))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
@@ -2856,8 +2864,8 @@ ERROR(autoclosure_function_input_nonunit,none,
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
 
-NOTE(escaping_optional_type_argument, none,
-     "closure is already escaping in optional type argument", ())
+ERROR(escaping_optional_type_argument, none,
+      "closure is already escaping in optional type argument", ())
 
 // @_nonEphemeral attribute
 ERROR(non_ephemeral_non_pointer_type,none,
@@ -5030,6 +5038,29 @@ NOTE(function_builder_remove_returns, none,
 ERROR(differentiable_programming_attr_used_without_required_module, none,
       "'@%0' attribute used without importing module %1",
       (StringRef, Identifier))
+
+ERROR(oslog_arg_must_be_bool_literal, none,
+      "argument must be a bool literal", ())
+ERROR(oslog_arg_must_be_integer_literal, none,
+      "argument must be an integer literal", ())
+ERROR(oslog_arg_must_be_string_literal, none,
+      "argument must be a string literal", ())
+ERROR(oslog_arg_must_be_float_literal, none,
+      "argument must be a floating-point literal", ())
+ERROR(oslog_arg_must_be_metatype_literal, none,
+      "argument must be a <Type>.self", ())
+ERROR(oslog_arg_must_be_closure, none, "argument must be a closure", ())
+ERROR(argument_must_be_constant, none,
+      "argument must be an expression with only literals", ())
+ERROR(oslog_message_must_be_string_interpolation, none,
+      "argument must be a string interpolation", ())
+ERROR(oslog_arg_must_be_enum_case, none,
+      "argument must be a case of enum %0", (Identifier))
+ERROR(oslog_arg_must_be_type_member_access, none,
+      "argument must be a static method or property of %0", (Identifier))
+ERROR(atomics_ordering_must_be_constant, none,
+      "ordering argument must be a static method or property of %0",
+      (Identifier))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

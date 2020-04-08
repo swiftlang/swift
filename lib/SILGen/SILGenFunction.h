@@ -1088,7 +1088,7 @@ public:
   void emitBreakOutOf(SILLocation loc, Stmt *S);
 
   void emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
-                         ArrayRef<CatchStmt*> clauses,
+                         ArrayRef<CaseStmt *> clauses,
                          JumpDest catchFallthroughDest);
 
   /// Emit code for the throw expr. If \p emitWillThrow is set then emit a

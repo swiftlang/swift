@@ -40,8 +40,7 @@ void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
 /// Emit diagnostics for a given statement.
 void performStmtDiagnostics(ASTContext &ctx, const Stmt *S);
 
-void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD,
-                                        BraceStmt *body);
+void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD);
 
 /// Perform diagnostics on the top level code declaration.
 void performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD);
@@ -82,6 +81,12 @@ void diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
                                           const Pattern *pattern,
                                           SourceLoc equalLoc,
                                           const Expr *initializer);
+
+/// If \p expr is a call to a known function with a requirement that some
+/// arguments must be constants, whether those arguments are passed only
+/// constants. Otherwise, diagnose and emit errors.
+void diagnoseConstantArgumentRequirement(const Expr *expr,
+                                         const DeclContext *declContext);
 
 /// Attempt to fix the type of \p decl so that it's a valid override for
 /// \p base...but only if we're highly confident that we know what the user

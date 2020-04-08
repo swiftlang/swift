@@ -1225,27 +1225,6 @@ public:
     llvm_unreachable("case stmt outside of switch?!");
   }
 
-  Stmt *visitCatchStmt(CatchStmt *S) {
-    // Catches are handled in visitDoCatchStmt.
-    llvm_unreachable("catch stmt outside of do-catch?!");
-  }
-
-  void checkCatchStmt(CatchStmt *S) {
-    // Check the catch pattern.
-    TypeChecker::typeCheckCatchPattern(S, DC);
-
-    // Check the guard expression, if present.
-    if (Expr *guard = S->getGuardExpr()) {
-      TypeChecker::typeCheckCondition(guard, DC);
-      S->setGuardExpr(guard);
-    }
-      
-    // Type-check the clause body.
-    Stmt *body = S->getBody();
-    typeCheckStmt(body);
-    S->setBody(body);
-  }
-
   Stmt *visitDoCatchStmt(DoCatchStmt *S) {
     // The labels are in scope for both the 'do' and all of the catch
     // clauses.  This allows the user to break out of (or restart) the
@@ -1258,11 +1237,109 @@ public:
     typeCheckStmt(newBody);
     S->setBody(newBody);
 
-    // Check all the catch clauses independently.
-    for (auto clause : S->getCatches()) {
-      checkCatchStmt(clause);
+    SmallVector<VarDecl *, 8> scratchMemory1;
+    SmallVector<VarDecl *, 8> scratchMemory2;
+
+    auto clauses = S->getCatches();
+    CaseStmt *previousBlock = nullptr;
+    for (auto i = clauses.begin(), e = clauses.end(); i != e; ++i) {
+      auto *caseBlock = *i;
+
+      scratchMemory1.clear();
+      scratchMemory2.clear();
+
+      SmallVectorImpl<VarDecl *> *prevCaseDecls = nullptr;
+      SmallVectorImpl<VarDecl *> *nextCaseDecls = &scratchMemory1;
+
+      auto caseLabelItemArray = caseBlock->getMutableCaseLabelItems();
+      {
+        // Peel off the first iteration so we handle the first case label
+        // especially since we use it to begin the validation chain.
+        auto &labelItem = caseLabelItemArray.front();
+
+        // Resolve the pattern in our case label if it has not been resolved and
+        // check that our var decls follow invariants.
+        bool limit = true;
+        checkCaseLabelItemPattern(caseBlock, labelItem, limit,
+                                  getASTContext().getExceptionType(),
+                                  &prevCaseDecls, &nextCaseDecls);
+
+        // After this is complete, prevCaseDecls will be pointing at
+        // scratchMemory1 which contains the initial case block's var decls and
+        // nextCaseDecls will be a nullptr. Set nextCaseDecls to point at
+        // scratchMemory2 for the next iterations.
+        assert(prevCaseDecls == &scratchMemory1);
+        assert(nextCaseDecls == nullptr);
+        nextCaseDecls = &scratchMemory2;
+
+        // Check the guard expression, if present.
+        if (auto *guard = labelItem.getGuardExpr()) {
+          TypeChecker::typeCheckCondition(guard, DC);
+          labelItem.setGuardExpr(guard);
+        }
+      }
+
+      // Setup the types of our case body var decls.
+      for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+        assert(expected->hasName());
+        for (auto *prev : *prevCaseDecls) {
+          if (!prev->hasName() || expected->getName() != prev->getName()) {
+            continue;
+          }
+          if (prev->hasInterfaceType())
+            expected->setInterfaceType(prev->getInterfaceType());
+          break;
+        }
+      }
+
+      // Then check the rest.
+      for (auto &labelItem : caseLabelItemArray.drop_front()) {
+        // Resolve the pattern in our case label if it has not been resolved
+        // and check that our var decls follow invariants.
+        bool limit = true;
+        checkCaseLabelItemPattern(caseBlock, labelItem, limit,
+                                  getASTContext().getExceptionType(),
+                                  &prevCaseDecls, &nextCaseDecls);
+        // Check the guard expression, if present.
+        if (auto *guard = labelItem.getGuardExpr()) {
+          TypeChecker::typeCheckCondition(guard, DC);
+          labelItem.setGuardExpr(guard);
+        }
+      }
+
+      // Our last CaseLabelItem's VarDecls are now in
+      // prevCaseDecls. Wire them up as parents of our case body var
+      // decls.
+      //
+      // NOTE: We know that the two lists of var decls must be in sync. Remember
+      // that we constructed our case body VarDecls from the first
+      // CaseLabelItems var decls. Just now we proved that all other
+      // CaseLabelItems have matching var decls of the first meaning
+      // transitively that our last case label item must have matching var decls
+      // for our case stmts CaseBodyVarDecls.
+      //
+      // NOTE: We do not check that we matched everything here. That is because
+      // the check has already been done by comparing the 1st CaseLabelItem var
+      // decls. If we insert a check here, we will emit the same error multiple
+      // times.
+      for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+        assert(expected->hasName());
+        for (auto *prev : *prevCaseDecls) {
+          if (!prev->hasName() || expected->getName() != prev->getName()) {
+            continue;
+          }
+          expected->setParentVarDecl(prev);
+          break;
+        }
+      }
+
+      // Type-check the body statements.
+      Stmt *body = caseBlock->getBody();
+      typeCheckStmt(body);
+      caseBlock->setBody(body);
+      previousBlock = caseBlock;
     }
-    
+
     return S;
   }
 
@@ -1274,42 +1351,6 @@ public:
 
 };
 } // end anonymous namespace
-
-bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
-  // Grab the standard exception type.
-  Type exnType = DC->getASTContext().getErrorDecl()->getDeclaredType();
-
-  Pattern *pattern = S->getErrorPattern();
-  if (Pattern *newPattern = TypeChecker::resolvePattern(pattern, DC,
-                                           /*isStmtCondition*/false)) {
-    pattern = newPattern;
-
-    // Coerce the pattern to the exception type.
-    bool coercionError = false;
-    if (exnType) {
-      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
-      TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-      auto coercedPattern = coercePatternToType(
-          contextualPattern, exnType, patternOptions);
-      if (coercedPattern)
-        pattern = coercedPattern;
-      else
-        coercionError = true;
-    }
-
-    if (!exnType || coercionError) {
-      // If that failed, be sure to give the variables error types
-      // before we type-check the guard.  (This will probably kill
-      // most of the type-checking, but maybe not.)
-      pattern->forEachVariable([&](VarDecl *var) {
-        var->setInvalid();
-      });
-    }
-
-    S->setErrorPattern(pattern);
-  }
-  return false;
-}
 
 static bool isDiscardableType(Type type) {
   return (type->hasError() ||
@@ -1688,6 +1729,7 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   auto res = TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
   TypeChecker::checkFunctionErrorHandling(AFD);
+  TypeChecker::computeCaptures(AFD);
   return res;
 }
 
@@ -1972,12 +2014,13 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  // If nothing went wrong yet, perform extra checking.
-  if (!hadError && endTypeCheckLoc.isInvalid())
-    performAbstractFuncDeclDiagnostics(AFD, body);
-
   // Wire up the function body now.
   AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+
+  // If nothing went wrong yet, perform extra checking.
+  if (!hadError && endTypeCheckLoc.isInvalid())
+    performAbstractFuncDeclDiagnostics(AFD);
+
   return hadError;
 }
 

@@ -789,6 +789,16 @@ public:
     return true;
   }
 
+  void printConformances(ArrayRef<ProtocolConformanceRef> conformances) {
+    // FIXME: conformances should always be printed and parsed!
+    if (!Ctx.printVerbose()) {
+      return;
+    }
+    *this << " // ";
+    for (ProtocolConformanceRef conformance : conformances)
+      conformance.dump(PrintState.OS, /*indent*/ 0, /*details*/ false);
+  }
+
   void printDebugLocRef(SILLocation Loc, const SourceManager &SM,
                         bool PrintComma = true) {
     auto DL = Loc.decodeDebugLoc(SM);
@@ -1797,6 +1807,7 @@ public:
       *this << getIDAndType(WMI->getTypeDependentOperands()[0].get());
     }
     *this << " : " << WMI->getType();
+    printConformances({WMI->getConformance()});
   }
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *OI) {
     if (OI->getAccessKind() == OpenedExistentialAccess::Immutable)
@@ -1823,21 +1834,26 @@ public:
   void visitInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << ", $"
           << AEI->getFormalConcreteType();
+    printConformances(AEI->getConformances());
   }
   void visitInitExistentialValueInst(InitExistentialValueInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << ", $"
           << AEI->getFormalConcreteType() << ", " << AEI->getType();
+    printConformances(AEI->getConformances());
   }
   void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << " : $"
           << AEI->getFormalConcreteType() << ", " << AEI->getType();
+    printConformances(AEI->getConformances());
   }
-  void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *AEI) {
-    *this << getIDAndType(AEI->getOperand()) << ", " << AEI->getType();
+  void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *EMI) {
+    *this << getIDAndType(EMI->getOperand()) << ", " << EMI->getType();
+    printConformances(EMI->getConformances());
   }
   void visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
     *this << AEBI->getExistentialType() << ", $"
           << AEBI->getFormalConcreteType();
+    printConformances(AEBI->getConformances());
   }
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
     *this << getIDAndType(DEI->getOperand());

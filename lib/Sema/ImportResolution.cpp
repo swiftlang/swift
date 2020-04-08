@@ -914,6 +914,11 @@ void ImportResolver::findCrossImports(
                          declaringImport.module.second->getName(),
                          bystandingImport.module.second->getName(), name);
 
+    if (ctx.LangOpts.EnableCrossImportRemarks)
+      ctx.Diags.diagnose(I.importLoc, diag::cross_import_added,
+                         declaringImport.module.second->getName(),
+                         bystandingImport.module.second->getName(), name);
+
     LLVM_DEBUG({
       auto &crossImportOptions = unboundImports.back().options;
       llvm::dbgs() << "  ";

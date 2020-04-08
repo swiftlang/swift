@@ -2394,25 +2394,36 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
   }
 }
 
+Type
+ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
+                                       ProtocolDecl *PD,
+                                       TypeEraserAttr *attr) const {
+  if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
+    auto resolution = TypeResolution::forContextual(PD);
+    return resolution.resolveType(typeEraserRepr, /*options=*/None);
+  } else {
+    auto *LazyResolver = attr->Resolver;
+    assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
+    auto ty = LazyResolver->loadTypeEraserType(attr, attr->ResolverContextData);
+    attr->Resolver = nullptr;
+    if (!ty) {
+      return ErrorType::get(PD->getASTContext());
+    }
+    return ty;
+  }
+}
+
 bool
 TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
                                          TypeEraserAttr *attr,
                                          ProtocolDecl *protocol) const {
   auto &ctx = protocol->getASTContext();
   auto &diags = ctx.Diags;
-  TypeLoc &typeEraserLoc = attr->getTypeEraserLoc();
-  TypeRepr *typeEraserRepr = typeEraserLoc.getTypeRepr();
   DeclContext *dc = protocol->getDeclContext();
   Type protocolType = protocol->getDeclaredType();
 
   // Get the NominalTypeDecl for the type eraser.
-  Type typeEraser = typeEraserLoc.getType();
-  if (!typeEraser && typeEraserRepr) {
-    auto resolution = TypeResolution::forContextual(protocol);
-    typeEraser = resolution.resolveType(typeEraserRepr, /*options=*/None);
-    typeEraserLoc.setType(typeEraser);
-  }
-
+  Type typeEraser = attr->getResolvedType(protocol);
   if (typeEraser->hasError())
     return false;
 
@@ -2422,13 +2433,13 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
     nominalTypeDecl = typeAliasDecl->getUnderlyingType()->getAnyNominal();
 
   if (!nominalTypeDecl || isa<ProtocolDecl>(nominalTypeDecl)) {
-    diags.diagnose(typeEraserLoc.getLoc(), diag::non_nominal_type_eraser);
+    diags.diagnose(attr->getLoc(), diag::non_nominal_type_eraser);
     return false;
   }
 
   // The nominal type must be accessible wherever the protocol is accessible
   if (nominalTypeDecl->getFormalAccess() < protocol->getFormalAccess()) {
-    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_not_accessible,
+    diags.diagnose(attr->getLoc(), diag::type_eraser_not_accessible,
                    nominalTypeDecl->getFormalAccess(), nominalTypeDecl->getName(),
                    protocolType, protocol->getFormalAccess());
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
@@ -2437,7 +2448,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
 
   // The type eraser must conform to the annotated protocol
   if (!TypeChecker::conformsToProtocol(typeEraser, protocol, dc, None)) {
-    diags.diagnose(typeEraserLoc.getLoc(), diag::type_eraser_does_not_conform,
+    diags.diagnose(attr->getLoc(), diag::type_eraser_does_not_conform,
                    typeEraser, protocolType);
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
     return false;
@@ -3694,8 +3705,6 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   return originalType;
 }
 
-
-
 /// Given a `@differentiable` attribute, attempts to resolve the original
 /// `AbstractFunctionDecl` for which it is registered, using the declaration
 /// on which it is actually declared. On error, emits diagnostic and returns
@@ -4441,6 +4450,21 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   if (typeCheckDerivativeAttr(Ctx, D, attr))
     attr->setInvalid();
+}
+
+AbstractFunctionDecl *
+DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
+                                            DerivativeAttr *attr) const {
+  // If the typechecker has resolved the original function, return it.
+  if (auto *FD = attr->OriginalFunction.dyn_cast<AbstractFunctionDecl *>())
+    return FD;
+
+  // If the function can be lazily resolved, do so now.
+  if (auto *Resolver = attr->OriginalFunction.dyn_cast<LazyMemberLoader *>())
+    return Resolver->loadReferencedFunctionDecl(attr,
+                                                attr->ResolverContextData);
+
+  return nullptr;
 }
 
 /// Returns true if the given type's `TangentVector` is equal to itself in the
