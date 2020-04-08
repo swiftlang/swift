@@ -465,7 +465,7 @@ public:
   /// Retrieve the top-level module. If this module is already top-level, this
   /// returns itself. If this is a submodule such as \c Foo.Bar.Baz, this
   /// returns the module \c Foo.
-  ModuleDecl *getTopLevelModule();
+  ModuleDecl *getTopLevelModule(bool overlay = false);
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
