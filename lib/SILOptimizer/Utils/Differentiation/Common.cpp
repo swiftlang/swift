@@ -357,7 +357,7 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
   if (!minimalConfig)
     return nullptr;
 
-  std::string originalName = original->getName();
+  std::string originalName = original->getName().str();
   // If original function requires a foreign entry point, use the foreign SIL
   // function to get or create the minimal differentiability witness.
   if (requiresForeignEntryPoint(originalAFD)) {
