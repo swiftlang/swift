@@ -642,8 +642,7 @@ int swift_decompose_float16(const __fp16 *f,
     // See comments in swift_decompose_double
     static const int64_t exponentBias = (1 << (exponentBitCount - 1)) - 2; // 14
 
-    // Step 0: Deconstruct the target number
-    // Note: this strongly assumes IEEE 754 binary16 format
+    // Step 0: Deconstruct IEEE 754 binary16 format
     uint32_t raw = *(const uint16_t *)f;
     int exponentBitPattern = (raw >> significandBitCount) & exponentMask;
     uint32_t significandBitPattern = raw & significandMask;
