@@ -178,6 +178,7 @@ UID_KEYS = [
     KEY('Files', 'key.files'),
     KEY('OptimizeForIDE', 'key.optimize_for_ide'),
     KEY('RequiredBystanders', 'key.required_bystanders'),
+    KEY('ReusingASTContext', 'key.reusingastcontext'),
 ]
 
 

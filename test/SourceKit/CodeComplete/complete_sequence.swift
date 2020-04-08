@@ -19,47 +19,51 @@ func bar(arg: Bar) {
 
 // Disabled.
 // RUN: %sourcekitd-test \
-// RUN:   -req=track-compiles == \
 // RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=12:11 %s -- %s == \
 // RUN:   -req=complete -req-opts=reuseastcontext=0 -pos=15:11 %s -- %s > %t.response
-// RUN: %FileCheck --check-prefix=RESULT %s < %t.response
-// RUN: %FileCheck --check-prefix=TRACE_NORMAL %s < %t.response
+// RUN: %FileCheck --check-prefix=RESULT_SLOW %s < %t.response
 
 // Enabled.
 // RUN: %sourcekitd-test \
-// RUN:   -req=track-compiles == \
 // RUN:   -req=complete -pos=12:11 %s -- %s == \
 // RUN:   -req=complete -pos=15:11 %s -- %s > %t.response.reuseastcontext
-// RUN: %FileCheck --check-prefix=RESULT  %s < %t.response.reuseastcontext
-// RUN: %FileCheck --check-prefix=TRACE_REUSEAST  %s < %t.response.reuseastcontext
+// RUN: %FileCheck --check-prefix=RESULT_FAST %s < %t.response.reuseastcontext
 
 // Enabled - compiler argument mismatch.
 // RUN: %sourcekitd-test \
-// RUN:   -req=track-compiles == \
 // RUN:   -req=complete -pos=12:11 %s -- %s -DNOTUSED == \
 // RUN:   -req=complete -pos=15:11 %s -- -DNOTUSED %s > %t.response.reuseastcontext_argmismatch
-// RUN: %FileCheck --check-prefix=RESULT  %s < %t.response.reuseastcontext_argmismatch
-// RUN: %FileCheck --check-prefix=TRACE_NORMAL   %s < %t.response.reuseastcontext_argmismatch
+// RUN: %FileCheck --check-prefix=RESULT_SLOW  %s < %t.response.reuseastcontext_argmismatch
 
-// RESULT-LABEL: key.results: [
-// RESULT-DAG: key.name: "fooMethod()"
-// RESULT-DAG: key.name: "self"
-// RESULT-DAG: key.name: "x"
-// RESULT-DAG: key.name: "y"
-// RESULT: ]
-// RESULT-LABEL: key.results: [
-// RESULT-DAG: key.name: "barMethod()"
-// RESULT-DAG: key.name: "self"
-// RESULT-DAG: key.name: "a"
-// RESULT-DAG: key.name: "b"
-// RESULT: ]
+// RESULT_SLOW-LABEL: key.results: [
+// RESULT_SLOW-DAG: key.name: "fooMethod()"
+// RESULT_SLOW-DAG: key.name: "self"
+// RESULT_SLOW-DAG: key.name: "x"
+// RESULT_SLOW-DAG: key.name: "y"
+// RESULT_SLOW: ]
+// RESULT_SLOW-NOT: key.reusingastcontext: 1 
 
-// TRACE_NORMAL-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE_NORMAL-NOT: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE_NORMAL-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE_NORMAL-NOT: key.description: "completion reusing previous ASTContext (benign diagnostic)"
+// RESULT_SLOW-LABEL: key.results: [
+// RESULT_SLOW-DAG: key.name: "barMethod()"
+// RESULT_SLOW-DAG: key.name: "self"
+// RESULT_SLOW-DAG: key.name: "a"
+// RESULT_SLOW-DAG: key.name: "b"
+// RESULT_SLOW: ]
+// RESULT_SLOW-NOT: key.reusingastcontext: 1 
 
-// TRACE_REUSEAST-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE_REUSEAST-NOT: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE_REUSEAST-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE_REUSEAST: key.description: "completion reusing previous ASTContext (benign diagnostic)"
+
+// RESULT_FAST-LABEL: key.results: [
+// RESULT_FAST-DAG: key.name: "fooMethod()"
+// RESULT_FAST-DAG: key.name: "self"
+// RESULT_FAST-DAG: key.name: "x"
+// RESULT_FAST-DAG: key.name: "y"
+// RESULT_FAST: ]
+// RESULT_FAST-NOT: key.reusingastcontext: 1 
+
+// RESULT_FAST-LABEL: key.results: [
+// RESULT_FAST-DAG: key.name: "barMethod()"
+// RESULT_FAST-DAG: key.name: "self"
+// RESULT_FAST-DAG: key.name: "a"
+// RESULT_FAST-DAG: key.name: "b"
+// RESULT_FAST: ]
+// RESULT_FAST: key.reusingastcontext: 1 
