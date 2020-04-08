@@ -65,6 +65,7 @@ where Element: Differentiable {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 extension Array.DifferentiableView: EuclideanDifferentiable
 where Element: EuclideanDifferentiable {
   public var differentiableVectorView: Array.DifferentiableView.TangentVector {
@@ -72,6 +73,7 @@ where Element: EuclideanDifferentiable {
       base.map { $0.differentiableVectorView })
   }
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 extension Array.DifferentiableView: Equatable
 where Element: Differentiable & Equatable {
@@ -171,6 +173,7 @@ extension Array: Differentiable where Element: Differentiable {
     self = view.base
   }
 
+  /// SWIFT_ENABLE_TENSORFLOW
   /// A closure that produces a `TangentVector` of zeros with the same
   /// `count` as `self`.
   public var zeroTangentVectorInitializer: () -> TangentVector {
@@ -178,14 +181,17 @@ extension Array: Differentiable where Element: Differentiable {
       TangentVector(.init(repeating: .zero, count: count))
     }
   }
+  
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 extension Array: EuclideanDifferentiable
 where Element: EuclideanDifferentiable {
   public var differentiableVectorView: TangentVector {
     TangentVector(map { $0.differentiableVectorView })
   }
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 //===----------------------------------------------------------------------===//
 // Derivatives
@@ -275,7 +281,7 @@ extension Array where Element: Differentiable {
 //===----------------------------------------------------------------------===//
 
 extension Array where Element: Differentiable {
-  @differentiable(wrt: (self,initialResult))
+  @differentiable(wrt: (self, initialResult))
   public func differentiableReduce<Result: Differentiable>(
     _ initialResult: Result,
     _ nextPartialResult: @differentiable (Result, Element) -> Result
@@ -301,7 +307,7 @@ extension Array where Element: Differentiable {
     var result = initialResult
     for element in self {
       let (y, pb) =
-        Swift.valueWithPullback(at: result, element, in: nextPartialResult)
+        valueWithPullback(at: result, element, in: nextPartialResult)
       result = y
       pullbacks.append(pb)
     }
@@ -341,7 +347,7 @@ extension Array where Element: Differentiable {
     var values: [Result] = []
     var pullbacks: [(Result.TangentVector) -> Element.TangentVector] = []
     for x in self {
-      let (y, pb) = Swift.valueWithPullback(at: x, in: body)
+      let (y, pb) = valueWithPullback(at: x, in: body)
       values.append(y)
       pullbacks.append(pb)
     }
