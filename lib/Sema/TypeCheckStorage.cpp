@@ -676,7 +676,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     auto *backing = var->getPropertyWrapperBackingProperty();
 
     // Error recovery.
-    if (!backing)
+    if (!backing || backing->isInvalid())
       return nullptr;
 
     storage = backing;
@@ -719,7 +719,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     auto *backing = var->getPropertyWrapperBackingProperty();
 
     // Error recovery.
-    if (!backing)
+    if (!backing || backing->isInvalid())
       return nullptr;
 
     storage = backing;
