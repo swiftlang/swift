@@ -34,6 +34,9 @@ struct ExpectedFixIt {
 } // end namespace swift
 
 namespace {
+
+static constexpr StringLiteral fixitExpectationNoneString("none");
+
 struct ExpectedDiagnosticInfo {
   // This specifies the full range of the "expected-foo {{}}" specifier.
   const char *ExpectedStart, *ExpectedEnd = nullptr;
@@ -46,7 +49,7 @@ struct ExpectedDiagnosticInfo {
 
   // This is true if a '{{none}}' is present to mark that there should be no
   // extra fixits.
-  bool noExtraFixitsMayAppear = false;
+  bool noExtraFixitsMayAppear() const { return noneMarkerStartLoc != nullptr; };
 
   // This is the raw input buffer for the message text, the part in the
   // {{...}}
@@ -58,6 +61,9 @@ struct ExpectedDiagnosticInfo {
   Optional<unsigned> ColumnNo;
 
   std::vector<ExpectedFixIt> Fixits;
+
+  // Loc of {{none}}
+  const char *noneMarkerStartLoc = nullptr;
 
   ExpectedDiagnosticInfo(const char *ExpectedStart,
                          DiagnosticKind Classification)
@@ -288,16 +294,15 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   unsigned PrevExpectedContinuationLine = 0;
 
   std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
-  
-  auto addError = [&](const char *Loc, std::string message,
+
+  auto addError = [&](const char *Loc, const Twine &message,
                       ArrayRef<llvm::SMFixIt> FixIts = {}) {
     auto loc = SourceLoc(SMLoc::getFromPointer(Loc));
     auto diag = SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message,
                               {}, FixIts);
     Errors.push_back(diag);
   };
-  
-  
+
   // Scan the memory buffer looking for expected-note/warning/error.
   for (size_t Match = InputFile.find("expected-");
        Match != StringRef::npos; Match = InputFile.find("expected-", Match+1)) {
@@ -457,11 +462,25 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       ExtraChecks = ExtraChecks.substr(EndLoc+2).ltrim();
       
       // Special case for specifying no fixits should appear.
-      if (FixItStr == "none") {
-        Expected.noExtraFixitsMayAppear = true;
+      if (FixItStr == fixitExpectationNoneString) {
+        if (Expected.noneMarkerStartLoc) {
+          addError(FixItStr.data() - 2,
+                   Twine("A second {{") + fixitExpectationNoneString +
+                       "}} was found. It may only appear once in an expectation.");
+          break;
+        }
+
+        Expected.noneMarkerStartLoc = FixItStr.data() - 2;
         continue;
       }
-        
+
+      if (Expected.noneMarkerStartLoc) {
+        addError(Expected.noneMarkerStartLoc, Twine("{{") +
+                                                  fixitExpectationNoneString +
+                                                  "}} must be at the end.");
+        break;
+      }
+
       // Parse the pieces of the fix-it.
       size_t MinusLoc = FixItStr.find('-');
       if (MinusLoc == StringRef::npos) {
@@ -547,46 +566,121 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     
     auto &FoundDiagnostic = *FoundDiagnosticIter;
 
-    const char *IncorrectFixit = nullptr;
+    const char *missedFixitLoc = nullptr;
     // Verify that any expected fix-its are present in the diagnostic.
     for (auto fixit : expected.Fixits) {
       // If we found it, we're ok.
-      if (!checkForFixIt(fixit, FoundDiagnostic, InputFile))
-        IncorrectFixit = fixit.StartLoc;
+      if (!checkForFixIt(fixit, FoundDiagnostic, InputFile)) {
+        missedFixitLoc = fixit.StartLoc;
+        break;
+      }
     }
 
-    bool matchedAllFixIts =
-        expected.Fixits.size() == FoundDiagnostic.FixIts.size();
+    const bool isUnexpectedFixitsSeen =
+        expected.Fixits.size() < FoundDiagnostic.FixIts.size();
+
+    struct ActualFixitsPhrase {
+      std::string phrase;
+      std::string actualFixits;
+    };
+
+    auto makeActualFixitsPhrase =
+        [&](ArrayRef<DiagnosticInfo::FixIt> actualFixits)
+        -> ActualFixitsPhrase {
+      std::string actualFixitsStr = renderFixits(actualFixits, InputFile);
+
+      auto phrase = Twine("actual fix-it") +
+                    (actualFixits.size() >= 2 ? "s" : "") +
+                    " seen: " + actualFixitsStr;
+      return ActualFixitsPhrase{phrase.str(), actualFixitsStr};
+    };
+
+    auto emitFixItsError = [&](const char *location, const Twine &message,
+                               const char *replStartLoc, const char *replEndLoc,
+                               const std::string &replStr) {
+      llvm::SMFixIt fix(llvm::SMRange(SMLoc::getFromPointer(replStartLoc),
+                                      SMLoc::getFromPointer(replEndLoc)),
+                        replStr);
+      addError(location, message, fix);
+    };
 
     // If we have any expected fixits that didn't get matched, then they are
     // wrong.  Replace the failed fixit with what actually happened.
-    if (IncorrectFixit) {
+
+    if (missedFixitLoc) {
+      // If we had an incorrect expected fixit, render it and produce a fixit
+      // of our own.
+
+      assert(!expected.Fixits.empty() &&
+             "some fix-its should be expected here");
+
+      const char *replStartLoc = expected.Fixits.front().StartLoc;
+      const char *replEndLoc = expected.Fixits.back().EndLoc;
+
+      std::string message = "expected fix-it not seen";
+      std::string actualFixits;
+
       if (FoundDiagnostic.FixIts.empty()) {
-        addError(IncorrectFixit, "expected fix-it not seen");
+        /// If actual fix-its is empty,
+        /// eat a space before first marker.
+        /// For example,
+        ///
+        /// @code
+        /// expected-error {{message}} {{1-2=aa}}
+        ///                           ~~~~~~~~~~~
+        ///                           ^ remove
+        /// @endcode
+        if (replStartLoc[-1] == ' ') {
+          replStartLoc--;
+        }
       } else {
-        // If we had an incorrect expected fixit, render it and produce a fixit
-        // of our own.
-        auto actual = renderFixits(FoundDiagnostic.FixIts, InputFile);
-        auto replStartLoc = SMLoc::getFromPointer(expected.Fixits[0].StartLoc);
-        auto replEndLoc = SMLoc::getFromPointer(expected.Fixits.back().EndLoc);
-
-        llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
-        addError(IncorrectFixit,
-                 "expected fix-it not seen; actual fix-its: " + actual, fix);
+        auto phrase = makeActualFixitsPhrase(FoundDiagnostic.FixIts);
+        actualFixits = phrase.actualFixits;
+        message += "; " + phrase.phrase;
       }
-    } else if (expected.noExtraFixitsMayAppear &&
-               !matchedAllFixIts &&
-               !expected.mayAppear) {
-      // If there was no fixit specification, but some were produced, add a
-      // fixit to add them in.
-      auto actual = renderFixits(FoundDiagnostic.FixIts, InputFile);
-      auto replStartLoc = SMLoc::getFromPointer(expected.ExpectedEnd - 8); // {{none}} length
-      auto replEndLoc = SMLoc::getFromPointer(expected.ExpectedEnd);
 
-      llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
-      addError(replStartLoc.getPointer(), "expected no fix-its; actual fix-it seen: " + actual, fix);
+      emitFixItsError(missedFixitLoc, message, replStartLoc, replEndLoc,
+                      actualFixits);
+    } else if (expected.noExtraFixitsMayAppear() && isUnexpectedFixitsSeen) {
+      // If unexpected fixit were produced, add a fixit to add them in.
+
+      assert(!FoundDiagnostic.FixIts.empty() &&
+             "some fix-its should be produced here");
+      assert(expected.noneMarkerStartLoc && "none marker location is null");
+
+      const char *replStartLoc = nullptr, *replEndLoc = nullptr;
+      std::string message;
+      if (expected.Fixits.empty()) {
+        message = "expected no fix-its";
+        replStartLoc = expected.noneMarkerStartLoc;
+        replEndLoc = expected.noneMarkerStartLoc;
+      } else {
+        message = "unexpected fix-it seen";
+        replStartLoc = expected.Fixits.front().StartLoc;
+        replEndLoc = expected.Fixits.back().EndLoc;
+      }
+
+      auto phrase = makeActualFixitsPhrase(FoundDiagnostic.FixIts);
+      std::string actualFixits = phrase.actualFixits;
+      message += "; " + phrase.phrase;
+
+      if (replStartLoc == replEndLoc) {
+        /// If no fix-its was expected and range of replacement is empty,
+        /// insert space after new last marker.
+        /// For example:
+        ///
+        /// @code
+        /// expected-error {{message}} {{none}}
+        ///                            ^
+        ///                    insert `{{1-2=aa}} `
+        /// @endcode
+        actualFixits += " ";
+      }
+
+      emitFixItsError(expected.noneMarkerStartLoc, message, replStartLoc,
+                      replEndLoc, actualFixits);
     }
-    
+
     // Actually remove the diagnostic from the list, so we don't match it
     // again. We do have to do this after checking fix-its, though, because
     // the diagnostic owns its fix-its.
