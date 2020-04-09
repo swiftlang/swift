@@ -182,8 +182,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 
   // Configure the toolchain.
   //
-  // We use `clang++` if C++ interop is enabled, `clang` otherwise.
-  //
   // We don't use `clang++` unconditionally because we want to avoid pulling in
   // a C++ standard library if it's not needed, in particular because the
   // standard library that `clang++` selects by default may not be the one that

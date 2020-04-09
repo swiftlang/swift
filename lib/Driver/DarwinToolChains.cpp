@@ -713,7 +713,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back(context.Args.MakeArgString(getTriple().getArchName()));
 
   if (context.cxxInteropEnabled()) {
-    // We only support libc++ on Darwin.
+    // On Darwin, we only support libc++.
     Arguments.push_back("-lc++");
   }
 

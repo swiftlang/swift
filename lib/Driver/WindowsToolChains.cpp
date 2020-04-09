@@ -85,8 +85,6 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   // Configure the toolchain.
-  //
-  // We use `clang++` if C++ interop is enabled, `clang` otherwise.
   const char *Clang = context.cxxInteropEnabled()? "clang++" : "clang";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
