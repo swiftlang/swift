@@ -26,7 +26,7 @@
 
 // Finally, execute the test.
 
-// RUN: %target-build-swift -I%t -L%t %s -o %t/a.out -lm -lexternal
+// RUN: %target-build-swift -I%t -L%t %s -o %t/a.out -lexternal
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
