@@ -1746,14 +1746,11 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
       info.UseDLLStorage ? llvm::GlobalValue::DLLImportStorageClass
                          : llvm::GlobalValue::DefaultStorageClass;
 
+  // SWIFT_ENABLE_TENSORFLOW: Cases slightly modified to fix TF-587.
   switch (linkage) {
   case SILLinkage::Public:
     return {llvm::GlobalValue::ExternalLinkage, PublicDefinitionVisibility,
             ExportedStorage};
-
-  case SILLinkage::PublicNonABI:
-    return isDefinition ? RESULT(WeakODR, Hidden, Default)
-                        : RESULT(External, Hidden, Default);
 
   case SILLinkage::Shared:
   case SILLinkage::SharedExternal:
@@ -1761,6 +1758,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Hidden:
+  case SILLinkage::PublicNonABI:
     return RESULT(External, Hidden, Default);
 
   case SILLinkage::Private: {
