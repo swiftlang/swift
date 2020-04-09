@@ -33,10 +33,7 @@ def Availability(bits):
 //===----------------------------------------------------------------------===//
 
 ${Availability(bits)}
-// SWIFT_ENABLE_TENSORFLOW
-// On the Tensorflow branch, this conforms to EuclideanDifferentiable
-// instead of Differentiable.
-extension ${Self} : EuclideanDifferentiable {
+extension ${Self}: Differentiable {
   ${Availability(bits)}
   public typealias TangentVector = ${Self}
 
@@ -45,6 +42,11 @@ extension ${Self} : EuclideanDifferentiable {
     self += direction
   }
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+${Availability(bits)}
+extension ${Self} : EuclideanDifferentiable {}
+// SWIFT_ENABLE_TENSORFLOW END
 
 // SWIFT_ENABLE_TENSORFLOW
 ${Availability(bits)}

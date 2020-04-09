@@ -173,7 +173,7 @@ extension Array: Differentiable where Element: Differentiable {
     self = view.base
   }
 
-  /// SWIFT_ENABLE_TENSORFLOW
+  // SWIFT_ENABLE_TENSORFLOW
   /// A closure that produces a `TangentVector` of zeros with the same
   /// `count` as `self`.
   public var zeroTangentVectorInitializer: () -> TangentVector {
@@ -181,7 +181,7 @@ extension Array: Differentiable where Element: Differentiable {
       TangentVector(.init(repeating: .zero, count: count))
     }
   }
-  
+  // SWIFT_ENABLE_TENSORFLOW END
 }
 
 // SWIFT_ENABLE_TENSORFLOW
