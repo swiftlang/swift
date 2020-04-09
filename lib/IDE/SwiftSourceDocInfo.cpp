@@ -72,6 +72,10 @@ SourceManager &NameMatcher::getSourceMgr() const {
   return SrcFile.getASTContext().SourceMgr;
 }
 
+ResolvedLoc NameMatcher::resolve(UnresolvedLoc Loc) {
+  return resolve({Loc}, {}).front();
+}
+
 std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens) {
 
   // Note the original indices and sort them in reverse source order
@@ -275,6 +279,36 @@ Stmt *NameMatcher::walkToStmtPost(Stmt *S) {
   return S;
 }
 
+Expr *NameMatcher::getApplicableArgFor(Expr *E) {
+  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
+    if (auto *Arg = UME->getArgument())
+      return Arg;
+  }
+  if (ParentCalls.empty())
+    return nullptr;
+  auto &Last = ParentCalls.back();
+  return Last.ApplicableTo == E ? Last.Call->getArg() : nullptr;
+}
+
+static Expr *extractNameExpr(Expr *Fn) {
+  Fn = Fn->getSemanticsProvidingExpr();
+  switch (Fn->getKind()) {
+    case ExprKind::DeclRef:
+    case ExprKind::UnresolvedDeclRef:
+    case ExprKind::UnresolvedMember:
+    case ExprKind::UnresolvedDot:
+      return Fn;
+    default:
+      break;
+  }
+  if (auto *SAE = dyn_cast<SelfApplyExpr>(Fn))
+    return extractNameExpr(SAE->getFn());
+  if (auto *ACE = dyn_cast<AutoClosureExpr>(Fn))
+    if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
+      return extractNameExpr(Unwrapped);
+  return nullptr;
+}
+
 std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
   if (shouldSkip(E))
     return std::make_pair(false, isDone()? nullptr : E);
@@ -285,21 +319,31 @@ std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
 
   // only match name locations of expressions apparent in the original source
   if (!E->isImplicit()) {
+
+    if (auto *CE = dyn_cast<CallExpr>(E)) {
+      // Keep a stack of parent CallExprs along with the expression their
+      // arguments belong to.
+      if (!CE->isImplicit()) {
+        if (auto *ApplicableExpr = extractNameExpr(CE->getFn()))
+          ParentCalls.push_back({ApplicableExpr, CE});
+      }
+    }
+
     // Try to resolve against the below kinds *before* their children are
     // visited to ensure visitation happens in source order.
     switch (E->getKind()) {
       case ExprKind::UnresolvedMember: {
         auto UME = cast<UnresolvedMemberExpr>(E);
-        tryResolve(ASTWalker::ParentTy(E), UME->getNameLoc(), UME->getArgument(), !UME->getArgument());
+        tryResolve(ASTWalker::ParentTy(E), UME->getNameLoc(), getApplicableArgFor(E));
       } break;
       case ExprKind::DeclRef: {
         auto DRE = cast<DeclRefExpr>(E);
-        tryResolve(ASTWalker::ParentTy(E), DRE->getNameLoc(), nullptr, true);
+        tryResolve(ASTWalker::ParentTy(E), DRE->getNameLoc(), getApplicableArgFor(E));
         break;
       }
       case ExprKind::UnresolvedDeclRef: {
         auto UDRE = cast<UnresolvedDeclRefExpr>(E);
-        tryResolve(ASTWalker::ParentTy(E), UDRE->getNameLoc(), nullptr, true);
+        tryResolve(ASTWalker::ParentTy(E), UDRE->getNameLoc(), getApplicableArgFor(E));
         break;
       }
       case ExprKind::StringLiteral:
@@ -327,8 +371,25 @@ std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
           return {false, nullptr};
         return {false, E};
       }
+      case ExprKind::Paren: {
+        ParenExpr *P = cast<ParenExpr>(E);
+        // Handle implicit callAsFunction reference on opening paren
+        auto Labels = getCallArgLabelRanges(getSourceMgr(), P,
+                                            LabelRangeEndAt::BeforeElemStart);
+        tryResolve(ASTWalker::ParentTy(E), P->getLParenLoc(),
+                   LabelRangeType::CallArg, Labels);
+        break;
+      }
       case ExprKind::Tuple: {
         TupleExpr *T = cast<TupleExpr>(E);
+        // Handle implicit callAsFunction reference on opening paren
+        auto Labels = getCallArgLabelRanges(getSourceMgr(), T,
+                                            LabelRangeEndAt::BeforeElemStart);
+        tryResolve(ASTWalker::ParentTy(E), T->getLParenLoc(),
+                   LabelRangeType::CallArg, Labels);
+        if (isDone())
+          break;
+
         // Handle arg label locations (the index reports property occurrences
         // on them for memberwise inits)
         for (unsigned i = 0, e = T->getNumElements(); i != e; ++i) {
@@ -383,11 +444,16 @@ Expr *NameMatcher::walkToExprPost(Expr *E) {
         break;
       case ExprKind::UnresolvedDot: {
         auto UDE = cast<UnresolvedDotExpr>(E);
-        tryResolve(ASTWalker::ParentTy(E), UDE->getNameLoc(), nullptr, true);
+        tryResolve(ASTWalker::ParentTy(E), UDE->getNameLoc(), getApplicableArgFor(E));
         break;
       }
       default:
         break;
+    }
+
+    if (auto *CE = dyn_cast<CallExpr>(E)) {
+      if (!ParentCalls.empty() && ParentCalls.back().Call == CE)
+        ParentCalls.pop_back();
     }
   }
 
@@ -517,7 +583,7 @@ std::vector<CharSourceRange> getSelectorLabelRanges(SourceManager &SM,
 }
 
 bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
-                             Expr *Arg, bool checkParentForLabels) {
+                             Expr *Arg) {
   if (NameLoc.isInvalid())
     return false;
 
@@ -542,16 +608,6 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
       return tryResolve(Node, NameLoc.getBaseNameLoc(), LabelRangeType::CallArg,
                         getCallArgLabelRanges(getSourceMgr(), Arg,
                                               LabelRangeEndAt::BeforeElemStart));
-
-    if (checkParentForLabels) {
-      if (auto P = dyn_cast_or_null<ApplyExpr>(Parent.getAsExpr())) {
-        if (P->getFn() == Node.getAsExpr())
-          return tryResolve(Node, NameLoc.getBaseNameLoc(),
-                            LabelRangeType::CallArg,
-                            getCallArgLabelRanges(getSourceMgr(), P->getArg(),
-                                            LabelRangeEndAt::BeforeElemStart));
-      }
-    }
   }
 
   return tryResolve(Node, NameLoc.getBaseNameLoc());
@@ -823,8 +879,11 @@ std::vector<CallArgInfo> swift::ide::
 getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
   std::vector<CallArgInfo> InfoVec;
   if (auto *TE = dyn_cast<TupleExpr>(Arg)) {
-    size_t ElemIndex = 0;
-    for (Expr *Elem : TE->getElements()) {
+    for (size_t ElemIndex: range(TE->getNumElements())) {
+      Expr *Elem = TE->getElement(ElemIndex);
+      if (isa<DefaultArgumentExpr>(Elem))
+        continue;
+
       SourceLoc LabelStart(Elem->getStartLoc());
       SourceLoc LabelEnd(LabelStart);
 
@@ -838,10 +897,10 @@ getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
         ElemIndex == TE->getNumElements() - 1;
       InfoVec.push_back({getSingleNonImplicitChild(Elem),
         CharSourceRange(SM, LabelStart, LabelEnd), IsTrailingClosure});
-      ++ElemIndex;
     }
   } else if (auto *PE = dyn_cast<ParenExpr>(Arg)) {
-    if (auto Sub = PE->getSubExpr())
+    Expr *Sub = PE->getSubExpr();
+    if (Sub && !isa<DefaultArgumentExpr>(Sub))
       InfoVec.push_back({getSingleNonImplicitChild(Sub),
         CharSourceRange(Sub->getStartLoc(), 0),
         PE->hasTrailingClosure()

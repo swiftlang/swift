@@ -808,7 +808,8 @@
                   key.name: "+(_:_:)",
                   key.usr: <usr>,
                   key.line: 86,
-                  key.column: 8
+                  key.column: 8,
+                  key.receiver_usr: "s:Si"
                 }
               ]
             },
