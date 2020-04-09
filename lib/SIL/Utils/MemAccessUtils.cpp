@@ -58,6 +58,15 @@ SILValue swift::getAddressAccess(SILValue v) {
   }
 }
 
+SILValue swift::getAccessedAddress(SILValue v) {
+  while (true) {
+    SILValue v2 = stripAccessMarkers(getAddressAccess(v));
+    if (v2 == v)
+      return v;
+    v = v2;
+  }
+}
+
 bool swift::isLetAddress(SILValue accessedAddress) {
   assert(accessedAddress == getAccessedAddress(accessedAddress)
          && "caller must find the address root");
