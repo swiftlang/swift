@@ -125,7 +125,7 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
 
 static bool areConservativelyCompatibleArgumentLabels(
     OverloadChoice choice, SmallVectorImpl<FunctionType::Param> &args,
-    bool hasTrailingClosure) {
+    Optional<unsigned> unlabeledTrailingClosureArgIndex) {
   ValueDecl *decl = nullptr;
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -166,7 +166,8 @@ static bool areConservativelyCompatibleArgumentLabels(
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
-  return !matchCallArguments(args, params, paramInfo, hasTrailingClosure,
+  return !matchCallArguments(args, params, paramInfo,
+                             unlabeledTrailingClosureArgIndex,
                              /*allow fixes*/ false, listener,
                              unusedParamBindings);
 }
@@ -218,11 +219,13 @@ bool constraints::
 matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
                    ArrayRef<AnyFunctionType::Param> params,
                    const ParameterListInfo &paramInfo,
-                   bool hasTrailingClosure,
+                   Optional<unsigned> unlabeledTrailingClosureArgIndex,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
                    SmallVectorImpl<ParamBinding> &parameterBindings) {
   assert(params.size() == paramInfo.size() && "Default map does not match");
+  assert(!unlabeledTrailingClosureArgIndex ||
+         *unlabeledTrailingClosureArgIndex < args.size());
 
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
@@ -430,7 +433,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   };
 
   // If we have a trailing closure, it maps to the last parameter.
-  if (hasTrailingClosure && numParams > 0) {
+  // TODO: generalize this correctly for the closure arg index.
+  if (unlabeledTrailingClosureArgIndex && numParams > 0) {
     unsigned lastParamIdx = numParams - 1;
     bool lastAcceptsTrailingClosure =
         acceptsTrailingClosure(params[lastParamIdx]);
@@ -1037,7 +1041,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ArgumentFailureTracker listener(cs, argsWithLabels, params,
                                     parameterBindings, locator);
     if (constraints::matchCallArguments(
-            argsWithLabels, params, paramInfo, argInfo->HasTrailingClosure,
+            argsWithLabels, params, paramInfo,
+            argInfo->UnlabeledTrailingClosureIndex,
             cs.shouldAttemptFixes(), listener, parameterBindings))
       return cs.getTypeMatchFailure(locator);
 
@@ -7928,7 +7933,8 @@ retry_after_fail:
           FunctionType::relabelParams(argsWithLabels, argumentInfo->Labels);
 
           if (!areConservativelyCompatibleArgumentLabels(
-                  choice, argsWithLabels, argumentInfo->HasTrailingClosure)) {
+                  choice, argsWithLabels,
+                  argumentInfo->UnlabeledTrailingClosureIndex)) {
             labelMismatch = true;
             return false;
           }

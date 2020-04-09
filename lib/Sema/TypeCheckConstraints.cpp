@@ -988,7 +988,6 @@ namespace {
 
                 E = CallExpr::create(Context, newCallee, lParen, {newArg},
                                      {Identifier()}, {SourceLoc()}, rParen,
-                                     SourceLoc(), SourceLoc(),
                                      /*trailingClosures=*/{},
                                      /*implicit=*/false);
               }

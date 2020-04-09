@@ -1187,20 +1187,17 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       SmallVector<Expr *, 2> indexArgs;
       SmallVector<Identifier, 2> indexArgLabels;
       SmallVector<SourceLoc, 2> indexArgLabelLocs;
-      SourceLoc trailingLBrace, trailingRBrace;
       SmallVector<TrailingClosure, 2> trailingClosures;
 
       ParserStatus status = parseExprList(
           tok::l_square, tok::r_square,
           /*isPostfix=*/true, isExprBasic, lSquareLoc, indexArgs,
           indexArgLabels, indexArgLabelLocs, rSquareLoc,
-          trailingLBrace, trailingRBrace, trailingClosures,
-          SyntaxKind::TupleExprElementList);
+          trailingClosures, SyntaxKind::TupleExprElementList);
       Result = makeParserResult(
           status | Result,
           SubscriptExpr::create(Context, Result.get(), lSquareLoc, indexArgs,
                                 indexArgLabels, indexArgLabelLocs, rSquareLoc,
-                                trailingLBrace, trailingRBrace,
                                 trailingClosures, ConcreteDeclRef(),
                                 /*implicit=*/false));
       SyntaxContext->createNodeInPlace(SyntaxKind::SubscriptExpr);
@@ -1224,11 +1221,10 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
                 leadingTriviaLoc(), *SyntaxContext));
       }
 
-      SourceLoc LBrace, RBrace;
       SmallVector<TrailingClosure, 2> trailingClosures;
       auto trailingResult =
-          parseTrailingClosures(isExprBasic, callee->getSourceRange(), LBrace,
-                                RBrace, trailingClosures);
+          parseTrailingClosures(isExprBasic, callee->getSourceRange(),
+                                trailingClosures);
       if (trailingClosures.empty())
         return nullptr;
 
@@ -1236,7 +1232,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       Result = makeParserResult(
           ParserStatus(Result) | trailingResult,
           CallExpr::create(Context, Result.get(), SourceLoc(), {}, {}, {},
-                           SourceLoc(), LBrace, RBrace, trailingClosures,
+                           SourceLoc(), trailingClosures,
                            /*implicit=*/false));
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
 
@@ -1613,7 +1609,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       SmallVector<Expr *, 2> args;
       SmallVector<Identifier, 2> argLabels;
       SmallVector<SourceLoc, 2> argLabelLocs;
-      SourceLoc trailingLBrace, trailingRBrace;
       SmallVector<TrailingClosure, 2> trailingClosures;
       
       ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
@@ -1621,7 +1616,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                           lParenLoc, args, argLabels,
                                           argLabelLocs,
                                           rParenLoc,
-                                          trailingLBrace, trailingRBrace,
                                           trailingClosures,
                                           SyntaxKind::TupleExprElementList);
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
@@ -1630,7 +1624,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                  UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
                                               lParenLoc, args, argLabels,
                                               argLabelLocs, rParenLoc,
-                                              trailingLBrace, trailingRBrace,
                                               trailingClosures,
                                               /*implicit=*/false));
     }
@@ -1644,10 +1637,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                 leadingTriviaLoc(), *SyntaxContext));
       }
 
-      SourceLoc LBrace, RBrace;
       SmallVector<TrailingClosure, 2> trailingClosures;
       auto result = parseTrailingClosures(isExprBasic, NameLoc.getSourceRange(),
-                                          LBrace, RBrace, trailingClosures);
+                                          trailingClosures);
       if (trailingClosures.empty())
         return nullptr;
 
@@ -1656,8 +1648,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       return makeParserResult(
           result, UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
                                                SourceLoc(), {}, {}, {},
-                                               SourceLoc(), LBrace, RBrace,
-                                               trailingClosures,
+                                               SourceLoc(), trailingClosures,
                                                /*implicit=*/false));
     }
 
@@ -3026,7 +3017,6 @@ Parser::parseExprList(tok leftTok, tok rightTok, SyntaxKind Kind) {
   SmallVector<TrailingClosure, 2> trailingClosures;
 
   SourceLoc leftLoc, rightLoc;
-  SourceLoc trailingLBrace, trailingRBrace;
   ParserStatus status = parseExprList(leftTok, rightTok, /*isPostfix=*/false,
                                       /*isExprBasic=*/true,
                                       leftLoc,
@@ -3034,8 +3024,6 @@ Parser::parseExprList(tok leftTok, tok rightTok, SyntaxKind Kind) {
                                       subExprNames,
                                       subExprNameLocs,
                                       rightLoc,
-                                      trailingLBrace,
-                                      trailingRBrace,
                                       trailingClosures,
                                       Kind);
 
@@ -3072,8 +3060,6 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                                    SmallVectorImpl<Identifier> &exprLabels,
                                    SmallVectorImpl<SourceLoc> &exprLabelLocs,
                                    SourceLoc &rightLoc,
-                                   SourceLoc &trailingLBrace,
-                                   SourceLoc &trailingRBrace,
                                    SmallVectorImpl<TrailingClosure> &trailingClosures,
                                    SyntaxKind Kind) {
   StructureMarkerRAII ParsingExprList(*this, Tok);
@@ -3158,139 +3144,25 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
   // Parse the closure.
   status |=
       parseTrailingClosures(isExprBasic, SourceRange(leftLoc, rightLoc),
-                            trailingLBrace, trailingRBrace, trailingClosures);
+                            trailingClosures);
   return status;
 }
 
-/// Check whether upcoming trailing closure actually represents a block of
-/// labeled trailing closures e.g.
-/// foo() {
-///  <label-1>: { ... }
-///  ...
-/// }
-static bool isBlockOfMultipleTrailingClosures(bool isExprBasic, Parser &P) {
-  assert(isValidTrailingClosure(isExprBasic, P));
+static bool isStartOfLabelledTrailingClosure(Parser &P) {
+  // Fast path: the next two tokens are a label and a colon.
+  // TODO: recognize a code-completion token here and record it in the AST.
+  if (!P.Tok.canBeArgumentLabel() || !P.peekToken().is(tok::colon))
+    return false;
 
-  // If closure doesn't start from a label there is no reason
-  // to look any farther.
-  {
-    const auto &nextTok = P.peekToken();
-    if (!(nextTok.canBeArgumentLabel() || nextTok.is(tok::code_complete)) ||
-        nextTok.getText()[0] == '$')
-      return false;
-  }
-
+  // Do some tentative parsing to distinguish `label: { ... }` and
+  // `label: switch x { ... }`.
   Parser::BacktrackingScope backtrack(P);
-  P.consumeToken(tok::l_brace);
-
-  if (P.Tok.is(tok::code_complete)) {
-    // Parse '{ <token> }' as a multiple trailing closure block.
-    if (P.peekToken().is(tok::r_brace))
-      return true;
-
-    // Otherwise, look through the code completion token.
-    P.consumeToken(tok::code_complete);
-    if (!P.Tok.canBeArgumentLabel() || P.Tok.getText()[0] == '$')
-      return false;
-  }
-
-  P.consumeToken(); // Consume Label text.
-
-  if (!P.consumeIf(tok::colon)) // Consume `:`
-    return false;
-
-  // If the next token after the label is not a left brace
-  // that means what follows is not a valid closure, which
-  // in turn means it can't be a labeled block.
-  if (!P.Tok.is(tok::l_brace))
-    return false;
-
-  return isValidTrailingClosure(isExprBasic, P);
-}
-
-ParserStatus Parser::parseMultipleTrailingClosures(
-    SourceLoc &LBrace, SourceLoc &RBrace,
-    SmallVectorImpl<TrailingClosure> &closures) {
-  SyntaxParsingContext ClauseCtx(SyntaxContext,
-                                 SyntaxKind::MultipleTrailingClosureClause);
-
-  // Consume '{' of the trailing closure
-  LBrace = consumeToken(tok::l_brace);
-
-  ParserStatus Status;
-  // There could N labeled closures depending on the number of arguments.
-  do {
-    if (!(Tok.canBeArgumentLabel() && peekToken().is(tok::colon))) {
-
-      if (Tok.is(tok::code_complete)) {
-        auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-        closures.emplace_back(Identifier(), SourceLoc(), CCE);
-        if (CodeCompletion)
-          CodeCompletion->completeCallArg(CCE, /*isFirst=*/false);
-
-        consumeToken(tok::code_complete);
-        Status.setHasCodeCompletion();
-        continue;
-      }
-
-      Status.setIsParseError();
-      diagnose(Tok.getLoc(),
-               diag::expected_argument_label_followed_by_closure_literal);
-      skipUntilDeclStmtRBrace(tok::r_brace);
-      break;
-    }
-
-    SyntaxParsingContext ElementCtx(SyntaxContext,
-                                    SyntaxKind::MultipleTrailingClosureElement);
-    Identifier label;
-    auto labelLoc = consumeArgumentLabel(label);
-    if (!labelLoc.isValid())
-      return makeParserError();
-
-    consumeToken(); // Consume ':'
-
-    SourceLoc closureLoc = Tok.getLoc();
-    auto closure = parseExpr(diag::expected_closure_literal);
-    if (closure.isNull()) {
-      Status.setIsParseError();
-      skipUntilDeclStmtRBrace(tok::r_brace);
-      break;
-    }
-
-    // Allow any expression, but diagnose if not a closure literal.
-    if (!isa<ClosureExpr>(closure.get()) &&
-        !isa<CaptureListExpr>(closure.get())) {
-      diagnose(closureLoc, diag::expected_closure_literal);
-    }
-
-    Status |= closure;
-    closures.push_back({label, labelLoc, closure.get()});
-
-    // Recover if blocks are separated by comma instead of newline.
-    if (Tok.is(tok::comma)) {
-      diagnose(Tok.getLoc(), diag::unexpected_separator, ",")
-        .fixItRemove(Tok.getLoc());
-      consumeToken();
-    }
-  } while (!Tok.is(tok::r_brace));
-  SyntaxContext->collectNodesInPlace(SyntaxKind::MultipleTrailingClosureElementList);
-
-  // Consume `}` of the trailing closure.
-  if (parseMatchingToken(tok::r_brace, RBrace,
-                         diag::expected_multiple_closures_block_rbrace,
-                         LBrace)) {
-    Status.setIsParseError();
-  } else {
-    if (!Status.hasCodeCompletion())
-      Status = makeParserSuccess();
-  }
-
-  return Status;
+  P.consumeToken();
+  return P.peekToken().is(tok::l_brace);
 }
 
 ParserStatus
 Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
-                              SourceLoc &LBrace, SourceLoc &RBrace,
                               SmallVectorImpl<TrailingClosure> &closures) {
   SourceLoc braceLoc = Tok.getLoc();
 
@@ -3302,20 +3174,14 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
 
   ParserStatus result;
 
-  if (isBlockOfMultipleTrailingClosures(isExprBasic, *this)) {
-    result |= parseMultipleTrailingClosures(LBrace, RBrace, closures);
-  } else {
-    // Parse the closure.
-    ParserResult<Expr> closure = parseExprClosure();
-    if (closure.isNull())
-      return makeParserError();
+  // Parse the closure.
+  ParserResult<Expr> closure = parseExprClosure();
+  if (closure.isNull())
+    return makeParserError();
 
-    result |= closure;
+  result |= closure;
 
-    LBrace = braceLoc;
-    RBrace = closure.get()->getEndLoc();
-    closures.push_back({closure.get()});
-  }
+  closures.push_back({closure.get()});
 
   // Warn if the trailing closure is separated from its callee by more than
   // one line. A single-line separation is acceptable for a trailing closure
@@ -3332,6 +3198,21 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
           .fixItInsert(braceLoc, "do ");
       }
     }
+  }
+
+  // Parse labeled trailing closures.
+  while (isStartOfLabelledTrailingClosure(*this)) {
+    Identifier label;
+    auto labelLoc = consumeArgumentLabel(label);
+    consumeToken(tok::colon);
+    ParserResult<Expr> closure = parseExprClosure();
+    if (closure.isNull())
+      return makeParserError();
+
+    result |= closure;
+    closures.push_back({label, labelLoc, closure.get()});
+
+    // Don't diagnose whitespace gaps before labelled closures.
   }
 
   return result;
@@ -3358,7 +3239,6 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
   SmallVector<Expr *, 2> args;
   SmallVector<Identifier, 2> argLabels;
   SmallVector<SourceLoc, 2> argLabelLocs;
-  SourceLoc trailingLBrace, trailingRBrace;
   SmallVector<TrailingClosure, 2> trailingClosures;
 
   ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
@@ -3366,8 +3246,6 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
                                       lParenLoc, args, argLabels,
                                       argLabelLocs,
                                       rParenLoc,
-                                      trailingLBrace,
-                                      trailingRBrace,
                                       trailingClosures,
                                       SyntaxKind::TupleExprElementList);
   if (status.hasCodeCompletion())
@@ -3378,7 +3256,6 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
   return makeParserResult(
     ObjectLiteralExpr::create(Context, PoundLoc, LitKind, lParenLoc, args,
                               argLabels, argLabelLocs, rParenLoc,
-                              trailingLBrace, trailingRBrace,
                               trailingClosures, /*implicit=*/false));
 }
 
@@ -3404,7 +3281,6 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
   SmallVector<SourceLoc, 2> argLabelLocs;
   SmallVector<Expr *, 2> args;
   SmallVector<Identifier, 2> argLabels;
-  SourceLoc trailingLBrace, trailingRBrace;
   SmallVector<TrailingClosure, 2> trailingClosures;
   if (Tok.isFollowingLParen()) {
     // Parse arguments.
@@ -3412,8 +3288,7 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
         parseExprList(tok::l_paren, tok::r_paren,
                       /*isPostfix=*/true, /*isExprBasic*/ true, LParenLoc,
                       args, argLabels, argLabelLocs, RParenLoc,
-                      trailingLBrace, trailingRBrace, trailingClosures,
-                      SyntaxKind::TupleExprElementList);
+                      trailingClosures, SyntaxKind::TupleExprElementList);
     if (status.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
     if (status.isError())
@@ -3498,7 +3373,6 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   SmallVector<Expr *, 2> args;
   SmallVector<Identifier, 2> argLabels;
   SmallVector<SourceLoc, 2> argLabelLocs;
-  SourceLoc trailingLBrace, trailingRBrace;
   SmallVector<TrailingClosure, 2> trailingClosures;
 
   // If there is a code completion token right after the '(', do a special case
@@ -3513,7 +3387,6 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
                        { Identifier() },
                        { },
                        rParenLoc,
-                       SourceLoc(), SourceLoc(),
                        /*trailingClosures=*/{},
                        /*implicit=*/false));
     CodeCompletion->completePostfixExprParen(fn.get(), CCE);
@@ -3529,8 +3402,6 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
                                       lParenLoc, args, argLabels,
                                       argLabelLocs,
                                       rParenLoc,
-                                      trailingLBrace,
-                                      trailingRBrace,
                                       trailingClosures,
                                       SyntaxKind::TupleExprElementList);
 
@@ -3538,7 +3409,6 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   return makeParserResult(status | fn,
                           CallExpr::create(Context, fn.get(), lParenLoc, args,
                                            argLabels, argLabelLocs, rParenLoc,
-                                           trailingLBrace, trailingRBrace,
                                            trailingClosures,
                                            /*implicit=*/false));
 }

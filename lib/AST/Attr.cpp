@@ -1867,8 +1867,7 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
   Expr *arg = nullptr;
   if (hasInitializer) {
     arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                             rParenLoc, SourceLoc(), SourceLoc(),
-                             /*trailingClosures=*/{}, implicit,
+                             rParenLoc, /*trailingClosures=*/{}, implicit,
                              argLabelsScratch, argLabelLocsScratch);
   }
 
