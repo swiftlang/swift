@@ -471,7 +471,7 @@ public:
 
 private:
   uint32_t computeHash() const {
-    size_t H = 0x56ba80d1 * NumKeyParameters;
+    size_t H = 0x56ba80d1u * NumKeyParameters;
     for (unsigned index = 0; index != NumKeyParameters; ++index) {
       H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
       H ^= (reinterpret_cast<size_t>(Data[index])
