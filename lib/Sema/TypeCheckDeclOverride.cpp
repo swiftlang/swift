@@ -1691,8 +1691,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure that the overriding property doesn't have storage.
     if ((overrideASD->hasStorage() ||
          overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
-        !(overrideASD->getParsedAccessor(AccessorKind::WillSet) ||
-          overrideASD->getParsedAccessor(AccessorKind::DidSet))) {
+        !overrideASD->hasObservers()) {
       bool downgradeToWarning = false;
       if (!ctx.isSwiftVersionAtLeast(5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
