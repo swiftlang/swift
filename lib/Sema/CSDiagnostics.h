@@ -140,19 +140,6 @@ protected:
     return cs.getASTContext();
   }
 
-  Optional<std::pair<Type, ConversionRestrictionKind>>
-  getRestrictionForType(Type type) const {
-    for (auto &e : S.ConstraintRestrictions) {
-      auto &location = e.first;
-      auto &restriction = e.second;
-
-      if (std::get<0>(location)->isEqual(type))
-        return std::pair<Type, ConversionRestrictionKind>(std::get<1>(location),
-                                                          restriction);
-    }
-    return None;
-  }
-
   /// Retrieve overload choice resolved for a given locator
   /// by the constraint solver.
   Optional<SelectedOverload>

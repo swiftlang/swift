@@ -1237,19 +1237,41 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       subElementDiagID = diag::assignment_lhs_is_apply_expression;
     }
   } else if (auto inoutExpr = dyn_cast<InOutExpr>(diagExpr)) {
-    if (auto restriction = getRestrictionForType(getType(inoutExpr))) {
-      PointerTypeKind pointerKind;
-      if (restriction->second == ConversionRestrictionKind::ArrayToPointer &&
-          restriction->first->getAnyPointerElementType(pointerKind) &&
-          (pointerKind == PTK_UnsafePointer ||
-           pointerKind == PTK_UnsafeRawPointer)) {
-        // If we're converting to an UnsafePointer, then the programmer
-        // specified an & unnecessarily. Produce a fixit hint to remove it.
-        emitDiagnostic(inoutExpr->getLoc(),
-                       diag::extra_address_of_unsafepointer, restriction->first)
-            .highlight(inoutExpr->getSourceRange())
-            .fixItRemove(inoutExpr->getStartLoc());
-        return true;
+    if (auto *parentExpr = findParentExpr(inoutExpr)) {
+      if (auto *call =
+              dyn_cast_or_null<ApplyExpr>(findParentExpr(parentExpr))) {
+        // Since this `inout` expression is an argument to a call/operator
+        // let's figure out whether this is an impliict conversion from
+        // array to an unsafe pointer type and diagnose it.
+        unsigned argIdx = 0;
+        if (auto *TE = dyn_cast<TupleExpr>(parentExpr)) {
+          for (unsigned n = TE->getNumElements(); argIdx != n; ++argIdx) {
+            if (TE->getElement(argIdx) == inoutExpr)
+              break;
+          }
+        }
+
+        auto *argLoc = getConstraintLocator(
+            call, {ConstraintLocator::ApplyArgument,
+                   LocatorPathElt::ApplyArgToParam(argIdx, argIdx,
+                                                   ParameterTypeFlags())});
+
+        if (auto info = getFunctionArgApplyInfo(argLoc)) {
+          auto &cs = getConstraintSystem();
+          auto paramType = info->getParamType();
+          auto argType = getType(inoutExpr)->getWithoutSpecifierType();
+
+          PointerTypeKind ptr;
+          if (cs.isArrayType(argType) &&
+              paramType->getAnyPointerElementType(ptr) &&
+              (ptr == PTK_UnsafePointer || ptr == PTK_UnsafeRawPointer)) {
+            emitDiagnostic(inoutExpr->getLoc(),
+                           diag::extra_address_of_unsafepointer, paramType)
+                .highlight(inoutExpr->getSourceRange())
+                .fixItRemove(inoutExpr->getStartLoc());
+            return true;
+          }
+        }
       }
     }
 
