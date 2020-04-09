@@ -4128,6 +4128,112 @@ static bool generateInitPatternConstraints(
   return false;
 }
 
+/// Generate constraints for a for-each statement.
+static Optional<SolutionApplicationTarget>
+generateForEachStmtConstraints(
+    ConstraintSystem &cs, SolutionApplicationTarget target, Expr *sequence) {
+  auto forEachStmtInfo = target.getForEachStmtInfo();
+  ForEachStmt *stmt = forEachStmtInfo.stmt;
+
+  auto locator = cs.getConstraintLocator(sequence);
+  auto contextualLocator =
+      cs.getConstraintLocator(sequence, LocatorPathElt::ContextualType());
+
+  // The expression type must conform to the Sequence protocol.
+  auto sequenceProto = TypeChecker::getProtocol(
+      cs.getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
+  if (!sequenceProto) {
+    return None;
+  }
+
+  Type sequenceType = cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
+  cs.addConstraint(ConstraintKind::Conversion, cs.getType(sequence),
+                   sequenceType, locator);
+  cs.addConstraint(ConstraintKind::ConformsTo, sequenceType,
+                   sequenceProto->getDeclaredType(), contextualLocator);
+
+  // Check the element pattern.
+  ASTContext &ctx = cs.getASTContext();
+  auto dc = target.getDeclContext();
+  Pattern *pattern = TypeChecker::resolvePattern(stmt->getPattern(), dc,
+                                                 /*isStmtCondition*/false);
+  if (!pattern)
+    return None;
+
+  auto contextualPattern =
+      ContextualPattern::forRawPattern(pattern, dc);
+  Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+  if (patternType->hasError()) {
+    return None;
+  }
+
+  // Collect constraints from the element pattern.
+  auto elementLocator = cs.getConstraintLocator(
+    contextualLocator, ConstraintLocator::SequenceElementType);
+  Type initType = cs.generateConstraints(
+      pattern, contextualLocator, target.shouldBindPatternVarsOneWay(),
+      nullptr, 0);
+  if (!initType)
+    return None;
+
+  // Add a conversion constraint between the element type of the sequence
+  // and the type of the element pattern.
+  auto elementAssocType =
+      sequenceProto->getAssociatedType(cs.getASTContext().Id_Element);
+  Type elementType = DependentMemberType::get(sequenceType, elementAssocType);
+  cs.addConstraint(ConstraintKind::Conversion, elementType, initType,
+                   elementLocator);
+
+  // Determine the iterator type.
+  auto iteratorAssocType =
+      sequenceProto->getAssociatedType(cs.getASTContext().Id_Iterator);
+  Type iteratorType = DependentMemberType::get(sequenceType, iteratorAssocType);
+
+  // The iterator type must conform to IteratorProtocol.
+  ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
+      cs.getASTContext(), stmt->getForLoc(),
+      KnownProtocolKind::IteratorProtocol);
+  if (!iteratorProto)
+    return None;
+
+  // Reference the makeIterator witness.
+  FuncDecl *makeIterator = ctx.getSequenceMakeIterator();
+  Type makeIteratorType =
+      cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
+  cs.addValueWitnessConstraint(
+      LValueType::get(sequenceType), makeIterator,
+      makeIteratorType, dc, FunctionRefKind::Compound,
+      contextualLocator);
+
+  // Generate constraints for the "where" expression, if there is one.
+  if (forEachStmtInfo.whereExpr) {
+    auto *boolDecl = dc->getASTContext().getBoolDecl();
+    if (!boolDecl)
+      return None;
+
+    Type boolType = boolDecl->getDeclaredType();
+    if (!boolType)
+      return None;
+
+    SolutionApplicationTarget whereTarget(
+        forEachStmtInfo.whereExpr, dc, CTP_Condition, boolType,
+        /*isDiscarded=*/false);
+    if (cs.generateConstraints(whereTarget, FreeTypeVariableBinding::Disallow))
+      return None;
+
+    forEachStmtInfo.whereExpr = whereTarget.getAsExpr();
+  }
+
+  // Populate all of the information for a for-each loop.
+  forEachStmtInfo.elementType = elementType;
+  forEachStmtInfo.iteratorType = iteratorType;
+  forEachStmtInfo.initType = initType;
+  forEachStmtInfo.sequenceType = sequenceType;
+  target.setPattern(pattern);
+  target.getForEachStmtInfo() = forEachStmtInfo;
+  return target;
+}
+
 bool ConstraintSystem::generateConstraints(
     SolutionApplicationTarget &target,
     FreeTypeVariableBinding allowFreeTypeVariables) {
@@ -4184,6 +4290,16 @@ bool ConstraintSystem::generateConstraints(
     if (target.getExprContextualTypePurpose() == CTP_Initialization &&
         generateInitPatternConstraints(*this, target, expr)) {
       return true;
+    }
+
+    // For a for-each statement, generate constraints for the pattern, where
+    // clause, and sequence traversal.
+    if (target.getExprContextualTypePurpose() == CTP_ForEachStmt) {
+      auto resultTarget = generateForEachStmtConstraints(*this, target, expr);
+      if (!resultTarget)
+        return true;
+
+      target = *resultTarget;
     }
 
     if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {

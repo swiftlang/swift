@@ -812,6 +812,27 @@ struct CaseLabelItemInfo {
   Expr *guardExpr;
 };
 
+/// Describes information about a for-each loop that needs to be tracked
+/// within the constraint system.
+struct ForEachStmtInfo {
+  ForEachStmt *stmt;
+
+  /// The type of the sequence.
+  Type sequenceType;
+
+  /// The type of the iterator.
+  Type iteratorType;
+
+  /// The type of an element in the sequence.
+  Type elementType;
+
+  /// The type of the pattern that matches the elements.
+  Type initType;
+
+  /// The "where" expression, if there is one.
+  Expr *whereExpr;
+};
+
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
 /// solution application targets.
 using SolutionApplicationTargetsKey =
@@ -1209,11 +1230,17 @@ class SolutionApplicationTarget {
       /// fresh type variables via one-way constraints.
       bool bindPatternVarsOneWay;
 
-      /// The pattern binding declaration for an initialization, if any.
-      PatternBindingDecl *patternBinding;
+      union {
+        struct {
+          /// The pattern binding declaration for an initialization, if any.
+          PatternBindingDecl *patternBinding;
 
-      /// The index into the pattern binding declaration, if any.
-      unsigned patternBindingIndex;
+          /// The index into the pattern binding declaration, if any.
+          unsigned patternBindingIndex;
+        } initialization;
+
+        ForEachStmtInfo forEachStmt;
+      };
     } expression;
 
     struct {
@@ -1280,6 +1307,11 @@ public:
   static SolutionApplicationTarget forInitialization(
       Expr *initializer, DeclContext *dc, Type patternType,
       PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
+      bool bindPatternVarsOneWay);
+
+  /// Form a target for a for-each loop.
+  static SolutionApplicationTarget forForEachStmt(
+      ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
       bool bindPatternVarsOneWay);
 
   Expr *getAsExpr() const {
@@ -1367,7 +1399,7 @@ public:
   }
 
   /// For a pattern initialization target, retrieve the contextual pattern.
-  ContextualPattern getInitializationContextualPattern() const;
+  ContextualPattern getContextualPattern() const;
 
   /// Whether this is an initialization for an Optional.Some pattern.
   bool isOptionalSomePatternInit() const {
@@ -1379,9 +1411,7 @@ public:
   /// Whether to bind the types of any variables within the pattern via
   /// one-way constraints.
   bool shouldBindPatternVarsOneWay() const {
-    return kind == Kind::expression &&
-        expression.contextualPurpose == CTP_Initialization &&
-        expression.bindPatternVarsOneWay;
+    return kind == Kind::expression && expression.bindPatternVarsOneWay;
   }
 
   /// Retrieve the wrapped variable when initializing a pattern with a
@@ -1395,13 +1425,25 @@ public:
   PatternBindingDecl *getInitializationPatternBindingDecl() const {
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
-    return expression.patternBinding;
+    return expression.initialization.patternBinding;
   }
 
   unsigned getInitializationPatternBindingIndex() const {
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
-    return expression.patternBindingIndex;
+    return expression.initialization.patternBindingIndex;
+  }
+
+  const ForEachStmtInfo &getForEachStmtInfo() const {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_ForEachStmt);
+    return expression.forEachStmt;
+  }
+
+  ForEachStmtInfo &getForEachStmtInfo() {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_ForEachStmt);
+    return expression.forEachStmt;
   }
 
   /// Whether this context infers an opaque return type.
@@ -1422,7 +1464,8 @@ public:
 
   void setPattern(Pattern *pattern) {
     assert(kind == Kind::expression);
-    assert(expression.contextualPurpose == CTP_Initialization);
+    assert(expression.contextualPurpose == CTP_Initialization ||
+           expression.contextualPurpose == CTP_ForEachStmt);
     expression.pattern = pattern;
   }
 
