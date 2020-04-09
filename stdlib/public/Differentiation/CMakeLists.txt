@@ -14,7 +14,7 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
   Differentiable.swift
   DifferentialOperators.swift
   DifferentiationUtilities.swift
-  AnyDerivative.swift
+  AnyDifferentiable.swift
   ArrayDifferentiation.swift
 
   GYB_SOURCES
