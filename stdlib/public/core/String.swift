@@ -422,6 +422,21 @@ extension String {
         codeUnits, encoding: sourceEncoding, repair: true)!.0
       return
     }
+
+    // Fast path for untyped raw storage and known stdlib types
+    if let contigBytes = codeUnits as? _HasContiguousBytes,
+      contigBytes._providesContiguousBytesNoCopy
+    {
+      self = contigBytes.withUnsafeBytes { rawBufPtr in
+        return String._fromUTF8Repairing(
+          UnsafeBufferPointer(
+            start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+            count: rawBufPtr.count)).0
+      }
+      return
+    }
+
+    // Fast path for user-defined Collections
     if let str = codeUnits.withContiguousStorageIfAvailable({
       (buffer: UnsafeBufferPointer<C.Element>) -> String in
       return String._fromUTF8Repairing(

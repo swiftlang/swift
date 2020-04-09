@@ -228,28 +228,38 @@ extension String {
       return _slowFromCodeUnits(input, encoding: encoding, repair: repair)
     }
 
-    // Needed for double-optional due to returning optional string in
-    // _fromASCIIValidating in withContiguousStorageIfAvailable
-    let resultOpt: String?
+    // Helper to simplify early returns
+    func resultOrSlow(_ resultOpt: String?) -> (String, repairsMade: Bool)? {
+      guard let result = resultOpt else {
+        return _slowFromCodeUnits(input, encoding: encoding, repair: repair)
+      }
+      return (result, repairsMade: false)
+    }
 
+    // Fast path for untyped raw storage and known stdlib types
+    if let contigBytes = input as? _HasContiguousBytes,
+      contigBytes._providesContiguousBytesNoCopy {
+      return resultOrSlow(contigBytes.withUnsafeBytes { rawBufPtr in
+        let buffer = UnsafeBufferPointer(
+          start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+          count: rawBufPtr.count)
+        return String._fromASCIIValidating(buffer)
+      })
+    }
+
+    // Fast path for user-defined Collections
     if let strOpt = input.withContiguousStorageIfAvailable({
       (buffer: UnsafeBufferPointer<Input.Element>) -> String? in
       return String._fromASCIIValidating(
         UnsafeRawBufferPointer(buffer).bindMemory(to: UInt8.self))
     }) {
-      resultOpt = strOpt
-    } else {
-      resultOpt = Array(input).withUnsafeBufferPointer {
+      return resultOrSlow(strOpt)
+    }
+
+    return resultOrSlow(Array(input).withUnsafeBufferPointer {
         let buffer = UnsafeRawBufferPointer($0).bindMemory(to: UInt8.self)
         return String._fromASCIIValidating(buffer)
-      }
-    }
-
-    guard let result = resultOpt else {
-      return _slowFromCodeUnits(input, encoding: encoding, repair: repair)
-    }
-
-    return (result, repairsMade: false)
+      })
   }
 
   public // @testable
