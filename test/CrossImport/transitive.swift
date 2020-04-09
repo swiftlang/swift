@@ -6,6 +6,8 @@
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDIRECT_FIRST
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks -DDIRECT_SECOND
 
+// REQUIRES: SR12554
+
 #if DIRECT_FIRST
 import ThinLibrary
 import UniversalExports
