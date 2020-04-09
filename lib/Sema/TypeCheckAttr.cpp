@@ -3193,7 +3193,7 @@ static bool conformsToDifferentiable(Type type, DeclContext *DC,
     return true;
   auto &ctx = type->getASTContext();
   Type tanType = conf.getTypeWitnessByName(type, ctx.Id_TangentVector);
-  return type->getCanonicalType() == tanType->getCanonicalType();
+  return type->isEqual(tanType);
 };
 
 IndexSubset *TypeChecker::inferDifferentiabilityParameters(

@@ -5,7 +5,7 @@
 // Reproducible only with `-parse-stdlib`.
 
 // The crash occurs because it is not sufficient for attribute type-checking to
-// check for `Differentiable` conformances. We must also checking for invalid
+// check for `Differentiable` conformances. We must also check for invalid
 // associated types:
 //
 //   (lldb) p valueResultConf.dump()
