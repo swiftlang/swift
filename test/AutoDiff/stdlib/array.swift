@@ -401,13 +401,10 @@ ArrayAutoDiffTests.test("Array.DifferentiableView.base") {
     backprop(FloatArrayTan([1, 2, 3, 4])))
 }
 
-// TODO: Upstream `Differentiable.zeroTangentVector` and implementations.
-/*
 ArrayAutoDiffTests.test("Array.zeroTangentVector") {
   let count = 10
   let array: [Float] = Array((0..<count).map(Float.init))
   expectEqual(array.zeroTangentVector.base, Array(repeating: 0, count: count))
 }
-*/
 
 runAllTests()
