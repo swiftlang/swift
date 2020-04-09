@@ -994,7 +994,8 @@ namespace {
     Type addSubscriptConstraints(
         Expr *anchor, Type baseTy, Expr *index,
         ValueDecl *declOrNull, ArrayRef<Identifier> argLabels,
-        bool hasTrailingClosure, ConstraintLocator *locator = nullptr,
+        Optional<unsigned> unlabeledTrailingClosure,
+        ConstraintLocator *locator = nullptr,
         SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
       // Locators used in this expression.
       if (locator == nullptr)
@@ -1010,7 +1011,8 @@ namespace {
         CS.getConstraintLocator(locator,
                                 ConstraintLocator::FunctionResult);
 
-      associateArgumentLabels(memberLocator, {argLabels, hasTrailingClosure});
+      associateArgumentLabels(memberLocator,
+                              {argLabels, unlabeledTrailingClosure});
 
       Type outputTy;
 
@@ -1303,7 +1305,8 @@ namespace {
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       auto *exprLoc = CS.getConstraintLocator(expr);
       associateArgumentLabels(
-          exprLoc, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
+          exprLoc, {expr->getArgumentLabels(),
+                    expr->getUnlabeledTrailingClosureIndex()});
 
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())
@@ -1587,7 +1590,8 @@ namespace {
 
         associateArgumentLabels(
             CS.getConstraintLocator(expr),
-            {expr->getArgumentLabels(), expr->hasTrailingClosure()});
+            {expr->getArgumentLabels(),
+             expr->getUnlabeledTrailingClosureIndex()});
         return baseTy;
       }
 
@@ -1829,7 +1833,7 @@ namespace {
       return addSubscriptConstraints(expr, CS.getType(base),
                                      expr->getIndex(),
                                      decl, expr->getArgumentLabels(),
-                                     expr->hasTrailingClosure());
+                                     expr->getUnlabeledTrailingClosureIndex());
     }
     
     Type visitArrayExpr(ArrayExpr *expr) {
@@ -2121,7 +2125,7 @@ namespace {
       return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
                                      expr->getIndex(), /*decl*/ nullptr,
                                      expr->getArgumentLabels(),
-                                     expr->hasTrailingClosure());
+                                     expr->getUnlabeledTrailingClosureIndex());
     }
 
     Type visitTupleElementExpr(TupleElementExpr *expr) {
@@ -2866,7 +2870,8 @@ namespace {
       SmallVector<Identifier, 4> scratch;
       associateArgumentLabels(
           CS.getConstraintLocator(expr),
-          {expr->getArgumentLabels(scratch), expr->hasTrailingClosure()},
+          {expr->getArgumentLabels(scratch),
+           expr->getUnlabeledTrailingClosureIndex()},
           /*labelsArePermanent=*/isa<CallExpr>(expr));
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
@@ -3414,10 +3419,13 @@ namespace {
         // Subscript should only appear in resolved ASTs, but we may need to
         // re-type-check the constraints during failure diagnosis.
         case KeyPathExpr::Component::Kind::Subscript: {
-          base = addSubscriptConstraints(E, base, component.getIndexExpr(),
+          auto index = component.getIndexExpr();
+          auto unlabeledTrailingClosureIndex =
+            index->getUnlabeledTrailingClosureIndexOfPackedArgument();
+          base = addSubscriptConstraints(E, base, index,
                                          /*decl*/ nullptr,
                                          component.getSubscriptLabels(),
-                                         /*hasTrailingClosure*/ false,
+                                         unlabeledTrailingClosureIndex,
                                          memberLocator,
                                          &componentTypeVars);
           break;
