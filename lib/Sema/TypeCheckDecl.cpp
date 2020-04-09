@@ -2374,6 +2374,14 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
 
+  // The projected storage wrapper ($foo) might have dynamically-dispatched
+  // accessors, so force them to be synthesized.
+  for (auto *member : CD->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      if (var->hasAttachedPropertyWrapper())
+        (void) var->getPropertyWrapperBackingProperty();
+  }
+
   return CD->getMembers();
 }
 
