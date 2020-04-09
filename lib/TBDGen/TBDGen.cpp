@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -1153,6 +1154,10 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
   if (auto *singleFile = desc.getSingleFile()) {
     assert(M == singleFile->getParentModule() && "mismatched file and module");
     visitFile(singleFile);
+    // Visit synthesized file, if it exists.
+    if (auto *SF = dyn_cast<SourceFile>(singleFile))
+      if (auto *synthesizedFile = SF->getSynthesizedFile())
+        visitFile(synthesizedFile);
   } else {
     llvm::SmallVector<ModuleDecl*, 4> Modules;
     Modules.push_back(M);

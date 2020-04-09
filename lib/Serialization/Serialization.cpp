@@ -32,6 +32,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Dwarf.h"
@@ -59,8 +60,8 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SmallVectorMemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include <vector>
 
@@ -1912,29 +1913,12 @@ bool Serializer::isDeclXRef(const Decl *D) const {
   const DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
   if (topLevel->getParentModule() != M)
     return true;
-  if (!SF || topLevel == SF)
+  if (!SF || topLevel == SF || topLevel == SF->getSynthesizedFile())
     return false;
   // Special-case for SIL generic parameter decls, which don't have a real
   // DeclContext.
   if (!isa<FileUnit>(topLevel)) {
-    // SWIFT_ENABLE_TENSORFLOW
-    // FIXME(TF-623): Find a robust way to special-casing structs/enums
-    // synthesized during SIL differentiation transform.
-    auto isDifferentiationDataStructure = [](const Decl *D) {
-      auto *valueDecl = dyn_cast<ValueDecl>(D);
-      if (!valueDecl)
-        return false;
-      if (auto *structDecl =
-              valueDecl->getInterfaceType()->getStructOrBoundGenericStruct())
-        return structDecl->getNameStr().contains("__PB__");
-      if (auto *enumDecl =
-              valueDecl->getInterfaceType()->getEnumOrBoundGenericEnum())
-        return enumDecl->getNameStr().contains("__Pred__");
-      return false;
-    };
-    assert(
-        (isa<GenericTypeParamDecl>(D) || isDifferentiationDataStructure(D)) &&
-        "unexpected decl kind");
+    assert(isa<GenericTypeParamDecl>(D) && "unexpected decl kind");
     return false;
   }
   return true;
@@ -5002,6 +4986,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   SmallVector<const FileUnit *, 1> Scratch;
   if (SF) {
     Scratch.push_back(SF);
+    if (auto *synthesizedFile = SF->getSynthesizedFile())
+      Scratch.push_back(synthesizedFile);
     files = llvm::makeArrayRef(Scratch);
   } else {
     files = M->getFiles();

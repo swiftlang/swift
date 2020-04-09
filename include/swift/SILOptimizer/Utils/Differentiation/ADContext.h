@@ -67,9 +67,6 @@ private:
   /// Shared pass manager.
   SILPassManager &passManager;
 
-  /// A synthesized file unit.
-  SynthesizedFileUnit *synthesizedFile = nullptr;
-
   /// The worklist (stack) of `differentiable_function` instructions to be
   /// processed.
   llvm::SmallVector<DifferentiableFunctionInst *, 32>
@@ -126,9 +123,10 @@ public:
   SILPassManager &getPassManager() const { return passManager; }
   Lowering::TypeConverter &getTypeConverter() { return module.Types; }
 
-  /// Get or create a synthesized file for adding generated linear map structs
-  /// and branching trace enums. Used by `LinearMapInfo`.
-  SynthesizedFileUnit &getOrCreateSynthesizedFile();
+  /// Get or create the synthesized file for the given `SILFunction`.
+  /// Used by `LinearMapInfo` for adding generated linear map struct and
+  /// branching trace enum declarations.
+  SynthesizedFileUnit &getOrCreateSynthesizedFile(SILFunction *original);
 
   /// Returns true if the `differentiable_function` instruction worklist is
   /// empty.
