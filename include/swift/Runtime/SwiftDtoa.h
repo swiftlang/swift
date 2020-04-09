@@ -23,6 +23,7 @@
 
 // Essentially all modern platforms use IEEE 754 floating point
 // types now, so enable these by default:
+#define SWIFT_DTOA_FLOAT16_SUPPORT 1
 #define SWIFT_DTOA_FLOAT_SUPPORT 1
 #define SWIFT_DTOA_DOUBLE_SUPPORT 1
 
@@ -100,6 +101,14 @@ int swift_decompose_double(double d,
 // In all cases, it returns the number of ASCII characters actually
 // written, or zero if the buffer was too small.
 size_t swift_format_double(double, char *dest, size_t length);
+#endif
+
+#if SWIFT_DTOA_FLOAT16_SUPPORT
+// See swift_decompose_double.  `digits_length` must be at least 5.
+int swift_decompose_float16(const __fp16 *f,
+    int8_t *digits, size_t digits_length, int *decimalExponent);
+// See swift_format_double.
+size_t swift_format_float16(const __fp16 *, char *dest, size_t length);
 #endif
 
 #if SWIFT_DTOA_FLOAT_SUPPORT

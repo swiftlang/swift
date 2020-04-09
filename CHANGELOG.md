@@ -45,6 +45,19 @@ Swift 5.3
   // the 'oldValue' does not need to be fetched.
   c.value = 1
   ```
+  
+* [SE-0276][]:
+
+  Catch clauses in a `do`-`catch` statement can now include multiple patterns in a comma-separated list. The body of a `catch` clause will be executed if a thrown error matches any of its patterns.
+
+  ```swift
+  do {
+    try performTask()
+  } catch TaskError.someFailure(let msg),
+          TaskError.anotherFailure(let msg) {
+    showMessage(msg)
+  }
+  ```
 
 * [SE-0280][]:
   
@@ -7990,6 +8003,7 @@ Swift 1.0
 [SE-0267]: <https://github.com/apple/swift-evolution/blob/master/proposals/0267-where-on-contextually-generic.md>
 [SE-0268]: <https://github.com/apple/swift-evolution/blob/master/proposals/0268-didset-semantics.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
+[SE-0276]: <https://github.com/apple/swift-evolution/blob/master/proposals/0276-multi-pattern-catch-clauses.md>
 [SE-0280]: <https://github.com/apple/swift-evolution/blob/master/proposals/0280-enum-cases-as-protocol-witnesses.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>

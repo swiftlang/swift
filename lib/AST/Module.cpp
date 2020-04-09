@@ -2569,7 +2569,6 @@ ASTScope &SourceFile::getScope() {
   return *Scope.get();
 }
 
-
 Identifier
 SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   assert(D->getDeclContext()->getModuleScopeContext() == this);
@@ -2609,6 +2608,14 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   buffer += hashString;
   PrivateDiscriminator = getASTContext().getIdentifier(buffer.str().upper());
   return PrivateDiscriminator;
+}
+
+SynthesizedFileUnit &SourceFile::getOrCreateSynthesizedFile() {
+  if (SynthesizedFile)
+    return *SynthesizedFile;
+  SynthesizedFile = new (getASTContext()) SynthesizedFileUnit(*this);
+  getParentModule()->addFile(*SynthesizedFile);
+  return *SynthesizedFile;
 }
 
 TypeRefinementContext *SourceFile::getTypeRefinementContext() {
@@ -2674,9 +2681,9 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName) {
 // SynthesizedFileUnit Implementation
 //===----------------------------------------------------------------------===//
 
-SynthesizedFileUnit::SynthesizedFileUnit(ModuleDecl &M)
-    : FileUnit(FileUnitKind::Synthesized, M) {
-  M.getASTContext().addDestructorCleanup(*this);
+SynthesizedFileUnit::SynthesizedFileUnit(SourceFile &SF)
+    : FileUnit(FileUnitKind::Synthesized, *SF.getParentModule()), SF(SF) {
+  SF.getASTContext().addDestructorCleanup(*this);
 }
 
 Identifier

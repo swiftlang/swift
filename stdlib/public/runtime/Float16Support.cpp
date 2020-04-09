@@ -27,7 +27,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__x86_64__) && !defined(__APPLE__)
+// Android NDK <r21 do not provide `__aeabi_d2h` in the compiler runtime,
+// provide shims in that case.
+#if (defined(ANDROID) && defined(__ARM_ARCH_7A__) && defined(__ARM_EABI__)) || \
+  (defined(__x86_64__) && !defined(__APPLE__))
 
 #include "../SwiftShims/Visibility.h"
 
@@ -45,7 +48,7 @@ static float fromEncoding(unsigned int e) {
   return f;
 }
 
-#if defined __F16C__
+#if defined(__x86_64__) && defined(__F16C__)
 
 // If we're compiling the runtime for a target that has the conversion
 // instruction, we might as well just use those. In theory, we'd also be
@@ -160,5 +163,11 @@ SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
   }
   return __gnu_f2h_ieee(f);
 }
+
+#if defined(__ARM_EABI__)
+SWIFT_RUNTIME_EXPORT unsigned short __aeabi_d2h(double d) {
+  return __truncdfhf2(d);
+}
+#endif
 
 #endif // defined(__x86_64__) && !defined(__APPLE__)

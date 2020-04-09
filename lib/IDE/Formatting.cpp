@@ -2567,18 +2567,18 @@ public:
   std::pair<LineRange, std::string> indent(unsigned LineIndex,
                                            FormatContext &FC,
                                            StringRef Text) {
+    if (FC.IsInStringLiteral()) {
+      return std::make_pair(
+          LineRange(LineIndex, 1),
+          swift::ide::getTextForLine(LineIndex, Text, /*Trim*/ false).str());
+    }
+
     if (FC.isExact()) {
       StringRef Line = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
       StringBuilder Builder;
       FC.padToExactColumn(Builder, FmtOptions);
       Builder.append(Line);
       return std::make_pair(LineRange(LineIndex, 1), Builder.str().str());
-    }
-
-    if (FC.IsInStringLiteral()) {
-      return std::make_pair(
-          LineRange(LineIndex, 1),
-          swift::ide::getTextForLine(LineIndex, Text, /*Trim*/ false).str());
     }
 
     // Take the current indent position of the context, then add the number of

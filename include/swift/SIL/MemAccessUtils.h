@@ -79,9 +79,7 @@ SingleValueInstruction *isAccessProjection(SILValue v);
 SILValue getAddressAccess(SILValue v);
 
 /// Convenience for stripAccessMarkers(getAddressAccess(v)).
-inline SILValue getAccessedAddress(SILValue v) {
-  return stripAccessMarkers(getAddressAccess(v));
-}
+SILValue getAccessedAddress(SILValue v);
 
 /// Return true if \p accessedAddress points to a let-variable.
 ///

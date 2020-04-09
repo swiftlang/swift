@@ -1132,9 +1132,15 @@ PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
   // Apply `Array.TangentVector.subscript.getter` to get array element adjoint
   // buffer.
   auto &ctx = builder.getASTContext();
-  // %index_literal = integer_literal $Builtin.Int64, <index>
-  auto *eltIndexLiteral = builder.createIntegerLiteral(
-      loc, SILType::getBuiltinIntegerType(64, ctx), eltIndex);
+  // %index_literal = integer_literal $Builtin.IntXX, <index>
+  auto builtinIntType =
+      SILType::getPrimitiveObjectType(ctx.getIntDecl()
+                                          ->getStoredProperties()
+                                          .front()
+                                          ->getInterfaceType()
+                                          ->getCanonicalType());
+  auto *eltIndexLiteral =
+      builder.createIntegerLiteral(loc, builtinIntType, eltIndex);
   auto intType = SILType::getPrimitiveObjectType(
       ctx.getIntDecl()->getDeclaredType()->getCanonicalType());
   // %index_int = struct $Int (%index_literal)
