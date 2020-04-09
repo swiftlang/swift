@@ -2945,7 +2945,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     UNARY_INSTRUCTION(CopyBlock)
     UNARY_INSTRUCTION(IsUnique)
     UNARY_INSTRUCTION(DestroyAddr)
-    UNARY_INSTRUCTION(CopyValue)
     UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
@@ -3018,6 +3017,21 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
 
     ResultVal = B.createUncheckedOwnershipConversion(InstLoc, Val, RHSKind);
+    break;
+  }
+
+  case SILInstructionKind::CopyValueInst: {
+    bool isMove;
+    SourceLoc valueLoc;
+    SILValue value;
+
+    if (parseSILOptional(isMove, *this, "move") ||
+        parseTypedValueRef(value, valueLoc, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal = B.createCopyValue(InstLoc, value, isMove);
+
     break;
   }
 

@@ -159,6 +159,9 @@ bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
   if (CVI->getType().isAddressOnly(B.getFunction()))
     return false;
 
+  assert(!CVI->isMove() &&
+         "copy_value with move is not valid in canonical SIL");
+
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
   B.emitCopyValueOperation(CVI->getLoc(), CVI->getOperand());

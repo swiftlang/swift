@@ -2287,6 +2287,14 @@ public:
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "copy_value is only valid in functions with qualified "
             "ownership");
+    if (!I->isMove())
+      return;
+
+    DominanceInfo domInfo(I->getFunction());
+    for (auto *use : I->getOperand()->getUses()) {
+      require(domInfo.dominates(use->getUser(), I),
+              "Operand may not be used after being moved from");
+    }
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {

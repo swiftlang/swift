@@ -6567,10 +6567,18 @@ public:
 class CopyValueInst
     : public UnaryInstructionBase<SILInstructionKind::CopyValueInst,
                                   SingleValueInstruction> {
+
   friend class SILBuilder;
 
-  CopyValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+  CopyValueInst(SILDebugLocation DebugLoc, SILValue operand, bool isMove)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
+    SILInstruction::Bits.CopyValueInst.IsMove = unsigned(isMove);
+  }
+
+public:
+  bool isMove() const {
+    return IsTake_t(SILInstruction::Bits.CopyValueInst.IsMove);
+  }
 };
 
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \

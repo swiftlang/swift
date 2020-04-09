@@ -1122,12 +1122,17 @@ public:
                       ObjCProtocolInst(getSILDebugLocation(Loc), P, Ty));
   }
 
-  CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
+  CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand,
+                                 bool isMove) {
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitCopyValueOperation");
     return insert(new (getModule())
-                      CopyValueInst(getSILDebugLocation(Loc), operand));
+                      CopyValueInst(getSILDebugLocation(Loc), operand, isMove));
+  }
+
+  CopyValueInst *createCopyValue(SILLocation loc, SILValue operand) {
+    return createCopyValue(loc, operand, false);
   }
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {

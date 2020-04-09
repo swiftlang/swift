@@ -248,6 +248,8 @@ protected:
     friend class StoreReferenceInstBase
   );
 
+  SWIFT_INLINE_BITFIELD(CopyValueInst, SingleValueInstruction, 1, IsMove : 1);
+
   SWIFT_INLINE_BITFIELD(BeginAccessInst, SingleValueInstruction,
                         NumSILAccessKindBits+NumSILAccessEnforcementBits
                         + 1 + 1,

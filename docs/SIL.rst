@@ -3931,7 +3931,7 @@ copy_value
 
    sil-instruction ::= 'copy_value' sil-operand
 
-   %1 = copy_value %0 : $A
+   %1 = copy_value '[move]'? %0 : $A
 
 Performs a copy of a loadable value as if by the value's type lowering and
 returns the copy. The returned copy semantically is a value that is completely
@@ -3949,6 +3949,11 @@ independent of the operand. In terms of specific types:
 
 In ownership qualified functions, a ``copy_value`` produces a +1 value that must
 be consumed at most once along any path through the program.
+
+With the optional ``[move]`` attribute, instead of the above behavior,
+``copy_value [move]`` is equivilant to creating a call to the static member
+function ``move`` on the operand, destroying the operand, and propigating the
+returned value.
 
 release_value
 `````````````

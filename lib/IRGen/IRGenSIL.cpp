@@ -3479,6 +3479,7 @@ void IRGenSILFunction::visitRetainValueAddrInst(swift::RetainValueAddrInst *i) {
 }
 
 void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
+  assert(!i->isMove() && "copy_value with move is not valid in canonical SIL");
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out;
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))

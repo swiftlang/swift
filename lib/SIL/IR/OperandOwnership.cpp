@@ -260,7 +260,6 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
     return Map::allLive();                                                     \
   }
 ACCEPTS_ANY_OWNERSHIP_INST(BeginBorrow)
-ACCEPTS_ANY_OWNERSHIP_INST(CopyValue)
 ACCEPTS_ANY_OWNERSHIP_INST(DebugValue)
 ACCEPTS_ANY_OWNERSHIP_INST(FixLifetime)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedBitwiseCast) // Is this right?
@@ -832,6 +831,23 @@ OperandOwnershipKindClassifier::visitKeyPathInst(KeyPathInst *I) {
   return Map::compatibilityMap(
        ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated);
 }
+
+ OperandOwnershipKindMap
+ OperandOwnershipKindClassifier::visitCopyValueInst(CopyValueInst *copy) {
+  // Accept all value ownership kinds. If move, must be invalidated.
+  Otherwise,
+  // must be live.
+  OperandOwnershipKindMap map;
+  unsigned index = 0;
+  unsigned end = unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1;
+  while (index != end) {
+    map.add(ValueOwnershipKind(index),
+            copy->isMove() ? UseLifetimeConstraint::MustBeInvalidated
+                           : UseLifetimeConstraint::MustBeLive);
+    ++index;
+  }
+  return map;
+//}
 
 //===----------------------------------------------------------------------===//
 //                            Builtin Use Checker

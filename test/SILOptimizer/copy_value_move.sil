@@ -1,0 +1,87 @@
+// RUN: %swift %s -emit-sil -module-name run | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+class Obj { }
+
+struct Foo {
+  @_hasStorage @_hasInitialValue var obj: Obj { get set }
+  public static func move(_ f: Foo) -> Foo
+  init()
+}
+
+// static Foo.move(_:)
+sil [ossa] @$s3run3FooV4moveyA2CFZ : $@convention(method) (@guaranteed Foo, @thin Foo.Type) -> @owned Foo
+
+// CHECK-LABEL: sil hidden @simple_test
+// CHECK-NOT: copy_value
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[FN:%.*]] = function_ref @$s3run3FooV4moveyA2CFZ
+// CHECK-NEXT: metatype
+// CHECK-NEXT: [[RV:%.*]] = apply [[FN]](%0
+// CHECK-NEXT: release_value %0
+// CHECK-NEXT: release_value [[RV]]
+// CHECK-LABEL: end sil function 'simple_test'
+sil hidden [ossa] @simple_test : $@convention(thin) (@owned Foo) -> () {
+bb0(%0 : @owned $Foo):
+  %5 = copy_value [move] %0 : $Foo
+  destroy_value %5 : $Foo
+  %14 = tuple ()
+  return %14 : $()
+}
+
+struct Bar {
+  @_hasStorage @_hasInitialValue var obj: Obj { get set }
+  public static func move(_ f: __owned Bar) -> Bar
+  init()
+}
+
+// static Bar.move(_:)
+sil [ossa] @$s3run3BarV4moveyA2CnFZ : $@convention(method) (@owned Bar, @thin Bar.Type) -> @owned Bar
+
+// CHECK-LABEL: sil hidden @test_owned_move
+// CHECK-NOT: copy_value
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[FN:%.*]] = function_ref @$s3run3BarV4moveyA2CnFZ
+// CHECK-NEXT: metatype
+// CHECK-NEXT: [[RV:%.*]] = apply [[FN]](%0
+// CHECK-NEXT: release_value [[RV]]
+// CHECK-LABEL: end sil function 'test_owned_move'
+sil hidden [ossa] @test_owned_move : $@convention(thin) (@owned Bar) -> () {
+bb0(%0 : @owned $Bar):
+  %5 = copy_value [move] %0 : $Bar
+  destroy_value %5 : $Bar
+  %14 = tuple ()
+  return %14 : $()
+}
+
+struct Gen<T> {
+  @_hasStorage @_hasInitialValue var obj: Obj { get set }
+  public static func move(_ f: Gen<T>) -> Gen<T>
+  init()
+}
+
+// static Gen.move(_:)
+sil [ossa] @$s3run3GenV4moveyACyxGAEFZ : $@convention(method) <T> (@guaranteed Gen<T>, @thin Gen<T>.Type) -> @owned Gen<T>
+
+// CHECK-LABEL: sil hidden @test_generic
+// CHECK-NOT: copy_value
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[FN:%.*]] = function_ref @$s3run3GenV4moveyACyxGAEFZ
+// CHECK-NEXT: metatype
+// CHECK-NEXT: [[RV:%.*]] = apply [[FN]]<T>(%0
+// CHECK-NEXT: release_value %0
+// CHECK-NEXT: release_value [[RV]]
+// CHECK-LABEL: end sil function 'test_generic'
+sil hidden [ossa] @test_generic : $@convention(thin) <T> (@owned Gen<T>) -> () {
+bb0(%0 : @owned $Gen<T>):
+  %2 = copy_value [move] %0 : $Gen<T>
+  destroy_value %2 : $Gen<T>
+  %5 = tuple ()
+  return %5 : $()
+}

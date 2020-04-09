@@ -241,6 +241,41 @@ static void deleteDeadAccessMarker(BeginAccessInst *BA) {
   BA->eraseFromParent();
 }
 
+static void lowerMoveValue(CopyValueInst *copyValue) {
+  // Call move static member function, then replace all uses with the result
+  // of the call to move. Then destroy the value.
+  SILBuilder builder(copyValue);
+  // Find the move function as a static memeber in the struct type.
+  DeclName moveName(builder.getASTContext().getIdentifier("move"));
+  auto moveDecl =
+      copyValue->getType().getStructOrBoundGenericStruct()->lookupDirect(
+          moveName);
+  assert(moveDecl.size() && "Couldn't find move member");
+  SILDeclRef ref(moveDecl.front(), SILDeclRef::Kind::Func);
+  auto fn = builder.getModule().lookUpFunction(ref.mangle());
+  assert(fn && "No move method in struct");
+  auto fnRef = builder.createFunctionRef(copyValue->getLoc(), fn);
+  auto thinCanMetatype = CanMetatypeType::get(copyValue->getType().getASTType(),
+                                              MetatypeRepresentation::Thin);
+  auto thinMetatype = SILType::getPrimitiveObjectType(thinCanMetatype);
+  auto metatype = builder.createMetatype(copyValue->getLoc(), thinMetatype);
+  // Get the substitution map.
+  SILType operandType = copyValue->getType();
+  auto *nominalType = operandType.getASTType()->getAnyNominal();
+  SubstitutionMap substMap =
+      operandType.getASTType()->getContextSubstitutionMap(
+          builder.getModule().getSwiftModule(), nominalType);
+  // Call the move function.
+  auto movedValue = builder.createApply(copyValue->getLoc(), fnRef, substMap,
+                                        {copyValue->getOperand(), metatype});
+  // If the method's not going to destory it, make sure we emit a destroy.
+  if (fn->getLoweredFunctionType()->getParameters().front().getConvention() ==
+      ParameterConvention::Direct_Guaranteed)
+    builder.createDestroyValue(copyValue->getLoc(), copyValue->getOperand());
+  copyValue->replaceAllUsesWith(movedValue);
+  copyValue->eraseFromParent();
+}
+
 /// lowerRawSILOperations - There are a variety of raw-sil instructions like
 /// 'assign' that are only used by this pass.  Now that definite initialization
 /// checking is done, remove them.
@@ -294,6 +329,15 @@ static bool lowerRawSILOperations(SILFunction &fn) {
       // mark_function_escape just gets zapped.
       if (isa<MarkFunctionEscapeInst>(inst)) {
         inst->eraseFromParent();
+        changed = true;
+        continue;
+      }
+
+      if (auto copyValue = dyn_cast<CopyValueInst>(inst)) {
+        // If the instruction isn't a move, it's fine.
+        if (!copyValue->isMove())
+          continue;
+        lowerMoveValue(copyValue);
         changed = true;
         continue;
       }

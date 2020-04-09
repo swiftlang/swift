@@ -1625,6 +1625,8 @@ public:
   }
 
   void visitCopyValueInst(CopyValueInst *I) {
+    if (I->isMove())
+      *this << "[move] ";
     *this << getIDAndType(I->getOperand());
   }
 
