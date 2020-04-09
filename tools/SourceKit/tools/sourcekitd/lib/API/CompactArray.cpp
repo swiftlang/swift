@@ -70,10 +70,13 @@ unsigned CompactArrayBuilderImpl::getOffsetForString(StringRef Str) {
 }
 
 std::unique_ptr<llvm::MemoryBuffer>
-CompactArrayBuilderImpl::createBuffer() const {
+CompactArrayBuilderImpl::createBuffer(CustomBufferKind Kind) const {
+  auto bodySize = sizeInBytes();
   std::unique_ptr<llvm::WritableMemoryBuffer> Buf;
-  Buf = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(sizeInBytes());
-  copyInto(Buf->getBufferStart(), Buf->getBufferSize());
+  Buf = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
+      sizeof(uint64_t) + bodySize);
+  *reinterpret_cast<uint64_t*>(Buf->getBufferStart()) = (uint64_t)Kind;
+  copyInto(Buf->getBufferStart() + sizeof(uint64_t), bodySize);
   return std::move(Buf);
 }
 
