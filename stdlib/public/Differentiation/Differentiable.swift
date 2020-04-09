@@ -35,7 +35,6 @@ public protocol Differentiable {
   /// along the given tangent vector.
   mutating func move(along direction: TangentVector)
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// A closure that produces a zero tangent vector, capturing minimal
   /// necessary information from `self`.
   ///
@@ -69,7 +68,6 @@ public protocol Differentiable {
   ///         }
   ///     }
   var zeroTangentVectorInitializer: () -> TangentVector { get }
-  // SWIFT_ENABLE_TENSORFLOW END
 }
 
 public extension Differentiable where TangentVector == Self {
@@ -79,13 +77,12 @@ public extension Differentiable where TangentVector == Self {
   }
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 public extension Differentiable {
   // This is a temporary solution enabling the addition of
   // `zeroTangentVectorInitializer` without implementing derived conformances.
   // This property will produce incorrect results when tangent vectors depend
   // on instance-specific information from `self`.
-  // FIXME: Implement derived conformances and remove this default
+  // TODO: Implement derived conformances and remove this default
   // implementation.
   @available(*, deprecated, message: """
       `zeroTangentVectorInitializer` derivation has not been implemented; this \
@@ -100,4 +97,3 @@ public extension Differentiable {
   /// `move(along: zeroTangentVector)` should not modify `self`.
   var zeroTangentVector: TangentVector { zeroTangentVectorInitializer() }
 }
-// SWIFT_ENABLE_TENSORFLOW END
