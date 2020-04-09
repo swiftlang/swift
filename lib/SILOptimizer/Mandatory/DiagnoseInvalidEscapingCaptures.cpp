@@ -78,6 +78,12 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
     return false;
   }
 
+  // Look through `differentiable_function`.
+  if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(user)) {
+    followUses(DFI);
+    return false;
+  }
+
   // @noescape block storage can be passed as an Optional (Nullable).
   if (auto *EI = dyn_cast<EnumInst>(user)) {
     followUses(EI);
