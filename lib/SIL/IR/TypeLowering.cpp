@@ -230,11 +230,7 @@ namespace {
       switch (type->getRepresentation()) {
       case AnyFunctionType::Representation::Swift:
       case AnyFunctionType::Representation::Block:
-        // SWIFT_ENABLE_TENSORFLOW
-        // TODO: Are there cases where we have to lower this differently when it
-        // is @differentiable?
         return asImpl().handleReference(type);
-
       case AnyFunctionType::Representation::CFunctionPointer:
       case AnyFunctionType::Representation::Thin:
         return asImpl().handleTrivial(type);

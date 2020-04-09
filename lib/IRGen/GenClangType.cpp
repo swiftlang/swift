@@ -568,7 +568,7 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   case SILFunctionType::Representation::CFunctionPointer:
     kind = CFunctionPointer;
     break;
-
+  
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::Method:

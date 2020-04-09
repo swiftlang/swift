@@ -318,6 +318,7 @@ struct SILDeclRef {
   /// Returns the entry point for the original function corresponding to an
   /// autodiff derivative function.
   SILDeclRef asAutoDiffOriginalFunction() const {
+    assert(derivativeFunctionIdentifier);
     SILDeclRef declRef = *this;
     declRef.derivativeFunctionIdentifier = nullptr;
     return declRef;

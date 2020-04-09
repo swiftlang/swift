@@ -362,4 +362,3 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
 SILTransform *swift::createExistentialSpecializer() {
   return new ExistentialSpecializer();
 }
-

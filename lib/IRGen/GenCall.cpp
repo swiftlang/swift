@@ -2785,6 +2785,7 @@ void CallEmission::setArgs(Explosion &original, bool isOutlined,
   case SILFunctionTypeRepresentation::Block:
     adjusted.add(getCallee().getBlockObject());
     LLVM_FALLTHROUGH;
+
   case SILFunctionTypeRepresentation::CFunctionPointer:
     externalizeArguments(IGF, getCallee(), original, adjusted,
                          Temporaries, isOutlined);
