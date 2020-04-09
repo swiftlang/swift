@@ -29,6 +29,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Strings.h"
@@ -689,6 +690,12 @@ std::string ASTMangler::mangleLocalTypeDecl(const TypeDecl *type) {
   }
 
   return finalize();
+}
+
+std::string ASTMangler::mangleOpaqueTypeDecl(const OpaqueTypeDecl *decl) {
+  DWARFMangling = true;
+  OptimizeProtocolNames = false;
+  return mangleDeclAsUSR(decl->getNamingDecl(), MANGLING_PREFIX_STR);
 }
 
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {

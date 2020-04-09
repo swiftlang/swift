@@ -236,6 +236,8 @@ public:
 
   std::string mangleLocalTypeDecl(const TypeDecl *type);
 
+  std::string mangleOpaqueTypeDecl(const OpaqueTypeDecl *decl);
+
   enum SpecialContext {
     ObjCContext,
     ClangImporterContext,
