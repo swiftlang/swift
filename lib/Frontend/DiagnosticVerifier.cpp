@@ -576,7 +576,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       }
     }
 
-    bool isUnexpectedFixitsSeen =
+    const bool isUnexpectedFixitsSeen =
         expected.Fixits.size() < FoundDiagnostic.FixIts.size();
 
     struct ActualFixitsPhrase {
