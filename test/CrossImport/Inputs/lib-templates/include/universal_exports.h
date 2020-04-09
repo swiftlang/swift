@@ -1,2 +1,2 @@
-#import <core_mi6.h>
+#include <core_mi6.h>
 void fromUniversalExportsClang();

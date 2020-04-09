@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.3)
+cmake_minimum_required(VERSION 3.12.4)
 
 # TODO: Fix RPATH usage to be CMP0068 compliant
 # Disable Policy CMP0068 for CMake 3.9
@@ -881,7 +881,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   endif()
 endif()
 
-find_package(PythonInterp REQUIRED)
+find_package(Python2 COMPONENTS Interpreter REQUIRED)
 
 #
 # Find optional dependencies.

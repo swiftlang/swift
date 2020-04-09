@@ -15,19 +15,19 @@ var x: FooClassBase
 //
 // RUN: %sourcekitd-test -req=interface-gen -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t > %t.response
-// RUN: diff -u %s.response %t.response
+// RUN: %diff -u %s.response %t.response
 
 // RUN: %sourcekitd-test -req=interface-gen -module Foo.FooSub -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t > %t.sub.response
-// RUN: diff -u %s.sub.response %t.sub.response
+// RUN: %diff -u %s.sub.response %t.sub.response
 
 // RUN: %sourcekitd-test -req=interface-gen -module FooHelper -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t > %t.helper.response
-// RUN: diff -u %s.helper.response %t.helper.response
+// RUN: %diff -u %s.helper.response %t.helper.response
 
 // RUN: %sourcekitd-test -req=interface-gen -module FooHelper.FooHelperExplicit -- -I %t.overlays \
 // RUN:         -F %S/../Inputs/libIDE-mock-sdk  -target %target-triple %clang-importer-sdk-nosource -I %t > %t.helper.explicit.response
-// RUN: diff -u %s.helper.explicit.response %t.helper.explicit.response
+// RUN: %diff -u %s.helper.explicit.response %t.helper.explicit.response
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t \
@@ -93,7 +93,7 @@ var x: FooClassBase
 
 // RUN: %sourcekitd-test -req=interface-gen -module APINotesTests -- -swift-version 4 -F %S/Inputs/mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource > %t.apinotes_swift3.response
-// RUN: diff -u %s.apinotes_swift3.response %t.apinotes_swift3.response
+// RUN: %diff -u %s.apinotes_swift3.response %t.apinotes_swift3.response
 // RUN: %sourcekitd-test -req=interface-gen -module APINotesTests -- -swift-version 5 -F %S/Inputs/mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource > %t.apinotes_swift4.response
-// RUN: diff -u %s.apinotes_swift4.response %t.apinotes_swift4.response
+// RUN: %diff -u %s.apinotes_swift4.response %t.apinotes_swift4.response
