@@ -287,6 +287,12 @@ let s = """
             c
     """
 
+print("""
+    foo {
+        bar()
+    }
+    """)
+
 
 // Interpolations shouldn't change how multiline strings are handled.
 //
