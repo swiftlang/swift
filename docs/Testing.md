@@ -275,6 +275,34 @@ code for the target that is not the build machine:
 
   Add ``REQUIRES: executable_test`` to the test.
 
+* ``%target-run-simple-swift(`` *compiler arguments* ``)``: like
+  ``%target-run-simple-swift``, but enables specifying compiler arguments when
+  compiling the Swift program.
+
+  Add ``REQUIRES: executable_test`` to the test.
+
+* ``%target-run-simple-swiftgyb``: build a one-file Swift `.gyb` program and
+  run it on the target machine.
+
+  Use this substitution for executable tests that don't require special
+  compiler arguments.
+
+  Add ``REQUIRES: executable_test`` to the test.
+
+* ``%target-run-simple-swiftgyb(`` *compiler arguments* ``)``: like
+  ``%target-run-simple-swiftgyb``, but enables specifying compiler arguments
+  when compiling the Swift program.
+
+  Add ``REQUIRES: executable_test`` to the test.
+
+* ``%target-run-simple-swift``: build a one-file Swift program and run it on
+  the target machine.
+
+  Use this substitution for executable tests that don't require special
+  compiler arguments.
+
+  Add ``REQUIRES: executable_test`` to the test.
+
 * ``%target-run-stdlib-swift``: like ``%target-run-simple-swift`` with
   ``-parse-stdlib -Xfrontend -disable-access-control``.
 

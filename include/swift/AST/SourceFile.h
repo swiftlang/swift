@@ -20,7 +20,6 @@
 namespace swift {
 
 class PersistentParserState;
-class SynthesizedFileUnit;
 
 /// A file containing Swift source code.
 ///

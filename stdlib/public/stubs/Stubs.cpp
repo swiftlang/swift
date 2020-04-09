@@ -269,7 +269,8 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 __swift_ssize_t swift_float16ToString(char *Buffer, size_t BufferLength,
                                       float Value, bool Debug) {
-  return swift_format_float(Value, Buffer, BufferLength);
+  __fp16 v = Value;
+  return swift_format_float16(&v, Buffer, BufferLength);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
@@ -546,4 +547,3 @@ int swift::_swift_stdlib_putc_stderr(int C) {
 size_t swift::_swift_stdlib_getHardwareConcurrency() {
   return std::thread::hardware_concurrency();
 }
-

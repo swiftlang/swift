@@ -87,6 +87,7 @@ set(SWIFTLIB_ESSENTIAL
   KeyPath.swift
   # SWIFT_ENABLE_TENSORFLOW
   KeyPathIterable.swift
+  # SWIFT_ENABLE_TENSORFLOW END
   KeyValuePairs.swift
   LazyCollection.swift
   LazySequence.swift
