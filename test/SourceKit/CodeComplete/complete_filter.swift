@@ -34,7 +34,7 @@ func foo() {
 // RUN: %sourcekitd-test -req=complete.open -pos=11:5 %s -- %s \
 // RUN:   == -req=complete.update -pos=11:5 -req-opts=filtertext=a %s -- %s > %t.both
 // RUN: cat %t.all %t.a > %t.both.check
-// RUN: diff -u %t.both %t.both.check
+// RUN: %diff -u %t.both %t.both.check
 
 // RUN: %sourcekitd-test -req=complete.open -pos=11:5 \
 // RUN:   -req-opts=filtertext=b %s -- %s > %t.b
