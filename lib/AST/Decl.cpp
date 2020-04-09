@@ -6348,32 +6348,19 @@ void ParamDecl::setDefaultArgumentCaptureInfo(CaptureInfo captures) {
   DefaultValueAndFlags.getPointer()->Captures = captures;
 }
 
-/// Return nullptr if there is no property wrapper
-OpaqueValueExpr *swift::findWrappedValuePlaceholder(VarDecl *var, Expr *init) {
-  if (!var->hasAttachedPropertyWrapper())
-    return nullptr;
-
-  auto *PBD = var->getParentPatternBinding();
-  if (!PBD)
-    return nullptr;
-
-  // If there is no '=' on the pattern, there was no initial value.
-  if (PBD->getEqualLoc(0).isInvalid() && !PBD->isDefaultInitializable())
-    return nullptr;
-
+PropertyWrapperValuePlaceholderExpr *
+swift::findWrappedValuePlaceholder(Expr *init) {
   class Walker : public ASTWalker {
   public:
-    OpaqueValueExpr *placeholder = nullptr;
+    PropertyWrapperValuePlaceholderExpr *placeholder = nullptr;
 
     virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (placeholder)
         return { false, E };
 
-      if (auto *opaqueValue = dyn_cast<OpaqueValueExpr>(E)) {
-        if (opaqueValue->getUnderlyingValue()) {
-          placeholder = opaqueValue;
-          return { false, opaqueValue };
-        }
+      if (auto *value = dyn_cast<PropertyWrapperValuePlaceholderExpr>(E)) {
+        placeholder = value;
+        return { false, value };
       }
 
       return { true, E };
@@ -6480,7 +6467,7 @@ ParamDecl::getDefaultValueStringRepresentation(
         }
 
         auto init =
-            findWrappedValuePlaceholder(original, parentInit)->getUnderlyingValue();
+            findWrappedValuePlaceholder(parentInit)->getOriginalWrappedValue();
         return extractInlinableText(getASTContext().SourceMgr, init, scratch);
       }
     }

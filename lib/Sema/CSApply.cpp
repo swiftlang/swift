@@ -3473,6 +3473,11 @@ namespace {
       return expr;
     }
 
+    Expr *visitPropertyWrapperValuePlaceholderExpr(
+        PropertyWrapperValuePlaceholderExpr *expr) {
+      return expr;
+    }
+
     Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -5548,11 +5553,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
      target->shouldInjectWrappedValuePlaceholder(apply);
 
   auto injectWrappedValuePlaceholder = [&](Expr *arg) -> Expr * {
-    auto *placeholder = new (ctx) OpaqueValueExpr(arg->getSourceRange(),
-                                                  cs.getType(arg),
-                                                  /*isPlaceholder=*/true,
-                                                  arg);
+    auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(ctx,
+        arg->getSourceRange(), cs.getType(arg), arg);
     cs.cacheType(placeholder);
+    cs.cacheType(placeholder->getOpaqueValuePlaceholder());
     shouldInjectWrappedValuePlaceholder = false;
     return placeholder;
   };

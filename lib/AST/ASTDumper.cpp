@@ -2498,9 +2498,17 @@ public:
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {
     printCommon(E, "opaque_value_expr") << " @ " << (void*)E;
-    if (auto *underlyingValue = E->getUnderlyingValue()) {
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitPropertyWrapperValuePlaceholderExpr(
+      PropertyWrapperValuePlaceholderExpr *E) {
+    printCommon(E, "property_wrapper_value_placeholder_expr");
+    OS << '\n';
+    printRec(E->getOpaqueValuePlaceholder());
+    if (auto *value = E->getOriginalWrappedValue()) {
       OS << '\n';
-      printRec(underlyingValue);
+      printRec(value);
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

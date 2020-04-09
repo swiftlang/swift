@@ -4021,14 +4021,11 @@ public:
 /// subexpressions of that AST node.
 class OpaqueValueExpr : public Expr {
   SourceRange Range;
-  Expr *UnderlyingValue;
 
 public:
   explicit OpaqueValueExpr(SourceRange Range, Type Ty,
-                           bool isPlaceholder = false,
-                           Expr *underlyingValue = nullptr)
-      : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty),
-        Range(Range), UnderlyingValue(underlyingValue) {
+                           bool isPlaceholder = false)
+      : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Range(Range) {
     Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
   }
 
@@ -4041,18 +4038,64 @@ public:
     Bits.OpaqueValueExpr.IsPlaceholder = value;
   }
 
-  Expr *getUnderlyingValue() const {
-    return UnderlyingValue;
+  SourceRange getSourceRange() const { return Range; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::OpaqueValue;
+  }
+};
+
+/// A placeholder to substitute with a \c wrappedValue initialization expression
+/// for a property with an attached property wrapper.
+///
+/// Wrapped value placeholder expressions are injected around the
+/// \c wrappedValue argument in a synthesized \c init(wrappedValue:)
+/// call. This injection happens for properties with attached property wrappers
+/// that can be initialized out-of-line with a wrapped value expression, rather
+/// than calling \c init(wrappedValue:) explicitly.
+///
+/// Wrapped value placeholders store the original initialization expression
+/// if one exists, along with an opaque value placeholder that can be bound
+/// to a different wrapped value expression.
+class PropertyWrapperValuePlaceholderExpr : public Expr {
+  SourceRange Range;
+  OpaqueValueExpr *Placeholder;
+  Expr *WrappedValue;
+
+  PropertyWrapperValuePlaceholderExpr(SourceRange Range, Type Ty,
+                                      OpaqueValueExpr *placeholder,
+                                      Expr *wrappedValue)
+      : Expr(ExprKind::PropertyWrapperValuePlaceholder, /*Implicit=*/true, Ty),
+        Range(Range), Placeholder(placeholder), WrappedValue(wrappedValue) {}
+
+public:
+  static PropertyWrapperValuePlaceholderExpr *
+  create(ASTContext &ctx, SourceRange range, Type ty, Expr *wrappedValue);
+
+  /// The original wrappedValue initialization expression provided via
+  /// \c = on a proprety with attached property wrappers.
+  Expr *getOriginalWrappedValue() const {
+    return WrappedValue;
   }
 
-  void setUnderlyingValue(Expr *value) {
-    UnderlyingValue = value;
+  void setOriginalWrappedValue(Expr *value) {
+    WrappedValue = value;
+  }
+
+  /// An opaque value placeholder that will be used to substitute in a
+  /// different wrapped value expression for out-of-line initialization.
+  OpaqueValueExpr *getOpaqueValuePlaceholder() const {
+    return Placeholder;
+  }
+
+  void setOpaqueValuePlaceholder(OpaqueValueExpr *placeholder) {
+    Placeholder = placeholder;
   }
 
   SourceRange getSourceRange() const { return Range; }
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::OpaqueValue; 
+    return E->getKind() == ExprKind::PropertyWrapperValuePlaceholder;
   }
 };
 

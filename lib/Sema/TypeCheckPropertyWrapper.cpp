@@ -669,11 +669,11 @@ Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
 }
 
 static bool isOpaquePlaceholderClosure(const Expr *value) {
-  auto ove = dyn_cast<OpaqueValueExpr>(value);
-  if (!ove || !ove->isPlaceholder())
+  auto *placeholder = dyn_cast<PropertyWrapperValuePlaceholderExpr>(value);
+  if (!placeholder)
     return false;
 
-  if (auto valueFnTy = ove->getType()->getAs<FunctionType>()) {
+  if (auto valueFnTy = placeholder->getType()->getAs<FunctionType>()) {
     return (valueFnTy->getNumParams() == 0);
   }
 
