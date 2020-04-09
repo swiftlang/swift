@@ -2309,8 +2309,7 @@ private:
   friend Optional<SolutionApplicationTarget>
   swift::TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
                                           bool &unresolvedTypeExprs,
-                                          TypeCheckExprOptions options,
-                                          ExprTypeCheckListener *listener);
+                                          TypeCheckExprOptions options);
 
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
@@ -4453,11 +4452,9 @@ private:
   /// Solve the system of constraints generated from provided expression.
   ///
   /// \param target The target to generate constraints from.
-  /// \param listener The callback to check solving progress.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   SolutionResult solveImpl(SolutionApplicationTarget &target,
-                           ExprTypeCheckListener *listener,
                            FreeTypeVariableBinding allowFreeTypeVariables
                              = FreeTypeVariableBinding::Disallow);
 
@@ -4470,7 +4467,6 @@ public:
   ///
   /// \param target The target that we'll generate constraints from, which
   /// may be updated by the solving process.
-  /// \param listener The callback to check solving progress.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
@@ -4478,7 +4474,6 @@ public:
   /// error occurred. When \c None, an error has been emitted.
   Optional<std::vector<Solution>> solve(
       SolutionApplicationTarget &target,
-      ExprTypeCheckListener *listener,
       FreeTypeVariableBinding allowFreeTypeVariables
         = FreeTypeVariableBinding::Disallow);
 

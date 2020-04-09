@@ -1958,16 +1958,6 @@ bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc) {
   return true;
 }
 
-ExprTypeCheckListener::~ExprTypeCheckListener() { }
-
-bool ExprTypeCheckListener::builtConstraints(ConstraintSystem &cs, Expr *expr) {
-  return false;
-}
-
-Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
-  return expr;
-}
-
 void ParentConditionalConformance::diagnoseConformanceStack(
     DiagnosticEngine &diags, SourceLoc loc,
     ArrayRef<ParentConditionalConformance> conformances) {
@@ -1999,14 +1989,13 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
                                       ContextualTypePurpose convertTypePurpose,
-                                      TypeCheckExprOptions options,
-                                      ExprTypeCheckListener *listener) {
+                                      TypeCheckExprOptions options) {
   SolutionApplicationTarget target(
       expr, dc, convertTypePurpose, convertType,
       options.contains(TypeCheckExprFlags::IsDiscarded));
   bool unresolvedTypeExprs = false;
   auto resultTarget = typeCheckExpression(
-      target, unresolvedTypeExprs, options, listener);
+      target, unresolvedTypeExprs, options);
   if (!resultTarget) {
     expr = target.getAsExpr();
     return Type();
@@ -2027,8 +2016,7 @@ Optional<SolutionApplicationTarget>
 TypeChecker::typeCheckExpression(
     SolutionApplicationTarget &target,
     bool &unresolvedTypeExprs,
-    TypeCheckExprOptions options,
-    ExprTypeCheckListener *listener) {
+    TypeCheckExprOptions options) {
   unresolvedTypeExprs = false;
   Expr *expr = target.getAsExpr();
   DeclContext *dc = target.getDeclContext();
@@ -2076,7 +2064,7 @@ TypeChecker::typeCheckExpression(
     allowFreeTypeVariables = FreeTypeVariableBinding::UnresolvedType;
 
   // Attempt to solve the constraint system.
-  auto viable = cs.solve(target, listener, allowFreeTypeVariables);
+  auto viable = cs.solve(target, allowFreeTypeVariables);
   if (!viable) {
     target.setExpr(expr);
     return None;
@@ -2107,13 +2095,6 @@ TypeChecker::typeCheckExpression(
   }
   Expr *result = resultTarget->getAsExpr();
 
-  // Notify listener that we've applied the solution.
-  if (listener) {
-    result = listener->appliedSolution(solution, result);
-    if (!result)
-      return None;
-  }
-
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
   if (!cs.shouldSuppressDiagnostics()) {
@@ -2137,8 +2118,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 Type TypeChecker::
 getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
                                    ConcreteDeclRef &referencedDecl,
-                                 FreeTypeVariableBinding allowFreeTypeVariables,
-                                   ExprTypeCheckListener *listener) {
+                                 FreeTypeVariableBinding allowFreeTypeVariables) {
   auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats,
                                   "typecheck-expr-no-apply", expr);
@@ -2162,7 +2142,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
     expr->setType(Type());
   SolutionApplicationTarget target(
       expr, dc, CTP_Unused, Type(), /*isDiscarded=*/false);
-  auto viable = cs.solve(target, listener, allowFreeTypeVariables);
+  auto viable = cs.solve(target, allowFreeTypeVariables);
   if (!viable) {
     recoverOriginalType();
     return Type();
