@@ -126,11 +126,6 @@ Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
   return nullptr;
 }
 
-Optional<SelectedOverload>
-FailureDiagnostic::getChoiceFor(ConstraintLocator *locator) const {
-  return getOverloadChoiceIfAvailable(S.getCalleeLocator(locator));
-}
-
 Type FailureDiagnostic::restoreGenericParameters(
     Type type,
     llvm::function_ref<void(GenericTypeParamType *, Type)> substitution) {
@@ -227,7 +222,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return getAffectedDeclFromType(
         getContextualType(getLocator()->getAnchor()));
 
-  if (auto overload = getChoiceFor(getLocator())) {
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     // If there is a declaration associated with this
     // failure e.g. an overload choice of the call
     // expression, let's see whether failure is
@@ -757,7 +752,7 @@ bool LabelingFailure::diagnoseAsNote() {
     return "(" + str + ")";
   };
 
-  auto selectedOverload = getChoiceFor(getLocator());
+  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!selectedOverload)
     return false;
 
@@ -1311,7 +1306,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
 }
 
 bool RValueTreatedAsLValueFailure::diagnoseAsNote() {
-  auto overload = getChoiceFor(getLocator());
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!(overload && overload->choice.isDecl()))
     return false;
 
@@ -2003,8 +1998,8 @@ bool ContextualFailure::diagnoseAsError() {
   case ConstraintLocator::RValueAdjustment: {
     auto &cs = getConstraintSystem();
 
-    auto overload = getChoiceFor(
-        cs.getConstraintLocator(anchor, ConstraintLocator::UnresolvedMember));
+    auto overload = getOverloadChoiceIfAvailable(
+        getConstraintLocator(anchor, ConstraintLocator::UnresolvedMember));
     if (!(overload && overload->choice.isDecl()))
       return false;
 
@@ -2067,7 +2062,7 @@ bool ContextualFailure::diagnoseAsError() {
 }
 
 bool ContextualFailure::diagnoseAsNote() {
-  auto overload = getChoiceFor(getLocator());
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!(overload && overload->choice.isDecl()))
     return false;
 
@@ -3495,7 +3490,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       };
 
       auto *baseLoc = cs.getConstraintLocator(ctorRef->getBase());
-      if (auto selection = getChoiceFor(baseLoc)) {
+      if (auto selection = getCalleeOverloadChoiceIfAvailable(baseLoc)) {
         OverloadChoice choice = selection->choice;
         if (choice.isDecl() && isMutable(choice.getDecl()) &&
             !isCallArgument(initCall) &&
@@ -3906,7 +3901,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
 
   diag.flush();
 
-  if (auto selectedOverload = getChoiceFor(locator)) {
+  if (auto selectedOverload = getCalleeOverloadChoiceIfAvailable(locator)) {
     if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
       emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
     }
@@ -3917,7 +3912,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
 
 bool MissingArgumentsFailure::diagnoseAsNote() {
   auto *locator = getLocator();
-  if (auto overload = getChoiceFor(locator)) {
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(locator)) {
     auto *fn = resolveType(overload->openedType)->getAs<AnyFunctionType>();
     auto loc = overload->choice.getDecl()->getLoc();
     if (loc.isInvalid())
@@ -4038,7 +4033,8 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
         .fixItInsert(insertLoc, insertText.str());
   }
 
-  if (auto selectedOverload = getChoiceFor(getLocator())) {
+  if (auto selectedOverload =
+          getCalleeOverloadChoiceIfAvailable(getLocator())) {
     if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
       emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
     }
@@ -4158,7 +4154,7 @@ bool MissingArgumentsFailure::diagnoseInvalidTupleDestructuring() const {
   if (!(argExpr && getType(argExpr)->getRValueType()->is<TupleType>()))
     return false;
 
-  auto selectedOverload = getChoiceFor(locator);
+  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(locator);
   if (!selectedOverload)
     return false;
 
@@ -4586,7 +4582,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
 
   emitDiagnostic(anchor->getLoc(), diag::extra_arguments_in_call, OS.str());
 
-  if (auto overload = getChoiceFor(getLocator())) {
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     if (auto *decl = overload->choice.getDeclOrNull()) {
       emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
     }
@@ -4596,7 +4592,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
 }
 
 bool ExtraneousArgumentsFailure::diagnoseAsNote() {
-  auto overload = getChoiceFor(getLocator());
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!(overload && overload->choice.isDecl()))
     return false;
 
@@ -5234,7 +5230,7 @@ bool MutatingMemberRefOnImmutableBase::diagnoseAsError() {
 }
 
 bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
-  auto selectedOverload = getChoiceFor(getLocator());
+  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!selectedOverload || !selectedOverload->choice.isDecl())
     return false;
 
@@ -5699,7 +5695,7 @@ bool ExpandArrayIntoVarargsFailure::diagnoseAsError() {
 }
 
 bool ExpandArrayIntoVarargsFailure::diagnoseAsNote() {
-  auto overload = getChoiceFor(getLocator());
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
   auto anchor = getAnchor();
   if (!overload || !anchor)
     return false;
@@ -5733,7 +5729,7 @@ bool ExtraneousCallFailure::diagnoseAsError() {
     }
   };
 
-  if (auto overload = getChoiceFor(cs.getCalleeLocator(locator))) {
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(locator)) {
     if (auto *decl = overload->choice.getDeclOrNull()) {
       if (auto *enumCase = dyn_cast<EnumElementDecl>(decl)) {
         auto diagnostic = emitDiagnostic(
@@ -5766,13 +5762,12 @@ bool ExtraneousCallFailure::diagnoseAsError() {
 
 bool InvalidUseOfTrailingClosure::diagnoseAsError() {
   auto *anchor = getAnchor();
-  auto &cs = getConstraintSystem();
 
   emitDiagnostic(anchor->getLoc(), diag::trailing_closure_bad_param,
                  getToType())
       .highlight(anchor->getSourceRange());
 
-  if (auto overload = getChoiceFor(cs.getCalleeLocator(getLocator()))) {
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     if (auto *decl = overload->choice.getDeclOrNull()) {
       emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
     }
@@ -6025,9 +6020,9 @@ bool AssignmentTypeMismatchFailure::diagnoseAsError() {
 
 bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
   auto *anchor = getAnchor();
-  auto &cs = getConstraintSystem();
 
-  if (auto overload = getChoiceFor(cs.getConstraintLocator(anchor))) {
+  if (auto overload =
+          getCalleeOverloadChoiceIfAvailable(getConstraintLocator(anchor))) {
     if (auto *decl = overload->choice.getDeclOrNull()) {
       emitDiagnostic(decl,
                      diag::cannot_convert_candidate_result_to_contextual_type,

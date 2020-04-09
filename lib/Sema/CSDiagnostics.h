@@ -160,6 +160,13 @@ protected:
     return S.getOverloadChoiceIfAvailable(locator);
   }
 
+  /// Retrieve overload choice resolved for a callee for the anchor
+  /// of a given locator.
+  Optional<SelectedOverload>
+  getCalleeOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
+    return getOverloadChoiceIfAvailable(S.getCalleeLocator(locator));
+  }
+
   ConstraintLocator *
   getConstraintLocator(Expr *anchor,
                        ConstraintLocator::PathElement element) const {
@@ -191,10 +198,6 @@ protected:
   /// application. If the locator is not for an argument application, or
   /// the argument list cannot be found, returns \c nullptr.
   Expr *getArgumentListExprFor(ConstraintLocator *locator) const;
-
-  /// \returns The overload choice made by the constraint system for the callee
-  /// of a given locator's anchor, or \c None if no such choice can be found.
-  Optional<SelectedOverload> getChoiceFor(ConstraintLocator *) const;
 
   /// \returns A new type with all of the type variables associated with
   /// generic parameters substituted back into being generic parameter type.
