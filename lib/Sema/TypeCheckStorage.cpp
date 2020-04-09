@@ -1450,8 +1450,12 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     auto type = observer->getInterfaceType().subst(subs);
     Expr *Callee = new (Ctx) DeclRefExpr(ref, DeclNameLoc(), /*imp*/true);
     Callee->setType(type);
-    auto *ValueDRE = new (Ctx) DeclRefExpr(arg, DeclNameLoc(), /*imp*/true);
-    ValueDRE->setType(arg->getType());
+
+    DeclRefExpr *ValueDRE = nullptr;
+    if (arg) {
+      ValueDRE = new (Ctx) DeclRefExpr(arg, DeclNameLoc(), /*imp*/ true);
+      ValueDRE->setType(arg->getType());
+    }
 
     if (SelfDecl) {
       auto *SelfDRE =
@@ -1466,8 +1470,13 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
       Callee = DSCE;
     }
 
-    auto *Call = CallExpr::createImplicit(Ctx, Callee, { ValueDRE },
-                                          { Identifier() });
+    CallExpr *Call = nullptr;
+    if (arg) {
+      Call = CallExpr::createImplicit(Ctx, Callee, {ValueDRE}, {Identifier()});
+    } else {
+      Call = CallExpr::createImplicit(Ctx, Callee, {}, {});
+    }
+
     if (auto funcType = type->getAs<FunctionType>())
       type = funcType->getResult();
     Call->setType(type);
@@ -1478,30 +1487,32 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
 
   // If there is a didSet, it will take the old value.  Load it into a temporary
   // 'let' so we have it for later.
-  // TODO: check the body of didSet to only do this load (which may call the
-  // superclass getter) if didSet takes an argument.
   VarDecl *OldValue = nullptr;
-  if (VD->getParsedAccessor(AccessorKind::DidSet)) {
-    Expr *OldValueExpr
-      = buildStorageReference(Set, VD, target, /*isLValue=*/true, Ctx);
+  if (auto didSet = VD->getParsedAccessor(AccessorKind::DidSet)) {
+    // Only do the load if the didSet body references the implicit oldValue
+    // parameter or it's provided explicitly in the parameter list.
+    if (!didSet->isSimpleDidSet()) {
+      Expr *OldValueExpr =
+          buildStorageReference(Set, VD, target, /*isLValue=*/true, Ctx);
 
-    // Error recovery.
-    if (OldValueExpr == nullptr) {
-      OldValueExpr = new (Ctx) ErrorExpr(SourceRange(), VD->getType());
-    } else {
-      OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getType());
+      // Error recovery.
+      if (OldValueExpr == nullptr) {
+        OldValueExpr = new (Ctx) ErrorExpr(SourceRange(), VD->getType());
+      } else {
+        OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getType());
+      }
+
+      OldValue = new (Ctx) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
+                                   /*IsCaptureList*/ false, SourceLoc(),
+                                   Ctx.getIdentifier("tmp"), Set);
+      OldValue->setImplicit();
+      OldValue->setInterfaceType(VD->getValueInterfaceType());
+      auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
+      auto *tmpPBD = PatternBindingDecl::createImplicit(
+          Ctx, StaticSpellingKind::None, tmpPattern, OldValueExpr, Set);
+      SetterBody.push_back(tmpPBD);
+      SetterBody.push_back(OldValue);
     }
-
-    OldValue = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                                 /*IsCaptureList*/false, SourceLoc(),
-                                 Ctx.getIdentifier("tmp"), Set);
-    OldValue->setImplicit();
-    OldValue->setInterfaceType(VD->getValueInterfaceType());
-    auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
-    auto *tmpPBD = PatternBindingDecl::createImplicit(
-        Ctx, StaticSpellingKind::None, tmpPattern, OldValueExpr, Set);
-    SetterBody.push_back(tmpPBD);
-    SetterBody.push_back(OldValue);
   }
 
   if (auto willSet = VD->getParsedAccessor(AccessorKind::WillSet))
@@ -1590,10 +1601,69 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
 }
 
 static std::pair<BraceStmt *, bool>
+synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
+                                              ASTContext &ctx) {
+  auto storage = accessor->getStorage();
+  SourceLoc loc = storage->getLoc();
+  auto isOverride = storage->getOverriddenDecl();
+  auto target = isOverride ? TargetImpl::Super : TargetImpl::Storage;
+
+  SmallVector<ASTNode, 1> body;
+
+  Expr *ref = buildStorageReference(accessor, storage, target, true, ctx);
+  ref = maybeWrapInOutExpr(ref, ctx);
+
+  YieldStmt *yield = YieldStmt::create(ctx, loc, loc, ref, loc, true);
+  body.push_back(yield);
+
+  auto Set = storage->getAccessor(AccessorKind::Set);
+  auto DidSet = storage->getAccessor(AccessorKind::DidSet);
+  auto *SelfDecl = accessor->getImplicitSelfDecl();
+
+  SubstitutionMap subs;
+  if (auto *genericEnv = Set->getGenericEnvironment())
+    subs = genericEnv->getForwardingSubstitutionMap();
+
+  auto callDidSet = [&]() {
+    ConcreteDeclRef ref(DidSet, subs);
+    auto type = DidSet->getInterfaceType().subst(subs);
+    Expr *Callee = new (ctx) DeclRefExpr(ref, DeclNameLoc(), /*imp*/ true);
+    Callee->setType(type);
+
+    if (SelfDecl) {
+      auto *SelfDRE = buildSelfReference(SelfDecl, SelfAccessorKind::Peer,
+                                         storage->isSetterMutating());
+      SelfDRE = maybeWrapInOutExpr(SelfDRE, ctx);
+      auto *DSCE = new (ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
+
+      if (auto funcType = type->getAs<FunctionType>())
+        type = funcType->getResult();
+      DSCE->setType(type);
+      DSCE->setThrows(false);
+      Callee = DSCE;
+    }
+
+    auto *Call = CallExpr::createImplicit(ctx, Callee, {}, {});
+    if (auto funcType = type->getAs<FunctionType>())
+      type = funcType->getResult();
+    Call->setType(type);
+    Call->setThrows(false);
+
+    body.push_back(Call);
+  };
+
+  callDidSet();
+
+  return {BraceStmt::create(ctx, loc, body, loc, true),
+          /*isTypeChecked=*/true};
+}
+
+static std::pair<BraceStmt *, bool>
 synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
   assert(accessor->isCoroutine());
 
   auto storage = accessor->getStorage();
+  auto storageReadWriteImpl = storage->getReadWriteImpl();
   auto target = (accessor->hasForcedStaticDispatch()
                    ? TargetImpl::Ordinary
                    : TargetImpl::Implementation);
@@ -1615,6 +1685,12 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
   SmallVector<ASTNode, 1> body;
 
   bool isLValue = accessor->getAccessorKind() == AccessorKind::Modify;
+
+  if (isLValue &&
+      (storageReadWriteImpl == ReadWriteImplKind::StoredWithSimpleDidSet ||
+       storageReadWriteImpl == ReadWriteImplKind::InheritedWithSimpleDidSet)) {
+    return synthesizeModifyCoroutineBodyWithSimpleDidSet(accessor, ctx);
+  }
 
   // Build a reference to the storage.
   Expr *ref = buildStorageReference(accessor, storage, target, isLValue, ctx);
@@ -2097,6 +2173,14 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
     llvm_unreachable("bad synthesized function kind");
+  }
+
+  switch (storage->getReadWriteImpl()) {
+  case ReadWriteImplKind::StoredWithSimpleDidSet:
+  case ReadWriteImplKind::InheritedWithSimpleDidSet:
+    return false;
+  default:
+    break;
   }
 
   return true;
@@ -2780,6 +2864,10 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasSetter = storage->getParsedAccessor(AccessorKind::Set);
   bool hasModify = storage->getParsedAccessor(AccessorKind::Modify);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
+  bool hasSimpleDidSet =
+      hasDidSet && const_cast<AccessorDecl *>(
+                       storage->getParsedAccessor(AccessorKind::DidSet))
+                       ->isSimpleDidSet();
 
   // 'get', 'read', and a non-mutable addressor are all exclusive.
   ReadImplKind readImpl;
@@ -2836,12 +2924,20 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     writeImpl = WriteImplKind::InheritedWithObservers;
     readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
 
+    if (!hasWillSet && hasSimpleDidSet) {
+      readWriteImpl = ReadWriteImplKind::InheritedWithSimpleDidSet;
+    }
+
   // Otherwise, it's stored.
   } else if (readImpl == ReadImplKind::Stored &&
              !cast<VarDecl>(storage)->isLet()) {
     if (hasWillSet || hasDidSet) {
       writeImpl = WriteImplKind::StoredWithObservers;
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+
+      if (!hasWillSet && hasSimpleDidSet) {
+        readWriteImpl = ReadWriteImplKind::StoredWithSimpleDidSet;
+      }
     } else {
       writeImpl = WriteImplKind::Stored;
       readWriteImpl = ReadWriteImplKind::Stored;
