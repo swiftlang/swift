@@ -167,6 +167,8 @@ static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 void ModuleFile::fatal(llvm::Error error) {
   if (FileContext) {
     getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Name);
+    getContext().Diags.diagnose(SourceLoc(), diag::serialization_misc_version,
+      Name, MiscVersion);
 
     if (!CompatibilityVersion.empty()) {
       if (getContext().LangOpts.EffectiveLanguageVersion
