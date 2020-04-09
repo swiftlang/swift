@@ -49,6 +49,7 @@ extension ${Self} : EuclideanDifferentiable {}
 // SWIFT_ENABLE_TENSORFLOW END
 
 // SWIFT_ENABLE_TENSORFLOW
+
 ${Availability(bits)}
 extension ${Self} : VectorProtocol {
   ${Availability(bits)}

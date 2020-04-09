@@ -1,3 +1,5 @@
+// TODO: Delete when https://github.com/apple/swift/pull/30887 is merged to `tensorflow`.
+
 // RUN: %target-swift-frontend -parse-sil %s -emit-ir | %FileCheck %s
 
 sil_stage canonical
