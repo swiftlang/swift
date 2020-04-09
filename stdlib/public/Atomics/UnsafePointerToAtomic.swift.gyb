@@ -51,14 +51,17 @@ public struct UnsafePointerToAtomic<Value: AtomicProtocol> {
   @inlinable
   public static func create(initialValue: __owned Value) -> Self {
     let ptr = UnsafeMutablePointer<Value.AtomicStorage>.allocate(capacity: 1)
-    ptr.initialize(to: Value.atomicStorage(for: initialValue))
+    ptr.initialize(to: Value.prepareAtomicStorage(for: initialValue))
     return Self(at: ptr)
   }
 
+  @discardableResult
   @inlinable
-  public func destroy() {
-    Value.deinitializeAtomicStorage(at: _ptr)
+  public func destroy() -> Value {
+    let result = Value.disposeAtomicStorage(_ptr.pointee)
+    _ptr.deinitialize(count: 1)
     _ptr.deallocate()
+    return result
   }
 }
 

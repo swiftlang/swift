@@ -89,7 +89,7 @@ struct AtomicCounter {
   class Buffer: ManagedBuffer<Int.AtomicStorage, Void> {
     deinit {
       withUnsafeMutablePointerToHeader { header in
-        Int.deinitializeAtomicStorage(at: header)
+        _ = Int.disposeAtomicStorage(header.pointee)
       }
     }
   }
@@ -98,7 +98,7 @@ struct AtomicCounter {
 
   init() {
     buffer = Buffer.create(minimumCapacity: 0) { _ in
-      Int.atomicStorage(for: 0)
+      Int.prepareAtomicStorage(for: 0)
     } as! Buffer
   }
 
@@ -126,7 +126,7 @@ struct AtomicUnmanagedRef<Instance: AnyObject> {
   class Buffer<Instance>: ManagedBuffer<AtomicValue.AtomicStorage, Void> {
     deinit {
       withUnsafeMutablePointerToHeader { header in
-        AtomicValue.deinitializeAtomicStorage(at: header)
+        _ = AtomicValue.disposeAtomicStorage(header.pointee)
       }
     }
   }
@@ -135,7 +135,7 @@ struct AtomicUnmanagedRef<Instance: AnyObject> {
 
   init() {
     buffer = Buffer<Instance>.create(minimumCapacity: 0) { _ in
-      AtomicValue.atomicStorage(for: nil)
+      AtomicValue.prepareAtomicStorage(for: nil)
     } as! Buffer<Instance>
   }
 

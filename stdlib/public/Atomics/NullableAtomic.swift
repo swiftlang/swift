@@ -16,13 +16,13 @@ import Swift
 public protocol NullableAtomic: AtomicProtocol {
   associatedtype NullableAtomicStorage
 
-  static func nullableAtomicStorage(
+  static func prepareNullableAtomicStorage(
     for value: __owned Self?
   ) -> NullableAtomicStorage
 
-  static func deinitializeNullableAtomicStorage(
-    at pointer: UnsafeMutablePointer<NullableAtomicStorage>
-  )
+  static func disposeNullableAtomicStorage(
+    _ storage: __owned NullableAtomicStorage
+  ) -> Self?
 
   @_semantics("atomics.requires_constant_orderings")
   static func atomicOptionalLoad(
@@ -74,17 +74,17 @@ public protocol NullableAtomic: AtomicProtocol {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension NullableAtomic where NullableAtomicStorage == Self? {
   @_transparent @_alwaysEmitIntoClient
-  public static func nullableAtomicStorage(
+  public static func prepareNullableAtomicStorage(
     for value: __owned Self?
   ) -> NullableAtomicStorage {
     return value
   }
 
   @inlinable
-  public static func deinitializeNullableAtomicStorage(
-    at pointer: UnsafeMutablePointer<Self?>
-  ) {
-    pointer.deinitialize(count: 1)
+  public static func disposeNullableAtomicStorage(
+    _ storage: __owned NullableAtomicStorage
+  ) -> Self? {
+    return storage
   }
 }
 
@@ -93,15 +93,17 @@ extension Optional: AtomicProtocol where Wrapped: NullableAtomic {
   public typealias AtomicStorage = Wrapped.NullableAtomicStorage
 
   @_transparent @_alwaysEmitIntoClient
-  public static func atomicStorage(for value: __owned Self) -> AtomicStorage {
-    return Wrapped.nullableAtomicStorage(for: value)
+  public static func prepareAtomicStorage(
+    for value: __owned Self
+  ) -> AtomicStorage {
+    return Wrapped.prepareNullableAtomicStorage(for: value)
   }
 
   @_transparent @_alwaysEmitIntoClient
-  public static func deinitializeAtomicStorage(
-    at pointer: UnsafeMutablePointer<AtomicStorage>
-  ) {
-    Wrapped.deinitializeNullableAtomicStorage(at: pointer)
+  public static func disposeAtomicStorage(
+    _ storage: __owned AtomicStorage
+  ) -> Self {
+    return Wrapped.disposeNullableAtomicStorage(storage)
   }
 
   @_semantics("atomics.requires_constant_orderings")

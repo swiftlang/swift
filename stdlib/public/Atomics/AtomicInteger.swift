@@ -23,7 +23,7 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   ///
   /// - Parameter operand: The value to add to the current value.
   /// - Parameter pointer: A memory location previously initialized with a value
-  ///   returned by `atomicStorage(for:)`.
+  ///   returned by `prepareAtomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
   @_semantics("atomics.requires_constant_orderings")
@@ -42,7 +42,7 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   ///
   /// - Parameter operand: The value to subtract from the current value.
   /// - Parameter pointer: A memory location previously initialized with a value
-  ///   returned by `atomicStorage(for:)`.
+  ///   returned by `prepareAtomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
   @_semantics("atomics.requires_constant_orderings")
@@ -58,7 +58,7 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   ///
   /// - Parameter operand: An integer value.
   /// - Parameter pointer: A memory location previously initialized with a value
-  ///   returned by `atomicStorage(for:)`.
+  ///   returned by `prepareAtomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
   @_semantics("atomics.requires_constant_orderings")
@@ -74,7 +74,7 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   ///
   /// - Parameter operand: An integer value.
   /// - Parameter pointer: A memory location previously initialized with a value
-  ///   returned by `atomicStorage(for:)`.
+  ///   returned by `prepareAtomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
   @_semantics("atomics.requires_constant_orderings")
@@ -90,7 +90,7 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   ///
   /// - Parameter operand: An integer value.
   /// - Parameter pointer: A memory location previously initialized with a value
-  ///   returned by `atomicStorage(for:)`.
+  ///   returned by `prepareAtomicStorage(for:)`.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
   @_semantics("atomics.requires_constant_orderings")

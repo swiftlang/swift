@@ -105,7 +105,7 @@ extension ${swiftType}: AtomicProtocol {
   % end
 
   @inlinable
-  public static func atomicStorage(for value: Self) -> AtomicStorage {
+  public static func prepareAtomicStorage(for value: Self) -> AtomicStorage {
     % if swiftType == "Unmanaged":
     return value.toOpaque()
     % else:
@@ -114,10 +114,12 @@ extension ${swiftType}: AtomicProtocol {
   }
 
   @inlinable
-  public static func deinitializeAtomicStorage(
-    at pointer: UnsafeMutablePointer<AtomicStorage>
-  ) {
-    pointer.deinitialize(count: 1)
+  public static func disposeAtomicStorage(_ storage: AtomicStorage) -> Self {
+    % if swiftType == "Unmanaged":
+    return Unmanaged.fromOpaque(storage)
+    % else:
+    return storage
+    % end
   }
 
   @_semantics("atomics.requires_constant_orderings")
@@ -309,7 +311,7 @@ extension ${swiftType}: NullableAtomic {
   % end
 
   @inlinable
-  public static func nullableAtomicStorage(
+  public static func prepareNullableAtomicStorage(
     for value: Self?
   ) -> NullableAtomicStorage {
     % if swiftType == "Unmanaged":
@@ -320,10 +322,15 @@ extension ${swiftType}: NullableAtomic {
   }
 
   @inlinable
-  public static func deinitializeNullableAtomicStorage(
-    at pointer: UnsafeMutablePointer<NullableAtomicStorage>
-  ) {
-    pointer.deinitialize(count: 1)
+  public static func disposeNullableAtomicStorage(
+    _ storage: NullableAtomicStorage
+  ) -> Self? {
+    % if swiftType == "Unmanaged":
+    guard let storage = storage else { return nil }
+    return Unmanaged.fromOpaque(storage)
+    % else:
+    return storage
+    % end
   }
 
   @_semantics("atomics.requires_constant_orderings")
