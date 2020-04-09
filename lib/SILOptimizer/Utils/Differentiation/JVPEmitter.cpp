@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,10 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// SWIFT_ENABLE_TENSORFLOW
-//
-// This file defines a helper class for generating JVPs in automatic
+// This file defines a helper class for generating VJP functions for automatic
 // differentiation.
+//
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "differentiation"
@@ -128,8 +127,8 @@ JVPEmitter::getNextDifferentialLocalAllocationInsertionPoint() {
 
 SILType JVPEmitter::getLoweredType(Type type) {
   auto jvpGenSig = jvp->getLoweredFunctionType()->getSubstGenericSignature();
-  Lowering::AbstractionPattern pattern(
-      jvpGenSig, type->getCanonicalType(jvpGenSig));
+  Lowering::AbstractionPattern pattern(jvpGenSig,
+                                       type->getCanonicalType(jvpGenSig));
   return jvp->getLoweredType(pattern, type);
 }
 
@@ -1045,7 +1044,8 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
     dfResults.push_back(
         SILResultInfo(inoutDiffParam->getInterfaceType()
                           ->getAutoDiffTangentSpace(lookupConformance)
-                          ->getType()->getCanonicalType(witnessCanGenSig),
+                          ->getType()
+                          ->getCanonicalType(witnessCanGenSig),
                       ResultConvention::Indirect));
   } else {
     auto origResult = origTy->getResults()[indices.source];
@@ -1054,7 +1054,8 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
     dfResults.push_back(
         SILResultInfo(origResult.getInterfaceType()
                           ->getAutoDiffTangentSpace(lookupConformance)
-                          ->getType()->getCanonicalType(witnessCanGenSig),
+                          ->getType()
+                          ->getCanonicalType(witnessCanGenSig),
                       origResult.getConvention()));
   }
 
@@ -1063,18 +1064,20 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
     auto origParam = origParams[i];
     origParam = origParam.getWithInterfaceType(
         origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
-    dfParams.push_back(SILParameterInfo(
-        origParam.getInterfaceType()
-            ->getAutoDiffTangentSpace(lookupConformance)
-            ->getType()->getCanonicalType(witnessCanGenSig),
-        origParam.getConvention()));
+    dfParams.push_back(
+        SILParameterInfo(origParam.getInterfaceType()
+                             ->getAutoDiffTangentSpace(lookupConformance)
+                             ->getType()
+                             ->getCanonicalType(witnessCanGenSig),
+                         origParam.getConvention()));
   }
 
   // Accept a differential struct in the differential parameter list. This is
   // the returned differential's closure context.
   auto *origEntry = original->getEntryBlock();
   auto *dfStruct = linearMapInfo->getLinearMapStruct(origEntry);
-  auto dfStructType = dfStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
+  auto dfStructType =
+      dfStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
   dfParams.push_back({dfStructType, ParameterConvention::Direct_Owned});
 
   Mangle::ASTMangler mangler;

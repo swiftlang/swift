@@ -68,7 +68,7 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
       // CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[READ]]
       // CHECK-NEXT: end_access [[READ]] : $*Int
-      // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
+      // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: assign [[ZERO]] to [[AADDR]]
 
@@ -103,7 +103,7 @@ struct DidSetWillSetTests: ForceAccessors {
 
       // CHECK: [[BOX:%.*]] = alloc_box ${ var DidSetWillSetTests }, var, name "other"
       // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOX]] : ${ var DidSetWillSetTests }, 0
-      // CHECK-NEXT: [[READ_SELF:%.*]] = begin_access [read] [unknown] %1 : $*DidSetWillSetTests
+      // CHECK-NEXT: [[READ_SELF:%.*]] = begin_access [read] [unknown] %0 : $*DidSetWillSetTests
       // CHECK-NEXT: copy_addr [[READ_SELF]] to [initialization] [[BOXADDR]] : $*DidSetWillSetTests
       // CHECK-NEXT: end_access [[READ_SELF]] : $*DidSetWillSetTests
 

@@ -101,21 +101,3 @@ public func _fatalErrorForwardModeDifferentiationDisabled() -> Never {
     differential-first differentiation APIs.
     """)
 }
-
-// TODO(TF-1211): Remove this diagnostic helper function.
-@_silgen_name("_fatalErrorJVPNotGenerated")
-public func _fatalErrorJVPNotGenerated() -> Never {
-  fatalError("""
-    Forward-mode automatic differentiation has not yet been upstreamed from \
-    tensorflow branch. Tracked by https://bugs.swift.org/browse/TF-1211.
-    """)
-}
-
-// TODO(TF-1211): Remove this diagnostic helper function.
-@_silgen_name("_fatalErrorVJPNotGenerated")
-public func _fatalErrorVJPNotGenerated() -> Never {
-  fatalError("""
-    Reverse-mode automatic differentiation has not yet been upstreamed from \
-    tensorflow branch. Tracked by https://bugs.swift.org/browse/TF-1211.
-    """)
-}

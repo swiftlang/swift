@@ -974,3 +974,20 @@ bb0(%0: $*FakeProtocol):
   %r = tuple ()
   return %r : $()
 }
+
+// Test `partial_apply` with a `@convention(method)` callee.
+// Rewriting `partial_apply` to `thin_to_thick_function` is not okay because
+// `thin_to_thick_function` supports only `@convention(thin)` operands.
+
+sil @method : $@convention(method) (Int32) -> ()
+
+sil @test_partial_apply_method : $@convention(thin) () -> @owned @callee_owned (Int32) -> () {
+  %1 = function_ref @method : $@convention(method) (Int32) -> ()
+  %2 = partial_apply %1() : $@convention(method) (Int32) -> ()
+  return %2 : $@callee_owned (Int32) -> ()
+}
+
+// CHECK-LABEL: sil @test_partial_apply_method
+// CHECK: [[FN:%.*]] = function_ref @method
+// CHECK-NEXT: partial_apply [[FN]]()
+// CHECK-NEXT: return

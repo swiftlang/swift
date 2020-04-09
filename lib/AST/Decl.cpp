@@ -2127,6 +2127,16 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadWriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
+  case ReadWriteImplKind::StoredWithSimpleDidSet:
+  case ReadWriteImplKind::InheritedWithSimpleDidSet:
+    if (storage->requiresOpaqueModifyCoroutine()) {
+      return AccessStrategy::getAccessor(AccessorKind::Modify,
+                                         /*dispatch*/ false);
+    } else {
+      return AccessStrategy::getMaterializeToTemporary(
+          getDirectReadAccessStrategy(storage),
+          getDirectWriteAccessStrategy(storage));
+    }
   case ReadWriteImplKind::MaterializeToTemporary:
     return AccessStrategy::getMaterializeToTemporary(
                                        getDirectReadAccessStrategy(storage),
@@ -7378,6 +7388,12 @@ bool AccessorDecl::isExplicitNonMutating() const {
     !isAssumedNonMutating() &&
     isInstanceMember() &&
     !getDeclContext()->getDeclaredInterfaceType()->hasReferenceSemantics();
+}
+
+bool AccessorDecl::isSimpleDidSet() const {
+  auto mutableThis = const_cast<AccessorDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SimpleDidSetRequest{mutableThis}, false);
 }
 
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {

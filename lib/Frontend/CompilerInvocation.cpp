@@ -449,8 +449,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO(TF-1097): Remove this flag.
   Opts.EnableExperimentalCrossFileDerivativeRegistration |=
       Args.hasArg(OPT_enable_experimental_cross_file_derivative_registration);
+  // SWIFT_ENABLE_TENSORFLOW END
+
   Opts.EnableExperimentalForwardModeDifferentiation |=
       Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
 

@@ -859,6 +859,21 @@ namespace {
       return true;
     }
 
+    bool
+    visitInitExistentialMetatypeInst(const InitExistentialMetatypeInst *RHS) {
+      auto *X = cast<InitExistentialMetatypeInst>(LHS);
+      ArrayRef<ProtocolConformanceRef> lhsConformances = X->getConformances();
+      ArrayRef<ProtocolConformanceRef> rhsConformances = RHS->getConformances();
+      if (lhsConformances.size() != rhsConformances.size())
+        return false;
+
+      for (unsigned i : indices(lhsConformances)) {
+        if (lhsConformances[i] != rhsConformances[i])
+          return false;
+      }
+      return true;
+    }
+
   private:
     const SILInstruction *LHS;
   };

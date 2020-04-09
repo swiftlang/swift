@@ -2788,14 +2788,22 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
   if (!diff.overloads.empty())
     return false;
 
-  if (!llvm::all_of(solutions, [](const Solution &solution) -> bool {
+  bool noFixes = llvm::all_of(solutions, [](const Solution &solution) -> bool {
+     const auto score = solution.getFixedScore();
+     return score.Data[SK_Fix] == 0 && solution.Fixes.empty();
+  });
+
+  bool allMismatches =
+      llvm::all_of(solutions, [](const Solution &solution) -> bool {
         return llvm::all_of(
             solution.Fixes, [](const ConstraintFix *fix) -> bool {
               return fix->getKind() == FixKind::AllowArgumentTypeMismatch ||
                      fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
                      fix->getKind() == FixKind::AllowTupleTypeMismatch;
             });
-      }))
+      });
+
+  if (!noFixes && !allMismatches)
     return false;
 
   auto &DE = cs.getASTContext().Diags;
@@ -2948,6 +2956,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   if (solutions.empty())
     return false;
 
+  SolutionDiff solutionDiff(solutions);
+
+  if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
+    return true;
+  
   if (auto bestScore = solverState->BestScore) {
     solutions.erase(llvm::remove_if(solutions,
                                     [&](const Solution &solution) {
@@ -2962,11 +2975,6 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
         }))
       return false;
   }
-
-  SolutionDiff solutionDiff(solutions);
-
-  if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
-    return true;
 
   if (diagnoseAmbiguityWithEphemeralPointers(*this, solutions))
     return true;

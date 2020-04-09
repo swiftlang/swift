@@ -570,7 +570,8 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
       return rootResult;
   }
 
-  if (startsWithSymbol(Tok, '.')) {
+  bool hasLeadingDot = startsWithSymbol(Tok, '.');
+  if (hasLeadingDot) {
     SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
 
     auto dotLoc = Tok.getLoc();
@@ -600,8 +601,9 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   if (rootResult.isNull() && pathResult.isNull())
     return nullptr;
 
-  auto keypath = new (Context) KeyPathExpr(
-      backslashLoc, rootResult.getPtrOrNull(), pathResult.getPtrOrNull());
+  auto keypath =
+      new (Context) KeyPathExpr(backslashLoc, rootResult.getPtrOrNull(),
+                                pathResult.getPtrOrNull(), hasLeadingDot);
 
   // Handle code completion.
   if ((Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()) ||

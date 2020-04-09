@@ -899,9 +899,10 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
          diagnoseUnsupportedControlFlow(context, original, invoker)))
       return true;
 
-    witness->setJVP(
-        createEmptyJVP(context, original, witness, serializeFunctions));
-    context.recordGeneratedFunction(witness->getJVP());
+    // Create empty JVP.
+    auto *jvp = createEmptyJVP(context, original, witness, serializeFunctions);
+    witness->setJVP(jvp);
+    context.recordGeneratedFunction(jvp);
 
     // For now, only do JVP generation if the flag is enabled and if custom VJP
     // does not exist. If custom VJP exists but custom JVP does not, skip JVP
@@ -918,18 +919,18 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
             diag::autodiff_jvp_control_flow_not_supported);
         return true;
       }
-      JVPEmitter emitter(context, original, witness, witness->getJVP(),
-                         invoker);
+      // Emit JVP function.
+      JVPEmitter emitter(context, original, witness, jvp, invoker);
       if (emitter.run())
         return true;
     } else {
       // If JVP generation is disabled or a user-defined custom VJP function
       // exists, fatal error with a nice message.
-      emitFatalError(context, witness->getJVP(),
+      emitFatalError(context, jvp,
                      "_fatalErrorForwardModeDifferentiationDisabled");
       LLVM_DEBUG(getADDebugStream()
                  << "Generated empty JVP for " << original->getName() << ":\n"
-                 << *witness->getJVP());
+                 << *jvp);
     }
   }
 
@@ -946,6 +947,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     auto *vjp = createEmptyVJP(context, original, witness, serializeFunctions);
     witness->setVJP(vjp);
     context.recordGeneratedFunction(vjp);
+    // Emit VJP function.
     VJPEmitter emitter(context, original, witness, vjp, invoker);
     return emitter.run();
   }

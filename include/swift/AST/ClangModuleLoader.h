@@ -128,7 +128,9 @@ public:
 
   /// Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
-  virtual ModuleDecl *getWrapperForModule(const clang::Module *mod) const = 0;
+  virtual ModuleDecl *
+  getWrapperForModule(const clang::Module *mod,
+                      bool returnOverlayIfPossible = false) const = 0;
 
   /// Adds a new search path to the Clang CompilerInstance, as if specified with
   /// -I or -F.

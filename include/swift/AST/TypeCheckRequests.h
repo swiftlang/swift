@@ -2301,6 +2301,27 @@ public:
   void cacheResult(Type value) const;
 };
 
+/// Determines whether this is a "simple" didSet i.e one that either does not
+/// use the implicit oldValue parameter in the body or does not take an explicit
+/// parameter (ex: 'didSet(oldValue)').
+class SimpleDidSetRequest
+    : public SimpleRequest<SimpleDidSetRequest, bool(AccessorDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, AccessorDecl *decl) const;
+
+public:
+  bool isCached() const {
+    return std::get<0>(getStorage())->getAccessorKind() == AccessorKind::DidSet;
+  }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

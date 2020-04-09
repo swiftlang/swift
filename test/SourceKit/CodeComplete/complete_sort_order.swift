@@ -12,7 +12,7 @@ func test() {
 // RUN: %sourcekitd-test -req=complete -req-opts=hidelowpriority=0,sort.byname=0 -pos=7:1 %s -- %s > %t.orig.off
 // RUN: %FileCheck -check-prefix=NAME_SORTED %s < %t.orig
 // RUN: %FileCheck -check-prefix=NAME_UNSORTED %s < %t.orig.off
-// RUN: not diff -u %t.orig %t.orig.off
+// RUN: not %diff -u %t.orig %t.orig.off
 
 // Make sure the order is as below, foo(Int) should come before foo(String).
 // NAME_SORTED: key.description: "#column"
