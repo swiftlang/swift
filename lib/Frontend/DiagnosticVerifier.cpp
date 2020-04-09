@@ -579,16 +579,20 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     bool isUnexpectedFixitsSeen =
         expected.Fixits.size() < FoundDiagnostic.FixIts.size();
 
-    // it returns actual fix-its string and diagnostic phrase
+    struct ActualFixitsPhrase {
+      std::string phrase;
+      std::string actualFixits;
+    };
+
     auto makeActualFixitsPhrase =
         [&](ArrayRef<DiagnosticInfo::FixIt> actualFixits)
-        -> std::tuple<std::string, std::string> {
+        -> ActualFixitsPhrase {
       std::string actualFixitsStr = renderFixits(actualFixits, InputFile);
 
       auto phrase = Twine("actual fix-it") +
                     (actualFixits.size() >= 2 ? "s" : "") +
                     " seen: " + actualFixitsStr;
-      return std::make_tuple(actualFixitsStr, phrase.str());
+      return ActualFixitsPhrase{phrase.str(), actualFixitsStr};
     };
 
     auto emitFixItsError = [&](const char *location, const Twine &message,
@@ -630,9 +634,9 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
           replStartLoc--;
         }
       } else {
-        auto actualAndPhrase = makeActualFixitsPhrase(FoundDiagnostic.FixIts);
-        actualFixits = std::get<0>(actualAndPhrase);
-        message += "; " + std::get<1>(actualAndPhrase);
+        auto phrase = makeActualFixitsPhrase(FoundDiagnostic.FixIts);
+        actualFixits = phrase.actualFixits;
+        message += "; " + phrase.phrase;
       }
 
       emitFixItsError(missedFixitLoc, message, replStartLoc, replEndLoc,
@@ -656,9 +660,9 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         replEndLoc = expected.Fixits.back().EndLoc;
       }
 
-      auto actualAndPhrase = makeActualFixitsPhrase(FoundDiagnostic.FixIts);
-      std::string actualFixits = std::get<0>(actualAndPhrase);
-      message += "; " + std::get<1>(actualAndPhrase);
+      auto phrase = makeActualFixitsPhrase(FoundDiagnostic.FixIts);
+      std::string actualFixits = phrase.actualFixits;
+      message += "; " + phrase.phrase;
 
       if (replStartLoc == replEndLoc) {
         /// If no fix-its was expected and range of replacement is empty,
