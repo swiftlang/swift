@@ -54,7 +54,7 @@ class CompletionInstance {
       const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
-      llvm::function_ref<void(CompilerInstance &)> Callback);
+      llvm::function_ref<void(CompilerInstance &, bool)> Callback);
 
   /// Calls \p Callback with new \c CompilerInstance for the completion
   /// request. The \c CompilerInstace passed to the callback already performed
@@ -66,7 +66,7 @@ class CompletionInstance {
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       std::string &Error, DiagnosticConsumer *DiagC,
-      llvm::function_ref<void(CompilerInstance &)> Callback);
+      llvm::function_ref<void(CompilerInstance &, bool)> Callback);
 
 public:
   /// Calls \p Callback with a \c CompilerInstance which is prepared for the
@@ -84,7 +84,7 @@ public:
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       bool EnableASTCaching, std::string &Error, DiagnosticConsumer *DiagC,
-      llvm::function_ref<void(CompilerInstance &)> Callback);
+      llvm::function_ref<void(CompilerInstance &, bool)> Callback);
 };
 
 } // namespace ide

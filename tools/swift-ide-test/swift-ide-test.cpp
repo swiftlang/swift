@@ -429,6 +429,12 @@ CodeCompletionComments("code-completion-comments",
                        llvm::cl::cat(Category),
                        llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+CodeCOmpletionAnnotateResults("code-completion-annotate-results",
+                              llvm::cl::desc("annotate completion results with XML"),
+                              llvm::cl::cat(Category),
+                              llvm::cl::init(false));
+
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
   llvm::cl::desc("A discriminator to prefer in lookups"),
@@ -786,7 +792,8 @@ static bool doCodeCompletionImpl(
       Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
       Offset, /*EnableASTCaching=*/false, Error,
       CodeCompletionDiagnostics ? &PrintDiags : nullptr,
-      [&](CompilerInstance &CI) {
+      [&](CompilerInstance &CI, bool reusingASTContext) {
+        assert(!reusingASTContext && "reusing AST context without enabling it");
         auto SF = CI.getCodeCompletionFile();
         performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
       });
@@ -842,7 +849,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             StringRef CodeCompletionToken,
                             bool CodeCompletionDiagnostics,
                             bool CodeCompletionKeywords,
-                            bool CodeCompletionComments) {
+                            bool CodeCompletionComments,
+                            bool CodeCompletionAnnotateResults) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -850,11 +858,13 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   }
   ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
   ide::CodeCompletionContext CompletionContext(CompletionCache);
+  CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
 
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
       new ide::PrintingCodeCompletionConsumer(
-          llvm::outs(), CodeCompletionKeywords, CodeCompletionComments));
+          llvm::outs(), CodeCompletionKeywords, CodeCompletionComments,
+          CodeCompletionAnnotateResults));
 
   // Create a factory for code completion callbacks that will feed the
   // Consumer.
@@ -3318,7 +3328,8 @@ int main(int argc, char *argv[]) {
 
     ide::PrintingCodeCompletionConsumer Consumer(
         llvm::outs(), options::CodeCompletionKeywords,
-        options::CodeCompletionComments);
+        options::CodeCompletionComments,
+        options::CodeCOmpletionAnnotateResults);
     for (StringRef filename : options::InputFilenames) {
       auto resultsOpt = ide::OnDiskCodeCompletionCache::getFromFile(filename);
       if (!resultsOpt) {
@@ -3527,7 +3538,8 @@ int main(int argc, char *argv[]) {
                                 options::CodeCompletionToken,
                                 options::CodeCompletionDiagnostics,
                                 options::CodeCompletionKeywords,
-                                options::CodeCompletionComments);
+                                options::CodeCompletionComments,
+                                options::CodeCOmpletionAnnotateResults);
     break;
 
   case ActionType::REPLCodeCompletion:

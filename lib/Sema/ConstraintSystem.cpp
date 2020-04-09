@@ -1694,7 +1694,14 @@ void ConstraintSystem::addOverloadSet(ArrayRef<Constraint *> choices,
     return;
   }
 
-  addDisjunctionConstraint(choices, locator, ForgetChoice);
+  auto *disjunction =
+      Constraint::createDisjunction(*this, choices, locator, ForgetChoice);
+  addUnsolvedConstraint(disjunction);
+  if (simplifyAppliedOverloads(disjunction, locator)) {
+    retireConstraint(disjunction);
+    if (!failedConstraint)
+      failedConstraint = disjunction;
+  }
 }
 
 /// If we're resolving an overload set with a decl that has special type
@@ -2763,14 +2770,22 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
   if (!diff.overloads.empty())
     return false;
 
-  if (!llvm::all_of(solutions, [](const Solution &solution) -> bool {
+  bool noFixes = llvm::all_of(solutions, [](const Solution &solution) -> bool {
+     const auto score = solution.getFixedScore();
+     return score.Data[SK_Fix] == 0 && solution.Fixes.empty();
+  });
+
+  bool allMismatches =
+      llvm::all_of(solutions, [](const Solution &solution) -> bool {
         return llvm::all_of(
             solution.Fixes, [](const ConstraintFix *fix) -> bool {
               return fix->getKind() == FixKind::AllowArgumentTypeMismatch ||
                      fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
                      fix->getKind() == FixKind::AllowTupleTypeMismatch;
             });
-      }))
+      });
+
+  if (!noFixes && !allMismatches)
     return false;
 
   auto &DE = cs.getASTContext().Diags;
@@ -2923,6 +2938,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   if (solutions.empty())
     return false;
 
+  SolutionDiff solutionDiff(solutions);
+
+  if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
+    return true;
+  
   if (auto bestScore = solverState->BestScore) {
     solutions.erase(llvm::remove_if(solutions,
                                     [&](const Solution &solution) {
@@ -2938,21 +2958,19 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       return false;
   }
 
-  SolutionDiff solutionDiff(solutions);
-
-  if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
-    return true;
-
   if (diagnoseAmbiguityWithEphemeralPointers(*this, solutions))
     return true;
 
   // Collect aggregated fixes from all solutions
-  llvm::SmallMapVector<std::pair<ConstraintLocator *, FixKind>,
-                       llvm::TinyPtrVector<ConstraintFix *>, 4>
+  using LocatorAndKind = std::pair<ConstraintLocator *, FixKind>;
+  using SolutionAndFix = std::pair<const Solution *, const ConstraintFix *>;
+  llvm::SmallMapVector<LocatorAndKind, llvm::SmallVector<SolutionAndFix, 4>, 4>
       aggregatedFixes;
   for (const auto &solution : solutions) {
-    for (auto *fix : solution.Fixes)
-      aggregatedFixes[{fix->getLocator(), fix->getKind()}].push_back(fix);
+    for (const auto *fix : solution.Fixes) {
+      LocatorAndKind key(fix->getLocator(), fix->getKind());
+      aggregatedFixes[key].emplace_back(&solution, fix);
+    }
   }
 
   // If there is an overload difference, let's see if there's a common callee
@@ -2983,8 +3001,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     bool diagnosed = false;
     for (auto fixes: aggregatedFixes) {
       // A common fix must appear in all solutions
-      if (fixes.second.size() < solutions.size()) continue;
-      diagnosed |= fixes.second.front()->diagnoseForAmbiguity(solutions);
+      auto &commonFixes = fixes.second;
+      if (commonFixes.size() != solutions.size()) continue;
+
+      auto *firstFix = commonFixes.front().second;
+      diagnosed |= firstFix->diagnoseForAmbiguity(commonFixes);
     }
     return diagnosed;
   }

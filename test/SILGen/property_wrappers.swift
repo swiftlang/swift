@@ -669,12 +669,10 @@ class Somesubclass : Someclass {
     // to the superclass' accessors.
     // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers12SomesubclassC0A0Sivs : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
     // CHECK: bb0([[NEW:%.+]] : $Int, {{%.+}} : @guaranteed $Somesubclass):
-    // CHECK:   [[GETTER:%.+]] = function_ref @$s17property_wrappers9SomeclassC0A0Sivg : $@convention(method) (@guaranteed Someclass) -> Int
-    // CHECK:   [[OLD:%.+]] = apply [[GETTER]]({{%.+}}) : $@convention(method) (@guaranteed Someclass) -> Int
     // CHECK:   [[SETTER:%.+]] = function_ref @$s17property_wrappers9SomeclassC0A0Sivs : $@convention(method) (Int, @guaranteed Someclass) -> ()
     // CHECK:   apply [[SETTER]]([[NEW]], {{%.+}}) : $@convention(method) (Int, @guaranteed Someclass) -> ()
-    // CHECK:   [[DIDSET:%.+]] = function_ref @$s17property_wrappers12SomesubclassC0A0SivW : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
-    // CHECK:   apply [[DIDSET]]([[OLD]], {{%.+}}) : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
+    // CHECK:   [[DIDSET:%.+]] = function_ref @$s17property_wrappers12SomesubclassC0A0SivW : $@convention(method) (@guaranteed Somesubclass) -> ()
+    // CHECK:   apply [[DIDSET]]({{%.+}}) : $@convention(method) (@guaranteed Somesubclass) -> ()
     didSet {
       print("Subclass")
     }

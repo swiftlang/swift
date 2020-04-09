@@ -106,6 +106,12 @@ public:
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) = 0;
 
+  /// Returns the referenced original declaration for a `@derivative(of:)`
+  /// attribute.
+  virtual AbstractFunctionDecl *
+  loadReferencedFunctionDecl(const DerivativeAttr *DA,
+                             uint64_t contextData) = 0;
+
   /// Returns the type for a given @_typeEraser() attribute.
   virtual Type loadTypeEraserType(const TypeEraserAttr *TRA,
                                   uint64_t contextData) = 0;

@@ -58,6 +58,24 @@ ADContext::ADContext(SILModuleTransform &transform)
     : transform(transform), module(*transform.getModule()),
       passManager(*transform.getPassManager()) {}
 
+/// Get the source file for the given `SILFunction`.
+static SourceFile &getSourceFile(SILFunction *f) {
+  if (f->hasLocation())
+    if (auto *declContext = f->getLocation().getAsDeclContext())
+      if (auto *parentSourceFile = declContext->getParentSourceFile())
+        return *parentSourceFile;
+  for (auto *file : f->getModule().getSwiftModule()->getFiles())
+    if (auto *sourceFile = dyn_cast<SourceFile>(file))
+      return *sourceFile;
+  llvm_unreachable("Could not resolve SourceFile from SILFunction");
+}
+
+SynthesizedFileUnit &
+ADContext::getOrCreateSynthesizedFile(SILFunction *original) {
+  auto &SF = getSourceFile(original);
+  return SF.getOrCreateSynthesizedFile();
+}
+
 FuncDecl *ADContext::getPlusDecl() const {
   if (!cachedPlusFn) {
     cachedPlusFn = findOperatorDeclInProtocol(astCtx.getIdentifier("+"),

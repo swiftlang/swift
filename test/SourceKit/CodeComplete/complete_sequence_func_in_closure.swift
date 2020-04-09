@@ -19,37 +19,46 @@ struct MyStruct {
 }
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=track-compiles == \
 // RUN:   -req=complete -pos=7:11 -repeat-request=2 %s -- %s -parse-as-library == \
 // RUN:   -req=complete -pos=15:15 -repeat-request=2 %s -- %s -parse-as-library \
 // RUN:   > %t.response.library
-// RUN: %FileCheck --check-prefix=RESULT %s < %t.response.library
-// RUN: %FileCheck --check-prefix=LIB_TRACE %s < %t.response.library
+// RUN: %FileCheck --check-prefix=RESULT_LIBRARY %s < %t.response.library
 
-// RESULT-LABEL: key.results: [
-// RESULT: key.description: "value"
-// RESULT-LABEL: key.results: [
-// RESULT: key.description: "value"
-// RESULT-LABEL: key.results: [
-// RESULT: key.description: "value"
-// RESULT-LABEL: key.results: [
-// RESULT: key.description: "value"
+// RESULT_LIBRARY-LABEL: key.results: [
+// RESULT_LIBRARY: key.description: "value"
+// RESULT_LIBRARY-NOT: key.reusingastcontext: 1
 
-// LIB_TRACE-NOT:  key.description: "completion reusing previous ASTContext (benign diagnostic)"
+// RESULT_LIBRARY-LABEL: key.results: [
+// RESULT_LIBRARY: key.description: "value"
+// RESULT_LIBRARY-NOT: key.reusingastcontext: 1
+
+// RESULT_LIBRARY-LABEL: key.results: [
+// RESULT_LIBRARY: key.description: "value"
+// RESULT_LIBRARY-NOT: key.reusingastcontext: 1
+
+// RESULT_LIBRARY-LABEL: key.results: [
+// RESULT_LIBRARY: key.description: "value"
+// RESULT_LIBRARY-NOT: key.reusingastcontext: 1
+
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=track-compiles == \
 // RUN:   -req=complete -pos=7:11 -repeat-request=2 %s -- %s == \
 // RUN:   -req=complete -pos=15:15 -repeat-request=2 %s -- %s \
 // RUN:   > %t.response.script
-// RUN: %FileCheck --check-prefix=RESULT %s < %t.response.script
-// RUN: %FileCheck --check-prefix=SCRIPT_TRACE %s < %t.response.script
+// RUN: %FileCheck --check-prefix=RESULT_SCRIPT %s < %t.response.script
 
-// SCRIPT_TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// SCRIPT_TRACE-NOT: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// SCRIPT_TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// SCRIPT_TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// SCRIPT_TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// SCRIPT_TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// SCRIPT_TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// SCRIPT_TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
+// RESULT_SCRIPT-LABEL: key.results: [
+// RESULT_SCRIPT: key.description: "value"
+// RESULT_SCRIPT-NOT: key.reusingastcontext: 1
+
+// RESULT_SCRIPT-LABEL: key.results: [
+// RESULT_SCRIPT: key.description: "value"
+// RESULT_SCRIPT: key.reusingastcontext: 1
+
+// RESULT_SCRIPT-LABEL: key.results: [
+// RESULT_SCRIPT: key.description: "value"
+// RESULT_SCRIPT: key.reusingastcontext: 1
+
+// RESULT_SCRIPT-LABEL: key.results: [
+// RESULT_SCRIPT: key.description: "value"
+// RESULT_SCRIPT: key.reusingastcontext: 1

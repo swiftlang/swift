@@ -449,6 +449,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
 
+  Opts.EnableExperimentalForwardModeDifferentiation |=
+      Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
+
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
@@ -545,6 +548,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_cross_import_overlays,
                    OPT_disable_cross_import_overlays,
                    Opts.EnableCrossImportOverlays);
+
+  Opts.EnableCrossImportRemarks = Args.hasArg(OPT_emit_cross_import_remarks);
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;

@@ -3705,8 +3705,6 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   return originalType;
 }
 
-
-
 /// Given a `@differentiable` attribute, attempts to resolve the original
 /// `AbstractFunctionDecl` for which it is registered, using the declaration
 /// on which it is actually declared. On error, emits diagnostic and returns
@@ -4452,6 +4450,21 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   if (typeCheckDerivativeAttr(Ctx, D, attr))
     attr->setInvalid();
+}
+
+AbstractFunctionDecl *
+DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
+                                            DerivativeAttr *attr) const {
+  // If the typechecker has resolved the original function, return it.
+  if (auto *FD = attr->OriginalFunction.dyn_cast<AbstractFunctionDecl *>())
+    return FD;
+
+  // If the function can be lazily resolved, do so now.
+  if (auto *Resolver = attr->OriginalFunction.dyn_cast<LazyMemberLoader *>())
+    return Resolver->loadReferencedFunctionDecl(attr,
+                                                attr->ResolverContextData);
+
+  return nullptr;
 }
 
 /// Returns true if the given type's `TangentVector` is equal to itself in the

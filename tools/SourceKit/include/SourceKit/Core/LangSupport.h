@@ -145,6 +145,7 @@ public:
   virtual void failed(StringRef ErrDescription) = 0;
 
   virtual void setCompletionKind(UIdent kind) {};
+  virtual void setReusingASTContext(bool) {};
   virtual bool handleResult(const CodeCompletionInfo &Info) = 0;
 };
 
