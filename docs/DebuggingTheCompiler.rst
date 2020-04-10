@@ -548,10 +548,17 @@ it's quite easy to do this manually:
 
   a. Add the compiler option ``-Xllvm -sil-opt-pass-count=<n>``, where ``<n>``
      is the number of optimizations to run.
-  b. Bisect: find n where the executable crashes, but does not crash with n-1.
-     Note that n can be quite large, e.g. > 100000 (just try
-     n = 10, 100, 1000, 10000, etc. to find an upper bound).
-  c. Add another option ``-Xllvm -sil-print-pass-name``. The output can be
+
+  b. Bisect: find n where the executable crashes, but does not crash
+     with n-1. First just try n = 10, 100, 1000, 10000, etc. to find
+     an upper bound). Then can either bisect the invocation by hand or
+     place the invocation into a script and use
+     ``./llvm-project/llvm/utils/bisect`` to automatically bisect
+     based on the scripts error code. Example invocation::
+
+       bisect --start=0 --end=10000 ./invoke_swift_passing_N.sh "%(count)s"
+
+  c. Once one finds ``n``, Add another option ``-Xllvm -sil-print-pass-name``. The output can be
      large, so it's best to redirect stderr to a file (``2> output``).
      In the output search for the last pass before ``stage Address Lowering``.
      It should be the ``Run #<n-1>``. This line tells you the name of the bad
