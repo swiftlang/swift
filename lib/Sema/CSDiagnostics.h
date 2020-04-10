@@ -56,6 +56,8 @@ public:
 
   virtual ~FailureDiagnostic();
 
+  virtual SourceLoc getLoc() const { return getAnchor()->getLoc(); }
+
   /// Try to diagnose a problem given affected expression,
   /// failure location, types and declarations deduced by
   /// constraint system, and other auxiliary information.
@@ -832,7 +834,7 @@ public:
 
 protected:
   /// Compute location of the failure for diagnostic.
-  SourceLoc getLoc() const;
+  SourceLoc getLoc() const override;
 };
 
 /// Diagnose mismatches relating to tuple destructuring.
@@ -1441,7 +1443,7 @@ public:
 
 protected:
   /// Compute location of the failure for diagnostic.
-  SourceLoc getLoc() const;
+  SourceLoc getLoc() const override;
 
   bool isForKeyPathDynamicMemberLookup() const {
     return getLocator()->isForKeyPathDynamicMemberLookup();
@@ -1819,8 +1821,6 @@ protected:
   /// Are currently impossible to fix correctly,
   /// so we have to attend to that in diagnostics.
   bool diagnoseMisplacedMissingArgument() const;
-
-  SourceLoc getLoc() const { return getAnchor()->getLoc(); }
 };
 
 /// Replace a coercion ('as') with a forced checked cast ('as!').
