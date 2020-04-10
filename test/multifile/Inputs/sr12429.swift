@@ -26,7 +26,6 @@ public struct PropertyWrapper<Value> {
     get {
       return self
     }
-    // Having this setter is what causes the mis-compilation
     set {
       self = newValue
     }
